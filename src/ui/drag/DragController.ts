@@ -22,7 +22,7 @@ export interface DragControllerDeps {
 	readonly arbiter: GestureArbiter;
 	onResult(drag: DragPayload, result: DropResult): Promise<void>;
 	onResize(item: TaskItem, end: number): Promise<void>;
-	onMenu(item: TaskItem, at: { x: number; y: number }): void;
+	onMenu(item: TaskItem, source: HTMLElement, at: { x: number; y: number }): void;
 }
 
 const DRAG = "drag";
@@ -41,7 +41,7 @@ export class DragController {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => this.begin(card, this.payload(item, from, e), e),
-			onLongTap: (e) => this.deps.onMenu(item, { x: e.clientX, y: e.clientY }),
+			onLongTap: (e) => this.deps.onMenu(item, card, { x: e.clientX, y: e.clientY }),
 		});
 	}
 
@@ -67,7 +67,7 @@ export class DragController {
 	private attachMenu(el: HTMLElement, item: TaskItem): void {
 		el.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
-			this.deps.onMenu(item, { x: e.clientX, y: e.clientY });
+			this.deps.onMenu(item, el, { x: e.clientX, y: e.clientY });
 		});
 	}
 
@@ -91,7 +91,7 @@ export class DragController {
 				if (result) {
 					this.deps.haptics.tap();
 					await this.deps.onResult(payload, result);
-				} else if (!moved) this.deps.onMenu(payload.item, { x: e.clientX, y: e.clientY });
+				} else if (!moved) this.deps.onMenu(payload.item, source, { x: e.clientX, y: e.clientY });
 			},
 		});
 		const move = (ev: PointerEvent) => {

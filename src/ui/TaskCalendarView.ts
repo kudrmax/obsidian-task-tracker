@@ -11,6 +11,7 @@ import type { DragPayload, DropResult, DropTarget } from "./drag/DropTarget";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
+import { TaskMenu } from "./menu/TaskMenu";
 import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
@@ -39,6 +40,9 @@ export class TaskCalendarView extends ItemView {
 	private header: DayHeader | null = null;
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
+	private soonList: TaskList | null = null;
+	private soon: readonly TaskItem[] = [];
+	private soonDrop: ListDrop | null = null;
 	private rightEl: HTMLElement | null = null;
 	private allDayEl: HTMLElement | null = null;
 	private timeline: Timeline | null = null;
@@ -73,7 +77,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onResize: (item, end) => this.act(() => this.deps.tasks.setSlot(item.key, { ...item.slot!, end })),
-			onMenu: (item, at) => this.showMenu(item, at),
+			onMenu: (item, source) => this.showMenu(item, source),
 		});
 	}
 
@@ -116,6 +120,12 @@ export class TaskCalendarView extends ItemView {
 			max: LIST_WIDTH_MAX,
 		});
 		this.rightEl = el(root, "div", "tc-right");
+		this.soonList = new TaskList(el(this.rightEl, "div", "is-soon"), {
+			items: () => this.soon,
+			showDue: () => false,
+			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
+		});
+		this.soonDrop = new ListDrop(this.soonList, this.rightEl, "soon", (drag) => drag.from !== "timeline");
 		this.allDayEl = el(this.rightEl, "div");
 		this.timeline = new Timeline(el(this.rightEl, "div"), {
 			date: () => this.selectedDate,
@@ -216,6 +226,7 @@ export class TaskCalendarView extends ItemView {
 	private dropTargets(): DropTarget[] {
 		const targets: DropTarget[] = [];
 		if (this.settings.rightMode === "calendar" && this.timelineDrop) targets.push(this.timelineDrop);
+		if (this.settings.rightMode === "soon" && this.soonDrop) targets.push(this.soonDrop);
 		if (this.leftDrop) targets.push(this.leftDrop);
 		return targets;
 	}
@@ -232,8 +243,19 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	private showMenu(item: TaskItem, at: { x: number; y: number }): void {
-		new Notice(`${item.text} (${at.x}, ${at.y})`);
+	private showMenu(item: TaskItem, source: HTMLElement): void {
+		const tasks = this.deps.tasks;
+		TaskMenu.open({
+			item,
+			source,
+			today: this.today(),
+			actions: {
+				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
+				setDueDate: (date) => this.act(() => tasks.setDueDate(item.key, date)),
+				rename: () => new Notice("Rename: the task sheet comes next"),
+				remove: () => this.act(() => tasks.remove(item.key)),
+			},
+		});
 	}
 
 	private async refresh(): Promise<void> {
@@ -246,12 +268,13 @@ export class TaskCalendarView extends ItemView {
 			this.day = null;
 		}
 		this.events = this.missing ? [] : (await this.deps.calendars.eventsOn(this.selectedDate)).events;
+		this.soon = this.missing ? [] : await this.deps.tasks.soonView();
 		this.render();
 	}
 
 	render(): void {
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list) return;
+		if (!this.header || !this.leftEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
 		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
 		this.header.render();
 		this.list.render();
@@ -265,6 +288,8 @@ export class TaskCalendarView extends ItemView {
 		if (this.missing) this.renderMissing(root);
 		this.allDayEl.style.display = soon ? "none" : "";
 		this.timeline.el.style.display = soon ? "none" : "";
+		this.soonList.el.style.display = soon ? "" : "none";
+		this.soonList.render();
 		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay));
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {

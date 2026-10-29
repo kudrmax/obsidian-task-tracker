@@ -33,6 +33,15 @@ body {
 	--tc-float-ring: #48484A;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7);
 	--tc-mask-ink: #000000;
+	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
+	--tc-accent-ui: var(--interactive-accent);
+	--tc-danger: #FF453A;
+	--tc-ink-dim: #636366;
+	--tc-separator: #48484A;
+	--tc-backdrop: rgba(0, 0, 0, 0.55);
+	--tc-panel-bg: rgba(44, 44, 46, 0.96);
+	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+	--tc-lifted-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 
 	/* Shape */
 	--tc-radius-card: 12px;
@@ -44,6 +53,12 @@ body {
 	--tc-radius-resize: 2px;
 	--tc-radius-pill: 8px;
 	--tc-radius-circle: 50%;
+	--tc-radius-panel: 14px;
+	--tc-radius-day: 18px;
+	--tc-radius-sheet-panel: 16px;
+	--tc-hairline-half: 0.5px;
+	--tc-stroke-menu: 1.8px;
+	--tc-stroke-month: 2.4px;
 	/* Obsidian 1.14 draws its buttons as squircles; ours keep the board's round corners. */
 	--tc-corner: round;
 	--tc-hairline: 1px;
@@ -88,6 +103,26 @@ body {
 	--tc-float-w: 190px;
 	--tc-float-h: 42px;
 
+	/* Sizes: the task menu, its due submenu and the month picker */
+	--tc-backdrop-blur: 8px;
+	--tc-lifted-scale: 1.04;
+	--tc-menu-gap: 12px;
+	--tc-panel-w: 250px;
+	--tc-picker-w: 300px;
+	--tc-row: 44px;
+	--tc-row-tall: 52px;
+	--tc-group-gap: 8px;
+	--tc-menu-icon: 20px;
+	--tc-back-icon: 18px;
+	--tc-month-btn: 32px;
+	--tc-month-icon: 18px;
+	--tc-day: 36px;
+	--tc-weekday-h: 20px;
+	--tc-weekday-h-sheet: 18px;
+	--tc-grid-gap: 2px;
+	--tc-grid-gap-sheet: 1px;
+	--tc-picker-remove-gap: 6px;
+
 	/* Sizes: the timeline */
 	--tc-hour: 56px;
 	--tc-day-hours: 24;
@@ -131,6 +166,10 @@ body {
 	--tc-font-hour: 11px;
 	--tc-leading-hour: 14px;
 	--tc-font-now: 10px;
+	--tc-font-menu: 16px;
+	--tc-font-value: 15px;
+	--tc-font-weekday: 11px;
+	--tc-font-day: 16px;
 	--tc-leading-normal: normal;
 	--tc-weight-normal: 400;
 	--tc-weight-semibold: 600;
@@ -146,6 +185,7 @@ body {
 	--tc-space-10: 10px;
 	--tc-space-12: 12px;
 	--tc-space-16: 16px;
+	--tc-grid-columns: 7;
 
 	/* Layers */
 	--tc-layer-block: 1;
@@ -155,6 +195,8 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
+	--tc-layer-overlay: 1000;
+	--tc-layer-panel: 1001;
 
 	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -251,6 +293,48 @@ body {
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
+
+/* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
+.tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-backdrop.is-shown { opacity: 1; }
+.tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-lifted-shadow); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; transition: transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-lifted.is-shown { transform: scale(var(--tc-lifted-scale)); }
+.tc-lifted .tc-due-mon { color: var(--tc-float-month); }
+.tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
+.tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
+.tc-panel.is-shown { opacity: 1; }
+.tc-panel.is-picker { width: var(--tc-picker-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
+.tc-panel button, .tc-picker button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.tc-menu-group + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
+.tc-panel .tc-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
+.tc-menu-row + .tc-menu-row { border-top: var(--tc-hairline-half) solid var(--tc-separator); }
+.tc-panel .tc-menu-row.is-danger { color: var(--tc-danger); }
+.tc-panel .tc-menu-row.is-tall { height: var(--tc-row-tall); }
+.tc-panel .tc-menu-row.is-apart { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
+.tc-menu-label { flex: 1; min-width: 0; }
+.tc-menu-value { font-size: var(--tc-font-value); color: var(--tc-muted); }
+.tc-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.tc-panel .tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-group-gap) solid var(--tc-card-bg); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
+
+/* The month picker: in the menu's panel, or under the task sheet's tiles. */
+.tc-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--tc-space-4) var(--tc-space-8); }
+.tc-picker.is-sheet { box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-10); border-radius: var(--tc-radius-sheet-panel); background: var(--tc-card-bg); }
+.tc-picker.is-sheet .tc-picker-head { padding-bottom: var(--tc-space-4); }
+.tc-picker-title { font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.tc-picker-nav { display: flex; gap: var(--tc-space-4); }
+.tc-picker .tc-picker-arrow { width: var(--tc-month-btn); height: var(--tc-month-btn); padding: 0; border-radius: var(--tc-radius-circle); color: var(--tc-accent-ui); display: flex; align-items: center; justify-content: center; }
+.tc-picker-arrow svg { width: var(--tc-month-icon); height: var(--tc-month-icon); stroke-width: var(--tc-stroke-month); }
+.tc-picker-grid { display: grid; grid-template-columns: repeat(var(--tc-grid-columns), minmax(0, 1fr)); row-gap: var(--tc-grid-gap); }
+.tc-picker.is-sheet .tc-picker-grid { row-gap: var(--tc-grid-gap-sheet); }
+.tc-weekday { height: var(--tc-weekday-h); text-align: center; font-size: var(--tc-font-weekday); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.tc-picker.is-sheet .tc-weekday { height: var(--tc-weekday-h-sheet); }
+.tc-picker .tc-day { justify-self: center; width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
+.tc-picker .tc-day.is-other { color: var(--tc-ink-dim); }
+.tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
+.tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
+.tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* No tasks file yet. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }

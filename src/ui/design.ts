@@ -55,6 +55,8 @@ export const PROPERTY = {
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",
 	eventText: "--tc-event-text",
+	/** The edge of the pressed card a panel hangs from: its bottom, or its top measured from the screen's bottom. */
+	panelY: "--tc-panel-y",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
@@ -88,6 +90,9 @@ export const LAYOUT = {
 	zoomSnapMs: 200,
 } as const;
 
+/** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */
 export function tokenMs(el: Element, property: string): number {
 	return parseFloat(getComputedStyle(el).getPropertyValue(property)) || 0;
 }
+
+export const tokenPx = tokenMs;
