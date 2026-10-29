@@ -1,19 +1,22 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, type DayView, StaleTaskError, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayView, StaleTaskError, TasksFileMissingError, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
-import { addDays, localDateOf } from "./dates";
+import { renderAllDayRows } from "./AllDayRow";
+import { addDays, localDateOf, minutesOf } from "./dates";
 import { DayHeader } from "./DayHeader";
 import { dayTitle } from "./dayTitle";
-import { LAYOUT, PROPERTY } from "./design";
+import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { Divider } from "./Divider";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { TaskList } from "./TaskList";
+import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
+const MINUTES_PER_HOUR = 60;
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -29,6 +32,11 @@ export class TaskCalendarView extends ItemView {
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private rightEl: HTMLElement | null = null;
+	private allDayEl: HTMLElement | null = null;
+	private timeline: Timeline | null = null;
+	private hourPx = DESIGN.hourPx;
+	private events: readonly CalendarEvent[] = [];
+	private scrolledFor: LocalDate | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private day: DayView | null = null;
@@ -80,6 +88,15 @@ export class TaskCalendarView extends ItemView {
 			max: LIST_WIDTH_MAX,
 		});
 		this.rightEl = el(root, "div", "tc-right");
+		this.allDayEl = el(this.rightEl, "div");
+		this.timeline = new Timeline(el(this.rightEl, "div"), {
+			date: () => this.selectedDate,
+			today: () => this.today(),
+			hourPx: () => this.hourPx,
+			tasks: () => this.day?.slotted ?? [],
+			events: () => this.events,
+			now: () => this.deps.clock.now(),
+		});
 		this.newTask = new NewTaskButton(root, false, { onCreate: (text) => this.act(() => this.deps.tasks.createInList(this.selectedDate, text)) });
 		this.newSoon = new NewTaskButton(root, true, { onCreate: (text) => this.act(() => this.deps.tasks.createInSoon(text)) });
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
@@ -144,12 +161,13 @@ export class TaskCalendarView extends ItemView {
 			this.missing = true;
 			this.day = null;
 		}
+		this.events = this.missing ? [] : (await this.deps.calendars.eventsOn(this.selectedDate)).events;
 		this.render();
 	}
 
 	render(): void {
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.rightEl || !this.newTask || !this.newSoon || !this.list) return;
+		if (!this.header || !this.leftEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list) return;
 		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
 		this.header.render();
 		this.list.render();
@@ -161,6 +179,15 @@ export class TaskCalendarView extends ItemView {
 		this.rightEl.style.display = this.missing ? "none" : "";
 		root.querySelector(".tc-missing")?.remove();
 		if (this.missing) this.renderMissing(root);
+		this.allDayEl.style.display = soon ? "none" : "";
+		this.timeline.el.style.display = soon ? "none" : "";
+		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay));
+		this.timeline.render();
+		if (this.scrolledFor !== this.selectedDate) {
+			this.scrolledFor = this.selectedDate;
+			if (this.selectedDate === this.today()) this.timeline.scrollTo(minutesOf(this.deps.clock.now()), LAYOUT.nowFraction);
+			else this.timeline.scrollTo(this.settings.scrollToHour * MINUTES_PER_HOUR, 0);
+		}
 	}
 
 	private renderMissing(root: HTMLElement): void {

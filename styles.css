@@ -44,6 +44,8 @@ body {
 	--tc-radius-resize: 2px;
 	--tc-radius-pill: 8px;
 	--tc-radius-circle: 50%;
+	/* Obsidian 1.14 draws its buttons as squircles; ours keep the board's round corners. */
+	--tc-corner: round;
 	--tc-hairline: 1px;
 	--tc-ring-w: 1px;
 	--tc-bar: 3px;
@@ -160,8 +162,8 @@ body {
 
 /* The view fills its leaf and draws everything itself. */
 .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
-.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); font-variant-numeric: tabular-nums; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; }
+.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .task-calendar svg { display: block; }
 
 /* The day row: the arrows round the day's name, the switch of the right column. */
@@ -194,7 +196,7 @@ body {
 .tc-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--tc-bar); background: var(--tc-strip-color); }
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
-.tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-soft); }
+.tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-soft); font-variant-numeric: tabular-nums; }
 .tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
 
 /* New task: a dashed button pinned under its list, which turns into a card with a field. */
@@ -210,10 +212,11 @@ body {
 .tc-allday-title { flex: 1; min-width: 0; padding: 0 var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-event-text); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
 
 /* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
-.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+/* The scroll box starts a label's lift above the first line, so the hour at its top keeps its whole label, as on the board. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
-.tc-canvas { position: relative; height: calc(var(--tc-hour) * var(--tc-day-hours)); }
-.tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); }
+.tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: calc(var(--tc-hour) * var(--tc-day-hours)); }
+.tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
 .tc-items { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); }
@@ -234,12 +237,12 @@ body {
 
 /* The now line: the time in a pill, the line to the right edge. */
 .tc-now { position: absolute; top: calc(var(--tc-y) - var(--tc-now-h) / 2); left: 0; right: 0; height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-now); pointer-events: none; }
-.tc-now-pill { width: var(--tc-now-pill-w); height: var(--tc-now-h); flex-shrink: 0; border-radius: var(--tc-radius-pill); background: var(--tc-now); color: var(--tc-text); font-size: var(--tc-font-now); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; }
+.tc-now-pill { width: var(--tc-now-pill-w); height: var(--tc-now-h); flex-shrink: 0; border-radius: var(--tc-radius-pill); background: var(--tc-now); color: var(--tc-text); font-size: var(--tc-font-now); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
 .tc-now-line { flex: 1; height: var(--tc-now-line); background: var(--tc-now); }
 
 /* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
-.tc-drop { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: var(--tc-drop-inset); right: var(--tc-drop-inset); box-sizing: border-box; border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
-.tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow), 0 0 0 var(--tc-hairline) var(--tc-float-ring); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); font-variant-numeric: tabular-nums; }
+.tc-drop { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: var(--tc-drop-inset); right: var(--tc-drop-inset); box-sizing: border-box; border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow), 0 0 0 var(--tc-hairline) var(--tc-float-ring); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
 
