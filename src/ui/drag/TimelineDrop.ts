@@ -6,6 +6,11 @@ import type { LocalDate } from "../types";
 import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
+function setColumn(block: HTMLElement, column: number, columns: number): void {
+	block.style.setProperty(PROPERTY.column, String(column));
+	block.style.setProperty(PROPERTY.columns, String(columns));
+}
+
 export interface TimelineDropOptions {
 	step(): number;
 	date(): LocalDate;
@@ -14,6 +19,7 @@ export interface TimelineDropOptions {
 /** The timeline as a place to drop: a dashed target snapped to the grid, with the start time, that scrolls the day near the edges. */
 export class TimelineDrop implements DropTarget {
 	private dropEl: HTMLElement | null = null;
+	private sharing: HTMLElement[] = [];
 	private start = 0;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private frame = 0;
@@ -33,11 +39,20 @@ export class TimelineDrop implements DropTarget {
 		const latest = LAYOUT.minutesPerDay - drag.durationMin;
 		const wanted = this.timeline.minutesAt(y) - drag.anchorMin;
 		this.start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
-		this.dropEl ??= el(this.timeline.itemsEl, "div", "tc-drop");
+		this.dropEl ??= el(this.timeline.itemsEl, "div", "tc-item tc-drop");
 		this.dropEl.style.setProperty(PROPERTY.y, px(this.timeline.yOf(this.start)));
 		this.dropEl.style.setProperty(PROPERTY.length, px(this.timeline.yOf(this.start + drag.durationMin) - this.timeline.yOf(this.start)));
 		this.dropEl.textContent = formatTime(this.start);
+		this.share(this.timeline.blocksBetween(this.start, this.start + drag.durationMin).filter((b) => !b.classList.contains("is-lifted")));
 		this.autoScroll(y);
+	}
+
+	/** A block already at the target's time takes the right half; the target the left. */
+	private share(blocks: HTMLElement[]): void {
+		for (const block of this.sharing) if (!blocks.includes(block)) setColumn(block, 0, 1);
+		for (const block of blocks) setColumn(block, 1, 2);
+		this.sharing = blocks;
+		if (this.dropEl) setColumn(this.dropEl, 0, blocks.length ? 2 : 1);
 	}
 
 	/** Near the top or bottom edge the day scrolls under the finger, faster the closer to the edge. */
@@ -63,6 +78,7 @@ export class TimelineDrop implements DropTarget {
 	clear(): void {
 		if (this.frame) cancelAnimationFrame(this.frame);
 		this.frame = 0;
+		this.share([]);
 		this.dropEl?.remove();
 		this.dropEl = null;
 		this.last = null;

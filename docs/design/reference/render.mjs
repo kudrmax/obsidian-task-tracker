@@ -1,8 +1,9 @@
 // Renders the approved boards in docs/design/canvas to static HTML and PNG: node docs/design/reference/render.mjs [board…]
-// A board's <script type="text/x-dc"> defines `class Component extends DCLogic { renderVals() }`; its values fill the
-// template: {{a.b}} is a dotted lookup, <sc-for list as> repeats, <sc-if value> branches. A board that holds a
-// <dc-import name="X" …> renders X with the import's attributes as props. PNGs come from headless Chrome at 1x
-// (<Board>.png, 390×844) and 2x (<Board>@2x.png), the scale Obsidian draws at on a Mac.
+// Without names it renders every board of canvas.json's "prod" page. A board's <script type="text/x-dc"> defines
+// `class Component extends DCLogic { renderVals() }`; its values fill the template: {{a.b}} is a dotted lookup,
+// <sc-for list as> repeats, <sc-if value> branches, and <dc-import name="X" prop="…"> inlines board X rendered with
+// those attributes as props ({{…}} values resolve in the importing board's scope; imports nest). PNGs come from
+// headless Chrome at 1x (<Board>.png, 390×844) and 2x (<Board>@2x.png), the scale Obsidian draws at on a Mac.
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +14,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const canvas = join(here, "..", "canvas");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const WIDTH = 390, HEIGHT = 844;
-const BOARDS = ["Screen", "ScreenSoon", "ScreenDrag", "ScreenLeft", "ScreenRight"];
+const canvasJson = JSON.parse(readFileSync(join(canvas, "canvas.json"), "utf8"));
+const BOARDS = canvasJson.order.filter((file) => canvasJson.boards[file]?.page === "prod").map((file) => file.replace(/\.dc\.html$/, ""));
 
 class DCLogic {
 	constructor(props) {
@@ -35,9 +37,11 @@ function board(name) {
 	return { name, defaults, Component, style, template };
 }
 
-/** The template as a tree of text, for and if nodes. */
+const camel = (attr) => attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
+/** The template as a tree of text, for, if and import nodes. */
 function parse(template) {
-	const tokens = template.split(/(<sc-for\b[^>]*>|<\/sc-for>|<sc-if\b[^>]*>|<\/sc-if>)/);
+	const tokens = template.split(/(<sc-for\b[^>]*>|<\/sc-for>|<sc-if\b[^>]*>|<\/sc-if>|<dc-import\b[^>]*>(?:<\/dc-import>)?)/);
 	const root = { children: [] };
 	const stack = [root];
 	for (const token of tokens) {
@@ -51,7 +55,10 @@ function parse(template) {
 			top.children.push(node);
 			stack.push(node);
 		} else if (token === "</sc-for>" || token === "</sc-if>") stack.pop();
-		else if (token) top.children.push({ kind: "text", text: token });
+		else if (token.startsWith("<dc-import")) {
+			const attrs = [...token.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value]);
+			top.children.push({ kind: "import", name: attrs.find(([key]) => key === "name")[1], props: attrs.filter(([key]) => key !== "name" && !key.startsWith("hint-")) });
+		} else if (token) top.children.push({ kind: "text", text: token });
 	}
 	return root;
 }
@@ -64,28 +71,26 @@ function render(nodes, scope) {
 		if (node.kind === "text") out += node.text.replace(/\{\{([^}]+)\}\}/g, (_, path) => String(lookup(scope, path.trim()) ?? ""));
 		else if (node.kind === "if") {
 			if (lookup(scope, node.value)) out += render(node.children, scope);
+		} else if (node.kind === "import") {
+			const props = {};
+			for (const [key, raw] of node.props) {
+				const ref = raw.match(/^\{\{([^}]+)\}\}$/);
+				props[camel(key)] = ref ? lookup(scope, ref[1].trim()) : raw;
+			}
+			out += renderWith(node.name, props).html;
 		} else for (const item of lookup(scope, node.list) ?? []) out += render(node.children, { ...scope, [node.as]: item });
 	}
 	return out;
 }
 
-const camel = (attr) => attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-
-function renderBoard(name) {
+/** A board rendered with the given props over its defaults; imports inside it render the same way. */
+function renderWith(name, props) {
 	const b = board(name);
-	const ownVals = new b.Component({ ...b.defaults }).renderVals();
-	const imported = b.template.match(/<dc-import\b([^>]*)>/);
-	if (!imported) return { html: render(parse(b.template).children, ownVals), style: b.style };
-	const attrs = [...imported[1].matchAll(/([\w-]+)="([^"]*)"/g)];
-	const target = board(attrs.find(([, key]) => key === "name")[2]);
-	const props = { ...target.defaults };
-	for (const [, key, raw] of attrs) {
-		if (key === "name" || key.startsWith("hint-")) continue;
-		const ref = raw.match(/^\{\{([^}]+)\}\}$/);
-		props[camel(key)] = ref ? lookup(ownVals, ref[1].trim()) : raw;
-	}
-	return { html: render(parse(target.template).children, new target.Component(props).renderVals()), style: target.style };
+	const vals = new b.Component({ ...b.defaults, ...props }).renderVals();
+	return { html: render(parse(b.template).children, vals), style: b.style };
 }
+
+const renderBoard = (name) => renderWith(name, {});
 
 function page({ html, style }, name) {
 	return `<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>${name}</title>\n<style>\n${style.trim()}\n</style>\n</head>\n<body>\n${html}\n</body>\n</html>\n`;

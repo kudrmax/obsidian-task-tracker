@@ -13,6 +13,7 @@ export function paintEvent(target: HTMLElement, event: CalendarEvent): void {
 /** The all-day events over the timeline, one row each; the column below learns how many rows beyond the first there are. */
 export function renderAllDayRows(container: HTMLElement, column: HTMLElement, events: readonly CalendarEvent[]): void {
 	clear(container);
+	el(container, "div", "tc-allday-backing");
 	for (const event of events) {
 		const row = el(container, "div", "tc-allday");
 		paintEvent(row, event);

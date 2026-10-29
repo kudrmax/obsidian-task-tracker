@@ -26,7 +26,7 @@ body {
 	--tc-resize: #636366;
 	--tc-now: #D92C24;
 	--tc-accent: #9580FF;
-	--tc-drop-bg: rgba(149, 128, 255, 0.12);
+	--tc-drop-bg: #251F3D;
 	--tc-strip-color: var(--interactive-accent);
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
@@ -50,7 +50,6 @@ body {
 	--tc-ring-w: 1px;
 	--tc-bar: 3px;
 	--tc-drop-border: 1.5px;
-	--tc-drop-inset: 1px;
 	--tc-stroke-chevron: 2.2px;
 	--tc-stroke-seg: 2px;
 
@@ -98,6 +97,8 @@ body {
 	--tc-allday-left: 28px;
 	--tc-allday-right: 4px;
 	--tc-allday-extra-rows: 0;
+	/* The black under the all-day rows, which the timeline scrolls beneath. */
+	--tc-allday-backing: 26px;
 	--tc-label-w: 22px;
 	--tc-label-lift: 7px;
 	--tc-line-left: 26px;
@@ -150,6 +151,8 @@ body {
 	--tc-layer-block: 1;
 	--tc-layer-drop: 2;
 	--tc-layer-now: 3;
+	--tc-layer-backing: 3;
+	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
 
@@ -207,7 +210,8 @@ body {
 .task-calendar .tc-new-input, .task-calendar .tc-new-input:focus, .task-calendar .tc-new-input:active { width: 100%; height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-8) 0 var(--tc-space-12); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); box-shadow: none; outline: none; -webkit-user-select: text; user-select: text; }
 
 /* The all-day events over the timeline, in their calendar's colour. */
-.tc-allday { margin: 0 var(--tc-allday-right) var(--tc-allday-gap) var(--tc-allday-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
+.tc-allday-backing { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-allday-backing); background: var(--tc-bg); z-index: var(--tc-layer-backing); }
+.tc-allday { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-allday-right) var(--tc-allday-gap) var(--tc-allday-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
 .tc-event-bar { width: var(--tc-bar); flex-shrink: 0; background: var(--tc-event-bar); }
 .tc-allday-title { flex: 1; min-width: 0; padding: 0 var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-event-text); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
 
@@ -241,7 +245,7 @@ body {
 .tc-now-line { flex: 1; height: var(--tc-now-line); background: var(--tc-now); }
 
 /* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
-.tc-drop { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: var(--tc-drop-inset); right: var(--tc-drop-inset); box-sizing: border-box; border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-drop { border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow), 0 0 0 var(--tc-hairline) var(--tc-float-ring); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */

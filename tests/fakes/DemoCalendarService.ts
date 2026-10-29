@@ -29,17 +29,30 @@ const at = (date: LocalDate, hours: number): Date => {
 	return new Date(y, m - 1, d, Math.floor(hours), Math.round((hours % 1) * 60));
 };
 
+/** Google updated today at 14:19; the work file exported yesterday at 08:02 from the iPhone and gone stale, as on the Sources board. */
+const GOOGLE_UPDATED = new Date(2026, 9, 30, 14, 19);
+const WORK_EXPORTED = new Date(2026, 9, 29, 8, 2);
+
 export class DemoCalendarService implements CalendarService {
+	private readonly last = new Map<LocalDate, DayEvents>();
+
 	async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const events: CalendarEvent[] = date === DEMO_DATE
 			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source }))
 			: [];
-		return {
+		const count = (source: CalendarSource) => `${events.filter((e) => e.source === source).length} events`;
+		const result: DayEvents = {
 			events,
 			statuses: [
-				{ source: "work", ok: true, message: `${events.filter((e) => e.source === "work").length} events`, updatedAt: at(date, 14) },
-				{ source: "google", ok: true, message: `${events.filter((e) => e.source === "google").length} events`, updatedAt: at(date, 14) },
+				{ source: "google", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
+				{ source: "work", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
 		};
+		this.last.set(date, result);
+		return result;
+	}
+
+	cached(date: LocalDate): DayEvents | null {
+		return this.last.get(date) ?? null;
 	}
 }

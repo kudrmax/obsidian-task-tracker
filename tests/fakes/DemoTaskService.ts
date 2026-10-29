@@ -1,4 +1,4 @@
-import { type DayView, type SectionKey, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
@@ -118,6 +118,35 @@ export class DemoTaskService implements TaskService {
 		if (!text.trim()) return;
 		const end = Math.min(MINUTES_PER_DAY, start + DEFAULT_MINUTES);
 		this.sections[date === this.today() ? "now" : "soon"].push(task(text.trim(), { slot: { date, start, end } }));
+		this.changed();
+	}
+
+	placementOf(item: TaskItem): Placement {
+		if (item.dueDate) return { kind: "date", date: item.dueDate };
+		return { kind: item.key.section === "soon" ? "soon" : "now" };
+	}
+
+	private place(t: DemoTask, placement: Placement): void {
+		if (placement.kind === "date") {
+			t.dueDate = placement.date;
+			this.sections[placement.date <= this.today() ? "now" : "soon"].push(t);
+		} else {
+			t.dueDate = null;
+			this.sections[placement.kind].push(t);
+		}
+	}
+
+	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
+		if (!draft.text.trim()) return;
+		this.place(task(draft.text.trim(), { slot: slot ?? null }), draft.placement);
+		this.changed();
+	}
+
+	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
+		const t = this.find(key);
+		t.text = draft.text.trim() || t.text;
+		const current = this.placementOf(this.item(key.section, key.index));
+		if (JSON.stringify(current) !== JSON.stringify(draft.placement)) this.place(this.take(key), draft.placement);
 		this.changed();
 	}
 

@@ -97,6 +97,11 @@ export class Timeline {
 		this.nowEl?.style.setProperty(PROPERTY.y, px(nowY));
 	}
 
+	/** The task blocks that take any of the minutes from `start` to `end`. */
+	blocksBetween(start: number, end: number): HTMLElement[] {
+		return this.placed.filter((p) => p.el.classList.contains("tc-block") && p.start < end && p.end > start).map((p) => p.el);
+	}
+
 	private place(el: HTMLElement, start: number, end: number): void {
 		el.style.setProperty(PROPERTY.y, px(this.yOf(start)));
 		el.style.setProperty(PROPERTY.length, px(this.yOf(end) - this.yOf(start)));
