@@ -1,0 +1,121 @@
+import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
+
+/** Which of the plugin's sections a task sits in. Inbox and Backlog are never read. */
+export type SectionKey = "now" | "soon" | "done";
+
+/**
+ * How the UI names a task between a read and an action: its section, its index among the tasks of that section,
+ * and the raw first line as read. A service rejects the action with StaleTaskError when the line at that index
+ * no longer matches `raw`.
+ */
+export interface TaskKey {
+	readonly section: SectionKey;
+	readonly index: number;
+	readonly raw: string;
+}
+
+export interface TaskItem {
+	readonly key: TaskKey;
+	readonly text: string;
+	readonly status: TaskStatus;
+	readonly dueDate: LocalDate | null;
+	readonly slot: Slot | null;
+}
+
+export interface DayView {
+	readonly date: LocalDate;
+	/** Left column, in file order: see spec §5. */
+	readonly list: readonly TaskItem[];
+	/** Tasks slotted on this date, in file order: the timeline. */
+	readonly slotted: readonly TaskItem[];
+}
+
+export class StaleTaskError extends Error {
+	constructor() {
+		super("The task changed in the file; the view was refreshed");
+		this.name = "StaleTaskError";
+	}
+}
+
+export class TasksFileMissingError extends Error {
+	constructor(readonly path: string) {
+		super(`Tasks file not found: ${path}`);
+		this.name = "TasksFileMissingError";
+	}
+}
+
+/**
+ * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
+ * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
+ */
+export interface TaskService {
+	dayView(date: LocalDate): Promise<DayView>;
+	/** Soon tasks without a due date and without a slot, in file order. */
+	soonView(): Promise<readonly TaskItem[]>;
+
+	/** Today: end of Now. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
+	createInList(date: LocalDate, text: string): Promise<void>;
+	/** End of Soon, no fields. */
+	createInSoon(text: string): Promise<void>;
+	/** A slot on `date` from `start` for the default duration; Now when `date` is today, else Soon. */
+	createAtTime(date: LocalDate, start: number, text: string): Promise<void>;
+
+	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
+	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
+	rename(key: TaskKey, text: string): Promise<void>;
+	remove(key: TaskKey): Promise<void>;
+
+	/** Puts `key` right before `before` in the file, in `before`'s section. `before` null: end of the list's section for `date`. */
+	moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void>;
+
+	/** Drop on the timeline, move or resize there. Moves a Now task to Soon when `slot.date` is not today. */
+	setSlot(key: TaskKey, slot: Slot): Promise<void>;
+	/** Drop from the timeline back on the list: the slot goes, due date and section stay. */
+	clearSlot(key: TaskKey): Promise<void>;
+
+	/** Soon → left column. Today: end of Now. Another day D: due date D, stays in Soon. */
+	moveToList(key: TaskKey, date: LocalDate): Promise<void>;
+	/** Left column → Soon. Today: end of Soon. Another day: due date removed. */
+	moveToSoon(key: TaskKey, date: LocalDate): Promise<void>;
+
+	/** Applies the three normalization rules (spec §4.4). Writes only when something changed. */
+	normalize(): Promise<void>;
+	/** Creates the tasks file with the five empty sections. */
+	createFile(): Promise<void>;
+
+	/** Fires after the file changed, by the plugin or by hand. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
+}
+
+export type CalendarSource = "google" | "work";
+
+export interface CalendarEvent {
+	readonly id: string;
+	readonly title: string;
+	readonly start: Date;
+	readonly end: Date;
+	readonly allDay: boolean;
+	readonly calendar: string;
+	/** `#RRGGBB`. The source supplies one; a source without colors falls back to a per-calendar default. */
+	readonly color: string;
+	readonly source: CalendarSource;
+}
+
+export interface SourceStatus {
+	readonly source: CalendarSource;
+	readonly ok: boolean;
+	/** "12 events", "not logged in", "file missing", an error text. */
+	readonly message: string;
+	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
+	readonly updatedAt: Date | null;
+}
+
+export interface DayEvents {
+	readonly events: readonly CalendarEvent[];
+	readonly statuses: readonly SourceStatus[];
+}
+
+/** Events of both sources for one day. A failing source keeps its last good events and reports the error. */
+export interface CalendarService {
+	eventsOn(date: LocalDate): Promise<DayEvents>;
+}

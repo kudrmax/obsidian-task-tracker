@@ -1,0 +1,10 @@
+{
+  "id": "task-calendar",
+  "name": "Task Calendar",
+  "version": "0.1.0",
+  "minAppVersion": "1.7.2",
+  "description": "A task list next to a day timeline. One markdown file is the truth; drag a task onto a time, see your calendars beside it.",
+  "author": "kudrmax",
+  "authorUrl": "https://github.com/kudrmax",
+  "isDesktopOnly": false
+}
