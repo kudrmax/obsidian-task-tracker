@@ -4,7 +4,8 @@ import { capturePointer, px, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { Timeline } from "../Timeline";
-import type { LocalDate } from "../types";
+import type { TimelineDrop } from "./TimelineDrop";
+import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DragOrigin, DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
@@ -23,10 +24,14 @@ export interface DragControllerDeps {
 	onResult(drag: DragPayload, result: DropResult): Promise<void>;
 	onResize(item: TaskItem, end: number): Promise<void>;
 	onMenu(item: TaskItem, source: HTMLElement, at: { x: number; y: number }): void;
+	/** A long tap on an empty place of the timeline, let go: a new task in the slot the target showed. */
+	newSlot(): TimelineDrop | null;
+	onNewSlot(slot: Slot): void;
 }
 
 const DRAG = "drag";
 const RESIZE = "resize";
+const NEW_SLOT = "newslot";
 
 /**
  * Gives a card or a block its gestures: the long press that lifts it, the drag that follows, the handle that resizes a
@@ -62,6 +67,47 @@ export class DragController {
 		const timeline = this.deps.timeline();
 		const anchorMin = from === "timeline" && item.slot && timeline ? timeline.minutesAt(e.clientY) - item.slot.start : durationMin / 2;
 		return { item, from, durationMin, anchorMin };
+	}
+
+	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the task screen. */
+	attachCanvas(canvas: HTMLElement): void {
+		const onEmpty = (e: PointerEvent) => {
+			const target = e.target as Element | null;
+			if (target?.closest(".tc-block, .tc-event, .tc-drop")) return;
+			this.beginNewSlot(canvas, e);
+		};
+		new LongPress(canvas, {
+			delayMs: () => this.deps.longPressMs(),
+			busy: () => this.deps.arbiter.busy,
+			onStart: onEmpty,
+			onLongTap: onEmpty,
+		});
+	}
+
+	private beginNewSlot(canvas: HTMLElement, e: PointerEvent): void {
+		const drop = this.deps.newSlot();
+		if (!drop || !this.deps.arbiter.claim(NEW_SLOT)) return;
+		this.deps.haptics.tap();
+		drop.previewNew(e.clientY, this.deps.newTaskMinutes());
+		capturePointer(canvas, e.pointerId);
+		const move = (ev: PointerEvent) => {
+			if (ev.pointerId === e.pointerId) drop.previewNew(ev.clientY, this.deps.newTaskMinutes());
+		};
+		const finish = (ev: PointerEvent, open: boolean) => {
+			if (ev.pointerId !== e.pointerId) return;
+			canvas.removeEventListener("pointermove", move);
+			canvas.removeEventListener("pointerup", up);
+			canvas.removeEventListener("pointercancel", cancel);
+			releasePointer(canvas, e.pointerId);
+			this.deps.arbiter.release(NEW_SLOT);
+			if (open) this.deps.onNewSlot({ date: this.deps.date(), ...drop.slot });
+			else drop.clear();
+		};
+		const up = (ev: PointerEvent) => finish(ev, true);
+		const cancel = (ev: PointerEvent) => finish(ev, false);
+		canvas.addEventListener("pointermove", move);
+		canvas.addEventListener("pointerup", up);
+		canvas.addEventListener("pointercancel", cancel);
 	}
 
 	private attachMenu(el: HTMLElement, item: TaskItem): void {

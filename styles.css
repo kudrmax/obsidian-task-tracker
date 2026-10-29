@@ -42,6 +42,11 @@ body {
 	--tc-panel-bg: rgba(44, 44, 46, 0.96);
 	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
 	--tc-lifted-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+	/* A source gone stale, and its dot. */
+	--tc-stale: #FF9F0A;
+	--tc-popover-bg: rgba(44, 44, 46, 0.97);
+	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+	--tc-pull-ink: #AEAEB2;
 
 	/* Shape */
 	--tc-radius-card: 12px;
@@ -56,6 +61,10 @@ body {
 	--tc-radius-panel: 14px;
 	--tc-radius-day: 18px;
 	--tc-radius-sheet-panel: 16px;
+	--tc-radius-dot: 4px;
+	--tc-stroke-source: 1.8px;
+	--tc-stroke-refresh: 1.9px;
+	--tc-stroke-pull: 2px;
 	--tc-hairline-half: 0.5px;
 	--tc-stroke-menu: 1.8px;
 	--tc-stroke-month: 2.4px;
@@ -123,6 +132,23 @@ body {
 	--tc-grid-gap-sheet: 1px;
 	--tc-picker-remove-gap: 6px;
 
+	/* Sizes: the calendar sources */
+	--tc-dot: 7px;
+	--tc-dot-top: 2px;
+	--tc-dot-right: 7px;
+	--tc-popover-w: 268px;
+	--tc-popover-right: 12px;
+	--tc-popover-gap: 10px;
+	--tc-source-row: 56px;
+	--tc-source-icon: 20px;
+	--tc-pull-top: 32px;
+	--tc-pull-h: 80px;
+	--tc-pull-left: 4px;
+	--tc-pull-right: 6px;
+	--tc-pull-icon: 14px;
+	--tc-pull-shift: 84px;
+	--tc-pull: 0px;
+
 	/* Sizes: the task screen */
 	--tc-sheet-bar: 44px;
 	--tc-sheet-side: 20px;
@@ -184,6 +210,9 @@ body {
 	--tc-font-weekday: 11px;
 	--tc-font-day: 16px;
 	--tc-font-sheet-btn: 17px;
+	--tc-font-sub: 13px;
+	--tc-font-pull: 12px;
+	--tc-leading-pull: 16px;
 	--tc-font-sheet-title: 28px;
 	--tc-leading-sheet-title: 34px;
 	--tc-font-tile: 15px;
@@ -201,6 +230,7 @@ body {
 	--tc-space-8: 8px;
 	--tc-space-10: 10px;
 	--tc-space-12: 12px;
+	--tc-space-14: 14px;
 	--tc-space-16: 16px;
 	--tc-grid-columns: 7;
 
@@ -212,6 +242,7 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
+	--tc-layer-pull: 5;
 	--tc-layer-sheet: 20;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
@@ -224,6 +255,9 @@ body {
 	--tc-duration-collapse: 150ms;
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
+	--tc-duration-pull: 200ms;
+	--tc-duration-spin: 900ms;
+	--tc-turn: 1turn;
 }
 
 /* The view fills its leaf and draws everything itself. */
@@ -244,6 +278,41 @@ body {
 .task-calendar .tc-seg-btn { width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; }
 .task-calendar .tc-seg-btn.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
 .tc-seg-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
+.task-calendar .tc-seg-btn, .tc-seg-copy .tc-seg-btn { position: relative; }
+.tc-dot { display: none; position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-dot); background: var(--tc-stale); }
+.tc-dot.is-shown { display: block; }
+
+/* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */
+.tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
+.tc-seg-copy .tc-seg-btn.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-seg-copy .tc-seg-btn { width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0; background: transparent; }
+.tc-popover { position: fixed; right: var(--tc-popover-right); top: calc(var(--tc-panel-y) + var(--tc-popover-gap)); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-popover-bg); box-shadow: var(--tc-popover-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-popover.is-shown { opacity: 1; }
+.tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-14); display: flex; align-items: center; gap: var(--tc-space-10); }
+.tc-source-row:not(:last-of-type) { border-bottom: var(--tc-hairline-half) solid var(--tc-separator); }
+.tc-source-row svg { width: var(--tc-source-icon); height: var(--tc-source-icon); flex-shrink: 0; color: var(--tc-ink-soft); stroke-width: var(--tc-stroke-source); }
+.tc-source-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tc-space-2); }
+.tc-source-name { font-size: var(--tc-font-menu); }
+.tc-source-sub { font-size: var(--tc-font-sub); color: var(--tc-muted); }
+.tc-source-time { font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tc-source-time.is-stale, .tc-pull-time.is-stale { color: var(--tc-stale); }
+.tc-popover .tc-source-refresh { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-14); border: 0; border-top: var(--tc-group-gap) solid var(--tc-card-bg); background: transparent; color: var(--tc-accent-ui); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: flex-start; gap: var(--tc-space-10); cursor: pointer; box-shadow: none; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.tc-source-refresh svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-refresh); }
+
+/* Pulling the timeline down opens the sources' lines above it. */
+.tc-timeline { transform: translate3d(0, var(--tc-pull), 0); transition: transform var(--tc-duration-pull) var(--tc-ease-out); }
+.tc-timeline.is-pulling { transition: none; }
+.tc-pull { display: none; position: absolute; left: var(--tc-pull-left); right: var(--tc-pull-right); top: var(--tc-pull-top); height: var(--tc-pull-h); z-index: var(--tc-layer-pull); flex-direction: column; gap: var(--tc-space-6); opacity: calc(var(--tc-pull) / var(--tc-pull-shift)); }
+.tc-pull.is-open { display: flex; }
+.tc-pull-spinner { align-self: center; color: var(--tc-muted); }
+.tc-pull-spinner svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-pull); }
+.tc-pull.is-refreshing .tc-pull-spinner svg { animation: tc-spin var(--tc-duration-spin) linear infinite; }
+.tc-pull-row { display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-pull); line-height: var(--tc-leading-pull); }
+.tc-pull-row svg { width: var(--tc-pull-icon); height: var(--tc-pull-icon); flex-shrink: 0; color: var(--tc-pull-ink); stroke-width: var(--tc-stroke-pull); }
+.tc-pull-name { flex: 1; min-width: 0; color: var(--tc-pull-ink); white-space: nowrap; }
+.tc-pull-time { color: var(--tc-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@keyframes tc-spin { to { transform: rotate(var(--tc-turn)); } }
+
 
 /* The columns: the list, the divider with its handle, the right column. */
 .tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }

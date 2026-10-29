@@ -36,15 +36,32 @@ export class TimelineDrop implements DropTarget {
 
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
-		const latest = LAYOUT.minutesPerDay - drag.durationMin;
-		const wanted = this.timeline.minutesAt(y) - drag.anchorMin;
+		this.show(y, drag.durationMin, drag.anchorMin);
+		this.autoScroll(y);
+	}
+
+	/** The target for a new task under a long tap: its start where the finger is. */
+	previewNew(y: number, durationMin: number): void {
+		this.show(y, durationMin, 0);
+	}
+
+	/** The slot the target shows now. */
+	get slot(): { start: number; end: number } {
+		return { start: this.start, end: this.end };
+	}
+
+	private end = 0;
+
+	private show(y: number, durationMin: number, anchorMin: number): void {
+		const latest = LAYOUT.minutesPerDay - durationMin;
+		const wanted = this.timeline.minutesAt(y) - anchorMin;
 		this.start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
+		this.end = this.start + durationMin;
 		this.dropEl ??= el(this.timeline.itemsEl, "div", "tc-item tc-drop");
 		this.dropEl.style.setProperty(PROPERTY.y, px(this.timeline.yOf(this.start)));
-		this.dropEl.style.setProperty(PROPERTY.length, px(this.timeline.yOf(this.start + drag.durationMin) - this.timeline.yOf(this.start)));
+		this.dropEl.style.setProperty(PROPERTY.length, px(this.timeline.yOf(this.end) - this.timeline.yOf(this.start)));
 		this.dropEl.textContent = formatTime(this.start);
-		this.share(this.timeline.blocksBetween(this.start, this.start + drag.durationMin).filter((b) => !b.classList.contains("is-lifted")));
-		this.autoScroll(y);
+		this.share(this.timeline.blocksBetween(this.start, this.end).filter((b) => !b.classList.contains("is-lifted")));
 	}
 
 	/** A block already at the target's time takes the right half; the target the left. */
@@ -84,7 +101,7 @@ export class TimelineDrop implements DropTarget {
 		this.last = null;
 	}
 
-	drop(_x: number, _y: number, drag: DragPayload): DropResult {
-		return { kind: "slot", slot: { date: this.opts.date(), start: this.start, end: this.start + drag.durationMin } };
+	drop(): DropResult {
+		return { kind: "slot", slot: { date: this.opts.date(), ...this.slot } };
 	}
 }

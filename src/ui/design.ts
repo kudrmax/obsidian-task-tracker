@@ -57,12 +57,15 @@ export const PROPERTY = {
 	eventText: "--tc-event-text",
 	/** The edge of the pressed card a panel hangs from: its bottom, or its top measured from the screen's bottom. */
 	panelY: "--tc-panel-y",
+	/** How far the timeline is pulled down from its top. */
+	pull: "--tc-pull",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
 export const DURATION = {
 	collapse: "--tc-duration-collapse",
 	fly: "--tc-duration-fly",
+	pull: "--tc-duration-pull",
 } as const;
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
@@ -86,6 +89,8 @@ export const LAYOUT = {
 	/** The fewest minutes a resized slot keeps. */
 	minSlotMinutes: 5,
 	minutesPerDay: 1440,
+	/** A pull let go past this far refreshes the sources. */
+	pullThreshold: 60,
 	/** A released pinch settles on the nearest zoom level over this long. */
 	zoomSnapMs: 200,
 } as const;

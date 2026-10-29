@@ -9,6 +9,8 @@ export interface DayHeaderOptions {
 	onToday(): void;
 	mode(): RightMode;
 	onMode(mode: RightMode): void;
+	dot(): boolean;
+	onSources(anchor: HTMLElement): void;
 }
 
 /** The day row: the arrows round the day's name, and the switch of the right column. */
@@ -24,7 +26,7 @@ export class DayHeader {
 		this.titleEl.setAttribute("aria-label", "Back to today");
 		this.titleEl.addEventListener("click", () => opts.onToday());
 		this.arrow(nav, "chevronRight", "Next day", () => opts.onStep(1));
-		this.segmented = new SegmentedControl(row, { value: () => opts.mode(), onChange: (mode) => opts.onMode(mode) });
+		this.segmented = new SegmentedControl(row, { value: () => opts.mode(), onChange: (mode) => opts.onMode(mode), dot: () => opts.dot(), onCalendarAgain: () => opts.onSources(this.segmented.el) });
 		this.render();
 	}
 

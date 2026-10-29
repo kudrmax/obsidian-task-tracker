@@ -1,5 +1,5 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, type DayView, type Placement, StaleTaskError, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayView, type Placement, type SourceStatus, StaleTaskError, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -13,6 +13,8 @@ import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
 import { TaskSheet } from "./sheet/TaskSheet";
+import { PullToRefresh } from "./sources/PullToRefresh";
+import { SourcesPopover } from "./sources/SourcesPopover";
 import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
@@ -49,12 +51,14 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private events: readonly CalendarEvent[] = [];
+	private statuses: readonly SourceStatus[] = [];
 	private scrolledFor: LocalDate | null = null;
 	private readonly arbiter = new GestureArbiter();
 	private readonly drag: DragController;
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
 	private zoomFrame = 0;
+	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private day: DayView | null = null;
@@ -79,6 +83,8 @@ export class TaskCalendarView extends ItemView {
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onResize: (item, end) => this.act(() => this.deps.tasks.setSlot(item.key, { ...item.slot!, end })),
 			onMenu: (item, source) => this.showMenu(item, source),
+			newSlot: () => this.timelineDrop,
+			onNewSlot: (slot) => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, slot),
 		});
 	}
 
@@ -105,6 +111,8 @@ export class TaskCalendarView extends ItemView {
 			onToday: () => this.select(this.today()),
 			mode: () => this.settings.rightMode,
 			onMode: (mode) => void this.setMode(mode),
+			dot: () => this.statuses.some((s) => s.stale),
+			onSources: (anchor) => this.showSources(anchor),
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -138,7 +146,15 @@ export class TaskCalendarView extends ItemView {
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
 		});
 		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels), date: () => this.selectedDate });
+		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
+		this.pull = new PullToRefresh(timeline.el, {
+			column: this.rightEl,
+			arbiter: this.arbiter,
+			statuses: () => this.statuses,
+			now: () => this.deps.clock.now(),
+			onRefresh: () => this.refreshCalendars(),
+		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
 			min: Math.min(...this.settings.zoomLevels.map((l) => l.hourPx)),
@@ -244,6 +260,17 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
+	private async refreshCalendars(): Promise<void> {
+		const day = await this.deps.calendars.eventsOn(this.selectedDate);
+		this.events = day.events;
+		this.statuses = day.statuses;
+		this.render();
+	}
+
+	private showSources(anchor: HTMLElement): void {
+		SourcesPopover.open({ anchor, statuses: this.statuses, now: this.deps.clock.now(), onRefresh: () => this.refreshCalendars() });
+	}
+
 	/** The task screen for a new task; with a slot, from a long tap on the timeline. */
 	newTaskSheet(placement: Placement, slot: Slot | null): void {
 		TaskSheet.open(this.contentEl, {
@@ -252,6 +279,7 @@ export class TaskCalendarView extends ItemView {
 			slot,
 			today: this.today(),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
+			onClose: () => this.timelineDrop?.clear(),
 		});
 	}
 
@@ -289,7 +317,14 @@ export class TaskCalendarView extends ItemView {
 			this.missing = true;
 			this.day = null;
 		}
-		this.events = this.missing ? [] : (await this.deps.calendars.eventsOn(this.selectedDate)).events;
+		if (this.missing) {
+			this.events = [];
+			this.statuses = [];
+		} else {
+			const day = await this.deps.calendars.eventsOn(this.selectedDate);
+			this.events = day.events;
+			this.statuses = day.statuses;
+		}
 		this.soon = this.missing ? [] : await this.deps.tasks.soonView();
 		this.render();
 	}
@@ -312,6 +347,7 @@ export class TaskCalendarView extends ItemView {
 		this.timeline.el.style.display = soon ? "none" : "";
 		this.soonList.el.style.display = soon ? "" : "none";
 		this.soonList.render();
+		this.pull?.renderArea();
 		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay));
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {
