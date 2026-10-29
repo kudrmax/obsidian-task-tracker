@@ -119,7 +119,7 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	const { section, dueDate } = placementTarget(draft.placement, today);
 	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: slot ?? null }));
 	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate });
-	if (samePlacement(placementOfEntry(entry), draft.placement)) return edited;
+	if (samePlacement(placementOfEntry(entry), draft.placement) || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 

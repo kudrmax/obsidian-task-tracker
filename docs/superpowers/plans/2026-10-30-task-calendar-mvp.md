@@ -448,6 +448,13 @@ it("cached returns the last result without fetching", …);
 
 - [ ] **Step 1: Долгое нажатие по пустому месту холста (не по блоку): цель броска по README (фон `#251F3D`, делит ширину с блоком того же времени, время начала), тактильный отклик, затем `TaskSheet.open` с `slot: { date, start: snap(minutesAt(y)), end: start + newTaskMinutes }`; Cancel убирает цель. Снимок ≈ `Screen.dc.html` с `newSlot=true` → коммит** `git commit -m "UI: new task by a long tap on the timeline"`
 
+### Task C13: Жесты Obsidian на экране плагина (замечание Макса с телефона, 31.10 ночь)
+
+**Files:**
+- Modify: `src/ui/TaskCalendarView.ts` (или новый `src/ui/gestures.ts`)
+
+- [ ] **Step 1:** На телефоне горизонтальные свайпы от краёв открывают боковые панели Obsidian и мешают перетаскиванию разделителя и карточек. Пока вид открыт, события `touchstart`, `touchmove`, `touchend`, `touchcancel` на корне вида не должны доходить до обработчиков Obsidian: `stopPropagation()` в bubbling-фазе на корневом элементе (свои обработчики на Pointer Events продолжают работать; `preventDefault` не вызывать, чтобы скролл списка и таймлайна остался). Проверить в эмуляции телефона через CDP `Input.dispatchTouchEvent`, что свайп от левого края внутри вида не открывает боковую панель (`app.workspace.leftSplit.collapsed` остаётся `true`), а скролл таймлайна одним пальцем работает. Коммит `git commit -m "UI: keep Obsidian's edge swipes off the view"`.
+
 ### Task C9: Финал потока C
 
 - [ ] Попиксельная сверка всех эталонов (главный экран в пяти состояниях, меню, срок, календарь, экран задачи в пяти состояниях, источники в трёх) (разница и PNG разницы в `docs/design/reference/diff/`), `npm test`, `npm run build` зелёные; отчёт оркестратору: проценты разницы по эталонам, что отступает от плана и почему, что осталось.
