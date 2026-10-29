@@ -208,7 +208,7 @@ body {
 /* The view fills its leaf and draws everything itself. */
 .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
 .task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .task-calendar svg { display: block; }
 
 /* The day row: the arrows round the day's name, the switch of the right column. */
@@ -305,10 +305,10 @@ body {
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
 .tc-panel.is-shown { opacity: 1; }
 .tc-panel.is-picker { width: var(--tc-picker-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
-.tc-panel button, .tc-picker button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.tc-panel button, .tc-picker button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .tc-menu-group + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
 .tc-panel .tc-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
-.tc-menu-row + .tc-menu-row { border-top: var(--tc-hairline-half) solid var(--tc-separator); }
+.tc-menu-group .tc-menu-row:not(:last-child) { border-bottom: var(--tc-hairline-half) solid var(--tc-separator); }
 .tc-panel .tc-menu-row.is-danger { color: var(--tc-danger); }
 .tc-panel .tc-menu-row.is-tall { height: var(--tc-row-tall); }
 .tc-panel .tc-menu-row.is-apart { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
@@ -330,7 +330,7 @@ body {
 .tc-picker.is-sheet .tc-picker-grid { row-gap: var(--tc-grid-gap-sheet); }
 .tc-weekday { height: var(--tc-weekday-h); text-align: center; font-size: var(--tc-font-weekday); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
 .tc-picker.is-sheet .tc-weekday { height: var(--tc-weekday-h-sheet); }
-.tc-picker .tc-day { justify-self: center; width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
+.tc-picker .tc-day { justify-self: center; display: flex; align-items: center; justify-content: center; width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
 .tc-picker .tc-day.is-other { color: var(--tc-ink-dim); }
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
 .tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
