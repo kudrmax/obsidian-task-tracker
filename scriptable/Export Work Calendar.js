@@ -1,5 +1,5 @@
 // Scriptable: выгружает события календаря iPhone (все аккаунты, включая Exchange)
-// за сегодня и завтра в <vault>/calendar/work.json для плагина Task Calendar spike.
+// за сегодня и завтра в <vault>/calendar/work.json для плагина Task Calendar.
 //
 // Нужна файловая закладка на папку vault:
 //  - для запуска внутри Scriptable: Settings → File Bookmarks → + → папка vault, имя ObsidianVault;
