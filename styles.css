@@ -1,0 +1,455 @@
+/*
+ * Task Calendar's design system: docs/design/canvas/Screen.dc.html, token by token. Every value lives here, in the
+ * body block: colours (the design's own, explicit; only the in-progress strip takes Obsidian's accent), shapes, sizes,
+ * type, spacing, layers and motion. Component rules below only read these tokens; tests/styles.test.ts fails on a
+ * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
+ * looks, change its token, or add one here with a name that says what it is for.
+ *
+ * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
+ * --tc-len, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
+ * into these rules; the rules do the arithmetic.
+ */
+body {
+	/* Colour */
+	--tc-bg: #000000;
+	--tc-text: #FFFFFF;
+	--tc-card-bg: #1C1C1E;
+	/* Chevrons, the due day, the chosen segment's ground. */
+	--tc-ink-soft: #E5E5EA;
+	--tc-muted: #8E8E93;
+	--tc-on-strong: #000000;
+	--tc-line: #2C2C2E;
+	--tc-handle: #48484A;
+	--tc-hour-line: #232325;
+	/* The ring round a task block and the dashed edge of New task. */
+	--tc-ring: #3A3A3C;
+	--tc-resize: #636366;
+	--tc-now: #D92C24;
+	--tc-accent: #9580FF;
+	--tc-drop-bg: #251F3D;
+	--tc-strip-color: var(--interactive-accent);
+	--tc-float-bg: #2C2C2E;
+	--tc-float-month: #AEAEB2;
+	--tc-float-ring: #48484A;
+	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7);
+	--tc-mask-ink: #000000;
+	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
+	--tc-accent-ui: var(--interactive-accent);
+	--tc-danger: #FF453A;
+	--tc-ink-dim: #636366;
+	--tc-separator: #48484A;
+	--tc-backdrop: rgba(0, 0, 0, 0.55);
+	--tc-panel-bg: rgba(44, 44, 46, 0.96);
+	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+	--tc-lifted-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+	/* A source gone stale, and its dot. */
+	--tc-stale: #FF9F0A;
+	--tc-popover-bg: rgba(44, 44, 46, 0.97);
+	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+	--tc-pull-ink: #AEAEB2;
+
+	/* Shape */
+	--tc-radius-card: 12px;
+	--tc-radius-block: 8px;
+	--tc-radius-event: 6px;
+	--tc-radius-seg: 16px;
+	--tc-radius-seg-btn: 14px;
+	--tc-radius-handle: 5px;
+	--tc-radius-resize: 2px;
+	--tc-radius-pill: 8px;
+	--tc-radius-circle: 50%;
+	--tc-radius-panel: 14px;
+	--tc-radius-day: 18px;
+	--tc-radius-sheet-panel: 16px;
+	--tc-radius-dot: 4px;
+	--tc-stroke-source: 1.8px;
+	--tc-stroke-refresh: 1.9px;
+	--tc-stroke-pull: 2px;
+	--tc-hairline-half: 0.5px;
+	--tc-stroke-menu: 1.8px;
+	--tc-stroke-month: 2.4px;
+	/* Obsidian 1.14 draws its buttons as squircles; ours keep the board's round corners. */
+	--tc-corner: round;
+	--tc-hairline: 1px;
+	--tc-ring-w: 1px;
+	--tc-bar: 3px;
+	--tc-drop-border: 1.5px;
+	--tc-stroke-chevron: 2.2px;
+	--tc-stroke-seg: 2px;
+
+	/* Sizes: the day row */
+	--tc-day-row-top: 16px;
+	--tc-day-row: 36px;
+	--tc-arrow: 36px;
+	--tc-chevron: 20px;
+	--tc-seg: 32px;
+	--tc-seg-pad: 2px;
+	--tc-seg-btn-w: 40px;
+	--tc-seg-btn-h: 28px;
+	--tc-seg-icon: 18px;
+
+	/* Sizes: the columns */
+	--tc-columns-top: 64px;
+	--tc-list-width: 187px;
+	--tc-divider: 16px;
+	--tc-handle-w: 10px;
+	--tc-handle-h: 52px;
+	--tc-handle-top: 260px;
+	--tc-handle-left: 3px;
+	/* How far Obsidian's phone navigation reaches up into the content; the code measures it. */
+	--tc-nav-clear: 0px;
+
+	/* Sizes: cards */
+	--tc-card-h: 40px;
+	--tc-card-gap: 6px;
+	/* A card steps aside by one card and one gap to open the place a dragged card will take. */
+	--tc-card-shift: 46px;
+	--tc-due-w: 24px;
+	--tc-due-gap: 1px;
+	--tc-fade-card: 24px;
+	--tc-fade-block: 16px;
+	--tc-new-h: calc(var(--tc-card-h) + 2 * var(--tc-space-8));
+	--tc-float-w: 190px;
+	--tc-float-h: 42px;
+
+	/* Sizes: the task menu, its due submenu and the month picker */
+	--tc-backdrop-blur: 8px;
+	--tc-lifted-scale: 1.04;
+	--tc-menu-gap: 12px;
+	--tc-panel-w: 250px;
+	--tc-picker-w: 300px;
+	--tc-row: 44px;
+	--tc-row-tall: 52px;
+	--tc-group-gap: 8px;
+	--tc-menu-icon: 20px;
+	--tc-back-icon: 18px;
+	--tc-month-btn: 32px;
+	--tc-month-icon: 18px;
+	--tc-day: 36px;
+	--tc-weekday-h: 20px;
+	--tc-weekday-h-sheet: 18px;
+	--tc-grid-gap: 2px;
+	--tc-grid-gap-sheet: 1px;
+	--tc-picker-remove-gap: 6px;
+
+	/* Sizes: the calendar sources */
+	--tc-dot: 7px;
+	--tc-dot-top: 2px;
+	--tc-dot-right: 7px;
+	--tc-popover-w: 268px;
+	--tc-popover-right: 12px;
+	--tc-popover-gap: 10px;
+	--tc-source-row: 56px;
+	--tc-source-icon: 20px;
+	--tc-pull-top: 32px;
+	--tc-pull-h: 80px;
+	--tc-pull-left: 4px;
+	--tc-pull-right: 6px;
+	--tc-pull-icon: 14px;
+	--tc-pull-shift: 84px;
+	--tc-pull: 0px;
+
+	/* Sizes: the task screen */
+	--tc-sheet-bar: 44px;
+	--tc-sheet-side: 20px;
+	--tc-sheet-gap: 20px;
+	--tc-tile-h: 78px;
+	--tc-radius-tile: 18px;
+	--tc-tile-icon: 24px;
+	--tc-stroke-tile: 1.9px;
+	--tc-tile-icon-gap: 7px;
+	--tc-time-icon: 15px;
+	/* The keyboard's height, when the host does not shrink the view for it. */
+	--tc-keyboard: 0px;
+
+	/* Sizes: the timeline */
+	--tc-hour: 56px;
+	--tc-day-hours: 24;
+	--tc-timeline-top: 34px;
+	--tc-allday-h: 22px;
+	--tc-allday-gap: 4px;
+	--tc-allday-left: 28px;
+	--tc-allday-right: 4px;
+	--tc-allday-extra-rows: 0;
+	/* The black under the all-day rows, which the timeline scrolls beneath. */
+	--tc-allday-backing: 26px;
+	--tc-label-w: 22px;
+	--tc-label-lift: 7px;
+	--tc-line-left: 26px;
+	--tc-items-left: 28px;
+	--tc-items-right: 4px;
+	--tc-item-inset: 1px;
+	--tc-item-gap: 2px;
+	--tc-resize-w: 16px;
+	--tc-resize-h: 3px;
+	--tc-resize-bottom: 3px;
+	--tc-resize-hit-w: 44px;
+	--tc-resize-hit-h: 24px;
+	--tc-now-h: 16px;
+	--tc-now-pill-w: 34px;
+	--tc-now-line: 2px;
+
+	/* Type */
+	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+	--tc-font-inherit: inherit;
+	--tc-font-title: 20px;
+	--tc-font-body: 15px;
+	--tc-font-due-day: 13px;
+	--tc-leading-due-day: 13px;
+	--tc-font-due-mon: 9px;
+	--tc-leading-due-mon: 9px;
+	--tc-tracking-mon: 0.3px;
+	--tc-font-block: 12px;
+	--tc-leading-block: 15px;
+	--tc-font-tiny: 10px;
+	--tc-font-hour: 11px;
+	--tc-leading-hour: 14px;
+	--tc-font-now: 10px;
+	--tc-font-menu: 16px;
+	--tc-font-value: 15px;
+	--tc-font-weekday: 11px;
+	--tc-font-day: 16px;
+	--tc-font-sheet-btn: 17px;
+	--tc-font-sub: 13px;
+	--tc-font-pull: 12px;
+	--tc-leading-pull: 16px;
+	--tc-font-sheet-title: 28px;
+	--tc-leading-sheet-title: 34px;
+	--tc-font-tile: 15px;
+	--tc-leading-normal: normal;
+	--tc-weight-normal: 400;
+	--tc-weight-semibold: 600;
+	--tc-weight-bold: 700;
+
+	/* Spacing */
+	--tc-space-2: 2px;
+	--tc-space-4: 4px;
+	--tc-space-5: 5px;
+	--tc-space-6: 6px;
+	--tc-space-7: 7px;
+	--tc-space-8: 8px;
+	--tc-space-10: 10px;
+	--tc-space-12: 12px;
+	--tc-space-14: 14px;
+	--tc-space-16: 16px;
+	--tc-grid-columns: 7;
+
+	/* Layers */
+	--tc-layer-block: 1;
+	--tc-layer-drop: 2;
+	--tc-layer-now: 3;
+	--tc-layer-backing: 3;
+	--tc-layer-allday: 4;
+	--tc-layer-new: 4;
+	--tc-layer-float: 1000;
+	--tc-layer-pull: 5;
+	--tc-layer-sheet: 20;
+	--tc-layer-overlay: 1000;
+	--tc-layer-panel: 1001;
+
+	/* Opacity */
+	--tc-disabled: 0.4;
+	/* A row or a text button while the finger is on it. */
+	--tc-pressed: 0.55;
+
+	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
+	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--tc-duration-collapse: 150ms;
+	--tc-duration-fly: 180ms;
+	--tc-duration-snap: 120ms;
+	--tc-duration-pull: 200ms;
+	--tc-duration-fade: 160ms;
+	/* The task screen rises this far as it fades in. */
+	--tc-rise: 12px;
+	--tc-duration-spin: 900ms;
+	--tc-turn: 1turn;
+}
+
+/* The view fills its leaf and draws everything itself. */
+.workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
+.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+/* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
+.task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active { background: transparent; box-shadow: none; }
+.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-seg-btn:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
+.task-calendar svg { display: block; }
+
+/* The day row: the arrows round the day's name, the switch of the right column. */
+.tc-day-row { position: absolute; left: 0; right: 0; top: var(--tc-day-row-top); height: var(--tc-day-row); padding: 0 var(--tc-space-12) 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: var(--tc-space-8); }
+.tc-day-nav { display: flex; align-items: center; gap: var(--tc-space-4); min-width: 0; }
+.task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; border-radius: var(--tc-radius-circle); color: var(--tc-ink-soft); display: flex; align-items: center; justify-content: center; }
+.tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
+.task-calendar .tc-day-title { height: var(--tc-day-row); padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
+.tc-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-card-bg); display: flex; gap: var(--tc-seg-pad); }
+.task-calendar .tc-seg-btn { width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; }
+.task-calendar .tc-seg-btn.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-seg-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
+.task-calendar .tc-seg-btn, .tc-seg-copy .tc-seg-btn { position: relative; }
+.tc-dot { display: none; position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-dot); background: var(--tc-stale); }
+.tc-dot.is-shown { display: block; }
+
+/* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */
+.tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
+.tc-seg-copy .tc-seg-btn.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-seg-copy .tc-seg-btn { width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0; background: transparent; }
+.tc-popover { position: fixed; right: var(--tc-popover-right); top: calc(var(--tc-panel-y) + var(--tc-popover-gap)); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-popover-bg); box-shadow: var(--tc-popover-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-popover.is-shown { opacity: 1; }
+.tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-14); display: flex; align-items: center; gap: var(--tc-space-10); }
+.tc-source-row:not(:last-of-type) { border-bottom: var(--tc-hairline-half) solid var(--tc-separator); }
+.tc-source-row svg { width: var(--tc-source-icon); height: var(--tc-source-icon); flex-shrink: 0; color: var(--tc-ink-soft); stroke-width: var(--tc-stroke-source); }
+.tc-source-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tc-space-2); }
+.tc-source-name { font-size: var(--tc-font-menu); }
+.tc-source-sub { font-size: var(--tc-font-sub); color: var(--tc-muted); }
+.tc-source-time { font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tc-source-time.is-stale, .tc-pull-time.is-stale { color: var(--tc-stale); }
+.tc-popover .tc-source-refresh { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-14); border: 0; border-top: var(--tc-group-gap) solid var(--tc-card-bg); background: transparent; color: var(--tc-accent-ui); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: flex-start; gap: var(--tc-space-10); cursor: pointer; box-shadow: none; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.tc-source-refresh svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-refresh); }
+
+/* Pulling the timeline down opens the sources' lines above it. */
+.tc-timeline { transform: translate3d(0, var(--tc-pull), 0); transition: transform var(--tc-duration-pull) var(--tc-ease-out); }
+.tc-timeline.is-pulling { transition: none; }
+.tc-pull { display: none; position: absolute; left: var(--tc-pull-left); right: var(--tc-pull-right); top: var(--tc-pull-top); height: var(--tc-pull-h); z-index: var(--tc-layer-pull); flex-direction: column; gap: var(--tc-space-6); opacity: calc(var(--tc-pull) / var(--tc-pull-shift)); }
+.tc-pull.is-open { display: flex; }
+.tc-pull-spinner { align-self: center; color: var(--tc-muted); }
+.tc-pull-spinner svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-pull); }
+.tc-pull.is-refreshing .tc-pull-spinner svg { animation: tc-spin var(--tc-duration-spin) linear infinite; }
+.tc-pull-row { display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-pull); line-height: var(--tc-leading-pull); }
+.tc-pull-row svg { width: var(--tc-pull-icon); height: var(--tc-pull-icon); flex-shrink: 0; color: var(--tc-pull-ink); stroke-width: var(--tc-stroke-pull); }
+.tc-pull-name { flex: 1; min-width: 0; color: var(--tc-pull-ink); white-space: nowrap; }
+.tc-pull-time { color: var(--tc-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@keyframes tc-spin { to { transform: rotate(var(--tc-turn)); } }
+
+
+/* The columns: the list, the divider with its handle, the right column. */
+.tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
+.tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
+.tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
+.task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
+.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); right: 0; top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
+
+/* A list of cards scrolls under its New task button. */
+.tc-list { height: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); padding-bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-new-h)); }
+.tc-list::-webkit-scrollbar { display: none; }
+.tc-list.is-soon { padding-right: var(--tc-space-10); padding-left: var(--tc-space-2); }
+
+/* A card: the strip of a task in progress, the title fading out on the right, the due date. */
+.tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-card.is-lifted { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
+.tc-card.is-shifted { transform: translateY(var(--tc-card-shift)); }
+.tc-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--tc-bar); background: var(--tc-strip-color); }
+.tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
+.tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
+.tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-soft); font-variant-numeric: tabular-nums; }
+.tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
+
+/* New task: a dashed button pinned under its list, which turns into a card with a field. */
+.tc-new { position: absolute; left: 0; bottom: calc(var(--tc-nav-clear) + var(--tc-space-8)); width: var(--tc-list-width); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); box-sizing: border-box; background: var(--tc-bg); z-index: var(--tc-layer-new); }
+.tc-new.is-soon { left: calc(var(--tc-list-width) + var(--tc-divider)); right: 0; width: auto; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
+.task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-ring); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
+.tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
+
+/* The all-day events over the timeline, in their calendar's colour. */
+.tc-allday-backing { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-allday-backing); background: var(--tc-bg); z-index: var(--tc-layer-backing); }
+.tc-allday { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-allday-right) var(--tc-allday-gap) var(--tc-allday-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
+.tc-event-bar { width: var(--tc-bar); flex-shrink: 0; background: var(--tc-event-bar); }
+.tc-allday-title { flex: 1; min-width: 0; padding: 0 var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-event-text); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
+
+/* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
+/* The scroll box starts a label's lift above the first line, so the hour at its top keeps its whole label, as on the board. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+.tc-timeline::-webkit-scrollbar { display: none; }
+.tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: calc(var(--tc-hour) * var(--tc-day-hours)); }
+.tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.tc-hour-label.is-hidden { visibility: hidden; }
+.tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
+.tc-items { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); }
+.tc-item { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: calc(var(--tc-col) * 100% / var(--tc-cols) + var(--tc-item-inset)); width: calc(100% / var(--tc-cols) - var(--tc-item-gap)); box-sizing: border-box; overflow: hidden; }
+.tc-item-title { font-size: var(--tc-font-block); line-height: var(--tc-leading-block); font-weight: var(--tc-weight-semibold); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
+/* A block shorter than a line of text keeps its title on one line, smaller. */
+.tc-item.is-tiny .tc-item-title { font-size: var(--tc-font-tiny); line-height: max(var(--tc-len) - var(--tc-item-gap) - var(--tc-space-2), var(--tc-font-tiny)); }
+.tc-event { border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; }
+.tc-event-body { flex: 1; min-width: 0; padding: var(--tc-space-4) var(--tc-space-6); }
+.tc-event .tc-item-title { color: var(--tc-event-text); }
+.tc-item.is-tiny .tc-event-body, .tc-block.is-tiny { padding: 0 var(--tc-space-5); }
+.tc-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring); padding: var(--tc-space-4) var(--tc-space-6); z-index: var(--tc-layer-block); touch-action: pan-y; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), box-shadow var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-block .tc-item-title { color: var(--tc-text); }
+.tc-block.is-lifted { opacity: 0; }
+.tc-block.is-resizing { box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-accent); }
+.tc-resize { position: absolute; bottom: var(--tc-resize-bottom); left: 50%; width: var(--tc-resize-w); height: var(--tc-resize-h); margin-left: calc(-1 * var(--tc-resize-w) / 2); border-radius: var(--tc-radius-resize); background: var(--tc-resize); }
+.tc-resize-hit { position: absolute; bottom: 0; left: 50%; width: var(--tc-resize-hit-w); height: min(var(--tc-resize-hit-h), 50%); margin-left: calc(-1 * var(--tc-resize-hit-w) / 2); touch-action: none; cursor: ns-resize; }
+
+/* The now line: the time in a pill, the line to the right edge. */
+.tc-now { position: absolute; top: calc(var(--tc-y) - var(--tc-now-h) / 2); left: 0; right: 0; height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-now); pointer-events: none; }
+.tc-now-pill { width: var(--tc-now-pill-w); height: var(--tc-now-h); flex-shrink: 0; border-radius: var(--tc-radius-pill); background: var(--tc-now); color: var(--tc-text); font-size: var(--tc-font-now); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.tc-now-line { flex: 1; height: var(--tc-now-line); background: var(--tc-now); }
+
+/* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
+.tc-drop { border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow), 0 0 0 var(--tc-hairline) var(--tc-float-ring); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
+.tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
+/* Landing, the card takes the look of a card at rest. */
+.tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
+.tc-float .tc-due-mon { color: var(--tc-float-month); }
+
+/* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
+.tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-backdrop.is-shown { opacity: 1; }
+.tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-lifted-shadow); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; transition: transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-lifted.is-shown { transform: scale(var(--tc-lifted-scale)); }
+.tc-lifted .tc-due-mon { color: var(--tc-float-month); }
+.tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
+.tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
+.tc-panel.is-shown { opacity: 1; }
+.tc-panel.is-picker { width: var(--tc-picker-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
+.tc-panel button, .tc-picker button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+.tc-menu-group + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
+.tc-panel .tc-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
+.tc-menu-group .tc-menu-row:not(:last-child) { border-bottom: var(--tc-hairline-half) solid var(--tc-separator); }
+.tc-panel .tc-menu-row.is-danger { color: var(--tc-danger); }
+.tc-panel .tc-menu-row.is-tall { height: var(--tc-row-tall); }
+.tc-panel .tc-menu-row.is-apart { border-top: var(--tc-group-gap) solid var(--tc-card-bg); }
+.tc-menu-label { flex: 1; min-width: 0; }
+.tc-menu-value { font-size: var(--tc-font-value); color: var(--tc-muted); }
+.tc-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.tc-panel .tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-group-gap) solid var(--tc-card-bg); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
+
+/* The month picker: in the menu's panel, or under the task sheet's tiles. */
+.tc-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--tc-space-4) var(--tc-space-8); }
+.tc-picker.is-sheet { box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-10); border-radius: var(--tc-radius-sheet-panel); background: var(--tc-card-bg); }
+.tc-picker.is-sheet .tc-picker-head { padding-bottom: var(--tc-space-4); }
+.tc-picker-title { font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
+.tc-picker-nav { display: flex; gap: var(--tc-space-4); }
+.tc-picker .tc-picker-arrow { width: var(--tc-month-btn); height: var(--tc-month-btn); padding: 0; border-radius: var(--tc-radius-circle); color: var(--tc-accent-ui); display: flex; align-items: center; justify-content: center; }
+.tc-picker-arrow svg { width: var(--tc-month-icon); height: var(--tc-month-icon); stroke-width: var(--tc-stroke-month); }
+.tc-picker-grid { display: grid; grid-template-columns: repeat(var(--tc-grid-columns), minmax(0, 1fr)); row-gap: var(--tc-grid-gap); }
+.tc-picker.is-sheet .tc-picker-grid { row-gap: var(--tc-grid-gap-sheet); }
+.tc-weekday { height: var(--tc-weekday-h); text-align: center; font-size: var(--tc-font-weekday); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.tc-picker.is-sheet .tc-weekday { height: var(--tc-weekday-h-sheet); }
+.tc-picker .tc-day { justify-self: center; display: flex; align-items: center; justify-content: center; width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
+.tc-picker .tc-day.is-other { color: var(--tc-ink-dim); }
+.tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
+.tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
+.tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
+
+/* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
+.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
+.tc-sheet.is-shown { opacity: 1; transform: none; }
+.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
+.task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-sheet-submit.is-disabled { opacity: var(--tc-disabled); cursor: default; }
+.tc-sheet-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: var(--tc-keyboard); display: flex; flex-direction: column; justify-content: center; gap: var(--tc-sheet-gap); }
+.task-calendar .tc-sheet-title { text-align: center; font-size: var(--tc-font-sheet-title); line-height: var(--tc-leading-sheet-title); font-weight: var(--tc-weight-bold); overflow-wrap: anywhere; outline: none; -webkit-user-select: text; user-select: text; caret-color: var(--tc-accent-ui); }
+.tc-tiles { display: flex; gap: var(--tc-space-10); }
+.task-calendar .tc-tile { flex: 1; height: var(--tc-tile-h); border-radius: var(--tc-radius-tile); background: var(--tc-card-bg); color: var(--tc-ink-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-tile-icon-gap); }
+.task-calendar .tc-tile.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-tile svg { width: var(--tc-tile-icon); height: var(--tc-tile-icon); stroke-width: var(--tc-stroke-tile); }
+.tc-tile-label { font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); }
+.tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
+
+/* No tasks file yet. */
+.tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }
+.task-calendar .tc-missing-btn { height: var(--tc-card-h); padding: 0 var(--tc-space-16); border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); }
