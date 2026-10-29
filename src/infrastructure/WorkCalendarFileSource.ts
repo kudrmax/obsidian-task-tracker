@@ -42,7 +42,7 @@ export class WorkCalendarFileSource implements EventSource {
 		const events = (file.events ?? [])
 			.filter((e) => wanted.length === 0 || wanted.includes(e.calendar.toLowerCase()))
 			.map((e) => this.toEvent(e));
-		return { events, updatedAt: new Date(file.exportedAt) };
+		return { events, updatedAt: new Date(file.exportedAt), detail: file.device };
 	}
 
 	private toEvent(e: WorkEventDto): CalendarEvent {

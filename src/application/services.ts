@@ -22,7 +22,7 @@ export function createServices(app: App, settings: SettingsStore, clock: Clock =
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings);
 	return {
 		tasks: new TaskServiceImpl(store, settings, clock),
-		calendars: new CalendarServiceImpl([googleSource, workSource]),
+		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings),
 		google,
 		googleSource,
 	};

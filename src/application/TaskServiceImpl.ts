@@ -5,7 +5,16 @@ import { listOn, slottedOn, soonList, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import type { TaskCalendarSettings } from "../settings";
-import { StaleTaskError, TasksFileMissingError, type DayView, type TaskItem, type TaskKey, type TaskService } from "./contracts";
+import {
+	StaleTaskError,
+	TasksFileMissingError,
+	type DayView,
+	type Placement,
+	type TaskDraft,
+	type TaskItem,
+	type TaskKey,
+	type TaskService,
+} from "./contracts";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 
 type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings) => TaskDocument;
@@ -53,6 +62,21 @@ export class TaskServiceImpl implements TaskService {
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
 		if (this.blank(text)) return;
 		await this.mutate((doc, today, settings) => ops.createAtTime(doc, date, today, start, settings.newTaskMinutes, text));
+	}
+
+	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
+		if (this.blank(draft.text)) return;
+		await this.mutate((doc, today) => ops.placeTask(doc, null, draft, today, slot));
+	}
+
+	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
+		if (this.blank(draft.text)) return;
+		await this.mutate((doc, today) => ops.placeTask(doc, this.entryOf(doc, key), draft, today));
+	}
+
+	placementOf(item: TaskItem): Placement {
+		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
+		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
 	}
 
 	async setStatus(key: TaskKey, status: TaskStatus): Promise<void> {

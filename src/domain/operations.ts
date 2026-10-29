@@ -1,5 +1,5 @@
-import type { SectionKey } from "../application/contracts";
-import { STATUS_CHARS, type LocalDate, type Slot, type Task, type TaskStatus } from "./Task";
+import type { Placement, TaskDraft } from "../application/contracts";
+import { STATUS_CHARS, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
 const DAY_MINUTES = 1440;
@@ -93,6 +93,34 @@ export function clearSlot(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 
 export function moveToList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
 	return date === today ? doc.moveEntry(entry, "now", "end") : setDueDate(doc, entry, date);
+}
+
+export function placementOfEntry(entry: TaskEntry): Placement {
+	if (entry.task.dueDate !== null) return { kind: "date", date: entry.task.dueDate };
+	return entry.section === "soon" ? { kind: "soon" } : { kind: "now" };
+}
+
+function samePlacement(a: Placement, b: Placement): boolean {
+	return a.kind === b.kind && (a.kind !== "date" || b.kind !== "date" || a.date === b.date);
+}
+
+function placementTarget(placement: Placement, today: LocalDate): { section: SectionKey; dueDate: LocalDate | null } {
+	switch (placement.kind) {
+		case "soon":
+			return { section: "soon", dueDate: null };
+		case "now":
+			return { section: "now", dueDate: null };
+		case "date":
+			return { section: placement.date <= today ? "now" : "soon", dueDate: placement.date };
+	}
+}
+
+export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot): TaskDocument {
+	const { section, dueDate } = placementTarget(draft.placement, today);
+	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: slot ?? null }));
+	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate });
+	if (samePlacement(placementOfEntry(entry), draft.placement)) return edited;
+	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 
 export function moveToSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {

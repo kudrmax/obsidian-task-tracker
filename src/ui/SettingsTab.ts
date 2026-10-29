@@ -74,6 +74,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	}
 
 	private googleGroup(el: HTMLElement): void {
+		new Setting(el).setName("Calendar sources").setHeading();
+		this.number(el, "Stale after", "Minutes without an update before a source gets the orange dot.", this.settings.staleAfterMinutes, (staleAfterMinutes) => ({ staleAfterMinutes }));
 		new Setting(el).setName("Google Calendar").setHeading();
 		this.text(el, "Client id", "OAuth client of type Desktop app.", this.settings.google.clientId, (clientId) => this.google({ clientId }));
 		new Setting(el)

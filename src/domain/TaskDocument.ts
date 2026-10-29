@@ -1,5 +1,4 @@
-import type { SectionKey } from "../application/contracts";
-import type { Task } from "./Task";
+import type { SectionKey, Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {

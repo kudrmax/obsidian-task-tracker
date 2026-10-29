@@ -1,5 +1,4 @@
-import type { SectionKey } from "../application/contracts";
-import type { LocalDate, Task } from "./Task";
+import type { LocalDate, SectionKey, Task } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
 function isOpen(task: Task): boolean {

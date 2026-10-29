@@ -34,9 +34,10 @@ describe("WorkCalendarFileSource", () => {
 	});
 
 	it("reads every event when no titles are configured", async () => {
-		const { events, updatedAt } = await source().eventsBetween();
+		const { events, updatedAt, detail } = await source().eventsBetween();
 		expect(events.map((e) => e.title)).toEqual(["Standup", "Dentist", "Holiday"]);
 		expect(updatedAt).toEqual(new Date("2026-10-30T08:00:00.000Z"));
+		expect(detail).toBe("iPhone");
 	});
 
 	it("maps the fields, with the default color when the file has none", async () => {
