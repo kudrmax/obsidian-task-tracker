@@ -16,7 +16,7 @@ const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const WIDTH = 390, HEIGHT = 844;
 const canvasJson = JSON.parse(readFileSync(join(canvas, "canvas.json"), "utf8"));
 /** States the plan compares against that no board of the canvas shows on its own. */
-const DERIVED = { ScreenNewSlot: ["Screen", { newSlot: true }] };
+const DERIVED = { ScreenNewSlot: ["Screen", { newSlot: true, sourceDot: true }] };
 const BOARDS = [...canvasJson.order.filter((file) => canvasJson.boards[file]?.page === "prod").map((file) => file.replace(/\.dc\.html$/, "")), ...Object.keys(DERIVED)];
 
 class DCLogic {
