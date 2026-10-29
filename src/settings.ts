@@ -1,3 +1,5 @@
+export type RightMode = "calendar" | "soon";
+
 export interface ZoomLevel {
 	/** Height of one hour on the timeline, CSS px. */
 	readonly hourPx: number;
@@ -38,6 +40,8 @@ export interface TaskCalendarSettings {
 	readonly scrollToHour: number;
 	/** Width of the left column, CSS px, set by dragging the divider. */
 	readonly listWidth: number;
+	/** What the right column shows; the segmented control in the day row sets it. */
+	readonly rightMode: RightMode;
 }
 
 export const LIST_WIDTH_MIN = 110;
@@ -61,6 +65,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	scrollToHour: 9,
 	listWidth: 187,
+	rightMode: "calendar",
 };
 
 /** Merges saved data over the defaults, one level deep for the nested objects. */
