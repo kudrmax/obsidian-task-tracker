@@ -1,6 +1,6 @@
 // Walks the plugin through every reference state in the scratch Obsidian and compares each screenshot with the
 // board: node docs/design/reference/capture.mjs [port]. Needs the scratch Obsidian from CLAUDE.md running with
-// remote debugging, the branch build installed, the window at 390×844 in phone emulation and the demo wiring
+// remote debugging, the demo build installed (`npm run build:demo`), the window at 390×844 in phone emulation
 // (today 2026-10-30 14:20). Writes diff/<Board>.obsidian.png, diff/<Board>.diff.png and diff/results.md.
 //
 // Obsidian's chrome stands where the boards draw it, only taller: the content starts 9 px lower than on the boards

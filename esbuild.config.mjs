@@ -1,10 +1,11 @@
 import esbuild from "esbuild";
 import { builtinModules } from "node:module";
 
-const production = process.argv[2] === "production";
+const production = process.argv.includes("production");
+const demo = process.argv.includes("demo");
 
 const context = await esbuild.context({
-  entryPoints: ["src/main.ts"],
+  entryPoints: [demo ? "src/demo.ts" : "src/main.ts"],
   bundle: true,
   external: ["obsidian", "electron", ...builtinModules],
   format: "cjs",

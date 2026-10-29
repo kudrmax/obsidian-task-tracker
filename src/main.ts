@@ -1,23 +1,32 @@
 import { Plugin, type WorkspaceLeaf } from "obsidian";
-import type { SettingsStore } from "./application/ports";
+import { systemClock, type Clock, type SettingsStore } from "./application/ports";
+import { createServices } from "./application/services";
 import { settingsFrom, type TaskCalendarSettings } from "./settings";
-import { TaskCalendarView, VIEW_TYPE } from "./ui/TaskCalendarView";
-// DEMO WIRING: replaced at integration
-import { DemoCalendarService } from "../tests/fakes/DemoCalendarService";
-import { DEMO_NOW, FixedClock } from "../tests/fakes/DemoClock";
-import { DemoTaskService } from "../tests/fakes/DemoTaskService";
+import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
+import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
 	private current: TaskCalendarSettings = settingsFrom(null);
 
 	override async onload(): Promise<void> {
 		this.current = settingsFrom(await this.loadData());
-		// DEMO WIRING: replaced at integration
-		const clock = new FixedClock(DEMO_NOW);
-		const deps = { tasks: new DemoTaskService(clock), calendars: new DemoCalendarService(), settings: this, clock };
+		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
+	}
+
+	/** The real services over the vault and the network; the demo build replaces them with fakes. */
+	protected createDeps(clock: Clock = systemClock): ViewDeps {
+		const services = createServices(this.app, this, clock);
+		this.addSettingTab(
+			new TaskCalendarSettingsTab(this.app, this, {
+				login: () => services.google.login(),
+				logout: () => services.google.logout(),
+				listCalendars: () => services.googleSource.listCalendars(),
+			}),
+		);
+		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock };
 	}
 
 	get(): TaskCalendarSettings {

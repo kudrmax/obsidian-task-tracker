@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit && node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
+    "build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
     "test": "vitest run"
   },
   "license": "MIT",
