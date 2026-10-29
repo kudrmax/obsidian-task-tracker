@@ -1,0 +1,248 @@
+/*
+ * Task Calendar's design system: docs/design/canvas/Screen.dc.html, token by token. Every value lives here, in the
+ * body block: colours (the design's own, explicit; only the in-progress strip takes Obsidian's accent), shapes, sizes,
+ * type, spacing, layers and motion. Component rules below only read these tokens; tests/styles.test.ts fails on a
+ * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
+ * looks, change its token, or add one here with a name that says what it is for.
+ *
+ * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
+ * --tc-len, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
+ * into these rules; the rules do the arithmetic.
+ */
+body {
+	/* Colour */
+	--tc-bg: #000000;
+	--tc-text: #FFFFFF;
+	--tc-card-bg: #1C1C1E;
+	/* Chevrons, the due day, the chosen segment's ground. */
+	--tc-ink-soft: #E5E5EA;
+	--tc-muted: #8E8E93;
+	--tc-on-strong: #000000;
+	--tc-line: #2C2C2E;
+	--tc-handle: #48484A;
+	--tc-hour-line: #232325;
+	/* The ring round a task block and the dashed edge of New task. */
+	--tc-ring: #3A3A3C;
+	--tc-resize: #636366;
+	--tc-now: #D92C24;
+	--tc-accent: #9580FF;
+	--tc-drop-bg: rgba(149, 128, 255, 0.12);
+	--tc-strip-color: var(--interactive-accent);
+	--tc-float-bg: #2C2C2E;
+	--tc-float-month: #AEAEB2;
+	--tc-float-ring: #48484A;
+	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7);
+	--tc-mask-ink: #000000;
+
+	/* Shape */
+	--tc-radius-card: 12px;
+	--tc-radius-block: 8px;
+	--tc-radius-event: 6px;
+	--tc-radius-seg: 16px;
+	--tc-radius-seg-btn: 14px;
+	--tc-radius-handle: 5px;
+	--tc-radius-resize: 2px;
+	--tc-radius-pill: 8px;
+	--tc-radius-circle: 50%;
+	--tc-hairline: 1px;
+	--tc-ring-w: 1px;
+	--tc-bar: 3px;
+	--tc-drop-border: 1.5px;
+	--tc-drop-inset: 1px;
+	--tc-stroke-chevron: 2.2px;
+	--tc-stroke-seg: 2px;
+
+	/* Sizes: the day row */
+	--tc-day-row-top: 16px;
+	--tc-day-row: 36px;
+	--tc-arrow: 36px;
+	--tc-chevron: 20px;
+	--tc-seg: 32px;
+	--tc-seg-pad: 2px;
+	--tc-seg-btn-w: 40px;
+	--tc-seg-btn-h: 28px;
+	--tc-seg-icon: 18px;
+
+	/* Sizes: the columns */
+	--tc-columns-top: 64px;
+	--tc-list-width: 187px;
+	--tc-divider: 16px;
+	--tc-handle-w: 10px;
+	--tc-handle-h: 52px;
+	--tc-handle-top: 260px;
+	--tc-handle-left: 3px;
+	/* How far Obsidian's phone navigation reaches up into the content; the code measures it. */
+	--tc-nav-clear: 0px;
+
+	/* Sizes: cards */
+	--tc-card-h: 40px;
+	--tc-card-gap: 6px;
+	/* A card steps aside by one card and one gap to open the place a dragged card will take. */
+	--tc-card-shift: 46px;
+	--tc-due-w: 24px;
+	--tc-due-gap: 1px;
+	--tc-fade-card: 24px;
+	--tc-fade-block: 16px;
+	--tc-new-h: calc(var(--tc-card-h) + 2 * var(--tc-space-8));
+	--tc-float-w: 190px;
+	--tc-float-h: 42px;
+
+	/* Sizes: the timeline */
+	--tc-hour: 56px;
+	--tc-day-hours: 24;
+	--tc-timeline-top: 34px;
+	--tc-allday-h: 22px;
+	--tc-allday-gap: 4px;
+	--tc-allday-left: 28px;
+	--tc-allday-right: 4px;
+	--tc-allday-extra-rows: 0;
+	--tc-label-w: 22px;
+	--tc-label-lift: 7px;
+	--tc-line-left: 26px;
+	--tc-items-left: 28px;
+	--tc-items-right: 4px;
+	--tc-item-inset: 1px;
+	--tc-item-gap: 2px;
+	--tc-resize-w: 16px;
+	--tc-resize-h: 3px;
+	--tc-resize-bottom: 3px;
+	--tc-resize-hit-w: 44px;
+	--tc-resize-hit-h: 24px;
+	--tc-now-h: 16px;
+	--tc-now-pill-w: 34px;
+	--tc-now-line: 2px;
+
+	/* Type */
+	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+	--tc-font-inherit: inherit;
+	--tc-font-title: 20px;
+	--tc-font-body: 15px;
+	--tc-font-due-day: 13px;
+	--tc-leading-due-day: 13px;
+	--tc-font-due-mon: 9px;
+	--tc-leading-due-mon: 9px;
+	--tc-tracking-mon: 0.3px;
+	--tc-font-block: 12px;
+	--tc-leading-block: 15px;
+	--tc-font-tiny: 10px;
+	--tc-font-hour: 11px;
+	--tc-leading-hour: 14px;
+	--tc-font-now: 10px;
+	--tc-leading-normal: normal;
+	--tc-weight-normal: 400;
+	--tc-weight-semibold: 600;
+	--tc-weight-bold: 700;
+
+	/* Spacing */
+	--tc-space-2: 2px;
+	--tc-space-4: 4px;
+	--tc-space-5: 5px;
+	--tc-space-6: 6px;
+	--tc-space-7: 7px;
+	--tc-space-8: 8px;
+	--tc-space-10: 10px;
+	--tc-space-12: 12px;
+	--tc-space-16: 16px;
+
+	/* Layers */
+	--tc-layer-block: 1;
+	--tc-layer-drop: 2;
+	--tc-layer-now: 3;
+	--tc-layer-new: 4;
+	--tc-layer-float: 1000;
+
+	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
+	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--tc-duration-collapse: 150ms;
+	--tc-duration-fly: 180ms;
+	--tc-duration-snap: 120ms;
+}
+
+/* The view fills its leaf and draws everything itself. */
+.workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
+.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); font-variant-numeric: tabular-nums; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; }
+.task-calendar svg { display: block; }
+
+/* The day row: the arrows round the day's name, the switch of the right column. */
+.tc-day-row { position: absolute; left: 0; right: 0; top: var(--tc-day-row-top); height: var(--tc-day-row); padding: 0 var(--tc-space-12) 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: var(--tc-space-8); }
+.tc-day-nav { display: flex; align-items: center; gap: var(--tc-space-4); min-width: 0; }
+.task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; border-radius: var(--tc-radius-circle); color: var(--tc-ink-soft); display: flex; align-items: center; justify-content: center; }
+.tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
+.task-calendar .tc-day-title { height: var(--tc-day-row); padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
+.tc-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-card-bg); display: flex; gap: var(--tc-seg-pad); }
+.task-calendar .tc-seg-btn { width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; }
+.task-calendar .tc-seg-btn.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-seg-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
+
+/* The columns: the list, the divider with its handle, the right column. */
+.tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
+.tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
+.tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
+.task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
+.tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); right: 0; top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
+
+/* A list of cards scrolls under its New task button. */
+.tc-list { height: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); padding-bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-new-h)); }
+.tc-list::-webkit-scrollbar { display: none; }
+.tc-list.is-soon { padding-right: var(--tc-space-10); padding-left: var(--tc-space-2); }
+
+/* A card: the strip of a task in progress, the title fading out on the right, the due date. */
+.tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-card.is-lifted { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
+.tc-card.is-shifted { transform: translateY(var(--tc-card-shift)); }
+.tc-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--tc-bar); background: var(--tc-strip-color); }
+.tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
+.tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
+.tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-soft); }
+.tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
+
+/* New task: a dashed button pinned under its list, which turns into a card with a field. */
+.tc-new { position: absolute; left: 0; bottom: calc(var(--tc-nav-clear) + var(--tc-space-8)); width: var(--tc-list-width); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); box-sizing: border-box; background: var(--tc-bg); z-index: var(--tc-layer-new); }
+.tc-new.is-soon { left: calc(var(--tc-list-width) + var(--tc-divider)); right: 0; width: auto; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
+.task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-ring); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
+.tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
+.task-calendar .tc-new-input, .task-calendar .tc-new-input:focus, .task-calendar .tc-new-input:active { width: 100%; height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-8) 0 var(--tc-space-12); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); box-shadow: none; outline: none; -webkit-user-select: text; user-select: text; }
+
+/* The all-day events over the timeline, in their calendar's colour. */
+.tc-allday { margin: 0 var(--tc-allday-right) var(--tc-allday-gap) var(--tc-allday-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
+.tc-event-bar { width: var(--tc-bar); flex-shrink: 0; background: var(--tc-event-bar); }
+.tc-allday-title { flex: 1; min-width: 0; padding: 0 var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-event-text); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
+
+/* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+.tc-timeline::-webkit-scrollbar { display: none; }
+.tc-canvas { position: relative; height: calc(var(--tc-hour) * var(--tc-day-hours)); }
+.tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); }
+.tc-hour-label.is-hidden { visibility: hidden; }
+.tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
+.tc-items { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); }
+.tc-item { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: calc(var(--tc-col) * 100% / var(--tc-cols) + var(--tc-item-inset)); width: calc(100% / var(--tc-cols) - var(--tc-item-gap)); box-sizing: border-box; overflow: hidden; }
+.tc-item-title { font-size: var(--tc-font-block); line-height: var(--tc-leading-block); font-weight: var(--tc-weight-semibold); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
+/* A block shorter than a line of text keeps its title on one line, smaller. */
+.tc-item.is-tiny .tc-item-title { font-size: var(--tc-font-tiny); line-height: max(var(--tc-len) - var(--tc-item-gap) - var(--tc-space-2), var(--tc-font-tiny)); }
+.tc-event { border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; }
+.tc-event-body { flex: 1; min-width: 0; padding: var(--tc-space-4) var(--tc-space-6); }
+.tc-event .tc-item-title { color: var(--tc-event-text); }
+.tc-item.is-tiny .tc-event-body, .tc-block.is-tiny { padding: 0 var(--tc-space-5); }
+.tc-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring); padding: var(--tc-space-4) var(--tc-space-6); z-index: var(--tc-layer-block); touch-action: pan-y; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), box-shadow var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-block .tc-item-title { color: var(--tc-text); }
+.tc-block.is-lifted { opacity: 0; }
+.tc-block.is-resizing { box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-accent); }
+.tc-resize { position: absolute; bottom: var(--tc-resize-bottom); left: 50%; width: var(--tc-resize-w); height: var(--tc-resize-h); margin-left: calc(-1 * var(--tc-resize-w) / 2); border-radius: var(--tc-radius-resize); background: var(--tc-resize); }
+.tc-resize-hit { position: absolute; bottom: 0; left: 50%; width: var(--tc-resize-hit-w); height: min(var(--tc-resize-hit-h), 50%); margin-left: calc(-1 * var(--tc-resize-hit-w) / 2); touch-action: none; cursor: ns-resize; }
+
+/* The now line: the time in a pill, the line to the right edge. */
+.tc-now { position: absolute; top: calc(var(--tc-y) - var(--tc-now-h) / 2); left: 0; right: 0; height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-now); pointer-events: none; }
+.tc-now-pill { width: var(--tc-now-pill-w); height: var(--tc-now-h); flex-shrink: 0; border-radius: var(--tc-radius-pill); background: var(--tc-now); color: var(--tc-text); font-size: var(--tc-font-now); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; }
+.tc-now-line { flex: 1; height: var(--tc-now-line); background: var(--tc-now); }
+
+/* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
+.tc-drop { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: var(--tc-drop-inset); right: var(--tc-drop-inset); box-sizing: border-box; border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow), 0 0 0 var(--tc-hairline) var(--tc-float-ring); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); font-variant-numeric: tabular-nums; }
+.tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), opacity var(--tc-duration-fly) var(--tc-ease-out); }
+.tc-float .tc-due-mon { color: var(--tc-float-month); }
+
+/* No tasks file yet. */
+.tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }
+.task-calendar .tc-missing-btn { height: var(--tc-card-h); padding: 0 var(--tc-space-16); border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); }
