@@ -1,7 +1,6 @@
-import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
+import type { LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
 
-/** Which of the plugin's sections a task sits in. Inbox and Backlog are never read. */
-export type SectionKey = "now" | "soon" | "done";
+export type { SectionKey };
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section,
