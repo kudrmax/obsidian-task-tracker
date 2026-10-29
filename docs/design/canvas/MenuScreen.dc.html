@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Меню задачи</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="Screen" hint-size="390px,844px"></dc-import>
+<div style="position: absolute; inset: 0; background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<sc-if value="{{showCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 10px; top: 212px; width: 175px; height: 40px; box-sizing: border-box; background: #2C2C2E; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px; transform: scale(1.04); box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 11;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #AEAEB2; letter-spacing: 0.3px;">NOV</span></span>
+</div>
+</sc-if>
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<div style="border-top: {{g.gap}};">
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{r.color}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{r.label}}</span>
+<sc-if value="{{r.hasValue}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 15px; color: #8E8E93;">{{r.value}}</span>
+</sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isDue}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px 0 10px; border: 0; border-bottom: 8px solid #1C1C1E; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Due date</button>
+<sc-for list="{{dueRows}}" as="r" hint-placeholder-count="4">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{r.label}}</span>
+<span style="font-size: 15px; color: #8E8E93;">{{r.value}}</span>
+</button>
+</sc-for>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid #1C1C1E; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-if value="{{isPicker}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: 264px; width: 300px; box-sizing: border-box; padding: 12px 12px 4px; border-radius: 14px; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px;">
+<span style="font-size: 16px; font-weight: 600;">November 2026</span>
+<div style="display: flex; gap: 4px;">
+<button aria-label="Previous month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Next month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px;">
+<sc-for list="{{weekdays}}" as="w" hint-placeholder-count="7">
+<span style="height: 20px; text-align: center; font-size: 11px; font-weight: 600; color: #8E8E93;">{{w}}</span>
+</sc-for>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="42">
+<button style="justify-self: center; width: 36px; height: 36px; border: 0; padding: 0; border-radius: 18px; background: {{d.bg}}; color: {{d.color}}; font: inherit; font-size: 16px; font-weight: {{d.weight}}; font-variant-numeric: tabular-nums;">{{d.n}}</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 44px; margin-top: 6px; border: 0; border-top: 0.5px solid #48484A; padding: 0 4px; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-if value="{{isBar}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: 148px; height: 58px; box-sizing: border-box; padding: 4px; border-radius: 16px; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); display: flex; gap: 2px; z-index: 11;">
+<sc-for list="{{actions}}" as="r" hint-placeholder-count="6">
+<button style="width: 54px; height: 50px; border: 0; border-radius: 12px; padding: 0; background: transparent; color: {{r.color}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 10px; line-height: 12px; font-weight: 500; white-space: nowrap;">{{r.short}}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isSheet}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 8px 16px 34px; border-radius: 20px 20px 0 0; background: #1C1C1E; display: flex; flex-direction: column; gap: 14px; z-index: 11;">
+<div style="align-self: center; width: 36px; height: 5px; border-radius: 3px; background: #48484A;"></div>
+<div style="display: flex; align-items: center; gap: 10px;">
+<div style="flex: 1; min-width: 0; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #AEAEB2; letter-spacing: 0.3px;">NOV</span></span>
+</div>
+<div style="display: flex; gap: 8px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="flex: 1; height: 66px; border: 0; border-radius: 12px; background: #2C2C2E; color: #FFFFFF; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-radius: 12px; overflow: hidden; background: #2C2C2E;">
+<button style="width: 100%; height: 46px; box-sizing: border-box; padding: 0 14px; border: 0; border-bottom: 0.5px solid #48484A; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.due}}"></path></svg><span style="flex: 1; text-align: left;">Due date</span><span style="font-size: 15px; color: #8E8E93;">3 Nov</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#636366" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+<button style="width: 100%; height: 46px; box-sizing: border-box; padding: 0 14px; border: 0; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.rename}}"></path></svg><span style="flex: 1; text-align: left;">Rename</span></button>
+</div>
+<button style="width: 100%; height: 46px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: 12px; background: #2C2C2E; color: #FF453A; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.del}}"></path></svg><span style="flex: 1; text-align: left;">Delete</span></button>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"menuStyle":{"editor":"enum","default":"list","options":["list","bar","sheet","due","picker"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const style = this.props.menuStyle ?? 'list';
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      progress: CIRCLE,
+      progressFill: 'M12 3a9 9 0 0 1 0 18z',
+      done: CIRCLE + ' M8 12.5l3 3l5.5-6',
+      wontdo: CIRCLE + ' M8 12h8',
+      due: 'M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4',
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13'
+    };
+    const WHITE = '#FFFFFF';
+    const RED = '#FF453A';
+    const all = [
+      { key: 'progress', label: 'In progress', short: 'Doing', d: icons.progress, fd: icons.progressFill, color: WHITE },
+      { key: 'done', label: 'Done', short: 'Done', d: icons.done, fd: '', color: WHITE },
+      { key: 'wontdo', label: 'Won’t do', short: 'Won’t do', d: icons.wontdo, fd: '', color: WHITE },
+      { key: 'due', label: 'Due date', short: 'Due', d: icons.due, fd: '', color: WHITE, value: '3 Nov' },
+      { key: 'rename', label: 'Rename', short: 'Rename', d: icons.rename, fd: '', color: WHITE },
+      { key: 'del', label: 'Delete', short: 'Delete', d: icons.del, fd: '', color: RED }
+    ].map((a) => ({ ...a, hasValue: !!a.value }));
+    const pick = (keys) => all.filter((a) => keys.includes(a.key));
+    const withSeps = (rows) => rows.map((r, i) => ({ ...r, sep: i < rows.length - 1 ? '0.5px solid #48484A' : '0' }));
+    const groups = [
+      { rows: withSeps(pick(['progress', 'done', 'wontdo'])), gap: '0' },
+      { rows: withSeps(pick(['due', 'rename'])), gap: '8px solid #1C1C1E' },
+      { rows: withSeps(pick(['del'])), gap: '8px solid #1C1C1E' }
+    ];
+    const accent = '#8A6CEF';
+    const dueRows = [
+      { label: 'Today', value: 'Fri' },
+      { label: 'Tomorrow', value: 'Sat' },
+      { label: 'Next week', value: 'Mon, 2 Nov' },
+      { label: 'Pick a date', value: '3 Nov' }
+    ].map((r, i, a) => ({ ...r, sep: i < a.length - 1 ? '0.5px solid #48484A' : '0' }));
+    const days = [];
+    const start = new Date(2026, 9, 26);
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const inMonth = d.getMonth() === 10;
+      const isToday = d.getMonth() === 9 && d.getDate() === 30;
+      const isSelected = inMonth && d.getDate() === 3;
+      days.push({
+        n: d.getDate(),
+        bg: isSelected ? accent : 'transparent',
+        color: isSelected ? '#FFFFFF' : isToday ? accent : inMonth ? '#FFFFFF' : '#636366',
+        weight: isSelected || isToday ? 700 : 400
+      });
+    }
+    return {
+      isDue: style === 'due',
+      isPicker: style === 'picker',
+      dueRows,
+      days,
+      weekdays: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+      accent,
+      isList: style === 'list',
+      isBar: style === 'bar',
+      isSheet: style === 'sheet',
+      showCard: style !== 'sheet',
+      groups,
+      actions: all,
+      statusTiles: pick(['progress', 'done', 'wontdo']),
+      icons
+    };
+  }
+}
+</script>
+</body>
+</html>
