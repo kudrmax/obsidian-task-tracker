@@ -58,6 +58,12 @@ export class Timeline {
 		return pxToMinutes(clientY - this.canvas.getBoundingClientRect().top, this.hourPx);
 	}
 
+	/** Lays out at the current hour's height, then scrolls so that `minutes` stays under `clientY`. */
+	zoomTo(minutes: number, clientY: number): void {
+		this.layout();
+		this.el.scrollTop = this.el.getBoundingClientRect().top + this.canvas.offsetTop + this.yOf(minutes) - clientY;
+	}
+
 	/** Puts the minute at `fraction` of the visible height. */
 	scrollTo(minutes: number, fraction: number): void {
 		this.el.scrollTop = Math.max(0, this.yOf(minutes) - fraction * this.el.clientHeight);

@@ -11,12 +11,13 @@ import type { DragPayload, DropResult, DropTarget } from "./drag/DropTarget";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
-import { stepFor } from "./zoomLevels";
+import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { Divider } from "./Divider";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
+import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -41,13 +42,14 @@ export class TaskCalendarView extends ItemView {
 	private rightEl: HTMLElement | null = null;
 	private allDayEl: HTMLElement | null = null;
 	private timeline: Timeline | null = null;
-	private hourPx = DESIGN.hourPx;
+	private hourPx: number = DESIGN.hourPx;
 	private events: readonly CalendarEvent[] = [];
 	private scrolledFor: LocalDate | null = null;
 	private readonly arbiter = new GestureArbiter();
 	private readonly drag: DragController;
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
+	private zoomFrame = 0;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private day: DayView | null = null;
@@ -125,6 +127,16 @@ export class TaskCalendarView extends ItemView {
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
 		});
 		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels), date: () => this.selectedDate });
+		const timeline = this.timeline;
+		new PinchZoom(timeline.el, {
+			hourPx: () => this.hourPx,
+			min: Math.min(...this.settings.zoomLevels.map((l) => l.hourPx)),
+			max: Math.max(...this.settings.zoomLevels.map((l) => l.hourPx)),
+			arbiter: this.arbiter,
+			minutesAt: (y) => timeline.minutesAt(y),
+			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
+			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
+		});
 		this.newTask = new NewTaskButton(root, false, { onCreate: (text) => this.act(() => this.deps.tasks.createInList(this.selectedDate, text)) });
 		this.newSoon = new NewTaskButton(root, true, { onCreate: (text) => this.act(() => this.deps.tasks.createInSoon(text)) });
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
@@ -178,6 +190,27 @@ export class TaskCalendarView extends ItemView {
 			new Notice(error.message);
 		}
 		await this.refresh();
+	}
+
+	private zoom(hourPx: number, anchor: ZoomAnchor): void {
+		if (this.zoomFrame) cancelAnimationFrame(this.zoomFrame);
+		this.zoomFrame = 0;
+		this.hourPx = hourPx;
+		this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
+	}
+
+	/** Released, the scale glides to the nearest level. */
+	private settleZoom(from: number, anchor: ZoomAnchor): void {
+		const to = nearestLevel(from, this.settings.zoomLevels).hourPx;
+		const started = performance.now();
+		const frame = (now: number) => {
+			const t = Math.min(1, (now - started) / LAYOUT.zoomSnapMs);
+			const eased = 1 - (1 - t) * (1 - t);
+			this.hourPx = from + (to - from) * eased;
+			this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
+			this.zoomFrame = t < 1 ? requestAnimationFrame(frame) : 0;
+		};
+		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
 	private dropTargets(): DropTarget[] {
