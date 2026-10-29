@@ -3,9 +3,11 @@
 // (a pixel at (x, y) in a is compared with (x + dx, y + dy) in b); `region` restricts the comparison, in a's pixels.
 // The diff PNG shows a dimmed, with the differing pixels in red.
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { decodePng, encodePng } from "./png.mjs";
 
-const args = process.argv.slice(2);
+const cli = process.argv[1] === fileURLToPath(import.meta.url);
+const args = cli ? process.argv.slice(2) : [];
 const option = (name, fallback) => {
 	const i = args.indexOf(name);
 	if (i < 0) return fallback;
@@ -45,7 +47,7 @@ export function diffImages(a, b, { tolerance = 0, dx = 0, dy = 0, region = null 
 	return { compared, differing, percent: compared ? (differing / compared) * 100 : 0, image: { width: a.width, height: a.height, data: out } };
 }
 
-if (aPath && bPath) {
+if (cli && aPath && bPath) {
 	const a = decodePng(readFileSync(aPath));
 	const b = decodePng(readFileSync(bPath));
 	const result = diffImages(a, b, { tolerance, dx, dy, region });

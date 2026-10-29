@@ -1,5 +1,6 @@
 import type { TaskDraft } from "../../application/contracts";
 import { formatTime } from "../dates";
+import { DURATION, tokenMs } from "../design";
 import { el } from "../dom";
 import { MonthPicker } from "../menu/MonthPicker";
 import type { LocalDate, Slot } from "../types";
@@ -53,6 +54,7 @@ export class TaskSheet {
 		}
 		this.render();
 		this.focusEnd();
+		requestAnimationFrame(() => this.el.classList.add("is-shown"));
 	}
 
 	private focusEnd(): void {
@@ -115,7 +117,8 @@ export class TaskSheet {
 	close(): void {
 		if (this.closed) return;
 		this.closed = true;
-		this.el.remove();
+		this.el.classList.remove("is-shown");
+		window.setTimeout(() => this.el.remove(), tokenMs(this.el, DURATION.fade));
 		this.opts.onClose?.();
 	}
 }

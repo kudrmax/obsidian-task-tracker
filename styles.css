@@ -249,6 +249,8 @@ body {
 
 	/* Opacity */
 	--tc-disabled: 0.4;
+	/* A row or a text button while the finger is on it. */
+	--tc-pressed: 0.55;
 
 	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -256,6 +258,9 @@ body {
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
 	--tc-duration-pull: 200ms;
+	--tc-duration-fade: 160ms;
+	/* The task screen rises this far as it fades in. */
+	--tc-rise: 12px;
 	--tc-duration-spin: 900ms;
 	--tc-turn: 1turn;
 }
@@ -264,8 +269,9 @@ body {
 .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
 .task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
-/* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground. */
-.task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active { background: transparent; box-shadow: none; }
+/* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
+.task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active { background: transparent; box-shadow: none; }
+.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-seg-btn:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
 .task-calendar svg { display: block; }
 
 /* The day row: the arrows round the day's name, the switch of the right column. */
@@ -428,7 +434,8 @@ body {
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
-.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
+.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
+.tc-sheet.is-shown { opacity: 1; transform: none; }
 .tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
 .task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 .task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }

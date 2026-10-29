@@ -66,6 +66,7 @@ export const DURATION = {
 	collapse: "--tc-duration-collapse",
 	fly: "--tc-duration-fly",
 	pull: "--tc-duration-pull",
+	fade: "--tc-duration-fade",
 } as const;
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */

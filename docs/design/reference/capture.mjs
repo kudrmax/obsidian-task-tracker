@@ -152,6 +152,7 @@ for (const state of STATES) {
 		actual = decodePng(buffer);
 	} else actual = await shot(file);
 	await state.after?.();
+	await sleep(400);
 	const expected = decodePng(readFileSync(join(here, `${state.board}@2x.png`)));
 	const exact = diffImages(expected, actual, { tolerance: 0, dx: 0, dy: state.frame.dy, region: state.frame.region });
 	const loose = diffImages(expected, actual, { tolerance: 32, dx: 0, dy: state.frame.dy, region: state.frame.region });
