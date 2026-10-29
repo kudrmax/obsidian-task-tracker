@@ -71,14 +71,11 @@ export class DragController {
 
 	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the task screen. */
 	attachCanvas(canvas: HTMLElement): void {
-		const onEmpty = (e: PointerEvent) => {
-			const target = e.target as Element | null;
-			if (target?.closest(".tc-block, .tc-event, .tc-drop")) return;
-			this.beginNewSlot(canvas, e);
-		};
+		const onEmpty = (e: PointerEvent) => this.beginNewSlot(canvas, e);
 		new LongPress(canvas, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
+			accepts: (e) => !(e.target as Element | null)?.closest(".tc-block, .tc-event, .tc-drop"),
 			onStart: onEmpty,
 			onLongTap: onEmpty,
 		});
@@ -95,9 +92,9 @@ export class DragController {
 		};
 		const finish = (ev: PointerEvent, open: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
-			canvas.removeEventListener("pointermove", move);
-			canvas.removeEventListener("pointerup", up);
-			canvas.removeEventListener("pointercancel", cancel);
+			document.removeEventListener("pointermove", move);
+			document.removeEventListener("pointerup", up);
+			document.removeEventListener("pointercancel", cancel);
 			releasePointer(canvas, e.pointerId);
 			this.deps.arbiter.release(NEW_SLOT);
 			if (open) this.deps.onNewSlot({ date: this.deps.date(), ...drop.slot });
@@ -105,9 +102,9 @@ export class DragController {
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);
-		canvas.addEventListener("pointermove", move);
-		canvas.addEventListener("pointerup", up);
-		canvas.addEventListener("pointercancel", cancel);
+		document.addEventListener("pointermove", move);
+		document.addEventListener("pointerup", up);
+		document.addEventListener("pointercancel", cancel);
 	}
 
 	private attachMenu(el: HTMLElement, item: TaskItem): void {
@@ -150,14 +147,14 @@ export class DragController {
 			if (ev.pointerId === e.pointerId) void session.cancel();
 		};
 		const detach = () => {
-			source.removeEventListener("pointermove", move);
-			source.removeEventListener("pointerup", up);
-			source.removeEventListener("pointercancel", cancel);
+			document.removeEventListener("pointermove", move);
+			document.removeEventListener("pointerup", up);
+			document.removeEventListener("pointercancel", cancel);
 			releasePointer(source, e.pointerId);
 		};
-		source.addEventListener("pointermove", move);
-		source.addEventListener("pointerup", up);
-		source.addEventListener("pointercancel", cancel);
+		document.addEventListener("pointermove", move);
+		document.addEventListener("pointerup", up);
+		document.addEventListener("pointercancel", cancel);
 	}
 
 	private beginResize(block: HTMLElement, handle: HTMLElement, item: TaskItem, e: PointerEvent): void {
@@ -180,9 +177,9 @@ export class DragController {
 		};
 		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
-			handle.removeEventListener("pointermove", move);
-			handle.removeEventListener("pointerup", up);
-			handle.removeEventListener("pointercancel", cancel);
+			document.removeEventListener("pointermove", move);
+			document.removeEventListener("pointerup", up);
+			document.removeEventListener("pointercancel", cancel);
 			releasePointer(handle, e.pointerId);
 			this.deps.arbiter.release(RESIZE);
 			block.classList.remove("is-resizing");
@@ -196,8 +193,8 @@ export class DragController {
 		};
 		const up = (ev: PointerEvent) => void finish(ev, true);
 		const cancel = (ev: PointerEvent) => void finish(ev, false);
-		handle.addEventListener("pointermove", move);
-		handle.addEventListener("pointerup", up);
-		handle.addEventListener("pointercancel", cancel);
+		document.addEventListener("pointermove", move);
+		document.addEventListener("pointerup", up);
+		document.addEventListener("pointercancel", cancel);
 	}
 }

@@ -79,3 +79,16 @@ describe("LongPress", () => {
 		expect(log).toEqual([]);
 	});
 });
+
+describe("LongPress accepts", () => {
+	it("ignores a press the element does not accept", () => {
+		vi.useFakeTimers();
+		const el = document.createElement("div");
+		const onStart = vi.fn();
+		new LongPress(el, { delayMs: () => 250, busy: () => false, onStart, accepts: () => false });
+		el.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, pointerType: "touch", clientX: 10, clientY: 10, bubbles: true }));
+		vi.advanceTimersByTime(300);
+		expect(onStart).not.toHaveBeenCalled();
+		vi.useRealTimers();
+	});
+});

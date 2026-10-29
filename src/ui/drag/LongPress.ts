@@ -11,6 +11,8 @@ export interface LongPressOptions {
 	onTap?(e: PointerEvent): void;
 	/** A mouse held still for the delay. */
 	onLongTap?(e: PointerEvent): void;
+	/** Whether this press is for this element at all: a press that starts on a child with gestures of its own is not. */
+	accepts?(e: PointerEvent): boolean;
 }
 
 interface Press {
@@ -38,6 +40,7 @@ export class LongPress {
 
 	private down(e: PointerEvent): void {
 		if (!e.isPrimary || e.button !== 0 || this.press || this.opts.busy()) return;
+		if (this.opts.accepts && !this.opts.accepts(e)) return;
 		const press: Press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse", timer: null, last: e };
 		press.timer = window.setTimeout(() => this.fire(press), this.opts.delayMs());
 		this.press = press;

@@ -61,7 +61,11 @@ export class TaskMenu {
 		this.backdrop = new Backdrop(() => this.close());
 		this.anchor = context.source.getBoundingClientRect();
 		this.lifted = el(document.body, "div", "tc-lifted");
-		fillCard(this.lifted, context.item, { showDue: true });
+		if (context.source.classList.contains("tc-block")) {
+			this.lifted.classList.add("is-block");
+			if (context.item.status === "inProgress") el(this.lifted, "span", "tc-strip");
+			el(this.lifted, "div", "tc-item-title", context.item.text);
+		} else fillCard(this.lifted, context.item, { showDue: true });
 		this.lifted.style.left = px(this.anchor.left);
 		this.lifted.style.top = px(this.anchor.top);
 		this.lifted.style.width = px(this.anchor.width);

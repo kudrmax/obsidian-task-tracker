@@ -52,6 +52,7 @@ export class TaskCalendarView extends ItemView {
 	private hourPx: number = DESIGN.hourPx;
 	private events: readonly CalendarEvent[] = [];
 	private statuses: readonly SourceStatus[] = [];
+	private renderPending = false;
 	private scrolledFor: LocalDate | null = null;
 	private readonly arbiter = new GestureArbiter();
 	private readonly drag: DragController;
@@ -170,9 +171,16 @@ export class TaskCalendarView extends ItemView {
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
 		this.registerDomEvent(document, "touchmove", (e) => this.arbiter.busy && e.preventDefault(), { passive: false });
 		for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
-		this.registerInterval(window.setInterval(() => this.render(), MINUTE_MS));
+		this.arbiter.onIdle(() => this.renderPending && this.render());
+		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
 		await this.refresh();
+	}
+
+	/** Once a minute: the now line moves, and a day that ended releases its slots (the file is written only when a rule fires). */
+	private async tick(): Promise<void> {
+		this.render();
+		await this.deps.tasks.normalize();
 	}
 
 	override async onClose(): Promise<void> {
@@ -312,6 +320,7 @@ export class TaskCalendarView extends ItemView {
 
 	private async refresh(): Promise<void> {
 		try {
+			await this.deps.tasks.normalize();
 			this.day = await this.deps.tasks.dayView(this.selectedDate);
 			this.missing = false;
 		} catch (error) {
@@ -331,7 +340,13 @@ export class TaskCalendarView extends ItemView {
 		this.render();
 	}
 
+	/** A gesture keeps the elements it holds: the redraw waits until it ends. */
 	render(): void {
+		if (this.arbiter.busy) {
+			this.renderPending = true;
+			return;
+		}
+		this.renderPending = false;
 		const root = this.contentEl;
 		if (!this.header || !this.leftEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
 		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));

@@ -39,8 +39,9 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 }
 
 /** Puts a fixed panel under `anchor`, aligned to its left edge, or over it when it would not fit below; the sheet adds the gap. */
-export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, viewportBottom: number): void {
-	panel.style.left = px(anchor.left);
+export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, viewportBottom: number, viewportRight = window.innerWidth): void {
+	const width = panel.getBoundingClientRect().width;
+	panel.style.left = px(Math.max(0, Math.min(anchor.left, viewportRight - gap - width)));
 	const fitsBelow = anchor.bottom + gap + panel.getBoundingClientRect().height <= viewportBottom;
 	panel.classList.toggle("is-above", !fitsBelow);
 	panel.style.setProperty(PROPERTY.panelY, px(fitsBelow ? anchor.bottom : viewportBottom - anchor.top));
