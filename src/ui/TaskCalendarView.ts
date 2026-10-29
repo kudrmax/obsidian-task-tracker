@@ -100,6 +100,7 @@ export class TaskCalendarView extends ItemView {
 		return "calendar-days";
 	}
 
+	/** Obsidian opens its side panels on swipes from the screen's edges; inside the view the fingers belong to the view. */
 	override async onOpen(): Promise<void> {
 		const root = this.contentEl;
 		clear(root);
@@ -168,6 +169,7 @@ export class TaskCalendarView extends ItemView {
 		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
 		this.registerDomEvent(document, "touchmove", (e) => this.arbiter.busy && e.preventDefault(), { passive: false });
+		for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.registerInterval(window.setInterval(() => this.render(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
 		await this.refresh();

@@ -18,6 +18,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, "diff");
 mkdirSync(out, { recursive: true });
 const port = Number(process.argv[2] ?? 9333);
+/** Board names to capture; none means all. */
+const only = process.argv.slice(3);
 
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
 const page = targets.find((t) => t.type === "page" && t.url === "app://obsidian.md/index.html");
@@ -54,7 +56,7 @@ async function click(x, y, button = "left") {
 }
 async function clickSelector(selector, text = "", index = 0) {
 	const at = await evaluate(`(() => { const all = [...document.querySelectorAll(${JSON.stringify(selector)})].filter(e => !${JSON.stringify(text)} || e.textContent.trim().startsWith(${JSON.stringify(text)})); const e = all[${index}]; if (!e) return null; const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
-	if (!at) throw new Error(`nothing to click: ${selector} ${text}`);
+	if (!at) throw new Error(`nothing to click: ${selector} ${text}; on screen: ${await evaluate("JSON.stringify({ drops: document.querySelectorAll('.tc-drop').length, sheets: document.querySelectorAll('.tc-sheet').length, backdrops: document.querySelectorAll('.tc-backdrop').length, busy: " + view + ".arbiter.busy })")}`);
 	await click(at[0], at[1]);
 }
 const park = () => mouse("mouseMoved", 200, 700, { button: "none" });
@@ -137,6 +139,7 @@ const STATES = [
 await reload();
 const results = [];
 for (const state of STATES) {
+	if (only.length && !only.includes(state.board)) continue;
 	await toNine();
 	await state.run();
 	await sleep(350);
