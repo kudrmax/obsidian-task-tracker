@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Экран: список и календарь</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<div style="position: absolute; left: 0; right: 0; top: 56px; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; box-sizing: border-box; z-index: 6;">
+<button aria-label="Toggle sidebar" style="width: 46px; height: 46px; border-radius: 23px; border: 0; padding: 0; background: #1F1F21; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg></button>
+<span style="font-size: 17px; font-weight: 600; color: #FFFFFF;">Task Calendar</span>
+<button aria-label="More actions" style="width: 56px; height: 46px; border-radius: 23px; border: 0; padding: 0; background: #1F1F21; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button>
+</div>
+
+<div style="position: absolute; left: 0; right: 0; top: 118px; height: 36px; padding: 0 12px 0 10px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+<button aria-label="Previous day" style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 18px; border: 0; padding: 0; background: transparent; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Today, back to today" style="height: 36px; border: 0; padding: 0 4px; background: transparent; color: #FFFFFF; font: inherit; font-size: 20px; font-weight: 700; white-space: nowrap;">{{dayTitle}}</button>
+<button aria-label="Next day" style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 18px; border: 0; padding: 0; background: transparent; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+</div>
+</div>
+
+<div style="position: absolute; left: 0; top: 166px; bottom: 0; width: {{listW}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{tasks}}" as="t" hint-placeholder-count="7">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: #1C1C1E; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
+</sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{t.title}}</div>
+<sc-if value="{{t.showDue}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA; font-variant-numeric: tabular-nums;">{{t.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #8E8E93; letter-spacing: 0.3px;">{{t.mon}}</span></span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="position: absolute; left: {{listW}}px; top: 166px; bottom: 0; width: 16px; display: flex; justify-content: center;">
+<div style="width: 1px; height: 100%; background: #2C2C2E;"></div>
+<button aria-label="Resize columns" style="position: absolute; top: 260px; left: 3px; width: 10px; height: 52px; border: 0; padding: 0; border-radius: 5px; background: #48484A;"></button>
+</div>
+
+<div style="position: absolute; left: {{calLeft}}px; right: 0; top: 166px; bottom: 0; overflow: hidden;">
+<div style="margin-left: 28px; margin-right: 4px; height: 22px; border-radius: 6px; background: rgba(48,209,88,0.22); display: flex; overflow: hidden;">
+<div style="width: 3px; flex-shrink: 0; background: #30D158;"></div>
+<div style="flex: 1; min-width: 0; padding: 0 6px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #86E3A0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">День рождения Ани</div>
+</div>
+
+<div style="position: absolute; top: {{timelineOffset}}px; left: 0; right: 0; height: 640px;">
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="11">
+<sc-if value="{{h.showLabel}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; top: {{h.labelTop}}px; left: 0; width: 22px; text-align: right; font-size: 11px; line-height: 14px; color: #8E8E93; font-variant-numeric: tabular-nums;">{{h.label}}</div>
+</sc-if>
+<div style="position: absolute; top: {{h.top}}px; left: 26px; right: 0; height: 1px; background: #232325;"></div>
+</sc-for>
+
+<div style="position: absolute; top: 0; bottom: 0; left: 28px; right: 4px;">
+<sc-for list="{{items}}" as="it" hint-placeholder-count="9">
+<sc-if value="{{it.isEvent}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; {{it.pos}} box-sizing: border-box; overflow: hidden; border-radius: 6px; background: {{it.bg}}; display: flex;">
+<div style="width: 3px; flex-shrink: 0; background: {{it.bar}};"></div>
+<div style="flex: 1; min-width: 0; padding: {{it.pad}};">
+<div style="font-size: {{it.fs}}px; line-height: {{it.lh}}px; font-weight: 600; color: {{it.text}}; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">{{it.title}}</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{it.isTask}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; {{it.pos}} box-sizing: border-box; overflow: hidden; border-radius: 8px; background: #1C1C1E; box-shadow: inset 0 0 0 1px #3A3A3C; padding: {{it.pad}}; z-index: 1;">
+<sc-if value="{{it.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
+</sc-if>
+<div style="font-size: {{it.fs}}px; line-height: {{it.lh}}px; font-weight: 600; color: #FFFFFF; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">{{it.title}}</div>
+<div style="position: absolute; bottom: 3px; left: 50%; width: 16px; height: 3px; margin-left: -8px; border-radius: 2px; background: #636366;"></div>
+</div>
+</sc-if>
+</sc-for>
+
+<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; top: {{drop.top}}px; height: {{drop.height}}px; left: 1px; right: 1px; box-sizing: border-box; border-radius: 8px; border: 1.5px dashed {{accent}}; background: rgba(149,128,255,0.12); padding: 4px 7px; z-index: 2;">
+<span style="font-size: 12px; font-weight: 600; color: {{accent}}; font-variant-numeric: tabular-nums;">16:30</span>
+</div>
+</sc-if>
+</div>
+
+<div style="position: absolute; top: {{nowTop}}px; left: 0; right: 0; height: 16px; display: flex; align-items: center; z-index: 3;">
+<span style="width: 34px; height: 16px; flex-shrink: 0; border-radius: 8px; background: #D92C24; color: #FFFFFF; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;">14:20</span>
+<div style="flex: 1; height: 2px; background: #D92C24;"></div>
+</div>
+</div>
+</div>
+
+<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{floatLeft}}px; top: {{floatTop}}px; width: 190px; height: 42px; box-sizing: border-box; background: #2C2C2E; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px; box-shadow: 0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A; z-index: 5;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #AEAEB2; letter-spacing: 0.3px;">NOV</span></span>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 0; bottom: 76px; width: {{listW}}px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: #000000; z-index: 4;">
+<button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed #3A3A3C; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: #8E8E93; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
+</div>
+
+<nav aria-label="Obsidian navigation" style="position: absolute; left: 42px; right: 42px; bottom: 19px; height: 49px; border-radius: 25px; background: #2A2A2C; display: flex; align-items: center; justify-content: space-around; z-index: 6; color: #E5E5EA;">
+<button aria-label="Back" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Forward" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: #6C6C70; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+<button aria-label="Search" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg></button>
+<button aria-label="New note" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+<button aria-label="Tabs" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="24" height="22" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="4" width="22" height="16" rx="3.5"></rect><text x="13" y="16" text-anchor="middle" font-size="10" font-family="-apple-system, Inter, sans-serif" fill="currentColor" stroke="none">20</text></svg></button>
+<button aria-label="Menu" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const listW = Number(this.props.listWidth ?? 187);
+    const dragging = this.props.dragging === true || this.props.dragging === 'true';
+    const accent = this.props.accent ?? '#9580FF';
+    const HOUR = 56;
+    const START = 9;
+    const COLUMNS_TOP = 166;
+    const TIMELINE_OFFSET = 34;
+    const DUE_MIN_WIDTH = 160;
+    const palette = {
+      work: { bg: 'rgba(10,132,255,0.24)', bar: '#0A84FF', text: '#8CC6FF' },
+      google: { bg: 'rgba(255,159,10,0.22)', bar: '#FF9F0A', text: '#FFC56B' },
+      pink: { bg: 'rgba(255,55,95,0.22)', bar: '#FF375F', text: '#FF9AAE' },
+      green: { bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0' }
+    };
+    const stripColor = this.props.stripColor ?? '#8A6CEF';
+    const tasks = [
+      { title: 'Созвониться с врачом' },
+      { title: 'Купить билеты в Белград', day: '3', mon: 'NOV', dragged: true },
+      { title: 'Сдать налоговую декларацию', day: '30', mon: 'OCT' },
+      { title: 'Записаться в барбершоп', progress: true, day: '2', mon: 'NOV' },
+      { title: 'Посмотреть доклад про local-first приложения', progress: true },
+      { title: 'Чай масала' },
+      { title: 'Позвонить маме' }
+    ]
+      .filter((t) => !(dragging && t.dragged))
+      .map((t) => ({ ...t, progress: !!t.progress, showDue: !!t.day && listW >= DUE_MIN_WIDTH }));
+    const raw = [
+      { kind: 'event', title: 'Стендап', s: 9, e: 9.25, cal: 'work' },
+      { kind: 'event', title: '1:1 с Костей', s: 10, e: 11, cal: 'work' },
+      { kind: 'task', title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true },
+      { kind: 'event', title: 'Обед с Вадимом', s: 12.5, e: 13.5, cal: 'google' },
+      { kind: 'task', title: 'Разобрать почту', s: 14, e: 15 },
+      { kind: 'event', title: 'Планирование спринта', s: 15, e: 16.5, cal: 'work', col: 0, cols: 2 },
+      { kind: 'event', title: 'Созвон с банком', s: 15.5, e: 16, cal: 'pink', col: 1, cols: 2 },
+      { kind: 'task', title: 'Заказать продукты', s: 17, e: 17.5 },
+      { kind: 'event', title: 'Тренировка', s: 18, e: 19.5, cal: 'green' }
+    ];
+    const items = raw
+      .filter((r) => !(dragging && r.s === 17))
+      .map((r) => {
+        const col = r.col ?? 0;
+        const cols = r.cols ?? 1;
+        const top = (r.s - START) * HOUR + 1;
+        const height = (r.e - r.s) * HOUR - 2;
+        const tiny = height < 24;
+        const colors = r.kind === 'event' ? palette[r.cal] : {};
+        return {
+          ...colors,
+          title: r.title,
+          isEvent: r.kind === 'event',
+          isTask: r.kind === 'task',
+          progress: !!r.progress,
+          pos: 'top: ' + top + 'px; height: ' + height + 'px; left: calc(' + (col * 100 / cols) + '% + 1px); width: calc(' + (100 / cols) + '% - 2px);',
+          pad: tiny ? '0 5px' : '4px 6px',
+          fs: tiny ? 10 : 12,
+          lh: tiny ? Math.max(height - 2, 10) : 15
+        };
+      });
+    const nowY = (14 + 20 / 60 - START) * HOUR;
+    const hours = [];
+    for (let h = START; h <= 19; h++) {
+      const top = (h - START) * HOUR;
+      hours.push({ label: String(h), top, labelTop: top - 7, showLabel: Math.abs(top - nowY) > 20 });
+    }
+    const drop = { top: (16.5 - START) * HOUR + 1, height: HOUR - 2 };
+    const calLeft = listW + 16;
+    return {
+      listW,
+      calLeft,
+      dragging,
+      dayTitle: 'Today',
+      tasks,
+      items,
+      hours,
+      drop,
+      timelineOffset: TIMELINE_OFFSET,
+      nowTop: nowY - 8,
+      floatLeft: Math.max(calLeft - 60, 10),
+      floatTop: COLUMNS_TOP + TIMELINE_OFFSET + drop.top - 20,
+      accent,
+      stripColor
+    };
+  }
+}
+</script>
+</body>
+</html>

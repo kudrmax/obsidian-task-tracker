@@ -1,0 +1,56 @@
+{
+  "v": 3,
+  "attachments": {},
+  "pages": [
+    {"id": "prod", "name": "Prod"},
+    {"id": "brainstorm", "name": "Brainstorm"}
+  ],
+  "boards": {
+    "ScreenLeft.dc.html": {"h": 844, "title": "Разделитель сдвинут влево", "w": 390, "x": 0, "y": 0, "page": "prod"},
+    "Screen.dc.html": {"h": 844, "title": "Разделитель по центру", "w": 390, "x": 470, "y": 0, "page": "prod"},
+    "ScreenRight.dc.html": {"h": 844, "title": "Разделитель сдвинут вправо", "w": 390, "x": 940, "y": 0, "page": "prod"},
+    "ScreenDrag.dc.html": {"h": 844, "title": "Перетаскивание: список сомкнулся", "w": 390, "x": 1410, "y": 0, "page": "prod"},
+
+    "Main.dc.html": {"h": 844, "title": "A — плоский список", "w": 390, "x": 0, "y": 0, "page": "brainstorm"},
+    "ListB.dc.html": {"h": 844, "title": "B — карточки", "w": 390, "x": 470, "y": 0, "page": "brainstorm"},
+    "ListC.dc.html": {"h": 844, "title": "C — группа", "w": 390, "x": 940, "y": 0, "page": "brainstorm"},
+    "NarrowA.dc.html": {"h": 844, "title": "A — узкая колонка", "w": 390, "x": 0, "y": 1144, "page": "brainstorm"},
+    "NarrowB.dc.html": {"h": 844, "title": "B — узкая колонка", "w": 390, "x": 470, "y": 1144, "page": "brainstorm"},
+    "NarrowC.dc.html": {"h": 844, "title": "C — узкая колонка", "w": 390, "x": 940, "y": 1144, "page": "brainstorm"},
+    "CardsB1.dc.html": {"h": 844, "title": "B1 — значок play и дата текстом", "w": 390, "x": 0, "y": 2288, "page": "brainstorm"},
+    "CardsB2.dc.html": {"h": 844, "title": "B2 — точка и дата с иконкой", "w": 390, "x": 470, "y": 2288, "page": "brainstorm"},
+    "CardsB3.dc.html": {"h": 844, "title": "B3 — круглые бейджи", "w": 390, "x": 940, "y": 2288, "page": "brainstorm"},
+    "CardsB1Narrow.dc.html": {"h": 844, "title": "B1 — узкая колонка", "w": 390, "x": 0, "y": 3432, "page": "brainstorm"},
+    "CardsB2Narrow.dc.html": {"h": 844, "title": "B2 — узкая колонка", "w": 390, "x": 470, "y": 3432, "page": "brainstorm"},
+    "CardsB3Narrow.dc.html": {"h": 844, "title": "B3 — узкая колонка", "w": 390, "x": 940, "y": 3432, "page": "brainstorm"},
+    "Cal.dc.html": {"h": 844, "title": "Календарь дня", "w": 390, "x": 0, "y": 4576, "page": "brainstorm"},
+    "CalSplit.dc.html": {"h": 844, "title": "Задачу тащат из списка в календарь", "w": 390, "x": 470, "y": 4576, "page": "brainstorm"},
+    "InProgress.dc.html": {"h": 900, "title": "Задача в процессе: варианты", "w": 480, "x": 0, "y": 5720, "page": "brainstorm"},
+    "InProgress2.dc.html": {"h": 560, "title": "Задача в процессе: 1, 4 и 5 на десяти задачах", "w": 720, "x": 560, "y": 5720, "page": "brainstorm"},
+    "InProgress3.dc.html": {"h": 560, "title": "Задача в процессе: серый градиент, настраивается", "w": 720, "x": 1360, "y": 5720, "page": "brainstorm"},
+    "InProgress4.dc.html": {"h": 560, "title": "Задача в процессе: чёткая полоса", "w": 480, "x": 2160, "y": 5720, "page": "brainstorm"},
+    "ComparePurple.dc.html": {"h": 900, "title": "Цвет полосы: сейчас и Obsidian", "w": 860, "x": 2720, "y": 5720, "page": "brainstorm"}
+  },
+  "createdOnFiles": {"at": "2026-10-30T12:00:00Z", "v": 1},
+  "designSystems": [],
+  "launch": {"view": "canvas", "page": "prod"},
+  "noteOrder": ["main", "tokens", "step1", "step1narrow", "step11", "step11narrow", "step2", "step3"],
+  "notes": {
+    "main": {"kind": "title1", "maxW": 1800, "text": "Главный экран: список и календарь дня", "x": 0, "y": -300, "page": "prod"},
+    "tokens": {"x": 1880, "y": 0, "w": 360, "fill": "gray", "size": "s", "page": "prod", "text": "Для разработки\n\nФон #000000\nКарточка задачи #1C1C1E, высота 40, скругление 12, текст 15\nДлинный текст гаснет справа, без переноса\nЗадача «в процессе»: полоса 3 px слева, цвет акцента Obsidian (--interactive-accent, по умолчанию #8A6CEF)\nДата: число 13 bold над месяцем 9, справа; скрыта, если колонка уже 160 px\nНа таймлайне задача серая с рамкой #3A3A3C и ручкой растягивания, событие в цвете своего календаря с полосой 3 px, без подписи времени\nЛиния «сейчас» #D92C24\nНовая задача: кнопка внизу левой колонки, закреплена\nТап по Today, Tomorrow или дате возвращает на сегодня"},
+    "step1": {"kind": "title1", "maxW": 1330, "text": "Шаг 1. Список задач", "x": 0, "y": -300, "page": "brainstorm"},
+    "step1narrow": {"kind": "title1", "maxW": 1330, "text": "Та же колонка, ужатая разделителем", "x": 0, "y": 864, "page": "brainstorm"},
+    "step11": {"kind": "title1", "maxW": 1330, "text": "Шаг 1.1. Карточки в одну строку", "x": 0, "y": 1988, "page": "brainstorm"},
+    "step11narrow": {"kind": "title1", "maxW": 1330, "text": "Они же в узкой колонке", "x": 0, "y": 3132, "page": "brainstorm"},
+    "step2": {"kind": "title1", "maxW": 860, "text": "Шаг 2. Календарь", "x": 0, "y": 4276, "page": "brainstorm"},
+    "step3": {"kind": "title1", "maxW": 3580, "text": "Шаг 3. Подсветка задачи в процессе", "x": 0, "y": 5420, "page": "brainstorm"}
+  },
+  "order": [
+    "ScreenLeft.dc.html", "Screen.dc.html", "ScreenRight.dc.html", "ScreenDrag.dc.html",
+    "Main.dc.html", "ListB.dc.html", "ListC.dc.html", "NarrowA.dc.html", "NarrowB.dc.html", "NarrowC.dc.html",
+    "CardsB1.dc.html", "CardsB2.dc.html", "CardsB3.dc.html", "CardsB1Narrow.dc.html", "CardsB2Narrow.dc.html", "CardsB3Narrow.dc.html",
+    "Cal.dc.html", "CalSplit.dc.html",
+    "InProgress.dc.html", "InProgress2.dc.html", "InProgress3.dc.html", "InProgress4.dc.html", "ComparePurple.dc.html"
+  ],
+  "title": "Task Calendar"
+}
