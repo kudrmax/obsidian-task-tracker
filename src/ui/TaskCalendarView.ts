@@ -5,10 +5,11 @@ import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { addDays, localDateOf } from "./dates";
 import { DayHeader } from "./DayHeader";
 import { dayTitle } from "./dayTitle";
-import { PROPERTY } from "./design";
+import { LAYOUT, PROPERTY } from "./design";
 import { Divider } from "./Divider";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
+import { TaskList } from "./TaskList";
 import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
@@ -26,6 +27,7 @@ export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
 	private header: DayHeader | null = null;
 	private leftEl: HTMLElement | null = null;
+	private list: TaskList | null = null;
 	private rightEl: HTMLElement | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
@@ -66,6 +68,10 @@ export class TaskCalendarView extends ItemView {
 			onMode: (mode) => void this.setMode(mode),
 		});
 		this.leftEl = el(root, "div", "tc-left");
+		this.list = new TaskList(el(this.leftEl, "div"), {
+			items: () => this.day?.list ?? [],
+			showDue: () => this.settings.listWidth >= LAYOUT.dueMinListWidth,
+		});
 		new Divider(el(root, "div"), {
 			width: () => this.settings.listWidth,
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
@@ -143,8 +149,10 @@ export class TaskCalendarView extends ItemView {
 
 	render(): void {
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.rightEl || !this.newTask || !this.newSoon) return;
+		if (!this.header || !this.leftEl || !this.rightEl || !this.newTask || !this.newSoon || !this.list) return;
+		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
 		this.header.render();
+		this.list.render();
 		root.classList.toggle("is-missing", this.missing);
 		const soon = this.settings.rightMode === "soon";
 		this.newSoon.el.style.display = soon && !this.missing ? "" : "none";
@@ -153,7 +161,6 @@ export class TaskCalendarView extends ItemView {
 		this.rightEl.style.display = this.missing ? "none" : "";
 		root.querySelector(".tc-missing")?.remove();
 		if (this.missing) this.renderMissing(root);
-		this.leftEl.classList.toggle("is-empty", !this.day?.list.length);
 	}
 
 	private renderMissing(root: HTMLElement): void {
