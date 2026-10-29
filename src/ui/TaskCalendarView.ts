@@ -1,10 +1,17 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, type DayView, StaleTaskError, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayView, StaleTaskError, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { addDays, localDateOf, minutesOf } from "./dates";
 import { DayHeader } from "./DayHeader";
+import { DragController } from "./drag/DragController";
+import { ListDrop } from "./drag/ListDrop";
+import type { DragPayload, DropResult, DropTarget } from "./drag/DropTarget";
+import { TimelineDrop } from "./drag/TimelineDrop";
+import { GestureArbiter } from "./gestures";
+import { detectHaptics, type HapticsHost } from "./haptics";
+import { stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { Divider } from "./Divider";
@@ -37,6 +44,10 @@ export class TaskCalendarView extends ItemView {
 	private hourPx = DESIGN.hourPx;
 	private events: readonly CalendarEvent[] = [];
 	private scrolledFor: LocalDate | null = null;
+	private readonly arbiter = new GestureArbiter();
+	private readonly drag: DragController;
+	private leftDrop: ListDrop | null = null;
+	private timelineDrop: TimelineDrop | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private day: DayView | null = null;
@@ -49,6 +60,19 @@ export class TaskCalendarView extends ItemView {
 	) {
 		super(leaf);
 		this.selectedDate = this.today();
+		this.drag = new DragController({
+			longPressMs: () => this.settings.longPressMs,
+			newTaskMinutes: () => this.settings.newTaskMinutes,
+			step: () => stepFor(this.hourPx, this.settings.zoomLevels),
+			date: () => this.selectedDate,
+			timeline: () => this.timeline,
+			targets: () => this.dropTargets(),
+			haptics: detectHaptics(window as unknown as HapticsHost),
+			arbiter: this.arbiter,
+			onResult: (drag, result) => this.applyDrop(drag, result),
+			onResize: (item, end) => this.act(() => this.deps.tasks.setSlot(item.key, { ...item.slot!, end })),
+			onMenu: (item, at) => this.showMenu(item, at),
+		});
 	}
 
 	override getViewType(): string {
@@ -79,7 +103,9 @@ export class TaskCalendarView extends ItemView {
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.day?.list ?? [],
 			showDue: () => this.settings.listWidth >= LAYOUT.dueMinListWidth,
+			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
 		new Divider(el(root, "div"), {
 			width: () => this.settings.listWidth,
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
@@ -96,10 +122,13 @@ export class TaskCalendarView extends ItemView {
 			tasks: () => this.day?.slotted ?? [],
 			events: () => this.events,
 			now: () => this.deps.clock.now(),
+			onBlock: (block, item) => this.drag.attachBlock(block, item),
 		});
+		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels), date: () => this.selectedDate });
 		this.newTask = new NewTaskButton(root, false, { onCreate: (text) => this.act(() => this.deps.tasks.createInList(this.selectedDate, text)) });
 		this.newSoon = new NewTaskButton(root, true, { onCreate: (text) => this.act(() => this.deps.tasks.createInSoon(text)) });
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
+		this.registerDomEvent(document, "touchmove", (e) => this.arbiter.busy && e.preventDefault(), { passive: false });
 		this.registerInterval(window.setInterval(() => this.render(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
 		await this.refresh();
@@ -140,16 +169,38 @@ export class TaskCalendarView extends ItemView {
 		this.render();
 	}
 
-	/** Runs one change to the file; a task changed under us is reported and the view redrawn. */
+	/** Runs one change to the file and redraws; a task changed under us is reported instead. */
 	private async act(change: () => Promise<void>): Promise<void> {
 		try {
 			await change();
 		} catch (error) {
-			if (error instanceof StaleTaskError) {
-				new Notice(error.message);
-				await this.refresh();
-			} else throw error;
+			if (!(error instanceof StaleTaskError)) throw error;
+			new Notice(error.message);
 		}
+		await this.refresh();
+	}
+
+	private dropTargets(): DropTarget[] {
+		const targets: DropTarget[] = [];
+		if (this.settings.rightMode === "calendar" && this.timelineDrop) targets.push(this.timelineDrop);
+		if (this.leftDrop) targets.push(this.leftDrop);
+		return targets;
+	}
+
+	/** What a drop means for the file: the table in spec §5.1. */
+	private applyDrop(drag: DragPayload, result: DropResult): Promise<void> {
+		const key = drag.item.key;
+		const tasks = this.deps.tasks;
+		return this.act(() => {
+			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
+			if (result.kind === "clearSlot" || drag.from === "timeline") return tasks.clearSlot(key);
+			if (drag.from === result.column) return tasks.moveBefore(key, result.before, this.selectedDate);
+			return result.column === "left" ? tasks.moveToList(key, this.selectedDate) : tasks.moveToSoon(key, this.selectedDate);
+		});
+	}
+
+	private showMenu(item: TaskItem, at: { x: number; y: number }): void {
+		new Notice(`${item.text} (${at.x}, ${at.y})`);
 	}
 
 	private async refresh(): Promise<void> {
