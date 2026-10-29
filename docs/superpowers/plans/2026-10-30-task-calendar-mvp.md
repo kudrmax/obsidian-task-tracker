@@ -276,6 +276,32 @@ it("adds missing sections on first write", …);
 
 - [ ] **Step 1: Реализовать, `npm run build` зелёный, коммит** `git commit -m "Settings tab and service factory"`
 
+### Task B11: Экран задачи и источники (добавлено по дизайну 30.10 вечер; после слияния `mvp` в ветку)
+
+**Files:**
+- Modify: `src/domain/operations.ts`, `src/application/TaskServiceImpl.ts`, `src/application/CalendarServiceImpl.ts`, `src/infrastructure/WorkCalendarFileSource.ts`, `src/application/EventSource.ts`
+- Test: `tests/domain/operations.test.ts`, `tests/application/TaskServiceImpl.test.ts`, `tests/application/CalendarServiceImpl.test.ts`
+
+**Interfaces:**
+- Consumes: новые контракты в `contracts.ts`: `Placement`, `TaskDraft`, `TaskService.create(draft, slot?)`, `TaskService.edit(key, draft)`, `TaskService.placementOf(item)`, `SourceStatus.detail`, `SourceStatus.stale`, `CalendarService.cached(date)`; `settings.staleAfterMinutes` (180).
+- Produces: `placeTask(doc, entry | null, draft, today, slot?)` в `operations.ts` (null = создать); `EventBatch.detail?: string` (устройство из work-файла).
+- Семантика: `create`/`edit` по комментариям в `contracts.ts`; `edit` с той же плиткой, что у задачи, меняет только текст и не двигает строку; `stale = !ok || (updatedAt != null && now − updatedAt > staleAfterMinutes)`; `cached(date)` отдаёт последний результат `eventsOn` для этой даты.
+
+- [ ] **Step 1: Тесты**
+
+```ts
+it("create with placement date before today lands at the end of Now", …);
+it("create with placement date after today lands at the end of Soon with the due date", …);
+it("create with a slot keeps the slot", …);
+it("edit with the same placement only renames in place", …);
+it("edit from now to soon moves to the end of Soon and drops the due date", …);
+it("placementOf returns date when the task has a due date", …);
+it("a source older than staleAfterMinutes is stale", …);
+it("cached returns the last result without fetching", …);
+```
+
+- [ ] **Step 2: Красные → реализовать → зелёные → коммит** `git commit -m "Task sheet placements, source staleness"`
+
 ### Task B10: Финал потока B
 
 - [ ] `npm test` и `npm run build` зелёные; `git log --oneline mvp..HEAD` показывает коммиты; отчёт оркестратору: список файлов, публичные сигнатуры, что отступает от плана и почему.
@@ -324,6 +350,8 @@ it("adds missing sections on first write", …);
 - [ ] **Step 2: `npm run build`, положить сборку в scratch-Obsidian (CLAUDE.md), открыть вид в эмуляции телефона, снимок; сравнить шапку, разделитель и переключатель с `docs/design/reference/Screen.png` наложением (скрипт `docs/design/reference/diff.mjs`: два PNG → процент отличающихся пикселей и PNG разницы; без зависимостей, PNG декодировать через `zlib` или снять снимки как JPEG=0 через CDP `Page.captureScreenshot` в формате png и сравнить через `sips`/`compare`, если ImageMagick есть)**
 - [ ] **Step 3: Коммит** `git commit -m "UI: view with day header, columns, divider, mode switch"`
 
+> **Изменение 30.10 (вечер):** дизайн дополнен экранами меню, срока, экрана задачи и источников (`docs/design/README.md`, разделы после «Перетаскивание»). Task C4: «New task» открывает экран задачи (Task C10), а не поле на месте. Task C8 заменена на C8′. Добавлены C10–C12. Перед ними слить `mvp` в ветку (`git merge mvp`): там новые контракты и настройки.
+
 ### Task C4: Список задач
 
 **Files:**
@@ -331,7 +359,7 @@ it("adds missing sections on first write", …);
 - Test: `tests/ui/TaskCard.test.ts` (happy-dom: структура карточки, полоса при `inProgress`, дата при `showDue`, формат месяца `NOV`)
 
 **Interfaces:**
-- Produces: `renderTaskCard(parent: HTMLElement, item: TaskItem, opts: { showDue: boolean }): HTMLElement`; `class TaskList { constructor(el, deps: { items(): readonly TaskItem[]; showDue(): boolean; onCreate(text: string): Promise<void>; onMenu(item, at: { x; y }): void }); render(): void }`; `class NewTaskButton` — кнопка → на том же месте карточка 40 px с `<input>` (фон `#1C1C1E`, 15 px, без рамки), фокус с клавиатурой; Enter → `onCreate`, поле очищается и остаётся; Escape или потеря фокуса с пустым полем → кнопка обратно.
+- Produces: `renderTaskCard(parent: HTMLElement, item: TaskItem, opts: { showDue: boolean }): HTMLElement`; `class TaskList { constructor(el, deps: { items(): readonly TaskItem[]; showDue(): boolean; onCreate(text: string): Promise<void>; onMenu(item, at: { x; y }): void }); render(): void }`; `class NewTaskButton` — кнопка по макету; нажатие вызывает `onNewTask()` (открывает экран задачи, Task C10; до C10 — заглушка, создающая задачу с текстом «New task» через `create`).
 - `DemoTaskService` реализует `TaskService` в памяти (массивы по секциям, те же данные, что в макете), все операции работают, `onChange` вызывается после каждой.
 
 - [ ] **Step 1: Тесты карточки красные → реализовать → зелёные**
@@ -377,27 +405,59 @@ it("adds missing sections on first write", …);
 
 - [ ] **Step 1: Тесты → реализовать → проба в scratch-Obsidian (два касания через CDP) → коммит** `git commit -m "UI: pinch zoom with grid-bound steps"`
 
-### Task C8: Режим Soon, меню задачи, переименование, due date
+### Task C8′: Режим Soon и меню задачи по макету
 
 **Files:**
-- Create: `src/ui/SoonList.ts`, `src/ui/TaskMenu.ts`, `src/ui/RenameModal.ts`, `src/ui/DueDateModal.ts`
-- Test: `tests/ui/TaskMenu.test.ts` (состав пунктов по статусу)
+- Create: `src/ui/SoonList.ts`, `src/ui/menu/TaskMenu.ts`, `src/ui/menu/MenuPanel.ts`, `src/ui/menu/DueSubmenu.ts`, `src/ui/menu/MonthPicker.ts`, `src/ui/menu/Backdrop.ts`, `src/ui/menu/dueOptions.ts`
+- Test: `tests/ui/dueOptions.test.ts`, `tests/ui/MonthPicker.test.ts`
 
 **Interfaces:**
-- Produces: `menuItems(item: TaskItem): readonly { id: "inProgress" | "todo" | "done" | "cancel" | "dueDate" | "rename" | "delete"; title: string }[]` (для `todo`: In progress, Done, Cancel, Due date, Rename, Delete; для `inProgress`: вместо In progress — Not in progress); `showTaskMenu(app, item, at, actions)` на `obsidian.Menu`; `RenameModal` (`Modal` с `<input>` и значением), `DueDateModal` (`Modal` с `<input type="date">` и кнопкой Remove, если дата есть). Долгое нажатие без движения на карточке или блоке → меню (на Mac — правая кнопка; долгое нажатие на Mac тоже, так как перетаскивание там стартует по сдвигу). Soon-список — тот же `TaskList` без даты, со своей кнопкой New task → `createInSoon`.
+- Produces: `menuRows(item: TaskItem): readonly MenuRow[]` (три группы по README; `In progress` ↔ `Stop progress`); `dueOptions(today: LocalDate, current: LocalDate | null): { today: {label, value}; tomorrow; nextWeek /* ближайший понедельник после сегодня */; pick: { value: string | "" }; canRemove: boolean }` (значения `Fri`, `Sat`, `Mon, 2 Nov`, `3 Nov` — en-GB); `class MonthPicker { constructor(el, opts: { month: LocalDate; today; selected: LocalDate | null; onPick(date): void; variant: "menu" | "sheet" }) }` — 42 ячейки с понедельника, навигация по месяцам; `class Backdrop` — подложка blur поверх корня вида, тап закрывает; `showTaskMenu(view, item, cardEl, actions)` — поднимает копию карточки (scale 1.04, фон `#2C2C2E`, тень), рисует панель под ней (или над, если не влезает), переключает подменю срока и календарь на месте панели. Все размеры и цвета из README через токены.
+- Soon-список — тот же `TaskList` без даты, своя кнопка New task → экран задачи с плиткой Soon.
 
-- [ ] **Step 1: Тест `menuItems` → реализовать → проба в scratch-Obsidian: статус, переименование, дата, удаление с демо-сервисом; снимок Soon ≈ `ScreenSoon.png` → коммит** `git commit -m "UI: Soon mode, task menu, rename and due date"`
+- [ ] **Step 1: Тесты `dueOptions` (ближайший понедельник с пятницы 30.10.2026 → `Mon, 2 Nov`; с понедельника → следующий понедельник), `MonthPicker` (сетка ноября 2026 начинается с 26 октября, 42 ячейки, выбранный и сегодня помечены) → красные → реализовать → зелёные**
+- [ ] **Step 2: Снимки в scratch-Obsidian ≈ `ScreenMenu.png`, `ScreenDue.png`, `ScreenPicker.png`, `ScreenSoon.png` (эталоны из Task C1 дополнить этими артбордами; `MenuScreen.dc.html` импортирует `Screen`, рендерер должен разворачивать `<dc-import>`) → коммит** `git commit -m "UI: Soon mode, task menu, due date submenu and month picker"`
+
+### Task C10: Экран задачи
+
+**Files:**
+- Create: `src/ui/sheet/TaskSheet.ts`, `src/ui/sheet/PlacementTiles.ts`, `src/ui/sheet/sheetState.ts`
+- Test: `tests/ui/sheetState.test.ts`
+
+**Interfaces:**
+- Produces: `class TaskSheet { static open(view, opts: { mode: "new" | "edit"; initial: TaskDraft; slot: Slot | null; onSubmit(draft: TaskDraft): Promise<void> }) }` — накрывает весь корень вида по README «Экран задачи»; Cancel/Add(Save); поле названия `contenteditable` 28/34 700 по центру с автофокусом (клавиатура сразу); плитки Soon/Now/Date; строка времени при `slot`; календарь под плитками по Date; Enter в поле = Add; пустое название → Add неактивен и ничего не делает. `sheetState.ts`: чистые функции `tileLabel(placement, today): "Soon" | "Now" | string`, `togglePlacement(state, tile)`.
+- Подключение: «New task» левой колонки → `mode: "new", placement: now`; «New task» Soon → `placement: soon`; долгий тап по пустому месту таймлайна (Task C12) → `placement: now` (или `date` дня, если день не сегодня) + `slot`; Rename в меню → `mode: "edit"`, `initial: { text, placement: tasks.placementOf(item) }`, `onSubmit → tasks.edit(key, draft)`.
+
+- [ ] **Step 1: Тесты `sheetState` → реализовать → снимки ≈ `ScreenSheet.png`, `ScreenSheetSlot.png`, `ScreenSheetEdit.png`, `ScreenSheetPicker.png`, `ScreenSheetLong.png` (клавиатуру iOS в макете не сравнивать: обрезать снимки по 544 px) → коммит** `git commit -m "UI: task sheet with placement tiles and date picker"`
+
+### Task C11: Источники календарей
+
+**Files:**
+- Create: `src/ui/sources/SourceDot.ts`, `src/ui/sources/SourcesPopover.ts`, `src/ui/sources/PullToRefresh.ts`, `src/ui/sources/sourceText.ts`
+- Test: `tests/ui/sourceText.test.ts`
+
+**Interfaces:**
+- Produces: `sourceText(status: SourceStatus, now: Date): { name: "Google Calendar" | "Work calendar"; short: "Google" | "Work"; sub: string; time: string; stale: boolean }` (`sub`: `Updated today` / `Exported from iPhone` / текст ошибки; `time`: `14:19` сегодня, `Yesterday 08:02`, иначе `3 Nov 08:02`; пусто при `updatedAt null`); точка на кнопке календаря, если любой источник `stale`; тап по кнопке календаря в режиме календаря → `SourcesPopover` (подложка, переключатель поверх, панель по README, «Refresh now» → `calendars.eventsOn(date)` и перерисовка); `PullToRefresh` на скролл-контейнере таймлайна: оттягивание при `scrollTop === 0` открывает область 80 px со спиннером и строками источников, отпускание за порог 60 px обновляет.
+
+- [ ] **Step 1: Тест `sourceText` → реализовать → снимки ≈ `ScreenSourcesDot.png`, `ScreenSourcesPopover.png`, `ScreenSourcesPull.png` → коммит** `git commit -m "UI: calendar sources dot, popover and pull to refresh"`
+
+### Task C12: Долгий тап по таймлайну
+
+**Files:**
+- Modify: `src/ui/Timeline.ts`, `src/ui/drag/TimelineDrop.ts`
+
+- [ ] **Step 1: Долгое нажатие по пустому месту холста (не по блоку): цель броска по README (фон `#251F3D`, делит ширину с блоком того же времени, время начала), тактильный отклик, затем `TaskSheet.open` с `slot: { date, start: snap(minutesAt(y)), end: start + newTaskMinutes }`; Cancel убирает цель. Снимок ≈ `Screen.dc.html` с `newSlot=true` → коммит** `git commit -m "UI: new task by a long tap on the timeline"`
 
 ### Task C9: Финал потока C
 
-- [ ] Попиксельная сверка всех пяти эталонов (разница и PNG разницы в `docs/design/reference/diff/`), `npm test`, `npm run build` зелёные; отчёт оркестратору: проценты разницы по эталонам, что отступает от плана и почему, что осталось.
+- [ ] Попиксельная сверка всех эталонов (главный экран в пяти состояниях, меню, срок, календарь, экран задачи в пяти состояниях, источники в трёх) (разница и PNG разницы в `docs/design/reference/diff/`), `npm test`, `npm run build` зелёные; отчёт оркестратору: проценты разницы по эталонам, что отступает от плана и почему, что осталось.
 
 ---
 
 ## Поток D: интеграция (оркестратор, ветка `mvp`)
 
 ### Task D1: Слияние
-- [ ] `git merge mvp-backend`, `git merge mvp-frontend`; в `src/main.ts` заменить демо-проводку на `createServices(app, this)`, подключить `TaskCalendarSettingsTab`; `tests/fakes/Demo*` остаются для тестов. `npm test`, `npm run build`.
+- [ ] `git merge mvp-backend`, `git merge mvp-frontend` (обе ветки уже содержат `mvp` с новыми контрактами); в `src/main.ts` заменить демо-проводку на `createServices(app, this)`, подключить `TaskCalendarSettingsTab`; `tests/fakes/Demo*` остаются для тестов. `npm test`, `npm run build`.
 
 ### Task D2: Проба в scratch-Obsidian на реальном файле
 - [ ] Vault с `TODOs Tasks.md` (копия шаблона `~/Obsidian/TODOs Tasks.md`), файл `calendar/work.json` из спайка; все действия §5.1 мышью на десктопе и touch в эмуляции; правка файла руками при открытом виде; Google без логина (статус «not logged in»). Review Focus 3 руками.

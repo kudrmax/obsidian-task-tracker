@@ -1,7 +1,6 @@
-import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
+import type { LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
 
-/** Which of the plugin's sections a task sits in. Inbox and Backlog are never read. */
-export type SectionKey = "now" | "soon" | "done";
+export type { SectionKey };
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section,
@@ -44,6 +43,14 @@ export class TasksFileMissingError extends Error {
 	}
 }
 
+/** Where the task sheet puts a task: Soon = section Soon without a due date, Now = section Now, Date = a due date. */
+export type Placement = { readonly kind: "soon" } | { readonly kind: "now" } | { readonly kind: "date"; readonly date: LocalDate };
+
+export interface TaskDraft {
+	readonly text: string;
+	readonly placement: Placement;
+}
+
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
@@ -59,6 +66,19 @@ export interface TaskService {
 	createInSoon(text: string): Promise<void>;
 	/** A slot on `date` from `start` for the default duration; Now when `date` is today, else Soon. */
 	createAtTime(date: LocalDate, start: number, text: string): Promise<void>;
+
+	/**
+	 * The task sheet. `soon`: end of Soon, no due date. `now`: end of Now, no due date. `date` D: due date D, end of Now
+	 * when D is today or earlier, else end of Soon. With `slot`: the slot is kept too (long tap on the timeline).
+	 */
+	create(draft: TaskDraft, slot?: Slot): Promise<void>;
+	/**
+	 * The task sheet on an existing task: new text and placement in one write. The slot stays. A placement equal to the
+	 * task's current one leaves its position in the file alone; a different one moves it as `create` would place it.
+	 */
+	edit(key: TaskKey, draft: TaskDraft): Promise<void>;
+	/** The placement the sheet shows for a task: `date` when it has a due date, else its section. */
+	placementOf(item: TaskItem): Placement;
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
@@ -108,6 +128,10 @@ export interface SourceStatus {
 	readonly message: string;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
+	/** The work file's `device` ("iPhone"); nothing for Google. */
+	readonly detail: string | null;
+	/** `updatedAt` older than `settings.staleAfterMinutes`, or not ok: the orange dot. */
+	readonly stale: boolean;
 }
 
 export interface DayEvents {
@@ -117,5 +141,8 @@ export interface DayEvents {
 
 /** Events of both sources for one day. A failing source keeps its last good events and reports the error. */
 export interface CalendarService {
+	/** Fetches both sources afresh. */
 	eventsOn(date: LocalDate): Promise<DayEvents>;
+	/** The last result for `date` without a fetch; null when `eventsOn` was never called for it. */
+	cached(date: LocalDate): DayEvents | null;
 }

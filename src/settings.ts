@@ -42,6 +42,8 @@ export interface TaskCalendarSettings {
 	readonly listWidth: number;
 	/** What the right column shows; the segmented control in the day row sets it. */
 	readonly rightMode: RightMode;
+	/** A calendar source whose last update is older than this gets the orange dot. */
+	readonly staleAfterMinutes: number;
 }
 
 export const LIST_WIDTH_MIN = 110;
@@ -66,6 +68,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	scrollToHour: 9,
 	listWidth: 187,
 	rightMode: "calendar",
+	staleAfterMinutes: 180,
 };
 
 /** Merges saved data over the defaults, one level deep for the nested objects. */
