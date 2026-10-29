@@ -123,6 +123,19 @@ body {
 	--tc-grid-gap-sheet: 1px;
 	--tc-picker-remove-gap: 6px;
 
+	/* Sizes: the task screen */
+	--tc-sheet-bar: 44px;
+	--tc-sheet-side: 20px;
+	--tc-sheet-gap: 20px;
+	--tc-tile-h: 78px;
+	--tc-radius-tile: 18px;
+	--tc-tile-icon: 24px;
+	--tc-stroke-tile: 1.9px;
+	--tc-tile-icon-gap: 7px;
+	--tc-time-icon: 15px;
+	/* The keyboard's height, when the host does not shrink the view for it. */
+	--tc-keyboard: 0px;
+
 	/* Sizes: the timeline */
 	--tc-hour: 56px;
 	--tc-day-hours: 24;
@@ -170,6 +183,10 @@ body {
 	--tc-font-value: 15px;
 	--tc-font-weekday: 11px;
 	--tc-font-day: 16px;
+	--tc-font-sheet-btn: 17px;
+	--tc-font-sheet-title: 28px;
+	--tc-leading-sheet-title: 34px;
+	--tc-font-tile: 15px;
 	--tc-leading-normal: normal;
 	--tc-weight-normal: 400;
 	--tc-weight-semibold: 600;
@@ -195,8 +212,12 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
+	--tc-layer-sheet: 20;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
+
+	/* Opacity */
+	--tc-disabled: 0.4;
 
 	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -209,6 +230,8 @@ body {
 .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; }
 .task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
+/* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground. */
+.task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active { background: transparent; box-shadow: none; }
 .task-calendar svg { display: block; }
 
 /* The day row: the arrows round the day's name, the switch of the right column. */
@@ -249,7 +272,6 @@ body {
 .tc-new.is-soon { left: calc(var(--tc-list-width) + var(--tc-divider)); right: 0; width: auto; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-ring); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
-.task-calendar .tc-new-input, .task-calendar .tc-new-input:focus, .task-calendar .tc-new-input:active { width: 100%; height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-8) 0 var(--tc-space-12); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); box-shadow: none; outline: none; -webkit-user-select: text; user-select: text; }
 
 /* The all-day events over the timeline, in their calendar's colour. */
 .tc-allday-backing { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-allday-backing); background: var(--tc-bg); z-index: var(--tc-layer-backing); }
@@ -335,6 +357,22 @@ body {
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
 .tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
+
+/* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
+.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
+.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
+.task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }
+.task-calendar .tc-sheet-submit.is-disabled { opacity: var(--tc-disabled); cursor: default; }
+.tc-sheet-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: var(--tc-keyboard); display: flex; flex-direction: column; justify-content: center; gap: var(--tc-sheet-gap); }
+.task-calendar .tc-sheet-title { text-align: center; font-size: var(--tc-font-sheet-title); line-height: var(--tc-leading-sheet-title); font-weight: var(--tc-weight-bold); overflow-wrap: anywhere; outline: none; -webkit-user-select: text; user-select: text; caret-color: var(--tc-accent-ui); }
+.tc-tiles { display: flex; gap: var(--tc-space-10); }
+.task-calendar .tc-tile { flex: 1; height: var(--tc-tile-h); border-radius: var(--tc-radius-tile); background: var(--tc-card-bg); color: var(--tc-ink-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-tile-icon-gap); }
+.task-calendar .tc-tile.is-on { background: var(--tc-ink-soft); color: var(--tc-on-strong); }
+.tc-tile svg { width: var(--tc-tile-icon); height: var(--tc-tile-icon); stroke-width: var(--tc-stroke-tile); }
+.tc-tile-label { font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); }
+.tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
 
 /* No tasks file yet. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }

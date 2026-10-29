@@ -1,5 +1,5 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, type DayView, StaleTaskError, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayView, type Placement, StaleTaskError, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -12,6 +12,7 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
+import { TaskSheet } from "./sheet/TaskSheet";
 import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
@@ -21,7 +22,7 @@ import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
-import type { LocalDate } from "./types";
+import type { LocalDate, Slot } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
@@ -147,8 +148,8 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
 		});
-		this.newTask = new NewTaskButton(root, false, { onCreate: (text) => this.act(() => this.deps.tasks.createInList(this.selectedDate, text)) });
-		this.newSoon = new NewTaskButton(root, true, { onCreate: (text) => this.act(() => this.deps.tasks.createInSoon(text)) });
+		this.newTask = new NewTaskButton(root, false, () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
+		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
 		this.registerDomEvent(document, "touchmove", (e) => this.arbiter.busy && e.preventDefault(), { passive: false });
 		this.registerInterval(window.setInterval(() => this.render(), MINUTE_MS));
@@ -243,6 +244,27 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
+	/** The task screen for a new task; with a slot, from a long tap on the timeline. */
+	newTaskSheet(placement: Placement, slot: Slot | null): void {
+		TaskSheet.open(this.contentEl, {
+			mode: "new",
+			initial: { text: "", placement },
+			slot,
+			today: this.today(),
+			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
+		});
+	}
+
+	private editSheet(item: TaskItem): void {
+		TaskSheet.open(this.contentEl, {
+			mode: "edit",
+			initial: { text: item.text, placement: this.deps.tasks.placementOf(item) },
+			slot: item.slot,
+			today: this.today(),
+			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
+		});
+	}
+
 	private showMenu(item: TaskItem, source: HTMLElement): void {
 		const tasks = this.deps.tasks;
 		TaskMenu.open({
@@ -252,7 +274,7 @@ export class TaskCalendarView extends ItemView {
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => tasks.setDueDate(item.key, date)),
-				rename: () => new Notice("Rename: the task sheet comes next"),
+				rename: () => this.editSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},
 		});
