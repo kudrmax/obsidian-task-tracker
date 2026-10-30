@@ -1,6 +1,7 @@
 import type { CalendarEvent } from "../application/contracts";
 import type { EventBatch, EventSource } from "../application/EventSource";
 import type { SettingsStore } from "../application/ports";
+import type { PathWatcher } from "./VaultPathWatcher";
 
 export interface WorkCalendarAdapter {
 	exists(path: string): Promise<boolean>;
@@ -32,7 +33,13 @@ export class WorkCalendarFileSource implements EventSource {
 	constructor(
 		private readonly adapter: WorkCalendarAdapter,
 		private readonly settings: SettingsStore,
+		private readonly watcher: PathWatcher,
 	) {}
+
+	/** Shortcuts or Sync brought a new file. */
+	onChange(listener: () => void): () => void {
+		return this.watcher.watch(() => this.settings.get().workCalendarFile, listener);
+	}
 
 	async eventsBetween(): Promise<EventBatch> {
 		const { workCalendarFile, workCalendarTitles } = this.settings.get();

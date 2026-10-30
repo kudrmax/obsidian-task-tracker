@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PathWatcher } from "../../src/infrastructure/VaultPathWatcher";
 import { WorkCalendarFileSource } from "../../src/infrastructure/WorkCalendarFileSource";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -23,14 +24,36 @@ class FakeAdapter {
 	}
 }
 
-function source(titles: string[] = [], path = "calendar/work.json") {
+class FakeWatcher implements PathWatcher {
+	readonly watched: { path: () => string; listener: () => void }[] = [];
+
+	watch(path: () => string, listener: () => void): () => void {
+		const entry = { path, listener };
+		this.watched.push(entry);
+		return () => this.watched.splice(this.watched.indexOf(entry), 1);
+	}
+}
+
+function source(titles: string[] = [], path = "calendar/work.json", watcher = new FakeWatcher()) {
 	const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, workCalendarFile: path, workCalendarTitles: titles });
-	return new WorkCalendarFileSource(new FakeAdapter({ "calendar/work.json": FILE }), settings);
+	return new WorkCalendarFileSource(new FakeAdapter({ "calendar/work.json": FILE }), settings, watcher);
 }
 
 describe("WorkCalendarFileSource", () => {
 	it("is the work source", () => {
 		expect(source().name).toBe("work");
+	});
+
+	it("says it changed when the file at the configured path changes", () => {
+		const watcher = new FakeWatcher();
+		const work = source([], "calendar/work.json", watcher);
+		let fired = 0;
+		const off = work.onChange(() => fired++);
+		expect(watcher.watched.map((w) => w.path())).toEqual(["calendar/work.json"]);
+		watcher.watched[0].listener();
+		expect(fired).toBe(1);
+		off();
+		expect(watcher.watched).toEqual([]);
 	});
 
 	it("reads every event when no titles are configured", async () => {

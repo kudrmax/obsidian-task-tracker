@@ -7,8 +7,11 @@ export interface TaskFileStore {
 	/** Atomic read-modify-write (vault.process). `fn` gets the current text and returns the new one. */
 	write(fn: (text: string) => string): Promise<void>;
 	create(text: string): Promise<void>;
-	/** Fires when the file changed on disk, by anyone. Returns the unsubscribe. */
-	onModify(listener: () => void): () => void;
+	/**
+	 * Fires once for every change of the file: a write (this plugin's own included), its creation, deletion or a rename to or
+	 * from its path. The one source of change notifications. Returns the unsubscribe.
+	 */
+	onChange(listener: () => void): () => void;
 }
 
 export interface Clock {
