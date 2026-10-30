@@ -152,6 +152,9 @@ body {
 	/* A priority's dot beside the value of Priority, and before a level in its submenu. */
 	--tc-dot-menu: 10px;
 	--tc-dot-level: 12px;
+	/* The task screen's priority pills. */
+	--tc-level-pill-h: 36px;
+	--tc-radius-chip: 18px;
 	--tc-stroke-check: 2.4px;
 	--tc-month-btn: 32px;
 	--tc-month-icon: 18px;
@@ -372,7 +375,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
 .task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active { background: transparent; box-shadow: none; }
-.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
+.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-level-pill:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
 .task-calendar svg { display: block; }
 
 /* The day row: the arrows round the day's name, the switch of the right column. */
@@ -604,6 +607,12 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-tile.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
 .tc-tile svg { width: var(--tc-tile-icon); height: var(--tc-tile-icon); stroke-width: var(--tc-stroke-tile); }
 .tc-tile-label { font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); }
+.tc-level-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tc-space-8); }
+.tc-level-pills.is-hidden { display: none; }
+.task-calendar .tc-level-pill { height: var(--tc-level-pill-h); box-sizing: border-box; padding: 0 var(--tc-space-14); border-radius: var(--tc-radius-chip); background: var(--tc-card-bg); color: var(--tc-ink-strong); font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); display: flex; align-items: center; gap: var(--tc-space-6); }
+.task-calendar .tc-level-pill.is-on { color: var(--tc-text); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
+.task-calendar .tc-level-pill[data-priority].is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
+.tc-level-pill-dot { width: var(--tc-dot-menu); height: var(--tc-dot-menu); }
 .tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
 

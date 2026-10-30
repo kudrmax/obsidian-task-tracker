@@ -366,6 +366,7 @@ export class TaskCalendarView extends ItemView {
 			initial: { text: "", placement, priority: null },
 			slot,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
 			onClose: () => this.timelineDrop?.clear(),
 		});
@@ -377,6 +378,7 @@ export class TaskCalendarView extends ItemView {
 			initial: { text: item.text, placement: this.deps.tasks.placementOf(item), priority: item.priority?.prefix ?? null },
 			slot: item.slot,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
 		});
 	}
