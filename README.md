@@ -48,7 +48,7 @@ The plugin reads your Google calendars through the Calendar API (read-only). You
 1. Open <https://console.cloud.google.com/>, create a project (any name).
 2. APIs & Services → Library → “Google Calendar API” → Enable.
 3. APIs & Services → OAuth consent screen → External → fill in the app name and your email → Save. Add your own Google account under Test users.
-4. APIs & Services → Credentials → Create credentials → OAuth client ID → Application type **Web application**. Under Authorized redirect URIs add exactly `https://kudrmax.github.io/obsidian-task-calendar/auth.html` → Create. Copy the Client ID and Client secret.
+4. APIs & Services → Credentials → Create credentials → OAuth client ID → Application type **Web application**. Under Authorized redirect URIs add exactly `https://kudrmax.github.io/obsidian-task-tracker/auth.html` → Create. Copy the Client ID and Client secret.
 5. In Obsidian, on either device: Settings → Task Calendar → Google Calendar → paste both → **Log in**. The browser opens; Google warns that the app is unverified → Advanced → Go to … → allow. Google sends the browser to the redirect page, which opens Obsidian again; a notice says you are logged in.
 6. Below the login, tick the calendars you want to see.
 

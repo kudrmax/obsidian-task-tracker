@@ -19,7 +19,7 @@ Never in `~/Obsidian`: it is production and syncs to the phone. A separate Obsid
 
 ## Releasing
 
-Per `~/.claude/CLAUDE.md`, «Свои плагины Obsidian». Version in `manifest.json`, `package.json`, `versions.json`. No CI: `npm run build`, then `gh release create <version> main.js manifest.json styles.css`. BRAT: `kudrmax/obsidian-task-calendar`, plugin id `task-calendar`.
+Per `~/.claude/CLAUDE.md`, «Свои плагины Obsidian». Version in `manifest.json`, `package.json`, `versions.json`. No CI: `npm run build`, then `gh release create <version> main.js manifest.json styles.css`. BRAT: `kudrmax/obsidian-task-tracker`, plugin id `task-calendar`.
 
 ## Files
 

@@ -470,4 +470,4 @@ it("cached returns the last result without fetching", …);
 - [ ] Vault с `TODOs Tasks.md` (копия шаблона `~/Obsidian/TODOs Tasks.md`), файл `calendar/work.json` из спайка; все действия §5.1 мышью на десктопе и touch в эмуляции; правка файла руками при открытом виде; Google без логина (статус «not logged in»). Review Focus 3 руками.
 
 ### Task D3: Телефон
-- [ ] Версия `0.1.0`, GitHub-репозиторий `kudrmax/obsidian-task-calendar`, релиз с `main.js`, `manifest.json`, `styles.css`; BRAT в `~/Obsidian` по правилам `~/.claude/CLAUDE.md`; Макс проверяет перетаскивание и пиксели на iPhone.
+- [ ] Версия `0.1.0`, GitHub-репозиторий `kudrmax/obsidian-task-tracker`, релиз с `main.js`, `manifest.json`, `styles.css`; BRAT в `~/Obsidian` по правилам `~/.claude/CLAUDE.md`; Макс проверяет перетаскивание и пиксели на iPhone.

@@ -3,7 +3,7 @@ import type { TokenResponse } from "./GoogleToken";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 /** The page Google sends the browser back to; it hands the code on to Obsidian (docs/auth.html, served by GitHub Pages). */
-export const REDIRECT_URI = "https://kudrmax.github.io/obsidian-task-calendar/auth.html";
+export const REDIRECT_URI = "https://kudrmax.github.io/obsidian-task-tracker/auth.html";
 /** The obsidian:// action that page opens: obsidian://task-calendar?code=…&state=… */
 export const PROTOCOL_ACTION = "task-calendar";
 const LOGIN_TIMEOUT_MS = 5 * 60_000;
