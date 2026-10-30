@@ -87,6 +87,8 @@ export const LAYOUT = {
 	pressTolerance: 8,
 	/** On a computer a drag starts after the pointer moves this far. */
 	dragStartDistance: 4,
+	/** The divider holds to the middle of the window while dragged this close to it. */
+	dividerSnapDistance: 8,
 	/** The timeline scrolls itself while a drag comes this close to its edge. */
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */

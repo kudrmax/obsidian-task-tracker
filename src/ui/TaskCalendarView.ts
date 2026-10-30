@@ -22,7 +22,7 @@ import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
-import { listWidthMax, shownListWidth } from "./listWidth";
+import { centeredListWidth, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -64,6 +64,7 @@ export class TaskCalendarView extends ItemView {
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
 	private readonly arbiter = new GestureArbiter();
+	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
@@ -94,7 +95,7 @@ export class TaskCalendarView extends ItemView {
 			step: () => stepFor(this.hourPx, this.settings.zoomLevels),
 			timeline: () => this.timeline,
 			targets: () => this.dropTargets(),
-			haptics: detectHaptics(window as unknown as HapticsHost),
+			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
@@ -156,6 +157,8 @@ export class TaskCalendarView extends ItemView {
 			onRelease: (width) => void this.deps.settings.update({ listWidth: width }).then(() => this.render()),
 			min: LIST_WIDTH_MIN,
 			max: () => listWidthMax(root.clientWidth),
+			center: () => centeredListWidth(root.clientWidth),
+			onSnap: () => this.haptics.tap(),
 		});
 		this.rightEl = el(root, "div", "tc-right");
 		this.allDayEl = el(this.rightEl, "div");
