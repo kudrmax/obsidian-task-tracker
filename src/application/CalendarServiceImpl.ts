@@ -10,6 +10,8 @@ interface SourceResult {
 }
 
 const MINUTE_MS = 60_000;
+/** A source silent this long counts as failed: its last events stay, marked stale, and the next fetch asks it afresh. */
+const ANSWER_TIMEOUT_MS = 15_000;
 /** About a month of days opened: the cache stays small, the days around today stay in it. */
 const KEPT_DAYS = 31;
 
@@ -50,6 +52,14 @@ class DayWindow {
 		const startsInside = e.start >= start && e.start < end;
 		return overlaps || (e.allDay && startsInside);
 	}
+}
+
+function answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const silence = new Promise<never>((_, reject) => {
+		timer = setTimeout(() => reject(new Error(`no answer in ${ms / 1000} s`)), ms);
+	});
+	return Promise.race([answer, silence]).finally(() => clearTimeout(timer));
 }
 
 function countMessage(n: number): string {
@@ -95,7 +105,7 @@ export class CalendarServiceImpl implements CalendarService {
 
 	private async fetch(source: EventSource, date: LocalDate, window: DayWindow): Promise<SourceResult> {
 		try {
-			const batch = await source.eventsBetween(window.fetchStart, window.fetchEnd);
+			const batch = await answerWithin(source.eventsBetween(window.fetchStart, window.fetchEnd), ANSWER_TIMEOUT_MS);
 			this.lastGood.set(source.name, batch);
 			const shown = batch.events.filter((e) => window.shows(e)).length;
 			return { events: batch.events, status: this.status(source.name, true, countMessage(shown), batch) };
