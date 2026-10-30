@@ -21,8 +21,15 @@ function sameEntryIn(doc: TaskDocument, entry: TaskEntry): TaskEntry {
 	return doc.tasks(entry.section)[entry.index];
 }
 
+/** Now is today: a task put into it takes today's due date. */
+function moveInto(doc: TaskDocument, entry: TaskEntry, section: SectionKey, index: number | "end", today: LocalDate): TaskDocument {
+	if (section !== "now" || entry.task.dueDate === today) return doc.moveEntry(entry, section, index);
+	const dated = patch(doc, entry, { dueDate: today });
+	return dated.moveEntry(sameEntryIn(dated, entry), section, index);
+}
+
 export function createInList(doc: TaskDocument, date: LocalDate, today: LocalDate, text: string): TaskDocument {
-	return date === today ? doc.insert("now", "end", newTask(text)) : doc.insert("soon", "end", newTask(text, { dueDate: date }));
+	return doc.insert(listSection(date, today), "end", newTask(text, { dueDate: date }));
 }
 
 export function createInSoon(doc: TaskDocument, text: string): TaskDocument {
@@ -68,15 +75,15 @@ export function moveBefore(
 	date: LocalDate,
 	today: LocalDate,
 ): TaskDocument {
-	if (before === null) return doc.moveEntry(entry, listSection(date, today), "end");
+	if (before === null) return moveInto(doc, entry, listSection(date, today), "end", today);
 	if (before.section === entry.section && before.index === entry.index) return doc;
-	return doc.moveEntry(entry, before.section, before.index);
+	return moveInto(doc, entry, before.section, before.index, today);
 }
 
 export function setSlot(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const clamped = boundary.clamp(slot, SLOT_STEP);
-	const slotted = patch(doc, entry, { slot: clamped });
-	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return slotted;
+	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
+	const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
 	return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
 }
 
@@ -85,10 +92,12 @@ export function clearSlot(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 }
 
 export function moveToList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
-	return date === today ? doc.moveEntry(entry, "now", "end") : setDueDate(doc, entry, date);
+	return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
 }
 
-export function placementOfEntry(entry: TaskEntry): Placement {
+/** Today's due date is the Now tile: Now is today. */
+export function placementOfEntry(entry: TaskEntry, today: LocalDate): Placement {
+	if (entry.task.dueDate === today) return { kind: "now" };
 	if (entry.task.dueDate !== null) return { kind: "date", date: entry.task.dueDate };
 	if (entry.section === "inbox") return { kind: "inbox" };
 	return entry.section === "soon" ? { kind: "soon" } : { kind: "now" };
@@ -105,7 +114,7 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 		case "soon":
 			return { section: "soon", dueDate: null };
 		case "now":
-			return { section: "now", dueDate: null };
+			return { section: "now", dueDate: today };
 		case "date":
 			return { section: placement.date <= today ? "now" : "soon", dueDate: placement.date };
 	}
@@ -117,8 +126,9 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	const { priority } = draft;
 	const unsorted = section === "inbox";
 	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }));
-	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate, priority, ...(unsorted ? { slot: null } : {}) });
-	if (samePlacement(placementOfEntry(entry), draft.placement) || entry.section === section) return edited;
+	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
+	const edited = patch(doc, entry, { text: draft.text.trim(), priority, ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) });
+	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 
@@ -128,6 +138,8 @@ export function moveToEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" 
 	return prepared.moveEntry(sameEntryIn(prepared, entry), section, "end");
 }
 
+/** The Soon column holds tasks without a date: the task loses it, and today's one also leaves Now for the end of Soon. */
 export function moveToSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
-	return date === today ? doc.moveEntry(entry, "soon", "end") : setDueDate(doc, entry, null);
+	const undated = setDueDate(doc, entry, null);
+	return date === today ? undated.moveEntry(sameEntryIn(undated, entry), "soon", "end") : undated;
 }

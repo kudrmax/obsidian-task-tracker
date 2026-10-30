@@ -56,6 +56,8 @@ export interface TaskMenuContext {
 	/** The card or block tapped; a copy of it stays over the backdrop, grown only to show a title the card cuts. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
+	/** The day on screen: the copy of a card leaves out a due date on it, as the list does. */
+	readonly day: LocalDate;
 	/** The priority levels the submenu offers. */
 	readonly levels: readonly PriorityLevel[];
 	readonly actions: MenuActions;
@@ -81,7 +83,7 @@ export class TaskMenu {
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
-		} else fillCard(this.lifted, context.item, { showDue: true });
+		} else fillCard(this.lifted, context.item, { day: context.day });
 		this.anchor = this.liftWhole(context.source.getBoundingClientRect());
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = el(document.body, "div", "tc-panel");

@@ -1,7 +1,7 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
-import { inboxList, listOn, slottedOn, soonList, toItem } from "../domain/queries";
+import { dayList, inboxList, slottedOn, soonWithoutDate, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
@@ -42,12 +42,12 @@ export class TaskServiceImpl implements TaskService {
 	async dayView(date: LocalDate): Promise<DayView> {
 		const { doc, today, boundary } = await this.readNormalized();
 		const item = this.itemOf();
-		return { date, list: listOn(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+		return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
 	}
 
-	async soonView(): Promise<readonly TaskItem[]> {
+	async soonWithoutDateView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
-		return soonList(doc).map(this.itemOf());
+		return soonWithoutDate(doc).map(this.itemOf());
 	}
 
 	async inboxView(): Promise<readonly TaskItem[]> {
@@ -81,6 +81,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	placementOf(item: TaskItem): Placement {
+		if (item.dueDate === this.boundary(this.settings.get()).dayOf(this.clock.now())) return { kind: "now" };
 		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
 		if (item.key.section === "inbox") return { kind: "inbox" };
 		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
