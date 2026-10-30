@@ -999,6 +999,22 @@
       "w": 390,
       "x": 1410,
       "y": 0
+    },
+    "Postpone22OnTomorrow.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Открыт завтрашний день: вместо Tomorrow — Today",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "Postpone22OnLater.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Открыт другой день: Today, Tomorrow и Pick a date",
+      "w": 390,
+      "x": 2350,
+      "y": 0
     }
   },
   "createdOnFiles": {
@@ -1366,7 +1382,9 @@
     "Postpone22SoonNow.dc.html",
     "Postpone22Calendar.dc.html",
     "Postpone22Inbox.dc.html",
-    "Postpone22Light.dc.html"
+    "Postpone22Light.dc.html",
+    "Postpone22OnTomorrow.dc.html",
+    "Postpone22OnLater.dc.html"
   ],
   "title": "Task Calendar"
 }
