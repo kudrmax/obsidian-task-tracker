@@ -1,4 +1,4 @@
-import { Plugin, type WorkspaceLeaf } from "obsidian";
+import { Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices } from "./application/services";
 import { settingsFrom, type TaskCalendarSettings } from "./settings";
@@ -10,6 +10,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	override async onload(): Promise<void> {
 		this.current = settingsFrom(await this.loadData());
+		this.registerEvent(this.watchSettingsFile());
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
@@ -27,6 +28,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			}),
 		);
 		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock };
+	}
+
+	/** Sync brings data.json from the other device (the Google token, logged in on the Mac): it counts here at once, with no reload. */
+	private watchSettingsFile(): EventRef {
+		const file = `${this.manifest.dir}/data.json`;
+		const vault = this.app.vault as Vault & { on(name: "raw", callback: (path: string) => void): EventRef };
+		return vault.on("raw", (path) => {
+			if (path === file) void this.loadData().then((data) => (this.current = settingsFrom(data)));
+		});
 	}
 
 	get(): TaskCalendarSettings {
