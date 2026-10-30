@@ -5,6 +5,7 @@ import type { EventBatch, EventSource } from "../../src/application/EventSource"
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+import { MemoryEventCache } from "../fakes/MemoryEventCache";
 
 const FETCHED = new Date(2026, 9, 30, 8, 0);
 const NOW = new Date(2026, 9, 30, 9, 0);
@@ -40,8 +41,8 @@ class FakeClock implements Clock {
 	}
 }
 
-function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes) {
-	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes }));
+function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes, cache = new MemoryEventCache()) {
+	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes }), cache);
 }
 
 describe("CalendarServiceImpl", () => {
@@ -127,11 +128,50 @@ describe("CalendarServiceImpl", () => {
 		const svc = service([work]);
 		expect(svc.cached("2026-10-30")).toBeNull();
 		const day = await svc.eventsOn("2026-10-30");
-		expect(svc.cached("2026-10-30")).toBe(day);
+		expect(svc.cached("2026-10-30")).toEqual(day);
 		expect(svc.cached("2026-10-31")).toBeNull();
 		expect(work.calls).toHaveLength(1);
 		const again = await svc.eventsOn("2026-10-30");
-		expect(svc.cached("2026-10-30")).toBe(again);
+		expect(svc.cached("2026-10-30")).toEqual(again);
+	});
+
+	it("after a restart, cached gives the days the device kept, before any fetch", async () => {
+		const cache = new MemoryEventCache();
+		const work = new FakeSource("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
+		const day = await service([work], new FakeClock(), undefined, cache).eventsOn("2026-10-30");
+		const restarted = service([new FakeSource("work")], new FakeClock(), undefined, cache);
+		expect(restarted.cached("2026-10-30")).toEqual(day);
+	});
+
+	it("a kept day counts its staleness from now", async () => {
+		const cache = new MemoryEventCache();
+		await service([new FakeSource("work")], new FakeClock(), undefined, cache).eventsOn("2026-10-30");
+		const nextDay = new FakeClock(new Date(2026, 9, 31, 9, 0));
+		expect(service([], nextDay, undefined, cache).cached("2026-10-30")!.statuses[0].stale).toBe(true);
+	});
+
+	it("a source failing after a restart keeps the day's kept events and their time", async () => {
+		const cache = new MemoryEventCache();
+		const google = new FakeSource("google", [event("google", "g1", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+		const work = new FakeSource("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
+		await service([google, work], new FakeClock(), undefined, cache).eventsOn("2026-10-30");
+		google.failWith = new Error("offline");
+		work.events = [];
+		const day = await service([google, work], new FakeClock(), undefined, cache).eventsOn("2026-10-30");
+		expect(day.events.map((e) => e.id)).toEqual(["g1"]);
+		expect(day.statuses[0]).toEqual({ source: "google", ok: false, message: "offline", updatedAt: FETCHED, detail: null, stale: true });
+	});
+
+	it("keeps the 31 days fetched last", async () => {
+		const cache = new MemoryEventCache();
+		const svc = service([new FakeSource("work")], new FakeClock(), undefined, cache);
+		const october = Array.from({ length: 31 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`);
+		for (const date of [...october, "2026-11-01"]) await svc.eventsOn(date);
+		await svc.eventsOn("2026-10-02");
+		expect(cache.days.size).toBe(31);
+		expect(cache.days.has("2026-10-01")).toBe(false);
+		expect([...cache.days.keys()].pop()).toBe("2026-10-02");
+		expect(svc.cached("2026-10-01")).toBeNull();
 	});
 });
 
