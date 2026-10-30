@@ -5,6 +5,7 @@ import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority } from "./TaskCard";
+import { shownCardSize } from "./cardSize";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
@@ -261,7 +262,7 @@ export class Timeline {
 	landing(): DOMRect | null {
 		if (!this.drop) return null;
 		const present = this.present();
-		const box = stackTasks([this.drop, ...present.map((t) => this.taskSpan(t))], this.eventSpans(), this.hourPx)[0];
+		const box = stackTasks([this.drop, ...present.map((t) => this.taskSpan(t))], this.eventSpans(), this.hourPx, shownCardSize())[0];
 		const items = this.itemsEl.getBoundingClientRect();
 		const top = this.canvas.getBoundingClientRect().top + box.top;
 		return new DOMRect(items.left + box.left, top, items.width - box.left - DESIGN.itemInset, box.height);
@@ -283,7 +284,7 @@ export class Timeline {
 		const placed = Array.from(this.itemsEl.querySelectorAll(":scope > .tc-block:not(.is-lifted)"));
 		if (present.some((task, i) => placed[i] !== task.el)) for (const task of present) this.itemsEl.insertBefore(task.el, this.grips);
 		const spans: TaskSpan[] = present.map((t) => this.taskSpan(t));
-		const boxes = stackTasks(spans, this.eventSpans(), this.hourPx);
+		const boxes = stackTasks(spans, this.eventSpans(), this.hourPx, shownCardSize());
 		let bottom = 0;
 		present.forEach((task, i) => {
 			const box = boxes[i];

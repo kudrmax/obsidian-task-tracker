@@ -3,6 +3,7 @@ import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices, type ServicesHost } from "./application/services";
 import { type DeviceState, partition, settingsFrom, sharedOf, type TaskCalendarSettings } from "./settings";
+import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
@@ -18,6 +19,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	override async onload(): Promise<void> {
 		await this.reloadSettings();
+		this.register(clearCardSize);
 		this.registerEvent(this.watchSettingsFile());
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
@@ -95,6 +97,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	}
 
 	private emit(): void {
+		showCardSize({ height: this.current.cardHeight, gap: this.current.cardGap });
 		for (const listener of this.listeners) listener();
 	}
 
