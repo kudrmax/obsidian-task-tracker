@@ -1,11 +1,12 @@
 import type { App, EventRef, TFile } from "obsidian";
 
-type ModifyListener = (file: { path: string }) => void;
+type VaultEvent = "modify" | "create" | "delete" | "rename";
+type FileListener = (file: { path: string }, oldPath?: string) => void;
 
 export class FakeVault {
 	readonly files = new Map<string, string>();
 	created: string[] = [];
-	private readonly listeners = new Map<EventRef, ModifyListener>();
+	private readonly listeners = new Map<EventRef, { name: VaultEvent; callback: FileListener }>();
 
 	getFileByPath(path: string): TFile | null {
 		return this.files.has(path) ? ({ path } as TFile) : null;
@@ -27,10 +28,9 @@ export class FakeVault {
 		return { path } as TFile;
 	}
 
-	on(name: "modify", callback: ModifyListener): EventRef {
-		if (name !== "modify") throw new Error(name);
+	on(name: VaultEvent, callback: FileListener): EventRef {
 		const ref = {} as EventRef;
-		this.listeners.set(ref, callback);
+		this.listeners.set(ref, { name, callback });
 		return ref;
 	}
 
@@ -38,8 +38,8 @@ export class FakeVault {
 		this.listeners.delete(ref);
 	}
 
-	emitModify(path: string): void {
-		for (const listener of this.listeners.values()) listener({ path });
+	emit(name: VaultEvent, path: string, oldPath?: string): void {
+		for (const listener of this.listeners.values()) if (listener.name === name) listener.callback({ path }, oldPath);
 	}
 
 	get listenerCount(): number {

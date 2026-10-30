@@ -23,11 +23,18 @@ export class VaultTaskFileStore implements TaskFileStore {
 		await this.app.vault.create(this.path(), text);
 	}
 
-	onModify(listener: () => void): () => void {
-		const ref = this.app.vault.on("modify", (file) => {
-			if (file.path === this.path()) listener();
-		});
-		return () => this.app.vault.offref(ref);
+	onChange(listener: () => void): () => void {
+		const vault = this.app.vault;
+		const ours = (...paths: string[]) => {
+			if (paths.includes(this.path())) listener();
+		};
+		const refs = [
+			vault.on("modify", (file) => ours(file.path)),
+			vault.on("create", (file) => ours(file.path)),
+			vault.on("delete", (file) => ours(file.path)),
+			vault.on("rename", (file, oldPath) => ours(file.path, oldPath)),
+		];
+		return () => refs.forEach((ref) => vault.offref(ref));
 	}
 
 	private file(): TFile | null {

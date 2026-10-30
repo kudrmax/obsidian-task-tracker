@@ -221,18 +221,18 @@ describe("the task sheet", () => {
 });
 
 describe("onChange", () => {
-	it("fires on a hand edit and after own writes", async () => {
+	it("fires once on a hand edit and once after each own write", async () => {
 		const { store, svc } = setup(FULL);
 		let fired = 0;
 		const off = svc.onChange(() => fired++);
-		store.emitModify();
+		store.emitChange();
 		expect(fired).toBe(1);
 		await svc.createInSoon("X");
 		expect(fired).toBe(2);
 		await svc.createInSoon("  ");
 		expect(fired).toBe(2);
 		off();
-		store.emitModify();
+		store.emitChange();
 		await svc.createInSoon("Y");
 		expect(fired).toBe(2);
 	});

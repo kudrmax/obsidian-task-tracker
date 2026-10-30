@@ -15,18 +15,20 @@ export class InMemoryTaskFileStore implements TaskFileStore {
 		if (this.text === null) throw new TasksFileMissingError("memory");
 		this.writes++;
 		this.text = fn(this.text);
+		this.emitChange();
 	}
 
 	async create(text: string): Promise<void> {
 		this.text = text;
+		this.emitChange();
 	}
 
-	onModify(listener: () => void): () => void {
+	onChange(listener: () => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
 	}
 
-	emitModify(): void {
+	emitChange(): void {
 		for (const listener of this.listeners) listener();
 	}
 }
