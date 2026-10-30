@@ -33,7 +33,6 @@ export interface TaskCalendarSettings {
 	/** Calendar titles to take from the work file; empty means all. */
 	readonly workCalendarTitles: readonly string[];
 	readonly google: GoogleSettings;
-	readonly newTaskMinutes: number;
 	readonly longPressMs: number;
 	readonly zoomLevels: readonly ZoomLevel[];
 	/** The hour a day other than today scrolls to when opened. */
@@ -57,7 +56,6 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
-	newTaskMinutes: 60,
 	longPressMs: 250,
 	zoomLevels: [
 		{ hourPx: 28, stepMinutes: 60 },

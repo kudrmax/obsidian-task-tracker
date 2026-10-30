@@ -61,7 +61,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
 		if (this.blank(text)) return;
-		await this.mutate((doc, today, settings) => ops.createAtTime(doc, date, today, start, settings.newTaskMinutes, text));
+		await this.mutate((doc, today) => ops.createAtTime(doc, date, today, start, text));
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {

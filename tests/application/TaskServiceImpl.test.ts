@@ -109,13 +109,12 @@ describe("writing", () => {
 		expect(store.text).toBe(FULL);
 	});
 
-	it("createAtTime takes the duration from settings", async () => {
-		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, newTaskMinutes: 45 });
-		const { store, svc } = setup(FULL, settings);
+	it("createAtTime puts the task at the time, without a duration", async () => {
+		const { store, svc } = setup(FULL);
 		await svc.createAtTime(T, 600, "Call");
-		expect(store.text).toContain("## Now\n- [ ] A\n- [ ] B\n- [ ] Call ⏰ 2026-10-30 10:00-10:45\n");
+		expect(store.text).toContain("## Now\n- [ ] A\n- [ ] B\n- [ ] Call ⏰ 2026-10-30 10:00\n");
 		await svc.createAtTime(D, 1420, "Late");
-		expect(store.text).toContain("## Soon\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40-24:00\n");
+		expect(store.text).toContain("## Soon\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40\n");
 	});
 
 	it("normalizes after every write", async () => {

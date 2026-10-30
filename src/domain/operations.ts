@@ -10,6 +10,7 @@ export function newTask(text: string, patch: Partial<Task> = {}): Task {
 }
 
 export function clampSlot(slot: Slot, stepMinutes: number): Slot {
+	if (slot.end === null) return { date: slot.date, start: Math.max(0, Math.min(slot.start, DAY_MINUTES - stepMinutes)), end: null };
 	let { start, end } = slot;
 	if (start < 0) {
 		end -= start;
@@ -45,10 +46,9 @@ export function createAtTime(
 	date: LocalDate,
 	today: LocalDate,
 	start: number,
-	minutes: number,
 	text: string,
 ): TaskDocument {
-	const slot: Slot = { date, start, end: Math.min(start + minutes, DAY_MINUTES) };
+	const slot: Slot = { date, start, end: null };
 	return doc.insert(listSection(date, today), "end", newTask(text, { slot }));
 }
 

@@ -7,11 +7,11 @@ export type SectionKey = "now" | "soon" | "done";
 /** `[ ]`, `[/]`, `[x]`, `[-]`. Any other character reads as todo and is written back unchanged. */
 export type TaskStatus = "todo" | "inProgress" | "done" | "cancelled";
 
-/** Minutes of the day, 0..1440. `end` may equal 1440 (midnight). */
+/** Minutes of the day, 0..1440. `end` may equal 1440 (midnight); null is a task at a time, without a duration. */
 export interface Slot {
 	readonly date: LocalDate;
 	readonly start: number;
-	readonly end: number;
+	readonly end: number | null;
 }
 
 export interface Task {

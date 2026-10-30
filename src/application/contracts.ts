@@ -64,7 +64,7 @@ export interface TaskService {
 	createInList(date: LocalDate, text: string): Promise<void>;
 	/** End of Soon, no fields. */
 	createInSoon(text: string): Promise<void>;
-	/** A slot on `date` from `start` for the default duration; Now when `date` is today, else Soon. */
+	/** A slot on `date` at `start`, without a duration; Now when `date` is today, else Soon. */
 	createAtTime(date: LocalDate, start: number, text: string): Promise<void>;
 
 	/**
