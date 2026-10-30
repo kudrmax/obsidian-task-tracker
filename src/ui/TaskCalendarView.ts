@@ -1,7 +1,7 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, usableLevels } from "../settings";
+import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
@@ -251,7 +251,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. */
 	private onSettings(): void {
-		if (this.settings.priorities !== this.priorities) {
+		if (!sameLevels(this.settings.priorities, this.priorities)) {
 			this.priorities = this.settings.priorities;
 			void this.data.tasks();
 		}

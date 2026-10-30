@@ -38,6 +38,10 @@ export function usablePrefix(prefix: string): boolean {
 	return /^\S+$/.test(prefix);
 }
 
+export function sameLevels(a: readonly PriorityLevel[], b: readonly PriorityLevel[]): boolean {
+	return a.length === b.length && a.every((level, i) => level.prefix === b[i].prefix && level.color === b[i].color);
+}
+
 /** The levels that mark tasks: a one-word prefix, the first of two with the same one. */
 export function usableLevels(levels: readonly PriorityLevel[]): readonly PriorityLevel[] {
 	return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);

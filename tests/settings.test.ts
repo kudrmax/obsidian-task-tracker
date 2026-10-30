@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf, usableLevels, usablePrefix } from "../src/settings";
+import { DEFAULT_SETTINGS, partition, settingsFrom, sameLevels, sharedOf, usableLevels, usablePrefix } from "../src/settings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -59,5 +59,12 @@ describe("priority levels", () => {
 			{ prefix: "p1", color: "blue" },
 			{ prefix: "p2", color: "orange" },
 		]);
+	});
+
+	it("tell levels apart by their content, not by the list they come in", () => {
+		const copy = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.priorities));
+		expect(sameLevels(DEFAULT_SETTINGS.priorities, copy)).toBe(true);
+		expect(sameLevels(DEFAULT_SETTINGS.priorities, [{ prefix: "p1", color: "blue" }, { prefix: "p2", color: "orange" }])).toBe(false);
+		expect(sameLevels(DEFAULT_SETTINGS.priorities, DEFAULT_SETTINGS.priorities.slice(0, 1))).toBe(false);
 	});
 });

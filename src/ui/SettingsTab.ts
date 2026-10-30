@@ -2,6 +2,7 @@ import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextCo
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
 import { type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { LevelEdits } from "./priorityLevels";
 import { formatTime } from "./dates";
 
 export interface GoogleCalendarOption {
@@ -65,33 +66,23 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */
 	private prioritiesGroup(el: HTMLElement): void {
 		new Setting(el).setName("Priorities").setHeading();
-		const levels = this.settings.priorities;
-		levels.forEach((level, index) => {
+		const saved = new LevelEdits(() => this.settings.priorities, (priorities) => this.plugin.update({ priorities }));
+		const redrawn = new LevelEdits(() => this.settings.priorities, (priorities) => this.updateLevels(priorities));
+		this.settings.priorities.forEach((level, index) => {
 			const row = el.createDiv("setting-item tc-level-row");
-			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => this.plugin.update({ priorities: this.levelsWith(index, { prefix: value.trim() }) }));
+			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void saved.rename(index, value));
 			prefix.inputEl.addClass("tc-level-prefix");
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of PRIORITY_COLORS) {
 				const swatch = swatches.createDiv({ cls: "tc-swatch", attr: { role: "button", tabindex: "0", "aria-label": color, "data-priority": color } });
 				swatch.toggleClass("is-on", color === level.color);
-				swatch.addEventListener("click", () => void this.updateLevels(this.levelsWith(index, { color })));
+				swatch.addEventListener("click", () => void redrawn.recolour(index, color));
 			}
-			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.updateLevels(levels.filter((_, i) => i !== index)));
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void redrawn.remove(index));
 		});
 		new Setting(el)
 			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
-			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.updateLevels([...levels, this.nextLevel(levels)])));
-	}
-
-	private levelsWith(index: number, patch: Partial<PriorityLevel>): PriorityLevel[] {
-		return this.settings.priorities.map((level, i) => (i === index ? { ...level, ...patch } : level));
-	}
-
-	private nextLevel(levels: readonly PriorityLevel[]): PriorityLevel {
-		let n = levels.length + 1;
-		while (levels.some((l) => l.prefix === `p${n}`)) n++;
-		const color = PRIORITY_COLORS.find((c) => !levels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
-		return { prefix: `p${n}`, color };
+			.addButton((b) => b.setButtonText("Add priority").onClick(() => void redrawn.add()));
 	}
 
 	private async updateLevels(priorities: readonly PriorityLevel[]): Promise<void> {
