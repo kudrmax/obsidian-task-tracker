@@ -443,7 +443,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 .task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }
 .task-calendar .tc-sheet-submit.is-disabled { opacity: var(--tc-disabled); cursor: default; }
-.tc-sheet-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: var(--tc-keyboard); display: flex; flex-direction: column; justify-content: center; gap: var(--tc-sheet-gap); }
+.tc-sheet-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: var(--tc-keyboard); display: flex; flex-direction: column; justify-content: center; }
+.tc-sheet-content { display: flex; flex-direction: column; gap: var(--tc-sheet-gap); }
+.tc-sheet-content.is-settling { transition: transform var(--tc-duration-fade) var(--tc-ease-out); }
 .task-calendar .tc-sheet-title { text-align: center; font-size: var(--tc-font-sheet-title); line-height: var(--tc-leading-sheet-title); font-weight: var(--tc-weight-bold); overflow-wrap: anywhere; outline: none; -webkit-user-select: text; user-select: text; caret-color: var(--tc-accent-ui); }
 .tc-tiles { display: flex; gap: var(--tc-space-10); }
 .task-calendar .tc-tile { flex: 1; height: var(--tc-tile-h); border-radius: var(--tc-radius-tile); background: var(--tc-card-bg); color: var(--tc-ink-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-tile-icon-gap); }

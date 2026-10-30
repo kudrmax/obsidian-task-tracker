@@ -10,21 +10,19 @@ export interface DragSessionOptions {
 	readonly origin: DOMRect;
 	/** The card is about to fly back: its place in the list opens again. */
 	onReturn?(): void;
-	/** The drop, or null for a cancelled drag; `moved` tells a held-and-released card from a dragged one. */
-	onEnd(result: DropResult | null, moved: boolean): Promise<void>;
+	/** The drop, or null for a cancelled drag. */
+	onEnd(result: DropResult | null): Promise<void>;
 }
 
 /** One drag from lift to drop: routes the pointer to the target under it and settles the card at the end. */
 export class DragSession {
 	private current: DropTarget | null = null;
-	private moved = false;
 	private done = false;
 
 	constructor(private readonly opts: DragSessionOptions) {}
 
 	move(x: number, y: number): void {
 		if (this.done) return;
-		this.moved = true;
 		this.opts.float.moveTo(x, y);
 		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
 		if (target !== this.current) {
@@ -41,7 +39,7 @@ export class DragSession {
 		const result = target?.drop(x, y, this.opts.payload) ?? null;
 		if (!target || !result) return this.settleBack();
 		const landing = target.landing() ?? this.opts.origin;
-		await Promise.all([this.opts.float.flyTo(landing), this.opts.onEnd(result, this.moved)]);
+		await Promise.all([this.opts.float.flyTo(landing), this.opts.onEnd(result)]);
 		target.clear();
 		this.opts.float.remove();
 	}
@@ -58,6 +56,6 @@ export class DragSession {
 		this.opts.onReturn?.();
 		await this.opts.float.flyTo(this.opts.origin);
 		this.opts.float.remove();
-		await this.opts.onEnd(null, this.moved);
+		await this.opts.onEnd(null);
 	}
 }

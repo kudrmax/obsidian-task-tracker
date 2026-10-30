@@ -34,8 +34,8 @@ const RESIZE = "resize";
 const NEW_SLOT = "newslot";
 
 /**
- * Gives a card or a block its gestures: the long press that lifts it, the drag that follows, the handle that resizes a
- * block, the menu. While a gesture owns the screen the view keeps the browser from scrolling (see the arbiter).
+ * Gives a card or a block its gestures: the tap that opens its menu, the long press that lifts it, the drag that follows,
+ * the handle that resizes a block. While a gesture owns the screen the view keeps the browser from scrolling (see the arbiter).
  */
 export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
@@ -46,7 +46,7 @@ export class DragController {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => this.begin(card, this.payload(item, from, e), e),
-			onLongTap: (e) => this.deps.onMenu(item, card, { x: e.clientX, y: e.clientY }),
+			onTap: (e) => this.deps.onMenu(item, card, { x: e.clientX, y: e.clientY }),
 		});
 	}
 
@@ -128,13 +128,12 @@ export class DragController {
 			float,
 			origin,
 			onReturn: () => source.classList.remove("is-lifted"),
-			onEnd: async (result, moved) => {
+			onEnd: async (result) => {
 				detach();
 				this.deps.arbiter.release(DRAG);
-				if (result) {
-					this.deps.haptics.tap();
-					await this.deps.onResult(payload, result);
-				} else if (!moved) this.deps.onMenu(payload.item, source, { x: e.clientX, y: e.clientY });
+				if (!result) return;
+				this.deps.haptics.tap();
+				await this.deps.onResult(payload, result);
 			},
 		});
 		const move = (ev: PointerEvent) => {

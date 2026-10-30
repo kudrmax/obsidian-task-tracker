@@ -1,7 +1,7 @@
 import type { TaskDraft } from "../../application/contracts";
 import { formatTime } from "../dates";
 import { DURATION, tokenMs } from "../design";
-import { el } from "../dom";
+import { el, px } from "../dom";
 import { MonthPicker } from "../menu/MonthPicker";
 import type { LocalDate, Slot } from "../types";
 import { PlacementTiles, sheetIcon } from "./PlacementTiles";
@@ -24,6 +24,9 @@ export class TaskSheet {
 	private readonly submit: HTMLButtonElement;
 	private readonly tiles: PlacementTiles;
 	private readonly body: HTMLElement;
+	/** What stands centred in the body; it slides when the body's height changes. */
+	private readonly content: HTMLElement;
+	private contentTop = 0;
 	private picker: MonthPicker | null = null;
 	private closed = false;
 
@@ -39,8 +42,9 @@ export class TaskSheet {
 		cancel.addEventListener("click", () => this.close());
 		this.submit = el(bar, "button", "tc-sheet-submit", opts.mode === "edit" ? "Save" : "Add");
 		this.submit.addEventListener("click", () => void this.save());
-		const body = el(this.el, "div", "tc-sheet-body");
-		this.body = body;
+		this.body = el(this.el, "div", "tc-sheet-body");
+		const body = el(this.body, "div", "tc-sheet-content");
+		this.content = body;
 		this.title = el(body, "div", "tc-sheet-title", opts.initial.text);
 		this.title.contentEditable = "true";
 		this.title.setAttribute("enterkeyhint", "done");
@@ -54,7 +58,22 @@ export class TaskSheet {
 		}
 		this.render();
 		this.focusEnd();
+		this.contentTop = this.content.offsetTop;
+		new ResizeObserver(() => this.slideContent()).observe(this.body);
 		requestAnimationFrame(() => this.el.classList.add("is-shown"));
+	}
+
+	/** The keyboard shrinks the view in one step: the content slides to its new centre instead of jumping there. */
+	private slideContent(): void {
+		const top = this.content.offsetTop;
+		const delta = this.contentTop - top;
+		this.contentTop = top;
+		if (delta === 0 || this.closed) return;
+		this.content.classList.remove("is-settling");
+		this.content.style.transform = `translate3d(0, ${px(delta)}, 0)`;
+		void this.content.offsetWidth;
+		this.content.classList.add("is-settling");
+		this.content.style.transform = "";
 	}
 
 	private focusEnd(): void {
@@ -94,7 +113,7 @@ export class TaskSheet {
 		this.renderSubmit();
 		this.tiles.render(this.state, this.opts.today);
 		if (this.state.pickerOpen && !this.picker) {
-			this.picker = new MonthPicker(el(this.body, "div"), {
+			this.picker = new MonthPicker(el(this.content, "div"), {
 				month: this.state.date ?? this.opts.today,
 				today: this.opts.today,
 				selected: this.state.date,

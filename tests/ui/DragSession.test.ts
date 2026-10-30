@@ -50,8 +50,8 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[]) {
 		targets,
 		float,
 		origin: rect(5, 500),
-		onEnd: async (result, moved) => {
-			ended.push([result, moved]);
+		onEnd: async (result) => {
+			ended.push(result);
 		},
 	});
 }
@@ -80,7 +80,7 @@ describe("DragSession", () => {
 		await s.release(50, 10);
 		expect(a.log).toEqual(["preview 50,10", "drop", "clear"]);
 		expect(float.log).toEqual(["move 50,10", "fly 0,0", "remove"]);
-		expect(ended).toEqual([[slot, true]]);
+		expect(ended).toEqual([slot]);
 	});
 
 	it("flies back and reports nothing when released outside every target", async () => {
@@ -91,16 +91,16 @@ describe("DragSession", () => {
 		s.move(300, 10);
 		await s.release(300, 10);
 		expect(float.log).toEqual(["move 300,10", "fly 5,500", "remove"]);
-		expect(ended).toEqual([[null, true]]);
+		expect(ended).toEqual([null]);
 	});
 
-	it("tells a release without any move apart from a drag", async () => {
+	it("a release without any move settles the card back with no result", async () => {
 		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
 		const float = new FakeFloat();
 		const ended: unknown[] = [];
 		const s = session([a], float, ended);
 		await s.release(50, 10);
-		expect(ended).toEqual([[null, false]]);
+		expect(ended).toEqual([null]);
 	});
 
 	it("treats a target that refuses the drop as no target", async () => {
@@ -111,6 +111,6 @@ describe("DragSession", () => {
 		s.move(50, 10);
 		await s.release(50, 10);
 		expect(float.log).toEqual(["move 50,10", "fly 5,500", "remove"]);
-		expect(ended).toEqual([[null, true]]);
+		expect(ended).toEqual([null]);
 	});
 });

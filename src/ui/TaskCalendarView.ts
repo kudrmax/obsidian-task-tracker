@@ -101,7 +101,10 @@ export class TaskCalendarView extends ItemView {
 		return "calendar-days";
 	}
 
-	/** Obsidian opens its side panels on swipes from the screen's edges; inside the view the fingers belong to the view. */
+	/**
+	 * Obsidian opens its side panels on swipes from the screen's edges; inside the view the fingers belong to the view. While a
+	 * gesture holds the screen the touches are also kept from scrolling: iOS would otherwise cancel the pointer mid-drag.
+	 */
 	override async onOpen(): Promise<void> {
 		const root = this.contentEl;
 		clear(root);
@@ -119,7 +122,7 @@ export class TaskCalendarView extends ItemView {
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.day?.list ?? [],
-			showDue: () => this.settings.listWidth >= LAYOUT.dueMinListWidth,
+			showDue: () => true,
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
@@ -169,8 +172,11 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, false, () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
-		this.registerDomEvent(document, "touchmove", (e) => this.arbiter.busy && e.preventDefault(), { passive: false });
-		for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
+		this.registerDomEvent(root, "touchmove", (e) => {
+			if (this.arbiter.busy) e.preventDefault();
+			e.stopPropagation();
+		}, { passive: false });
+		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
