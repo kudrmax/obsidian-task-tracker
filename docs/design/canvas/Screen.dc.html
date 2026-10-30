@@ -177,32 +177,18 @@ body{margin:0;background:#000}
 </sc-if>
 
 <div style="position: absolute; left: {{now.left}}px; bottom: 76px; width: {{now.width}}px; padding: {{now.btnPad}}; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
-<sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
-</sc-if>
 </div>
 
 <sc-if value="{{inboxPanel.visible}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; left: {{inboxPanel.left}}px; width: {{inboxPanel.width}}px; bottom: 76px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
-<sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
-</sc-if>
 </div>
 </sc-if>
 
 <sc-if value="{{soonPanel.visible}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; left: {{soonPanel.left}}px; width: {{soonPanel.width}}px; bottom: 76px; padding: {{soonPanel.btnPad}}; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
-<sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
-</sc-if>
-</div>
-</sc-if>
-
-<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: 0; right: 0; bottom: 76px; padding: 8px 10px; box-sizing: border-box; background: {{c.bg}}; display: flex; gap: 8px; z-index: 4;">
-<sc-for list="{{zones}}" as="z">
-<div style="flex: 1; min-width: 0; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
-</sc-for>
 </div>
 </sc-if>
 
@@ -216,7 +202,7 @@ body{margin:0;background:#000}
 </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon","inbox"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"dropZone":{"editor":"enum","default":"none","options":["none","tomorrow","pick"]},"sourceDot":{"editor":"boolean","default":false},"priorities":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon","inbox"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"priorities":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   themes() {
     return {
@@ -273,7 +259,6 @@ class Component extends DCLogic {
     const isInbox = rightMode === 'inbox';
     const isSoon = rightMode === 'soon' || isInbox;
     const newSlot = this.props.newSlot === true || this.props.newSlot === 'true';
-    const dropZone = dragging ? (this.props.dropZone ?? 'none') : 'none';
     const light = this.props.theme === 'light';
     const c = this.themes()[light ? 'light' : 'dark'];
     const priorities = this.props.priorities === true || this.props.priorities === 'true';
@@ -373,7 +358,7 @@ class Component extends DCLogic {
     const overlapsEvent = (top, bottom) => eventSpans.some((ev) => top < ev.bottom && bottom > ev.top);
     const cardSource = [
       ...TASK_SETS[scenario].map((t, i) => ({ ...t, order: i })),
-      ...(cardMode && ((dragging && dropZone === 'none') || newSlot) ? [{ drop: true, s: 16.5, order: -1 }] : [])
+      ...(cardMode && (dragging || newSlot) ? [{ drop: true, s: 16.5, order: -1 }] : [])
     ].sort((a, b) => a.s - b.s || a.order - b.order);
     const cards = [];
     const bodies = [];
@@ -499,17 +484,6 @@ class Component extends DCLogic {
       now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
       cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
     };
-    const ZONE_H = 40, ZONE_GAP = 8, FLOAT_W = 190, FLOAT_H = 42;
-    const ZONES_TOP = 844 - 76 - ZONE_GAP - ZONE_H;
-    const ZONE_W = (SCREEN - 2 * 10 - ZONE_GAP) / 2;
-    const zone = (key, label, path) => {
-      const hot = dropZone === key;
-      return { label, path, border: hot ? `solid ${accent}` : `dashed ${c.dash}`, bg: hot ? c.placeholder : 'transparent', color: hot ? c.text : c.muted };
-    };
-    const zones = [
-      zone('tomorrow', 'Tomorrow', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14'),
-      zone('pick', 'Pick a date', chipPaths.cal)
-    ];
     const firstChip = isInbox ? 0 : leftSide ? 2 : 1;
     const sourceDot = this.props.sourceDot === true || this.props.sourceDot === 'true';
     const chips = [
@@ -536,8 +510,6 @@ class Component extends DCLogic {
       chips,
       pillLeft: 2 + Math.round(38 * (isInbox ? 0 : 1 + p)),
       dragging,
-      showNew: !dragging,
-      zones,
       isCal: calLeft < SCREEN,
       soon,
       inbox,
@@ -553,8 +525,8 @@ class Component extends DCLogic {
       listScroll: Number(this.props.listScroll ?? 0),
       soonScroll: Number(this.props.soonScroll ?? 0),
       nowTop: nowY - 8,
-      floatLeft: dropZone === 'none' ? Math.max(calLeft - 60, 10) : Math.min(10 + (dropZone === 'pick' ? ZONE_W + ZONE_GAP : 0) + ZONE_W / 2 - FLOAT_W / 2 + 24, SCREEN - FLOAT_W - 6),
-      floatTop: dropZone === 'none' ? COLUMNS_TOP + TIMELINE_OFFSET + drop.top - 20 : ZONES_TOP - FLOAT_H + 16,
+      floatLeft: Math.max(calLeft - 60, 10),
+      floatTop: COLUMNS_TOP + TIMELINE_OFFSET + drop.top - 20,
       accent,
       stripColor
     };
