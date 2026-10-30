@@ -1,3 +1,4 @@
+import { DayBoundary } from "../domain/DayBoundary";
 import type { LocalDate } from "../domain/Task";
 import type { CalendarEvent, CalendarService, CalendarSource, DayEvents, SourceStatus } from "./contracts";
 import type { EventBatch, EventSource } from "./EventSource";
@@ -10,15 +11,43 @@ interface SourceResult {
 
 const MINUTE_MS = 60_000;
 
-function localMidnight(date: LocalDate, plusDays = 0): Date {
+function localTime(date: LocalDate, plusDays: number, hour: number): Date {
 	const [y, m, d] = date.split("-").map(Number);
-	return new Date(y, m - 1, d + plusDays);
+	return new Date(y, m - 1, d + plusDays, hour);
 }
 
-function touchesDay(e: CalendarEvent, dayStart: Date, dayEnd: Date): boolean {
-	const overlaps = e.start < dayEnd && e.end > dayStart;
-	const startsInside = e.start >= dayStart && e.start < dayEnd;
-	return overlaps || (e.allDay && startsInside);
+/** The times a day shows: its timed events from the hour it starts to the next day's, its all-day events by date. */
+class DayWindow {
+	private readonly timedStart: Date;
+	private readonly timedEnd: Date;
+	private readonly dateStart: Date;
+	private readonly dateEnd: Date;
+
+	constructor(date: LocalDate, boundary: DayBoundary) {
+		this.timedStart = localTime(date, 0, boundary.startHour);
+		this.timedEnd = localTime(date, 1, boundary.startHour);
+		this.dateStart = localTime(date, 0, 0);
+		this.dateEnd = localTime(date, 1, 0);
+	}
+
+	/** What to ask the sources for: both spans. */
+	get fetchStart(): Date {
+		return this.dateStart;
+	}
+
+	get fetchEnd(): Date {
+		return this.timedEnd;
+	}
+
+	shows(e: CalendarEvent): boolean {
+		return e.allDay ? this.touches(e, this.dateStart, this.dateEnd) : this.touches(e, this.timedStart, this.timedEnd);
+	}
+
+	private touches(e: CalendarEvent, start: Date, end: Date): boolean {
+		const overlaps = e.start < end && e.end > start;
+		const startsInside = e.start >= start && e.start < end;
+		return overlaps || (e.allDay && startsInside);
+	}
 }
 
 function countMessage(n: number): string {
@@ -36,12 +65,11 @@ export class CalendarServiceImpl implements CalendarService {
 	) {}
 
 	async eventsOn(date: LocalDate): Promise<DayEvents> {
-		const dayStart = localMidnight(date);
-		const dayEnd = localMidnight(date, 1);
-		const results = await Promise.all(this.sources.map((s) => this.fetch(s, dayStart, dayEnd)));
+		const window = new DayWindow(date, new DayBoundary(this.settings.get().dayStartHour));
+		const results = await Promise.all(this.sources.map((s) => this.fetch(s, window)));
 		const events = results
 			.flatMap((r) => r.events)
-			.filter((e) => touchesDay(e, dayStart, dayEnd))
+			.filter((e) => window.shows(e))
 			.sort((a, b) => a.start.getTime() - b.start.getTime());
 		const day: DayEvents = { events, statuses: results.map((r) => r.status) };
 		this.lastDay.set(date, day);
@@ -57,11 +85,11 @@ export class CalendarServiceImpl implements CalendarService {
 		return () => offs.forEach((off) => off());
 	}
 
-	private async fetch(source: EventSource, start: Date, end: Date): Promise<SourceResult> {
+	private async fetch(source: EventSource, window: DayWindow): Promise<SourceResult> {
 		try {
-			const batch = await source.eventsBetween(start, end);
+			const batch = await source.eventsBetween(window.fetchStart, window.fetchEnd);
 			this.lastGood.set(source.name, batch);
-			const shown = batch.events.filter((e) => touchesDay(e, start, end)).length;
+			const shown = batch.events.filter((e) => window.shows(e)).length;
 			return { events: batch.events, status: this.status(source.name, true, countMessage(shown), batch) };
 		} catch (e) {
 			const previous = this.lastGood.get(source.name);

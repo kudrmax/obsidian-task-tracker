@@ -2,6 +2,7 @@ import type { LocalDate } from "./types";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 1440;
 
 const two = (n: number) => String(n).padStart(2, "0");
 
@@ -32,8 +33,10 @@ export function minutesOf(d: Date): number {
 	return d.getHours() * MINUTES_PER_HOUR + d.getMinutes();
 }
 
+/** `09:00`; past midnight (a slot running into the next date) from the start of that date again. */
 export function formatTime(minutes: number): string {
-	return `${two(Math.floor(minutes / MINUTES_PER_HOUR))}:${two(minutes % MINUTES_PER_HOUR)}`;
+	const clock = minutes > MINUTES_PER_DAY ? minutes - MINUTES_PER_DAY : minutes;
+	return `${two(Math.floor(clock / MINUTES_PER_HOUR))}:${two(clock % MINUTES_PER_HOUR)}`;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

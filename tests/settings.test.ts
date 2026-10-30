@@ -6,6 +6,11 @@ describe("settingsFrom", () => {
 		expect(settingsFrom(null)).toEqual(DEFAULT_SETTINGS);
 	});
 
+	it("starts the day at midnight unless set", () => {
+		expect(settingsFrom(null).dayStartHour).toBe(0);
+		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
+	});
+
 	it("keeps the other nested keys when one is saved", () => {
 		const s = settingsFrom({ google: { clientId: "id" }, sections: { now: "Today" } });
 		expect(s.google.clientId).toBe("id");

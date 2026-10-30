@@ -2,7 +2,7 @@ import { formatTime } from "../dates";
 import { LAYOUT, PROPERTY } from "../design";
 import { el, px } from "../dom";
 import type { Timeline } from "../Timeline";
-import type { LocalDate } from "../types";
+import type { Slot } from "../types";
 import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
@@ -13,7 +13,6 @@ function setColumn(block: HTMLElement, column: number, columns: number): void {
 
 export interface TimelineDropOptions {
 	step(): number;
-	date(): LocalDate;
 }
 
 /** The timeline as a place to drop: a dashed target snapped to the grid, with the start time, that scrolls the day near the edges. */
@@ -46,8 +45,8 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	/** The slot the target shows now. */
-	get slot(): { start: number; end: number } {
-		return { start: this.start, end: this.end };
+	get slot(): Slot {
+		return this.timeline.slotAt(this.start, this.end);
 	}
 
 	private end = 0;
@@ -102,6 +101,6 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	drop(): DropResult {
-		return { kind: "slot", slot: { date: this.opts.date(), ...this.slot } };
+		return { kind: "slot", slot: this.slot };
 	}
 }

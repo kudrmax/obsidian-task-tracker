@@ -14,6 +14,7 @@ const DEVICE_STATE_KEY = "task-calendar:device";
  */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
 	private current: TaskCalendarSettings = settingsFrom(null);
+	private readonly listeners = new Set<() => void>();
 
 	override async onload(): Promise<void> {
 		await this.reloadSettings();
@@ -59,6 +60,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	private async reloadSettings(): Promise<void> {
 		this.current = { ...settingsFrom(await this.loadData()), ...this.deviceState() };
+		this.emit();
 	}
 
 	get(): TaskCalendarSettings {
@@ -75,6 +77,16 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			await this.saveData(sharedOf(fileSettings));
 		}
 		this.current = { ...fileSettings, ...deviceState };
+		this.emit();
+	}
+
+	onChange(listener: () => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	}
+
+	private emit(): void {
+		for (const listener of this.listeners) listener();
 	}
 
 	private async openView(): Promise<void> {

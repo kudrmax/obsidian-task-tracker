@@ -38,6 +38,8 @@ export interface TaskCalendarSettings {
 	readonly zoomLevels: readonly ZoomLevel[];
 	/** The hour a day other than today scrolls to when opened. */
 	readonly scrollToHour: number;
+	/** The hour one day ends and the next begins, 0..23: today, the due dates and the timeline count from it. */
+	readonly dayStartHour: number;
 	/** Width of the left column, CSS px, set by dragging the divider. */
 	readonly listWidth: number;
 	/** What the right column shows; the segmented control in the day row sets it. */
@@ -66,6 +68,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ hourPx: 224, stepMinutes: 5 },
 	],
 	scrollToHour: 9,
+	dayStartHour: 0,
 	listWidth: 187,
 	rightMode: "calendar",
 	staleAfterMinutes: 180,

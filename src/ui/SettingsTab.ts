@@ -2,6 +2,7 @@ import { Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
 import type { GoogleSettings, SectionNames, TaskCalendarSettings } from "../settings";
+import { formatTime } from "./dates";
 
 export interface GoogleCalendarOption {
 	readonly id: string;
@@ -14,6 +15,9 @@ export interface SettingsTabDeps {
 	logout(): Promise<void>;
 	listCalendars(): Promise<GoogleCalendarOption[]>;
 }
+
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
 
 const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 	inbox: "Inbox section",
@@ -61,6 +65,13 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el).setName("Timeline").setHeading();
 		this.number(el, "New task duration", "Minutes a task gets when dropped on the timeline.", this.settings.newTaskMinutes, (newTaskMinutes) => ({ newTaskMinutes }));
 		this.number(el, "Long press delay", "Milliseconds before a touch becomes a drag.", this.settings.longPressMs, (longPressMs) => ({ longPressMs }));
+		new Setting(el)
+			.setName("Day starts at")
+			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
+			.addDropdown((d) => {
+				for (let hour = 0; hour < HOURS_PER_DAY; hour++) d.addOption(String(hour), formatTime(hour * MINUTES_PER_HOUR));
+				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.plugin.update({ dayStartHour: Number(value) }));
+			});
 		this.number(el, "Scroll to hour", "Hour another day opens at.", this.settings.scrollToHour, (scrollToHour) => ({ scrollToHour }));
 		new Setting(el)
 			.setName("Zoom levels")

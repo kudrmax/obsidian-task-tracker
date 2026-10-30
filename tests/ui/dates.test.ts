@@ -24,5 +24,7 @@ describe("dates", () => {
 		expect(formatTime(860)).toBe("14:20");
 		expect(formatTime(540)).toBe("09:00");
 		expect(formatTime(990)).toBe("16:30");
+		expect(formatTime(1440)).toBe("24:00");
+		expect(formatTime(1500)).toBe("01:00");
 	});
 });

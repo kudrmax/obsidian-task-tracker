@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	clampSlot,
 	clearSlot,
 	createAtTime,
 	createInList,
@@ -17,6 +16,7 @@ import {
 	setSlot,
 	setStatus,
 } from "../../src/domain/operations";
+import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -50,6 +50,10 @@ describe("create", () => {
 
 	it("createAtTime today lands in Now with a slot of the given length", () => {
 		expect(createAtTime(parse("## Now\n\n## Soon\n"), T, T, 600, 60, "New").serialize()).toBe("## Now\n- [ ] New ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n");
+	});
+
+	it("createAtTime clips the end where the day ends", () => {
+		expect(createAtTime(parse("## Now\n\n## Soon\n"), "2026-10-31", T, 180, 120, "Late", new DayBoundary(4)).serialize()).toBe("## Now\n- [ ] Late ⏰ 2026-10-31 03:00-04:00\n\n## Soon\n");
 	});
 
 	it("createAtTime on another day lands in Soon and clips the end at midnight", () => {
@@ -122,6 +126,11 @@ describe("slots", () => {
 		expect(setSlot(d, d.tasks("soon")[0], { date: D, start: 600, end: 660 }, T).serialize()).toBe("## Soon\n- [ ] C ⏰ 2026-11-03 10:00-11:00\n- [ ] A\n");
 	});
 
+	it("setSlot after midnight of today keeps a Now task in Now when the day starts later", () => {
+		const d = parse("## Now\n- [ ] A\n\n## Soon\n");
+		expect(setSlot(d, d.tasks("now")[0], { date: "2026-10-31", start: 60, end: 120 }, T, new DayBoundary(4)).serialize()).toBe("## Now\n- [ ] A ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n");
+	});
+
 	it("setSlot clamps the slot to the day", () => {
 		const d = parse("## Now\n- [ ] A\n");
 		expect(setSlot(d, d.tasks("now")[0], { date: T, start: 1420, end: 1480 }, T).serialize()).toBe("## Now\n- [ ] A ⏰ 2026-10-30 23:40-24:00\n");
@@ -132,11 +141,6 @@ describe("slots", () => {
 		expect(clearSlot(d, d.tasks("soon")[0]).serialize()).toBe("## Soon\n- [ ] A 📅 2026-11-03\n");
 	});
 
-	it("clampSlot keeps the end at midnight and the start a step before", () => {
-		expect(clampSlot({ date: D, start: 1420, end: 1480 }, 30)).toEqual({ date: D, start: 1410, end: 1440 });
-		expect(clampSlot({ date: D, start: -10, end: 50 }, 30)).toEqual({ date: D, start: 0, end: 60 });
-		expect(clampSlot({ date: D, start: 600, end: 660 }, 30)).toEqual({ date: D, start: 600, end: 660 });
-	});
 });
 
 describe("between the list and Soon", () => {
