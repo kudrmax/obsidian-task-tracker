@@ -220,7 +220,7 @@ body {
 	--tc-font-hour: 11px;
 	--tc-leading-hour: 14px;
 	/* A label between the hours: half an hour's, centred on its line like the hour's. */
-	--tc-font-minor: 6px;
+	--tc-font-minor: 7px;
 	--tc-leading-minor: 8px;
 	--tc-minor-lift: 4px;
 	--tc-font-now: 10px;
