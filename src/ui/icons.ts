@@ -12,27 +12,12 @@ interface IconSpec {
 const ICONS = {
 	chevronLeft: { fill: false, join: true, shapes: [["polyline", { points: "15 5 8 12 15 19" }]] },
 	chevronRight: { fill: false, join: true, shapes: [["polyline", { points: "9 5 16 12 9 19" }]] },
-	calendar: {
+	calendar: { fill: false, join: true, shapes: [["path", { d: "M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5" }]] },
+	soon: { fill: false, join: true, shapes: [["path", { d: "M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z" }]] },
+	now: {
 		fill: false,
-		join: false,
-		shapes: [
-			["rect", { x: "3.5", y: "5", width: "17", height: "15.5", rx: "3" }],
-			["line", { x1: "3.5", y1: "10", x2: "20.5", y2: "10" }],
-			["line", { x1: "8", y1: "3", x2: "8", y2: "6.5" }],
-			["line", { x1: "16", y1: "3", x2: "16", y2: "6.5" }],
-		],
-	},
-	soon: {
-		fill: false,
-		join: false,
-		shapes: [
-			["line", { x1: "9", y1: "6.5", x2: "20", y2: "6.5" }],
-			["line", { x1: "9", y1: "12", x2: "20", y2: "12" }],
-			["line", { x1: "9", y1: "17.5", x2: "20", y2: "17.5" }],
-			["circle", { cx: "4.5", cy: "6.5", r: "1", fill: "currentColor" }],
-			["circle", { cx: "4.5", cy: "12", r: "1", fill: "currentColor" }],
-			["circle", { cx: "4.5", cy: "17.5", r: "1", fill: "currentColor" }],
-		],
+		join: true,
+		shapes: [["path", { d: "M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4" }]],
 	},
 	plus: {
 		fill: false,

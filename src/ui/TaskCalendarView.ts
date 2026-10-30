@@ -18,7 +18,7 @@ import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
-import { DESIGN, LAYOUT, PROPERTY } from "./design";
+import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
@@ -38,12 +38,17 @@ export interface ViewDeps {
 	readonly clock: Clock;
 }
 
-/** The screen: the day row, the list of the day on the left, the day's timeline or the Soon list on the right. */
+/**
+ * The screen: the day row over a window two columns wide on a strip of three, Soon, the list of the day (Now) and the
+ * day's timeline. The window shows Soon and Now, halved by a fixed divider, or Now and the timeline, parted by the divider
+ * that sets the list's width; switching slides the strip.
+ */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
 	private header: DayHeader | null = null;
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
+	private soonEl: HTMLElement | null = null;
 	private soonList: TaskList | null = null;
 	private soon: readonly TaskItem[] = [];
 	private soonDrop: ListDrop | null = null;
@@ -63,6 +68,7 @@ export class TaskCalendarView extends ItemView {
 	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
+	private switching = 0;
 	private day: DayView | null = null;
 	private missing = false;
 	private unsubscribe: (() => void) | null = null;
@@ -119,6 +125,7 @@ export class TaskCalendarView extends ItemView {
 			onMode: (mode) => void this.setMode(mode),
 			dot: () => this.statuses.some((s) => s.stale),
 			onSources: (anchor) => this.showSources(anchor),
+			longPressMs: () => this.settings.longPressMs,
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -127,6 +134,14 @@ export class TaskCalendarView extends ItemView {
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
+		this.soonEl = el(root, "div", "tc-soon");
+		this.soonList = new TaskList(el(this.soonEl, "div"), {
+			items: () => this.soon,
+			showDue: () => false,
+			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
+		});
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
+		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
 			width: () => this.settings.listWidth,
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
@@ -135,12 +150,6 @@ export class TaskCalendarView extends ItemView {
 			max: LIST_WIDTH_MAX,
 		});
 		this.rightEl = el(root, "div", "tc-right");
-		this.soonList = new TaskList(el(this.rightEl, "div", "is-soon"), {
-			items: () => this.soon,
-			showDue: () => false,
-			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
-		});
-		this.soonDrop = new ListDrop(this.soonList, this.rightEl, "soon", (drag) => drag.from !== "timeline");
 		this.allDayEl = el(this.rightEl, "div");
 		this.timeline = new Timeline(el(this.rightEl, "div"), {
 			theme: () => this.theme(),
@@ -227,7 +236,16 @@ export class TaskCalendarView extends ItemView {
 		void this.refresh();
 	}
 
+	/**
+	 * The strip slides only while the window moves to the other pair, in step with the switch's pill, before the choice is
+	 * saved; the divider's drag and a resize move it at once.
+	 */
 	private async setMode(mode: RightMode): Promise<void> {
+		const root = this.contentEl;
+		window.clearTimeout(this.switching);
+		root.classList.add("is-switching");
+		this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
+		root.classList.toggle("is-lists", mode === "soon");
 		await this.deps.settings.update({ rightMode: mode });
 		this.render();
 	}
@@ -365,21 +383,15 @@ export class TaskCalendarView extends ItemView {
 		}
 		this.renderPending = false;
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
+		if (!this.header || !this.leftEl || !this.soonEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
 		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
 		this.header.render();
 		this.list.render();
 		root.classList.toggle("is-missing", this.missing);
-		const soon = this.settings.rightMode === "soon";
-		this.newSoon.el.style.display = soon && !this.missing ? "" : "none";
-		this.newTask.el.style.display = this.missing ? "none" : "";
-		this.leftEl.style.display = this.missing ? "none" : "";
-		this.rightEl.style.display = this.missing ? "none" : "";
+		root.classList.toggle("is-lists", this.settings.rightMode === "soon");
+		for (const part of [this.leftEl, this.soonEl, this.rightEl, this.newTask.el, this.newSoon.el]) part.style.display = this.missing ? "none" : "";
 		root.querySelector(".tc-missing")?.remove();
 		if (this.missing) this.renderMissing(root);
-		this.allDayEl.style.display = soon ? "none" : "";
-		this.timeline.el.style.display = soon ? "none" : "";
-		this.soonList.el.style.display = soon ? "" : "none";
 		this.soonList.render();
 		this.pull?.renderArea();
 		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay), this.theme());
