@@ -78,6 +78,18 @@ The export itself comes with the plugin: it keeps it in its own folder (`.obsidi
 
 On the iPhone, pulling the timeline down (or Refresh now in the sources window) runs the shortcut too: Shortcuts comes up for a moment and returns to Obsidian with the new events. On the Mac the same file arrives through Obsidian Sync.
 
+## Notifications (iPhone)
+
+A task put on a time rings on the phone at its start: the task’s title, its time below, a tap opens Obsidian. A Scriptable script reads the tasks file with the plugin’s own parser and keeps one pending notification per unfinished task with a slot in Now and Soon; a task moved, unslotted, done or cancelled loses its old one on the next run. Due dates alone do not notify.
+
+1. Scriptable → **+** → a script named `Task Notifications`, paste [`scriptable/Task Notifications.js`](scriptable/Task%20Notifications.js). If the plugin’s tasks file, section names or markers differ from the defaults, change them in `SETTINGS` at its top.
+2. The `ObsidianVault` file bookmark from the work calendar setup serves this script too.
+3. Run it once: iOS asks to allow notifications; the alert shows how many tasks are ahead.
+4. Shortcuts → Automation → **+** → App → Obsidian → **Is Closed** → Run Immediately, with the actions Scriptable “Create File Bookmark” (`ObsidianVault`, the vault folder) → Scriptable “Run Script” → `Task Notifications`. Leaving Obsidian is when the file holds your last changes and those synced from the Mac: Obsidian syncs only while it is open, so a task put on a time on the Mac reaches the phone the next time you open and leave Obsidian there.
+5. To make them hard to miss: Settings → Notifications → Scriptable → Sounds on, Banner Style **Persistent** (the banner stays until you swipe it). For every Focus you use during the day: Settings → Focus → the Focus → Apps → Allowed Apps → **+** → Scriptable, or it rings silently.
+
+The script is built from `src/scriptable` by `node scriptable/build.mjs` (part of `npm run build`); a test fails when the committed script is stale.
+
 ## Development
 
 ```bash
