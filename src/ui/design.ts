@@ -93,7 +93,7 @@ export const LAYOUT = {
 	/** The divider holds to the middle of the window while dragged this close to it. */
 	dividerSnapDistance: 8,
 	/** It holds only while moving slower than this, px per ms: a quick swipe passes the middle by, without a tick. */
-	dividerSnapSpeed: 0.25,
+	dividerSnapSpeed: 0.05,
 	/** The timeline scrolls itself while a drag comes this close to its edge. */
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
