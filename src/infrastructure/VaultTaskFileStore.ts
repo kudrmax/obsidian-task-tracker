@@ -1,6 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { TasksFileMissingError } from "../application/contracts";
 import type { TaskFileStore } from "../application/ports";
+import { VaultPathWatcher } from "./VaultPathWatcher";
 
 export class VaultTaskFileStore implements TaskFileStore {
 	constructor(
@@ -23,11 +24,8 @@ export class VaultTaskFileStore implements TaskFileStore {
 		await this.app.vault.create(this.path(), text);
 	}
 
-	onModify(listener: () => void): () => void {
-		const ref = this.app.vault.on("modify", (file) => {
-			if (file.path === this.path()) listener();
-		});
-		return () => this.app.vault.offref(ref);
+	onChange(listener: () => void): () => void {
+		return new VaultPathWatcher(this.app.vault).watch(this.path, listener);
 	}
 
 	private file(): TFile | null {

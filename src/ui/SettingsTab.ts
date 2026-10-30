@@ -85,7 +85,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				t.setValue(this.settings.google.clientSecret).onChange((clientSecret) => this.plugin.update(this.google({ clientSecret })));
 			});
 		this.loginRow(el);
-		this.number(el, "Refresh interval", "Seconds between fetches while the view is open.", this.settings.google.refreshSeconds, (refreshSeconds) =>
+		this.number(el, "Refresh interval", "Seconds between calendar fetches while the view is open; 0 turns the timer off. Coming back to Obsidian fetches at once.", this.settings.google.refreshSeconds, (refreshSeconds) =>
 			this.google({ refreshSeconds }),
 		);
 		if (this.settings.google.refreshToken) void this.calendarRows(el.createDiv());

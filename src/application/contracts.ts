@@ -145,4 +145,6 @@ export interface CalendarService {
 	eventsOn(date: LocalDate): Promise<DayEvents>;
 	/** The last result for `date` without a fetch; null when `eventsOn` was never called for it. */
 	cached(date: LocalDate): DayEvents | null;
+	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
 }

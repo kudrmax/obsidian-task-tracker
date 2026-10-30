@@ -46,21 +46,35 @@ describe("VaultTaskFileStore", () => {
 		expect(await store.read()).toBe("B");
 	});
 
-	it("onModify fires for the tasks file only and unsubscribes", () => {
+	it("onChange fires for the tasks file only and unsubscribes", () => {
 		const { vault, store, setPath } = setup("a.md");
 		let fired = 0;
-		const off = store.onModify(() => fired++);
-		vault.emitModify("other.md");
+		const off = store.onChange(() => fired++);
+		vault.emit("modify", "other.md");
 		expect(fired).toBe(0);
-		vault.emitModify("a.md");
+		vault.emit("modify", "a.md");
 		expect(fired).toBe(1);
 		setPath("b.md");
-		vault.emitModify("a.md");
-		vault.emitModify("b.md");
+		vault.emit("modify", "a.md");
+		vault.emit("modify", "b.md");
 		expect(fired).toBe(2);
 		off();
-		vault.emitModify("b.md");
+		vault.emit("modify", "b.md");
 		expect(fired).toBe(2);
 		expect(vault.listenerCount).toBe(0);
+	});
+
+	it("onChange fires when the tasks file is created, deleted, or renamed to or from its path", () => {
+		const { vault, store } = setup("a.md");
+		let fired = 0;
+		store.onChange(() => fired++);
+		vault.emit("create", "a.md");
+		vault.emit("delete", "a.md");
+		vault.emit("rename", "a.md", "old.md");
+		vault.emit("rename", "new.md", "a.md");
+		expect(fired).toBe(4);
+		vault.emit("create", "other.md");
+		vault.emit("rename", "x.md", "y.md");
+		expect(fired).toBe(4);
 	});
 });

@@ -129,12 +129,11 @@ export class TaskServiceImpl implements TaskService {
 
 	async createFile(): Promise<void> {
 		await this.store.create(TaskDocument.empty(allSectionNames(this.settings.get())));
-		this.emit();
 	}
 
 	onChange(listener: () => void): () => void {
 		this.listeners.add(listener);
-		this.unsubscribeStore ??= this.store.onModify(() => this.emit());
+		this.unsubscribeStore ??= this.store.onChange(() => this.emit());
 		return () => {
 			this.listeners.delete(listener);
 			if (this.listeners.size === 0) {
@@ -158,7 +157,6 @@ export class TaskServiceImpl implements TaskService {
 			}
 		});
 		if (failure !== null) throw failure;
-		this.emit();
 	}
 
 	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate }> {

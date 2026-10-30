@@ -11,4 +11,6 @@ export interface EventBatch {
 export interface EventSource {
 	readonly name: CalendarSource;
 	eventsBetween(start: Date, end: Date): Promise<EventBatch>;
+	/** A source that knows when its data changed (the work file) says so; Google has no such signal and is polled. */
+	onChange?(listener: () => void): () => void;
 }
