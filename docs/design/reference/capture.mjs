@@ -136,6 +136,19 @@ const STATES = [
 	},
 ];
 
+/** The light boards show the same states on Obsidian's light theme: the class on body switches the tokens, the view redraws its event colours. */
+const setTheme = (name) => evaluate(`(() => { document.body.classList.toggle('theme-light', ${name === "light"}); document.body.classList.toggle('theme-dark', ${name === "dark"}); ${view}.render(); return 'ok'; })()`);
+const LIGHT = { ScreenLight: "Screen", ScreenLightSoon: "ScreenSoon", ScreenLightDrag: "ScreenDrag", ScreenLightMenu: "ScreenMenu", ScreenLightDue: "ScreenDue", ScreenLightPicker: "ScreenPicker", ScreenLightSheet: "ScreenSheet", ScreenLightSheetPicker: "ScreenSheetPicker", ScreenLightSources: "ScreenSourcesPopover" };
+for (const [board, dark] of Object.entries(LIGHT)) {
+	const base = STATES.find((s) => s.board === dark);
+	STATES.push({
+		...base,
+		board,
+		run: async () => { await setTheme("light"); await sleep(200); await base.run(); },
+		after: async () => { await base.after?.(); await setTheme("dark"); },
+	});
+}
+
 await reload();
 const results = [];
 for (const state of STATES) {

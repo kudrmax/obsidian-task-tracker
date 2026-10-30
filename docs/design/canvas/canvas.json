@@ -2,112 +2,1005 @@
   "v": 3,
   "attachments": {},
   "pages": [
-    {"id": "prod", "name": "Prod"},
-    {"id": "brainstorm", "name": "Brainstorm"}
+    {
+      "id": "prod",
+      "name": "Prod"
+    },
+    {
+      "id": "brainstorm",
+      "name": "Brainstorm"
+    }
   ],
   "boards": {
-    "ScreenLeft.dc.html": {"h": 844, "title": "Разделитель сдвинут влево", "w": 390, "x": 0, "y": 0, "page": "prod"},
-    "Screen.dc.html": {"h": 844, "title": "Разделитель по центру", "w": 390, "x": 470, "y": 0, "page": "prod"},
-    "ScreenRight.dc.html": {"h": 844, "title": "Разделитель сдвинут вправо", "w": 390, "x": 940, "y": 0, "page": "prod"},
-    "ScreenDrag.dc.html": {"h": 844, "title": "Перетаскивание: список сомкнулся", "w": 390, "x": 1410, "y": 0, "page": "prod"},
-    "ScreenSoon.dc.html": {"h": 844, "title": "Справа включён Soon", "w": 390, "x": 1880, "y": 0, "page": "prod"},
-    "ScreenMenu.dc.html": {"h": 844, "title": "Меню задачи по долгому нажатию", "w": 390, "x": 2350, "y": 0, "page": "prod"},
-    "ScreenDue.dc.html": {"h": 844, "title": "Due date: подменю", "w": 390, "x": 2820, "y": 0, "page": "prod"},
-    "ScreenPicker.dc.html": {"h": 844, "title": "Due date: выбор даты", "w": 390, "x": 3290, "y": 0, "page": "prod"},
-    "ScreenSheet.dc.html": {"h": 844, "title": "Экран задачи: новая задача", "w": 390, "x": 3760, "y": 0, "page": "prod"},
-    "ScreenSheetSlot.dc.html": {"h": 844, "title": "Экран задачи: долгий тап на таймлайне", "w": 390, "x": 4230, "y": 0, "page": "prod"},
-    "ScreenSheetEdit.dc.html": {"h": 844, "title": "Экран задачи: редактирование", "w": 390, "x": 4700, "y": 0, "page": "prod"},
-    "ScreenSheetPicker.dc.html": {"h": 844, "title": "Экран задачи: нажали Date", "w": 390, "x": 5170, "y": 0, "page": "prod"},
-    "ScreenSheetLong.dc.html": {"h": 844, "title": "Экран задачи: название в несколько строк", "w": 390, "x": 5640, "y": 0, "page": "prod"},
-    "ScreenSourcesDot.dc.html": {"h": 844, "title": "Источники: календарь устарел", "w": 390, "x": 6110, "y": 0, "page": "prod"},
-    "ScreenSourcesPopover.dc.html": {"h": 844, "title": "Источники: тап по иконке календаря", "w": 390, "x": 6580, "y": 0, "page": "prod"},
-    "ScreenSourcesPull.dc.html": {"h": 844, "title": "Источники: таймлайн оттянут вниз", "w": 390, "x": 7050, "y": 0, "page": "prod"},
-
-    "Main.dc.html": {"h": 844, "title": "A — плоский список", "w": 390, "x": 0, "y": 0, "page": "brainstorm"},
-    "ListB.dc.html": {"h": 844, "title": "B — карточки", "w": 390, "x": 470, "y": 0, "page": "brainstorm"},
-    "ListC.dc.html": {"h": 844, "title": "C — группа", "w": 390, "x": 940, "y": 0, "page": "brainstorm"},
-    "NarrowA.dc.html": {"h": 844, "title": "A — узкая колонка", "w": 390, "x": 0, "y": 1144, "page": "brainstorm"},
-    "NarrowB.dc.html": {"h": 844, "title": "B — узкая колонка", "w": 390, "x": 470, "y": 1144, "page": "brainstorm"},
-    "NarrowC.dc.html": {"h": 844, "title": "C — узкая колонка", "w": 390, "x": 940, "y": 1144, "page": "brainstorm"},
-    "CardsB1.dc.html": {"h": 844, "title": "B1 — значок play и дата текстом", "w": 390, "x": 0, "y": 2288, "page": "brainstorm"},
-    "CardsB2.dc.html": {"h": 844, "title": "B2 — точка и дата с иконкой", "w": 390, "x": 470, "y": 2288, "page": "brainstorm"},
-    "CardsB3.dc.html": {"h": 844, "title": "B3 — круглые бейджи", "w": 390, "x": 940, "y": 2288, "page": "brainstorm"},
-    "CardsB1Narrow.dc.html": {"h": 844, "title": "B1 — узкая колонка", "w": 390, "x": 0, "y": 3432, "page": "brainstorm"},
-    "CardsB2Narrow.dc.html": {"h": 844, "title": "B2 — узкая колонка", "w": 390, "x": 470, "y": 3432, "page": "brainstorm"},
-    "CardsB3Narrow.dc.html": {"h": 844, "title": "B3 — узкая колонка", "w": 390, "x": 940, "y": 3432, "page": "brainstorm"},
-    "Cal.dc.html": {"h": 844, "title": "Календарь дня", "w": 390, "x": 0, "y": 4576, "page": "brainstorm"},
-    "CalSplit.dc.html": {"h": 844, "title": "Задачу тащат из списка в календарь", "w": 390, "x": 470, "y": 4576, "page": "brainstorm"},
-    "InProgress.dc.html": {"h": 900, "title": "Задача в процессе: варианты", "w": 480, "x": 0, "y": 5720, "page": "brainstorm"},
-    "InProgress2.dc.html": {"h": 560, "title": "Задача в процессе: 1, 4 и 5 на десяти задачах", "w": 720, "x": 560, "y": 5720, "page": "brainstorm"},
-    "InProgress3.dc.html": {"h": 560, "title": "Задача в процессе: серый градиент, настраивается", "w": 720, "x": 1360, "y": 5720, "page": "brainstorm"},
-    "InProgress4.dc.html": {"h": 560, "title": "Задача в процессе: чёткая полоса", "w": 480, "x": 2160, "y": 5720, "page": "brainstorm"},
-    "ComparePurple.dc.html": {"h": 900, "title": "Цвет полосы: сейчас и Obsidian", "w": 860, "x": 2720, "y": 5720, "page": "brainstorm"},
-    "SoonScreen.dc.html": {"h": 844, "title": "Soon: переключатель иконками", "w": 390, "x": 0, "y": 6920, "page": "brainstorm"},
-    "SoonCal.dc.html": {"h": 844, "title": "Тот же переключатель, включён календарь", "w": 390, "x": 470, "y": 6920, "page": "brainstorm"},
-    "SoonText.dc.html": {"h": 844, "title": "Soon: переключатель текстом", "w": 390, "x": 940, "y": 6920, "page": "brainstorm"},
-    "SoonColumn.dc.html": {"h": 844, "title": "Soon: переключатель над правой колонкой", "w": 390, "x": 1410, "y": 6920, "page": "brainstorm"},
-    "MenuScreen.dc.html": {"h": 844, "title": "Меню: список как в iOS", "w": 390, "x": 0, "y": 8064, "page": "brainstorm"},
-    "MenuBar.dc.html": {"h": 844, "title": "Меню: панель действий над задачей", "w": 390, "x": 470, "y": 8064, "page": "brainstorm"},
-    "MenuSheet.dc.html": {"h": 844, "title": "Меню: нижний лист", "w": 390, "x": 940, "y": 8064, "page": "brainstorm"},
-    "MenuDue.dc.html": {"h": 844, "title": "Due date: подменю", "w": 390, "x": 1410, "y": 8064, "page": "brainstorm"},
-    "MenuPicker.dc.html": {"h": 844, "title": "Due date: выбор даты", "w": 390, "x": 1880, "y": 8064, "page": "brainstorm"},
-    "NewTask.dc.html": {"h": 844, "title": "Кнопка New task: поле на месте", "w": 390, "x": 0, "y": 9208, "page": "brainstorm"},
-    "NewInlineSlot.dc.html": {"h": 844, "title": "Долгий тап на таймлайне: ввод в блоке", "w": 390, "x": 470, "y": 9208, "page": "brainstorm"},
-    "NewComposer.dc.html": {"h": 844, "title": "Строка ввода: New task слева, заготовка в конце списка", "w": 390, "x": 940, "y": 9208, "page": "brainstorm"},
-    "NewComposerSlot.dc.html": {"h": 844, "title": "Строка ввода: долгий тап, заготовка на 16:30", "w": 390, "x": 1410, "y": 9208, "page": "brainstorm"},
-    "NewComposerSoon.dc.html": {"h": 844, "title": "Строка ввода: New task в Soon, заготовка в конце Soon", "w": 390, "x": 1880, "y": 9208, "page": "brainstorm"},
-    "NewChipList.dc.html": {"h": 844, "title": "Нажали на метку Today", "w": 390, "x": 2350, "y": 9208, "page": "brainstorm"},
-    "NewChipSlot.dc.html": {"h": 844, "title": "Нажали на метку 16:30", "w": 390, "x": 2820, "y": 9208, "page": "brainstorm"},
-    "RenameList.dc.html": {"h": 844, "title": "Rename: задача в списке", "w": 390, "x": 0, "y": 10352, "page": "brainstorm"},
-    "RenameSlot.dc.html": {"h": 844, "title": "Rename: задача на таймлайне", "w": 390, "x": 470, "y": 10352, "page": "brainstorm"},
-    "Sources.dc.html": {"h": 844, "title": "1. Точка на иконке: календарь устарел", "w": 390, "x": 0, "y": 11496, "page": "brainstorm"},
-    "SourcesPopover.dc.html": {"h": 844, "title": "1. Тап по иконке: окно источников", "w": 390, "x": 470, "y": 11496, "page": "brainstorm"},
-    "SourcesPull.dc.html": {"h": 844, "title": "2. Таймлайн оттянут вниз", "w": 390, "x": 940, "y": 11496, "page": "brainstorm"},
-    "SourcesSettings.dc.html": {"h": 844, "title": "3. Раздел в настройках плагина", "w": 390, "x": 1410, "y": 11496, "page": "brainstorm"},
-    "NewSheet.dc.html": {"h": 844, "title": "Новая задача из списка", "w": 390, "x": 0, "y": 12640, "page": "brainstorm"},
-    "NewSheetSlot.dc.html": {"h": 844, "title": "Новая задача долгим тапом по таймлайну", "w": 390, "x": 470, "y": 12640, "page": "brainstorm"},
-    "NewSheetEdit.dc.html": {"h": 844, "title": "Редактирование задачи", "w": 390, "x": 940, "y": 12640, "page": "brainstorm"},
-    "NewSheetPicker.dc.html": {"h": 844, "title": "Нажали Date: календарь", "w": 390, "x": 1410, "y": 12640, "page": "brainstorm"},
-    "NewSheetLong.dc.html": {"h": 844, "title": "Название в несколько строк", "w": 390, "x": 1880, "y": 12640, "page": "brainstorm"},
-    "SelPills.dc.html": {"h": 844, "title": "1. Отдельные круглые кнопки", "w": 390, "x": 0, "y": 13784, "page": "brainstorm"},
-    "SelTiles.dc.html": {"h": 844, "title": "2. Плитки с иконкой", "w": 390, "x": 470, "y": 13784, "page": "brainstorm"},
-    "SelCircles.dc.html": {"h": 844, "title": "3. Круги с подписью", "w": 390, "x": 940, "y": 13784, "page": "brainstorm"},
-    "SelAccent.dc.html": {"h": 844, "title": "4. Кнопки с рамкой, выбранная фиолетовая", "w": 390, "x": 1410, "y": 13784, "page": "brainstorm"}
+    "ScreenLeft.dc.html": {
+      "h": 844,
+      "title": "Разделитель сдвинут влево",
+      "w": 390,
+      "x": 0,
+      "y": 0,
+      "page": "prod"
+    },
+    "Screen.dc.html": {
+      "h": 844,
+      "title": "Разделитель по центру",
+      "w": 390,
+      "x": 470,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenRight.dc.html": {
+      "h": 844,
+      "title": "Разделитель сдвинут вправо",
+      "w": 390,
+      "x": 940,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenDrag.dc.html": {
+      "h": 844,
+      "title": "Перетаскивание: список сомкнулся",
+      "w": 390,
+      "x": 1410,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSoon.dc.html": {
+      "h": 844,
+      "title": "Справа включён Soon",
+      "w": 390,
+      "x": 1880,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenMenu.dc.html": {
+      "h": 844,
+      "title": "Меню задачи по долгому нажатию",
+      "w": 390,
+      "x": 2350,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenDue.dc.html": {
+      "h": 844,
+      "title": "Due date: подменю",
+      "w": 390,
+      "x": 2820,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenPicker.dc.html": {
+      "h": 844,
+      "title": "Due date: выбор даты",
+      "w": 390,
+      "x": 3290,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSheet.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: новая задача",
+      "w": 390,
+      "x": 3760,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSheetSlot.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: долгий тап на таймлайне",
+      "w": 390,
+      "x": 4230,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSheetEdit.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: редактирование",
+      "w": 390,
+      "x": 4700,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSheetPicker.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: нажали Date",
+      "w": 390,
+      "x": 5170,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSheetLong.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: название в несколько строк",
+      "w": 390,
+      "x": 5640,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSourcesDot.dc.html": {
+      "h": 844,
+      "title": "Источники: календарь устарел",
+      "w": 390,
+      "x": 6110,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSourcesPopover.dc.html": {
+      "h": 844,
+      "title": "Источники: тап по иконке календаря",
+      "w": 390,
+      "x": 6580,
+      "y": 0,
+      "page": "prod"
+    },
+    "ScreenSourcesPull.dc.html": {
+      "h": 844,
+      "title": "Источники: таймлайн оттянут вниз",
+      "w": 390,
+      "x": 7050,
+      "y": 0,
+      "page": "prod"
+    },
+    "Main.dc.html": {
+      "h": 844,
+      "title": "A — плоский список",
+      "w": 390,
+      "x": 0,
+      "y": 0,
+      "page": "brainstorm"
+    },
+    "ListB.dc.html": {
+      "h": 844,
+      "title": "B — карточки",
+      "w": 390,
+      "x": 470,
+      "y": 0,
+      "page": "brainstorm"
+    },
+    "ListC.dc.html": {
+      "h": 844,
+      "title": "C — группа",
+      "w": 390,
+      "x": 940,
+      "y": 0,
+      "page": "brainstorm"
+    },
+    "NarrowA.dc.html": {
+      "h": 844,
+      "title": "A — узкая колонка",
+      "w": 390,
+      "x": 0,
+      "y": 1144,
+      "page": "brainstorm"
+    },
+    "NarrowB.dc.html": {
+      "h": 844,
+      "title": "B — узкая колонка",
+      "w": 390,
+      "x": 470,
+      "y": 1144,
+      "page": "brainstorm"
+    },
+    "NarrowC.dc.html": {
+      "h": 844,
+      "title": "C — узкая колонка",
+      "w": 390,
+      "x": 940,
+      "y": 1144,
+      "page": "brainstorm"
+    },
+    "CardsB1.dc.html": {
+      "h": 844,
+      "title": "B1 — значок play и дата текстом",
+      "w": 390,
+      "x": 0,
+      "y": 2288,
+      "page": "brainstorm"
+    },
+    "CardsB2.dc.html": {
+      "h": 844,
+      "title": "B2 — точка и дата с иконкой",
+      "w": 390,
+      "x": 470,
+      "y": 2288,
+      "page": "brainstorm"
+    },
+    "CardsB3.dc.html": {
+      "h": 844,
+      "title": "B3 — круглые бейджи",
+      "w": 390,
+      "x": 940,
+      "y": 2288,
+      "page": "brainstorm"
+    },
+    "CardsB1Narrow.dc.html": {
+      "h": 844,
+      "title": "B1 — узкая колонка",
+      "w": 390,
+      "x": 0,
+      "y": 3432,
+      "page": "brainstorm"
+    },
+    "CardsB2Narrow.dc.html": {
+      "h": 844,
+      "title": "B2 — узкая колонка",
+      "w": 390,
+      "x": 470,
+      "y": 3432,
+      "page": "brainstorm"
+    },
+    "CardsB3Narrow.dc.html": {
+      "h": 844,
+      "title": "B3 — узкая колонка",
+      "w": 390,
+      "x": 940,
+      "y": 3432,
+      "page": "brainstorm"
+    },
+    "Cal.dc.html": {
+      "h": 844,
+      "title": "Календарь дня",
+      "w": 390,
+      "x": 0,
+      "y": 4576,
+      "page": "brainstorm"
+    },
+    "CalSplit.dc.html": {
+      "h": 844,
+      "title": "Задачу тащат из списка в календарь",
+      "w": 390,
+      "x": 470,
+      "y": 4576,
+      "page": "brainstorm"
+    },
+    "InProgress.dc.html": {
+      "h": 900,
+      "title": "Задача в процессе: варианты",
+      "w": 480,
+      "x": 0,
+      "y": 5720,
+      "page": "brainstorm"
+    },
+    "InProgress2.dc.html": {
+      "h": 560,
+      "title": "Задача в процессе: 1, 4 и 5 на десяти задачах",
+      "w": 720,
+      "x": 560,
+      "y": 5720,
+      "page": "brainstorm"
+    },
+    "InProgress3.dc.html": {
+      "h": 560,
+      "title": "Задача в процессе: серый градиент, настраивается",
+      "w": 720,
+      "x": 1360,
+      "y": 5720,
+      "page": "brainstorm"
+    },
+    "InProgress4.dc.html": {
+      "h": 560,
+      "title": "Задача в процессе: чёткая полоса",
+      "w": 480,
+      "x": 2160,
+      "y": 5720,
+      "page": "brainstorm"
+    },
+    "ComparePurple.dc.html": {
+      "h": 900,
+      "title": "Цвет полосы: сейчас и Obsidian",
+      "w": 860,
+      "x": 2720,
+      "y": 5720,
+      "page": "brainstorm"
+    },
+    "SoonScreen.dc.html": {
+      "h": 844,
+      "title": "Soon: переключатель иконками",
+      "w": 390,
+      "x": 0,
+      "y": 6920,
+      "page": "brainstorm"
+    },
+    "SoonCal.dc.html": {
+      "h": 844,
+      "title": "Тот же переключатель, включён календарь",
+      "w": 390,
+      "x": 470,
+      "y": 6920,
+      "page": "brainstorm"
+    },
+    "SoonText.dc.html": {
+      "h": 844,
+      "title": "Soon: переключатель текстом",
+      "w": 390,
+      "x": 940,
+      "y": 6920,
+      "page": "brainstorm"
+    },
+    "SoonColumn.dc.html": {
+      "h": 844,
+      "title": "Soon: переключатель над правой колонкой",
+      "w": 390,
+      "x": 1410,
+      "y": 6920,
+      "page": "brainstorm"
+    },
+    "MenuScreen.dc.html": {
+      "h": 844,
+      "title": "Меню: список как в iOS",
+      "w": 390,
+      "x": 0,
+      "y": 8064,
+      "page": "brainstorm"
+    },
+    "MenuBar.dc.html": {
+      "h": 844,
+      "title": "Меню: панель действий над задачей",
+      "w": 390,
+      "x": 470,
+      "y": 8064,
+      "page": "brainstorm"
+    },
+    "MenuSheet.dc.html": {
+      "h": 844,
+      "title": "Меню: нижний лист",
+      "w": 390,
+      "x": 940,
+      "y": 8064,
+      "page": "brainstorm"
+    },
+    "MenuDue.dc.html": {
+      "h": 844,
+      "title": "Due date: подменю",
+      "w": 390,
+      "x": 1410,
+      "y": 8064,
+      "page": "brainstorm"
+    },
+    "MenuPicker.dc.html": {
+      "h": 844,
+      "title": "Due date: выбор даты",
+      "w": 390,
+      "x": 1880,
+      "y": 8064,
+      "page": "brainstorm"
+    },
+    "NewTask.dc.html": {
+      "h": 844,
+      "title": "Кнопка New task: поле на месте",
+      "w": 390,
+      "x": 0,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewInlineSlot.dc.html": {
+      "h": 844,
+      "title": "Долгий тап на таймлайне: ввод в блоке",
+      "w": 390,
+      "x": 470,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewComposer.dc.html": {
+      "h": 844,
+      "title": "Строка ввода: New task слева, заготовка в конце списка",
+      "w": 390,
+      "x": 940,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewComposerSlot.dc.html": {
+      "h": 844,
+      "title": "Строка ввода: долгий тап, заготовка на 16:30",
+      "w": 390,
+      "x": 1410,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewComposerSoon.dc.html": {
+      "h": 844,
+      "title": "Строка ввода: New task в Soon, заготовка в конце Soon",
+      "w": 390,
+      "x": 1880,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewChipList.dc.html": {
+      "h": 844,
+      "title": "Нажали на метку Today",
+      "w": 390,
+      "x": 2350,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "NewChipSlot.dc.html": {
+      "h": 844,
+      "title": "Нажали на метку 16:30",
+      "w": 390,
+      "x": 2820,
+      "y": 9208,
+      "page": "brainstorm"
+    },
+    "RenameList.dc.html": {
+      "h": 844,
+      "title": "Rename: задача в списке",
+      "w": 390,
+      "x": 0,
+      "y": 10352,
+      "page": "brainstorm"
+    },
+    "RenameSlot.dc.html": {
+      "h": 844,
+      "title": "Rename: задача на таймлайне",
+      "w": 390,
+      "x": 470,
+      "y": 10352,
+      "page": "brainstorm"
+    },
+    "Sources.dc.html": {
+      "h": 844,
+      "title": "1. Точка на иконке: календарь устарел",
+      "w": 390,
+      "x": 0,
+      "y": 11496,
+      "page": "brainstorm"
+    },
+    "SourcesPopover.dc.html": {
+      "h": 844,
+      "title": "1. Тап по иконке: окно источников",
+      "w": 390,
+      "x": 470,
+      "y": 11496,
+      "page": "brainstorm"
+    },
+    "SourcesPull.dc.html": {
+      "h": 844,
+      "title": "2. Таймлайн оттянут вниз",
+      "w": 390,
+      "x": 940,
+      "y": 11496,
+      "page": "brainstorm"
+    },
+    "SourcesSettings.dc.html": {
+      "h": 844,
+      "title": "3. Раздел в настройках плагина",
+      "w": 390,
+      "x": 1410,
+      "y": 11496,
+      "page": "brainstorm"
+    },
+    "NewSheet.dc.html": {
+      "h": 844,
+      "title": "Новая задача из списка",
+      "w": 390,
+      "x": 0,
+      "y": 12640,
+      "page": "brainstorm"
+    },
+    "NewSheetSlot.dc.html": {
+      "h": 844,
+      "title": "Новая задача долгим тапом по таймлайну",
+      "w": 390,
+      "x": 470,
+      "y": 12640,
+      "page": "brainstorm"
+    },
+    "NewSheetEdit.dc.html": {
+      "h": 844,
+      "title": "Редактирование задачи",
+      "w": 390,
+      "x": 940,
+      "y": 12640,
+      "page": "brainstorm"
+    },
+    "NewSheetPicker.dc.html": {
+      "h": 844,
+      "title": "Нажали Date: календарь",
+      "w": 390,
+      "x": 1410,
+      "y": 12640,
+      "page": "brainstorm"
+    },
+    "NewSheetLong.dc.html": {
+      "h": 844,
+      "title": "Название в несколько строк",
+      "w": 390,
+      "x": 1880,
+      "y": 12640,
+      "page": "brainstorm"
+    },
+    "SelPills.dc.html": {
+      "h": 844,
+      "title": "1. Отдельные круглые кнопки",
+      "w": 390,
+      "x": 0,
+      "y": 13784,
+      "page": "brainstorm"
+    },
+    "SelTiles.dc.html": {
+      "h": 844,
+      "title": "2. Плитки с иконкой",
+      "w": 390,
+      "x": 470,
+      "y": 13784,
+      "page": "brainstorm"
+    },
+    "SelCircles.dc.html": {
+      "h": 844,
+      "title": "3. Круги с подписью",
+      "w": 390,
+      "x": 940,
+      "y": 13784,
+      "page": "brainstorm"
+    },
+    "SelAccent.dc.html": {
+      "h": 844,
+      "title": "4. Кнопки с рамкой, выбранная фиолетовая",
+      "w": 390,
+      "x": 1410,
+      "y": 13784,
+      "page": "brainstorm"
+    },
+    "Palette.dc.html": {
+      "h": 820,
+      "w": 1240,
+      "x": 0,
+      "y": 1444,
+      "title": "Палитра: тёмная и светлая",
+      "page": "prod"
+    },
+    "ThemeDark.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1320,
+      "y": 14928,
+      "title": "Тёмная (как сейчас)",
+      "page": "brainstorm"
+    },
+    "LightScreen.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1790,
+      "y": 14928,
+      "title": "Светлая: главный экран",
+      "page": "brainstorm"
+    },
+    "LightSoon.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2260,
+      "y": 14928,
+      "title": "Светлая: Soon",
+      "page": "brainstorm"
+    },
+    "LightDrag.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2730,
+      "y": 14928,
+      "title": "Светлая: перетаскивание",
+      "page": "brainstorm"
+    },
+    "LightMenu.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3200,
+      "y": 14928,
+      "title": "Светлая: меню задачи",
+      "page": "brainstorm"
+    },
+    "LightSheet.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3670,
+      "y": 14928,
+      "title": "Светлая: экран задачи",
+      "page": "brainstorm"
+    },
+    "ScreenLight.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1320,
+      "y": 1444,
+      "title": "Главный экран",
+      "page": "prod"
+    },
+    "ScreenLightSoon.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1790,
+      "y": 1444,
+      "title": "Soon справа",
+      "page": "prod"
+    },
+    "ScreenLightDrag.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2260,
+      "y": 1444,
+      "title": "Перетаскивание",
+      "page": "prod"
+    },
+    "ScreenLightMenu.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2730,
+      "y": 1444,
+      "title": "Меню задачи",
+      "page": "prod"
+    },
+    "ScreenLightDue.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3200,
+      "y": 1444,
+      "title": "Подменю Due date",
+      "page": "prod"
+    },
+    "ScreenLightPicker.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3670,
+      "y": 1444,
+      "title": "Pick a date",
+      "page": "prod"
+    },
+    "ScreenLightSheet.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 4140,
+      "y": 1444,
+      "title": "Экран задачи",
+      "page": "prod"
+    },
+    "ScreenLightSheetPicker.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 4610,
+      "y": 1444,
+      "title": "Экран задачи: дата",
+      "page": "prod"
+    },
+    "ScreenLightSources.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 5080,
+      "y": 1444,
+      "title": "Источники календаря",
+      "page": "prod"
+    },
+    "TrioStrip.dc.html": {
+      "h": 970,
+      "w": 820,
+      "x": 0,
+      "y": 16072,
+      "title": "Лента и окно экрана",
+      "page": "brainstorm"
+    },
+    "TrioChips.dc.html": {
+      "h": 370,
+      "w": 760,
+      "x": 900,
+      "y": 16072,
+      "title": "Переключатель: три варианта",
+      "page": "brainstorm"
+    },
+    "TrioLists.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1740,
+      "y": 16072,
+      "title": "Soon и Now",
+      "page": "brainstorm"
+    },
+    "TrioMid1.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2210,
+      "y": 16072,
+      "title": "Переход: треть пути",
+      "page": "brainstorm"
+    },
+    "TrioMid2.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2680,
+      "y": 16072,
+      "title": "Переход: две трети",
+      "page": "brainstorm"
+    },
+    "TrioCal.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3150,
+      "y": 16072,
+      "title": "Now и Календарь",
+      "page": "brainstorm"
+    },
+    "TrioCalNarrow.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 3620,
+      "y": 16072,
+      "title": "Now и Календарь: разделитель сдвинут",
+      "page": "brainstorm"
+    }
   },
-  "createdOnFiles": {"at": "2026-10-30T12:00:00Z", "v": 1},
+  "createdOnFiles": {
+    "at": "2026-10-30T12:00:00Z",
+    "v": 1
+  },
   "designSystems": [],
-  "launch": {"view": "canvas", "page": "prod"},
-  "noteOrder": ["main", "tokens", "step1", "step1narrow", "step11", "step11narrow", "step2", "step3", "step4", "step5", "step6", "step7", "step8", "step9", "step10"],
+  "launch": {
+    "view": "canvas",
+    "page": "prod"
+  },
+  "noteOrder": [
+    "main",
+    "tokens",
+    "step1",
+    "step1narrow",
+    "step11",
+    "step11narrow",
+    "step2",
+    "step3",
+    "step4",
+    "step5",
+    "step6",
+    "step7",
+    "step8",
+    "step9",
+    "step10",
+    "step11light",
+    "lightTitle",
+    "tokensLight",
+    "step12trio"
+  ],
   "notes": {
-    "main": {"kind": "title1", "maxW": 7440, "text": "Главный экран: список и календарь дня", "x": 0, "y": -300, "page": "prod"},
-    "tokens": {"x": 7520, "y": 0, "w": 360, "fill": "gray", "size": "s", "page": "prod", "text": "Для разработки\n\nФон #000000\nКарточка задачи #1C1C1E, высота 40, скругление 12, текст 15\nДлинный текст гаснет справа, без переноса\nЗадача «в процессе»: полоса 3 px слева, цвет акцента Obsidian (--interactive-accent, по умолчанию #8A6CEF)\nДата: число 13 bold над месяцем 9, справа; скрыта, если колонка уже 160 px\nНа таймлайне задача серая с рамкой #3A3A3C и ручкой растягивания, событие в цвете своего календаря с полосой 3 px, без подписи времени\nЛиния «сейчас» #D92C24\nНовая задача: кнопка внизу левой колонки, закреплена\nТап по Today, Tomorrow или дате возвращает на сегодня\nПереключатель правой части: две иконки (календарь, список Soon) справа в строке дня, выбранная на плашке #E5E5EA\nВ режиме Soon у правой колонки своя кнопка New task, добавляет в конец Soon\nПеретаскивание Soon ↔ левый список выглядит так же, как перетаскивание в календарь\nМеню задачи: долгое нажатие (iPhone), правая кнопка (Mac); системный вид iOS, три группы: статусы, срок и имя, Delete красным; одинаковое для списка и таймлайна; у задачи в процессе вместо In progress пункт Stop progress\nDue date открывает подменю на месте меню: Today, Tomorrow, Next week (ближайший понедельник), Pick a date, отдельно Remove due date; Pick a date открывает месячный календарь, неделя с понедельника, дата применяется по нажатию\nЭкран задачи: New task, долгий тап по пустому месту таймлайна и Rename в меню открывают отдельный экран на всё окно; клавиатура открыта сразу\nНаверху Cancel и Add (у существующей задачи Save); название 28 bold по центру, переносится на несколько строк; название, переключатель и календарь вместе стоят по вертикальному центру области между верхней строкой и клавиатурой; клавиша Готово = Add\nПод названием три плитки Soon, Now, Date (на всю ширину, высота 78, скругление 18, иконка 24 над подписью 15; фон #1C1C1E, выбранная #E5E5EA с чёрным; иконки: лоток, солнце, календарь) (по умолчанию Now; New task в Soon ставит Soon); Soon = секция Soon без срока, Now = секция Now, Date = срок, на кнопке вместо Date пишется выбранная дата\nDate открывает месячный календарь под переключателем, неделя с понедельника, дата применяется по нажатию\nВремени на экране не выбирают: его задают на сетке таймлайна; у задачи с таймлайна время показано серым под переключателем, по центру, только для чтения; длительность по умолчанию из настроек; пустое название ничего не создаёт\nИсточники календаря: если источник давно не обновлялся или пришла ошибка, на иконке календаря в переключателе оранжевая точка #FF9F0A 7 px без обводки; тап по иконке, когда календарь уже открыт, показывает окно: у каждого источника время обновления (у рабочего ещё устройство), устаревший оранжевым, ниже Refresh now; оттягивание таймлайна вниз показывает те же источники и обновляет их"},
-    "step1": {"kind": "title1", "maxW": 1330, "text": "Шаг 1. Список задач", "x": 0, "y": -300, "page": "brainstorm"},
-    "step1narrow": {"kind": "title1", "maxW": 1330, "text": "Та же колонка, ужатая разделителем", "x": 0, "y": 864, "page": "brainstorm"},
-    "step11": {"kind": "title1", "maxW": 1330, "text": "Шаг 1.1. Карточки в одну строку", "x": 0, "y": 1988, "page": "brainstorm"},
-    "step11narrow": {"kind": "title1", "maxW": 1330, "text": "Они же в узкой колонке", "x": 0, "y": 3132, "page": "brainstorm"},
-    "step2": {"kind": "title1", "maxW": 860, "text": "Шаг 2. Календарь", "x": 0, "y": 4276, "page": "brainstorm"},
-    "step3": {"kind": "title1", "maxW": 3580, "text": "Шаг 3. Подсветка задачи в процессе", "x": 0, "y": 5420, "page": "brainstorm"},
-    "step4": {"kind": "title1", "maxW": 1800, "text": "Шаг 4. Режим Soon", "x": 0, "y": 6620, "page": "brainstorm"},
-    "step5": {"kind": "title1", "maxW": 1330, "text": "Шаг 5. Меню задачи", "maxW": 2270, "x": 0, "y": 7764, "page": "brainstorm"},
-    "step6": {"kind": "title1", "maxW": 3210, "text": "Шаг 6. Новая задача", "x": 0, "y": 8908, "page": "brainstorm"},
-    "step7": {"kind": "title1", "maxW": 860, "text": "Шаг 7. Переименование", "x": 0, "y": 10052, "page": "brainstorm"},
-    "step8": {"kind": "title1", "maxW": 1800, "text": "Шаг 8. Где спрятать источники", "x": 0, "y": 11196, "page": "brainstorm"},
-    "step9": {"kind": "title1", "maxW": 2270, "text": "Шаг 9. Задача на отдельном экране", "x": 0, "y": 12340, "page": "brainstorm"},
-    "step10": {"kind": "title1", "maxW": 1800, "text": "Шаг 10. Кнопки Soon, Now, Date", "x": 0, "y": 13484, "page": "brainstorm"}
+    "main": {
+      "kind": "title1",
+      "maxW": 7440,
+      "text": "Главный экран: список и календарь дня",
+      "x": 0,
+      "y": -300,
+      "page": "prod"
+    },
+    "tokens": {
+      "x": 7520,
+      "y": 0,
+      "w": 360,
+      "fill": "gray",
+      "size": "s",
+      "page": "prod",
+      "text": "Для разработки\n\nФон #000000\nКарточка задачи #1C1C1E, высота 40, скругление 12, текст 15\nДлинный текст гаснет справа, без переноса\nЗадача «в процессе»: полоса 3 px слева, цвет акцента Obsidian (--interactive-accent, по умолчанию #8A6CEF)\nДата: число 13 bold над месяцем 9, справа; скрыта, если колонка уже 160 px\nНа таймлайне задача серая с рамкой #3A3A3C и ручкой растягивания, событие в цвете своего календаря с полосой 3 px, без подписи времени\nЛиния «сейчас» #D92C24\nНовая задача: кнопка внизу левой колонки, закреплена\nТап по Today, Tomorrow или дате возвращает на сегодня\nПереключатель правой части: две иконки (календарь, список Soon) справа в строке дня, выбранная на плашке #E5E5EA\nВ режиме Soon у правой колонки своя кнопка New task, добавляет в конец Soon\nПеретаскивание Soon ↔ левый список выглядит так же, как перетаскивание в календарь\nМеню задачи: долгое нажатие (iPhone), правая кнопка (Mac); системный вид iOS, три группы: статусы, срок и имя, Delete красным; одинаковое для списка и таймлайна; у задачи в процессе вместо In progress пункт Stop progress\nDue date открывает подменю на месте меню: Today, Tomorrow, Next week (ближайший понедельник), Pick a date, отдельно Remove due date; Pick a date открывает месячный календарь, неделя с понедельника, дата применяется по нажатию\nЭкран задачи: New task, долгий тап по пустому месту таймлайна и Rename в меню открывают отдельный экран на всё окно; клавиатура открыта сразу\nНаверху Cancel и Add (у существующей задачи Save); название 28 bold по центру, переносится на несколько строк; название, переключатель и календарь вместе стоят по вертикальному центру области между верхней строкой и клавиатурой; клавиша Готово = Add\nПод названием три плитки Soon, Now, Date (на всю ширину, высота 78, скругление 18, иконка 24 над подписью 15; фон #1C1C1E, выбранная #E5E5EA с чёрным; иконки: лоток, солнце, календарь) (по умолчанию Now; New task в Soon ставит Soon); Soon = секция Soon без срока, Now = секция Now, Date = срок, на кнопке вместо Date пишется выбранная дата\nDate открывает месячный календарь под переключателем, неделя с понедельника, дата применяется по нажатию\nВремени на экране не выбирают: его задают на сетке таймлайна; у задачи с таймлайна время показано серым под переключателем, по центру, только для чтения; длительность по умолчанию из настроек; пустое название ничего не создаёт\nИсточники календаря: если источник давно не обновлялся или пришла ошибка, на иконке календаря в переключателе оранжевая точка #FF9F0A 7 px без обводки; тап по иконке, когда календарь уже открыт, показывает окно: у каждого источника время обновления (у рабочего ещё устройство), устаревший оранжевым, ниже Refresh now; оттягивание таймлайна вниз показывает те же источники и обновляет их"
+    },
+    "step1": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Шаг 1. Список задач",
+      "x": 0,
+      "y": -300,
+      "page": "brainstorm"
+    },
+    "step1narrow": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Та же колонка, ужатая разделителем",
+      "x": 0,
+      "y": 864,
+      "page": "brainstorm"
+    },
+    "step11": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Шаг 1.1. Карточки в одну строку",
+      "x": 0,
+      "y": 1988,
+      "page": "brainstorm"
+    },
+    "step11narrow": {
+      "kind": "title1",
+      "maxW": 1330,
+      "text": "Они же в узкой колонке",
+      "x": 0,
+      "y": 3132,
+      "page": "brainstorm"
+    },
+    "step2": {
+      "kind": "title1",
+      "maxW": 860,
+      "text": "Шаг 2. Календарь",
+      "x": 0,
+      "y": 4276,
+      "page": "brainstorm"
+    },
+    "step3": {
+      "kind": "title1",
+      "maxW": 3580,
+      "text": "Шаг 3. Подсветка задачи в процессе",
+      "x": 0,
+      "y": 5420,
+      "page": "brainstorm"
+    },
+    "step4": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "Шаг 4. Режим Soon",
+      "x": 0,
+      "y": 6620,
+      "page": "brainstorm"
+    },
+    "step5": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "Шаг 5. Меню задачи",
+      "x": 0,
+      "y": 7764,
+      "page": "brainstorm"
+    },
+    "step6": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "Шаг 6. Новая задача",
+      "x": 0,
+      "y": 8908,
+      "page": "brainstorm"
+    },
+    "step7": {
+      "kind": "title1",
+      "maxW": 860,
+      "text": "Шаг 7. Переименование",
+      "x": 0,
+      "y": 10052,
+      "page": "brainstorm"
+    },
+    "step8": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "Шаг 8. Где спрятать источники",
+      "x": 0,
+      "y": 11196,
+      "page": "brainstorm"
+    },
+    "step9": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "Шаг 9. Задача на отдельном экране",
+      "x": 0,
+      "y": 12340,
+      "page": "brainstorm"
+    },
+    "step10": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "Шаг 10. Кнопки Soon, Now, Date",
+      "x": 0,
+      "y": 13484,
+      "page": "brainstorm"
+    },
+    "step11light": {
+      "kind": "title1",
+      "maxW": 4200,
+      "text": "Шаг 11. Светлая тема",
+      "x": 0,
+      "y": 14628,
+      "page": "brainstorm"
+    },
+    "lightTitle": {
+      "kind": "title1",
+      "maxW": 5900,
+      "text": "Светлая тема: палитра и состояния",
+      "x": 0,
+      "y": 1144,
+      "page": "prod"
+    },
+    "tokensLight": {
+      "text": "Светлая тема\n\nТема следует за Obsidian: светлая при theme-light, тёмная при theme-dark; своей настройки нет\nРоли цветов те же, что в тёмной; значения на доске «Палитра» слева\nФон #FFFFFF, карточка #F2F2F7 (задачи, блоки, плитки, трек переключателя, календарь на экране задачи)\nТекст #000000, иконки и число срока #3A3A3C / #1C1C1E, вторичный #8E8E93\nРазделитель колонок #E5E5EA, ручка разделителя #C7C7CC, сетка часов #EFEFF4\nЗадача на таймлайне: фон #F2F2F7, рамка #D1D1D6, ручка растягивания #AEAEB2\nПунктир New task #C7C7CC\nВыбранное инвертируется: плашка #1C1C1E с белым (переключатель календарь/Soon, плитки Soon/Now/Date)\nАкцент и полоса In progress: --interactive-accent (в светлом Obsidian по умолчанию #8A5CF5); выбранный день в календаре тем же цветом с белым\nПлейсхолдер при перетаскивании: пунктир акцентом, фон #F1ECFE\nЛиния «сейчас» #FF3B30, точка источника #FF9500\nСобытия: полоса цветом календаря, фон тот же цвет на 13–16 %, текст тёмным оттенком: Work #007AFF / #0058B8, Google #FF9500 / #9A5300, розовый #FF2D55 / #B8173C, зелёный #34C759 / #1F7A35\nПоднятая карточка (перетаскивание, меню) белая с тенью вместо светлой заливки\nПод меню и окном источников: затемнение rgba(0,0,0,0.22) + blur 8\nМеню и окно источников: панель rgba(250,250,252,0.97), разделители #D1D1D6, промежутки между группами #E5E5EA, Delete #FF3B30\nКлавиатура системная, светлая сама",
+      "x": 5630,
+      "y": 1444,
+      "w": 360,
+      "fill": "gray",
+      "size": "s",
+      "page": "prod"
+    },
+    "step12trio": {
+      "kind": "title1",
+      "maxW": 3900,
+      "text": "Шаг 12. Три колонки: Soon, Now, Календарь",
+      "x": 0,
+      "y": 15772,
+      "page": "brainstorm"
+    }
   },
   "order": [
-    "ScreenLeft.dc.html", "Screen.dc.html", "ScreenRight.dc.html", "ScreenDrag.dc.html", "ScreenSoon.dc.html", "ScreenMenu.dc.html", "ScreenDue.dc.html", "ScreenPicker.dc.html", "ScreenSheet.dc.html", "ScreenSheetSlot.dc.html", "ScreenSheetEdit.dc.html", "ScreenSheetPicker.dc.html", "ScreenSheetLong.dc.html", "ScreenSourcesDot.dc.html", "ScreenSourcesPopover.dc.html", "ScreenSourcesPull.dc.html",
-    "Main.dc.html", "ListB.dc.html", "ListC.dc.html", "NarrowA.dc.html", "NarrowB.dc.html", "NarrowC.dc.html",
-    "CardsB1.dc.html", "CardsB2.dc.html", "CardsB3.dc.html", "CardsB1Narrow.dc.html", "CardsB2Narrow.dc.html", "CardsB3Narrow.dc.html",
-    "Cal.dc.html", "CalSplit.dc.html",
-    "InProgress.dc.html", "InProgress2.dc.html", "InProgress3.dc.html", "InProgress4.dc.html", "ComparePurple.dc.html",
-    "SoonScreen.dc.html", "SoonCal.dc.html", "SoonText.dc.html", "SoonColumn.dc.html",
-    "MenuScreen.dc.html", "MenuBar.dc.html", "MenuSheet.dc.html", "MenuDue.dc.html", "MenuPicker.dc.html",
-    "NewTask.dc.html", "NewInlineSlot.dc.html", "NewComposer.dc.html", "NewComposerSlot.dc.html", "NewComposerSoon.dc.html", "NewChipList.dc.html", "NewChipSlot.dc.html",
-    "RenameList.dc.html", "RenameSlot.dc.html",
-    "Sources.dc.html", "SourcesPopover.dc.html", "SourcesPull.dc.html", "SourcesSettings.dc.html",
-    "NewSheet.dc.html", "NewSheetSlot.dc.html", "NewSheetEdit.dc.html", "NewSheetPicker.dc.html", "NewSheetLong.dc.html",
-    "SelPills.dc.html", "SelTiles.dc.html", "SelCircles.dc.html", "SelAccent.dc.html"
+    "ScreenLeft.dc.html",
+    "Screen.dc.html",
+    "ScreenRight.dc.html",
+    "ScreenDrag.dc.html",
+    "ScreenSoon.dc.html",
+    "ScreenMenu.dc.html",
+    "ScreenDue.dc.html",
+    "ScreenPicker.dc.html",
+    "ScreenSheet.dc.html",
+    "ScreenSheetSlot.dc.html",
+    "ScreenSheetEdit.dc.html",
+    "ScreenSheetPicker.dc.html",
+    "ScreenSheetLong.dc.html",
+    "ScreenSourcesDot.dc.html",
+    "ScreenSourcesPopover.dc.html",
+    "ScreenSourcesPull.dc.html",
+    "Main.dc.html",
+    "ListB.dc.html",
+    "ListC.dc.html",
+    "NarrowA.dc.html",
+    "NarrowB.dc.html",
+    "NarrowC.dc.html",
+    "CardsB1.dc.html",
+    "CardsB2.dc.html",
+    "CardsB3.dc.html",
+    "CardsB1Narrow.dc.html",
+    "CardsB2Narrow.dc.html",
+    "CardsB3Narrow.dc.html",
+    "Cal.dc.html",
+    "CalSplit.dc.html",
+    "InProgress.dc.html",
+    "InProgress2.dc.html",
+    "InProgress3.dc.html",
+    "InProgress4.dc.html",
+    "ComparePurple.dc.html",
+    "SoonScreen.dc.html",
+    "SoonCal.dc.html",
+    "SoonText.dc.html",
+    "SoonColumn.dc.html",
+    "MenuScreen.dc.html",
+    "MenuBar.dc.html",
+    "MenuSheet.dc.html",
+    "MenuDue.dc.html",
+    "MenuPicker.dc.html",
+    "NewTask.dc.html",
+    "NewInlineSlot.dc.html",
+    "NewComposer.dc.html",
+    "NewComposerSlot.dc.html",
+    "NewComposerSoon.dc.html",
+    "NewChipList.dc.html",
+    "NewChipSlot.dc.html",
+    "RenameList.dc.html",
+    "RenameSlot.dc.html",
+    "Sources.dc.html",
+    "SourcesPopover.dc.html",
+    "SourcesPull.dc.html",
+    "SourcesSettings.dc.html",
+    "NewSheet.dc.html",
+    "NewSheetSlot.dc.html",
+    "NewSheetEdit.dc.html",
+    "NewSheetPicker.dc.html",
+    "NewSheetLong.dc.html",
+    "SelPills.dc.html",
+    "SelTiles.dc.html",
+    "SelCircles.dc.html",
+    "SelAccent.dc.html",
+    "Palette.dc.html",
+    "ThemeDark.dc.html",
+    "LightScreen.dc.html",
+    "LightSoon.dc.html",
+    "LightDrag.dc.html",
+    "LightMenu.dc.html",
+    "LightSheet.dc.html",
+    "ScreenLight.dc.html",
+    "ScreenLightSoon.dc.html",
+    "ScreenLightDrag.dc.html",
+    "ScreenLightMenu.dc.html",
+    "ScreenLightDue.dc.html",
+    "ScreenLightPicker.dc.html",
+    "ScreenLightSheet.dc.html",
+    "ScreenLightSheetPicker.dc.html",
+    "ScreenLightSources.dc.html",
+    "TrioStrip.dc.html",
+    "TrioChips.dc.html",
+    "TrioLists.dc.html",
+    "TrioMid1.dc.html",
+    "TrioMid2.dc.html",
+    "TrioCal.dc.html",
+    "TrioCalNarrow.dc.html"
   ],
   "title": "Task Calendar"
 }

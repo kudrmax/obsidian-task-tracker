@@ -3,6 +3,7 @@ import { type CalendarEvent, type CalendarService, type DayView, type Placement,
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
+import type { Theme } from "./eventColors";
 import { addDays, localDateOf, minutesOf } from "./dates";
 import { DayHeader } from "./DayHeader";
 import { DragController } from "./drag/DragController";
@@ -142,6 +143,7 @@ export class TaskCalendarView extends ItemView {
 		this.soonDrop = new ListDrop(this.soonList, this.rightEl, "soon", (drag) => drag.from !== "timeline");
 		this.allDayEl = el(this.rightEl, "div");
 		this.timeline = new Timeline(el(this.rightEl, "div"), {
+			theme: () => this.theme(),
 			date: () => this.selectedDate,
 			today: () => this.today(),
 			hourPx: () => this.hourPx,
@@ -178,6 +180,7 @@ export class TaskCalendarView extends ItemView {
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.arbiter.onIdle(() => this.renderPending && this.render());
+		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
 		await this.refresh();
@@ -204,6 +207,11 @@ export class TaskCalendarView extends ItemView {
 
 	private today(): LocalDate {
 		return localDateOf(this.deps.clock.now());
+	}
+
+	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
+	private theme(): Theme {
+		return document.body.classList.contains("theme-light") ? "light" : "dark";
 	}
 
 	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
@@ -371,7 +379,7 @@ export class TaskCalendarView extends ItemView {
 		this.soonList.el.style.display = soon ? "" : "none";
 		this.soonList.render();
 		this.pull?.renderArea();
-		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay));
+		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay), this.theme());
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;

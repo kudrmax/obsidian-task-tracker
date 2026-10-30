@@ -1,5 +1,6 @@
 import type { CalendarEvent, TaskItem } from "../application/contracts";
 import { paintEvent } from "./AllDayRow";
+import type { Theme } from "./eventColors";
 import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
@@ -7,6 +8,7 @@ import { itemBox, layoutColumns, minutesToPx, pxToMinutes } from "./timelineLayo
 import type { LocalDate } from "./types";
 
 export interface TimelineDeps {
+	theme(): Theme;
 	date(): LocalDate;
 	today(): LocalDate;
 	hourPx(): number;
@@ -118,7 +120,7 @@ export class Timeline {
 		const block = make(this.itemsEl, "div", "tc-item tc-event");
 		block.style.setProperty(PROPERTY.column, String(col));
 		block.style.setProperty(PROPERTY.columns, String(cols));
-		paintEvent(block, event);
+		paintEvent(block, event, this.deps.theme());
 		make(block, "div", "tc-event-bar");
 		make(make(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
 		this.placed.push({ el: block, start: minutesOf(event.start), end: minutesOf(event.end) });

@@ -14,7 +14,7 @@
 body{margin:0;background:#000}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{tk.bg}}; color: {{tk.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
 
 <div style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
 <button style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{accent}}; font: inherit; font-size: 17px;">Cancel</button>
@@ -70,7 +70,7 @@ body{margin:0;background:#000}
 </sc-if>
 
 <sc-if value="{{showPicker}}" hint-placeholder-val="{{false}}">
-<div style="box-sizing: border-box; padding: 8px 10px 10px; border-radius: 16px; background: #1C1C1E;">
+<div style="box-sizing: border-box; padding: 8px 10px 10px; border-radius: 16px; background: {{tk.card}};">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 4px;">
 <span style="font-size: 16px; font-weight: 600;">November 2026</span>
 <div style="display: flex; gap: 4px;">
@@ -90,37 +90,41 @@ body{margin:0;background:#000}
 </sc-if>
 </div>
 
-<div style="position: absolute; left: 0; right: 0; top: 544px; height: 300px; box-sizing: border-box; padding: 8px 3px 0; background: #1E1E20; display: flex; flex-direction: column; gap: 11px;">
+<div style="position: absolute; left: 0; right: 0; top: 544px; height: 300px; box-sizing: border-box; padding: 8px 3px 0; background: {{tk.kbd}}; display: flex; flex-direction: column; gap: 11px;">
 <sc-for list="{{letterRows}}" as="row" hint-placeholder-count="2">
 <div style="display: flex; gap: 5px;">
 <sc-for list="{{row}}" as="k" hint-placeholder-count="11">
-<span style="flex: 1; height: 42px; border-radius: 5px; background: #48484B; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: 0 1px 0 rgba(0,0,0,0.5);">{{k}}</span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{tk.key}}; color: {{tk.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{tk.keyShadow}};">{{k}}</span>
 </sc-for>
 </div>
 </sc-for>
 <div style="display: flex; gap: 5px;">
-<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: #2F2F31; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l8 8h-4.5v7h-7v-7H4z"></path></svg></span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{tk.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{tk.text}}" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l8 8h-4.5v7h-7v-7H4z"></path></svg></span>
 <sc-for list="{{row3}}" as="k" hint-placeholder-count="9">
-<span style="flex: 1; height: 42px; border-radius: 5px; background: #48484B; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: 0 1px 0 rgba(0,0,0,0.5);">{{k}}</span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{tk.key}}; color: {{tk.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{tk.keyShadow}};">{{k}}</span>
 </sc-for>
-<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: #2F2F31; display: flex; align-items: center; justify-content: center;"><svg width="22" height="20" viewBox="0 0 26 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h13a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 22 19H9l-6.5-7z M13 9.5l5 5 M18 9.5l-5 5"></path></svg></span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{tk.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="20" viewBox="0 0 26 24" fill="none" stroke="{{tk.text}}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h13a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 22 19H9l-6.5-7z M13 9.5l5 5 M18 9.5l-5 5"></path></svg></span>
 </div>
 <div style="display: flex; gap: 5px;">
-<span style="width: 46px; flex-shrink: 0; height: 42px; border-radius: 5px; background: #2F2F31; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px;">123</span>
-<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: #2F2F31; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M3 12h18 M12 3c2.8 3 2.8 15 0 18 M12 3c-2.8 3-2.8 15 0 18"></path></svg></span>
-<span style="flex: 1; height: 42px; border-radius: 5px; background: #48484B; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px;">Пробел</span>
+<span style="width: 46px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{tk.fnKey}}; color: {{tk.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">123</span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{tk.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{tk.text}}" stroke-width="1.6" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M3 12h18 M12 3c2.8 3 2.8 15 0 18 M12 3c-2.8 3-2.8 15 0 18"></path></svg></span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{tk.key}}; color: {{tk.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Пробел</span>
 <span style="width: 92px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{accent}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px;">Готово</span>
 </div>
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const mode = this.props.mode ?? 'list';
-    const accent = '#8A6CEF';
-    const ON = { bg: '#E5E5EA', color: '#000000' };
-    const OFF = { bg: 'transparent', color: '#E5E5EA' };
+    const light = this.props.theme === 'light';
+    const tk = light
+      ? { bg: '#FFFFFF', text: '#000000', card: '#F2F2F7', soft: '#1C1C1E', outside: '#C7C7CC', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)', onBg: '#1C1C1E', onText: '#FFFFFF', accent: '#8A5CF5' }
+      : { bg: '#000000', text: '#FFFFFF', card: '#1C1C1E', soft: '#E5E5EA', outside: '#636366', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)', onBg: '#E5E5EA', onText: '#000000', accent: '#8A6CEF' };
+    const accent = tk.accent;
+    const ON = { bg: tk.onBg, color: tk.onText };
+    const OFF = { bg: 'transparent', color: tk.soft };
     const isEdit = mode === 'edit';
     const isPicker = mode === 'picker';
     const dateLabels = { edit: '2 Nov', picker: '3 Nov' };
@@ -142,7 +146,7 @@ class Component extends DCLogic {
         ...p,
         ...(on ? ON : OFF),
         path: paths[p.key],
-        pillBg: on ? ON.bg : '#1C1C1E',
+        pillBg: on ? ON.bg : tk.card,
         labelColor: on ? '#FFFFFF' : '#8E8E93',
         weight: on ? 700 : 500,
         accentBg: on ? accent : 'transparent',
@@ -166,11 +170,12 @@ class Component extends DCLogic {
       days.push({
         n: d.getDate(),
         bg: isSelected ? accent : 'transparent',
-        color: isSelected ? '#FFFFFF' : isToday ? accent : inMonth ? '#FFFFFF' : '#636366',
+        color: isSelected ? '#FFFFFF' : isToday ? accent : inMonth ? tk.text : tk.outside,
         weight: isSelected || isToday ? 700 : 400
       });
     }
     return {
+      tk,
       title: isEdit
         ? 'Записаться в барбершоп'
         : mode === 'long'

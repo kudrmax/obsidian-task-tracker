@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Палитра: тёмная и светлая</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#000}
+</style>
+</helmet>
+<div style="width: 1240px; display: flex; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<sc-for list="{{themes}}" as="th" hint-placeholder-count="2">
+<section style="width: 620px; box-sizing: border-box; padding: 36px 32px 40px; background: {{th.c.bg}}; color: {{th.c.text}}; display: flex; flex-direction: column; gap: 28px;">
+
+<header style="display: flex; align-items: baseline; justify-content: space-between;">
+<h2 style="margin: 0; font-size: 28px; line-height: 34px; font-weight: 700;">{{th.name}}</h2>
+<span style="font-size: 14px; color: {{th.c.muted}};">{{th.basis}}</span>
+</header>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; row-gap: 24px;">
+<sc-for list="{{th.groups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: {{th.c.muted}};">{{g.title}}</h3>
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 36px;">
+<span style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; background: {{r.hex}}; box-shadow: inset 0 0 0 1px {{th.c.swatchEdge}};"></span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 14px; line-height: 18px; font-weight: 600;">{{r.name}}</span>
+<span style="font-size: 12px; line-height: 15px; color: {{th.c.muted}};">{{r.use}}</span>
+</span>
+<code style="flex-shrink: 0; font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: {{th.c.muted}};">{{r.code}}</code>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: {{th.c.muted}};">События календарей</h3>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{th.events}}" as="e" hint-placeholder-count="4">
+<div style="height: 44px; border-radius: 6px; background: {{e.bg}}; display: flex; overflow: hidden;">
+<span style="width: 3px; flex-shrink: 0; background: {{e.bar}};"></span>
+<span style="padding: 5px 7px; font-size: 12px; line-height: 15px; font-weight: 600; color: {{e.text}};">{{e.name}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: {{th.c.muted}};">Элементы</h3>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; align-items: center;">
+
+<div style="height: 40px; box-sizing: border-box; background: {{th.c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; font-size: 15px;">Позвонить маме</div>
+
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{th.c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{th.c.strip}};"></span>
+<span style="flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden;">Записаться в барбершоп</span>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{th.c.dueDay}};">2</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{th.c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
+</div>
+
+<div style="position: relative; height: 52px; box-sizing: border-box; border-radius: 8px; background: {{th.c.card}}; box-shadow: inset 0 0 0 1px {{th.c.outline}}; padding: 4px 6px;">
+<span style="font-size: 12px; line-height: 15px; font-weight: 600;">Разобрать почту</span>
+<span style="position: absolute; bottom: 3px; left: 50%; width: 16px; height: 3px; margin-left: -8px; border-radius: 2px; background: {{th.c.grabber}};"></span>
+</div>
+
+<div style="height: 52px; box-sizing: border-box; border-radius: 8px; border: 1.5px dashed {{th.c.accent}}; background: {{th.c.placeholder}}; padding: 4px 7px;">
+<span style="font-size: 12px; font-weight: 600; color: {{th.c.accent}};">16:30</span>
+</div>
+
+<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{th.c.dash}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{th.c.muted}};"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{th.c.accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</div>
+
+<div style="display: flex; align-items: center; gap: 12px;">
+<div style="height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{th.c.track}}; display: flex; gap: 2px;">
+<span style="width: 40px; height: 28px; border-radius: 14px; background: {{th.c.selectedBg}}; color: {{th.c.selectedText}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><line x1="3.5" y1="10" x2="20.5" y2="10"></line><line x1="8" y1="3" x2="8" y2="6.5"></line><line x1="16" y1="3" x2="16" y2="6.5"></line></svg></span>
+<span style="width: 40px; height: 28px; border-radius: 14px; color: {{th.c.muted}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="9" y1="6.5" x2="20" y2="6.5"></line><line x1="9" y1="12" x2="20" y2="12"></line><line x1="9" y1="17.5" x2="20" y2="17.5"></line><circle cx="4.5" cy="6.5" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="17.5" r="1" fill="currentColor"></circle></svg></span>
+</div>
+<div style="flex: 1; display: flex; align-items: center;">
+<span style="width: 34px; height: 16px; flex-shrink: 0; border-radius: 8px; background: {{th.c.now}}; color: #FFFFFF; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;">14:20</span>
+<span style="flex: 1; height: 2px; background: {{th.c.now}};"></span>
+</div>
+</div>
+
+</div>
+</div>
+
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1240,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const T = {
+      dark: {
+        bg: '#000000', card: '#1C1C1E', raised: '#2C2C2E', text: '#FFFFFF', icon: '#E5E5EA', dueDay: '#E5E5EA', muted: '#8E8E93',
+        separator: '#2C2C2E', grid: '#232325', outline: '#3A3A3C', dash: '#3A3A3C', handle: '#48484A', grabber: '#636366',
+        track: '#1C1C1E', selectedBg: '#E5E5EA', selectedText: '#000000',
+        accent: '#9580FF', strip: '#8A6CEF', placeholder: '#251F3D', now: '#D92C24', dot: '#FF9F0A', swatchEdge: 'rgba(255,255,255,0.14)',
+        events: [
+          { name: 'Work', bg: 'rgba(10,132,255,0.24)', bar: '#0A84FF', text: '#8CC6FF' },
+          { name: 'Google', bg: 'rgba(255,159,10,0.22)', bar: '#FF9F0A', text: '#FFC56B' },
+          { name: 'Розовый', bg: 'rgba(255,55,95,0.22)', bar: '#FF375F', text: '#FF9AAE' },
+          { name: 'Зелёный', bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0' }
+        ]
+      },
+      light: {
+        bg: '#FFFFFF', card: '#F2F2F7', raised: '#FFFFFF', text: '#000000', icon: '#3A3A3C', dueDay: '#1C1C1E', muted: '#8E8E93',
+        separator: '#E5E5EA', grid: '#EFEFF4', outline: '#D1D1D6', dash: '#C7C7CC', handle: '#C7C7CC', grabber: '#AEAEB2',
+        track: '#EEEEF0', selectedBg: '#1C1C1E', selectedText: '#FFFFFF',
+        accent: '#8A5CF5', strip: '#8A5CF5', placeholder: '#F1ECFE', now: '#FF3B30', dot: '#FF9500', swatchEdge: 'rgba(0,0,0,0.12)',
+        events: [
+          { name: 'Work', bg: 'rgba(0,122,255,0.13)', bar: '#007AFF', text: '#0058B8' },
+          { name: 'Google', bg: 'rgba(255,149,0,0.16)', bar: '#FF9500', text: '#9A5300' },
+          { name: 'Розовый', bg: 'rgba(255,45,85,0.13)', bar: '#FF2D55', text: '#B8173C' },
+          { name: 'Зелёный', bg: 'rgba(52,199,89,0.16)', bar: '#34C759', text: '#1F7A35' }
+        ]
+      }
+    };
+    const row = (c, key, name, use, code) => ({ hex: c[key], name, use, code: code ?? c[key] });
+    const groups = (c, raisedNote) => [
+      { title: 'Поверхности', rows: [
+        row(c, 'bg', 'Фон', 'Экран'),
+        row(c, 'card', 'Карточка', 'Задачи, плитки, трек'),
+        row(c, 'raised', 'Поднятая', raisedNote)
+      ] },
+      { title: 'Текст', rows: [
+        row(c, 'text', 'Основной', 'Названия, заголовки'),
+        row(c, 'icon', 'Иконки', 'Стрелки дня, число срока'),
+        row(c, 'muted', 'Вторичный', 'Месяц, часы, New task')
+      ] },
+      { title: 'Линии', rows: [
+        row(c, 'separator', 'Разделитель', 'Между колонками'),
+        row(c, 'grid', 'Сетка часов', 'Таймлайн'),
+        row(c, 'outline', 'Обводка задачи', 'Блок задачи в календаре'),
+        row(c, 'dash', 'Пунктир', 'Кнопка New task')
+      ] },
+      { title: 'Выбор и сигналы', rows: [
+        row(c, 'selectedBg', 'Выбранное', 'Сегмент, плитка Now'),
+        row(c, 'strip', 'In progress', '--interactive-accent'),
+        row(c, 'now', 'Сейчас', 'Линия текущего времени'),
+        row(c, 'dot', 'Источник', 'Точка у календаря')
+      ] }
+    ];
+    return {
+      themes: [
+        { name: 'Тёмная', basis: 'iOS dark, Obsidian dark', c: T.dark, groups: groups(T.dark, 'Перетаскивание, меню'), events: T.dark.events },
+        { name: 'Светлая', basis: 'iOS light, Obsidian light', c: T.light, groups: groups(T.light, 'Белая с тенью'), events: T.light.events }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

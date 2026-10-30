@@ -14,19 +14,19 @@
 body{margin:0;background:#000}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
-<dc-import name="Screen" hint-size="390px,844px"></dc-import>
-<div style="position: absolute; inset: 0; background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{m.bg}}; color: {{m.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="Screen" theme="{{theme}}" hint-size="390px,844px"></dc-import>
+<div style="position: absolute; inset: 0; background: {{m.overlay}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
 
 <sc-if value="{{showCard}}" hint-placeholder-val="{{true}}">
-<div style="position: absolute; left: 10px; top: 212px; width: 175px; height: 40px; box-sizing: border-box; background: #2C2C2E; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px; transform: scale(1.04); box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 11;">
+<div style="position: absolute; left: 10px; top: 212px; width: 175px; height: 40px; box-sizing: border-box; background: {{m.lifted}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px; transform: scale(1.04); box-shadow: {{m.liftShadow}}; z-index: 11;">
 <div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
-<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #AEAEB2; letter-spacing: 0.3px;">NOV</span></span>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{m.dueDay}};">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{m.muted}}; letter-spacing: 0.3px;">NOV</span></span>
 </div>
 </sc-if>
 
 <sc-if value="{{isList}}" hint-placeholder-val="{{true}}">
-<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
+<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: {{m.panel}}; box-shadow: {{m.shadow}}; z-index: 11;">
 <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
 <div style="border-top: {{g.gap}};">
 <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
@@ -44,20 +44,20 @@ body{margin:0;background:#000}
 </sc-if>
 
 <sc-if value="{{isDue}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
-<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px 0 10px; border: 0; border-bottom: 8px solid #1C1C1E; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Due date</button>
+<div style="position: absolute; left: 10px; top: 264px; width: 250px; border-radius: 14px; overflow: hidden; background: {{m.panel}}; box-shadow: {{m.shadow}}; z-index: 11;">
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px 0 10px; border: 0; border-bottom: 8px solid {{m.gap}}; background: transparent; color: {{m.text}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Due date</button>
 <sc-for list="{{dueRows}}" as="r" hint-placeholder-count="4">
-<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{m.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
 <span style="flex: 1; min-width: 0;">{{r.label}}</span>
 <span style="font-size: 15px; color: #8E8E93;">{{r.value}}</span>
 </button>
 </sc-for>
-<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid #1C1C1E; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{m.gap}}; background: transparent; color: {{m.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
 </div>
 </sc-if>
 
 <sc-if value="{{isPicker}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: 10px; top: 264px; width: 300px; box-sizing: border-box; padding: 12px 12px 4px; border-radius: 14px; background: rgba(44,44,46,0.96); box-shadow: 0 16px 40px rgba(0,0,0,0.6); z-index: 11;">
+<div style="position: absolute; left: 10px; top: 264px; width: 300px; box-sizing: border-box; padding: 12px 12px 4px; border-radius: 14px; background: {{m.panel}}; box-shadow: {{m.shadow}}; z-index: 11;">
 <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px;">
 <span style="font-size: 16px; font-weight: 600;">November 2026</span>
 <div style="display: flex; gap: 4px;">
@@ -73,7 +73,7 @@ body{margin:0;background:#000}
 <button style="justify-self: center; width: 36px; height: 36px; border: 0; padding: 0; border-radius: 18px; background: {{d.bg}}; color: {{d.color}}; font: inherit; font-size: 16px; font-weight: {{d.weight}}; font-variant-numeric: tabular-nums;">{{d.n}}</button>
 </sc-for>
 </div>
-<button style="width: 100%; height: 44px; margin-top: 6px; border: 0; border-top: 0.5px solid #48484A; padding: 0 4px; background: transparent; color: #FFFFFF; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
+<button style="width: 100%; height: 44px; margin-top: 6px; border: 0; border-top: 0.5px solid {{m.sep}}; padding: 0 4px; background: transparent; color: {{m.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Remove due date</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M9 9l6 6 M15 9l-6 6"></path></svg></button>
 </div>
 </sc-if>
 
@@ -93,7 +93,7 @@ body{margin:0;background:#000}
 <div style="align-self: center; width: 36px; height: 5px; border-radius: 3px; background: #48484A;"></div>
 <div style="display: flex; align-items: center; gap: 10px;">
 <div style="flex: 1; min-width: 0; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
-<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #AEAEB2; letter-spacing: 0.3px;">NOV</span></span>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{m.dueDay}};">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{m.muted}}; letter-spacing: 0.3px;">NOV</span></span>
 </div>
 <div style="display: flex; gap: 8px;">
 <sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
@@ -112,7 +112,7 @@ body{margin:0;background:#000}
 </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"menuStyle":{"editor":"enum","default":"list","options":["list","bar","sheet","due","picker"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"menuStyle":{"editor":"enum","default":"list","options":["list","bar","sheet","due","picker"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const style = this.props.menuStyle ?? 'list';
@@ -126,8 +126,12 @@ class Component extends DCLogic {
       rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
       del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13'
     };
-    const WHITE = '#FFFFFF';
-    const RED = '#FF453A';
+    const light = this.props.theme === 'light';
+    const m = light
+      ? { bg: '#FFFFFF', text: '#000000', overlay: 'rgba(0,0,0,0.22)', lifted: '#FFFFFF', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', liftShadow: '0 10px 30px rgba(0,0,0,0.16)', dueDay: '#1C1C1E', muted: '#8E8E93', sep: '#D1D1D6', gap: '#E5E5EA' }
+      : { bg: '#000000', text: '#FFFFFF', overlay: 'rgba(0,0,0,0.55)', lifted: '#2C2C2E', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', liftShadow: '0 10px 30px rgba(0,0,0,0.6)', dueDay: '#E5E5EA', muted: '#AEAEB2', sep: '#48484A', gap: '#1C1C1E' };
+    const WHITE = m.text;
+    const RED = light ? '#FF3B30' : '#FF453A';
     const all = [
       { key: 'progress', label: 'In progress', short: 'Doing', d: icons.progress, fd: icons.progressFill, color: WHITE },
       { key: 'done', label: 'Done', short: 'Done', d: icons.done, fd: '', color: WHITE },
@@ -137,19 +141,19 @@ class Component extends DCLogic {
       { key: 'del', label: 'Delete', short: 'Delete', d: icons.del, fd: '', color: RED }
     ].map((a) => ({ ...a, hasValue: !!a.value }));
     const pick = (keys) => all.filter((a) => keys.includes(a.key));
-    const withSeps = (rows) => rows.map((r, i) => ({ ...r, sep: i < rows.length - 1 ? '0.5px solid #48484A' : '0' }));
+    const withSeps = (rows) => rows.map((r, i) => ({ ...r, sep: i < rows.length - 1 ? '0.5px solid ' + m.sep : '0' }));
     const groups = [
       { rows: withSeps(pick(['progress', 'done', 'wontdo'])), gap: '0' },
-      { rows: withSeps(pick(['due', 'rename'])), gap: '8px solid #1C1C1E' },
-      { rows: withSeps(pick(['del'])), gap: '8px solid #1C1C1E' }
+      { rows: withSeps(pick(['due', 'rename'])), gap: '8px solid ' + m.gap },
+      { rows: withSeps(pick(['del'])), gap: '8px solid ' + m.gap }
     ];
-    const accent = '#8A6CEF';
+    const accent = light ? '#8A5CF5' : '#8A6CEF';
     const dueRows = [
       { label: 'Today', value: 'Fri' },
       { label: 'Tomorrow', value: 'Sat' },
       { label: 'Next week', value: 'Mon, 2 Nov' },
       { label: 'Pick a date', value: '3 Nov' }
-    ].map((r, i, a) => ({ ...r, sep: i < a.length - 1 ? '0.5px solid #48484A' : '0' }));
+    ].map((r, i, a) => ({ ...r, sep: i < a.length - 1 ? '0.5px solid ' + m.sep : '0' }));
     const days = [];
     const start = new Date(2026, 9, 26);
     for (let i = 0; i < 42; i++) {
@@ -160,11 +164,13 @@ class Component extends DCLogic {
       days.push({
         n: d.getDate(),
         bg: isSelected ? accent : 'transparent',
-        color: isSelected ? '#FFFFFF' : isToday ? accent : inMonth ? '#FFFFFF' : '#636366',
+        color: isSelected ? '#FFFFFF' : isToday ? accent : inMonth ? m.text : (light ? '#C7C7CC' : '#636366'),
         weight: isSelected || isToday ? 700 : 400
       });
     }
     return {
+      m,
+      theme: light ? 'light' : 'dark',
       isDue: style === 'due',
       isPicker: style === 'picker',
       dueRows,

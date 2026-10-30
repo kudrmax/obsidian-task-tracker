@@ -11,7 +11,7 @@
 ## One design system
 
 - `styles.css`: the `body { … }` block at the top holds every token (`--tc-…`): colours, radii, sizes, type, spacing, motion. Component rules only read `var(--tc-…)`. `tests/styles.test.ts` fails on a bare number, colour or radius in a rule, on an unused or undefined token, and on `DESIGN` in `src/ui/design.ts` disagreeing with the CSS. Don't loosen it: move the value into a token.
-- Colours are the design's (dark, explicit), not Obsidian's theme, except the in-progress strip: `--interactive-accent`.
+- Colours are the design's (explicit), not Obsidian's theme, except the in-progress strip and the light accent: `--interactive-accent`. The theme follows Obsidian's: the `body.theme-light { … }` block right after the tokens overrides the colours with the light values of the board «Палитра»; it defines no new names. Event colours are computed in `src/ui/eventColors.ts` per theme.
 
 ## Trying a build
 

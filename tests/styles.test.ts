@@ -10,7 +10,9 @@ interface Declaration {
 	readonly isToken: boolean;
 }
 
-/** styles.css as rules and declarations; the tokens are the declarations of the top-level `body` rule. */
+const LIGHT = "body.theme-light";
+
+/** styles.css as rules and declarations; the tokens are the declarations of the top-level `body` rule, and `body.theme-light` overrides some of them. */
 class Stylesheet {
 	readonly declarations: Declaration[] = [];
 
@@ -30,7 +32,11 @@ class Stylesheet {
 	}
 
 	get tokens(): Map<string, string> {
-		return new Map(this.declarations.filter((d) => d.isToken).map((d) => [d.property, d.value]));
+		return new Map(this.declarations.filter((d) => d.isToken && d.selector === "body").map((d) => [d.property, d.value]));
+	}
+
+	get lightTokens(): Map<string, string> {
+		return new Map(this.declarations.filter((d) => d.isToken && d.selector === LIGHT).map((d) => [d.property, d.value]));
 	}
 
 	get rules(): Declaration[] {
@@ -46,7 +52,7 @@ class Stylesheet {
 
 	private read(stack: readonly string[], body: string): void {
 		const selector = stack[stack.length - 1] ?? "";
-		const isToken = stack.length === 1 && selector === "body";
+		const isToken = stack.length === 1 && (selector === "body" || selector === LIGHT);
 		for (const part of body.split(";")) {
 			const colon = part.indexOf(":");
 			if (colon < 0 || !part.trim()) continue;
@@ -143,10 +149,21 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.declarations.filter((d) => d.value.includes("!important")).map(where)).toEqual([]);
 	});
 
-	it("defines every token once", () => {
-		const names = sheet.declarations.filter((d) => d.isToken).map((d) => d.property);
-		expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
-		expect(names.filter((name) => !name.startsWith("--tc-"))).toEqual([]);
+	it("defines every token once per theme", () => {
+		for (const selector of ["body", LIGHT]) {
+			const names = sheet.declarations.filter((d) => d.isToken && d.selector === selector).map((d) => d.property);
+			expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
+			expect(names.filter((name) => !name.startsWith("--tc-"))).toEqual([]);
+		}
+	});
+
+	it("lets the light theme change only colours the dark theme defines", () => {
+		const dark = sheet.tokens;
+		const light = sheet.lightTokens;
+		expect([...light.keys()].filter((name) => !dark.has(name))).toEqual([]);
+		const colour = /#[0-9a-f]{6}|rgba?[(]|var[(]--interactive-accent[)]/i;
+		expect([...light.entries()].filter(([, value]) => !colour.test(value))).toEqual([]);
+		expect(light.size).toBeGreaterThan(0);
 	});
 
 	it("reads only properties that are defined, in the stylesheet or by the code", () => {

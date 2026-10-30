@@ -17,7 +17,7 @@ const WIDTH = 390, HEIGHT = 844;
 const canvasJson = JSON.parse(readFileSync(join(canvas, "canvas.json"), "utf8"));
 /** States the plan compares against that no board of the canvas shows on its own. */
 const DERIVED = { ScreenNewSlot: ["Screen", { newSlot: true, sourceDot: true }] };
-const BOARDS = [...canvasJson.order.filter((file) => canvasJson.boards[file]?.page === "prod").map((file) => file.replace(/\.dc\.html$/, "")), ...Object.keys(DERIVED)];
+const BOARDS = [...canvasJson.order.filter((file) => canvasJson.boards[file]?.page === "prod" && canvasJson.boards[file].w === WIDTH).map((file) => file.replace(/\.dc\.html$/, "")), ...Object.keys(DERIVED)];
 
 class DCLogic {
 	constructor(props) {
