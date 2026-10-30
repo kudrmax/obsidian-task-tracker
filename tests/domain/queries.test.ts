@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listOn, slottedOn, soonList, toItem } from "../../src/domain/queries";
+import { listOn, openSlotted, slottedOn, soonList, toItem } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -50,6 +50,17 @@ describe("slottedOn", () => {
 		expect(texts(slottedOn(doc, T))).toEqual(["Slotted today", "Soon due D slotted today"]);
 		expect(texts(slottedOn(doc, "2026-10-31"))).toEqual(["Slotted tomorrow"]);
 		expect(texts(slottedOn(doc, D))).toEqual(["Due D slotted D", "Soon slotted D"]);
+	});
+});
+
+describe("openSlotted", () => {
+	it("every unfinished task with a slot in Now and Soon, whatever the day", () => {
+		expect(texts(openSlotted(doc))).toEqual(["Slotted today", "Slotted tomorrow", "Due D slotted D", "Soon slotted D", "Soon due D slotted today"]);
+	});
+
+	it("skips a finished one still waiting for the rules to move it to Done", () => {
+		const finished = TaskDocument.parse(["## Now", "- [x] Done ⏰ 2026-10-30 10:00", "- [-] Cancelled ⏰ 2026-10-30 11:00", "- [ ] Open ⏰ 2026-10-30 12:00"].join("\n"), SECTIONS, M);
+		expect(texts(openSlotted(finished))).toEqual(["Open"]);
 	});
 });
 
