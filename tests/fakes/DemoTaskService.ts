@@ -242,6 +242,14 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
+	async postpone(key: TaskKey, date: LocalDate): Promise<void> {
+		const t = this.take(key);
+		t.dueDate = date;
+		t.slot = null;
+		this.sections[date <= this.today() ? "now" : "soon"].push(t);
+		this.changed();
+	}
+
 	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
 		const t = this.take(key);
 		if (section === "inbox") {

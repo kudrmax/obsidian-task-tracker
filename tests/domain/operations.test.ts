@@ -11,6 +11,7 @@ import {
 	newTask,
 	placeTask,
 	placementOfEntry,
+	postpone,
 	remove,
 	rename,
 	setDueDate,
@@ -312,5 +313,29 @@ describe("priority", () => {
 	it("rename keeps the priority", () => {
 		const d = doc("## Now\n- [ ] p2 A\n");
 		expect(rename(d, d.tasks("now")[0], "B").serialize()).toBe("## Now\n- [ ] p2 B\n");
+	});
+});
+
+describe("postpone", () => {
+	const TOMORROW = "2026-10-31";
+
+	it("takes a Now task to the end of Soon with the new due date, without its time", () => {
+		const d = parse("## Now\n- [ ] A ⏰ 2026-10-30 14:00-15:00\n- [ ] B\n\n## Soon\n- [ ] S\n");
+		expect(postpone(d, d.tasks("now")[0], TOMORROW, T).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] S\n- [ ] A 📅 2026-10-31\n");
+	});
+
+	it("takes an Inbox task to the end of Soon", () => {
+		const d = parse("## Inbox\n- [ ] I\n\n## Now\n\n## Soon\n- [ ] S\n");
+		expect(postpone(d, d.tasks("inbox")[0], D, T).serialize()).toBe("## Inbox\n\n## Now\n\n## Soon\n- [ ] S\n- [ ] I 📅 2026-11-03\n");
+	});
+
+	it("keeps a Soon task in its place, changing its due date", () => {
+		const d = parse("## Now\n\n## Soon\n- [ ] S 📅 2026-10-31\n- [ ] U\n");
+		expect(postpone(d, d.tasks("soon")[0], D, T).serialize()).toBe("## Now\n\n## Soon\n- [ ] S 📅 2026-11-03\n- [ ] U\n");
+	});
+
+	it("puts a task due today or earlier at the end of Now", () => {
+		const d = parse("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n");
+		expect(postpone(d, d.tasks("soon")[0], T, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] S 📅 2026-10-30\n\n## Soon\n");
 	});
 });

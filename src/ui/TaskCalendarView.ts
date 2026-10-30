@@ -10,7 +10,8 @@ import { DayData } from "./DayData";
 import { DayHeader } from "./DayHeader";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import type { DragPayload, DropResult, DropTarget } from "./drag/DropTarget";
+import type { DragPayload, DropTarget, PlacedResult } from "./drag/DropTarget";
+import { PostponeZones } from "./drag/PostponeZones";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
@@ -80,6 +81,7 @@ export class TaskCalendarView extends ItemView {
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
+	private postponeZones: PostponeZones | null = null;
 	private switching = 0;
 	private readonly unsubscribe: (() => void)[] = [];
 
@@ -106,7 +108,9 @@ export class TaskCalendarView extends ItemView {
 			targets: () => this.dropTargets(),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
+			onDragging: (active) => this.contentEl.classList.toggle("is-dragging", active),
 			onResult: (drag, result) => this.applyDrop(drag, result),
+			onPickDate: (item, source) => this.showMenu(item, source, undefined, "picker"),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
@@ -214,6 +218,7 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
+		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today());
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -363,23 +368,25 @@ export class TaskCalendarView extends ItemView {
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
-	/** The two columns the window shows. */
+	/** The zones that put a task off, under the Today column, then the two columns the window shows. */
 	private dropTargets(): DropTarget[] {
 		const shown: Record<RightMode, (DropTarget | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.soonDrop],
 		};
-		return shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
+		const columns = shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
+		return [...(this.postponeZones?.targets ?? []), ...columns];
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
-	private applyDrop(drag: DragPayload, result: DropResult): Promise<void> {
+	private applyDrop(drag: DragPayload, result: PlacedResult): Promise<void> {
 		const key = drag.item.key;
 		const tasks = this.deps.tasks;
 		return this.act(() => {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
+			if (result.kind === "postpone") return tasks.postpone(key, result.date);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
 			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
@@ -421,18 +428,21 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
+	/** The task menu; opened on its picker, a chosen day puts the task off as Tomorrow does. */
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, opening?: "picker"): TaskMenu {
 		const tasks = this.deps.tasks;
+		const setDueDate = (date: LocalDate | null) => (opening === "picker" && date !== null ? tasks.postpone(item.key, date) : tasks.setDueDate(item.key, date));
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
+			opening,
 			today: this.today(),
 			day: this.selectedDate,
 			levels: usableLevels(this.settings.priorities),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
-				setDueDate: (date) => this.act(() => tasks.setDueDate(item.key, date)),
+				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: () => this.editSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
