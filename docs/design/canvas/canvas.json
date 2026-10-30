@@ -851,6 +851,94 @@
       "y": 4458,
       "title": "Мелкий масштаб: час 28",
       "page": "prod"
+    },
+    "ScreenPriority.dc.html": {
+      "h": 844,
+      "title": "Приоритеты: Now и календарь",
+      "w": 390,
+      "x": 0,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenPrioritySoon.dc.html": {
+      "h": 844,
+      "title": "Приоритеты: Soon и Now",
+      "w": 390,
+      "x": 470,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenPriorityMenu.dc.html": {
+      "h": 844,
+      "title": "Меню задачи с приоритетом p1",
+      "w": 390,
+      "x": 940,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenPrioritySub.dc.html": {
+      "h": 844,
+      "title": "Priority: подменю",
+      "w": 390,
+      "x": 1410,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenSheetPriority.dc.html": {
+      "h": 844,
+      "title": "Экран задачи: выбран p1",
+      "w": 390,
+      "x": 1880,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenPrioritySettings.dc.html": {
+      "h": 844,
+      "title": "Настройки: уровни приоритета",
+      "w": 390,
+      "x": 2350,
+      "y": 5902,
+      "page": "prod"
+    },
+    "ScreenLightPriority.dc.html": {
+      "h": 844,
+      "title": "Приоритеты: светлая тема",
+      "w": 390,
+      "x": 0,
+      "y": 7346,
+      "page": "prod"
+    },
+    "ScreenLightPrioritySoon.dc.html": {
+      "h": 844,
+      "title": "Приоритеты в Soon: светлая тема",
+      "w": 390,
+      "x": 470,
+      "y": 7346,
+      "page": "prod"
+    },
+    "ScreenLightPrioritySub.dc.html": {
+      "h": 844,
+      "title": "Priority: подменю, светлая тема",
+      "w": 390,
+      "x": 940,
+      "y": 7346,
+      "page": "prod"
+    },
+    "ScreenLightSheetPriority.dc.html": {
+      "h": 844,
+      "title": "Экран задачи, светлая тема",
+      "w": 390,
+      "x": 1410,
+      "y": 7346,
+      "page": "prod"
+    },
+    "ScreenLightPrioritySettings.dc.html": {
+      "h": 844,
+      "title": "Настройки, светлая тема",
+      "w": 390,
+      "x": 1880,
+      "y": 7346,
+      "page": "prod"
     }
   },
   "createdOnFiles": {
@@ -1191,7 +1279,18 @@
     "ScreenTasksResize.dc.html",
     "ScreenTasksLong.dc.html",
     "ScreenTasksZoomIn.dc.html",
-    "ScreenTasksZoomOut.dc.html"
+    "ScreenTasksZoomOut.dc.html",
+    "ScreenPriority.dc.html",
+    "ScreenPrioritySoon.dc.html",
+    "ScreenPriorityMenu.dc.html",
+    "ScreenPrioritySub.dc.html",
+    "ScreenSheetPriority.dc.html",
+    "ScreenPrioritySettings.dc.html",
+    "ScreenLightPriority.dc.html",
+    "ScreenLightPrioritySoon.dc.html",
+    "ScreenLightPrioritySub.dc.html",
+    "ScreenLightSheetPriority.dc.html",
+    "ScreenLightPrioritySettings.dc.html"
   ],
   "title": "Task Calendar"
 }
