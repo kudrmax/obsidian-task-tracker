@@ -29,7 +29,26 @@ describe("rule 1: past slots", () => {
 	});
 
 	it("erases past slots in Soon and in-progress tasks too", () => {
-		expect(normalize(parse("## Soon\n- [/] A ⏰ 2026-10-29 10:00-11:00\n- [ ] B ⏰ 2026-10-01 10:00-11:00\n"), T).serialize()).toBe("## Soon\n- [/] A\n- [ ] B\n");
+		expect(normalize(parse("## Soon\n- [/] A ⏰ 2026-10-29 10:00-11:00\n- [ ] B ⏰ 2026-10-01 10:00-11:00\n"), T).serialize()).toBe(
+			"## Soon\n- [/] A 📅 2026-10-30\n- [ ] B 📅 2026-10-30\n",
+		);
+	});
+
+	it("gives a task left without a date the slot's day, which turns into today", () => {
+		expect(normalize(parse("## Now\n- [ ] A ⏰ 2026-10-29 10:00-11:00\n"), T).serialize()).toBe("## Now\n- [ ] A 📅 2026-10-30\n");
+	});
+});
+
+describe("past due dates", () => {
+	it("an open task's past due date becomes today's", () => {
+		expect(normalize(parse("## Now\n- [ ] A 📅 2026-10-28\n- [/] B 📅 2026-10-01\n- [ ] C 📅 2026-11-01\n- [ ] D\n"), T).serialize()).toBe(
+			"## Now\n- [ ] A 📅 2026-10-30\n- [/] B 📅 2026-10-30\n- [ ] C 📅 2026-11-01\n- [ ] D\n",
+		);
+	});
+
+	it("a closed task keeps its date", () => {
+		const text = "## Done\n- [x] A 📅 2026-10-28\n- [-] B 📅 2026-10-28\n";
+		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 });
 
@@ -48,7 +67,7 @@ describe("rule 2: done and cancelled", () => {
 	});
 });
 
-describe("rule 3: Soon tasks due today or earlier", () => {
+describe("rule 4: Soon tasks due today or earlier", () => {
 	it("moves a Soon task due today or earlier to the start of Now", () => {
 		expect(normalize(parse("## Now\n- [ ] N\n\n## Soon\n- [ ] S 📅 2026-10-30\n- [ ] Later 📅 2026-11-01\n"), T).serialize()).toBe(
 			"## Now\n- [ ] S 📅 2026-10-30\n- [ ] N\n\n## Soon\n- [ ] Later 📅 2026-11-01\n",
@@ -57,7 +76,7 @@ describe("rule 3: Soon tasks due today or earlier", () => {
 
 	it("moves overdue tasks in file order, keeping it", () => {
 		expect(normalize(parse("## Now\n- [ ] N\n\n## Soon\n- [ ] A 📅 2026-10-01\n- [ ] X\n- [/] B 📅 2026-10-29\n"), T).serialize()).toBe(
-			"## Now\n- [ ] A 📅 2026-10-01\n- [/] B 📅 2026-10-29\n- [ ] N\n\n## Soon\n- [ ] X\n",
+			"## Now\n- [ ] A 📅 2026-10-30\n- [/] B 📅 2026-10-30\n- [ ] N\n\n## Soon\n- [ ] X\n",
 		);
 	});
 
@@ -79,7 +98,7 @@ describe("as a whole", () => {
 	const messy = "## Now\n- [ ] A ⏰ 2026-10-29 10:00-11:00\n- [x] B\n\n## Soon\n- [ ] C 📅 2026-10-29 ⏰ 2026-10-28 09:00-10:00\n- [-] D\n- [ ] E\n\n## Done\n- [x] Old\n";
 
 	it("applies the rules in order with one result", () => {
-		expect(normalize(parse(messy), T).serialize()).toBe("## Now\n- [ ] C 📅 2026-10-29\n- [ ] A\n\n## Soon\n- [ ] E\n\n## Done\n- [x] B\n- [-] D\n- [x] Old\n");
+		expect(normalize(parse(messy), T).serialize()).toBe("## Now\n- [ ] C 📅 2026-10-30\n- [ ] A 📅 2026-10-30\n\n## Soon\n- [ ] E\n\n## Done\n- [x] B\n- [-] D\n- [x] Old\n");
 	});
 
 	it("is idempotent", () => {
@@ -96,7 +115,7 @@ describe("as a whole", () => {
 describe("a day that starts at 4", () => {
 	it("erases a slot before 4 today: it belonged to the day before", () => {
 		const text = "## Now\n- [ ] A ⏰ 2026-10-30 02:00-03:00\n";
-		expect(normalize(parse(text), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] A\n");
+		expect(normalize(parse(text), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] A 📅 2026-10-30\n");
 		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 
@@ -114,8 +133,8 @@ describe("rule 3: a sorted Inbox task leaves Inbox", () => {
 		expect(normalize(parse("## Inbox\n- [ ] A 📅 2026-10-30\n- [/] B ⏰ 2026-10-30 10:00-11:00\n\n## Now\n- [ ] N\n\n## Soon\n"), T).serialize()).toBe("## Inbox\n\n## Now\n- [ ] A 📅 2026-10-30\n- [/] B ⏰ 2026-10-30 10:00-11:00\n- [ ] N\n\n## Soon\n");
 	});
 
-	it("a task without fields stays, and one whose past slot was erased too", () => {
-		expect(normalize(parse("## Inbox\n- [ ] A\n- [ ] B ⏰ 2026-10-29 10:00-11:00\n\n## Soon\n"), T).serialize()).toBe("## Inbox\n- [ ] A\n- [ ] B\n\n## Soon\n");
+	it("a task without fields stays; one whose past slot was erased keeps today's date and leaves", () => {
+		expect(normalize(parse("## Inbox\n- [ ] A\n- [ ] B ⏰ 2026-10-29 10:00-11:00\n\n## Soon\n"), T).serialize()).toBe("## Inbox\n- [ ] A\n\n## Soon\n- [ ] B 📅 2026-10-30\n");
 	});
 
 	it("a done or cancelled Inbox task goes to Done", () => {

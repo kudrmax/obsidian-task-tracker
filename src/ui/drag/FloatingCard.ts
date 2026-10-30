@@ -1,4 +1,5 @@
 import type { TaskItem } from "../../application/contracts";
+import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs } from "../design";
 import { px } from "../dom";
 import { fillCard } from "../TaskCard";
@@ -16,10 +17,10 @@ const SETTLE_MS = 20;
 export class FloatingCard implements Float {
 	readonly el: HTMLElement;
 
-	constructor(item: TaskItem, private readonly grab: Grab) {
+	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate) {
 		this.el = document.createElement("div");
 		this.el.className = "tc-float";
-		fillCard(this.el, item, { showDue: true });
+		fillCard(this.el, item, { day });
 		document.body.appendChild(this.el);
 		showWhole(this.el, { width: DESIGN.floatWidth, height: DESIGN.floatHeight }, DESIGN.floatWidth);
 	}

@@ -100,6 +100,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
+			day: () => this.selectedDate,
 			step: () => stepFor(this.hourPx),
 			timeline: () => this.timeline,
 			targets: () => this.dropTargets(),
@@ -147,21 +148,21 @@ export class TaskCalendarView extends ItemView {
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.data.day?.list ?? [],
-			showDue: () => true,
+			day: () => this.selectedDate,
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
 		this.inboxEl = el(root, "div", "tc-inbox");
 		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
 			items: () => this.data.inbox,
-			showDue: () => false,
+			day: () => null,
 			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon");
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.data.soon,
-			showDue: () => false,
+			day: () => null,
 			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
@@ -426,6 +427,7 @@ export class TaskCalendarView extends ItemView {
 			source,
 			lifted,
 			today: this.today(),
+			day: this.selectedDate,
 			levels: usableLevels(this.settings.priorities),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),

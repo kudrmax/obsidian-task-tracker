@@ -38,8 +38,8 @@ describe("newTask", () => {
 });
 
 describe("create", () => {
-	it("createInList today lands at the end of Now", () => {
-		expect(createInList(parse("## Now\n- [ ] A\n\n## Soon\n- [ ] C\n"), T, T, "New").serialize()).toBe("## Now\n- [ ] A\n- [ ] New\n\n## Soon\n- [ ] C\n");
+	it("createInList today lands at the end of Now, due today", () => {
+		expect(createInList(parse("## Now\n- [ ] A\n\n## Soon\n- [ ] C\n"), T, T, "New").serialize()).toBe("## Now\n- [ ] A\n- [ ] New 📅 2026-10-30\n\n## Soon\n- [ ] C\n");
 	});
 
 	it("createInList on another day lands at the end of Soon with the due date", () => {
@@ -92,15 +92,16 @@ describe("edit", () => {
 });
 
 describe("moveBefore", () => {
-	it("puts the task right before the target in the target's section", () => {
-		const d = parse("## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] D\n");
-		expect(moveBefore(d, d.tasks("now")[0], d.tasks("soon")[1], T, T).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A\n- [ ] D\n");
-		expect(moveBefore(d, d.tasks("now")[1], d.tasks("now")[0], T, T).serialize()).toBe("## Now\n- [ ] B\n- [ ] A\n\n## Soon\n- [ ] C\n- [ ] D\n");
+	it("puts the task right before the target in the target's section; into Now it comes due today", () => {
+		const d = parse("## Now\n- [ ] A\n- [ ] B 📅 2026-10-30\n\n## Soon\n- [ ] C\n- [ ] D\n");
+		expect(moveBefore(d, d.tasks("now")[0], d.tasks("soon")[1], T, T).serialize()).toBe("## Now\n- [ ] B 📅 2026-10-30\n\n## Soon\n- [ ] C\n- [ ] A\n- [ ] D\n");
+		expect(moveBefore(d, d.tasks("now")[1], d.tasks("now")[0], T, T).serialize()).toBe("## Now\n- [ ] B 📅 2026-10-30\n- [ ] A\n\n## Soon\n- [ ] C\n- [ ] D\n");
+		expect(moveBefore(d, d.tasks("soon")[0], d.tasks("now")[0], T, T).serialize()).toBe("## Now\n- [ ] C 📅 2026-10-30\n- [ ] A\n- [ ] B 📅 2026-10-30\n\n## Soon\n- [ ] D\n");
 	});
 
 	it("with no target goes to the end of Now today and the end of Soon on another day", () => {
 		const d = parse("## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] C\n");
-		expect(moveBefore(d, d.tasks("now")[0], null, T, T).serialize()).toBe("## Now\n- [ ] B\n- [ ] A\n\n## Soon\n- [ ] C\n");
+		expect(moveBefore(d, d.tasks("now")[0], null, T, T).serialize()).toBe("## Now\n- [ ] B\n- [ ] A 📅 2026-10-30\n\n## Soon\n- [ ] C\n");
 		expect(moveBefore(d, d.tasks("now")[0], null, D, T).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A\n");
 	});
 
@@ -120,6 +121,16 @@ describe("slots", () => {
 		const d = parse("## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] C\n");
 		expect(setSlot(d, d.tasks("now")[0], { date: "2026-10-31", start: 600, end: 660 }, T).serialize()).toBe(
 			"## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A ⏰ 2026-10-31 10:00-11:00\n",
+		);
+	});
+
+	it("setSlot on another day takes today's due date off the Now task it moves to Soon", () => {
+		const d = parse("## Now\n- [ ] A 📅 2026-10-30\n- [ ] B 📅 2026-11-05\n\n## Soon\n");
+		expect(setSlot(d, d.tasks("now")[0], { date: D, start: 600, end: 660 }, T).serialize()).toBe(
+			"## Now\n- [ ] B 📅 2026-11-05\n\n## Soon\n- [ ] A ⏰ 2026-11-03 10:00-11:00\n",
+		);
+		expect(setSlot(d, d.tasks("now")[1], { date: D, start: 600, end: 660 }, T).serialize()).toBe(
+			"## Now\n- [ ] A 📅 2026-10-30\n\n## Soon\n- [ ] B 📅 2026-11-05 ⏰ 2026-11-03 10:00-11:00\n",
 		);
 	});
 
@@ -151,9 +162,9 @@ describe("slots", () => {
 });
 
 describe("between the list and Soon", () => {
-	it("moveToList today moves to the end of Now", () => {
+	it("moveToList today moves to the end of Now, due today", () => {
 		const d = parse("## Now\n- [ ] A\n\n## Soon\n- [ ] C\n- [ ] D\n");
-		expect(moveToList(d, d.tasks("soon")[0], T, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] C\n\n## Soon\n- [ ] D\n");
+		expect(moveToList(d, d.tasks("soon")[0], T, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] C 📅 2026-10-30\n\n## Soon\n- [ ] D\n");
 	});
 
 	it("moveToList on another day sets the due date and keeps the section", () => {
@@ -161,9 +172,9 @@ describe("between the list and Soon", () => {
 		expect(moveToList(d, d.tasks("soon")[0], D, T).serialize()).toBe("## Now\n- [ ] A\n\n## Soon\n- [ ] C 📅 2026-11-03\n- [ ] D\n");
 	});
 
-	it("moveToSoon today moves to the end of Soon and keeps the due date", () => {
+	it("moveToSoon today moves to the end of Soon without the due date", () => {
 		const d = parse("## Now\n- [ ] A 📅 2026-10-30\n- [ ] B\n\n## Soon\n- [ ] C\n");
-		expect(moveToSoon(d, d.tasks("now")[0], T, T).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A 📅 2026-10-30\n");
+		expect(moveToSoon(d, d.tasks("now")[0], T, T).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A\n");
 	});
 
 	it("moveToSoon on another day drops the due date and keeps the section", () => {
@@ -180,8 +191,8 @@ describe("placeTask", () => {
 		expect(placeTask(parse(BASE), null, { text: " New ", placement: { kind: "soon" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n- [ ] New\n\n## Done\n");
 	});
 
-	it("creates at the end of Now", () => {
-		expect(placeTask(parse(BASE), null, { text: "New", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] New\n\n## Soon\n- [ ] S\n\n## Done\n");
+	it("creates at the end of Now, due today", () => {
+		expect(placeTask(parse(BASE), null, { text: "New", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] New 📅 2026-10-30\n\n## Soon\n- [ ] S\n\n## Done\n");
 	});
 
 	it("creates with a date today or earlier at the end of Now with the due date", () => {
@@ -195,7 +206,7 @@ describe("placeTask", () => {
 
 	it("creates with a slot and keeps it", () => {
 		expect(placeTask(parse(BASE), null, { text: "New", placement: { kind: "now" }, priority: null }, T, { date: T, start: 990, end: 1050 }).serialize()).toBe(
-			"## Now\n- [ ] A\n- [ ] New ⏰ 2026-10-30 16:30-17:30\n\n## Soon\n- [ ] S\n\n## Done\n",
+			"## Now\n- [ ] A\n- [ ] New 📅 2026-10-30 ⏰ 2026-10-30 16:30-17:30\n\n## Soon\n- [ ] S\n\n## Done\n",
 		);
 	});
 
@@ -219,9 +230,9 @@ describe("placeTask", () => {
 		expect(placeTask(d, d.tasks("soon")[0], { text: "S", placement: { kind: "date", date: T }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] S 📅 2026-10-30\n\n## Soon\n- [ ] R\n");
 	});
 
-	it("edits from a date to now: due date dropped, position kept", () => {
-		const d = parse("## Now\n- [ ] A 📅 2026-10-30\n- [ ] B\n");
-		expect(placeTask(d, d.tasks("now")[0], { text: "A", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n");
+	it("edits from another date to now: due today, at the end of Now", () => {
+		const d = parse("## Now\n- [ ] B\n\n## Soon\n- [ ] A 📅 2026-11-03\n");
+		expect(placeTask(d, d.tasks("soon")[0], { text: "A", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] B\n- [ ] A 📅 2026-10-30\n\n## Soon\n");
 	});
 
 	it("a changed date within the same section keeps the position", () => {
@@ -231,12 +242,13 @@ describe("placeTask", () => {
 });
 
 describe("placementOf", () => {
-	it("returns the date when the task has a due date, else the section", () => {
-		const d = parse("## Now\n- [ ] A 📅 2026-11-03\n- [ ] B\n\n## Soon\n- [ ] S\n\n## Done\n- [x] X\n");
-		expect(placementOfEntry(d.tasks("now")[0])).toEqual({ kind: "date", date: D });
-		expect(placementOfEntry(d.tasks("now")[1])).toEqual({ kind: "now" });
-		expect(placementOfEntry(d.tasks("soon")[0])).toEqual({ kind: "soon" });
-		expect(placementOfEntry(d.tasks("done")[0])).toEqual({ kind: "now" });
+	it("returns Now for today's due date, the date for another one, else the section", () => {
+		const d = parse("## Now\n- [ ] A 📅 2026-11-03\n- [ ] B\n- [ ] C 📅 2026-10-30\n\n## Soon\n- [ ] S\n\n## Done\n- [x] X\n");
+		expect(placementOfEntry(d.tasks("now")[0], T)).toEqual({ kind: "date", date: D });
+		expect(placementOfEntry(d.tasks("now")[1], T)).toEqual({ kind: "now" });
+		expect(placementOfEntry(d.tasks("now")[2], T)).toEqual({ kind: "now" });
+		expect(placementOfEntry(d.tasks("soon")[0], T)).toEqual({ kind: "soon" });
+		expect(placementOfEntry(d.tasks("done")[0], T)).toEqual({ kind: "now" });
 	});
 });
 
@@ -264,7 +276,7 @@ describe("Inbox", () => {
 	});
 
 	it("an Inbox task shows the Inbox tile", () => {
-		expect(placementOfEntry(parse(text).tasks("inbox")[0])).toEqual({ kind: "inbox" });
+		expect(placementOfEntry(parse(text).tasks("inbox")[0], T)).toEqual({ kind: "inbox" });
 	});
 
 	it("moveToEnd moves between Inbox and Soon, and to the end of its own section", () => {
@@ -292,7 +304,7 @@ describe("priority", () => {
 
 	it("placeTask writes the draft's priority on a new task and keeps one prefix on an edited one", () => {
 		const d = doc("## Now\n- [ ] p1 A\n\n## Soon\n");
-		expect(placeTask(d, null, { text: "New", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] p1 A\n- [ ] p1 New\n\n## Soon\n");
+		expect(placeTask(d, null, { text: "New", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] p1 A\n- [ ] p1 New 📅 2026-10-30\n\n## Soon\n");
 		expect(placeTask(d, d.tasks("now")[0], { text: "A2", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] p1 A2\n\n## Soon\n");
 		expect(placeTask(d, d.tasks("now")[0], { text: "A", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] A\n\n## Soon\n");
 	});

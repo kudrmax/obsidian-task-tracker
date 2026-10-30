@@ -50,7 +50,7 @@ export class TasksFileMissingError extends Error {
 
 /**
  * Where the task sheet puts a task: Inbox = section Inbox without a due date or slot, Soon = section Soon without a due
- * date, Now = section Now, Date = a due date.
+ * date, Now = section Now with today's due date (Now is today), Date = a due date.
  */
 export type Placement =
 	| { readonly kind: "inbox" }
@@ -71,12 +71,12 @@ export interface TaskDraft {
  */
 export interface TaskService {
 	dayView(date: LocalDate): Promise<DayView>;
-	/** Soon tasks without a due date and without a slot, in file order. */
-	soonView(): Promise<readonly TaskItem[]>;
+	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
+	soonWithoutDateView(): Promise<readonly TaskItem[]>;
 	/** Every Inbox task, in file order: none has a due date or a slot (spec §4.4, rule 3). */
 	inboxView(): Promise<readonly TaskItem[]>;
 
-	/** Today: end of Now. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
+	/** Today: end of Now, due today. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
 	createInList(date: LocalDate, text: string): Promise<void>;
 	/** End of Soon, no fields. */
 	createInSoon(text: string): Promise<void>;
@@ -84,7 +84,7 @@ export interface TaskService {
 	createAtTime(date: LocalDate, start: number, text: string): Promise<void>;
 
 	/**
-	 * The task sheet. `inbox`: end of Inbox, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, no due date. `date` D: due date D, end of Now
+	 * The task sheet. `inbox`: end of Inbox, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
 	 * when D is today or earlier, else end of Soon. With `slot`: the slot is kept too (long tap on the timeline).
 	 */
 	create(draft: TaskDraft, slot?: Slot): Promise<void>;
@@ -94,7 +94,7 @@ export interface TaskService {
 	 * Inbox takes the slot away too.
 	 */
 	edit(key: TaskKey, draft: TaskDraft): Promise<void>;
-	/** The placement the sheet shows for a task: `date` when it has a due date, else its section. */
+	/** The placement the sheet shows for a task: `now` when it is due today, `date` when it has another due date, else its section. */
 	placementOf(item: TaskItem): Placement;
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
@@ -104,22 +104,22 @@ export interface TaskService {
 	rename(key: TaskKey, text: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
 
-	/** Puts `key` right before `before` in the file, in `before`'s section. `before` null: end of the list's section for `date`. */
+	/** Puts `key` right before `before` in the file, in `before`'s section. `before` null: end of the list's section for `date`. Into Now it comes due today. */
 	moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void>;
 
-	/** Drop on the timeline, move or resize there. Moves a Now task to Soon when `slot.date` is not today. */
+	/** Drop on the timeline, move or resize there. Moves a Now task to Soon, without today's due date, when `slot.date` is not today. */
 	setSlot(key: TaskKey, slot: Slot): Promise<void>;
 	/** Drop from the timeline back on the list: the slot goes, due date stays; with `place`, the task moves there as `moveBefore` would. */
 	clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void>;
 
-	/** Soon → left column. Today: end of Now. Another day D: due date D, stays in Soon. */
+	/** Soon → Day column. Today: end of Now, due today. Another day D: due date D, stays in Soon. */
 	moveToList(key: TaskKey, date: LocalDate): Promise<void>;
-	/** Left column → Soon. Today: end of Soon. Another day: due date removed. */
+	/** Day column → Soon: the due date goes. Today the task also moves to the end of Soon. */
 	moveToSoon(key: TaskKey, date: LocalDate): Promise<void>;
 	/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
 	moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void>;
 
-	/** Applies the four normalization rules (spec §4.4). Writes only when something changed. */
+	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;
 	/** Creates the tasks file with the five empty sections. */
 	createFile(): Promise<void>;
