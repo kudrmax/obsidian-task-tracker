@@ -116,6 +116,8 @@ export interface TaskService {
 	moveToList(key: TaskKey, date: LocalDate): Promise<void>;
 	/** Left column → Soon. Today: end of Soon. Another day: due date removed. */
 	moveToSoon(key: TaskKey, date: LocalDate): Promise<void>;
+	/** Put off to `date` (a drop on Tomorrow or Pick a date): due date `date`, no slot; the end of Soon for a later day, of Now for today or earlier. */
+	postpone(key: TaskKey, date: LocalDate): Promise<void>;
 	/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
 	moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void>;
 

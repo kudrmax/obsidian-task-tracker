@@ -134,6 +134,10 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today) => ops.moveToSoon(doc, this.entryOf(doc, key), date, today));
 	}
 
+	async postpone(key: TaskKey, date: LocalDate): Promise<void> {
+		await this.mutate((doc, today) => ops.postpone(doc, this.entryOf(doc, key), date, today));
+	}
+
 	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
 		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}

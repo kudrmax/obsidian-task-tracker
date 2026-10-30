@@ -131,3 +131,10 @@ export function moveToEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" 
 export function moveToSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
 	return date === today ? doc.moveEntry(entry, "soon", "end") : setDueDate(doc, entry, null);
 }
+
+/** Put off to `date`: the time goes, and the task waits in Soon for a later day or comes to the end of Now for today. */
+export function postpone(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
+	const postponed = patch(doc, entry, { dueDate: date, slot: null });
+	const section: SectionKey = date <= today ? "now" : "soon";
+	return entry.section === section ? postponed : postponed.moveEntry(sameEntryIn(postponed, entry), section, "end");
+}
