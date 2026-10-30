@@ -10,3 +10,8 @@ export function listWidthMax(viewWidth: number): number {
 export function shownListWidth(saved: number, viewWidth: number): number {
 	return viewWidth > 0 ? Math.min(saved, listWidthMax(viewWidth)) : saved;
 }
+
+/** The width that puts the divider's line in the middle of the window, where the two columns are equal. */
+export function centeredListWidth(viewWidth: number): number {
+	return (viewWidth - DESIGN.dividerWidth) / 2;
+}

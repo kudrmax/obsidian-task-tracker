@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { listWidthMax, shownListWidth } from "../../src/ui/listWidth";
+import { centeredListWidth, listWidthMax, shownListWidth } from "../../src/ui/listWidth";
 
 describe("list width", () => {
 	it("keeps the design's bounds on a phone", () => {
@@ -20,5 +20,10 @@ describe("list width", () => {
 
 	it("keeps the saved width while the view has no width yet", () => {
 		expect(shownListWidth(800, 0)).toBe(800);
+	});
+
+	it("centres the divider's line in the window", () => {
+		expect(centeredListWidth(390)).toBe(187);
+		expect(centeredListWidth(1601)).toBe(792.5);
 	});
 });
