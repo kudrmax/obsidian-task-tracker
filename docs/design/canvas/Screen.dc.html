@@ -28,13 +28,15 @@ body{margin:0;background:#000}
 <button aria-label="Today, back to today" style="height: 36px; border: 0; padding: 0 4px; background: transparent; color: {{c.text}}; font: inherit; font-size: 20px; font-weight: 700; white-space: nowrap;">{{dayTitle}}</button>
 <button aria-label="Next day" style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 18px; border: 0; padding: 0; background: transparent; color: {{c.icon}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
 </div>
-<div style="height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{c.track}}; display: flex; gap: 2px;">
-<button aria-label="Calendar" style="position: relative; width: 40px; height: 28px; border: 0; padding: 0; border-radius: 14px; background: {{seg.calBg}}; color: {{seg.calColor}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><line x1="3.5" y1="10" x2="20.5" y2="10"></line><line x1="8" y1="3" x2="8" y2="6.5"></line><line x1="16" y1="3" x2="16" y2="6.5"></line></svg><sc-if value="{{sourceDot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 7px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
-<button aria-label="Soon" style="width: 40px; height: 28px; border: 0; padding: 0; border-radius: 14px; background: {{seg.soonBg}}; color: {{seg.soonColor}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="9" y1="6.5" x2="20" y2="6.5"></line><line x1="9" y1="12" x2="20" y2="12"></line><line x1="9" y1="17.5" x2="20" y2="17.5"></line><circle cx="4.5" cy="6.5" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="17.5" r="1" fill="currentColor"></circle></svg></button>
+<div style="position: relative; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{c.track}}; display: flex;">
+<span style="position: absolute; top: 2px; left: {{pillLeft}}px; width: 76px; height: 28px; border-radius: 14px; background: {{c.selectedBg}};"></span>
+<sc-for list="{{chips}}" as="o" hint-placeholder-count="3">
+<button aria-label="{{o.label}}" style="position: relative; width: 38px; height: 28px; border: 0; padding: 0; background: transparent; color: {{o.color}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
+</sc-for>
 </div>
 </div>
 
-<div style="position: absolute; left: 0; top: 166px; bottom: 0; width: {{listW}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
+<div style="position: absolute; left: {{now.left}}px; top: 166px; bottom: 0; width: {{now.width}}px; padding: {{now.pad}}; box-sizing: border-box; overflow: hidden;">
 <div style="margin-top: -{{listScroll}}px; display: flex; flex-direction: column; gap: 6px;">
 <sc-for list="{{tasks}}" as="t" hint-placeholder-count="7">
 <div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
@@ -50,12 +52,31 @@ body{margin:0;background:#000}
 </div>
 </div>
 
-<div style="position: absolute; left: {{listW}}px; top: 166px; bottom: 0; width: 16px; display: flex; justify-content: center;">
-<div style="width: 1px; height: 100%; background: {{c.separator}};"></div>
-<button aria-label="Resize columns" style="position: absolute; top: 260px; left: 3px; width: 10px; height: 52px; border: 0; padding: 0; border-radius: 5px; background: {{c.handle}};"></button>
+<sc-if value="{{soonPanel.visible}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{soonPanel.left}}px; top: 166px; bottom: 0; width: {{soonPanel.width}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
+<div style="margin-top: -{{soonScroll}}px; display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{soon}}" as="t" hint-placeholder-count="8">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
+<sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
+</sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{t.title}}</div>
 </div>
+</sc-for>
+</div>
+</div>
+</sc-if>
 
-<div style="position: absolute; left: {{calLeft}}px; right: 0; top: 166px; bottom: 0; overflow: hidden;">
+<sc-for list="{{dividers}}" as="d" hint-placeholder-count="1">
+<div style="position: absolute; left: {{d.left}}px; top: 166px; bottom: 0; width: 16px; display: flex; justify-content: center;">
+<div style="width: 1px; height: 100%; background: {{c.separator}};"></div>
+<sc-if value="{{d.handle}}" hint-placeholder-val="{{true}}">
+<button aria-label="Resize columns" style="position: absolute; top: 260px; left: 3px; width: 10px; height: 52px; border: 0; padding: 0; border-radius: 5px; background: {{c.handle}};"></button>
+</sc-if>
+</div>
+</sc-for>
+
+<div style="position: absolute; left: {{calLeft}}px; width: {{calWidth}}px; top: 166px; bottom: 0; overflow: hidden;">
 <sc-if value="{{isCal}}" hint-placeholder-val="{{true}}">
 <div style="position: absolute; left: 0; right: 0; top: 0; height: 26px; background: {{c.bg}}; z-index: 3;"></div>
 <div style="position: relative; z-index: 4; margin-left: 28px; margin-right: 4px; height: 22px; border-radius: 6px; background: {{allDay.bg}}; display: flex; overflow: hidden;">
@@ -105,18 +126,6 @@ body{margin:0;background:#000}
 </div>
 </div>
 </sc-if>
-<sc-if value="{{isSoon}}" hint-placeholder-val="{{false}}">
-<div style="margin-top: -{{soonScroll}}px; padding: 0 10px 0 2px; display: flex; flex-direction: column; gap: 6px;">
-<sc-for list="{{soon}}" as="t" hint-placeholder-count="8">
-<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
-<sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
-<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
-</sc-if>
-<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{t.title}}</div>
-</div>
-</sc-for>
-</div>
-</sc-if>
 </div>
 
 <sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
@@ -126,12 +135,12 @@ body{margin:0;background:#000}
 </div>
 </sc-if>
 
-<div style="position: absolute; left: 0; bottom: 76px; width: {{listW}}px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
+<div style="position: absolute; left: {{now.left}}px; bottom: 76px; width: {{now.width}}px; padding: {{now.btnPad}}; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </div>
 
-<sc-if value="{{isSoon}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: {{calLeft}}px; right: 0; bottom: 76px; padding: 8px 10px 8px 2px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
+<sc-if value="{{soonPanel.visible}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{soonPanel.left}}px; width: {{soonPanel.width}}px; bottom: 76px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </div>
 </sc-if>
@@ -146,7 +155,7 @@ body{margin:0;background:#000}
 </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   themes() {
     return {
@@ -187,14 +196,6 @@ class Component extends DCLogic {
     const newSlot = this.props.newSlot === true || this.props.newSlot === 'true';
     const light = this.props.theme === 'light';
     const c = this.themes()[light ? 'light' : 'dark'];
-    const ON = { bg: c.selectedBg, color: c.selectedText };
-    const OFF = { bg: 'transparent', color: c.muted };
-    const seg = {
-      calBg: isSoon ? OFF.bg : ON.bg,
-      calColor: isSoon ? OFF.color : ON.color,
-      soonBg: isSoon ? ON.bg : OFF.bg,
-      soonColor: isSoon ? ON.color : OFF.color
-    };
     const soon = [
       { title: 'Продлить страховку' },
       { title: 'Купить подарок Ане' },
@@ -211,6 +212,7 @@ class Component extends DCLogic {
     const COLUMNS_TOP = 166;
     const TIMELINE_OFFSET = 34;
     const DUE_MIN_WIDTH = 160;
+    const SCREEN_HALF = (390 - 16) / 2;
     const palette = c.events;
     const stripColor = light ? c.strip : (this.props.stripColor ?? '#8A6CEF');
     const tasks = [
@@ -223,7 +225,7 @@ class Component extends DCLogic {
       { title: 'Позвонить маме' }
     ]
       .filter((t) => !(dragging && t.dragged))
-      .map((t) => ({ ...t, progress: !!t.progress, showDue: !!t.day && listW >= DUE_MIN_WIDTH }));
+      .map((t) => ({ ...t, progress: !!t.progress, showDue: !!t.day && (isSoon ? SCREEN_HALF : listW) >= DUE_MIN_WIDTH }));
     const raw = [
       { kind: 'event', title: 'Стендап', s: 9, e: 9.25, cal: 'work' },
       { kind: 'event', title: '1:1 с Костей', s: 10, e: 11, cal: 'work' },
@@ -263,17 +265,58 @@ class Component extends DCLogic {
       hours.push({ label: String(h), top, labelTop: top - 7, showLabel: Math.abs(top - nowY) > 20 });
     }
     const drop = { top: (16.5 - START) * HOUR + 1, height: HOUR - 2 };
-    const calLeft = listW + 16;
+    const SCREEN = 390;
+    const GAP = 16;
+    const rawProgress = Number(this.props.progress ?? -1);
+    const p = rawProgress >= 0 ? rawProgress : (isSoon ? 0 : 1);
+    const mix = (from, to) => Math.round(from + (to - from) * p);
+    const half = (SCREEN - GAP) / 2;
+    const nowLeft = mix(half + GAP, 0);
+    const nowWidth = mix(half, listW);
+    const leftSide = p > 0.5;
+    const now = {
+      left: nowLeft,
+      width: nowWidth,
+      pad: leftSide ? '0 2px 0 10px' : '0 10px 0 2px',
+      btnPad: leftSide ? '8px 2px 8px 10px' : '8px 10px 8px 2px'
+    };
+    const soonPanel = { left: nowLeft - GAP - half, width: half, visible: nowLeft - GAP > 0 };
+    const calLeft = nowLeft + nowWidth + GAP;
+    const calWidth = SCREEN - listW - GAP;
+    const dividers = [
+      ...(soonPanel.visible ? [{ left: nowLeft - GAP, handle: false }] : []),
+      ...(calLeft < SCREEN ? [{ left: nowLeft + nowWidth, handle: true }] : [])
+    ];
+    const chipPaths = {
+      soon: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const firstChip = leftSide ? 1 : 0;
+    const sourceDot = this.props.sourceDot === true || this.props.sourceDot === 'true';
+    const chips = [
+      { key: 'soon', label: 'Soon' },
+      { key: 'now', label: 'Now' },
+      { key: 'cal', label: 'Calendar' }
+    ].map((o, i) => ({
+      ...o,
+      path: chipPaths[o.key],
+      color: i === firstChip || i === firstChip + 1 ? c.selectedText : c.muted,
+      dot: o.key === 'cal' && sourceDot
+    }));
     return {
       c,
       allDay: palette.green,
       listW,
       calLeft,
+      calWidth,
+      now,
+      soonPanel,
+      dividers,
+      chips,
+      pillLeft: 2 + Math.round(38 * p),
       dragging,
-      sourceDot: this.props.sourceDot === true || this.props.sourceDot === 'true',
-      isSoon,
-      isCal: !isSoon,
-      seg,
+      isCal: calLeft < SCREEN,
       soon,
       dayTitle: 'Today',
       tasks,

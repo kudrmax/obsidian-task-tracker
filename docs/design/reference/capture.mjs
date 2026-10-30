@@ -54,6 +54,14 @@ async function click(x, y, button = "left") {
 	await mouse("mouseReleased", x, y, { button });
 	await sleep(400);
 }
+/** A press held past the long-press delay, as on the switch to open the sources window. */
+async function hold(x, y) {
+	await mouse("mouseMoved", x, y, { button: "none" });
+	await mouse("mousePressed", x, y);
+	await sleep(400);
+	await mouse("mouseReleased", x, y);
+	await sleep(400);
+}
 async function clickSelector(selector, text = "", index = 0) {
 	const at = await evaluate(`(() => { const all = [...document.querySelectorAll(${JSON.stringify(selector)})].filter(e => !${JSON.stringify(text)} || e.textContent.trim().startsWith(${JSON.stringify(text)})); const e = all[${index}]; if (!e) return null; const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()`);
 	if (!at) throw new Error(`nothing to click: ${selector} ${text}; on screen: ${await evaluate("JSON.stringify({ drops: document.querySelectorAll('.tc-drop').length, sheets: document.querySelectorAll('.tc-sheet').length, backdrops: document.querySelectorAll('.tc-backdrop').length, busy: " + view + ".arbiter.busy })")}`);
@@ -79,6 +87,12 @@ async function reload() {
 const toNine = () => evaluate(`${view}.timeline.scrollTo(540, 0); 'ok'`);
 const keyboard = () => evaluate(`document.querySelector('.task-calendar').style.setProperty('--tc-keyboard', '243px'); 'kb'`);
 const cancelSheet = () => clickSelector(".tc-sheet-cancel");
+/**
+ * Halfway frames of the slide from Soon and Now to Now and the calendar: the boards mix the two layouts by the eased
+ * share, so the transitions are paused at the time ease-in-out reaches it (a third: 119.6 of 300 ms, two thirds: 178.5).
+ */
+const slideTo = (ms) => evaluate(`(async () => { const v = ${view}; const toggle = v.header.switcher; await ${plugin}.update({ rightMode: 'soon' }); v.render(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); toggle.el.click(); await new Promise(r => requestAnimationFrame(r)); window.clearTimeout(v.switching); window.clearTimeout(toggle.settling); for (const a of document.getAnimations()) { a.pause(); a.currentTime = ${ms}; } return document.getAnimations().length; })()`);
+const endSlide = () => evaluate(`(async () => { for (const a of document.getAnimations()) a.finish(); ${view}.contentEl.classList.remove('is-switching'); ${view}.header.switcher.el.classList.remove('is-settling'); await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`);
 const closeOverlay = () => click(200, 700);
 
 /** The main screen's content region, and the task screen's region above the board's keyboard. */
@@ -111,6 +125,8 @@ const STATES = [
 		},
 	},
 	{ board: "ScreenSoon", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'soon' }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`) },
+	{ board: "ScreenSwitch1", frame: SCREEN, run: () => slideTo(119.6), after: endSlide },
+	{ board: "ScreenSwitch2", frame: SCREEN, run: () => slideTo(178.5), after: endSlide },
 	{ board: "ScreenMenu", frame: SCREEN, run: () => click(100, 241, "right"), after: closeOverlay },
 	{ board: "ScreenDue", frame: SCREEN, run: async () => { await click(100, 241, "right"); await clickSelector(".tc-menu-row", "Due date"); }, after: closeOverlay },
 	{ board: "ScreenPicker", frame: SCREEN, run: async () => { await click(100, 241, "right"); await clickSelector(".tc-menu-row", "Due date"); await clickSelector(".tc-menu-row", "Pick a date"); }, after: closeOverlay },
@@ -120,7 +136,7 @@ const STATES = [
 	{ board: "ScreenSheetPicker", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon) .tc-new-btn"); await keyboard(); await type("Позвонить в банк"); await clickSelector(".tc-tile", "", 2); await clickSelector(".tc-picker-next"); await clickSelector(".tc-day:not(.is-other)", "3"); await clickSelector(".tc-tile", "", 2); }, after: cancelSheet },
 	{ board: "ScreenSheetLong", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon) .tc-new-btn"); await keyboard(); await type("Позвонить в банк и узнать, почему списали комиссию за обслуживание карты"); }, after: cancelSheet },
 	{ board: "ScreenSourcesDot", frame: SCREEN, run: async () => {} },
-	{ board: "ScreenSourcesPopover", frame: SCREEN, run: () => click(314, 145), after: closeOverlay },
+	{ board: "ScreenSourcesPopover", frame: SCREEN, run: () => hold(357, 145), after: closeOverlay },
 	{
 		board: "ScreenSourcesPull", frame: SCREEN,
 		// The board draws the pull over the 9:00 view; a real pull starts only at the scroll top, so the pulled state is set on the DOM.
