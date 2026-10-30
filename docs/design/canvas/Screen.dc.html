@@ -30,7 +30,7 @@ body{margin:0;background:#000}
 </div>
 <div style="position: relative; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{c.track}}; display: flex;">
 <span style="position: absolute; top: 2px; left: {{pillLeft}}px; width: 76px; height: 28px; border-radius: 14px; background: {{c.selectedBg}};"></span>
-<sc-for list="{{chips}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{chips}}" as="o" hint-placeholder-count="4">
 <button aria-label="{{o.label}}" style="position: relative; width: 38px; height: 28px; border: 0; padding: 0; background: transparent; color: {{o.color}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
 </sc-for>
 </div>
@@ -52,8 +52,23 @@ body{margin:0;background:#000}
 </div>
 </div>
 
+<sc-if value="{{inboxPanel.visible}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{inboxPanel.left}}px; top: 166px; bottom: 0; width: {{inboxPanel.width}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
+<div style="margin-top: -0px; display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{inbox}}" as="t" hint-placeholder-count="6">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{t.bg}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
+<sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
+</sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{t.title}}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
 <sc-if value="{{soonPanel.visible}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: {{soonPanel.left}}px; top: 166px; bottom: 0; width: {{soonPanel.width}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
+<div style="position: absolute; left: {{soonPanel.left}}px; top: 166px; bottom: 0; width: {{soonPanel.width}}px; padding: {{soonPanel.pad}}; box-sizing: border-box; overflow: hidden;">
 <div style="margin-top: -{{soonScroll}}px; display: flex; flex-direction: column; gap: 6px;">
 <sc-for list="{{soon}}" as="t" hint-placeholder-count="8">
 <div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{t.bg}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
@@ -165,8 +180,14 @@ body{margin:0;background:#000}
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </div>
 
+<sc-if value="{{inboxPanel.visible}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{inboxPanel.left}}px; width: {{inboxPanel.width}}px; bottom: 76px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
+<button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
+</div>
+</sc-if>
+
 <sc-if value="{{soonPanel.visible}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; left: {{soonPanel.left}}px; width: {{soonPanel.width}}px; bottom: 76px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
+<div style="position: absolute; left: {{soonPanel.left}}px; width: {{soonPanel.width}}px; bottom: 76px; padding: {{soonPanel.btnPad}}; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </div>
 </sc-if>
@@ -181,7 +202,7 @@ body{margin:0;background:#000}
 </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"priorities":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon","inbox"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"priorities":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   themes() {
     return {
@@ -234,7 +255,9 @@ class Component extends DCLogic {
   renderVals() {
     const listW = Number(this.props.listWidth ?? 187);
     const dragging = this.props.dragging === true || this.props.dragging === 'true';
-    const isSoon = (this.props.rightMode ?? 'calendar') === 'soon';
+    const rightMode = this.props.rightMode ?? 'calendar';
+    const isInbox = rightMode === 'inbox';
+    const isSoon = rightMode === 'soon' || isInbox;
     const newSlot = this.props.newSlot === true || this.props.newSlot === 'true';
     const light = this.props.theme === 'light';
     const c = this.themes()[light ? 'light' : 'dark'];
@@ -251,6 +274,14 @@ class Component extends DCLogic {
       { title: 'Заменить фильтр для воды' },
       { title: 'Настроить бэкап ноутбука' }
     ].map((t) => ({ ...t, progress: !!t.progress, bg: cardBg(t.p) }));
+    const inbox = [
+      { title: 'Узнать про курсы итальянского' },
+      { title: 'Идея подарка на Новый год' },
+      { title: 'Ответить Лёше про поход' },
+      { title: 'Посмотреть «Дюну 2»' },
+      { title: 'Почитать про налоговое резидентство' },
+      { title: 'Сменить тариф мобильной связи' }
+    ].map((t) => ({ ...t, bg: cardBg(t.p) }));
     const accent = light ? c.accent : (this.props.accent ?? '#9580FF');
     const cardMode = (this.props.taskStyle ?? 'card') !== 'event';
     const scenario = cardMode ? (this.props.scenario ?? 'day') : 'day';
@@ -422,7 +453,8 @@ class Component extends DCLogic {
     const p = rawProgress >= 0 ? rawProgress : (isSoon ? 0 : 1);
     const mix = (from, to) => Math.round(from + (to - from) * p);
     const half = (SCREEN - GAP) / 2;
-    const nowLeft = mix(half + GAP, 0);
+    const inboxShift = isInbox ? half + GAP : 0;
+    const nowLeft = mix(half + GAP, 0) + inboxShift;
     const nowWidth = mix(half, listW);
     const leftSide = p > 0.5;
     const now = {
@@ -431,21 +463,31 @@ class Component extends DCLogic {
       pad: leftSide ? '0 2px 0 10px' : '0 10px 0 2px',
       btnPad: leftSide ? '8px 2px 8px 10px' : '8px 10px 8px 2px'
     };
-    const soonPanel = { left: nowLeft - GAP - half, width: half, visible: nowLeft - GAP > 0 };
+    const soonPanel = {
+      left: nowLeft - GAP - half,
+      width: half,
+      visible: nowLeft - GAP > 0,
+      pad: isInbox ? '0 10px 0 2px' : '0 2px 0 10px',
+      btnPad: isInbox ? '8px 10px 8px 2px' : '8px 2px 8px 10px'
+    };
+    const inboxPanel = { left: soonPanel.left - GAP - half, width: half, visible: soonPanel.left - GAP > 0 };
     const calLeft = nowLeft + nowWidth + GAP;
     const calWidth = SCREEN - listW - GAP;
     const dividers = [
-      ...(soonPanel.visible ? [{ left: nowLeft - GAP, handle: false }] : []),
+      ...(inboxPanel.visible ? [{ left: soonPanel.left - GAP, handle: false }] : []),
+      ...(soonPanel.visible && nowLeft - GAP < SCREEN ? [{ left: nowLeft - GAP, handle: false }] : []),
       ...(calLeft < SCREEN ? [{ left: nowLeft + nowWidth, handle: true }] : [])
     ];
     const chipPaths = {
-      soon: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
       now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
       cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
     };
-    const firstChip = leftSide ? 1 : 0;
+    const firstChip = isInbox ? 0 : leftSide ? 2 : 1;
     const sourceDot = this.props.sourceDot === true || this.props.sourceDot === 'true';
     const chips = [
+      { key: 'inbox', label: 'Inbox' },
       { key: 'soon', label: 'Soon' },
       { key: 'now', label: 'Now' },
       { key: 'cal', label: 'Calendar' }
@@ -463,12 +505,14 @@ class Component extends DCLogic {
       calWidth,
       now,
       soonPanel,
+      inboxPanel,
       dividers,
       chips,
-      pillLeft: 2 + Math.round(38 * p),
+      pillLeft: 2 + Math.round(38 * (isInbox ? 0 : 1 + p)),
       dragging,
       isCal: calLeft < SCREEN,
       soon,
+      inbox,
       dayTitle: 'Today',
       tasks,
       items,

@@ -1,7 +1,7 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
-import { listOn, slottedOn, soonList, toItem } from "../domain/queries";
+import { inboxList, listOn, slottedOn, soonList, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
@@ -26,7 +26,7 @@ function allSectionNames(settings: TaskCalendarSettings): readonly string[] {
 
 function managedSectionNames(settings: TaskCalendarSettings): readonly string[] {
 	const s = settings.sections;
-	return [s.now, s.soon, s.done];
+	return [s.inbox, s.now, s.soon, s.done];
 }
 
 export class TaskServiceImpl implements TaskService {
@@ -48,6 +48,11 @@ export class TaskServiceImpl implements TaskService {
 	async soonView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
 		return soonList(doc).map(this.itemOf());
+	}
+
+	async inboxView(): Promise<readonly TaskItem[]> {
+		const { doc } = await this.readNormalized();
+		return inboxList(doc).map(this.itemOf());
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -77,6 +82,7 @@ export class TaskServiceImpl implements TaskService {
 
 	placementOf(item: TaskItem): Placement {
 		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
+		if (item.key.section === "inbox") return { kind: "inbox" };
 		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
 	}
 
@@ -126,6 +132,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
 		await this.mutate((doc, today) => ops.moveToSoon(doc, this.entryOf(doc, key), date, today));
+	}
+
+	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
+		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}
 
 	async normalize(): Promise<void> {
@@ -184,7 +194,7 @@ export class TaskServiceImpl implements TaskService {
 		const s = settings.sections;
 		return TaskDocument.parse(
 			text,
-			{ now: s.now, soon: s.soon, done: s.done },
+			{ inbox: s.inbox, now: s.now, soon: s.soon, done: s.done },
 			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
 		);
 	}

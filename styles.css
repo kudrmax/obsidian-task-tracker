@@ -390,8 +390,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
 .task-calendar .tc-day-title { height: var(--tc-day-row); padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
 .tc-seg { position: relative; height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; touch-action: none; cursor: pointer; outline: none; }
-.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); }
-.tc-seg.is-lists .tc-seg-pill { left: var(--tc-seg-pad); }
+.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + 2 * var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); }
+.tc-seg.is-lists .tc-seg-pill { left: calc(var(--tc-seg-pad) + var(--tc-seg-btn-w)); }
+.tc-seg.is-inbox .tc-seg-pill { left: var(--tc-seg-pad); }
 .tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; }
 .tc-seg-icon.is-on { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
@@ -431,20 +432,31 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 @keyframes tc-spin { to { transform: rotate(var(--tc-turn)); } }
 
 
-/* The columns: the list, the divider with its handle, the right column. */
+/* The columns on the strip, Inbox, Soon, the list and the right column; the fixed dividers between the halves, and the one with its handle. */
 .tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
 .task-calendar.is-lists .tc-left { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); }
 .tc-soon { position: absolute; left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
 .task-calendar.is-lists .tc-soon { left: 0; }
+.task-calendar.is-inbox .tc-soon { left: calc(var(--tc-half-column) + var(--tc-divider)); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); }
+.task-calendar.is-inbox .tc-left { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); }
+.tc-inbox { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
+.task-calendar.is-lists .tc-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-inbox .tc-inbox { left: 0; }
 .tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
 .task-calendar.is-lists .tc-divider { left: 100%; }
 .tc-divider.is-fixed { left: calc(-1 * var(--tc-divider)); touch-action: auto; cursor: auto; }
 .task-calendar.is-lists .tc-divider.is-fixed { left: var(--tc-half-column); }
+.task-calendar.is-inbox .tc-divider { left: calc(100% + var(--tc-divider) + var(--tc-half-column)); }
+.task-calendar.is-inbox .tc-divider.is-fixed { left: 100%; }
+.tc-divider.is-fixed.is-inbox { left: calc(-1 * (var(--tc-half-column) + 2 * var(--tc-divider))); }
+.task-calendar.is-lists .tc-divider.is-fixed.is-inbox { left: calc(-1 * var(--tc-divider)); }
+.task-calendar.is-inbox .tc-divider.is-fixed.is-inbox { left: var(--tc-half-column); }
 .tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
 .task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
 .tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
-.task-calendar.is-switching :is(.tc-left, .tc-soon, .tc-divider, .tc-right, .tc-new) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip); }
+.task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
+.task-calendar.is-switching :is(.tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-new) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip); }
 
 /* A list of cards scrolls under its New task button. */
 .tc-list { height: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); padding-bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-new-h)); }
@@ -465,6 +477,11 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar.is-lists .tc-new { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
 .tc-new.is-soon { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); width: var(--tc-half-column); }
 .task-calendar.is-lists .tc-new.is-soon { left: 0; padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
+.task-calendar.is-inbox .tc-new { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
+.task-calendar.is-inbox .tc-new.is-soon { left: calc(var(--tc-half-column) + var(--tc-divider)); }
+.tc-new.is-inbox { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); width: var(--tc-half-column); }
+.task-calendar.is-lists .tc-new.is-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
+.task-calendar.is-inbox .tc-new.is-inbox { left: 0; padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
 

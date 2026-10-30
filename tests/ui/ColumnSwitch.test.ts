@@ -28,12 +28,14 @@ function setUp(initial: RightMode, dot = false) {
 	});
 	const pill = control.el.querySelector<HTMLElement>(".tc-seg-pill")!;
 	for (const icon of control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")) Object.defineProperty(icon, "offsetWidth", { get: () => STEP });
-	Object.defineProperty(pill, "offsetLeft", { get: () => (pill.style.left ? parseFloat(pill.style.left) : mode === "calendar" ? 2 + STEP : 2) });
+	const place = { inbox: 0, soon: 1, calendar: 2 } as const;
+	Object.defineProperty(pill, "offsetLeft", { get: () => (pill.style.left ? parseFloat(pill.style.left) : 2 + place[mode] * STEP) });
 	const lit = () => [...control.el.querySelectorAll(".tc-seg-icon.is-on")].map((icon) => [...control.el.querySelectorAll(".tc-seg-icon")].indexOf(icon));
-	const tap = () => {
+	const icons = [...control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")];
+	const tap = (column: number) => {
 		control.el.dispatchEvent(pointer("pointerdown", 50));
 		control.el.dispatchEvent(pointer("pointerup", 50));
-		control.el.click();
+		icons[column].click();
 	};
 	const drag = (...xs: number[]) => {
 		control.el.dispatchEvent(pointer("pointerdown", xs[0]));
@@ -50,38 +52,52 @@ describe("ColumnSwitch", () => {
 
 	it("lights the two columns the window shows and puts the pill over them", () => {
 		const calendar = setUp("calendar");
-		expect(calendar.lit()).toEqual([1, 2]);
-		expect(calendar.control.el.classList.contains("is-lists")).toBe(false);
-		expect(calendar.control.el.getAttribute("aria-checked")).toBe("true");
+		expect(calendar.lit()).toEqual([2, 3]);
+		expect(calendar.control.el.className).toBe("tc-seg");
 		const lists = setUp("soon");
-		expect(lists.lit()).toEqual([0, 1]);
+		expect(lists.lit()).toEqual([1, 2]);
 		expect(lists.control.el.classList.contains("is-lists")).toBe(true);
+		const inbox = setUp("inbox");
+		expect(inbox.lit()).toEqual([0, 1]);
+		expect(inbox.control.el.classList.contains("is-inbox")).toBe(true);
 	});
 
-	it("flips to the other side on a tap anywhere, like a toggle", () => {
+	it("moves to the nearest place that shows a tapped column, and stays for a column already shown", () => {
 		const s = setUp("calendar");
-		s.tap();
+		s.tap(3);
+		s.tap(2);
+		expect(s.changes).toEqual([]);
+		s.tap(1);
 		expect(s.changes).toEqual(["soon"]);
-		s.tap();
-		expect(s.changes).toEqual(["soon", "calendar"]);
+		s.tap(0);
+		expect(s.changes).toEqual(["soon", "inbox"]);
+		s.tap(2);
+		expect(s.changes).toEqual(["soon", "inbox", "soon"]);
+		s.tap(3);
+		expect(s.changes).toEqual(["soon", "inbox", "soon", "calendar"]);
+		const far = setUp("calendar");
+		far.tap(0);
+		expect(far.changes).toEqual(["inbox"]);
 	});
 
 	it("carries the pill under the finger within its track, the screen staying put until let go", () => {
 		const s = setUp("calendar");
 		s.control.el.dispatchEvent(pointer("pointerdown", 100));
 		s.control.el.dispatchEvent(pointer("pointermove", 85));
-		expect(s.pill.style.left).toBe("25px");
-		expect(s.lit()).toEqual([1, 2]);
+		expect(s.pill.style.left).toBe("63px");
+		expect(s.lit()).toEqual([2, 3]);
 		s.control.el.dispatchEvent(pointer("pointermove", 70));
+		expect(s.lit()).toEqual([1, 2]);
+		s.control.el.dispatchEvent(pointer("pointermove", 30));
 		expect(s.lit()).toEqual([0, 1]);
 		s.control.el.dispatchEvent(pointer("pointermove", 0));
 		expect(s.pill.style.left).toBe("2px");
 		s.control.el.dispatchEvent(pointer("pointermove", 300));
-		expect(s.pill.style.left).toBe("40px");
+		expect(s.pill.style.left).toBe("78px");
 		expect(s.changes).toEqual([]);
 	});
 
-	it("settles on the nearer side when let go, and a drag is not a tap", () => {
+	it("settles on the nearest place when let go, and a drag is not a tap", () => {
 		const s = setUp("calendar");
 		s.drag(100, 85);
 		expect(s.changes).toEqual([]);
@@ -90,6 +106,8 @@ describe("ColumnSwitch", () => {
 		expect(s.changes).toEqual(["soon"]);
 		s.drag(100, 110, 125);
 		expect(s.changes).toEqual(["soon", "calendar"]);
+		s.drag(100, 20);
+		expect(s.changes).toEqual(["soon", "calendar", "inbox"]);
 	});
 
 	it("opens the sources when held while the calendar shows, and does not flip", () => {
@@ -97,7 +115,7 @@ describe("ColumnSwitch", () => {
 		s.control.el.dispatchEvent(pointer("pointerdown", 50));
 		vi.advanceTimersByTime(LONG_PRESS);
 		s.control.el.dispatchEvent(pointer("pointerup", 50));
-		s.control.el.click();
+		s.control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")[0].click();
 		expect(s.sources()).toBe(1);
 		expect(s.changes).toEqual([]);
 		const lists = setUp("soon");

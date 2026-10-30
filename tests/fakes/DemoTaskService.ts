@@ -21,9 +21,17 @@ const two = (n: number) => String(n).padStart(2, "0");
 const time = (m: number) => `${two(Math.floor(m / 60))}:${two(m % 60)}`;
 const localDateOf = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
-/** The board's tasks, in memory: the same seven on the list, four on the timeline, eight in Soon. */
+/** The board's tasks, in memory: the same seven on the list, four on the timeline, eight in Soon, six in Inbox. */
 export class DemoTaskService implements TaskService {
 	private sections: Record<SectionKey, DemoTask[]> = {
+		inbox: [
+			task("Узнать про курсы итальянского"),
+			task("Идея подарка на Новый год"),
+			task("Ответить Лёше про поход"),
+			task("Посмотреть «Дюну 2»"),
+			task("Почитать про налоговое резидентство"),
+			task("Сменить тариф мобильной связи"),
+		],
 		now: [
 			task("Созвониться с врачом"),
 			task("Купить билеты в Белград", { dueDate: "2026-11-03" }),
@@ -110,6 +118,10 @@ export class DemoTaskService implements TaskService {
 		return this.items("soon").filter((t) => !t.dueDate && !t.slot);
 	}
 
+	async inboxView(): Promise<readonly TaskItem[]> {
+		return this.items("inbox");
+	}
+
 	async createInList(date: LocalDate, text: string): Promise<void> {
 		if (!text.trim()) return;
 		if (date === this.today()) this.sections.now.push(task(text.trim()));
@@ -131,6 +143,7 @@ export class DemoTaskService implements TaskService {
 
 	placementOf(item: TaskItem): Placement {
 		if (item.dueDate) return { kind: "date", date: item.dueDate };
+		if (item.key.section === "inbox") return { kind: "inbox" };
 		return { kind: item.key.section === "soon" ? "soon" : "now" };
 	}
 
@@ -140,6 +153,7 @@ export class DemoTaskService implements TaskService {
 			this.sections[placement.date <= this.today() ? "now" : "soon"].push(t);
 		} else {
 			t.dueDate = null;
+			if (placement.kind === "inbox") t.slot = null;
 			this.sections[placement.kind].push(t);
 		}
 	}
@@ -225,6 +239,16 @@ export class DemoTaskService implements TaskService {
 	async moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
 		if (date === this.today()) this.sections.soon.push(this.take(key));
 		else this.find(key).dueDate = null;
+		this.changed();
+	}
+
+	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
+		const t = this.take(key);
+		if (section === "inbox") {
+			t.dueDate = null;
+			t.slot = null;
+		}
+		this.sections[section].push(t);
 		this.changed();
 	}
 

@@ -1,8 +1,8 @@
 /** A calendar day as `YYYY-MM-DD`. Compared as strings. */
 export type LocalDate = string;
 
-/** Which of the plugin's sections a task sits in. Inbox and Backlog are never read. */
-export type SectionKey = "now" | "soon" | "done";
+/** Which of the plugin's sections a task sits in. Backlog is never read. */
+export type SectionKey = "inbox" | "now" | "soon" | "done";
 
 /** `[ ]`, `[/]`, `[x]`, `[-]`. Any other character reads as todo and is written back unchanged. */
 export type TaskStatus = "todo" | "inProgress" | "done" | "cancelled";

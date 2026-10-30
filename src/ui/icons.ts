@@ -13,7 +13,8 @@ const ICONS = {
 	chevronLeft: { fill: false, join: true, shapes: [["polyline", { points: "15 5 8 12 15 19" }]] },
 	chevronRight: { fill: false, join: true, shapes: [["polyline", { points: "9 5 16 12 9 19" }]] },
 	calendar: { fill: false, join: true, shapes: [["path", { d: "M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5" }]] },
-	soon: { fill: false, join: true, shapes: [["path", { d: "M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z" }]] },
+	inbox: { fill: false, join: true, shapes: [["path", { d: "M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z" }]] },
+	soon: { fill: false, join: true, shapes: [["path", { d: "M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5" }]] },
 	now: {
 		fill: false,
 		join: true,

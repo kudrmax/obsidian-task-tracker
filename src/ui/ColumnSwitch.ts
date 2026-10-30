@@ -13,17 +13,25 @@ export interface ColumnSwitchOptions {
 	longPressMs(): number;
 }
 
-type Column = "soon" | "now" | "calendar";
+type Column = "inbox" | "soon" | "now" | "calendar";
 
-/** The window's two columns of the three, Soon, Now and the calendar. */
-const SHOWN: Readonly<Record<RightMode, readonly Column[]>> = { soon: ["soon", "now"], calendar: ["now", "calendar"] };
+const COLUMNS: readonly Column[] = ["inbox", "soon", "now", "calendar"];
 
-const other = (mode: RightMode): RightMode => (mode === "calendar" ? "soon" : "calendar");
+/** The window's places left to right; a place's index is that of the first of the two columns it shows. */
+const PLACES: readonly RightMode[] = ["inbox", "soon", "calendar"];
+
+const placeOf = (mode: RightMode): number => PLACES.indexOf(mode);
+
+/** The place a tap on a column moves to: none when the window shows it, else the nearest that does. */
+function placeShowing(column: number, from: number): number | null {
+	if (column === from || column === from + 1) return null;
+	return column < from ? column : column - 1;
+}
 
 interface Press {
 	readonly pointerId: number;
 	readonly x: number;
-	/** The pill's left edge when pressed, and where it stands over Soon and Now: it travels one icon's width. */
+	/** The pill's left edge when pressed, and where it stands over Inbox and Soon: it travels an icon's width per place. */
 	readonly left: number;
 	readonly min: number;
 	readonly step: number;
@@ -32,9 +40,10 @@ interface Press {
 }
 
 /**
- * The switch in the day row, a toggle drawn as three icons with a pill over the two columns the screen shows. A tap
- * anywhere flips it; the pill follows a finger and settles on the nearer side when let go, and only then does the
- * screen slide. Held while the calendar shows, it opens the sources window.
+ * The switch in the day row: four icons, Inbox, Soon, Now and the calendar, with a pill over the two columns the screen
+ * shows, in one of three places. A tap on an icon the pill leaves uncovered moves it to the nearest place that covers
+ * the icon; the pill follows a finger and settles on the nearest place when let go, and only then does the screen
+ * slide. Held while the calendar shows, it opens the sources window.
  */
 export class ColumnSwitch {
 	readonly el: HTMLElement;
@@ -48,10 +57,11 @@ export class ColumnSwitch {
 
 	constructor(parent: HTMLElement, private readonly opts: ColumnSwitchOptions) {
 		this.el = el(parent, "div", "tc-seg");
-		this.el.setAttribute("role", "switch");
-		this.el.setAttribute("aria-label", "Show the calendar");
+		this.el.setAttribute("role", "group");
+		this.el.setAttribute("aria-label", "Columns");
 		this.el.tabIndex = 0;
 		this.pill = el(this.el, "span", "tc-seg-pill");
+		this.add("inbox");
 		this.add("soon");
 		this.add("now");
 		this.dot = el(this.add("calendar"), "span", "tc-dot");
@@ -59,17 +69,21 @@ export class ColumnSwitch {
 		this.el.addEventListener("pointermove", (e) => this.move(e));
 		this.el.addEventListener("pointerup", (e) => this.up(e, true));
 		this.el.addEventListener("pointercancel", (e) => this.up(e, false));
-		this.el.addEventListener("click", () => this.tap());
+		this.el.addEventListener("click", (e) => this.tap(e.target));
 		this.el.addEventListener("keydown", (e) => {
-			if (e.key !== "Enter" && e.key !== " ") return;
+			const shift = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+			if (shift === 0) return;
 			e.preventDefault();
-			this.flip(other(this.opts.value()));
+			const place = placeOf(this.opts.value()) + shift;
+			if (place >= 0 && place < PLACES.length) this.settle(PLACES[place]);
 		});
 		this.render();
 	}
 
 	private add(column: Column): HTMLElement {
 		const cell = el(this.el, "span", "tc-seg-icon");
+		cell.dataset.column = column;
+		cell.setAttribute("aria-label", column === "calendar" ? "Calendar" : column[0].toUpperCase() + column.slice(1));
 		cell.appendChild(icon(column));
 		this.icons.set(column, cell);
 		return cell;
@@ -80,7 +94,7 @@ export class ColumnSwitch {
 		this.swallowClick = false;
 		const step = this.icons.get("now")!.offsetWidth;
 		const left = this.pill.offsetLeft;
-		const min = this.opts.value() === "calendar" ? left - step : left;
+		const min = left - placeOf(this.opts.value()) * step;
 		const hold = window.setTimeout(() => this.held(), this.opts.longPressMs());
 		this.press = { pointerId: e.pointerId, x: e.clientX, left, min, step, hold, dragging: false };
 	}
@@ -102,9 +116,13 @@ export class ColumnSwitch {
 			this.el.classList.remove("is-settling");
 			capturePointer(this.el, press.pointerId);
 		}
-		const left = Math.min(press.min + press.step, Math.max(press.min, press.left + dx));
+		const left = Math.min(press.min + (PLACES.length - 1) * press.step, Math.max(press.min, press.left + dx));
 		this.pill.style.left = px(left);
-		this.light(left - press.min >= press.step / 2 ? "calendar" : "soon");
+		this.light(this.nearest(press));
+	}
+
+	private nearest(press: Press): RightMode {
+		return PLACES[Math.round((this.pill.offsetLeft - press.min) / press.step)];
 	}
 
 	private up(e: PointerEvent, released: boolean): void {
@@ -115,20 +133,23 @@ export class ColumnSwitch {
 		if (!press.dragging) return;
 		releasePointer(this.el, press.pointerId);
 		this.swallowClick = true;
-		const nearer = this.pill.offsetLeft - press.min >= press.step / 2 ? "calendar" : "soon";
-		this.flip(released ? nearer : this.opts.value());
+		this.settle(released ? this.nearest(press) : this.opts.value());
 	}
 
-	private tap(): void {
+	private tap(target: EventTarget | null): void {
 		if (this.swallowClick) {
 			this.swallowClick = false;
 			return;
 		}
-		this.flip(other(this.opts.value()));
+		const cell = target instanceof Element ? target.closest<HTMLElement>(".tc-seg-icon") : null;
+		const column = cell ? COLUMNS.indexOf(cell.dataset.column as Column) : -1;
+		if (column < 0) return;
+		const place = placeShowing(column, placeOf(this.opts.value()));
+		if (place !== null) this.settle(PLACES[place]);
 	}
 
-	/** The pill glides from where it stands to its side; a side other than the one shown moves the screen with it. */
-	private flip(mode: RightMode): void {
+	/** The pill glides from where it stands to its place; a place other than the one shown moves the screen with it. */
+	private settle(mode: RightMode): void {
 		window.clearTimeout(this.settling);
 		this.el.classList.add("is-settling");
 		this.settling = window.setTimeout(() => this.el.classList.remove("is-settling"), tokenMs(this.el, DURATION.slide));
@@ -138,9 +159,10 @@ export class ColumnSwitch {
 	}
 
 	private light(mode: RightMode): void {
+		this.el.classList.toggle("is-inbox", mode === "inbox");
 		this.el.classList.toggle("is-lists", mode === "soon");
-		this.el.setAttribute("aria-checked", String(mode === "calendar"));
-		for (const [column, cell] of this.icons) cell.classList.toggle("is-on", SHOWN[mode].includes(column));
+		const first = placeOf(mode);
+		COLUMNS.forEach((column, i) => this.icons.get(column)!.classList.toggle("is-on", i === first || i === first + 1));
 	}
 
 	render(): void {

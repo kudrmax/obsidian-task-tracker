@@ -31,6 +31,10 @@ export function soonList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
 }
 
+export function inboxList(doc: TaskDocument): readonly TaskEntry[] {
+	return doc.tasks("inbox");
+}
+
 export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null): TaskItem {
 	return {
 		key: { section: entry.section, index: entry.index, raw: entry.raw },

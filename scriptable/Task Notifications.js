@@ -273,7 +273,7 @@ function formatTaskLine(parsed, markers) {
 }
 
 // src/domain/TaskDocument.ts
-var SECTION_KEYS = ["now", "soon", "done"];
+var SECTION_KEYS = ["inbox", "now", "soon", "done"];
 var HEADING_RE = /^#{1,6}(\s|$)/;
 var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
 var INDENT_RE = /^[ \t]*/;
@@ -307,7 +307,7 @@ var TaskDocument = class _TaskDocument {
     return new _TaskDocument(lines, eol, trailingEol, sections, markers);
   }
   static empty(all) {
-    return _TaskDocument.parse("", { now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
+    return _TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
   }
   serialize() {
     return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");

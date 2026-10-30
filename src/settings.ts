@@ -1,4 +1,5 @@
-export type RightMode = "calendar" | "soon";
+/** Which pair of neighbouring columns the window shows: Inbox and Soon, Soon and Now, or Now and the calendar. */
+export type RightMode = "calendar" | "soon" | "inbox";
 
 /** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
 export interface ZoomLevel {

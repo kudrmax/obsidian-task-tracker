@@ -1,6 +1,6 @@
 import { DESIGN } from "../design";
 import type { ListEntry, TaskList } from "../TaskList";
-import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
+import type { DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
 
 /** A list as a place to drop: within its own list the cards step aside at the finger; from elsewhere the card joins the end. */
 export class ListDrop implements DropTarget {
@@ -10,7 +10,7 @@ export class ListDrop implements DropTarget {
 	constructor(
 		private readonly list: TaskList,
 		private readonly area: HTMLElement,
-		readonly column: "left" | "soon",
+		readonly column: ListColumn,
 		private readonly accepts: (drag: DragPayload) => boolean,
 	) {}
 

@@ -33,6 +33,16 @@ function closedToDone(doc: TaskDocument): TaskDocument {
 	return gatherAtStart(doc, "done", (e) => !isOpen(e.task));
 }
 
+/** An Inbox task that got a due date or a slot is sorted: it goes to Soon, and from there `dueToNow` takes today's on. */
+function datedOutOfInbox(doc: TaskDocument): TaskDocument {
+	if (!doc.hasSection("soon")) return doc;
+	for (;;) {
+		const entry = doc.tasks("inbox").find((e) => isOpen(e.task) && (e.task.dueDate !== null || e.task.slot !== null));
+		if (!entry) return doc;
+		doc = doc.moveEntry(entry, "soon", "end");
+	}
+}
+
 function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	return gatherAtStart(doc, "now", (e) => {
 		if (e.section !== "soon" || !isOpen(e.task)) return false;
@@ -43,6 +53,6 @@ function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): T
 }
 
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
-	const result = dueToNow(closedToDone(erasePastSlots(doc, today, boundary)), today, boundary);
+	const result = dueToNow(datedOutOfInbox(closedToDone(erasePastSlots(doc, today, boundary))), today, boundary);
 	return result.serialize() === doc.serialize() ? doc : result;
 }

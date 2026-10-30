@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { listOn, openSlotted, slottedOn, soonList, toItem } from "../../src/domain/queries";
+import { inboxList, listOn, openSlotted, slottedOn, soonList, toItem } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
 const T = "2026-10-30";
 const D = "2026-11-03";
 
@@ -94,6 +94,19 @@ describe("a day that starts at 4", () => {
 
 	it("the list leaves out what the timeline shows", () => {
 		expect(texts(listOn(night, T, T, atFour))).toEqual(["Early", "Plain"]);
+	});
+});
+
+describe("inboxList", () => {
+	const withInbox = TaskDocument.parse("## Inbox\n- [ ] I\n- [/] J\n\n## Now\n- [ ] N\n\n## Soon\n- [ ] S\n", SECTIONS, M);
+
+	it("lists every Inbox task in file order", () => {
+		expect(texts(inboxList(withInbox))).toEqual(["I", "J"]);
+	});
+
+	it("keeps Inbox out of the day's list, Soon and the timeline", () => {
+		expect(texts(listOn(withInbox, T, T))).toEqual(["N"]);
+		expect(texts(soonList(withInbox))).toEqual(["S"]);
 	});
 });
 
