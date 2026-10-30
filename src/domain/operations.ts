@@ -86,6 +86,7 @@ export function moveToList(doc: TaskDocument, entry: TaskEntry, date: LocalDate,
 
 export function placementOfEntry(entry: TaskEntry): Placement {
 	if (entry.task.dueDate !== null) return { kind: "date", date: entry.task.dueDate };
+	if (entry.section === "inbox") return { kind: "inbox" };
 	return entry.section === "soon" ? { kind: "soon" } : { kind: "now" };
 }
 
@@ -95,6 +96,8 @@ function samePlacement(a: Placement, b: Placement): boolean {
 
 function placementTarget(placement: Placement, today: LocalDate): { section: SectionKey; dueDate: LocalDate | null } {
 	switch (placement.kind) {
+		case "inbox":
+			return { section: "inbox", dueDate: null };
 		case "soon":
 			return { section: "soon", dueDate: null };
 		case "now":
@@ -104,12 +107,20 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 	}
 }
 
+/** Inbox is what is not sorted yet: a task placed there loses its slot as well as its due date. */
 export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
-	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: slot ?? null }));
-	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate });
+	const unsorted = section === "inbox";
+	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null) }));
+	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate, ...(unsorted ? { slot: null } : {}) });
 	if (samePlacement(placementOfEntry(entry), draft.placement) || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
+}
+
+/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
+export function moveToEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" | "soon"): TaskDocument {
+	const prepared = section === "inbox" ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
+	return prepared.moveEntry(sameEntryIn(prepared, entry), section, "end");
 }
 
 export function moveToSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {

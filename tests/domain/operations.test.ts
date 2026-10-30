@@ -5,6 +5,7 @@ import {
 	createInList,
 	createInSoon,
 	moveBefore,
+	moveToEnd,
 	moveToList,
 	moveToSoon,
 	newTask,
@@ -20,7 +21,7 @@ import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
 const T = "2026-10-30";
 const D = "2026-11-03";
 
@@ -243,5 +244,37 @@ describe("placeTask keeps the position when only the date changes within a secti
 		const d = parse("## Now\n\n## Soon\n- [ ] A 📅 2026-11-05\n- [ ] B\n");
 		const out = placeTask(d, d.tasks("soon")[0], { text: "A", placement: { kind: "date", date: "2026-11-06" } }, "2026-10-30");
 		expect(out.serialize()).toBe("## Now\n\n## Soon\n- [ ] A 📅 2026-11-06\n- [ ] B\n");
+	});
+});
+
+describe("Inbox", () => {
+	const text = "## Inbox\n- [ ] I\n\n## Now\n- [ ] A 📅 2026-11-03 ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n- [ ] S\n\n## Done\n";
+
+	it("the Inbox tile creates at the end of Inbox and drops a slot", () => {
+		const slot = { date: T, start: 600, end: null };
+		expect(placeTask(parse(text), null, { text: "New", placement: { kind: "inbox" } }, T, slot).serialize()).toBe(
+			"## Inbox\n- [ ] I\n- [ ] New\n\n## Now\n- [ ] A 📅 2026-11-03 ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("an edit to Inbox takes the due date and the slot away", () => {
+		const d = parse(text);
+		expect(placeTask(d, d.tasks("now")[0], { text: "A", placement: { kind: "inbox" } }, T).serialize()).toBe("## Inbox\n- [ ] I\n- [ ] A\n\n## Now\n\n## Soon\n- [ ] S\n\n## Done\n");
+	});
+
+	it("an Inbox task shows the Inbox tile", () => {
+		expect(placementOfEntry(parse(text).tasks("inbox")[0])).toEqual({ kind: "inbox" });
+	});
+
+	it("moveToEnd moves between Inbox and Soon, and to the end of its own section", () => {
+		const d = parse("## Inbox\n- [ ] I\n- [ ] J\n\n## Soon\n- [ ] S\n- [ ] T\n");
+		expect(moveToEnd(d, d.tasks("inbox")[0], "soon").serialize()).toBe("## Inbox\n- [ ] J\n\n## Soon\n- [ ] S\n- [ ] T\n- [ ] I\n");
+		expect(moveToEnd(d, d.tasks("soon")[0], "inbox").serialize()).toBe("## Inbox\n- [ ] I\n- [ ] J\n- [ ] S\n\n## Soon\n- [ ] T\n");
+		expect(moveToEnd(d, d.tasks("soon")[0], "soon").serialize()).toBe("## Inbox\n- [ ] I\n- [ ] J\n\n## Soon\n- [ ] T\n- [ ] S\n");
+	});
+
+	it("moveToEnd into Inbox drops the due date and the slot", () => {
+		const d = parse("## Inbox\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n");
+		expect(moveToEnd(d, d.tasks("soon")[0], "inbox").serialize()).toBe("## Inbox\n- [ ] S\n\n## Soon\n");
 	});
 });

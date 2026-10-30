@@ -19,7 +19,7 @@ export interface TaskSheetOptions {
 /** How tall the keyboard was the last time it shrank the view: the next screen leaves that room from its first frame. */
 let rememberedKeyboard = 0;
 
-/** The task screen over the whole view: the title to type, the three tiles, the calendar under them, Cancel and Add. */
+/** The task screen over the whole view: the title to type, the four tiles, the calendar under them, Cancel and Add. */
 export class TaskSheet {
 	readonly el: HTMLElement;
 	private state: SheetState;

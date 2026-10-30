@@ -42,9 +42,9 @@ export interface ViewDeps {
 }
 
 /**
- * The screen: the day row over a window two columns wide on a strip of three, Soon, the list of the day (Now) and the
- * day's timeline. The window shows Soon and Now, halved by a fixed divider, or Now and the timeline, parted by the divider
- * that sets the list's width; switching slides the strip.
+ * The screen: the day row over a window two columns wide on a strip of four, Inbox, Soon, the list of the day (Now) and
+ * the day's timeline. The window shows Inbox and Soon or Soon and Now, halved by a fixed divider, or Now and the timeline,
+ * parted by the divider that sets the list's width; switching slides the strip.
  */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
@@ -54,6 +54,9 @@ export class TaskCalendarView extends ItemView {
 	private soonEl: HTMLElement | null = null;
 	private soonList: TaskList | null = null;
 	private soonDrop: ListDrop | null = null;
+	private inboxEl: HTMLElement | null = null;
+	private inboxList: TaskList | null = null;
+	private inboxDrop: ListDrop | null = null;
 	private rightEl: HTMLElement | null = null;
 	private allDayEl: HTMLElement | null = null;
 	private timeline: Timeline | null = null;
@@ -72,6 +75,7 @@ export class TaskCalendarView extends ItemView {
 	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
+	private newInbox: NewTaskButton | null = null;
 	private switching = 0;
 	private readonly unsubscribe: (() => void)[] = [];
 
@@ -142,6 +146,13 @@ export class TaskCalendarView extends ItemView {
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
+		this.inboxEl = el(root, "div", "tc-inbox");
+		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
+			items: () => this.data.inbox,
+			showDue: () => false,
+			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
+		});
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon");
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.data.soon,
@@ -149,6 +160,7 @@ export class TaskCalendarView extends ItemView {
 			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
+		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
 			width: () => shownListWidth(this.settings.listShare, root.clientWidth),
@@ -193,8 +205,9 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
 		});
-		this.newTask = new NewTaskButton(root, false, () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
-		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
+		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
+		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
+		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -287,9 +300,14 @@ export class TaskCalendarView extends ItemView {
 		window.clearTimeout(this.switching);
 		root.classList.add("is-switching");
 		this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
-		root.classList.toggle("is-lists", mode === "soon");
+		this.showMode(mode);
 		await this.deps.settings.update({ rightMode: mode });
 		this.render();
+	}
+
+	private showMode(mode: RightMode): void {
+		this.contentEl.classList.toggle("is-lists", mode === "soon");
+		this.contentEl.classList.toggle("is-inbox", mode === "inbox");
 	}
 
 	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
@@ -334,12 +352,14 @@ export class TaskCalendarView extends ItemView {
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
+	/** The two columns the window shows. */
 	private dropTargets(): DropTarget[] {
-		const targets: DropTarget[] = [];
-		if (this.settings.rightMode === "calendar" && this.timelineDrop) targets.push(this.timelineDrop);
-		if (this.settings.rightMode === "soon" && this.soonDrop) targets.push(this.soonDrop);
-		if (this.leftDrop) targets.push(this.leftDrop);
-		return targets;
+		const shown: Record<RightMode, (DropTarget | null)[]> = {
+			calendar: [this.timelineDrop, this.leftDrop],
+			soon: [this.soonDrop, this.leftDrop],
+			inbox: [this.inboxDrop, this.soonDrop],
+		};
+		return shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
@@ -350,8 +370,10 @@ export class TaskCalendarView extends ItemView {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
-			if (drag.from === result.column) return tasks.moveBefore(key, result.before, this.selectedDate);
-			return result.column === "left" ? tasks.moveToList(key, this.selectedDate) : tasks.moveToSoon(key, this.selectedDate);
+			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
+			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
+			if (drag.from === "left") return tasks.moveToSoon(key, this.selectedDate);
+			return tasks.moveToEnd(key, result.column);
 		});
 	}
 
@@ -405,17 +427,18 @@ export class TaskCalendarView extends ItemView {
 		}
 		this.renderPending = false;
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.soonEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
+		if (!this.header || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.list || !this.soonList || !this.inboxList) return;
 		this.fitListWidth();
 		this.header.render();
 		this.list.render();
 		const missing = this.data.missing;
 		root.classList.toggle("is-missing", missing);
-		root.classList.toggle("is-lists", this.settings.rightMode === "soon");
-		for (const part of [this.leftEl, this.soonEl, this.rightEl, this.newTask.el, this.newSoon.el]) part.style.display = missing ? "none" : "";
+		this.showMode(this.settings.rightMode);
+		for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el]) part.style.display = missing ? "none" : "";
 		root.querySelector(".tc-missing")?.remove();
 		if (missing) this.renderMissing(root);
 		this.soonList.render();
+		this.inboxList.render();
 		this.pull?.renderArea();
 		renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		this.timeline.render();

@@ -1,7 +1,10 @@
 import type { TaskItem, TaskKey } from "../../application/contracts";
 import type { Slot } from "../types";
 
-export type DragOrigin = "left" | "soon" | "timeline";
+/** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
+export type ListColumn = "left" | "soon" | "inbox";
+
+export type DragOrigin = ListColumn | "timeline";
 
 export interface DragPayload {
 	readonly item: TaskItem;
@@ -14,7 +17,7 @@ export interface DragPayload {
 
 export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }
-	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: "left" | "soon" }
+	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
 	| { readonly kind: "clearSlot" };
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */

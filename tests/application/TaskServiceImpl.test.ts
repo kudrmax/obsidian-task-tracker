@@ -52,11 +52,11 @@ describe("reading", () => {
 
 describe("writing", () => {
 	it("setStatus done moves the task to Done in one write", async () => {
-		const { store, svc } = setup("## Now\n- [ ] A\n- [ ] B\n\n## Soon\n\n## Done\n");
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n\n## Soon\n\n## Done\n");
 		const view = await svc.dayView(T);
 		await svc.setStatus(view.list[0].key, "done");
 		expect(store.writes).toBe(1);
-		expect(store.text).toBe("## Now\n- [ ] B\n\n## Soon\n\n## Done\n- [x] A\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n\n## Done\n- [x] A\n");
 	});
 
 	it("rejects a stale key and leaves the file alone", async () => {
@@ -75,15 +75,15 @@ describe("writing", () => {
 		const view = await svc.dayView(T);
 		expect(view.list[0].key).toEqual({ section: "now", index: 0, raw: "- [ ] A" });
 		await svc.rename(view.list[0].key, "A2");
-		expect(store.text).toBe("## Now\n- [ ] A2\n\n## Done\n- [x] Old\n\n## Soon\n");
+		expect(store.text).toBe("## Now\n- [ ] A2\n\n## Done\n- [x] Old\n\n## Inbox\n\n## Soon\n");
 	});
 
-	it("adds the missing Now, Soon and Done on first write", async () => {
+	it("adds the missing Inbox, Now, Soon and Done on first write", async () => {
 		const { store, svc } = setup("## Now\n");
 		await svc.createInList(T, "A");
-		expect(store.text).toBe("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+		expect(store.text).toBe("## Now\n- [ ] A\n\n## Inbox\n\n## Soon\n\n## Done\n");
 		await svc.createInSoon("S");
-		expect(store.text).toBe("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n\n## Done\n");
+		expect(store.text).toBe("## Now\n- [ ] A\n\n## Inbox\n\n## Soon\n- [ ] S\n\n## Done\n");
 	});
 
 	it("uses the section names and markers from settings", async () => {
@@ -93,9 +93,9 @@ describe("writing", () => {
 			dueDateMarker: "due:",
 			slotMarker: "at:",
 		});
-		const { store, svc } = setup("## Today\n\n## Next\n\n## Finished\n", settings);
+		const { store, svc } = setup("## In\n\n## Today\n\n## Next\n\n## Finished\n", settings);
 		await svc.createInList(D, "A");
-		expect(store.text).toBe("## Today\n\n## Next\n- [ ] A due: 2026-11-03\n\n## Finished\n");
+		expect(store.text).toBe("## In\n\n## Today\n\n## Next\n- [ ] A due: 2026-11-03\n\n## Finished\n");
 	});
 
 	it("whitespace-only text creates nothing", async () => {
@@ -118,10 +118,10 @@ describe("writing", () => {
 	});
 
 	it("normalizes after every write", async () => {
-		const { store, svc } = setup("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n\n## Done\n");
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n- [ ] S\n\n## Done\n");
 		const soon = await svc.soonView();
 		await svc.setDueDate(soon[0].key, T);
-		expect(store.text).toBe("## Now\n- [ ] S 📅 2026-10-30\n- [ ] A\n\n## Soon\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] S 📅 2026-10-30\n- [ ] A\n\n## Soon\n\n## Done\n");
 	});
 
 	it("moves tasks between the list, Soon and the timeline", async () => {
@@ -147,24 +147,24 @@ describe("writing", () => {
 	});
 
 	it("clearSlot with a place puts the task where it was dropped on the list", async () => {
-		const { store, svc } = setup("## Now\n- [ ] A ⏰ 2026-10-30 10:00\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A ⏰ 2026-10-30 10:00\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");
 		let view = await svc.dayView(T);
 		await svc.clearSlot(view.slotted[0].key, { before: null, date: T });
-		expect(store.text).toBe("## Now\n- [ ] B\n- [ ] C\n- [ ] A\n\n## Soon\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n- [ ] C\n- [ ] A\n\n## Soon\n\n## Done\n");
 		await svc.setSlot((await svc.dayView(T)).list[2].key, { date: T, start: 600, end: null });
 		view = await svc.dayView(T);
 		await svc.clearSlot(view.slotted[0].key, { before: view.list[1].key, date: T });
-		expect(store.text).toBe("## Now\n- [ ] B\n- [ ] A\n- [ ] C\n\n## Soon\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n- [ ] A\n- [ ] C\n\n## Soon\n\n## Done\n");
 	});
 
 	it("normalize writes only when a rule changed something", async () => {
-		const { store, svc } = setup("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
 		await svc.normalize();
 		expect(store.writes).toBe(0);
-		store.text = "## Now\n- [x] A\n\n## Soon\n\n## Done\n";
+		store.text = "## Inbox\n\n## Now\n- [x] A\n\n## Soon\n\n## Done\n";
 		await svc.normalize();
 		expect(store.writes).toBe(1);
-		expect(store.text).toBe("## Now\n\n## Soon\n\n## Done\n- [x] A\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n## Soon\n\n## Done\n- [x] A\n");
 	});
 
 	it("normalize of a missing file does nothing", async () => {
@@ -261,18 +261,57 @@ describe("a day that starts at 4", () => {
 	const settings = () => new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 4 });
 
 	it("at 2 at night today is still the day before", async () => {
-		const store = new InMemoryTaskFileStore("## Now\n\n## Soon\n- [ ] Due 📅 2026-10-31\n");
+		const store = new InMemoryTaskFileStore("## Inbox\n\n## Now\n\n## Soon\n- [ ] Due 📅 2026-10-31\n");
 		const svc = new TaskServiceImpl(store, settings(), night);
 		await svc.createInList(T, "Late");
-		expect(store.text).toBe("## Now\n- [ ] Late\n\n## Soon\n- [ ] Due 📅 2026-10-31\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] Late\n\n## Soon\n- [ ] Due 📅 2026-10-31\n\n## Done\n");
 	});
 
 	it("the day's timeline takes the slots after midnight and a slot there keeps a Now task in Now", async () => {
-		const store = new InMemoryTaskFileStore("## Now\n- [ ] A\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
+		const store = new InMemoryTaskFileStore("## Inbox\n\n## Now\n- [ ] A\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
 		const svc = new TaskServiceImpl(store, settings(), night);
 		const day = await svc.dayView(T);
 		expect(day.slotted.map((i) => i.text)).toEqual(["B"]);
 		await svc.setSlot(day.list[0].key, { date: "2026-10-31", start: 180, end: 300 });
-		expect(store.text).toBe("## Now\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
+	});
+});
+
+describe("Inbox", () => {
+	it("inboxView lists the Inbox tasks with their keys and the Inbox placement", async () => {
+		const { svc } = setup("## Inbox\n- [ ] I\n- [/] J\n\n## Now\n- [ ] A\n\n## Soon\n- [ ] C\n");
+		const inbox = await svc.inboxView();
+		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
+		expect(inbox[1].key).toEqual({ section: "inbox", index: 1, raw: "- [/] J" });
+		expect(svc.placementOf(inbox[0])).toEqual({ kind: "inbox" });
+		expect((await svc.dayView(T)).list.map((i) => i.text)).toEqual(["A"]);
+	});
+
+	it("the Inbox tile creates at the end of Inbox", async () => {
+		const { store, svc } = setup(FULL);
+		await svc.create({ text: "New", placement: { kind: "inbox" } });
+		expect(store.text).toBe("## Inbox\n- [ ] New\n\n## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
+	});
+
+	it("a due date from the menu takes the task out of Inbox", async () => {
+		const { store, svc } = setup("## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n\n## Soon\n- [ ] C\n\n## Done\n");
+		await svc.setDueDate((await svc.inboxView())[0].key, D);
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n- [ ] C\n- [ ] I 📅 2026-11-03\n\n## Done\n");
+	});
+
+	it("moveToEnd drags between Inbox and Soon", async () => {
+		const { store, svc } = setup("## Inbox\n- [ ] I\n\n## Now\n\n## Soon\n- [ ] C\n- [ ] E\n\n## Done\n");
+		await svc.moveToEnd((await svc.inboxView())[0].key, "soon");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n## Soon\n- [ ] C\n- [ ] E\n- [ ] I\n\n## Done\n");
+		await svc.moveToEnd((await svc.soonView())[0].key, "inbox");
+		expect(store.text).toBe("## Inbox\n- [ ] C\n\n## Now\n\n## Soon\n- [ ] E\n- [ ] I\n\n## Done\n");
+		await svc.moveToEnd((await svc.soonView())[0].key, "soon");
+		expect(store.text).toBe("## Inbox\n- [ ] C\n\n## Now\n\n## Soon\n- [ ] I\n- [ ] E\n\n## Done\n");
+	});
+
+	it("adds a missing Inbox heading at the end on the first write", async () => {
+		const { store, svc } = setup("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+		await svc.createInSoon("S");
+		expect(store.text).toBe("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n\n## Done\n\n## Inbox\n");
 	});
 });

@@ -2,6 +2,7 @@ import type { SectionKey, Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {
+	readonly inbox: string;
 	readonly now: string;
 	readonly soon: string;
 	readonly done: string;
@@ -29,7 +30,7 @@ interface Section {
 	readonly endLine: number;
 }
 
-const SECTION_KEYS: readonly SectionKey[] = ["now", "soon", "done"];
+const SECTION_KEYS: readonly SectionKey[] = ["inbox", "now", "soon", "done"];
 const HEADING_RE = /^#{1,6}(\s|$)/;
 const SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
 const INDENT_RE = /^[ \t]*/;
@@ -83,7 +84,7 @@ export class TaskDocument {
 	}
 
 	static empty(all: readonly string[]): string {
-		return TaskDocument.parse("", { now: "", soon: "", done: "" }, { dueDate: "", slot: "" })
+		return TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" })
 			.ensureSections(all)
 			.serialize();
 	}

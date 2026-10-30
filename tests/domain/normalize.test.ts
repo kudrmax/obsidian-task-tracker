@@ -6,7 +6,7 @@ import { TaskDocument } from "../../src/domain/TaskDocument";
 const AT_FOUR = new DayBoundary(4);
 
 const M = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
 const T = "2026-10-30";
 
 function parse(text: string): TaskDocument {
@@ -102,5 +102,28 @@ describe("a day that starts at 4", () => {
 
 	it("keeps a slot after midnight of today and brings its Soon task to Now", () => {
 		expect(normalize(parse("## Now\n\n## Soon\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n"), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n");
+	});
+});
+
+describe("rule 3: a sorted Inbox task leaves Inbox", () => {
+	it("a due date in the future sends it to the end of Soon", () => {
+		expect(normalize(parse("## Inbox\n- [ ] A 📅 2026-11-03\n- [ ] B\n\n## Now\n\n## Soon\n- [ ] S\n"), T).serialize()).toBe("## Inbox\n- [ ] B\n\n## Now\n\n## Soon\n- [ ] S\n- [ ] A 📅 2026-11-03\n");
+	});
+
+	it("a due date today or a slot today ends in Now", () => {
+		expect(normalize(parse("## Inbox\n- [ ] A 📅 2026-10-30\n- [/] B ⏰ 2026-10-30 10:00-11:00\n\n## Now\n- [ ] N\n\n## Soon\n"), T).serialize()).toBe("## Inbox\n\n## Now\n- [ ] A 📅 2026-10-30\n- [/] B ⏰ 2026-10-30 10:00-11:00\n- [ ] N\n\n## Soon\n");
+	});
+
+	it("a task without fields stays, and one whose past slot was erased too", () => {
+		expect(normalize(parse("## Inbox\n- [ ] A\n- [ ] B ⏰ 2026-10-29 10:00-11:00\n\n## Soon\n"), T).serialize()).toBe("## Inbox\n- [ ] A\n- [ ] B\n\n## Soon\n");
+	});
+
+	it("a done or cancelled Inbox task goes to Done", () => {
+		expect(normalize(parse("## Inbox\n- [x] A\n- [ ] B\n- [-] C\n\n## Done\n- [x] Old\n"), T).serialize()).toBe("## Inbox\n- [ ] B\n\n## Done\n- [x] A\n- [-] C\n- [x] Old\n");
+	});
+
+	it("waits while the file has no Soon", () => {
+		const text = "## Inbox\n- [ ] A 📅 2026-11-03\n";
+		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 });

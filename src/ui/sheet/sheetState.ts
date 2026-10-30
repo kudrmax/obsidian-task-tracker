@@ -2,7 +2,7 @@ import type { Placement, TaskDraft } from "../../application/contracts";
 import { dayMonth } from "../dates";
 import type { LocalDate } from "../types";
 
-export type Tile = "soon" | "now" | "date";
+export type Tile = "inbox" | "soon" | "now" | "date";
 
 export interface SheetState {
 	readonly tile: Tile;
@@ -11,6 +11,7 @@ export interface SheetState {
 }
 
 export function tileLabel(placement: Placement, _today: LocalDate): string {
+	if (placement.kind === "inbox") return "Inbox";
 	if (placement.kind === "soon") return "Soon";
 	if (placement.kind === "now") return "Now";
 	return dayMonth(placement.date);
@@ -20,7 +21,7 @@ export function initialState(placement: Placement): SheetState {
 	return { tile: placement.kind, date: placement.kind === "date" ? placement.date : null, pickerOpen: false };
 }
 
-/** A tap on a tile: Soon and Now take it; Date takes it and opens the calendar, again when a day is already chosen. */
+/** A tap on a tile: Inbox, Soon and Now take it; Date takes it and opens the calendar, again when a day is already chosen. */
 export function togglePlacement(state: SheetState, tile: Tile): SheetState {
 	return { ...state, tile, pickerOpen: tile === "date" };
 }

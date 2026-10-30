@@ -5,8 +5,8 @@ import { icon } from "./icons";
 export class NewTaskButton {
 	readonly el: HTMLElement;
 
-	constructor(parent: HTMLElement, soon: boolean, onPress: () => void) {
-		this.el = el(parent, "div", soon ? "tc-new is-soon" : "tc-new");
+	constructor(parent: HTMLElement, column: "now" | "soon" | "inbox", onPress: () => void) {
+		this.el = el(parent, "div", column === "now" ? "tc-new" : `tc-new is-${column}`);
 		const button = el(this.el, "button", "tc-new-btn");
 		button.appendChild(icon("plus"));
 		button.appendChild(document.createTextNode("New task"));
