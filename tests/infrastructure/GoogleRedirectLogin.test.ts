@@ -99,9 +99,10 @@ describe("GoogleRedirectLogin", () => {
 		await expect(first).rejects.toThrow("five minutes");
 		const second = login.login("id");
 		await flush();
+		const replaced = expect(second).rejects.toThrow("newer login");
 		const third = login.login("id");
 		await flush();
-		await expect(second).rejects.toThrow("newer login");
+		await replaced;
 		await login.receive({ code: "c", state: stateOf(opened[2]) });
 		await expect(third).resolves.toBe("r");
 	});
