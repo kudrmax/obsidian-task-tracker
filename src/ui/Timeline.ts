@@ -4,6 +4,7 @@ import type { Theme } from "./eventColors";
 import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
+import { markPriority } from "./TaskCard";
 import { durationParts, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
@@ -342,6 +343,7 @@ export class Timeline {
 	private placeTask(item: TaskItem): PlacedTask {
 		const block = make(this.itemsEl, "div", "tc-block");
 		const card = make(block, "div", "tc-block-card");
+		markPriority(card, item.priority);
 		if (item.status === "inProgress") make(card, "span", "tc-strip");
 		make(card, "div", "tc-card-title", item.text);
 		const meta = make(card, "span", "tc-block-meta is-hidden");

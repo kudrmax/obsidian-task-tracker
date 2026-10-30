@@ -41,3 +41,12 @@ describe("renderTaskCard", () => {
 		expect(card.querySelector(".tc-due")).toBeNull();
 	});
 });
+
+describe("a task's priority", () => {
+	it("marks the card with the level's colour, and a card without one with nothing", () => {
+		const tinted = renderTaskCard(document.createElement("div"), item({ priority: { prefix: "p1", color: "red" } }), { showDue: true });
+		expect(tinted.dataset.priority).toBe("red");
+		expect(tinted.querySelector(".tc-card-title")?.textContent).toBe("Купить билеты в Белград");
+		expect(renderTaskCard(document.createElement("div"), item(), { showDue: true }).hasAttribute("data-priority")).toBe(false);
+	});
+});

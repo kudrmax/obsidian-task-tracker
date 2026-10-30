@@ -1,4 +1,5 @@
 import type { TaskItem } from "../application/contracts";
+import type { PriorityLevel } from "../settings";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
 
@@ -14,6 +15,7 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 }
 
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
+	markPriority(card, item.priority);
 	if (item.status === "inProgress") el(card, "span", "tc-strip");
 	el(card, "div", "tc-card-title", item.text);
 	if (opts.showDue && item.dueDate) {
@@ -21,4 +23,10 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 		el(due, "span", "tc-due-day", dayOfMonth(item.dueDate));
 		el(due, "span", "tc-due-mon", monthAbbreviation(item.dueDate));
 	}
+}
+
+/** Gives a card, or a dot, the colour of a priority level; none takes it away. */
+export function markPriority(node: HTMLElement, level: PriorityLevel | null): void {
+	if (level) node.dataset.priority = level.color;
+	else delete node.dataset.priority;
 }
