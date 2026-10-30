@@ -417,7 +417,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 
 /* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
 /* The scroll box starts a label's lift above the first line, so the hour at its top keeps its whole label, as on the board. */
-.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+/* It ends level with the bottom of the New task button, above Obsidian's phone navigation, so the whole day fits at the smallest zoom. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
 .tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: calc(var(--tc-hour) * var(--tc-day-hours)); }
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
