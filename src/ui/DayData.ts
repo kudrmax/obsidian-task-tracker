@@ -59,10 +59,14 @@ export class DayData {
 		return this.missing ? [] : this.dayEvents.statuses;
 	}
 
-	/** The view opens: the events last fetched for the day at once, both parts afresh. */
+	/**
+	 * The view opens: resolves once the tasks are read, with the events last fetched for the day. The fresh events are
+	 * fetched in the background and redraw when they come: the phone keeps Obsidian's splash until the view has opened.
+	 */
 	load(): Promise<void> {
 		this.showCached(this.dayEvents);
-		return this.fetchBoth();
+		void this.calendars();
+		return this.tasks();
 	}
 
 	/** The tasks file read afresh: after a change to it. */

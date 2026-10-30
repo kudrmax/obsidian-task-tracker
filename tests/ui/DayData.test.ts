@@ -57,6 +57,8 @@ function setup(tasks: TaskService = new DemoTaskService({ now: () => new Date(20
 }
 
 const titles = (data: DayData) => data.events.map((e) => e.title);
+/** Lets an answered fetch reach the screen. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("DayData", () => {
 	it("shows a change to the tasks without asking the calendars", async () => {
@@ -98,12 +100,33 @@ describe("DayData", () => {
 		expect(titles(data)).toEqual([`on ${TODAY}`]);
 	});
 
+	it("opens without waiting for the network: the tasks and the events last fetched at once, the fresh events later", async () => {
+		const { data, calendars, updates } = setup();
+		calendars.last.set(TODAY, { events: [event("kept")], statuses: [] });
+		await data.load();
+		expect(data.day!.date).toBe(TODAY);
+		expect(titles(data)).toEqual(["kept"]);
+		const shown = updates();
+		calendars.answer();
+		await settled();
+		expect(titles(data)).toEqual([`on ${TODAY}`]);
+		expect(updates()).toBe(shown + 1);
+	});
+
+	it("opens with no events when none were ever fetched for the day", async () => {
+		const { data } = setup();
+		await data.load();
+		expect(data.day!.date).toBe(TODAY);
+		expect(titles(data)).toEqual([]);
+	});
+
 	it("shows nothing of a missing file, and no events or statuses with it", async () => {
 		const missing = { normalize: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
 		const { data, calendars } = setup(missing);
 		const opened = data.load();
 		calendars.answer();
 		await opened;
+		await settled();
 		expect(data.missing).toBe(true);
 		expect(data.day).toBeNull();
 		expect(data.soon).toEqual([]);
