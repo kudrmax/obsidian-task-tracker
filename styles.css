@@ -120,6 +120,8 @@ body {
 	--tc-new-h: calc(var(--tc-card-h) + 2 * var(--tc-space-8));
 	--tc-float-w: 190px;
 	--tc-float-h: 42px;
+	/* Pressed, a card shows its whole title: the copy over the menu grows past its column up to this far from the window's edges, then wraps. */
+	--tc-whole-margin: 10px;
 
 	/* Sizes: the task menu, its due submenu and the month picker */
 	--tc-backdrop-blur: 8px;
@@ -491,6 +493,15 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
+/* The whole title of a pressed card: past its column (the card under the finger keeps its width), on as many lines as it takes, its first line where it stood. */
+.tc-float.is-whole, .tc-lifted.is-whole { align-items: flex-start; }
+.tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); }
+.tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.tc-float.is-whole { padding-top: calc((var(--tc-float-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-float-h) - var(--tc-leading-card)) / 2); }
+.tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
+.is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); -webkit-mask-image: none; mask-image: none; }
+.tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.tc-float.is-whole .tc-due { margin-top: calc((var(--tc-float-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-float-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }

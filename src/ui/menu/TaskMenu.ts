@@ -3,6 +3,7 @@ import { dayMonth } from "../dates";
 import { DURATION, tokenMs, tokenPx } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard } from "../TaskCard";
+import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { Backdrop } from "./Backdrop";
 import { dueOptions } from "./dueOptions";
@@ -39,7 +40,7 @@ export interface MenuActions {
 
 export interface TaskMenuContext {
 	readonly item: TaskItem;
-	/** The card or block tapped; a copy of it stays, unchanged, over the backdrop. */
+	/** The card or block tapped; a copy of it stays over the backdrop, grown only to show a title the card cuts. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
 	readonly actions: MenuActions;
@@ -61,20 +62,27 @@ export class TaskMenu {
 
 	private constructor(private readonly context: TaskMenuContext) {
 		this.backdrop = new Backdrop(() => this.close());
-		this.anchor = context.source.getBoundingClientRect();
 		this.lifted = el(document.body, "div", "tc-lifted");
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { showDue: true });
-		this.lifted.style.left = px(this.anchor.left);
-		this.lifted.style.top = px(this.anchor.top);
-		this.lifted.style.width = px(this.anchor.width);
-		this.lifted.style.height = px(this.anchor.height);
+		this.anchor = this.liftWhole(context.source.getBoundingClientRect());
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = el(document.body, "div", "tc-panel");
 		this.showMenu();
 		requestAnimationFrame(() => this.panel.classList.add("is-shown"));
+	}
+
+	/** The copy stands where the card does; a title the card cuts grows it past the column, kept inside the window, and the panel goes by the copy. */
+	private liftWhole(card: DOMRect): DOMRect {
+		const room = windowRoom(this.lifted);
+		const size = showWhole(this.lifted, card, roomWidth(room));
+		const left = grownStart(card.left, card.width, size.width, room.width, room.margin);
+		const top = grownStart(card.top, card.height, size.height, room.height, room.margin);
+		this.lifted.style.left = px(left);
+		this.lifted.style.top = px(top);
+		return new DOMRect(left, top, size.width, size.height);
 	}
 
 	private place(): void {
