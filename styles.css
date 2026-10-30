@@ -159,7 +159,7 @@ body {
 	--tc-level-prefix-w: 56px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
-	--tc-swatch-halo: var(--background-primary);
+	--tc-swatch-halo: var(--setting-items-background);
 	--tc-stroke-check: 2.4px;
 	--tc-month-btn: 32px;
 	--tc-month-icon: 18px;
@@ -619,12 +619,12 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-level-pill[data-priority].is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
 .tc-level-pill-dot { width: var(--tc-dot-menu); height: var(--tc-dot-menu); }
 
-.tc-level-setting .setting-item-info { display: none; }
-.tc-level-setting .setting-item-control { flex: 1; justify-content: flex-start; gap: var(--tc-space-12); }
-.tc-level-setting .tc-level-prefix { width: var(--tc-level-prefix-w); }
+/* A level stays one row on the phone too, where Obsidian stacks a setting's parts. */
+.setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-12); }
+.tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; }
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); margin-right: auto; }
-.tc-level-setting .tc-swatch, .tc-level-setting .tc-swatch:hover { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); box-shadow: none; cursor: pointer; }
-.tc-level-setting .tc-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
+.tc-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); cursor: pointer; }
+.tc-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
 .tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
 

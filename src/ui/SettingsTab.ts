@@ -1,4 +1,4 @@
-import { Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
 import { type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
@@ -67,18 +67,16 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el).setName("Priorities").setHeading();
 		const levels = this.settings.priorities;
 		levels.forEach((level, index) => {
-			const row = new Setting(el).setClass("tc-level-setting");
-			row.addText((t) => {
-				t.inputEl.addClass("tc-level-prefix");
-				t.setValue(level.prefix).onChange((prefix) => this.plugin.update({ priorities: this.levelsWith(index, { prefix: prefix.trim() }) }));
-			});
-			const swatches = row.controlEl.createDiv("tc-swatches");
+			const row = el.createDiv("setting-item tc-level-row");
+			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => this.plugin.update({ priorities: this.levelsWith(index, { prefix: value.trim() }) }));
+			prefix.inputEl.addClass("tc-level-prefix");
+			const swatches = row.createDiv("tc-swatches");
 			for (const color of PRIORITY_COLORS) {
-				const swatch = swatches.createEl("button", { cls: "tc-swatch", attr: { "aria-label": color, "data-priority": color } });
+				const swatch = swatches.createDiv({ cls: "tc-swatch", attr: { role: "button", tabindex: "0", "aria-label": color, "data-priority": color } });
 				swatch.toggleClass("is-on", color === level.color);
 				swatch.addEventListener("click", () => void this.updateLevels(this.levelsWith(index, { color })));
 			}
-			row.addExtraButton((b) => b.setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.updateLevels(levels.filter((_, i) => i !== index))));
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.updateLevels(levels.filter((_, i) => i !== index)));
 		});
 		new Setting(el)
 			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
