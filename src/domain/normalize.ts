@@ -6,11 +6,21 @@ function isOpen(task: Task): boolean {
 	return task.status === "todo" || task.status === "inProgress";
 }
 
+/** A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. */
 function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	for (;;) {
 		const entry = doc.allTasks().find((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
+		if (!entry?.task.slot) return doc;
+		doc = doc.replace(entry, { ...entry.task, slot: null, dueDate: entry.task.dueDate ?? boundary.dayOfSlot(entry.task.slot) });
+	}
+}
+
+/** What was left undone stays for today: a past due date becomes today's. */
+function pastDatesToToday(doc: TaskDocument, today: LocalDate): TaskDocument {
+	for (;;) {
+		const entry = doc.allTasks().find((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
 		if (!entry) return doc;
-		doc = doc.replace(entry, { ...entry.task, slot: null });
+		doc = doc.replace(entry, { ...entry.task, dueDate: today });
 	}
 }
 
@@ -53,6 +63,6 @@ function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): T
 }
 
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
-	const result = dueToNow(datedOutOfInbox(closedToDone(erasePastSlots(doc, today, boundary))), today, boundary);
+	const result = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary);
 	return result.serialize() === doc.serialize() ? doc : result;
 }

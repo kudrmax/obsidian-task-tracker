@@ -6,7 +6,7 @@ import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
-import type { Slot } from "../types";
+import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DragOrigin, DragPayload, DropTarget, PlacedResult } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
@@ -15,6 +15,8 @@ import { snapMinutes } from "./snap";
 
 export interface DragControllerDeps {
 	longPressMs(): number;
+	/** The day on screen: the card under the finger leaves out a due date on it, as the list does. */
+	day(): LocalDate;
 	step(): number;
 	timeline(): Timeline | null;
 	targets(): readonly DropTarget[];
@@ -178,7 +180,7 @@ export class DragController {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top });
+		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
 		source.classList.add("is-lifted");

@@ -12,7 +12,8 @@ function listed(doc: TaskDocument): readonly TaskEntry[] {
 	return [...doc.tasks("now"), ...doc.tasks("soon")];
 }
 
-export function listOn(doc: TaskDocument, date: LocalDate, today: LocalDate, boundary = DayBoundary.MIDNIGHT): readonly TaskEntry[] {
+/** The Day column: today it is Now, another day D the tasks of Now and Soon due on D. Slotted ones are on the timeline. */
+export function dayList(doc: TaskDocument, date: LocalDate, today: LocalDate, boundary = DayBoundary.MIDNIGHT): readonly TaskEntry[] {
 	const shown = (e: TaskEntry): boolean =>
 		date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
 	return listed(doc).filter((e) => shown(e) && !slottedOnDate(e, date, boundary));
@@ -27,7 +28,8 @@ export function openSlotted(doc: TaskDocument): readonly TaskEntry[] {
 	return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
 }
 
-export function soonList(doc: TaskDocument): readonly TaskEntry[] {
+/** The Soon column: Soon is everything not for today, and the column shows the part of it without a date. */
+export function soonWithoutDate(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
 }
 

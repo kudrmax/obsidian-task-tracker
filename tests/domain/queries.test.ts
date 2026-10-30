@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxList, listOn, openSlotted, slottedOn, soonList, toItem } from "../../src/domain/queries";
+import { inboxList, dayList, openSlotted, slottedOn, soonWithoutDate, toItem } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -31,17 +31,17 @@ const TEXT = [
 const doc = TaskDocument.parse(TEXT, SECTIONS, M);
 const texts = (entries: readonly { task: { text: string } }[]) => entries.map((e) => e.task.text);
 
-describe("listOn", () => {
+describe("dayList", () => {
 	it("today: Now without a slot on today, then Soon due today", () => {
-		expect(texts(listOn(doc, T, T))).toEqual(["Plain", "Slotted tomorrow", "Due D", "Due D slotted D", "Soon due today"]);
+		expect(texts(dayList(doc, T, T))).toEqual(["Plain", "Slotted tomorrow", "Due D", "Due D slotted D", "Soon due today"]);
 	});
 
 	it("another day: Now and Soon due that day without a slot on it", () => {
-		expect(texts(listOn(doc, D, T))).toEqual(["Due D", "Soon due D", "Soon due D slotted today"]);
+		expect(texts(dayList(doc, D, T))).toEqual(["Due D", "Soon due D", "Soon due D slotted today"]);
 	});
 
 	it("a day with nothing due is empty", () => {
-		expect(listOn(doc, "2026-12-01", T)).toEqual([]);
+		expect(dayList(doc, "2026-12-01", T)).toEqual([]);
 	});
 });
 
@@ -64,9 +64,9 @@ describe("openSlotted", () => {
 	});
 });
 
-describe("soonList", () => {
+describe("soonWithoutDate", () => {
 	it("lists Soon tasks without a due date and without a slot", () => {
-		expect(texts(soonList(doc))).toEqual(["Soon plain"]);
+		expect(texts(soonWithoutDate(doc))).toEqual(["Soon plain"]);
 	});
 });
 
@@ -93,7 +93,7 @@ describe("a day that starts at 4", () => {
 	});
 
 	it("the list leaves out what the timeline shows", () => {
-		expect(texts(listOn(night, T, T, atFour))).toEqual(["Early", "Plain"]);
+		expect(texts(dayList(night, T, T, atFour))).toEqual(["Early", "Plain"]);
 	});
 });
 
@@ -105,8 +105,8 @@ describe("inboxList", () => {
 	});
 
 	it("keeps Inbox out of the day's list, Soon and the timeline", () => {
-		expect(texts(listOn(withInbox, T, T))).toEqual(["N"]);
-		expect(texts(soonList(withInbox))).toEqual(["S"]);
+		expect(texts(dayList(withInbox, T, T))).toEqual(["N"]);
+		expect(texts(soonWithoutDate(withInbox))).toEqual(["S"]);
 	});
 });
 

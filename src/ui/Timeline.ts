@@ -289,7 +289,6 @@ export class Timeline {
 			const box = boxes[i];
 			this.placeBox(task.el, box.top, box.height, box.left);
 			task.el.classList.toggle("is-over", box.overlay);
-			task.el.classList.toggle("is-late", this.isLate(task.item));
 			this.fillMeta(task, spans[i], box.stacked, box.hiddenDuration);
 			bottom = Math.max(bottom, box.top + box.height);
 		});
@@ -322,12 +321,6 @@ export class Timeline {
 		return this.deps.date() === this.deps.today() ? this.deps.boundary().offsetOf(this.deps.date(), this.deps.now()) : null;
 	}
 
-	/** Not begun though its time has passed: the card is ringed in the now line's colour and keeps its time on the right. */
-	private isLate(item: TaskItem): boolean {
-		const now = this.nowMinutes();
-		return now !== null && item.status === "todo" && this.spanOf(item.slot!).start < now;
-	}
-
 	private placeBox(el: HTMLElement, top: number, height: number, left: number): void {
 		el.style.setProperty(PROPERTY.y, px(top));
 		el.style.setProperty(PROPERTY.length, px(height));
@@ -335,12 +328,12 @@ export class Timeline {
 	}
 
 	/**
-	 * On the right, a late or a stacked card shows the time it is put on in the file, a card shorter than its duration the
-	 * duration; a stretched one shows none, its pill instead.
+	 * On the right, a stacked card shows the time it is put on in the file, a card shorter than its duration the duration;
+	 * a stretched one shows neither, its pill instead.
 	 */
 	private fillMeta(task: PlacedTask, span: TaskSpan, stacked: boolean, hiddenDuration: boolean): void {
 		const stretching = this.stretch?.el === task.el;
-		const parts = stretching ? null : this.isLate(task.item) || stacked ? timeParts(task.item.slot!.start) : hiddenDuration && span.end !== null ? durationParts(span.end - span.start) : null;
+		const parts = stretching ? null : stacked ? timeParts(task.item.slot!.start) : hiddenDuration && span.end !== null ? durationParts(span.end - span.start) : null;
 		task.meta.classList.toggle("is-hidden", parts === null);
 		const [top, bottom] = task.meta.children;
 		top.textContent = parts?.[0] ?? "";

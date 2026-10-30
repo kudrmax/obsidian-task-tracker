@@ -114,7 +114,7 @@ export class DemoTaskService implements TaskService {
 		return { date, list, slotted: all.filter(slottedOn) };
 	}
 
-	async soonView(): Promise<readonly TaskItem[]> {
+	async soonWithoutDateView(): Promise<readonly TaskItem[]> {
 		return this.items("soon").filter((t) => !t.dueDate && !t.slot);
 	}
 
@@ -124,8 +124,7 @@ export class DemoTaskService implements TaskService {
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
 		if (!text.trim()) return;
-		if (date === this.today()) this.sections.now.push(task(text.trim()));
-		else this.sections.soon.push(task(text.trim(), { dueDate: date }));
+		this.sections[date === this.today() ? "now" : "soon"].push(task(text.trim(), { dueDate: date }));
 		this.changed();
 	}
 
@@ -142,6 +141,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	placementOf(item: TaskItem): Placement {
+		if (item.dueDate === this.today()) return { kind: "now" };
 		if (item.dueDate) return { kind: "date", date: item.dueDate };
 		if (item.key.section === "inbox") return { kind: "inbox" };
 		return { kind: item.key.section === "soon" ? "soon" : "now" };
@@ -152,7 +152,7 @@ export class DemoTaskService implements TaskService {
 			t.dueDate = placement.date;
 			this.sections[placement.date <= this.today() ? "now" : "soon"].push(t);
 		} else {
-			t.dueDate = null;
+			t.dueDate = placement.kind === "now" ? this.today() : null;
 			if (placement.kind === "inbox") t.slot = null;
 			this.sections[placement.kind].push(t);
 		}
@@ -231,14 +231,14 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async moveToList(key: TaskKey, date: LocalDate): Promise<void> {
+		this.find(key).dueDate = date;
 		if (date === this.today()) this.sections.now.push(this.take(key));
-		else this.find(key).dueDate = date;
 		this.changed();
 	}
 
 	async moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
+		this.find(key).dueDate = null;
 		if (date === this.today()) this.sections.soon.push(this.take(key));
-		else this.find(key).dueDate = null;
 		this.changed();
 	}
 

@@ -59,16 +59,22 @@ body {
 	/* Priority levels: a dot of the colour itself, and a card's ground: the colour 26 % over the card. */
 	--tc-priority-red: #FF453A;
 	--tc-priority-red-card: #572725;
+	--tc-priority-red-meta: #D89A97;
 	--tc-priority-orange: #FF9F0A;
 	--tc-priority-orange-card: #573E19;
+	--tc-priority-orange-meta: #D8B785;
 	--tc-priority-yellow: #FFD60A;
 	--tc-priority-yellow-card: #574C19;
+	--tc-priority-yellow-meta: #D8CB86;
 	--tc-priority-green: #30D158;
 	--tc-priority-green-card: #214B2D;
+	--tc-priority-green-meta: #91C9A0;
 	--tc-priority-teal: #40C8E0;
 	--tc-priority-teal-card: #254950;
+	--tc-priority-teal-meta: #97C5D0;
 	--tc-priority-blue: #0A84FF;
 	--tc-priority-blue-card: #173759;
+	--tc-priority-blue-meta: #83AEDA;
 
 	/* Shape */
 	--tc-radius-card: 12px;
@@ -366,16 +372,22 @@ body.theme-light {
 	--tc-gap-ink: #E5E5EA;
 	--tc-priority-red: #FF3B30;
 	--tc-priority-red-card: #F4D5D7;
+	--tc-priority-red-meta: #C36261;
 	--tc-priority-orange: #FF9500;
 	--tc-priority-orange-card: #F4E3CF;
+	--tc-priority-orange-meta: #AA7D40;
 	--tc-priority-yellow: #FFCC00;
 	--tc-priority-yellow-card: #F4ECCF;
+	--tc-priority-yellow-meta: #9D893A;
 	--tc-priority-green: #34C759;
 	--tc-priority-green-card: #D4EBDE;
+	--tc-priority-green-meta: #549266;
 	--tc-priority-teal: #30B0C7;
 	--tc-priority-teal-card: #D3E7EF;
+	--tc-priority-teal-meta: #548C99;
 	--tc-priority-blue: #007AFF;
 	--tc-priority-blue-card: #CBDFF8;
+	--tc-priority-blue-meta: #4682C7;
 }
 
 /* The view fills its leaf and draws everything itself. */
@@ -531,9 +543,6 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 .tc-block.is-over .tc-block-card { box-shadow: 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
-.tc-block.is-late .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-now); }
-.tc-block.is-over.is-late .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-now), 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
-.tc-block.is-late .tc-block-meta { color: var(--tc-now); }
 .tc-block.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
 .tc-block.is-over.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent), 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
 .tc-block-meta { width: var(--tc-meta-w); flex-shrink: 0; margin-top: calc(-1 * var(--tc-meta-lift)); display: flex; flex-direction: column; align-items: center; font-size: var(--tc-font-meta); line-height: var(--tc-leading-meta); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
@@ -579,13 +588,14 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-lifted.is-block > .tc-block { top: 0; left: 0; right: 0; height: 100%; }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. */
-[data-priority="red"] { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); }
-[data-priority="orange"] { --tc-priority-ink: var(--tc-priority-orange); --tc-priority-fill: var(--tc-priority-orange-card); }
-[data-priority="yellow"] { --tc-priority-ink: var(--tc-priority-yellow); --tc-priority-fill: var(--tc-priority-yellow-card); }
-[data-priority="green"] { --tc-priority-ink: var(--tc-priority-green); --tc-priority-fill: var(--tc-priority-green-card); }
-[data-priority="teal"] { --tc-priority-ink: var(--tc-priority-teal); --tc-priority-fill: var(--tc-priority-teal-card); }
-[data-priority="blue"] { --tc-priority-ink: var(--tc-priority-blue); --tc-priority-fill: var(--tc-priority-blue-card); }
+[data-priority="red"] { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); --tc-priority-meta: var(--tc-priority-red-meta); }
+[data-priority="orange"] { --tc-priority-ink: var(--tc-priority-orange); --tc-priority-fill: var(--tc-priority-orange-card); --tc-priority-meta: var(--tc-priority-orange-meta); }
+[data-priority="yellow"] { --tc-priority-ink: var(--tc-priority-yellow); --tc-priority-fill: var(--tc-priority-yellow-card); --tc-priority-meta: var(--tc-priority-yellow-meta); }
+[data-priority="green"] { --tc-priority-ink: var(--tc-priority-green); --tc-priority-fill: var(--tc-priority-green-card); --tc-priority-meta: var(--tc-priority-green-meta); }
+[data-priority="teal"] { --tc-priority-ink: var(--tc-priority-teal); --tc-priority-fill: var(--tc-priority-teal-card); --tc-priority-meta: var(--tc-priority-teal-meta); }
+[data-priority="blue"] { --tc-priority-ink: var(--tc-priority-blue); --tc-priority-fill: var(--tc-priority-blue-card); --tc-priority-meta: var(--tc-priority-blue-meta); }
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
+.tc-block-card[data-priority] .tc-block-meta { color: var(--tc-priority-meta); }
 .tc-priority-dot { flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }

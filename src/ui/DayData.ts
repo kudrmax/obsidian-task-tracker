@@ -97,7 +97,7 @@ export class DayData {
 		const tasks = this.deps.tasks;
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonView(), tasks.inboxView()]);
+			const [day, soon, inbox] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonWithoutDateView(), tasks.inboxView()]);
 			return { day, soon, inbox, missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return MISSING;
