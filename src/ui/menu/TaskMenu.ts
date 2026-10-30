@@ -39,13 +39,13 @@ export interface MenuActions {
 
 export interface TaskMenuContext {
 	readonly item: TaskItem;
-	/** The card or block pressed; a copy of it stays lifted over the backdrop. */
+	/** The card or block tapped; a copy of it stays, unchanged, over the backdrop. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
 	readonly actions: MenuActions;
 }
 
-/** The task menu over a blurred screen: the pressed card lifted, the panel under it, the due submenu and the month picker in its place. */
+/** The task menu over a blurred screen: the tapped card stays as it is above the blur, the panel grows out under it; the due submenu and the month picker take its place. */
 export class TaskMenu {
 	private readonly backdrop: Backdrop;
 	private readonly lifted: HTMLElement;
@@ -72,10 +72,7 @@ export class TaskMenu {
 		this.lifted.style.height = px(this.anchor.height);
 		this.panel = el(document.body, "div", "tc-panel");
 		this.showMenu();
-		requestAnimationFrame(() => {
-			this.lifted.classList.add("is-shown");
-			this.panel.classList.add("is-shown");
-		});
+		requestAnimationFrame(() => this.panel.classList.add("is-shown"));
 	}
 
 	private place(): void {
@@ -142,7 +139,7 @@ export class TaskMenu {
 		if (this.closed) return;
 		this.closed = true;
 		this.backdrop.el.classList.remove("is-shown");
-		this.lifted.classList.remove("is-shown");
+		this.panel.classList.add("is-closing");
 		this.panel.classList.remove("is-shown");
 		window.setTimeout(() => {
 			this.backdrop.remove();

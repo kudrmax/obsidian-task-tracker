@@ -62,8 +62,9 @@ export class Timeline {
 
 	/** Lays out at the current hour's height, then scrolls so that `minutes` stays under `clientY`. */
 	zoomTo(minutes: number, clientY: number): void {
+		const origin = this.el.getBoundingClientRect().top + this.canvas.offsetTop;
 		this.layout();
-		this.el.scrollTop = this.el.getBoundingClientRect().top + this.canvas.offsetTop + this.yOf(minutes) - clientY;
+		this.el.scrollTop = origin + this.yOf(minutes) - clientY;
 	}
 
 	/** Puts the minute at `fraction` of the visible height. */

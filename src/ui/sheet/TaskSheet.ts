@@ -1,6 +1,6 @@
 import type { TaskDraft } from "../../application/contracts";
 import { formatTime } from "../dates";
-import { DURATION, tokenMs } from "../design";
+import { DURATION, PROPERTY, tokenMs } from "../design";
 import { el, px } from "../dom";
 import { MonthPicker } from "../menu/MonthPicker";
 import type { LocalDate, Slot } from "../types";
@@ -16,6 +16,9 @@ export interface TaskSheetOptions {
 	onClose?(): void;
 }
 
+/** How tall the keyboard was the last time it shrank the view: the next screen leaves that room from its first frame. */
+let rememberedKeyboard = 0;
+
 /** The task screen over the whole view: the title to type, the three tiles, the calendar under them, Cancel and Add. */
 export class TaskSheet {
 	readonly el: HTMLElement;
@@ -27,6 +30,9 @@ export class TaskSheet {
 	/** What stands centred in the body; it slides when the body's height changes. */
 	private readonly content: HTMLElement;
 	private contentTop = 0;
+	private openHeight = 0;
+	/** Whether the keyboard has shrunk the view since this screen opened; once it leaves, the content takes the whole height. */
+	private keyboardSeen = false;
 	private picker: MonthPicker | null = null;
 	private closed = false;
 
@@ -37,6 +43,7 @@ export class TaskSheet {
 	private constructor(root: HTMLElement, private readonly opts: TaskSheetOptions) {
 		this.state = initialState(opts.initial.placement);
 		this.el = el(root, "div", "tc-sheet");
+		this.el.style.setProperty(PROPERTY.keyboard, px(rememberedKeyboard));
 		const bar = el(this.el, "div", "tc-sheet-bar");
 		const cancel = el(bar, "button", "tc-sheet-cancel", "Cancel");
 		cancel.addEventListener("click", () => this.close());
@@ -56,11 +63,41 @@ export class TaskSheet {
 			time.appendChild(sheetIcon("clock"));
 			time.appendChild(document.createTextNode(`${formatTime(opts.slot.start)}–${formatTime(opts.slot.end)}`));
 		}
+		this.body.addEventListener("pointerdown", (e) => this.keepKeyboard(e));
+		this.body.addEventListener("click", (e) => this.refocus(e));
 		this.render();
 		this.focusEnd();
+		this.openHeight = this.el.clientHeight;
 		this.contentTop = this.content.offsetTop;
-		new ResizeObserver(() => this.slideContent()).observe(this.body);
+		new ResizeObserver(() => this.fitKeyboard()).observe(this.el);
 		requestAnimationFrame(() => this.el.classList.add("is-shown"));
+	}
+
+	/** A tap on a tile or the calendar changes the task, not the focus: the keyboard stays. */
+	private keepKeyboard(e: PointerEvent): void {
+		if (!(e.target as Element).closest(".tc-sheet-title")) e.preventDefault();
+	}
+
+	/** A tap on the empty part of the screen brings the caret, and the keyboard, back to the title. */
+	private refocus(e: MouseEvent): void {
+		if ((e.target as Element).closest(".tc-tile, .tc-picker, .tc-sheet-title")) return;
+		this.focusEnd();
+	}
+
+	/**
+	 * The host shrinks the view when the keyboard opens: the room reserved for it gives way by as much, so the content
+	 * stays put; what is left over slides. The height is remembered for the next screen.
+	 */
+	private fitKeyboard(): void {
+		if (this.closed || this.el.clientHeight === 0) return;
+		const shrink = Math.max(0, this.openHeight - this.el.clientHeight);
+		if (shrink > 0) {
+			this.keyboardSeen = true;
+			rememberedKeyboard = Math.max(rememberedKeyboard, shrink);
+			this.el.style.setProperty(PROPERTY.keyboard, px(Math.max(0, rememberedKeyboard - shrink)));
+		} else if (this.keyboardSeen) this.el.style.setProperty(PROPERTY.keyboard, px(0));
+		this.el.parentElement?.scrollTo(0, 0);
+		this.slideContent();
 	}
 
 	/** The keyboard shrinks the view in one step: the content slides to its new centre instead of jumping there. */
@@ -77,7 +114,8 @@ export class TaskSheet {
 	}
 
 	private focusEnd(): void {
-		this.title.focus();
+		this.title.focus({ preventScroll: true });
+		this.el.parentElement?.scrollTo(0, 0);
 		const range = document.createRange();
 		range.selectNodeContents(this.title);
 		range.collapse(false);

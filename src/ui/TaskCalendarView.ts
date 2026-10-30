@@ -175,7 +175,7 @@ export class TaskCalendarView extends ItemView {
 		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
 		this.unsubscribe = this.deps.tasks.onChange(() => void this.refresh());
 		this.registerDomEvent(root, "touchmove", (e) => {
-			if (this.arbiter.busy) e.preventDefault();
+			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
 			e.stopPropagation();
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
@@ -243,11 +243,14 @@ export class TaskCalendarView extends ItemView {
 		await this.refresh();
 	}
 
+	/** Each finger reports its moves on its own; the timeline is laid out once per frame for the latest scale. */
 	private zoom(hourPx: number, anchor: ZoomAnchor): void {
 		if (this.zoomFrame) cancelAnimationFrame(this.zoomFrame);
-		this.zoomFrame = 0;
-		this.hourPx = hourPx;
-		this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
+		this.zoomFrame = requestAnimationFrame(() => {
+			this.zoomFrame = 0;
+			this.hourPx = hourPx;
+			this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
+		});
 	}
 
 	/** Released, the scale glides to the nearest level. */

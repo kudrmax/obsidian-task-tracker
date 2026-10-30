@@ -45,7 +45,6 @@ body {
 	--tc-backdrop: rgba(0, 0, 0, 0.55);
 	--tc-panel-bg: rgba(44, 44, 46, 0.96);
 	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-	--tc-lifted-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 	/* A source gone stale, and its dot. */
 	--tc-stale: #FF9F0A;
 	--tc-popover-bg: rgba(44, 44, 46, 0.97);
@@ -121,7 +120,9 @@ body {
 
 	/* Sizes: the task menu, its due submenu and the month picker */
 	--tc-backdrop-blur: 8px;
-	--tc-lifted-scale: 1.04;
+	/* The menu panel grows out from the card it belongs to. */
+	--tc-menu-scale: 0.94;
+	--tc-menu-rise: 8px;
 	--tc-menu-gap: 12px;
 	--tc-panel-w: 250px;
 	--tc-picker-w: 300px;
@@ -262,6 +263,7 @@ body {
 	/* Motion: a lifted card closes its place and the list closes over it; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 	--tc-duration-collapse: 150ms;
+	--tc-duration-menu: 200ms;
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
 	--tc-duration-pull: 200ms;
@@ -298,7 +300,6 @@ body.theme-light {
 	--tc-backdrop: rgba(0, 0, 0, 0.22);
 	--tc-panel-bg: rgba(250, 250, 252, 0.97);
 	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
-	--tc-lifted-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 	--tc-stale: #FF9500;
 	--tc-popover-bg: rgba(250, 250, 252, 0.97);
 	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
@@ -310,7 +311,7 @@ body.theme-light {
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
 body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); }
-.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.task-calendar { position: relative; height: 100%; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
 .task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active { background: transparent; box-shadow: none; }
@@ -437,15 +438,14 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
-.tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-lifted-shadow); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; transition: transform var(--tc-duration-collapse) var(--tc-ease-out); }
-.tc-lifted.is-shown { transform: scale(var(--tc-lifted-scale)); }
-.tc-lifted .tc-due-mon { color: var(--tc-float-month); }
-.tc-lifted.is-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring), var(--tc-lifted-shadow); padding: var(--tc-space-4) var(--tc-space-6); align-items: flex-start; }
+.tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
+.tc-lifted.is-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring); padding: var(--tc-space-4) var(--tc-space-6); align-items: flex-start; }
 .tc-lifted.is-block .tc-item-title { color: var(--tc-text); }
-.tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
-.tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
-.tc-panel.is-shown { opacity: 1; }
+.tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }
+.tc-panel.is-shown { opacity: 1; transform: none; }
+.tc-panel.is-closing { transition-duration: var(--tc-duration-collapse); }
 .tc-panel.is-picker { width: var(--tc-picker-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
 .tc-panel button, .tc-picker button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .tc-menu-group + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }

@@ -59,6 +59,8 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How far the timeline is pulled down from its top. */
 	pull: "--tc-pull",
+	/** The keyboard's height reserved under the task screen's content before the host shrinks the view for it. */
+	keyboard: "--tc-keyboard",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
