@@ -39,7 +39,7 @@ body{margin:0;background:#000}
 <div style="position: absolute; left: {{now.left}}px; top: 166px; bottom: 0; width: {{now.width}}px; padding: {{now.pad}}; box-sizing: border-box; overflow: hidden;">
 <div style="margin-top: -{{listScroll}}px; display: flex; flex-direction: column; gap: 6px;">
 <sc-for list="{{tasks}}" as="t" hint-placeholder-count="7">
-<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{t.bg}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
 <sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
 <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
 </sc-if>
@@ -56,7 +56,7 @@ body{margin:0;background:#000}
 <div style="position: absolute; left: {{inboxPanel.left}}px; top: 166px; bottom: 0; width: {{inboxPanel.width}}px; padding: 0 2px 0 10px; box-sizing: border-box; overflow: hidden;">
 <div style="margin-top: -0px; display: flex; flex-direction: column; gap: 6px;">
 <sc-for list="{{inbox}}" as="t" hint-placeholder-count="6">
-<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{t.bg}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
 <sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
 <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
 </sc-if>
@@ -71,7 +71,7 @@ body{margin:0;background:#000}
 <div style="position: absolute; left: {{soonPanel.left}}px; top: 166px; bottom: 0; width: {{soonPanel.width}}px; padding: {{soonPanel.pad}}; box-sizing: border-box; overflow: hidden;">
 <div style="margin-top: -{{soonScroll}}px; display: flex; flex-direction: column; gap: 6px;">
 <sc-for list="{{soon}}" as="t" hint-placeholder-count="8">
-<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{c.card}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
+<div style="position: relative; overflow: hidden; height: 40px; box-sizing: border-box; background: {{t.bg}}; border-radius: 12px; padding: 0 8px 0 12px; display: flex; align-items: center;">
 <sc-if value="{{t.progress}}" hint-placeholder-val="{{false}}">
 <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
 </sc-if>
@@ -130,7 +130,7 @@ body{margin:0;background:#000}
 
 <sc-for list="{{cards}}" as="k" hint-placeholder-count="0">
 <sc-if value="{{k.isTask}}" hint-placeholder-val="{{true}}">
-<div style="position: absolute; top: {{k.top}}px; height: {{k.height}}px; {{k.x}} box-sizing: border-box; overflow: hidden; border-radius: 12px; background: {{c.card}}; box-shadow: {{k.ring}}; padding: {{k.pad}}; display: flex; align-items: flex-start; gap: 6px; z-index: 2;">
+<div style="position: absolute; top: {{k.top}}px; height: {{k.height}}px; {{k.x}} box-sizing: border-box; overflow: hidden; border-radius: 12px; background: {{k.bg}}; box-shadow: {{k.ring}}; padding: {{k.pad}}; display: flex; align-items: flex-start; gap: 6px; z-index: 2;">
 <sc-if value="{{k.progress}}" hint-placeholder-val="{{false}}">
 <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
 </sc-if>
@@ -202,7 +202,7 @@ body{margin:0;background:#000}
 </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon","inbox"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon","inbox"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"priorities":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   themes() {
     return {
@@ -218,6 +218,14 @@ class Component extends DCLogic {
           google: { bg: 'rgba(255,159,10,0.22)', bar: '#FF9F0A', text: '#FFC56B' },
           pink: { bg: 'rgba(255,55,95,0.22)', bar: '#FF375F', text: '#FF9AAE' },
           green: { bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0' }
+        },
+        priority: {
+          red: { dot: '#FF453A', card: '#572725' },
+          orange: { dot: '#FF9F0A', card: '#573E19' },
+          yellow: { dot: '#FFD60A', card: '#574C19' },
+          green: { dot: '#30D158', card: '#214B2D' },
+          teal: { dot: '#40C8E0', card: '#254950' },
+          blue: { dot: '#0A84FF', card: '#173759' }
         }
       },
       light: {
@@ -232,6 +240,14 @@ class Component extends DCLogic {
           google: { bg: 'rgba(255,149,0,0.16)', bar: '#FF9500', text: '#9A5300' },
           pink: { bg: 'rgba(255,45,85,0.13)', bar: '#FF2D55', text: '#B8173C' },
           green: { bg: 'rgba(52,199,89,0.16)', bar: '#34C759', text: '#1F7A35' }
+        },
+        priority: {
+          red: { dot: '#FF3B30', card: '#F4D5D7' },
+          orange: { dot: '#FF9500', card: '#F4E3CF' },
+          yellow: { dot: '#FFCC00', card: '#F4ECCF' },
+          green: { dot: '#34C759', card: '#D4EBDE' },
+          teal: { dot: '#30B0C7', card: '#D3E7EF' },
+          blue: { dot: '#007AFF', card: '#CBDFF8' }
         }
       }
     };
@@ -245,16 +261,19 @@ class Component extends DCLogic {
     const newSlot = this.props.newSlot === true || this.props.newSlot === 'true';
     const light = this.props.theme === 'light';
     const c = this.themes()[light ? 'light' : 'dark'];
+    const priorities = this.props.priorities === true || this.props.priorities === 'true';
+    const LEVELS = { p1: 'red', p2: 'orange' };
+    const cardBg = (p) => (priorities && p ? c.priority[LEVELS[p]].card : c.card);
     const soon = [
-      { title: 'Продлить страховку' },
+      { title: 'Продлить страховку', p: 'p1' },
       { title: 'Купить подарок Ане' },
-      { title: 'Разобрать фото с поездки', progress: true },
+      { title: 'Разобрать фото с поездки', progress: true, p: 'p2' },
       { title: 'Записаться к стоматологу' },
       { title: 'Починить велосипед' },
       { title: 'Прочитать Deep Work' },
       { title: 'Заменить фильтр для воды' },
       { title: 'Настроить бэкап ноутбука' }
-    ].map((t) => ({ ...t, progress: !!t.progress }));
+    ].map((t) => ({ ...t, progress: !!t.progress, bg: cardBg(t.p) }));
     const inbox = [
       { title: 'Узнать про курсы итальянского' },
       { title: 'Идея подарка на Новый год' },
@@ -262,7 +281,7 @@ class Component extends DCLogic {
       { title: 'Посмотреть «Дюну 2»' },
       { title: 'Почитать про налоговое резидентство' },
       { title: 'Сменить тариф мобильной связи' }
-    ];
+    ].map((t) => ({ ...t, bg: cardBg(t.p) }));
     const accent = light ? c.accent : (this.props.accent ?? '#9580FF');
     const cardMode = (this.props.taskStyle ?? 'card') !== 'event';
     const scenario = cardMode ? (this.props.scenario ?? 'day') : 'day';
@@ -277,16 +296,16 @@ class Component extends DCLogic {
     const palette = c.events;
     const stripColor = light ? c.strip : (this.props.stripColor ?? '#8A6CEF');
     const tasks = [
-      { title: 'Созвониться с врачом' },
+      { title: 'Созвониться с врачом', p: 'p1' },
       { title: 'Купить билеты в Белград', day: '3', mon: 'NOV', dragged: true },
-      { title: 'Сдать налоговую декларацию', day: '30', mon: 'OCT' },
+      { title: 'Сдать налоговую декларацию', day: '30', mon: 'OCT', p: 'p1' },
       { title: 'Записаться в барбершоп', progress: true, day: '2', mon: 'NOV' },
-      { title: 'Посмотреть доклад про local-first приложения', progress: true },
+      { title: 'Посмотреть доклад про local-first приложения', progress: true, p: 'p2' },
       { title: 'Чай масала' },
       { title: 'Позвонить маме' }
     ]
       .filter((t) => !(dragging && t.dragged))
-      .map((t) => ({ ...t, progress: !!t.progress, showDue: !!t.day && (isSoon ? SCREEN_HALF : listW) >= DUE_MIN_WIDTH }));
+      .map((t) => ({ ...t, progress: !!t.progress, bg: cardBg(t.p), showDue: !!t.day && (isSoon ? SCREEN_HALF : listW) >= DUE_MIN_WIDTH }));
     const raw = [
       { kind: 'event', title: 'Стендап', s: 9, e: 9.25, cal: 'work' },
       { kind: 'event', title: '1:1 с Костей', s: 10, e: 11, cal: 'work' },
@@ -306,8 +325,8 @@ class Component extends DCLogic {
     const durationParts = (h) => (h >= 1 ? [h % 1 ? Math.floor(h) + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0') : String(h), 'H'] : [String(Math.round(h * 60)), 'MIN']);
     const TASK_SETS = {
       day: [
-        { title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true },
-        { title: 'Разобрать почту', s: 14 },
+        { title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true, p: 'p2' },
+        { title: 'Разобрать почту', s: 14, p: 'p1' },
         { title: 'Подготовить вопросы к планированию', s: 16 },
         { title: 'Заказать продукты', s: 17 }
       ],
@@ -364,6 +383,7 @@ class Component extends DCLogic {
       const meta = t.drop ? fmt(t.s) : '';
       cards.push({
         title: t.title,
+        bg: cardBg(t.p),
         isTask: !t.drop,
         isDrop: !!t.drop,
         progress: !!t.progress,

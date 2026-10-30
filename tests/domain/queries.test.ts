@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxList, listOn, slottedOn, soonList, toItem } from "../../src/domain/queries";
+import { inboxList, listOn, openSlotted, slottedOn, soonList, toItem } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -53,6 +53,17 @@ describe("slottedOn", () => {
 	});
 });
 
+describe("openSlotted", () => {
+	it("every unfinished task with a slot in Now and Soon, whatever the day", () => {
+		expect(texts(openSlotted(doc))).toEqual(["Slotted today", "Slotted tomorrow", "Due D slotted D", "Soon slotted D", "Soon due D slotted today"]);
+	});
+
+	it("skips a finished one still waiting for the rules to move it to Done", () => {
+		const finished = TaskDocument.parse(["## Now", "- [x] Done ⏰ 2026-10-30 10:00", "- [-] Cancelled ⏰ 2026-10-30 11:00", "- [ ] Open ⏰ 2026-10-30 12:00"].join("\n"), SECTIONS, M);
+		expect(texts(openSlotted(finished))).toEqual(["Open"]);
+	});
+});
+
 describe("soonList", () => {
 	it("lists Soon tasks without a due date and without a slot", () => {
 		expect(texts(soonList(doc))).toEqual(["Soon plain"]);
@@ -67,6 +78,7 @@ describe("toItem", () => {
 			status: "inProgress",
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
+			priority: null,
 		});
 	});
 });
@@ -95,5 +107,16 @@ describe("inboxList", () => {
 	it("keeps Inbox out of the day's list, Soon and the timeline", () => {
 		expect(texts(listOn(withInbox, T, T))).toEqual(["N"]);
 		expect(texts(soonList(withInbox))).toEqual(["S"]);
+	});
+});
+
+describe("toItem with priority levels", () => {
+	const RED = { prefix: "p1", color: "red" } as const;
+	const levelOf = (prefix: string) => (prefix === "p1" ? RED : null);
+
+	it("gives the level of the task's prefix, none without one", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] p1 A\n- [ ] B\n", SECTIONS, { ...M, priorities: ["p1"] });
+		expect(toItem(d.tasks("now")[0], levelOf)).toMatchObject({ text: "A", priority: RED });
+		expect(toItem(d.tasks("now")[1], levelOf).priority).toBeNull();
 	});
 });

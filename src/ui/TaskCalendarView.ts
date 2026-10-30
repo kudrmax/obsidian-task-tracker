@@ -1,7 +1,7 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type RightMode } from "../settings";
+import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
@@ -39,6 +39,8 @@ export interface ViewDeps {
 	readonly calendars: CalendarService;
 	readonly settings: SettingsStore;
 	readonly clock: Clock;
+	/** Asks the phone for fresh work calendar events; a refresh the user asks for runs it before reading the sources. */
+	exportWorkCalendar(): void;
 }
 
 /**
@@ -66,6 +68,8 @@ export class TaskCalendarView extends ItemView {
 	private renderPending = false;
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
+	/** The levels the tasks were last read with: other levels colour them anew. */
+	private priorities: readonly PriorityLevel[];
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -85,6 +89,7 @@ export class TaskCalendarView extends ItemView {
 	) {
 		super(leaf);
 		this.dayStartHour = this.settings.dayStartHour;
+		this.priorities = this.settings.priorities;
 		this.selectedDate = this.today();
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: () => this.render() });
 		this.polling = new CalendarPolling({
@@ -194,7 +199,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			statuses: () => this.data.statuses,
 			now: () => this.deps.clock.now(),
-			onRefresh: () => this.polling.refresh(),
+			onRefresh: () => this.refreshNow(),
 		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
@@ -261,6 +266,10 @@ export class TaskCalendarView extends ItemView {
 
 	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. */
 	private onSettings(): void {
+		if (!sameLevels(this.settings.priorities, this.priorities)) {
+			this.priorities = this.settings.priorities;
+			void this.data.tasks();
+		}
 		if (this.settings.dayStartHour === this.dayStartHour) return;
 		this.dayStartHour = this.settings.dayStartHour;
 		this.scrolledFor = null;
@@ -378,16 +387,22 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private showSources(anchor: HTMLElement): void {
-		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.polling.refresh() });
+		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.refreshNow() });
+	}
+
+	private refreshNow(): Promise<void> {
+		this.deps.exportWorkCalendar();
+		return this.polling.refresh();
 	}
 
 	/** The task screen for a new task; with a slot, from a long tap on the timeline. */
 	newTaskSheet(placement: Placement, slot: Slot | null): void {
 		TaskSheet.open(this.contentEl, {
 			mode: "new",
-			initial: { text: "", placement },
+			initial: { text: "", placement, priority: null },
 			slot,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
 			onClose: () => this.timelineDrop?.clear(),
 		});
@@ -396,9 +411,10 @@ export class TaskCalendarView extends ItemView {
 	private editSheet(item: TaskItem): void {
 		TaskSheet.open(this.contentEl, {
 			mode: "edit",
-			initial: { text: item.text, placement: this.deps.tasks.placementOf(item) },
+			initial: { text: item.text, placement: this.deps.tasks.placementOf(item), priority: item.priority?.prefix ?? null },
 			slot: item.slot,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
 		});
 	}
@@ -410,9 +426,11 @@ export class TaskCalendarView extends ItemView {
 			source,
 			lifted,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => tasks.setDueDate(item.key, date)),
+				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: () => this.editSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},

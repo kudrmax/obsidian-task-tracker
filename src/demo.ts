@@ -8,6 +8,6 @@ import type { ViewDeps } from "./ui/TaskCalendarView";
 export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 	protected override createDeps(): ViewDeps {
 		const clock = new FixedClock(DEMO_NOW);
-		return { tasks: new DemoTaskService(clock), calendars: new DemoCalendarService(), settings: this, clock };
+		return { tasks: new DemoTaskService(clock), calendars: new DemoCalendarService(), settings: this, clock, exportWorkCalendar: () => undefined };
 	}
 }

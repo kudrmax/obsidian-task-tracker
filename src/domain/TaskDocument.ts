@@ -2,7 +2,8 @@ import type { SectionKey, Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {
-	readonly inbox: string;
+	/** Left out by a reader Inbox means nothing to: the phone's reminders, Inbox tasks having no slot. */
+	readonly inbox?: string;
 	readonly now: string;
 	readonly soon: string;
 	readonly done: string;
@@ -45,6 +46,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.statusChar === b.statusChar &&
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
+		a.priority === b.priority &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&

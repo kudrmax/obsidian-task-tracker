@@ -25,6 +25,8 @@ export interface Task {
 	readonly text: string;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** The prefix of a priority level, the first word of the line's text; null without one. */
+	readonly priority: string | null;
 	/** Nested lines (deeper indent than the task), raw, in file order. They travel with the task. */
 	readonly children: readonly string[];
 }

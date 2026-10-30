@@ -4,7 +4,7 @@ import * as ops from "../domain/operations";
 import { inboxList, listOn, slottedOn, soonList, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
-import type { TaskCalendarSettings } from "../settings";
+import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
 	StaleTaskError,
 	TasksFileMissingError,
@@ -41,17 +41,18 @@ export class TaskServiceImpl implements TaskService {
 
 	async dayView(date: LocalDate): Promise<DayView> {
 		const { doc, today, boundary } = await this.readNormalized();
-		return { date, list: listOn(doc, date, today, boundary).map(toItem), slotted: slottedOn(doc, date, boundary).map(toItem) };
+		const item = this.itemOf();
+		return { date, list: listOn(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
 	}
 
 	async soonView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
-		return soonList(doc).map(toItem);
+		return soonList(doc).map(this.itemOf());
 	}
 
 	async inboxView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
-		return inboxList(doc).map(toItem);
+		return inboxList(doc).map(this.itemOf());
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -91,6 +92,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async setDueDate(key: TaskKey, date: LocalDate | null): Promise<void> {
 		await this.mutate((doc) => ops.setDueDate(doc, this.entryOf(doc, key), date));
+	}
+
+	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
+		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
 	}
 
 	async rename(key: TaskKey, text: string): Promise<void> {
@@ -187,7 +192,20 @@ export class TaskServiceImpl implements TaskService {
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
 		const s = settings.sections;
-		return TaskDocument.parse(text, { inbox: s.inbox, now: s.now, soon: s.soon, done: s.done }, { dueDate: settings.dueDateMarker, slot: settings.slotMarker });
+		return TaskDocument.parse(
+			text,
+			{ inbox: s.inbox, now: s.now, soon: s.soon, done: s.done },
+			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
+		);
+	}
+
+	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
+		return usableLevels(settings.priorities);
+	}
+
+	private itemOf(): (entry: TaskEntry) => TaskItem {
+		const levels = this.levels(this.settings.get());
+		return (entry) => toItem(entry, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
 	}
 
 	private entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {

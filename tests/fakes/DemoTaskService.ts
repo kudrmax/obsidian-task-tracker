@@ -1,5 +1,6 @@
 import { type DayView, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
+import { DEFAULT_SETTINGS } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
 interface DemoTask {
@@ -7,12 +8,13 @@ interface DemoTask {
 	status: TaskStatus;
 	dueDate: LocalDate | null;
 	slot: Slot | null;
+	priority: string | null;
 }
 
 const DEMO_DATE = "2026-10-30";
 const STATUS_CHAR: Record<TaskStatus, string> = { todo: " ", inProgress: "/", done: "x", cancelled: "-" };
 
-const task = (text: string, extra: Partial<DemoTask> = {}): DemoTask => ({ text, status: "todo", dueDate: null, slot: null, ...extra });
+const task = (text: string, extra: Partial<DemoTask> = {}): DemoTask => ({ text, status: "todo", dueDate: null, slot: null, priority: null, ...extra });
 const slot = (start: number, end: number | null = null): Slot => ({ date: DEMO_DATE, start: start * 60, end: end === null ? null : end * 60 });
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -75,12 +77,12 @@ export class DemoTaskService implements TaskService {
 	private raw(t: DemoTask): string {
 		const due = t.dueDate ? ` 📅 ${t.dueDate}` : "";
 		const s = t.slot ? ` ⏰ ${t.slot.date} ${time(t.slot.start)}${t.slot.end === null ? "" : `-${time(t.slot.end)}`}` : "";
-		return `- [${STATUS_CHAR[t.status]}] ${t.text}${due}${s}`;
+		return `- [${STATUS_CHAR[t.status]}] ${t.priority ? `${t.priority} ` : ""}${t.text}${due}${s}`;
 	}
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
-		return { key: { section, index, raw: this.raw(t) }, text: t.text, status: t.status, dueDate: t.dueDate, slot: t.slot };
+		return { key: { section, index, raw: this.raw(t) }, text: t.text, status: t.status, dueDate: t.dueDate, slot: t.slot, priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null };
 	}
 
 	private items(section: SectionKey): TaskItem[] {
@@ -158,13 +160,14 @@ export class DemoTaskService implements TaskService {
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
 		if (!draft.text.trim()) return;
-		this.place(task(draft.text.trim(), { slot: slot ?? null }), draft.placement);
+		this.place(task(draft.text.trim(), { slot: slot ?? null, priority: draft.priority }), draft.placement);
 		this.changed();
 	}
 
 	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
 		const t = this.find(key);
 		t.text = draft.text.trim() || t.text;
+		t.priority = draft.priority;
 		const current = this.placementOf(this.item(key.section, key.index));
 		if (JSON.stringify(current) !== JSON.stringify(draft.placement)) this.place(this.take(key), draft.placement);
 		this.changed();
@@ -181,6 +184,11 @@ export class DemoTaskService implements TaskService {
 
 	async setDueDate(key: TaskKey, date: LocalDate | null): Promise<void> {
 		this.find(key).dueDate = date;
+		this.changed();
+	}
+
+	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
+		this.find(key).priority = priority;
 		this.changed();
 	}
 

@@ -81,7 +81,7 @@ const plugin = "app.plugins.plugins['task-calendar']";
 const type = (text) => send("Input.insertText", { text });
 
 async function reload() {
-	await evaluate(`(async () => { await app.plugins.disablePlugin('task-calendar'); await app.plugins.enablePlugin('task-calendar'); await app.commands.executeCommandById('task-calendar:open'); await new Promise(r => setTimeout(r, 800)); await ${plugin}.update({ listWidth: 187, rightMode: 'calendar', dayStartHour: 0 }); ${view}.render(); ${view}.timeline.scrollTo(540, 0); return 'ok'; })()`);
+	await evaluate(`(async () => { await app.plugins.disablePlugin('task-calendar'); await app.plugins.enablePlugin('task-calendar'); await app.commands.executeCommandById('task-calendar:open'); await new Promise(r => setTimeout(r, 800)); await ${plugin}.update({ listShare: 0.5, rightMode: 'calendar', dayStartHour: 0 }); ${view}.render(); ${view}.timeline.scrollTo(540, 0); return 'ok'; })()`);
 	await sleep(300);
 }
 const toNine = () => evaluate(`${view}.timeline.scrollTo(540, 0); 'ok'`);
@@ -91,7 +91,7 @@ const cancelSheet = () => clickSelector(".tc-sheet-cancel");
  * Halfway frames of the slide from Soon and Now to Now and the calendar: the boards mix the two layouts by the eased
  * share, so the transitions are paused at the time ease-in-out reaches it (a third: 119.6 of 300 ms, two thirds: 178.5).
  */
-const slideTo = (ms) => evaluate(`(async () => { const v = ${view}; const toggle = v.header.switcher; await ${plugin}.update({ rightMode: 'soon' }); v.render(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); toggle.el.click(); await new Promise(r => requestAnimationFrame(r)); window.clearTimeout(v.switching); window.clearTimeout(toggle.settling); for (const a of document.getAnimations()) { a.pause(); a.currentTime = ${ms}; } return document.getAnimations().length; })()`);
+const slideTo = (ms) => evaluate(`(async () => { const v = ${view}; const toggle = v.header.switcher; await ${plugin}.update({ rightMode: 'soon' }); v.render(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); toggle.el.querySelector('[data-column=calendar]').click(); await new Promise(r => requestAnimationFrame(r)); window.clearTimeout(v.switching); window.clearTimeout(toggle.settling); for (const a of document.getAnimations()) { a.pause(); a.currentTime = ${ms}; } return document.getAnimations().length; })()`);
 const endSlide = () => evaluate(`(async () => { for (const a of document.getAnimations()) a.finish(); ${view}.contentEl.classList.remove('is-switching'); ${view}.header.switcher.el.classList.remove('is-settling'); await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`);
 const closeOverlay = () => click(200, 700);
 
@@ -133,8 +133,8 @@ const SHEET = { dy: 114, region: [0, 108, 780, 980] };
 
 const STATES = [
 	{ board: "Screen", frame: SCREEN, run: async () => {} },
-	{ board: "ScreenLeft", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ listWidth: 130 }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ listWidth: 187 }); ${view}.render(); })()`) },
-	{ board: "ScreenRight", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ listWidth: 250 }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ listWidth: 187 }); ${view}.render(); })()`) },
+	{ board: "ScreenLeft", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ listShare: 130 / 374 }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ listShare: 0.5 }); ${view}.render(); })()`) },
+	{ board: "ScreenRight", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ listShare: 250 / 374 }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ listShare: 0.5 }); ${view}.render(); })()`) },
 	{
 		board: "ScreenDrag", frame: SCREEN,
 		// Card 2 by a mouse, carried to the timeline so the target lands on 16:30; the shot while the button is down.
@@ -157,16 +157,18 @@ const STATES = [
 		},
 	},
 	{ board: "ScreenSoon", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'soon' }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`) },
+	{ board: "ScreenInbox", frame: SCREEN, run: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'inbox' }); ${view}.render(); })()`), after: () => evaluate(`(async () => { await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`) },
 	{ board: "ScreenSwitch1", frame: SCREEN, run: () => slideTo(119.6), after: endSlide },
 	{ board: "ScreenSwitch2", frame: SCREEN, run: () => slideTo(178.5), after: endSlide },
 	{ board: "ScreenMenu", frame: SCREEN, run: () => click(100, 241, "right"), after: closeOverlay },
 	{ board: "ScreenDue", frame: SCREEN, run: async () => { await click(100, 241, "right"); await clickSelector(".tc-menu-row", "Due date"); }, after: closeOverlay },
 	{ board: "ScreenPicker", frame: SCREEN, run: async () => { await click(100, 241, "right"); await clickSelector(".tc-menu-row", "Due date"); await clickSelector(".tc-menu-row", "Pick a date"); }, after: closeOverlay },
-	{ board: "ScreenSheet", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon) .tc-new-btn"); await keyboard(); await type("Позвонить в банк"); }, after: cancelSheet },
+	{ board: "ScreenSheet", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon):not(.is-inbox) .tc-new-btn"); await keyboard(); await type("Позвонить в банк"); }, after: cancelSheet },
 	{ board: "ScreenSheetSlot", frame: SHEET, run: async () => { await evaluate(`${view}.newTaskSheet({ kind: 'now' }, { date: '2026-10-30', start: 990, end: 1050 }); 'ok'`); await keyboard(); await type("Позвонить в банк"); }, after: cancelSheet },
+	{ board: "ScreenSheetInbox", frame: SHEET, run: async () => { await evaluate(`${view}.newTaskSheet({ kind: 'inbox' }, null); 'ok'`); await keyboard(); await type("Узнать про курсы итальянского"); }, after: cancelSheet },
 	{ board: "ScreenSheetEdit", frame: SHEET, run: async () => { await click(100, 333, "right"); await clickSelector(".tc-menu-row", "Rename"); await keyboard(); }, after: cancelSheet },
-	{ board: "ScreenSheetPicker", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon) .tc-new-btn"); await keyboard(); await type("Позвонить в банк"); await clickSelector(".tc-tile", "", 2); await clickSelector(".tc-picker-next"); await clickSelector(".tc-day:not(.is-other)", "3"); await clickSelector(".tc-tile", "", 2); }, after: cancelSheet },
-	{ board: "ScreenSheetLong", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon) .tc-new-btn"); await keyboard(); await type("Позвонить в банк и узнать, почему списали комиссию за обслуживание карты"); }, after: cancelSheet },
+	{ board: "ScreenSheetPicker", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon):not(.is-inbox) .tc-new-btn"); await keyboard(); await type("Позвонить в банк"); await clickSelector(".tc-tile", "", 3); await clickSelector(".tc-picker-next"); await clickSelector(".tc-day:not(.is-other)", "3"); await clickSelector(".tc-tile", "", 3); }, after: cancelSheet },
+	{ board: "ScreenSheetLong", frame: SHEET, run: async () => { await clickSelector(".tc-new:not(.is-soon):not(.is-inbox) .tc-new-btn"); await keyboard(); await type("Позвонить в банк и узнать, почему списали комиссию за обслуживание карты"); }, after: cancelSheet },
 	{ board: "ScreenSourcesDot", frame: SCREEN, run: async () => {} },
 	{ board: "ScreenSourcesPopover", frame: SCREEN, run: () => hold(357, 145), after: closeOverlay },
 	{
@@ -210,7 +212,7 @@ const STATES = [
 
 /** The light boards show the same states on Obsidian's light theme: the class on body switches the tokens, the view redraws its event colours. */
 const setTheme = (name) => evaluate(`(() => { document.body.classList.toggle('theme-light', ${name === "light"}); document.body.classList.toggle('theme-dark', ${name === "dark"}); ${view}.render(); return 'ok'; })()`);
-const LIGHT = { ScreenLight: "Screen", ScreenLightSoon: "ScreenSoon", ScreenLightDrag: "ScreenDrag", ScreenLightMenu: "ScreenMenu", ScreenLightDue: "ScreenDue", ScreenLightPicker: "ScreenPicker", ScreenLightSheet: "ScreenSheet", ScreenLightSheetPicker: "ScreenSheetPicker", ScreenLightSources: "ScreenSourcesPopover" };
+const LIGHT = { ScreenLight: "Screen", ScreenLightSoon: "ScreenSoon", ScreenLightInbox: "ScreenInbox", ScreenLightDrag: "ScreenDrag", ScreenLightMenu: "ScreenMenu", ScreenLightDue: "ScreenDue", ScreenLightPicker: "ScreenPicker", ScreenLightSheet: "ScreenSheet", ScreenLightSheetPicker: "ScreenSheetPicker", ScreenLightSources: "ScreenSourcesPopover" };
 for (const [board, dark] of Object.entries(LIGHT)) {
 	const base = STATES.find((s) => s.board === dark);
 	STATES.push({

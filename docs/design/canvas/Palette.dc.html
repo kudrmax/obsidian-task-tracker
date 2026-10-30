@@ -54,6 +54,19 @@ body{margin:0;background:#000}
 </div>
 
 <div style="display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: {{th.c.muted}};">Приоритеты: карточка и точка</h3>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{th.priorities}}" as="p" hint-placeholder-count="6">
+<div style="height: 40px; box-sizing: border-box; border-radius: 12px; background: {{p.card}}; padding: 0 10px 0 12px; display: flex; align-items: center; gap: 8px;">
+<span style="width: 10px; height: 10px; flex-shrink: 0; border-radius: 5px; background: {{p.dot}};"></span>
+<span style="flex: 1; min-width: 0; font-size: 15px;">{{p.name}}</span>
+<code style="font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: {{th.c.muted}};">{{p.card}}</code>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
 <h3 style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: {{th.c.muted}};">Элементы</h3>
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; align-items: center;">
 
@@ -110,6 +123,14 @@ class Component extends DCLogic {
           { name: 'Google', bg: 'rgba(255,159,10,0.22)', bar: '#FF9F0A', text: '#FFC56B' },
           { name: 'Розовый', bg: 'rgba(255,55,95,0.22)', bar: '#FF375F', text: '#FF9AAE' },
           { name: 'Зелёный', bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0' }
+        ],
+        priorities: [
+          { name: 'Red', dot: '#FF453A', card: '#572725' },
+          { name: 'Orange', dot: '#FF9F0A', card: '#573E19' },
+          { name: 'Yellow', dot: '#FFD60A', card: '#574C19' },
+          { name: 'Green', dot: '#30D158', card: '#214B2D' },
+          { name: 'Teal', dot: '#40C8E0', card: '#254950' },
+          { name: 'Blue', dot: '#0A84FF', card: '#173759' }
         ]
       },
       light: {
@@ -122,6 +143,14 @@ class Component extends DCLogic {
           { name: 'Google', bg: 'rgba(255,149,0,0.16)', bar: '#FF9500', text: '#9A5300' },
           { name: 'Розовый', bg: 'rgba(255,45,85,0.13)', bar: '#FF2D55', text: '#B8173C' },
           { name: 'Зелёный', bg: 'rgba(52,199,89,0.16)', bar: '#34C759', text: '#1F7A35' }
+        ],
+        priorities: [
+          { name: 'Red', dot: '#FF3B30', card: '#F4D5D7' },
+          { name: 'Orange', dot: '#FF9500', card: '#F4E3CF' },
+          { name: 'Yellow', dot: '#FFCC00', card: '#F4ECCF' },
+          { name: 'Green', dot: '#34C759', card: '#D4EBDE' },
+          { name: 'Teal', dot: '#30B0C7', card: '#D3E7EF' },
+          { name: 'Blue', dot: '#007AFF', card: '#CBDFF8' }
         ]
       }
     };
@@ -151,8 +180,8 @@ class Component extends DCLogic {
     ];
     return {
       themes: [
-        { name: 'Тёмная', basis: 'iOS dark, Obsidian dark', c: T.dark, groups: groups(T.dark, 'Перетаскивание, меню'), events: T.dark.events },
-        { name: 'Светлая', basis: 'iOS light, Obsidian light', c: T.light, groups: groups(T.light, 'Белая с тенью'), events: T.light.events }
+        { name: 'Тёмная', basis: 'iOS dark, Obsidian dark', c: T.dark, groups: groups(T.dark, 'Перетаскивание, меню'), events: T.dark.events, priorities: T.dark.priorities },
+        { name: 'Светлая', basis: 'iOS light, Obsidian light', c: T.light, groups: groups(T.light, 'Белая с тенью'), events: T.light.events, priorities: T.light.priorities }
       ]
     };
   }

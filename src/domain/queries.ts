@@ -1,4 +1,5 @@
 import type { TaskItem } from "../application/contracts";
+import type { PriorityLevel } from "../settings";
 import { DayBoundary } from "./DayBoundary";
 import type { LocalDate } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
@@ -21,6 +22,11 @@ export function slottedOn(doc: TaskDocument, date: LocalDate, boundary = DayBoun
 	return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
 }
 
+/** Unfinished tasks of Now and Soon that are put on a time, on any day. */
+export function openSlotted(doc: TaskDocument): readonly TaskEntry[] {
+	return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
+}
+
 export function soonList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
 }
@@ -29,12 +35,13 @@ export function inboxList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("inbox");
 }
 
-export function toItem(entry: TaskEntry): TaskItem {
+export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null): TaskItem {
 	return {
 		key: { section: entry.section, index: entry.index, raw: entry.raw },
 		text: entry.task.text,
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
+		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 	};
 }

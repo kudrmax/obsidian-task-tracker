@@ -183,41 +183,41 @@ describe("writing", () => {
 describe("the task sheet", () => {
 	it("create places by the tile and keeps a slot", async () => {
 		const { store, svc } = setup(FULL);
-		await svc.create({ text: "S", placement: { kind: "soon" } });
-		await svc.create({ text: "N", placement: { kind: "now" } });
-		await svc.create({ text: "D", placement: { kind: "date", date: D } }, { date: D, start: 600, end: 660 });
-		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" } });
+		await svc.create({ text: "S", placement: { kind: "soon" }, priority: null });
+		await svc.create({ text: "N", placement: { kind: "now" }, priority: null });
+		await svc.create({ text: "D", placement: { kind: "date", date: D }, priority: null }, { date: D, start: 600, end: 660 });
+		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" }, priority: null });
 		expect(store.writes).toBe(4);
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] N\n- [ ] P 📅 2026-10-01\n\n## Soon\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 ⏰ 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("create with blank text writes nothing", async () => {
 		const { store, svc } = setup(FULL);
-		await svc.create({ text: " ", placement: { kind: "now" } });
+		await svc.create({ text: " ", placement: { kind: "now" }, priority: null });
 		expect(store.writes).toBe(0);
 	});
 
 	it("edit with the same placement only renames in place", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "A2", placement: { kind: "now" } });
+		await svc.edit(view.list[0].key, { text: "A2", placement: { kind: "now" }, priority: null });
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A2\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("edit with another placement moves the task", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "A", placement: { kind: "soon" } });
+		await svc.edit(view.list[0].key, { text: "A", placement: { kind: "soon" }, priority: null });
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("edit with blank text writes nothing and a stale key is rejected", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "", placement: { kind: "soon" } });
+		await svc.edit(view.list[0].key, { text: "", placement: { kind: "soon" }, priority: null });
 		expect(store.writes).toBe(0);
 		store.text = "## Now\n- [ ] Changed\n";
-		await expect(svc.edit(view.list[0].key, { text: "X", placement: { kind: "soon" } })).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.edit(view.list[0].key, { text: "X", placement: { kind: "soon" }, priority: null })).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe("## Now\n- [ ] Changed\n");
 	});
 
@@ -289,7 +289,7 @@ describe("Inbox", () => {
 
 	it("the Inbox tile creates at the end of Inbox", async () => {
 		const { store, svc } = setup(FULL);
-		await svc.create({ text: "New", placement: { kind: "inbox" } });
+		await svc.create({ text: "New", placement: { kind: "inbox" }, priority: null });
 		expect(store.text).toBe("## Inbox\n- [ ] New\n\n## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
 	});
 
@@ -313,5 +313,43 @@ describe("Inbox", () => {
 		const { store, svc } = setup("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
 		await svc.createInSoon("S");
 		expect(store.text).toBe("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n\n## Done\n\n## Inbox\n");
+	});
+});
+
+describe("priority", () => {
+	const withLevels = (priorities: typeof DEFAULT_SETTINGS.priorities) => new FakeSettingsStore({ ...DEFAULT_SETTINGS, priorities });
+
+	it("gives an item its level and the text without the prefix", async () => {
+		const { svc } = setup("## Now\n- [ ] p1 A\n- [ ] B\n");
+		const view = await svc.dayView(T);
+		expect(view.list[0]).toMatchObject({ text: "A", priority: { prefix: "p1", color: "red" } });
+		expect(view.list[1].priority).toBeNull();
+	});
+
+	it("setPriority writes the prefix, null takes it off", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] p1 A\n\n## Soon\n\n## Done\n");
+		await svc.setPriority((await svc.dayView(T)).list[0].key, "p2");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] p2 A\n\n## Soon\n\n## Done\n");
+		await svc.setPriority((await svc.dayView(T)).list[0].key, null);
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+	});
+
+	it("reads a prefix no level has as text, and leaves the line alone", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] p1 A\n- [ ] B\n\n## Soon\n\n## Done\n", withLevels([]));
+		const view = await svc.dayView(T);
+		expect(view.list[0]).toMatchObject({ text: "p1 A", priority: null });
+		await svc.rename(view.list[1].key, "C");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] p1 A\n- [ ] C\n\n## Soon\n\n## Done\n");
+	});
+
+	it("takes the first of two levels with one prefix, and ignores a prefix with a space", async () => {
+		const { svc } = setup("## Now\n- [ ] p1 A\n- [ ] x y B\n", withLevels([
+			{ prefix: "p1", color: "blue" },
+			{ prefix: "p1", color: "red" },
+			{ prefix: "x y", color: "green" },
+		]));
+		const view = await svc.dayView(T);
+		expect(view.list[0].priority).toEqual({ prefix: "p1", color: "blue" });
+		expect(view.list[1]).toMatchObject({ text: "x y B", priority: null });
 	});
 });

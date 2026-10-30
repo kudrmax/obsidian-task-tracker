@@ -1,17 +1,21 @@
 import type { TaskDraft } from "../../application/contracts";
+import type { PriorityLevel } from "../../settings";
 import { formatTime } from "../dates";
 import { DURATION, PROPERTY, tokenMs } from "../design";
 import { el, px } from "../dom";
 import { MonthPicker } from "../menu/MonthPicker";
 import type { LocalDate, Slot } from "../types";
 import { PlacementTiles, sheetIcon } from "./PlacementTiles";
-import { draftOf, initialState, pickDate, type SheetState, togglePlacement } from "./sheetState";
+import { PriorityPills } from "./PriorityPills";
+import { draftOf, initialState, pickDate, pickPriority, type SheetState, togglePlacement } from "./sheetState";
 
 export interface TaskSheetOptions {
 	readonly mode: "new" | "edit";
 	readonly initial: TaskDraft;
 	readonly slot: Slot | null;
 	readonly today: LocalDate;
+	/** The priority levels the pills offer. */
+	readonly levels: readonly PriorityLevel[];
 	onSubmit(draft: TaskDraft): Promise<void>;
 	onClose?(): void;
 }
@@ -19,13 +23,14 @@ export interface TaskSheetOptions {
 /** How tall the keyboard was the last time it shrank the view: the next screen leaves that room from its first frame. */
 let rememberedKeyboard = 0;
 
-/** The task screen over the whole view: the title to type, the four tiles, the calendar under them, Cancel and Add. */
+/** The task screen over the whole view: the title to type, the four tiles, the priorities or the calendar under them, Cancel and Add. */
 export class TaskSheet {
 	readonly el: HTMLElement;
 	private state: SheetState;
 	private readonly title: HTMLElement;
 	private readonly submit: HTMLButtonElement;
 	private readonly tiles: PlacementTiles;
+	private readonly pills: PriorityPills;
 	private readonly body: HTMLElement;
 	/** What stands centred in the body; it slides when the body's height changes. */
 	private readonly content: HTMLElement;
@@ -41,7 +46,7 @@ export class TaskSheet {
 	}
 
 	private constructor(root: HTMLElement, private readonly opts: TaskSheetOptions) {
-		this.state = initialState(opts.initial.placement);
+		this.state = initialState(opts.initial.placement, opts.initial.priority);
 		this.el = el(root, "div", "tc-sheet");
 		this.el.style.setProperty(PROPERTY.keyboard, px(rememberedKeyboard));
 		const bar = el(this.el, "div", "tc-sheet-bar");
@@ -64,6 +69,7 @@ export class TaskSheet {
 			const { start, end } = opts.slot;
 			time.appendChild(document.createTextNode(end === null ? formatTime(start) : `${formatTime(start)}–${formatTime(end)}`));
 		}
+		this.pills = new PriorityPills(body, opts.levels, (prefix) => this.setState(pickPriority(this.state, prefix)));
 		this.body.addEventListener("pointerdown", (e) => this.keepKeyboard(e));
 		this.body.addEventListener("click", (e) => this.refocus(e));
 		this.render();
@@ -81,7 +87,7 @@ export class TaskSheet {
 
 	/** A tap on the empty part of the screen brings the caret, and the keyboard, back to the title. */
 	private refocus(e: MouseEvent): void {
-		if ((e.target as Element).closest(".tc-tile, .tc-picker, .tc-sheet-title")) return;
+		if ((e.target as Element).closest(".tc-tile, .tc-level-pill, .tc-picker, .tc-sheet-title")) return;
 		this.focusEnd();
 	}
 
@@ -151,6 +157,7 @@ export class TaskSheet {
 	private render(): void {
 		this.renderSubmit();
 		this.tiles.render(this.state, this.opts.today);
+		this.pills.render(this.state);
 		if (this.state.pickerOpen && !this.picker) {
 			this.picker = new MonthPicker(el(this.content, "div"), {
 				month: this.state.date ?? this.opts.today,
