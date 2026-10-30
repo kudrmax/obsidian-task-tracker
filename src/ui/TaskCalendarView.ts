@@ -108,7 +108,10 @@ export class TaskCalendarView extends ItemView {
 			targets: () => this.dropTargets(),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
-			onDragging: (active) => this.contentEl.classList.toggle("is-dragging", active),
+			onDragging: (active) => {
+				if (active) this.postponeZones?.show();
+				this.contentEl.classList.toggle("is-dragging", active);
+			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onPickDate: (item, source) => this.showMenu(item, source, undefined, "picker"),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
@@ -218,7 +221,7 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
-		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today());
+		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
