@@ -1,7 +1,7 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
@@ -22,6 +22,7 @@ import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
+import { listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -123,7 +124,7 @@ export class TaskCalendarView extends ItemView {
 		const root = this.contentEl;
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
-		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
+		this.fitListWidth();
 		this.header = new DayHeader(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
 			onStep: (days) => this.select(addDays(this.selectedDate, days)),
@@ -150,11 +151,11 @@ export class TaskCalendarView extends ItemView {
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
-			width: () => this.settings.listWidth,
+			width: () => shownListWidth(this.settings.listWidth, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
 			onRelease: (width) => void this.deps.settings.update({ listWidth: width }).then(() => this.render()),
 			min: LIST_WIDTH_MIN,
-			max: LIST_WIDTH_MAX,
+			max: () => listWidthMax(root.clientWidth),
 		});
 		this.rightEl = el(root, "div", "tc-right");
 		this.allDayEl = el(this.rightEl, "div");
@@ -223,6 +224,7 @@ export class TaskCalendarView extends ItemView {
 
 	override onResize(): void {
 		this.measureNavigation();
+		this.fitListWidth();
 	}
 
 	private get settings() {
@@ -236,6 +238,10 @@ export class TaskCalendarView extends ItemView {
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
 	private theme(): Theme {
 		return document.body.classList.contains("theme-light") ? "light" : "dark";
+	}
+
+	private fitListWidth(): void {
+		this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listWidth, this.contentEl.clientWidth)));
 	}
 
 	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
@@ -370,7 +376,7 @@ export class TaskCalendarView extends ItemView {
 		this.renderPending = false;
 		const root = this.contentEl;
 		if (!this.header || !this.leftEl || !this.soonEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
-		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
+		this.fitListWidth();
 		this.header.render();
 		this.list.render();
 		const missing = this.data.missing;

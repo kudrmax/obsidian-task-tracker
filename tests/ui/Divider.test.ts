@@ -11,7 +11,7 @@ describe("Divider", () => {
 		const el = document.createElement("div");
 		const widths: number[] = [];
 		const released: number[] = [];
-		new Divider(el, { width: () => 187, onWidth: (w) => widths.push(w), onRelease: (w) => released.push(w), min: 110, max: 280 });
+		new Divider(el, { width: () => 187, onWidth: (w) => widths.push(w), onRelease: (w) => released.push(w), min: 110, max: () => 280 });
 		el.dispatchEvent(pointer("pointerdown", 200));
 		el.dispatchEvent(pointer("pointermove", 230));
 		el.dispatchEvent(pointer("pointermove", 400));
@@ -25,7 +25,7 @@ describe("Divider", () => {
 	it("ignores moves while nothing is pressed", () => {
 		const el = document.createElement("div");
 		const widths: number[] = [];
-		new Divider(el, { width: () => 187, onWidth: (w) => widths.push(w), onRelease: () => {}, min: 110, max: 280 });
+		new Divider(el, { width: () => 187, onWidth: (w) => widths.push(w), onRelease: () => {}, min: 110, max: () => 280 });
 		el.dispatchEvent(pointer("pointermove", 230));
 		expect(widths).toEqual([]);
 	});
