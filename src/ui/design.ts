@@ -7,7 +7,7 @@ export const DESIGN = {
 	hourPx: 56,
 	/** Hours drawn on the timeline. */
 	dayHours: 24,
-	/** How far the timeline reaches over its first hour line, so that the first hour's label is not cut. */
+	/** How far an hour's label rises over its line, and hangs under it: the timeline keeps this much room over its first hour and under its closing one. */
 	labelLift: 7,
 	/** Where the columns start under the day row. */
 	columnsTop: 64,

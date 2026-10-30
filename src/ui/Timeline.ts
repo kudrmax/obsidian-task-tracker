@@ -70,8 +70,8 @@ function isOpen(item: TaskItem): boolean {
 
 /**
  * A day of hours that scrolls: the hour lines and labels, finer ones as it zooms in, the events, the task cards over them,
- * the now line. It runs from the hour the day begins to the same hour the next morning; positions are minutes from that
- * hour. Task cards never share the width: they stack by time (see stackTasks); a drop target joins the stack as a card.
+ * the now line. It runs from the hour the day begins to the same hour the next morning, both labelled; positions are minutes
+ * from that hour. Task cards never share the width: they stack by time (see stackTasks); a drop target joins the stack as a card.
  */
 export class Timeline {
 	readonly canvas: HTMLElement;
@@ -96,7 +96,7 @@ export class Timeline {
 	) {
 		el.classList.add("tc-timeline");
 		this.canvas = make(el, "div", "tc-canvas");
-		for (let hour = 0; hour < DESIGN.dayHours; hour++) this.hours.push(this.mark(this.canvas, hour * MINUTES_PER_HOUR, ""));
+		for (let hour = 0; hour <= DESIGN.dayHours; hour++) this.hours.push(this.mark(this.canvas, hour * MINUTES_PER_HOUR, ""));
 		this.minorEl = make(this.canvas, "div");
 		this.itemsEl = make(this.canvas, "div", "tc-items");
 		this.grips = make(null, "div", "tc-grips");
@@ -145,9 +145,9 @@ export class Timeline {
 		return now !== null && isOpen(item) ? followNow(span, now) : span;
 	}
 
-	/** The hour's height at which the day, from its first hour to its last, fills the visible height; null before the timeline is laid out. */
+	/** The hour's height at which the day, from its first hour's label to its closing one, fills the visible height; null before the timeline is laid out. */
 	wholeDayHourPx(): number | null {
-		const visible = this.visibleHeight() - DESIGN.labelLift;
+		const visible = this.visibleHeight() - 2 * DESIGN.labelLift;
 		return visible > 0 ? visible / DESIGN.dayHours : null;
 	}
 
