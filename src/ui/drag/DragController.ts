@@ -186,19 +186,21 @@ export class DragController {
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		let picked = false;
+		const reopen = () => {
+			source.classList.remove("is-lifted");
+			timeline?.layoutTasks();
+		};
 		const session = new DragSession({
 			payload,
 			targets: this.deps.targets(),
 			float,
 			origin,
-			onReturn: () => {
-				source.classList.remove("is-lifted");
-				timeline?.layoutTasks();
-			},
+			onReturn: reopen,
 			onEnd: async (result) => {
 				detach();
 				if (result?.kind === "pickDate") {
 					picked = true;
+					reopen();
 					return;
 				}
 				this.deps.arbiter.release(DRAG);
@@ -207,12 +209,10 @@ export class DragController {
 				await this.deps.onResult(payload, result);
 			},
 		});
-		/** The card has come to rest. One dropped on Pick a date shows again, and the screen is held until the picker covers it. */
+		/** The card has come to rest. Over one dropped on Pick a date, back in its place by now, the picker opens; the screen is held until it does. */
 		const settled = () => {
 			this.deps.onDragging(false);
 			if (!picked) return;
-			source.classList.remove("is-lifted");
-			timeline?.layoutTasks();
 			this.deps.haptics.tap();
 			this.deps.onPickDate(payload.item, source);
 			this.deps.arbiter.release(DRAG);
