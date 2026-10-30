@@ -1,7 +1,7 @@
 import { Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
-import type { GoogleSettings, SectionNames, TaskCalendarSettings } from "../settings";
+import { type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import { formatTime } from "./dates";
 
 export interface GoogleCalendarOption {
@@ -40,6 +40,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		this.tasksFileGroup(containerEl);
+		this.prioritiesGroup(containerEl);
 		this.timelineGroup(containerEl);
 		this.googleGroup(containerEl);
 		this.workGroup(containerEl);
@@ -59,6 +60,45 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		}
 		this.text(el, "Due date marker", "Precedes the due date on a task line.", this.settings.dueDateMarker, (dueDateMarker) => ({ dueDateMarker }));
 		this.text(el, "Slot marker", "Precedes the time slot on a task line.", this.settings.slotMarker, (slotMarker) => ({ slotMarker }));
+	}
+
+	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */
+	private prioritiesGroup(el: HTMLElement): void {
+		new Setting(el).setName("Priorities").setHeading();
+		const levels = this.settings.priorities;
+		levels.forEach((level, index) => {
+			const row = new Setting(el).setClass("tc-level-setting");
+			row.addText((t) => {
+				t.inputEl.addClass("tc-level-prefix");
+				t.setValue(level.prefix).onChange((prefix) => this.plugin.update({ priorities: this.levelsWith(index, { prefix: prefix.trim() }) }));
+			});
+			const swatches = row.controlEl.createDiv("tc-swatches");
+			for (const color of PRIORITY_COLORS) {
+				const swatch = swatches.createEl("button", { cls: "tc-swatch", attr: { "aria-label": color, "data-priority": color } });
+				swatch.toggleClass("is-on", color === level.color);
+				swatch.addEventListener("click", () => void this.updateLevels(this.levelsWith(index, { color })));
+			}
+			row.addExtraButton((b) => b.setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.updateLevels(levels.filter((_, i) => i !== index))));
+		});
+		new Setting(el)
+			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
+			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.updateLevels([...levels, this.nextLevel(levels)])));
+	}
+
+	private levelsWith(index: number, patch: Partial<PriorityLevel>): PriorityLevel[] {
+		return this.settings.priorities.map((level, i) => (i === index ? { ...level, ...patch } : level));
+	}
+
+	private nextLevel(levels: readonly PriorityLevel[]): PriorityLevel {
+		let n = levels.length + 1;
+		while (levels.some((l) => l.prefix === `p${n}`)) n++;
+		const color = PRIORITY_COLORS.find((c) => !levels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+		return { prefix: `p${n}`, color };
+	}
+
+	private async updateLevels(priorities: readonly PriorityLevel[]): Promise<void> {
+		await this.plugin.update({ priorities });
+		this.display();
 	}
 
 	private timelineGroup(el: HTMLElement): void {
