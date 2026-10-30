@@ -158,4 +158,15 @@ describe("Divider", () => {
 		expect(widths[widths.length - 1]).toBe(160.5);
 		expect(snaps).toBe(1);
 	});
+
+	it("holds to the centre on a calm drag", () => {
+		const el = document.createElement("div");
+		let snaps = 0;
+		const widths: number[] = [];
+		divider(el, { onWidth: (w) => widths.push(w), center: () => 160.5, onSnap: () => snaps++ });
+		el.dispatchEvent(pointer("pointerdown", 200));
+		for (let x = 199; x >= 175; x -= 1) el.dispatchEvent(pointer("pointermove", x, 16));
+		expect(widths[widths.length - 1]).toBe(160.5);
+		expect(snaps).toBe(1);
+	});
 });
