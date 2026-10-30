@@ -23,6 +23,6 @@ export function dueOptions(today: LocalDate, current: LocalDate | null): DueOpti
 		tomorrow: { label: shortWeekday(tomorrow), value: tomorrow },
 		nextWeek: { label: weekdayDayMonth(monday), value: monday },
 		pick: { label: current ? dayMonth(current) : "" },
-		canRemove: current !== null,
+		canRemove: current !== null && current !== today,
 	};
 }

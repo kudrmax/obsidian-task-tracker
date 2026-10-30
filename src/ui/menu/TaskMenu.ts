@@ -172,7 +172,9 @@ export class TaskMenu {
 			onPick: (date) => this.pick(() => actions.setDueDate(date))(),
 			variant: "menu",
 		});
-		menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.setDueDate(null)) }, "tc-menu-row tc-picker-remove");
+		if (dueOptions(today, item.dueDate).canRemove) {
+			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.setDueDate(null)) }, "tc-menu-row tc-picker-remove");
+		}
 		this.place();
 	}
 

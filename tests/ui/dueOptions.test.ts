@@ -17,4 +17,8 @@ describe("dueOptions", () => {
 		expect(o.pick).toEqual({ label: "" });
 		expect(o.canRemove).toBe(false);
 	});
+
+	it("offers no removal of today's date: a task for today is in Now by that date", () => {
+		expect(dueOptions("2026-10-30", "2026-10-30").canRemove).toBe(false);
+	});
 });
