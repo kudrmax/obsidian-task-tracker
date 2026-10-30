@@ -39,8 +39,8 @@ export interface TaskCalendarSettings {
 	readonly scrollToHour: number;
 	/** The hour one day ends and the next begins, 0..23: today, the due dates and the timeline count from it. */
 	readonly dayStartHour: number;
-	/** Width of the left column, CSS px, set by dragging the divider. */
-	readonly listWidth: number;
+	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
+	readonly listShare: number;
 	/** What the right column shows; the segmented control in the day row sets it. */
 	readonly rightMode: RightMode;
 	/** A calendar source whose last update is older than this gets the orange dot. */
@@ -67,13 +67,13 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	scrollToHour: 9,
 	dayStartHour: 5,
-	listWidth: 187,
+	listShare: 0.5,
 	rightMode: "calendar",
 	staleAfterMinutes: 180,
 };
 
 /** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listWidth", "rightMode"] as const;
+export const DEVICE_KEYS = ["listShare", "rightMode"] as const;
 export type DeviceKey = (typeof DEVICE_KEYS)[number];
 export type DeviceState = Pick<TaskCalendarSettings, DeviceKey>;
 export type SharedSettings = Omit<TaskCalendarSettings, DeviceKey>;
@@ -91,7 +91,7 @@ export function partition(patch: Partial<TaskCalendarSettings>): { device: Parti
 
 /** The settings without the device's part: what the synced file holds. */
 export function sharedOf(settings: TaskCalendarSettings): SharedSettings {
-	const { listWidth: _w, rightMode: _m, ...shared } = settings;
+	const { listShare: _s, rightMode: _m, ...shared } = settings;
 	return shared;
 }
 

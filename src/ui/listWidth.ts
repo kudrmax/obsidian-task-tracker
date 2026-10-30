@@ -6,12 +6,21 @@ export function listWidthMax(viewWidth: number): number {
 	return Math.max(LIST_WIDTH_MAX, viewWidth - DESIGN.dividerWidth - LIST_WIDTH_MIN);
 }
 
-/** The saved width, narrowed to the window it is shown in; a view not laid out yet has no width to fit. */
-export function shownListWidth(saved: number, viewWidth: number): number {
-	return viewWidth > 0 ? Math.min(saved, listWidthMax(viewWidth)) : saved;
+/** The list's share of the columns' width, in px for this window and within the list's bounds. */
+export function shownListWidth(share: number, viewWidth: number): number {
+	return Math.min(listWidthMax(viewWidth), Math.max(LIST_WIDTH_MIN, share * columnsWidth(viewWidth)));
+}
+
+/** The share of the columns' width a list this wide takes. */
+export function listShareOf(width: number, viewWidth: number): number {
+	return width / columnsWidth(viewWidth);
 }
 
 /** The width that puts the divider's line in the middle of the window, where the two columns are equal. */
 export function centeredListWidth(viewWidth: number): number {
-	return (viewWidth - DESIGN.dividerWidth) / 2;
+	return columnsWidth(viewWidth) / 2;
+}
+
+function columnsWidth(viewWidth: number): number {
+	return viewWidth - DESIGN.dividerWidth;
 }
