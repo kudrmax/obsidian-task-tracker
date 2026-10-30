@@ -9,8 +9,9 @@ export interface ZoomAnchor {
 
 export interface PinchZoomOptions {
 	hourPx(): number;
-	min: number;
-	max: number;
+	/** The bounds follow the screen's height: the whole day is the farthest a pinch goes out. */
+	min(): number;
+	max(): number;
 	arbiter: GestureArbiter;
 	minutesAt(clientY: number): number;
 	onScale(hourPx: number, anchor: ZoomAnchor): void;
@@ -50,7 +51,7 @@ export class PinchZoom {
 	}
 
 	private clamp(hourPx: number): number {
-		return Math.min(this.opts.max, Math.max(this.opts.min, hourPx));
+		return Math.min(this.opts.max(), Math.max(this.opts.min(), hourPx));
 	}
 
 	private geometry(): { distance: number; midY: number } {

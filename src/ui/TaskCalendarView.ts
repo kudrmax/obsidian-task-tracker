@@ -1,7 +1,7 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels } from "../settings";
+import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
@@ -19,7 +19,7 @@ import { TaskMenu } from "./menu/TaskMenu";
 import { TaskSheet } from "./sheet/TaskSheet";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
-import { nearestLevel, stepFor } from "./zoomLevels";
+import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -77,6 +77,8 @@ export class TaskCalendarView extends ItemView {
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
 	private zoomFrame = 0;
+	/** The pinch settled on the whole day: it keeps fitting as the timeline's height changes. */
+	private wholeDay = false;
 	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
@@ -195,6 +197,7 @@ export class TaskCalendarView extends ItemView {
 			tasks: () => this.data.day?.slotted ?? [],
 			events: () => this.data.events,
 			now: () => this.deps.clock.now(),
+			onResize: () => this.fitWholeDay(),
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
@@ -211,8 +214,8 @@ export class TaskCalendarView extends ItemView {
 		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
-			min: Math.min(...this.settings.zoomLevels.map((l) => l.hourPx)),
-			max: Math.max(...this.settings.zoomLevels.map((l) => l.hourPx)),
+			min: () => this.zoomLevels()[0].hourPx,
+			max: () => this.zoomLevels()[this.zoomLevels().length - 1].hourPx,
 			arbiter: this.arbiter,
 			minutesAt: (y) => timeline.minutesAt(y),
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
@@ -347,8 +350,24 @@ export class TaskCalendarView extends ItemView {
 		await this.data.tasks();
 	}
 
+	/** The settings' levels at this screen's height, the whole day first; the settings' own before the timeline is laid out. */
+	private zoomLevels(): ZoomLevel[] {
+		const configured = this.settings.zoomLevels;
+		return levelsFor(this.timeline?.wholeDayHourPx() ?? Math.min(...configured.map((l) => l.hourPx)), configured);
+	}
+
+	/** Zoomed out to the whole day, the day keeps fitting when the timeline's height changes; a timeline grown past its day zooms in to fill it. */
+	private fitWholeDay(): void {
+		const whole = this.timeline?.wholeDayHourPx() ?? null;
+		if (whole === null || this.zoomFrame || (!this.wholeDay && this.hourPx >= whole)) return;
+		this.wholeDay = true;
+		this.hourPx = whole;
+		this.timeline?.layout();
+	}
+
 	/** Each finger reports its moves on its own; the timeline is laid out once per frame for the latest scale. */
 	private zoom(hourPx: number, anchor: ZoomAnchor): void {
+		this.wholeDay = false;
 		if (this.zoomFrame) cancelAnimationFrame(this.zoomFrame);
 		this.zoomFrame = requestAnimationFrame(() => {
 			this.zoomFrame = 0;
@@ -359,7 +378,9 @@ export class TaskCalendarView extends ItemView {
 
 	/** Released, the scale glides to the nearest level. */
 	private settleZoom(from: number, anchor: ZoomAnchor): void {
-		const to = nearestLevel(from, this.settings.zoomLevels).hourPx;
+		const levels = this.zoomLevels();
+		const to = nearestLevel(from, levels).hourPx;
+		this.wholeDay = to === levels[0].hourPx;
 		const started = performance.now();
 		const frame = (now: number) => {
 			const t = Math.min(1, (now - started) / LAYOUT.zoomSnapMs);

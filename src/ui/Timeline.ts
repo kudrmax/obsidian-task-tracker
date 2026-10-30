@@ -19,6 +19,8 @@ export interface TimelineDeps {
 	tasks(): readonly TaskItem[];
 	events(): readonly CalendarEvent[];
 	now(): Date;
+	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
+	onResize?(): void;
 	onBlock?(block: HTMLElement, item: TaskItem): void;
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
@@ -68,8 +70,8 @@ function isOpen(item: TaskItem): boolean {
 
 /**
  * A day of hours that scrolls: the hour lines and labels, finer ones as it zooms in, the events, the task cards over them,
- * the now line. It runs from the hour the day begins to the same hour the next morning; positions are minutes from that
- * hour. Task cards never share the width: they stack by time (see stackTasks); a drop target joins the stack as a card.
+ * the now line. It runs from the hour the day begins to the same hour the next morning, both labelled; positions are minutes
+ * from that hour. Task cards never share the width: they stack by time (see stackTasks); a drop target joins the stack as a card.
  */
 export class Timeline {
 	readonly canvas: HTMLElement;
@@ -94,11 +96,14 @@ export class Timeline {
 	) {
 		el.classList.add("tc-timeline");
 		this.canvas = make(el, "div", "tc-canvas");
-		for (let hour = 0; hour < DESIGN.dayHours; hour++) this.hours.push(this.mark(this.canvas, hour * MINUTES_PER_HOUR, ""));
+		for (let hour = 0; hour <= DESIGN.dayHours; hour++) this.hours.push(this.mark(this.canvas, hour * MINUTES_PER_HOUR, ""));
 		this.minorEl = make(this.canvas, "div");
 		this.itemsEl = make(this.canvas, "div", "tc-items");
 		this.grips = make(null, "div", "tc-grips");
-		new ResizeObserver(() => this.holdAnchor()).observe(el);
+		new ResizeObserver(() => {
+			this.deps.onResize?.();
+			this.holdAnchor();
+		}).observe(el);
 		for (const type of ["pointerdown", "wheel", "touchstart"] as const) el.addEventListener(type, () => (this.anchor = null), { passive: true });
 		for (const edge of ["start", "end"] as const) {
 			make(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
@@ -140,8 +145,20 @@ export class Timeline {
 		return now !== null && isOpen(item) ? followNow(span, now) : span;
 	}
 
-	/** Lays out at the current hour's height, then scrolls so that `minutes` stays under `clientY`. */
+	/** The hour's height at which the day, from its first hour's label to its closing one, fills the visible height; null before the timeline is laid out. */
+	wholeDayHourPx(): number | null {
+		const visible = this.visibleHeight() - 2 * DESIGN.labelLift;
+		return visible > 0 ? visible / DESIGN.dayHours : null;
+	}
+
+	/** The height the fade at the bottom leaves visible. */
+	private visibleHeight(): number {
+		return this.el.clientHeight - parseFloat(getComputedStyle(this.el).paddingBottom);
+	}
+
+	/** Lays out at the current hour's height, then scrolls so that `minutes` stays under `clientY`. The room kept for an anchor goes. */
 	zoomTo(minutes: number, clientY: number): void {
+		this.setRoom(0, 0);
 		const origin = this.el.getBoundingClientRect().top + this.canvas.offsetTop;
 		this.layout();
 		this.el.scrollTop = origin + this.yOf(minutes) - clientY;
@@ -158,15 +175,18 @@ export class Timeline {
 
 	private holdAnchor(): void {
 		if (!this.anchor) return;
-		this.canvas.style.setProperty(PROPERTY.roomTop, px(0));
-		this.canvas.style.setProperty(PROPERTY.roomBottom, px(0));
-		const visible = this.el.clientHeight - parseFloat(getComputedStyle(this.el).paddingBottom);
+		this.setRoom(0, 0);
+		const visible = this.visibleHeight();
 		if (visible <= 0) return;
 		const box = { y: this.yOf(this.anchor.minutes), canvasTop: this.canvas.offsetTop, canvasHeight: this.canvas.offsetHeight, visible };
 		const place = scrollPlace(box, this.anchor.fraction);
-		this.canvas.style.setProperty(PROPERTY.roomTop, px(place.roomTop));
-		this.canvas.style.setProperty(PROPERTY.roomBottom, px(place.roomBottom));
+		this.setRoom(place.roomTop, place.roomBottom);
 		this.el.scrollTop = place.scrollTop;
+	}
+
+	private setRoom(top: number, bottom: number): void {
+		this.canvas.style.setProperty(PROPERTY.roomTop, px(top));
+		this.canvas.style.setProperty(PROPERTY.roomBottom, px(bottom));
 	}
 
 	render(): void {

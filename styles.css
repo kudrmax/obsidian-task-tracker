@@ -529,7 +529,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; box-sizing: border-box; padding-bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
 .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); background: linear-gradient(to bottom, transparent, var(--tc-bg) var(--tc-fade-stop)); z-index: var(--tc-layer-fade); pointer-events: none; }
-.tc-canvas { position: relative; margin-top: calc(var(--tc-label-lift) + var(--tc-room-top)); margin-bottom: var(--tc-room-bottom); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
+.tc-canvas { position: relative; margin-top: calc(var(--tc-label-lift) + var(--tc-room-top)); margin-bottom: calc(var(--tc-label-lift) + var(--tc-room-bottom)); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
