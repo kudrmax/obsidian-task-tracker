@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, settingsFrom } from "../src/settings";
+import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf } from "../src/settings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -12,5 +12,18 @@ describe("settingsFrom", () => {
 		expect(s.google.refreshSeconds).toBe(60);
 		expect(s.sections.now).toBe("Today");
 		expect(s.sections.done).toBe("Done");
+	});
+});
+
+describe("the device's part of the settings", () => {
+	it("keeps the divider's place and the column shown apart from what the file holds", () => {
+		expect(partition({ listWidth: 200, rightMode: "soon", longPressMs: 300 })).toEqual({ device: { listWidth: 200, rightMode: "soon" }, shared: { longPressMs: 300 } });
+	});
+
+	it("leaves them out of what is written to the file", () => {
+		const shared = sharedOf(DEFAULT_SETTINGS) as Record<string, unknown>;
+		expect("listWidth" in shared).toBe(false);
+		expect("rightMode" in shared).toBe(false);
+		expect(shared.google).toEqual(DEFAULT_SETTINGS.google);
 	});
 });

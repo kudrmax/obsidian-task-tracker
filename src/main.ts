@@ -1,15 +1,21 @@
 import { Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices } from "./application/services";
-import { settingsFrom, type TaskCalendarSettings } from "./settings";
+import { type DeviceState, partition, settingsFrom, sharedOf, type TaskCalendarSettings } from "./settings";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
+const DEVICE_STATE_KEY = "task-calendar:device";
+
+/**
+ * The settings: the synced file (data.json) for what is the vault's, and the device's own storage for the divider's
+ * place and the column shown. The file is written over its freshest copy, so a token Sync just brought is never lost.
+ */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
 	private current: TaskCalendarSettings = settingsFrom(null);
 
 	override async onload(): Promise<void> {
-		this.current = settingsFrom(await this.loadData());
+		await this.reloadSettings();
 		this.registerEvent(this.watchSettingsFile());
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
@@ -35,8 +41,17 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const file = `${this.manifest.dir}/data.json`;
 		const vault = this.app.vault as Vault & { on(name: "raw", callback: (path: string) => void): EventRef };
 		return vault.on("raw", (path) => {
-			if (path === file) void this.loadData().then((data) => (this.current = settingsFrom(data)));
+			if (path === file) void this.reloadSettings();
 		});
+	}
+
+	private deviceState(): Partial<DeviceState> {
+		const saved = this.app.loadLocalStorage(DEVICE_STATE_KEY) as Partial<DeviceState> | null;
+		return saved ?? {};
+	}
+
+	private async reloadSettings(): Promise<void> {
+		this.current = { ...settingsFrom(await this.loadData()), ...this.deviceState() };
 	}
 
 	get(): TaskCalendarSettings {
@@ -44,8 +59,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	}
 
 	async update(patch: Partial<TaskCalendarSettings>): Promise<void> {
-		this.current = { ...this.current, ...patch };
-		await this.saveData(this.current);
+		const { device, shared } = partition(patch);
+		const deviceState = { ...this.deviceState(), ...device };
+		if (Object.keys(device).length) this.app.saveLocalStorage(DEVICE_STATE_KEY, deviceState);
+		let fileSettings = settingsFrom(await this.loadData());
+		if (Object.keys(shared).length) {
+			fileSettings = settingsFrom({ ...fileSettings, ...shared });
+			await this.saveData(sharedOf(fileSettings));
+		}
+		this.current = { ...fileSettings, ...deviceState };
 	}
 
 	private async openView(): Promise<void> {

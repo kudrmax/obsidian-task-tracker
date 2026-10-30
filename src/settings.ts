@@ -71,6 +71,29 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	staleAfterMinutes: 180,
 };
 
+/** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */
+export const DEVICE_KEYS = ["listWidth", "rightMode"] as const;
+export type DeviceKey = (typeof DEVICE_KEYS)[number];
+export type DeviceState = Pick<TaskCalendarSettings, DeviceKey>;
+export type SharedSettings = Omit<TaskCalendarSettings, DeviceKey>;
+
+/** Splits a patch into the part that goes to the device and the part that goes to the synced file. */
+export function partition(patch: Partial<TaskCalendarSettings>): { device: Partial<DeviceState>; shared: Partial<SharedSettings> } {
+	const device: Partial<Record<DeviceKey, unknown>> = {};
+	const shared: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(patch)) {
+		if ((DEVICE_KEYS as readonly string[]).includes(key)) device[key as DeviceKey] = value;
+		else shared[key] = value;
+	}
+	return { device: device as Partial<DeviceState>, shared: shared as Partial<SharedSettings> };
+}
+
+/** The settings without the device's part: what the synced file holds. */
+export function sharedOf(settings: TaskCalendarSettings): SharedSettings {
+	const { listWidth: _w, rightMode: _m, ...shared } = settings;
+	return shared;
+}
+
 /** Merges saved data over the defaults, one level deep for the nested objects. */
 export function settingsFrom(saved: unknown): TaskCalendarSettings {
 	const s = (saved ?? {}) as Partial<TaskCalendarSettings>;
