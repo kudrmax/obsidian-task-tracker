@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { itemBox, layoutColumns } from "../../src/ui/timelineLayout";
+import { gridDivision, itemBox, layoutColumns } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -35,5 +35,20 @@ describe("itemBox", () => {
 	it("calls a block tiny under 24 px", () => {
 		expect(itemBox(0, 30, 56).tiny).toBe(false);
 		expect(itemBox(0, 30, 28).tiny).toBe(true);
+	});
+});
+
+describe("gridDivision", () => {
+	it("draws only the hours up to the base zoom: half an hour there is too close for a label", () => {
+		expect(gridDivision(28)).toBe(60);
+		expect(gridDivision(56)).toBe(60);
+	});
+
+	it("adds the half hours once they have room, then the quarters, then every five minutes", () => {
+		expect(gridDivision(80)).toBe(30);
+		expect(gridDivision(112)).toBe(30);
+		expect(gridDivision(160)).toBe(15);
+		expect(gridDivision(224)).toBe(15);
+		expect(gridDivision(480)).toBe(5);
 	});
 });

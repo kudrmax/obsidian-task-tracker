@@ -5,7 +5,7 @@ export interface DividerOptions {
 	onWidth(width: number): void;
 	onRelease(width: number): void;
 	min: number;
-	max: number;
+	max(): number;
 }
 
 /** The strip between the columns: dragging it, or its handle, sets the list's width. */
@@ -35,7 +35,7 @@ export class Divider {
 
 	private widthFor(e: PointerEvent): number {
 		const wanted = this.press!.width + e.clientX - this.press!.x;
-		return Math.round(Math.min(this.opts.max, Math.max(this.opts.min, wanted)));
+		return Math.round(Math.min(this.opts.max(), Math.max(this.opts.min, wanted)));
 	}
 
 	private move(e: PointerEvent): void {
