@@ -183,7 +183,7 @@ body{margin:0;background:#000}
 <sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; flex-direction: column; gap: 8px;">
 <sc-for list="{{zones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span><span style="flex-shrink: 0; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{z.value}}</span></div>
+<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
 </sc-for>
 </div>
 </sc-if>
@@ -197,7 +197,7 @@ body{margin:0;background:#000}
 <sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; flex-direction: column; gap: 8px;">
 <sc-for list="{{idleZones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span><span style="flex-shrink: 0; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{z.value}}</span></div>
+<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
 </sc-for>
 </div>
 </sc-if>
@@ -212,7 +212,7 @@ body{margin:0;background:#000}
 <sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; flex-direction: column; gap: 8px;">
 <sc-for list="{{idleZones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span><span style="flex-shrink: 0; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{z.value}}</span></div>
+<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
 </sc-for>
 </div>
 </sc-if>
@@ -514,17 +514,17 @@ class Component extends DCLogic {
     };
     const ZONE_H = 40, ZONE_GAP = 8, FLOAT_W = 190, FLOAT_H = 42;
     const ZONES_TOP = 844 - 76 - (ZONE_GAP + ZONE_H + ZONE_GAP + ZONE_H + ZONE_GAP) + ZONE_GAP;
-    const zone = (key, label, value, path, idle = false) => {
+    const zone = (key, label, path, idle = false) => {
       const hot = !idle && dropZone === key;
-      return { label, value, path, border: hot ? `solid ${accent}` : `dashed ${c.dash}`, bg: hot ? c.placeholder : 'transparent', color: hot ? c.text : c.muted };
+      return { label, path, border: hot ? `solid ${accent}` : `dashed ${c.dash}`, bg: hot ? c.placeholder : 'transparent', color: hot ? c.text : c.muted };
     };
     const zones = [
-      zone('tomorrow', 'Tomorrow', 'Sat', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14'),
-      zone('pick', 'Pick a date', '', chipPaths.cal)
+      zone('tomorrow', 'Tomorrow', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14'),
+      zone('pick', 'Pick a date', chipPaths.cal)
     ];
     const idleZones = [
-      zone('tomorrow', 'Tomorrow', 'Sat', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14', true),
-      zone('pick', 'Pick a date', '', chipPaths.cal, true)
+      zone('tomorrow', 'Tomorrow', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14', true),
+      zone('pick', 'Pick a date', chipPaths.cal, true)
     ];
     const firstChip = isInbox ? 0 : leftSide ? 2 : 1;
     const sourceDot = this.props.sourceDot === true || this.props.sourceDot === 'true';
