@@ -4,7 +4,7 @@ import type { Theme } from "./eventColors";
 import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
-import { gridDivision, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span } from "./timelineLayout";
+import { gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -22,9 +22,11 @@ export interface TimelineDeps {
 
 interface GridMark {
 	readonly minutes: number;
-	readonly label: HTMLElement;
+	readonly label: HTMLElement | null;
 	readonly line: HTMLElement;
 }
+
+type HourMark = GridMark & { readonly label: HTMLElement };
 
 interface Placed {
 	readonly el: HTMLElement;
@@ -41,10 +43,10 @@ const MINUTES_PER_HOUR = 60;
 export class Timeline {
 	readonly canvas: HTMLElement;
 	readonly itemsEl: HTMLElement;
-	private readonly hours: GridMark[] = [];
+	private readonly hours: HourMark[] = [];
 	private readonly minorEl: HTMLElement;
 	private minor: GridMark[] = [];
-	private division = MINUTES_PER_HOUR;
+	private grid: Grid = { labels: MINUTES_PER_HOUR, lines: MINUTES_PER_HOUR };
 	private placed: Placed[] = [];
 	private nowEl: HTMLElement | null = null;
 
@@ -120,12 +122,12 @@ export class Timeline {
 		const nowMinutes = this.deps.boundary().offsetOf(this.deps.date(), this.deps.now());
 		const nowY = this.yOf(nowMinutes);
 		const today = this.deps.date() === this.deps.today();
-		this.divide(gridDivision(hourPx));
+		this.divide(gridAt(hourPx));
 		for (const { minutes, label, line } of [...this.hours, ...this.minor]) {
 			const y = this.yOf(minutes);
-			label.style.setProperty(PROPERTY.y, px(y));
 			line.style.setProperty(PROPERTY.y, px(y));
-			label.classList.toggle("is-hidden", today && Math.abs(y - nowY) <= LAYOUT.labelHideDistance);
+			label?.style.setProperty(PROPERTY.y, px(y));
+			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) <= LAYOUT.labelHideDistance);
 		}
 		for (const { el, start, end } of this.placed) this.place(el, start, end);
 		this.nowEl?.style.setProperty(PROPERTY.y, px(nowY));
@@ -136,23 +138,22 @@ export class Timeline {
 		return this.placed.filter((p) => p.el.classList.contains("tc-block") && p.start < end && p.end > start).map((p) => p.el);
 	}
 
-	private mark(parent: HTMLElement, minutes: number, text: string): GridMark {
+	private mark(parent: HTMLElement, minutes: number, text: string): HourMark {
 		return { minutes, label: make(parent, "div", "tc-hour-label", text), line: make(parent, "div", "tc-hour-line") };
 	}
 
-	/** Redraws the marks between the hours when the zoom crosses into another division. */
-	private divide(division: number): void {
-		if (division === this.division) return;
-		this.division = division;
+	/** Redraws the marks between the hours when the zoom crosses into another grid: small labels on some, bare lines on the rest. */
+	private divide(grid: Grid): void {
+		if (grid.labels === this.grid.labels && grid.lines === this.grid.lines) return;
+		this.grid = grid;
 		clear(this.minorEl);
 		this.minor = [];
-		for (let minutes = division; minutes < DESIGN.dayHours * MINUTES_PER_HOUR; minutes += division) {
+		for (let minutes = grid.lines; minutes < DESIGN.dayHours * MINUTES_PER_HOUR; minutes += grid.lines) {
 			const minute = minutes % MINUTES_PER_HOUR;
 			if (minute === 0) continue;
-			const mark = this.mark(this.minorEl, minutes, `:${String(minute).padStart(2, "0")}`);
-			mark.label.classList.add("is-minor");
-			mark.line.classList.add("is-minor");
-			this.minor.push(mark);
+			const line = make(this.minorEl, "div", "tc-hour-line is-minor");
+			const label = minute % grid.labels === 0 ? make(this.minorEl, "div", "tc-hour-label is-minor", `:${String(minute).padStart(2, "0")}`) : null;
+			this.minor.push({ minutes, label, line });
 		}
 	}
 

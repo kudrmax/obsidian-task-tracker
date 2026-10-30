@@ -76,9 +76,12 @@ export const DURATION = {
 export const LAYOUT = {
 	/** An hour's label hides when its line comes this close to the now line. */
 	labelHideDistance: 20,
-	/** The grid divides an hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
+	/** The grid labels a division of the hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
 	gridDivisions: [5, 15, 30],
 	gridLabelGap: 40,
+	/** Unlabelled lines every `gridTickMinutes` join them once those stand at least `gridTickGap` apart. */
+	gridTickMinutes: 5,
+	gridTickGap: 16,
 	/** A block under this height is drawn tiny: one small line, no padding. */
 	tinyItemHeight: 24,
 	/** How far the now line stands down the visible timeline when today opens. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gridDivision, itemBox, layoutColumns } from "../../src/ui/timelineLayout";
+import { gridAt, itemBox, layoutColumns } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -38,17 +38,24 @@ describe("itemBox", () => {
 	});
 });
 
-describe("gridDivision", () => {
+describe("gridAt", () => {
 	it("draws only the hours up to the base zoom: half an hour there is too close for a label", () => {
-		expect(gridDivision(28)).toBe(60);
-		expect(gridDivision(56)).toBe(60);
+		expect(gridAt(28)).toEqual({ labels: 60, lines: 60 });
+		expect(gridAt(56)).toEqual({ labels: 60, lines: 60 });
 	});
 
-	it("adds the half hours once they have room, then the quarters, then every five minutes", () => {
-		expect(gridDivision(80)).toBe(30);
-		expect(gridDivision(112)).toBe(30);
-		expect(gridDivision(160)).toBe(15);
-		expect(gridDivision(224)).toBe(15);
-		expect(gridDivision(480)).toBe(5);
+	it("labels the half hours once they have room, then the quarters, then every five minutes", () => {
+		expect(gridAt(80).labels).toBe(30);
+		expect(gridAt(112).labels).toBe(30);
+		expect(gridAt(160).labels).toBe(15);
+		expect(gridAt(224).labels).toBe(15);
+		expect(gridAt(480).labels).toBe(5);
+	});
+
+	it("adds bare lines every five minutes once those stand apart, between the labelled ones", () => {
+		expect(gridAt(112).lines).toBe(30);
+		expect(gridAt(160).lines).toBe(15);
+		expect(gridAt(192)).toEqual({ labels: 15, lines: 5 });
+		expect(gridAt(224)).toEqual({ labels: 15, lines: 5 });
 	});
 });
