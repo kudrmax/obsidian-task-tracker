@@ -6,7 +6,9 @@ import { browserLoginDeps, GoogleRedirectLogin } from "../infrastructure/GoogleR
 import { requestToken } from "../infrastructure/GoogleToken";
 import { VaultPathWatcher } from "../infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "../infrastructure/VaultTaskFileStore";
+import { WorkCalendarExportScript } from "../infrastructure/WorkCalendarExportScript";
 import { WorkCalendarFileSource } from "../infrastructure/WorkCalendarFileSource";
+import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "../infrastructure/WorkCalendarShortcut";
 import { CalendarServiceImpl } from "./CalendarServiceImpl";
 import type { CalendarService, TaskService } from "./contracts";
 import { systemClock, type Clock, type SettingsStore } from "./ports";
@@ -19,9 +21,16 @@ export interface Services {
 	readonly googleSource: GoogleCalendarSource;
 	/** Receives Google's answer from the obsidian:// handler. */
 	readonly login: GoogleRedirectLogin;
+	readonly workExport: WorkCalendarExportScript;
+	readonly workShortcut: WorkCalendarShortcut;
 }
 
-export function createServices(app: App, settings: SettingsStore, clock: Clock = systemClock): Services {
+export interface ServicesHost {
+	readonly pluginDir: string;
+	readonly shortcuts: WorkCalendarShortcutHost;
+}
+
+export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock): Services {
 	const store = new VaultTaskFileStore(app, () => settings.get().tasksFile);
 	const login = new GoogleRedirectLogin(browserLoginDeps((fields) => requestToken(settings.get().google.clientId, settings.get().google.clientSecret, fields)));
 	const google = new GoogleAuth(settings, login);
@@ -33,5 +42,7 @@ export function createServices(app: App, settings: SettingsStore, clock: Clock =
 		google,
 		googleSource,
 		login,
+		workExport: new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings),
+		workShortcut: new WorkCalendarShortcut(host.shortcuts),
 	};
 }

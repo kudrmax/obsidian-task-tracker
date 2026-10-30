@@ -1,7 +1,7 @@
-import { Notice, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
+import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
-import { createServices } from "./application/services";
+import { createServices, type ServicesHost } from "./application/services";
 import { type DeviceState, partition, settingsFrom, sharedOf, type TaskCalendarSettings } from "./settings";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
@@ -27,7 +27,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	/** The real services over the vault and the network; the demo build replaces them with fakes. */
 	protected createDeps(clock: Clock = systemClock): ViewDeps {
-		const services = createServices(this.app, this, clock);
+		const services = createServices(this.app, this.servicesHost(), this, clock);
+		this.register(services.workExport.keepInstalled());
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
 			services.login.receive(params).then(
 				() => new Notice("Google Calendar: logged in"),
@@ -39,9 +40,17 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				login: () => services.google.login(),
 				logout: () => services.google.logout(),
 				listCalendars: () => services.googleSource.listCalendars(),
+				scriptableLoader: () => services.workExport.loader,
 			}),
 		);
-		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock };
+		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock, exportWorkCalendar: () => services.workShortcut.run() };
+	}
+
+	private servicesHost(): ServicesHost {
+		return {
+			pluginDir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
+			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => window.open(url) },
+		};
 	}
 
 	/** Sync brings data.json from the other device (the Google token, logged in on the Mac): it counts here at once, with no reload. */

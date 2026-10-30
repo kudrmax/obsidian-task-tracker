@@ -39,6 +39,8 @@ export interface ViewDeps {
 	readonly calendars: CalendarService;
 	readonly settings: SettingsStore;
 	readonly clock: Clock;
+	/** Asks the phone for fresh work calendar events; a refresh the user asks for runs it before reading the sources. */
+	exportWorkCalendar(): void;
 }
 
 /**
@@ -185,7 +187,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			statuses: () => this.data.statuses,
 			now: () => this.deps.clock.now(),
-			onRefresh: () => this.polling.refresh(),
+			onRefresh: () => this.refreshNow(),
 		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
@@ -363,7 +365,12 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private showSources(anchor: HTMLElement): void {
-		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.polling.refresh() });
+		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.refreshNow() });
+	}
+
+	private refreshNow(): Promise<void> {
+		this.deps.exportWorkCalendar();
+		return this.polling.refresh();
 	}
 
 	/** The task screen for a new task; with a slot, from a long tap on the timeline. */

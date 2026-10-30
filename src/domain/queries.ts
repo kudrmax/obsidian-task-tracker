@@ -22,6 +22,11 @@ export function slottedOn(doc: TaskDocument, date: LocalDate, boundary = DayBoun
 	return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
 }
 
+/** Unfinished tasks of Now and Soon that are put on a time, on any day. */
+export function openSlotted(doc: TaskDocument): readonly TaskEntry[] {
+	return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
+}
+
 export function soonList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
 }
