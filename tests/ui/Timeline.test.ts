@@ -57,6 +57,7 @@ describe("Timeline grid", () => {
 		zoom.hourPx = 224;
 		view.layout();
 		expect(minorLabels(view).slice(0, 4)).toEqual([":15", ":30", ":45", ":15"]);
+		expect(view.canvas.querySelectorAll(".tc-hour-line.is-minor")).toHaveLength(24 * 11);
 
 		zoom.hourPx = 56;
 		view.layout();
