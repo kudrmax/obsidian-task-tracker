@@ -25,6 +25,9 @@ body {
 	--tc-line: #2C2C2E;
 	--tc-handle: #48484A;
 	--tc-hour-line: #232325;
+	/* The marks between the hours, once the zoom gives them room: greyer than the hours'. */
+	--tc-minor-label: #636366;
+	--tc-minor-line: #161618;
 	/* The ring round a task block and the dashed edge of New task. */
 	--tc-ring: #3A3A3C;
 	--tc-dash: #3A3A3C;
@@ -291,6 +294,8 @@ body.theme-light {
 	--tc-line: #E5E5EA;
 	--tc-handle: #C7C7CC;
 	--tc-hour-line: #EFEFF4;
+	--tc-minor-label: #AEAEB2;
+	--tc-minor-line: #F6F6F9;
 	--tc-ring: #D1D1D6;
 	--tc-dash: #C7C7CC;
 	--tc-resize: #AEAEB2;
@@ -424,6 +429,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
+.tc-hour-label.is-minor { color: var(--tc-minor-label); }
+.tc-hour-line.is-minor { background: var(--tc-minor-line); }
 .tc-items { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); }
 .tc-item { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: calc(var(--tc-col) * 100% / var(--tc-cols) + var(--tc-item-inset)); width: calc(100% / var(--tc-cols) - var(--tc-item-gap)); box-sizing: border-box; overflow: hidden; }
 .tc-item-title { font-size: var(--tc-font-block); line-height: var(--tc-leading-block); font-weight: var(--tc-weight-semibold); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }

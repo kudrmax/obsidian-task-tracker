@@ -42,6 +42,11 @@ export function layoutColumns(spans: readonly Span[]): ColumnBox[] {
 	return boxes;
 }
 
+/** The minutes between the grid's lines at this zoom: the finest division whose labels still have room, else the hour. */
+export function gridDivision(hourPx: number): number {
+	return LAYOUT.gridDivisions.find((minutes) => minutesToPx(minutes, hourPx) >= LAYOUT.gridLabelGap) ?? MINUTES_PER_HOUR;
+}
+
 export function minutesToPx(minutes: number, hourPx: number): number {
 	return (minutes / MINUTES_PER_HOUR) * hourPx;
 }
