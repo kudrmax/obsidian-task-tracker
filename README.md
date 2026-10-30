@@ -71,10 +71,12 @@ The export itself comes with the plugin: it keeps it in its own folder (`.obsidi
 1. Install Scriptable, create a script named `Export Work Calendar`, paste the script from Settings → Work calendar → Scriptable script → **Copy**.
 2. Scriptable → Settings → File Bookmarks → **+** → pick the vault folder → name it `ObsidianVault`.
 3. Run the script once: iOS asks for calendar access, the alert shows the number of events.
-4. Shortcuts → Automation → **+** → App → Obsidian → Is Opened → Run Immediately, with the actions Scriptable “Create File Bookmark” (`ObsidianVault`, the vault folder) → Scriptable “Run Script” → `Export Work Calendar`. Add “Time of Day” automations for the hours you want refreshes at.
-5. In the plugin settings, list the calendar titles to take from the file (empty: all of them), so Google calendars are not shown twice.
+4. Shortcuts → **+** → a shortcut named `Export Work Calendar` with two actions: Scriptable “Create File Bookmark” (`ObsidianVault`, the vault folder) → Scriptable “Run Script” → `Export Work Calendar`, Run In App off. The plugin and the automations below run this shortcut.
+5. Shortcuts → Automation → **+** → App → Obsidian → Is Opened → Run Immediately → Run Shortcut `Export Work Calendar`: the events are fresh every time Obsidian opens.
+6. The same with Time of Day, Run Immediately, one automation per hour you want a refresh at (iOS has no “every hour”), for example 9:00 to 19:00.
+7. In the plugin settings, list the calendar titles to take from the file (empty: all of them), so Google calendars are not shown twice.
 
-On the Mac the same file arrives through Obsidian Sync.
+On the iPhone, pulling the timeline down (or Refresh now in the sources window) runs the shortcut too: Shortcuts comes up for a moment and returns to Obsidian with the new events. On the Mac the same file arrives through Obsidian Sync.
 
 ## Development
 
