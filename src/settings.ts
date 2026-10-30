@@ -1,10 +1,9 @@
 export type RightMode = "calendar" | "soon";
 
+/** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
 export interface ZoomLevel {
 	/** Height of one hour on the timeline, CSS px. */
 	readonly hourPx: number;
-	/** Drag, resize and drop step at this level, minutes. */
-	readonly stepMinutes: number;
 }
 
 export interface SectionNames {
@@ -60,10 +59,10 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
 	longPressMs: 250,
 	zoomLevels: [
-		{ hourPx: 28, stepMinutes: 60 },
-		{ hourPx: 56, stepMinutes: 30 },
-		{ hourPx: 112, stepMinutes: 15 },
-		{ hourPx: 224, stepMinutes: 5 },
+		{ hourPx: 28 },
+		{ hourPx: 56 },
+		{ hourPx: 112 },
+		{ hourPx: 224 },
 	],
 	scrollToHour: 9,
 	dayStartHour: 5,

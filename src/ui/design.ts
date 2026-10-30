@@ -108,8 +108,10 @@ export const LAYOUT = {
 	stackGap: 4,
 	/** How far in a task card lies over a long task's body or an event. */
 	overlayInset: 18,
-	/** A task's dots stretch it by this step, whatever the zoom. */
-	resizeStepMinutes: 15,
+	/** The steps a drag, a drop and a stretch snap to, finest first: 10 is left out, since tasks start at :15 and :45 more than at :10. */
+	snapSteps: [5, 15, 30, 60],
+	/** The least a finger moves for one step: under this the snapped time would flicker between neighbours. */
+	snapStepPx: 9,
 	minutesPerDay: 1440,
 	/** A pull let go past this far refreshes the sources. */
 	pullThreshold: 60,

@@ -227,7 +227,7 @@ export class DragController {
 		const slot = timeline.spanOf(item.slot);
 		this.deps.haptics.tap();
 		capturePointer(block, e.pointerId);
-		const step = LAYOUT.resizeStepMinutes;
+		const step = this.deps.step();
 		let start = slot.start;
 		let end = slot.end ?? slot.start;
 		const move = (ev: PointerEvent) => {

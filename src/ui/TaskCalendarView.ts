@@ -91,7 +91,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
-			step: () => stepFor(this.hourPx, this.settings.zoomLevels),
+			step: () => stepFor(this.hourPx),
 			timeline: () => this.timeline,
 			targets: () => this.dropTargets(),
 			haptics: this.haptics,
@@ -174,7 +174,7 @@ export class TaskCalendarView extends ItemView {
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(this.rightEl, "div", "tc-fade");
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels) });
+		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		this.pull = new PullToRefresh(timeline.el, {
