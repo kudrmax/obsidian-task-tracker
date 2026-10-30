@@ -1,4 +1,4 @@
-import { localDateOf } from "../domain/LocalDate";
+import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { listOn, slottedOn, soonList, toItem } from "../domain/queries";
@@ -17,7 +17,7 @@ import {
 } from "./contracts";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 
-type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings) => TaskDocument;
+type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
 
 function allSectionNames(settings: TaskCalendarSettings): readonly string[] {
 	const s = settings.sections;
@@ -40,8 +40,8 @@ export class TaskServiceImpl implements TaskService {
 	) {}
 
 	async dayView(date: LocalDate): Promise<DayView> {
-		const { doc, today } = await this.readNormalized();
-		return { date, list: listOn(doc, date, today).map(toItem), slotted: slottedOn(doc, date).map(toItem) };
+		const { doc, today, boundary } = await this.readNormalized();
+		return { date, list: listOn(doc, date, today, boundary).map(toItem), slotted: slottedOn(doc, date, boundary).map(toItem) };
 	}
 
 	async soonView(): Promise<readonly TaskItem[]> {
@@ -61,7 +61,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
 		if (this.blank(text)) return;
-		await this.mutate((doc, today, settings) => ops.createAtTime(doc, date, today, start, settings.newTaskMinutes, text));
+		await this.mutate((doc, today, settings, boundary) => ops.createAtTime(doc, date, today, start, settings.newTaskMinutes, text, boundary));
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
@@ -103,7 +103,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async setSlot(key: TaskKey, slot: Slot): Promise<void> {
-		await this.mutate((doc, today) => ops.setSlot(doc, this.entryOf(doc, key), slot, today));
+		await this.mutate((doc, today, _settings, boundary) => ops.setSlot(doc, this.entryOf(doc, key), slot, today, boundary));
 	}
 
 	async clearSlot(key: TaskKey): Promise<void> {
@@ -123,7 +123,8 @@ export class TaskServiceImpl implements TaskService {
 		if (text === null) return;
 		const settings = this.settings.get();
 		const doc = this.parse(text, settings);
-		if (normalize(doc, this.today()) === doc) return;
+		const boundary = this.boundary(settings);
+		if (normalize(doc, boundary.dayOf(this.clock.now()), boundary) === doc) return;
 		await this.mutate((d) => d);
 	}
 
@@ -145,12 +146,13 @@ export class TaskServiceImpl implements TaskService {
 
 	private async mutate(operation: Operation): Promise<void> {
 		const settings = this.settings.get();
-		const today = this.today();
+		const boundary = this.boundary(settings);
+		const today = boundary.dayOf(this.clock.now());
 		let failure: unknown = null;
 		await this.store.write((text) => {
 			try {
-				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today);
-				return normalize(operation(doc, today, settings), today).serialize();
+				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary);
+				return normalize(operation(doc, today, settings, boundary), today, boundary).serialize();
 			} catch (e) {
 				failure = e;
 				return text;
@@ -159,12 +161,13 @@ export class TaskServiceImpl implements TaskService {
 		if (failure !== null) throw failure;
 	}
 
-	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate }> {
+	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate; boundary: DayBoundary }> {
 		const settings = this.settings.get();
 		const text = await this.store.read();
 		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
-		const today = this.today();
-		return { doc: normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today), today };
+		const boundary = this.boundary(settings);
+		const today = boundary.dayOf(this.clock.now());
+		return { doc: normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary), today, boundary };
 	}
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
@@ -178,8 +181,8 @@ export class TaskServiceImpl implements TaskService {
 		return entry;
 	}
 
-	private today(): LocalDate {
-		return localDateOf(this.clock.now());
+	private boundary(settings: TaskCalendarSettings): DayBoundary {
+		return new DayBoundary(settings.dayStartHour);
 	}
 
 	private blank(text: string): boolean {

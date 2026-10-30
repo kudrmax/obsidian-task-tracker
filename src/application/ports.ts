@@ -26,6 +26,8 @@ export const systemClock: Clock = { now: () => new Date() };
 export interface SettingsStore {
 	get(): TaskCalendarSettings;
 	update(patch: Partial<TaskCalendarSettings>): Promise<void>;
+	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
 }
 
 /** The events last fetched for each day, kept on the device across restarts: the calendar opens with them before the network answers. */

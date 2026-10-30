@@ -41,11 +41,26 @@ class FakeClock implements Clock {
 	}
 }
 
-function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes, cache = new MemoryEventCache()) {
-	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes }), cache);
+function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes, cache = new MemoryEventCache(), dayStartHour = 0) {
+	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes, dayStartHour }), cache);
 }
 
 describe("CalendarServiceImpl", () => {
+	it("a day that starts at 4 takes the timed events from 4 to 4 and the all-day events of its date", async () => {
+		const google = new FakeSource("google", [
+			event("google", "before four", new Date(2026, 9, 30, 2), new Date(2026, 9, 30, 3)),
+			event("google", "evening", new Date(2026, 9, 30, 20), new Date(2026, 9, 30, 21)),
+			event("google", "after midnight", new Date(2026, 9, 31, 1), new Date(2026, 9, 31, 2)),
+			event("google", "all day", new Date(2026, 9, 30), new Date(2026, 9, 31), true),
+			event("google", "all next day", new Date(2026, 9, 31), new Date(2026, 10, 1), true),
+		]);
+		const day = await service([google], new FakeClock(), DEFAULT_SETTINGS.staleAfterMinutes, new MemoryEventCache(), 4).eventsOn("2026-10-30");
+		expect(google.calls[0].start).toEqual(new Date(2026, 9, 30, 0, 0));
+		expect(google.calls[0].end).toEqual(new Date(2026, 9, 31, 4, 0));
+		expect(day.events.map((e) => e.id)).toEqual(["all day", "evening", "after midnight"]);
+		expect(day.statuses[0].message).toBe("3 events");
+	});
+
 	it("asks every source for the local day and merges the events by start", async () => {
 		const google = new FakeSource("google", [event("google", "g1", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
 		const work = new FakeSource("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);

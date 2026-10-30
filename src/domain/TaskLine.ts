@@ -1,4 +1,6 @@
 import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
+
+const DAY_MINUTES = 1440;
 import { STATUS_CHARS, type Slot, type Task, type TaskStatus } from "./Task";
 
 export interface Markers {
@@ -65,8 +67,8 @@ class FieldSlicer {
 		const date = m[1];
 		const start = parseHHMM(m[2]);
 		const end = parseHHMM(m[3]);
-		if (!isValidLocalDate(date) || start === null || end === null || start >= end) return null;
-		return { date, start, end };
+		if (!isValidLocalDate(date) || start === null || end === null || start >= DAY_MINUTES || start === end) return null;
+		return { date, start, end: end < start ? end + DAY_MINUTES : end };
 	}
 }
 
@@ -87,7 +89,7 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 	let line = `${indent}${bullet} [${task.statusChar}] ${task.text}`;
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
-		line += ` ${markers.slot} ${task.slot.date} ${minutesToHHMM(task.slot.start)}-${minutesToHHMM(task.slot.end)}`;
+		line += ` ${markers.slot} ${task.slot.date} ${minutesToHHMM(task.slot.start)}-${minutesToHHMM(task.slot.end > DAY_MINUTES ? task.slot.end - DAY_MINUTES : task.slot.end)}`;
 	}
 	return line;
 }

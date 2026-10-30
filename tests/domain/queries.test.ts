@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { listOn, slottedOn, soonList, toItem } from "../../src/domain/queries";
+import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -67,5 +68,19 @@ describe("toItem", () => {
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
 		});
+	});
+});
+
+describe("a day that starts at 4", () => {
+	const night = TaskDocument.parse("## Now\n- [ ] Late ⏰ 2026-10-31 01:00-02:00\n- [ ] Early ⏰ 2026-10-30 02:00-03:00\n- [ ] Plain\n", SECTIONS, M);
+	const atFour = new DayBoundary(4);
+
+	it("the timeline takes the slots from 4 to 4", () => {
+		expect(texts(slottedOn(night, T, atFour))).toEqual(["Late"]);
+		expect(texts(slottedOn(night, "2026-10-29", atFour))).toEqual(["Early"]);
+	});
+
+	it("the list leaves out what the timeline shows", () => {
+		expect(texts(listOn(night, T, T, atFour))).toEqual(["Early", "Plain"]);
 	});
 });

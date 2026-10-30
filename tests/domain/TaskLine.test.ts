@@ -40,6 +40,18 @@ describe("parseTaskLine", () => {
 		expect(formatTaskLine(p, M)).toBe(line);
 	});
 
+	it("reads a slot over midnight: an end before the start is on the next date", () => {
+		const line = "- [ ] Ночь ⏰ 2026-10-30 23:00-01:00";
+		const p = parseTaskLine(line, M)!;
+		expect(p.task.slot).toEqual({ date: "2026-10-30", start: 1380, end: 1500 });
+		expect(formatTaskLine(p, M)).toBe(line);
+	});
+
+	it("keeps a slot of no length in the text", () => {
+		expect(parseTaskLine("- [ ] A ⏰ 2026-10-30 10:00-10:00", M)!.task.slot).toBeNull();
+		expect(parseTaskLine("- [ ] A ⏰ 2026-10-30 24:00-01:00", M)!.task.slot).toBeNull();
+	});
+
 	it("keeps a broken due date in the text", () => {
 		const line = "- [ ] Текст 📅 2026-13-40";
 		const p = parseTaskLine(line, M)!;
