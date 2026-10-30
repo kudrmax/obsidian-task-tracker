@@ -33,11 +33,15 @@ export interface DropTarget {
 	landing(): DOMRect | null;
 	clear(): void;
 	drop(x: number, y: number, drag: DragPayload): DropResult | null;
+	/** While over this target the card hangs with its bottom here, in client pixels, so the target stays in sight. */
+	ceiling?(): number;
 }
 
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
+	/** Under the finger sideways, its bottom at `bottom`. */
+	raiseTo(x: number, bottom: number): void;
 	flyTo(rect: DOMRect): Promise<void>;
 	remove(): void;
 }

@@ -36,6 +36,9 @@ class FakeFloat implements Float {
 	moveTo(x: number, y: number): void {
 		this.log.push(`move ${x},${y}`);
 	}
+	raiseTo(x: number, bottom: number): void {
+		this.log.push(`raise ${x},${bottom}`);
+	}
 	async flyTo(to: DOMRect): Promise<void> {
 		this.log.push(`fly ${to.x},${to.y}`);
 	}
@@ -57,6 +60,15 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[]) {
 }
 
 describe("DragSession", () => {
+	it("raises the float above a target with a ceiling, so the card leaves it in sight", () => {
+		const bar = Object.assign(new FakeTarget("bar", 0, 100, { kind: "pickDate" }), { ceiling: () => 680 });
+		const float = new FakeFloat();
+		const s = session([bar], float, []);
+		s.move(50, 700);
+		s.move(150, 300);
+		expect(float.log).toEqual(["raise 50,680", "move 150,300"]);
+	});
+
 	it("moves the float and previews on the target under the pointer, clearing the one left", () => {
 		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
 		const b = new FakeTarget("b", 100, 200, { kind: "clearSlot" });
