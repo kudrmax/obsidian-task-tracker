@@ -218,7 +218,7 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
-		this.postponeZones = new PostponeZones(root, () => this.today(), () => this.haptics.tap());
+		this.postponeZones = new PostponeZones(root, () => this.today());
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),

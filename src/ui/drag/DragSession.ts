@@ -23,10 +23,8 @@ export class DragSession {
 
 	move(x: number, y: number): void {
 		if (this.done) return;
+		this.opts.float.moveTo(x, y);
 		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
-		const ceiling = target?.ceiling?.();
-		if (ceiling === undefined) this.opts.float.moveTo(x, y);
-		else this.opts.float.raiseTo(x, ceiling);
 		if (target !== this.current) {
 			this.current?.clear();
 			this.current = target;

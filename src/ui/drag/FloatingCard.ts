@@ -29,10 +29,6 @@ export class FloatingCard implements Float {
 		this.el.style.transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
 	}
 
-	raiseTo(x: number, bottom: number): void {
-		this.el.style.transform = `translate3d(${x - this.grab.dx}px, ${bottom - this.el.offsetHeight}px, 0)`;
-	}
-
 	/** Slides to the rect, taking its size and the look of a card at rest, its title on one line again. */
 	async flyTo(rect: DOMRect): Promise<void> {
 		this.el.classList.remove("is-whole");

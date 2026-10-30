@@ -1,5 +1,4 @@
 import { addDays } from "../dates";
-import { tokenPx } from "../design";
 import { el } from "../dom";
 import { icon, type IconName } from "../icons";
 import type { LocalDate } from "../types";
@@ -7,14 +6,12 @@ import type { DropResult, DropTarget } from "./DropTarget";
 
 type Zone = "tomorrow" | "pick";
 
-/** One zone as a place to drop: lit while the card is over it, the card held above the bar. */
+/** One zone as a place to drop: lit while the card is over it. */
 class PostponeDrop implements DropTarget {
 	constructor(
 		private readonly zone: HTMLElement,
-		private readonly bar: HTMLElement,
 		private readonly kind: Zone,
 		private readonly today: () => LocalDate,
-		private readonly onEnter: () => void,
 	) {}
 
 	hitTest(x: number, y: number): boolean {
@@ -23,13 +20,7 @@ class PostponeDrop implements DropTarget {
 	}
 
 	preview(): void {
-		if (this.zone.classList.contains("is-hot")) return;
 		this.zone.classList.add("is-hot");
-		this.onEnter();
-	}
-
-	ceiling(): number {
-		return this.bar.getBoundingClientRect().top - tokenPx(this.bar, "--tc-space-8");
 	}
 
 	/** Into Tomorrow the card goes; from Pick a date it goes back to its place, where the date picker opens over it. */
@@ -51,12 +42,11 @@ export class PostponeZones {
 	readonly targets: readonly DropTarget[];
 	private readonly bar: HTMLElement;
 
-	/** `onEnter`: the finger came onto a zone (a haptic tap). */
-	constructor(parent: HTMLElement, today: () => LocalDate, onEnter: () => void) {
+	constructor(parent: HTMLElement, today: () => LocalDate) {
 		this.bar = el(parent, "div", "tc-postpone");
 		this.targets = [
-			new PostponeDrop(this.zone(this.bar, "tomorrow", "Tomorrow"), this.bar, "tomorrow", today, onEnter),
-			new PostponeDrop(this.zone(this.bar, "calendar", "Pick a date"), this.bar, "pick", today, onEnter),
+			new PostponeDrop(this.zone(this.bar, "tomorrow", "Tomorrow"), "tomorrow", today),
+			new PostponeDrop(this.zone(this.bar, "calendar", "Pick a date"), "pick", today),
 		];
 	}
 

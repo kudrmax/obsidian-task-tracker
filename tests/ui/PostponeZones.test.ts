@@ -10,15 +10,11 @@ const drag: DragPayload = { item, from: "left", durationMin: null, grabPx: 20 };
 function setup() {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
-	const entered: number[] = [];
-	const zones = new PostponeZones(parent, () => "2026-10-30", () => entered.push(1));
+	const zones = new PostponeZones(parent, () => "2026-10-30");
 	const [tomorrow, pick] = Array.from(parent.querySelectorAll<HTMLElement>(".tc-zone"));
 	tomorrow.getBoundingClientRect = () => new DOMRect(10, 700, 160, 40);
 	pick.getBoundingClientRect = () => new DOMRect(178, 700, 160, 40);
-	const bar = parent.querySelector<HTMLElement>(".tc-postpone")!;
-	bar.style.setProperty("--tc-space-8", "8px");
-	bar.getBoundingClientRect = () => new DOMRect(0, 692, 390, 56);
-	return { parent, zones, tomorrow, pick, entered };
+	return { parent, zones, tomorrow, pick };
 }
 
 describe("PostponeZones", () => {
@@ -60,14 +56,5 @@ describe("PostponeZones", () => {
 		expect(zones.top()).toBeNull();
 		bar.getBoundingClientRect = () => new DOMRect(0, 692, 390, 56);
 		expect(zones.top()).toBe(692);
-	});
-
-	it("holds the card 8 px above the bar and taps once on entering a zone", () => {
-		const { zones, entered } = setup();
-		const target = zones.targets[0];
-		expect(target.ceiling?.()).toBe(684);
-		target.preview(50, 720, drag);
-		target.preview(60, 720, drag);
-		expect(entered).toEqual([1]);
 	});
 });
