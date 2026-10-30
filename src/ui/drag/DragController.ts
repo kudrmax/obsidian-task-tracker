@@ -224,7 +224,7 @@ export class DragController {
 	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
 		const timeline = this.deps.timeline();
 		if (!timeline || !item.slot || !this.deps.arbiter.claim(RESIZE)) return;
-		const slot = timeline.spanOf(item.slot);
+		const slot = timeline.shownSpan(item);
 		this.deps.haptics.tap();
 		capturePointer(block, e.pointerId);
 		const step = this.deps.step();

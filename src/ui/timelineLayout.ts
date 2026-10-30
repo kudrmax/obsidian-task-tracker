@@ -137,6 +137,12 @@ export function stackTasks(tasks: readonly TaskSpan[], events: readonly Span[], 
 	return boxes;
 }
 
+/** A task left open past its start rides the now line, its duration kept; the file keeps its time. */
+export function followNow(span: TaskSpan, now: number): TaskSpan {
+	if (span.start >= now) return span;
+	return { start: now, end: span.end === null ? null : now + span.end - span.start };
+}
+
 /** A duration as the card writes it: a number over its unit. */
 export function durationParts(minutes: number): [string, string] {
 	if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];

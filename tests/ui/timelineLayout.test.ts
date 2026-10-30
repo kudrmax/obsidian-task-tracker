@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, gridAt, itemBox, layoutColumns, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, followNow, gridAt, itemBox, layoutColumns, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -180,5 +180,17 @@ describe("scrollPlace", () => {
 
 	it("puts the hour of another day at the very top", () => {
 		expect(scrollPlace({ ...day, y: 9 * 56 }, 0)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 7 + 9 * 56 });
+	});
+});
+
+describe("followNow", () => {
+	it("leaves a span that starts at now or later alone", () => {
+		expect(followNow({ start: 720, end: null }, 720)).toEqual({ start: 720, end: null });
+		expect(followNow({ start: 780, end: 840 }, 720)).toEqual({ start: 780, end: 840 });
+	});
+
+	it("starts a passed span at now, its duration kept", () => {
+		expect(followNow({ start: 600, end: null }, 720)).toEqual({ start: 720, end: null });
+		expect(followNow({ start: 600, end: 660 }, 720)).toEqual({ start: 720, end: 780 });
 	});
 });
