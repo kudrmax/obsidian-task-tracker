@@ -38,6 +38,8 @@ describe("DayBoundary", () => {
 		expect(AT_FOUR.slotAt(D, 1260, 1320)).toEqual({ date: NEXT, start: 60, end: 120 });
 		expect(AT_FOUR.slotAt(D, 1140, 1260)).toEqual({ date: D, start: 1380, end: 1500 });
 		expect(DayBoundary.MIDNIGHT.slotAt(D, 1380, 1440)).toEqual({ date: D, start: 1380, end: 1440 });
+		expect(AT_FOUR.slotAt(D, 1260, null)).toEqual({ date: NEXT, start: 60, end: null });
+		expect(AT_FOUR.spanOf({ date: NEXT, start: 60, end: null }, D)).toEqual({ start: 1260, end: null });
 	});
 
 	it("names the hour each line of the day starts at", () => {
@@ -59,6 +61,8 @@ describe("DayBoundary", () => {
 		expect(DayBoundary.MIDNIGHT.clamp({ date: D, start: 1420, end: 1480 }, 30)).toEqual({ date: D, start: 1410, end: 1440 });
 		expect(DayBoundary.MIDNIGHT.clamp({ date: D, start: -10, end: 50 }, 30)).toEqual({ date: D, start: 0, end: 60 });
 		expect(DayBoundary.MIDNIGHT.clamp({ date: D, start: 600, end: 660 }, 30)).toEqual({ date: D, start: 600, end: 660 });
+		expect(DayBoundary.MIDNIGHT.clamp({ date: D, start: 1440, end: null }, 30)).toEqual({ date: D, start: 1410, end: null });
+		expect(AT_FOUR.clamp({ date: NEXT, start: 235, end: null }, 5)).toEqual({ date: NEXT, start: 235, end: null });
 	});
 
 	it("takes only a whole hour of the day", () => {

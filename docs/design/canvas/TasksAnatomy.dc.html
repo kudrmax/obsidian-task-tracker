@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача на таймлайне: анатомия</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#000}
+</style>
+</helmet>
+<div style="width: 760px; box-sizing: border-box; padding: 36px 40px 40px; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 36px;">
+<sc-for list="{{specimens}}" as="sp" hint-placeholder-count="8">
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;">
+<h3 style="margin: 0; font-size: 16px; line-height: 20px; font-weight: 700;">{{sp.name}}</h3>
+<p style="margin: 0; font-size: 13px; line-height: 17px; color: #8E8E93;">{{sp.note}}</p>
+</div>
+<div style="position: relative; height: {{sp.areaH}}px;">
+<sc-for list="{{sp.lines}}" as="l" hint-placeholder-count="2">
+<span style="position: absolute; left: 0; width: 22px; top: {{l.labelTop}}px; text-align: right; font-size: 11px; line-height: 14px; color: #8E8E93; font-variant-numeric: tabular-nums;">{{l.label}}</span>
+<span style="position: absolute; left: 26px; right: 0; top: {{l.top}}px; height: 1px; background: #232325;"></span>
+</sc-for>
+<sc-for list="{{sp.events}}" as="e" hint-placeholder-count="0">
+<div style="position: absolute; left: 29px; right: 1px; top: {{e.top}}px; height: {{e.h}}px; border-radius: 6px; background: rgba(10,132,255,0.24); display: flex; overflow: hidden;">
+<span style="width: 3px; flex-shrink: 0; background: #0A84FF;"></span>
+<span style="padding: 4px 6px; font-size: 12px; line-height: 15px; font-weight: 600; color: #8CC6FF;">{{e.title}}</span>
+</div>
+</sc-for>
+<sc-for list="{{sp.cards}}" as="k" hint-placeholder-count="1">
+<sc-if value="{{k.isTask}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{k.left}}px; right: 1px; top: {{k.top}}px; height: {{k.h}}px; box-sizing: border-box; overflow: hidden; border-radius: 12px; background: #1C1C1E; box-shadow: {{k.ring}}; padding: 11px 8px 0 12px; display: flex; align-items: flex-start; gap: 6px;">
+<sc-if value="{{k.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #8A6CEF;"></span>
+</sc-if>
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; line-height: 18px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{k.title}}</span>
+<sc-if value="{{k.hasMeta}}" hint-placeholder-val="{{false}}">
+<span style="width: 14px; flex-shrink: 0; margin-top: -1px; display: flex; flex-direction: column; align-items: center;"><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: #8E8E93; font-variant-numeric: tabular-nums;">{{k.top1}}</span><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: #8E8E93; font-variant-numeric: tabular-nums;">{{k.top2}}</span></span>
+</sc-if>
+<sc-if value="{{k.resizing}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; right: 8px; bottom: 10px; height: 18px; padding: 0 6px; border-radius: 6px; background: #9580FF; color: #FFFFFF; font-size: 12px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{k.end}}</span>
+</sc-if>
+</div>
+<sc-if value="{{k.resizing}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; top: {{k.hTop}}px; right: 15px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid #9580FF; background: #000000;"></span>
+<span style="position: absolute; top: {{k.hBottom}}px; left: {{k.hLeft}}px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid #9580FF; background: #000000;"></span>
+</sc-if>
+</sc-if>
+<sc-if value="{{k.isDrop}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{k.left}}px; right: 1px; top: {{k.top}}px; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1.5px dashed #9580FF; background: #251F3D; padding: 0 8px 0 12px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #9580FF; font-variant-numeric: tabular-nums;">{{k.meta}}</div>
+</sc-if>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":970}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const H = 56;
+    const lines = (from, count) => Array.from({ length: count }, (_, i) => ({ label: String(from + i), top: i * H, labelTop: i * H - 7 }));
+    const card = (o) => ({ isTask: true, isDrop: false, left: 29, progress: false, ring: 'none', hasMeta: !!o.meta, meta: '', resizing: false, end: '', grabber: '#636366', ...o, hTop: o.top - 5, hBottom: o.top + o.h - 5, hLeft: (o.left ?? 29) + 14, top1: o.meta ? o.meta.split(' ')[0] : '', top2: o.meta ? o.meta.split(' ')[1] : '' });
+    const specimens = [
+      { name: '1. Задача на время', note: 'Без длительности и без ручек. Высота 40 при любом масштабе, верх на линии своего времени', areaH: 120, lines: lines(14, 3), events: [],
+        cards: [card({ title: 'Разобрать почту', top: 1, h: 40 })] },
+      { name: '2. С длительностью', note: 'Высота = длительность, но не меньше 40. Название наверху', areaH: 120, lines: lines(14, 3), events: [],
+        cards: [card({ title: 'Написать отчёт', top: 1, h: 110, progress: true })] },
+      { name: '3. Выделение и растягивание', note: 'Долгое нажатие: рамка акцентом и две точки. Верхняя двигает начало, нижняя конец, шаг 15 минут', areaH: 120, lines: lines(14, 3), events: [],
+        cards: [card({ title: 'Разобрать почту', top: 1, h: 82, ring: 'inset 0 0 0 1.5px #9580FF', resizing: true, end: '15:30', grabber: '#9580FF' })] },
+      { name: '4. Длительность не видна', note: 'Длительность короче 40 px: карточка остаётся 40, справа мелко длительность', areaH: 120, lines: [{ label: '11', top: 0, labelTop: -7 }, { label: '12', top: 28, labelTop: 21 }, { label: '13', top: 56, labelTop: 49 }, { label: '14', top: 84, labelTop: 77 }], events: [],
+        cards: [card({ title: 'Написать отчёт', top: 1, h: 40, progress: true, hasMeta: true, meta: '1 H' })] },
+      { name: '5. Одно время', note: 'Не колонки, а друг под другом через 4 px. У всех задач стопки крошечное время справа', areaH: 150, lines: lines(17, 3), events: [],
+        cards: [card({ title: 'Заказать продукты', top: 1, h: 40, meta: '17 00' }), card({ title: 'Позвонить в банк', top: 45, h: 40, meta: '17 00' }), card({ title: 'Купить корм коту', top: 89, h: 40, meta: '17 05' })] },
+      { name: '6. Внутри длинной', note: 'Задача во время длинной ложится на её тело с отступом 18; голова длинной не закрывается', areaH: 150, lines: lines(14, 3), events: [],
+        cards: [card({ title: 'Ревью дизайна', top: 1, h: 140 }), card({ title: 'Ответить Вадиму', top: 57, h: 40, left: 47, ring: '0 0 0 2px #000000' })] },
+      { name: '7. Поверх события', note: 'Задача над событием с отступом 18 и обводкой цвета фона; полоса события видна слева', areaH: 120, lines: lines(15, 3), events: [{ title: 'Планирование спринта', top: 1, h: 82 }],
+        cards: [card({ title: 'Подготовить вопросы', top: 29, h: 40, left: 47, ring: '0 0 0 2px #000000' })] },
+      { name: '8. Цель броска', note: 'Пунктир 40 px с временем; встаёт в стопку как обычная задача и двигает соседей', areaH: 120, lines: lines(16, 3), events: [],
+        cards: [{ isTask: false, isDrop: true, left: 29, top: 29, meta: '16:30' }, card({ title: 'Заказать продукты', top: 73, h: 40, meta: '17 00' })] }
+    ];
+    return { specimens };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,25 +1,17 @@
-import { formatTime } from "../dates";
-import { LAYOUT, PROPERTY } from "../design";
-import { el, px } from "../dom";
+import { LAYOUT } from "../design";
 import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
 import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
-function setColumn(block: HTMLElement, column: number, columns: number): void {
-	block.style.setProperty(PROPERTY.column, String(column));
-	block.style.setProperty(PROPERTY.columns, String(columns));
-}
-
 export interface TimelineDropOptions {
 	step(): number;
 }
 
-/** The timeline as a place to drop: a dashed target snapped to the grid, with the start time, that scrolls the day near the edges. */
+/** The timeline as a place to drop: a dashed card snapped to the grid, with the start time, that scrolls the day near the edges. */
 export class TimelineDrop implements DropTarget {
-	private dropEl: HTMLElement | null = null;
-	private sharing: HTMLElement[] = [];
-	private start = 0;
+	private start: number | null = null;
+	private duration: number | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private frame = 0;
 
@@ -33,42 +25,31 @@ export class TimelineDrop implements DropTarget {
 		return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
 	}
 
+	/** The dashed card's top stays where the dragged card's top is under the finger. */
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
-		this.show(y, drag.durationMin, drag.anchorMin);
+		this.show(this.timeline.minutesAt(y - drag.grabPx), drag.durationMin);
 		this.autoScroll(y);
 	}
 
 	/** The target for a new task under a long tap: its start where the finger is. */
-	previewNew(y: number, durationMin: number): void {
-		this.show(y, durationMin, 0);
+	previewNew(y: number): void {
+		this.show(this.timeline.minutesAt(y), null);
 	}
 
-	/** The slot the target shows now. */
+	/** The slot the target shows now: a task keeps its duration, a new one has none. */
 	get slot(): Slot {
-		return this.timeline.slotAt(this.start, this.end);
+		const start = this.start ?? 0;
+		return this.timeline.slotAt(start, this.duration === null ? null : start + this.duration);
 	}
 
-	private end = 0;
-
-	private show(y: number, durationMin: number, anchorMin: number): void {
-		const latest = LAYOUT.minutesPerDay - durationMin;
-		const wanted = this.timeline.minutesAt(y) - anchorMin;
-		this.start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
-		this.end = this.start + durationMin;
-		this.dropEl ??= el(this.timeline.itemsEl, "div", "tc-item tc-drop");
-		this.dropEl.style.setProperty(PROPERTY.y, px(this.timeline.yOf(this.start)));
-		this.dropEl.style.setProperty(PROPERTY.length, px(this.timeline.yOf(this.end) - this.timeline.yOf(this.start)));
-		this.dropEl.textContent = formatTime(this.start);
-		this.share(this.timeline.blocksBetween(this.start, this.end).filter((b) => !b.classList.contains("is-lifted")));
-	}
-
-	/** A block already at the target's time takes the right half; the target the left. */
-	private share(blocks: HTMLElement[]): void {
-		for (const block of this.sharing) if (!blocks.includes(block)) setColumn(block, 0, 1);
-		for (const block of blocks) setColumn(block, 1, 2);
-		this.sharing = blocks;
-		if (this.dropEl) setColumn(this.dropEl, 0, blocks.length ? 2 : 1);
+	private show(wanted: number, duration: number | null): void {
+		const latest = LAYOUT.minutesPerDay - (duration ?? LAYOUT.minSlotMinutes);
+		const start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
+		this.duration = duration;
+		if (start === this.start) return;
+		this.start = start;
+		this.timeline.showDrop(start);
 	}
 
 	/** Near the top or bottom edge the day scrolls under the finger, faster the closer to the edge. */
@@ -88,15 +69,14 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	landing(): DOMRect | null {
-		return this.dropEl?.getBoundingClientRect() ?? null;
+		return this.timeline.dropRect();
 	}
 
 	clear(): void {
 		if (this.frame) cancelAnimationFrame(this.frame);
 		this.frame = 0;
-		this.share([]);
-		this.dropEl?.remove();
-		this.dropEl = null;
+		this.start = null;
+		this.timeline.clearDrop();
 		this.last = null;
 	}
 

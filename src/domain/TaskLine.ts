@@ -34,7 +34,7 @@ class FieldSlicer {
 	private readonly dueRe: RegExp;
 
 	constructor(markers: Markers) {
-		this.slotRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.slot)}\\s+${DATE}\\s+${TIME}-${TIME}$`);
+		this.slotRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.slot)}\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
 		this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
 	}
 
@@ -66,8 +66,10 @@ class FieldSlicer {
 	private slotOf(m: RegExpExecArray): Slot | null {
 		const date = m[1];
 		const start = parseHHMM(m[2]);
+		if (!isValidLocalDate(date) || start === null || start >= DAY_MINUTES) return null;
+		if (m[3] === undefined) return { date, start, end: null };
 		const end = parseHHMM(m[3]);
-		if (!isValidLocalDate(date) || start === null || end === null || start >= DAY_MINUTES || start === end) return null;
+		if (end === null || start === end) return null;
 		return { date, start, end: end < start ? end + DAY_MINUTES : end };
 	}
 }
@@ -89,7 +91,8 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 	let line = `${indent}${bullet} [${task.statusChar}] ${task.text}`;
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
-		line += ` ${markers.slot} ${task.slot.date} ${minutesToHHMM(task.slot.start)}-${minutesToHHMM(task.slot.end > DAY_MINUTES ? task.slot.end - DAY_MINUTES : task.slot.end)}`;
+		const { date, start, end } = task.slot;
+		line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES ? end - DAY_MINUTES : end)}`}`;
 	}
 	return line;
 }
