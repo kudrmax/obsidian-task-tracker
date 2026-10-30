@@ -81,7 +81,7 @@ const plugin = "app.plugins.plugins['task-calendar']";
 const type = (text) => send("Input.insertText", { text });
 
 async function reload() {
-	await evaluate(`(async () => { await app.plugins.disablePlugin('task-calendar'); await app.plugins.enablePlugin('task-calendar'); await app.commands.executeCommandById('task-calendar:open'); await new Promise(r => setTimeout(r, 800)); await ${plugin}.update({ listWidth: 187, rightMode: 'calendar' }); ${view}.render(); ${view}.timeline.scrollTo(540, 0); return 'ok'; })()`);
+	await evaluate(`(async () => { await app.plugins.disablePlugin('task-calendar'); await app.plugins.enablePlugin('task-calendar'); await app.commands.executeCommandById('task-calendar:open'); await new Promise(r => setTimeout(r, 800)); await ${plugin}.update({ listWidth: 187, rightMode: 'calendar', dayStartHour: 0 }); ${view}.render(); ${view}.timeline.scrollTo(540, 0); return 'ok'; })()`);
 	await sleep(300);
 }
 const toNine = () => evaluate(`${view}.timeline.scrollTo(540, 0); 'ok'`);

@@ -25,7 +25,7 @@ Made by `node docs/design/reference/capture.mjs` against the scratch Obsidian (C
 | ScreenNewSlot | 0.633% | 16.328% |
 | ScreenTasksStack | 0.672% | 10.631% |
 | ScreenTasksLong | 0.716% | 9.263% |
-| ScreenTasksZoomIn | 0.652% | 12.823% |
+| ScreenTasksZoomIn | 0.679% | 13.091% |
 | ScreenTasksZoomOut | 9.839% | 24.522% |
 | ScreenTasksResize | 0.646% | 14.232% |
 | ScreenLight | 0.613% | 13.493% |
@@ -35,5 +35,5 @@ Made by `node docs/design/reference/capture.mjs` against the scratch Obsidian (C
 | ScreenLightDue | 0.563% | 44.821% |
 | ScreenLightPicker | 0.594% | 39.850% |
 | ScreenLightSheet | 11.666% | 28.706% |
-| ScreenLightSheetPicker | 15.974% | 34.005% |
+| ScreenLightSheetPicker | 15.986% | 34.015% |
 | ScreenLightSources | 0.226% | 43.870% |
