@@ -22,9 +22,11 @@ body{margin:0;background:#000}
 
 <sc-if value="{{isPopover}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; inset: 0; background: {{k.overlay}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
-<div style="position: absolute; left: 292px; top: 120px; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{k.track}}; display: flex; gap: 2px; z-index: 11;">
-<span style="position: relative; width: 40px; height: 28px; border-radius: 14px; background: {{k.selBg}}; color: {{k.selText}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><line x1="3.5" y1="10" x2="20.5" y2="10"></line><line x1="8" y1="3" x2="8" y2="6.5"></line><line x1="16" y1="3" x2="16" y2="6.5"></line></svg><span style="position: absolute; top: 2px; right: 7px; width: 7px; height: 7px; border-radius: 4px; background: {{k.orange}};"></span></span>
-<span style="width: 40px; height: 28px; border-radius: 14px; color: #8E8E93; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="9" y1="6.5" x2="20" y2="6.5"></line><line x1="9" y1="12" x2="20" y2="12"></line><line x1="9" y1="17.5" x2="20" y2="17.5"></line><circle cx="4.5" cy="6.5" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="17.5" r="1" fill="currentColor"></circle></svg></span>
+<div style="position: absolute; left: 260px; top: 120px; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{k.track}}; display: flex; z-index: 11;">
+<span style="position: absolute; top: 2px; left: 40px; width: 76px; height: 28px; border-radius: 14px; background: {{k.selBg}};"></span>
+<sc-for list="{{chips}}" as="o" hint-placeholder-count="3">
+<span style="position: relative; width: 38px; height: 28px; color: {{o.color}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{k.orange}};"></span></sc-if></span>
+</sc-for>
 </div>
 <div style="position: absolute; right: 12px; top: 162px; width: 268px; border-radius: 14px; overflow: hidden; background: {{k.panel}}; box-shadow: {{k.shadow}}; z-index: 11;">
 <sc-for list="{{sources}}" as="s" hint-placeholder-count="2">
@@ -89,8 +91,8 @@ class Component extends DCLogic {
     const mode = this.props.mode ?? 'dot';
     const light = this.props.theme === 'light';
     const k = light
-      ? { bg: '#FFFFFF', text: '#000000', overlay: 'rgba(0,0,0,0.22)', track: '#EEEEF0', selBg: '#1C1C1E', selText: '#FFFFFF', orange: '#FF9500', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', icon: '#3A3A3C', gap: '#E5E5EA', soft: '#6C6C70', sep: '#D1D1D6', accent: '#8A5CF5' }
-      : { bg: '#000000', text: '#FFFFFF', overlay: 'rgba(0,0,0,0.55)', track: '#1C1C1E', selBg: '#E5E5EA', selText: '#000000', orange: '#FF9F0A', panel: 'rgba(44,44,46,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.7)', icon: '#E5E5EA', gap: '#1C1C1E', soft: '#AEAEB2', sep: '#48484A', accent: '#8A6CEF' };
+      ? { bg: '#FFFFFF', text: '#000000', overlay: 'rgba(0,0,0,0.22)', track: '#EEEEF0', selBg: '#1C1C1E', selText: '#FFFFFF', muted: '#8E8E93', orange: '#FF9500', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', icon: '#3A3A3C', gap: '#E5E5EA', soft: '#6C6C70', sep: '#D1D1D6', accent: '#8A5CF5' }
+      : { bg: '#000000', text: '#FFFFFF', overlay: 'rgba(0,0,0,0.55)', track: '#1C1C1E', selBg: '#E5E5EA', selText: '#000000', muted: '#8E8E93', orange: '#FF9F0A', panel: 'rgba(44,44,46,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.7)', icon: '#E5E5EA', gap: '#1C1C1E', soft: '#AEAEB2', sep: '#48484A', accent: '#8A6CEF' };
     const SEP = '0.5px solid ' + k.sep;
     const ORANGE = k.orange;
     const icons = {
@@ -118,6 +120,11 @@ class Component extends DCLogic {
       taskSettings,
       icons,
       k,
+      chips: [
+        { path: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z', color: k.muted, dot: false },
+        { path: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4', color: k.selText, dot: false },
+        { path: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5', color: k.selText, dot: true }
+      ],
       theme: light ? 'light' : 'dark',
       accent: k.accent
     };

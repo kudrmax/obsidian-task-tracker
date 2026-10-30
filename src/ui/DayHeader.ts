@@ -1,7 +1,7 @@
 import type { RightMode } from "../settings";
 import { el } from "./dom";
 import { icon } from "./icons";
-import { SegmentedControl } from "./SegmentedControl";
+import { ColumnSwitch } from "./ColumnSwitch";
 
 export interface DayHeaderOptions {
 	title(): string;
@@ -11,12 +11,13 @@ export interface DayHeaderOptions {
 	onMode(mode: RightMode): void;
 	dot(): boolean;
 	onSources(anchor: HTMLElement): void;
+	longPressMs(): number;
 }
 
-/** The day row: the arrows round the day's name, and the switch of the right column. */
+/** The day row: the arrows round the day's name, and the switch of the columns. */
 export class DayHeader {
 	private readonly titleEl: HTMLButtonElement;
-	private readonly segmented: SegmentedControl;
+	private readonly switcher: ColumnSwitch;
 
 	constructor(parent: HTMLElement, private readonly opts: DayHeaderOptions) {
 		const row = el(parent, "div", "tc-day-row");
@@ -26,7 +27,13 @@ export class DayHeader {
 		this.titleEl.setAttribute("aria-label", "Back to today");
 		this.titleEl.addEventListener("click", () => opts.onToday());
 		this.arrow(nav, "chevronRight", "Next day", () => opts.onStep(1));
-		this.segmented = new SegmentedControl(row, { value: () => opts.mode(), onChange: (mode) => opts.onMode(mode), dot: () => opts.dot(), onCalendarAgain: () => opts.onSources(this.segmented.el) });
+		this.switcher = new ColumnSwitch(row, {
+			value: () => opts.mode(),
+			onChange: (mode) => opts.onMode(mode),
+			dot: () => opts.dot(),
+			onSources: () => opts.onSources(this.switcher.el),
+			longPressMs: () => opts.longPressMs(),
+		});
 		this.render();
 	}
 
@@ -39,6 +46,6 @@ export class DayHeader {
 
 	render(): void {
 		this.titleEl.textContent = this.opts.title();
-		this.segmented.render();
+		this.switcher.render();
 	}
 }

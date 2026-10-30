@@ -98,8 +98,8 @@ describe("GoogleRedirectLogin", () => {
 		timers[0].fn();
 		await expect(first).rejects.toThrow("five minutes");
 		const second = login.login("id");
-		const replaced = expect(second).rejects.toThrow("newer login");
 		await flush();
+		const replaced = expect(second).rejects.toThrow("newer login");
 		const third = login.login("id");
 		await flush();
 		await replaced;
