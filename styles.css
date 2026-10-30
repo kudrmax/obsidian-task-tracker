@@ -520,6 +520,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 .tc-block.is-over .tc-block-card { box-shadow: 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
+.tc-block.is-late .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-now); }
+.tc-block.is-over.is-late .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-now), 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
+.tc-block.is-late .tc-block-meta { color: var(--tc-now); }
 .tc-block.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
 .tc-block.is-over.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent), 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
 .tc-block-meta { width: var(--tc-meta-w); flex-shrink: 0; margin-top: calc(-1 * var(--tc-meta-lift)); display: flex; flex-direction: column; align-items: center; font-size: var(--tc-font-meta); line-height: var(--tc-leading-meta); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
