@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { DayBoundary } from "../../src/application/contracts";
 import type { TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
+import { DEFAULT_SETTINGS } from "../../src/settings";
+
+/** One card and one gap: how far down a stack the next card stands. */
+const STACK_STEP = DEFAULT_SETTINGS.cardHeight + DEFAULT_SETTINGS.cardGap;
 
 function timeline(zoom: { hourPx: number }, boundary = DayBoundary.MIDNIGHT, tasks: TaskItem[] = []): Timeline {
 	const view = new Timeline(document.createElement("div"), {
@@ -97,7 +101,7 @@ describe("task cards", () => {
 		expect(grips.classList.contains("is-shown")).toBe(false);
 		view.select(tasks[1]);
 		expect(grips.classList.contains("is-shown")).toBe(true);
-		expect(grips.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1 + 44}px`);
+		expect(grips.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1 + STACK_STEP}px`);
 	});
 
 	it("marks a drop with a line at its very minute and leaves the cards where they are", () => {
@@ -154,7 +158,7 @@ describe("tasks the now line has passed", () => {
 
 	it("writes a task in progress pushed down the stack at its own time, not the line's", () => {
 		const [, doing] = onToday([task(0, 540, null), task(1, 600, null, "inProgress")]);
-		expect(y(doing)).toBe(`${12 * hourPx + 1 + 44}px`);
+		expect(y(doing)).toBe(`${12 * hourPx + 1 + STACK_STEP}px`);
 		expect(meta(doing)).toEqual(["10", "00"]);
 	});
 
@@ -167,7 +171,7 @@ describe("tasks the now line has passed", () => {
 	it("stacks several late tasks under the line in their order", () => {
 		const [first, second] = onToday([task(0, 540, null), task(1, 600, null)]);
 		expect(y(first)).toBe(`${12 * hourPx + 1}px`);
-		expect(y(second)).toBe(`${12 * hourPx + 1 + 44}px`);
+		expect(y(second)).toBe(`${12 * hourPx + 1 + STACK_STEP}px`);
 		expect(meta(second)).toEqual(["10", "00"]);
 	});
 

@@ -1,4 +1,4 @@
-import { DESIGN } from "../design";
+import { shownCardSize } from "../cardSize";
 import type { ListEntry, TaskList } from "../TaskList";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
 
@@ -37,9 +37,10 @@ export class ListDrop implements DropTarget {
 		const at = this.rects[this.index];
 		if (at) return at;
 		const last = this.rects[this.rects.length - 1];
-		if (last) return new DOMRect(last.left, last.bottom + DESIGN.cardGap, last.width, DESIGN.cardHeight);
+		const card = shownCardSize();
+		if (last) return new DOMRect(last.left, last.bottom + card.gap, last.width, card.height);
 		const r = this.list.el.getBoundingClientRect();
-		return new DOMRect(r.left, r.top, r.width, DESIGN.cardHeight);
+		return new DOMRect(r.left, r.top, r.width, card.height);
 	}
 
 	clear(): void {

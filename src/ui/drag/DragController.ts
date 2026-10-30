@@ -1,5 +1,6 @@
 import type { TaskItem } from "../../application/contracts";
-import { DESIGN, LAYOUT } from "../design";
+import { shownCardSize } from "../cardSize";
+import { LAYOUT } from "../design";
 import { stretchedSpan } from "../timelineLayout";
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
@@ -78,7 +79,7 @@ export class DragController {
 	private payload(card: HTMLElement, item: TaskItem, from: DragOrigin, e: PointerEvent): DragPayload {
 		const onTimeline = from === "timeline" && item.slot;
 		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
-		const grabPx = onTimeline ? e.clientY - card.getBoundingClientRect().top : DESIGN.cardHeight / 2;
+		const grabPx = onTimeline ? e.clientY - card.getBoundingClientRect().top : shownCardSize().height / 2;
 		return { item, from, durationMin, grabPx };
 	}
 
@@ -246,7 +247,7 @@ export class DragController {
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
-			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx);
+			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx, shownCardSize().height);
 			const changed = next.start !== slot.start || next.end !== slot.end;
 			if (apply && changed) {
 				this.deps.haptics.tap();

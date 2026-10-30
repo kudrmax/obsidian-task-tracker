@@ -265,8 +265,9 @@ export class TaskCalendarView extends ItemView {
 		return new DayBoundary(this.settings.dayStartHour);
 	}
 
-	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. */
+	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. Another card size restacks the timeline. */
 	private onSettings(): void {
+		this.timeline?.layoutTasks();
 		if (!sameLevels(this.settings.priorities, this.priorities)) {
 			this.priorities = this.settings.priorities;
 			void this.data.tasks();

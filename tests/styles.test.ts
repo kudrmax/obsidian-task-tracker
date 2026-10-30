@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SETTINGS } from "../src/settings";
 import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../src/ui/design";
 
 interface Declaration {
@@ -184,6 +185,11 @@ describe("styles.css keeps to its design system", () => {
 			.map((measure) => ({ measure, token: DESIGN_TOKENS[measure], css: tokens.get(DESIGN_TOKENS[measure]), code: DESIGN[measure] }))
 			.filter(({ css, code }) => css === undefined || !/^\d+(\.\d+)?(px)?$/.test(css) || parseFloat(css) !== code);
 		expect(differences).toEqual([]);
+	});
+
+	it("draws the cards at the settings' default size until the settings set theirs", () => {
+		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
+		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
 	});
 });
 

@@ -22,7 +22,7 @@ export class FloatingCard implements Float {
 		this.el.className = "tc-float";
 		fillCard(this.el, item, { day });
 		document.body.appendChild(this.el);
-		stretchWhole(this.el, { width: DESIGN.floatWidth, height: DESIGN.floatHeight }, roomWidth(windowRoom(this.el)));
+		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
 	}
 
 	moveTo(x: number, y: number): void {
