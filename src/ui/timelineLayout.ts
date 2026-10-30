@@ -10,6 +10,12 @@ export interface ColumnBox {
 	readonly cols: number;
 }
 
+/** The minutes between the grid's labelled lines and between all its lines. */
+export interface Grid {
+	readonly labels: number;
+	readonly lines: number;
+}
+
 export interface ItemBox {
 	readonly top: number;
 	readonly height: number;
@@ -42,9 +48,11 @@ export function layoutColumns(spans: readonly Span[]): ColumnBox[] {
 	return boxes;
 }
 
-/** The minutes between the grid's lines at this zoom: the finest division whose labels still have room, else the hour. */
-export function gridDivision(hourPx: number): number {
-	return LAYOUT.gridDivisions.find((minutes) => minutesToPx(minutes, hourPx) >= LAYOUT.gridLabelGap) ?? MINUTES_PER_HOUR;
+/** The grid at this zoom: labels at the finest division that still has room for them, else the hour; lines as often as they stay apart. */
+export function gridAt(hourPx: number): Grid {
+	const labels = LAYOUT.gridDivisions.find((minutes) => minutesToPx(minutes, hourPx) >= LAYOUT.gridLabelGap) ?? MINUTES_PER_HOUR;
+	const ticks = minutesToPx(LAYOUT.gridTickMinutes, hourPx) >= LAYOUT.gridTickGap;
+	return { labels, lines: ticks ? LAYOUT.gridTickMinutes : labels };
 }
 
 export function minutesToPx(minutes: number, hourPx: number): number {

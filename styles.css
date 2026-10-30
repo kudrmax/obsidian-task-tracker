@@ -219,6 +219,10 @@ body {
 	--tc-font-tiny: 10px;
 	--tc-font-hour: 11px;
 	--tc-leading-hour: 14px;
+	/* A label between the hours: half an hour's, centred on its line like the hour's. */
+	--tc-font-minor: 6px;
+	--tc-leading-minor: 8px;
+	--tc-minor-lift: 4px;
 	--tc-font-now: 10px;
 	--tc-font-menu: 16px;
 	--tc-font-value: 15px;
@@ -433,7 +437,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
-.tc-hour-label.is-minor { color: var(--tc-minor-label); }
+.tc-hour-label.is-minor { top: calc(var(--tc-y) - var(--tc-minor-lift)); font-size: var(--tc-font-minor); line-height: var(--tc-leading-minor); color: var(--tc-minor-label); }
 .tc-hour-line.is-minor { background: var(--tc-minor-line); }
 .tc-items { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); }
 .tc-item { position: absolute; top: calc(var(--tc-y) + var(--tc-item-inset)); height: calc(var(--tc-len) - var(--tc-item-gap)); left: calc(var(--tc-col) * 100% / var(--tc-cols) + var(--tc-item-inset)); width: calc(100% / var(--tc-cols) - var(--tc-item-gap)); box-sizing: border-box; overflow: hidden; }
