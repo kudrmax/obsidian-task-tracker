@@ -135,4 +135,27 @@ describe("Divider", () => {
 		el.dispatchEvent(pointer("pointerup", 176, 200));
 		expect(released).toEqual([160]);
 	});
+
+	it("lets an ordinary drag pass the centre without holding or ticking", () => {
+		const el = document.createElement("div");
+		const widths: number[] = [];
+		let snaps = 0;
+		divider(el, { onWidth: (w) => widths.push(w), center: () => 160, onSnap: () => snaps++ });
+		el.dispatchEvent(pointer("pointerdown", 200));
+		for (let x = 198; x >= 150; x -= 2) el.dispatchEvent(pointer("pointermove", x, 16));
+		expect(widths).toContain(161);
+		expect(widths).not.toContain(160.5);
+		expect(snaps).toBe(0);
+	});
+
+	it("holds to the centre when brought there carefully", () => {
+		const el = document.createElement("div");
+		let snaps = 0;
+		const widths: number[] = [];
+		divider(el, { onWidth: (w) => widths.push(w), center: () => 160.5, onSnap: () => snaps++ });
+		el.dispatchEvent(pointer("pointerdown", 200));
+		for (let x = 199.5; x >= 175; x -= 0.5) el.dispatchEvent(pointer("pointermove", x, 16));
+		expect(widths[widths.length - 1]).toBe(160.5);
+		expect(snaps).toBe(1);
+	});
 });

@@ -22,7 +22,7 @@ import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
-import { centeredListWidth, listWidthMax, shownListWidth } from "./listWidth";
+import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -151,9 +151,9 @@ export class TaskCalendarView extends ItemView {
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
-			width: () => shownListWidth(this.settings.listWidth, root.clientWidth),
+			width: () => shownListWidth(this.settings.listShare, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
-			onRelease: (width) => void this.deps.settings.update({ listWidth: width }).then(() => this.render()),
+			onRelease: (width) => void this.deps.settings.update({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.render()),
 			min: LIST_WIDTH_MIN,
 			max: () => listWidthMax(root.clientWidth),
 			center: () => centeredListWidth(root.clientWidth),
@@ -259,8 +259,10 @@ export class TaskCalendarView extends ItemView {
 		return document.body.classList.contains("theme-light") ? "light" : "dark";
 	}
 
+	/** A view not laid out yet has no width to take a share of: it keeps the design's width until it has one. */
 	private fitListWidth(): void {
-		this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listWidth, this.contentEl.clientWidth)));
+		const width = this.contentEl.clientWidth;
+		if (width > 0) this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listShare, width)));
 	}
 
 	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
