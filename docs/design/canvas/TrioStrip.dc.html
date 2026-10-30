@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Лента из трёх колонок</title>
+<title>Лента из четырёх колонок</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -14,20 +14,20 @@
 body{margin:0;background:#0E0E10}
 </style>
 </helmet>
-<div style="width: 820px; box-sizing: border-box; padding: 40px; background: #0E0E10; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 48px;">
-<sc-for list="{{rows}}" as="r" hint-placeholder-count="2">
+<div style="width: 1016px; box-sizing: border-box; padding: 40px; background: #0E0E10; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 48px;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
 <section style="display: flex; flex-direction: column; gap: 18px;">
 <header style="display: flex; align-items: center; justify-content: space-between;">
 <h2 style="margin: 0; font-size: 22px; line-height: 28px; font-weight: 700;">{{r.title}}</h2>
 <div style="position: relative; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: #1C1C1E; display: flex;">
 <span style="position: absolute; top: 2px; left: {{r.pillLeft}}px; width: 76px; height: 28px; border-radius: 14px; background: #E5E5EA;"></span>
-<sc-for list="{{r.chips}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{r.chips}}" as="o" hint-placeholder-count="4">
 <span style="position: relative; width: 38px; height: 28px; color: {{o.color}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
 </sc-for>
 </div>
 </header>
 <div style="position: relative; height: 300px;">
-<sc-for list="{{r.panels}}" as="c" hint-placeholder-count="3">
+<sc-for list="{{r.panels}}" as="c" hint-placeholder-count="4">
 <div style="position: absolute; top: 10px; left: {{c.left}}px; width: 220px; height: 280px; box-sizing: border-box; padding: 14px 12px; border-radius: 14px; background: #000000; opacity: {{c.opacity}}; display: flex; flex-direction: column; gap: 8px;">
 <div style="display: flex; align-items: center; gap: 8px; color: #E5E5EA;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{c.path}}"></path></svg><span style="font-size: 15px; font-weight: 600;">{{c.name}}</span></div>
 <sc-if value="{{c.isList}}" hint-placeholder-val="{{true}}">
@@ -65,11 +65,12 @@ body{margin:0;background:#0E0E10}
 </sc-for>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":820,"height":970}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1016,"height":1480}}'>
 class Component extends DCLogic {
   renderVals() {
     const paths = {
-      soon: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
       now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
       cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5',
       lock: 'M7 11V8a5 5 0 0 1 10 0v3 M5.5 11h13v9.5h-13z',
@@ -84,39 +85,54 @@ class Component extends DCLogic {
       { title: 'Тренировка', top: 196, h: 36, bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0', ring: 'none' }
     ];
     const panelsFor = (visible) => [
+      { name: 'Inbox', path: paths.inbox, isList: true, isCal: false, cards: ['Узнать про курсы итальянского', 'Идея подарка на Новый год', 'Ответить Лёше про поход', 'Посмотреть «Дюну 2»', 'Сменить тариф связи'] },
       { name: 'Soon', path: paths.soon, isList: true, isCal: false, cards: ['Продлить страховку', 'Купить подарок Ане', 'Разобрать фото', 'Починить велосипед', 'Прочитать Deep Work'] },
       { name: 'Now', path: paths.now, isList: true, isCal: false, cards: ['Созвониться с врачом', 'Купить билеты', 'Сдать декларацию', 'Записаться в барбершоп', 'Позвонить маме'] },
       { name: 'Календарь', path: paths.cal, isList: false, isCal: true, blocks }
     ].map((c, i) => ({ ...c, left: 8 + i * COL, opacity: visible.includes(i) ? 1 : 0.28 }));
-    const chipsFor = (first) => ['soon', 'now', 'cal'].map((key, i) => ({ path: paths[key], color: i === first || i === first + 1 ? '#000000' : '#8E8E93' }));
+    const chipsFor = (first) => ['inbox', 'soon', 'now', 'cal'].map((key, i) => ({ path: paths[key], color: i === first || i === first + 1 ? '#000000' : '#8E8E93' }));
     return {
       rows: [
         {
-          title: 'Soon и Now',
+          title: 'Inbox и Soon',
           pillLeft: 2,
           chips: chipsFor(0),
           panels: panelsFor([0, 1]),
           frameLeft: 0,
           labelLeft: 20,
-          divLeft: 8 + 220 + 0,
+          divLeft: 8 + 220,
           handle: false,
           facts: [
             { path: paths.lock, text: 'Разделитель стоит ровно по центру, тянуть нельзя' },
-            { path: paths.cal, text: 'Календарь ждёт справа за краем экрана' }
+            { path: paths.now, text: 'Now и календарь ждут справа за краем экрана' }
           ]
         },
         {
-          title: 'Now и Календарь',
+          title: 'Soon и Now',
           pillLeft: 40,
           chips: chipsFor(1),
           panels: panelsFor([1, 2]),
           frameLeft: COL,
           labelLeft: COL + 20,
           divLeft: 8 + COL + 220,
+          handle: false,
+          facts: [
+            { path: paths.lock, text: 'Разделитель стоит ровно по центру, тянуть нельзя' },
+            { path: paths.inbox, text: 'Inbox слева, календарь справа, оба за краем экрана' }
+          ]
+        },
+        {
+          title: 'Now и Календарь',
+          pillLeft: 78,
+          chips: chipsFor(2),
+          panels: panelsFor([2, 3]),
+          frameLeft: 2 * COL,
+          labelLeft: 2 * COL + 20,
+          divLeft: 8 + 2 * COL + 220,
           handle: true,
           facts: [
             { path: paths.resize, text: 'Разделитель тянется, ширина запоминается' },
-            { path: paths.soon, text: 'Soon уехал влево за край экрана' }
+            { path: paths.soon, text: 'Inbox и Soon уехали влево за край экрана' }
           ]
         }
       ]

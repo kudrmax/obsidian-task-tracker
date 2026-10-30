@@ -26,7 +26,7 @@ body{margin:0;background:#000}
 
 <sc-if value="{{styles.segment}}" hint-placeholder-val="{{true}}">
 <div style="height: 40px; box-sizing: border-box; padding: 3px; border-radius: 20px; background: #1C1C1E; display: flex; gap: 3px;">
-<sc-for list="{{places}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{places}}" as="o" hint-placeholder-count="4">
 <button style="flex: 1; height: 34px; border: 0; border-radius: 17px; background: {{o.bg}}; color: {{o.color}}; font: inherit; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
 <sc-if value="{{o.icon}}" hint-placeholder-val="{{false}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><line x1="3.5" y1="10" x2="20.5" y2="10"></line><line x1="8" y1="3" x2="8" y2="6.5"></line><line x1="16" y1="3" x2="16" y2="6.5"></line></svg></sc-if>{{o.label}}</button>
 </sc-for>
@@ -35,7 +35,7 @@ body{margin:0;background:#000}
 
 <sc-if value="{{styles.pills}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; justify-content: center; gap: 10px;">
-<sc-for list="{{places}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{places}}" as="o" hint-placeholder-count="4">
 <button style="height: 44px; padding: 0 22px; border: 0; border-radius: 22px; background: {{o.pillBg}}; color: {{o.color}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg>{{o.label}}</button>
 </sc-for>
 </div>
@@ -43,7 +43,7 @@ body{margin:0;background:#000}
 
 <sc-if value="{{styles.tiles}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; gap: 10px;">
-<sc-for list="{{places}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{places}}" as="o" hint-placeholder-count="4">
 <button style="flex: 1; height: 78px; border: 0; border-radius: 18px; background: {{o.pillBg}}; color: {{o.color}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><span style="font-size: 15px; font-weight: 600;">{{o.label}}</span></button>
 </sc-for>
 </div>
@@ -51,7 +51,7 @@ body{margin:0;background:#000}
 
 <sc-if value="{{styles.circles}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; justify-content: center; gap: 30px;">
-<sc-for list="{{places}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{places}}" as="o" hint-placeholder-count="4">
 <button style="width: 72px; border: 0; padding: 0; background: transparent; color: #E5E5EA; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 8px;"><span style="width: 62px; height: 62px; border-radius: 31px; background: {{o.pillBg}}; color: {{o.color}}; display: flex; align-items: center; justify-content: center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span><span style="font-size: 14px; font-weight: {{o.weight}}; color: {{o.labelColor}};">{{o.label}}</span></button>
 </sc-for>
 </div>
@@ -59,7 +59,7 @@ body{margin:0;background:#000}
 
 <sc-if value="{{styles.accent}}" hint-placeholder-val="{{false}}">
 <div style="display: flex; justify-content: center; gap: 10px;">
-<sc-for list="{{places}}" as="o" hint-placeholder-count="3">
+<sc-for list="{{places}}" as="o" hint-placeholder-count="4">
 <button style="height: 44px; padding: 0 22px; box-sizing: border-box; border: 1.5px solid {{o.accentBorder}}; border-radius: 22px; background: {{o.accentBg}}; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg>{{o.label}}</button>
 </sc-for>
 </div>
@@ -114,7 +114,7 @@ body{margin:0;background:#000}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long","inbox"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const mode = this.props.mode ?? 'list';
@@ -129,14 +129,16 @@ class Component extends DCLogic {
     const isPicker = mode === 'picker';
     const dateLabels = { edit: '2 Nov', picker: '3 Nov' };
     const dateLabel = dateLabels[mode] ?? 'Date';
-    const selected = isEdit || isPicker ? 'date' : 'now';
+    const selected = mode === 'inbox' ? 'inbox' : isEdit || isPicker ? 'date' : 'now';
     const pickerStyle = this.props.pickerStyle ?? 'tiles';
     const paths = {
-      soon: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
       now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
       date: 'M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4'
     };
     const places = [
+      { key: 'inbox', label: 'Inbox', icon: false },
       { key: 'soon', label: 'Soon', icon: false },
       { key: 'now', label: 'Now', icon: false },
       { key: 'date', label: dateLabel, icon: true }
@@ -180,7 +182,9 @@ class Component extends DCLogic {
         ? 'Записаться в барбершоп'
         : mode === 'long'
           ? 'Позвонить в банк и узнать, почему списали комиссию за обслуживание карты'
-          : 'Позвонить в банк',
+          : mode === 'inbox'
+            ? 'Узнать про курсы итальянского'
+            : 'Позвонить в банк',
       doneLabel: isEdit ? 'Save' : 'Add',
       hasTime: mode === 'slot',
       showPicker: isPicker,
