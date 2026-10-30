@@ -1,7 +1,7 @@
 import type { SourceStatus } from "../../application/contracts";
-import { DURATION, PROPERTY, tokenMs } from "../design";
+import { PROPERTY } from "../design";
 import { el, px } from "../dom";
-import { Backdrop } from "../menu/Backdrop";
+import { Overlay } from "../menu/Overlay";
 import { sourceIcon } from "./sourceIcons";
 import { sourceText } from "./sourceText";
 
@@ -15,28 +15,24 @@ export interface SourcesPopoverOptions {
 
 /** The sources window: each calendar with when it was last brought up to date, and Refresh now. */
 export class SourcesPopover {
-	private readonly backdrop: Backdrop;
-	private readonly copy: HTMLElement;
-	private readonly panel: HTMLElement;
-	private closed = false;
+	private readonly overlay: Overlay;
 
 	static open(opts: SourcesPopoverOptions): SourcesPopover {
 		return new SourcesPopover(opts);
 	}
 
 	private constructor(opts: SourcesPopoverOptions) {
-		this.backdrop = new Backdrop(() => this.close());
+		this.overlay = new Overlay(() => this.close());
 		const rect = opts.anchor.getBoundingClientRect();
-		this.copy = opts.anchor.cloneNode(true) as HTMLElement;
-		this.copy.classList.add("tc-seg-copy");
-		this.copy.style.left = px(rect.left);
-		this.copy.style.top = px(rect.top);
-		document.body.appendChild(this.copy);
-		this.panel = el(document.body, "div", "tc-popover");
-		this.panel.style.setProperty(PROPERTY.panelY, px(rect.bottom));
+		const copy = this.overlay.add(opts.anchor.cloneNode(true) as HTMLElement);
+		copy.classList.add("tc-seg-copy");
+		copy.style.left = px(rect.left);
+		copy.style.top = px(rect.top);
+		const panel = this.overlay.add(el(null, "div", "tc-popover"));
+		panel.style.setProperty(PROPERTY.panelY, px(rect.bottom));
 		for (const status of opts.statuses) {
 			const text = sourceText(status, opts.now);
-			const row = el(this.panel, "div", "tc-source-row");
+			const row = el(panel, "div", "tc-source-row");
 			row.appendChild(sourceIcon(status.source));
 			const lines = el(row, "div", "tc-source-lines");
 			el(lines, "span", "tc-source-name", text.name);
@@ -44,25 +40,17 @@ export class SourcesPopover {
 			const time = el(row, "span", "tc-source-time", text.time);
 			time.classList.toggle("is-stale", text.stale);
 		}
-		const refresh = el(this.panel, "button", "tc-source-refresh");
+		const refresh = el(panel, "button", "tc-source-refresh");
 		refresh.appendChild(sourceIcon("refresh"));
 		refresh.appendChild(document.createTextNode("Refresh now"));
 		refresh.addEventListener("click", () => {
 			this.close();
 			void opts.onRefresh();
 		});
-		requestAnimationFrame(() => this.panel.classList.add("is-shown"));
+		this.overlay.show();
 	}
 
 	close(): void {
-		if (this.closed) return;
-		this.closed = true;
-		this.backdrop.el.classList.remove("is-shown");
-		this.panel.classList.remove("is-shown");
-		window.setTimeout(() => {
-			this.backdrop.remove();
-			this.copy.remove();
-			this.panel.remove();
-		}, tokenMs(this.panel, DURATION.collapse));
+		this.overlay.close();
 	}
 }

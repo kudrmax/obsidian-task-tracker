@@ -148,7 +148,7 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
-	/* Pressed, a card shows its whole title: the copy over the menu grows past its column up to this far from the window's edges, then wraps. */
+	/* Pressed, a card shows its whole title: it stretches to the right past its column, up to this far from the window's edges. */
 	--tc-whole-margin: 10px;
 
 	/* Sizes: the task menu, its due submenu and the month picker */
@@ -576,15 +576,13 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
-/* The whole title of a pressed card: past its column (the card under the finger keeps its width), on as many lines as it takes, its first line where it stood. */
-.tc-float.is-whole, .tc-lifted.is-whole { align-items: flex-start; }
-.tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); }
+/* The whole title of a pressed card: the card stretches to the right on its one line; the copy over the menu then wraps a title still too long, its first line where it stood. */
+.is-stretched .tc-card-title, .is-whole .tc-card-title { -webkit-mask-image: none; mask-image: none; }
+.tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); align-items: flex-start; }
 .tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
-.tc-float.is-whole { padding-top: calc((var(--tc-float-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-float-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
-.is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); -webkit-mask-image: none; mask-image: none; }
+.is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
 .tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
-.tc-float.is-whole .tc-due { margin-top: calc((var(--tc-float-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-float-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
@@ -592,6 +590,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
 .tc-lifted.is-block { background: none; padding: 0; border-radius: 0; overflow: visible; }
 .tc-lifted.is-block > .tc-block { top: 0; left: 0; right: 0; height: 100%; }
+/* Closing, the copy fades with the sheet and the panel: they go together. */
+.tc-lifted.is-closing, .tc-seg-copy.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. */
 [data-priority="red"] { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); --tc-priority-meta: var(--tc-priority-red-meta); }
