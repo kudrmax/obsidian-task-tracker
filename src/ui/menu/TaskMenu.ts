@@ -1,12 +1,12 @@
 import type { TaskItem } from "../../application/contracts";
 import type { PriorityColor, PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
-import { DURATION, tokenMs, tokenPx } from "../design";
+import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard } from "../TaskCard";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { Backdrop } from "./Backdrop";
+import { Overlay } from "./Overlay";
 import { dueOptions } from "./dueOptions";
 import { backRow, levelRow, menuGroup, type MenuRowSpec, menuRow, placePanel } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
@@ -67,28 +67,27 @@ export interface TaskMenuContext {
 
 /** The task menu over a blurred screen: the tapped card stays as it is above the blur, the panel grows out under it; the due submenu and the month picker take its place. */
 export class TaskMenu {
-	private readonly backdrop: Backdrop;
+	private readonly overlay: Overlay;
 	private readonly lifted: HTMLElement;
 	private readonly panel: HTMLElement;
 	private readonly anchor: DOMRect;
-	private closed = false;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
 	}
 
 	private constructor(private readonly context: TaskMenuContext) {
-		this.backdrop = new Backdrop(() => this.close());
-		this.lifted = el(document.body, "div", "tc-lifted");
+		this.overlay = new Overlay(() => this.close());
+		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
 		this.anchor = this.liftWhole(context.source.getBoundingClientRect());
 		context.lifted?.(this.lifted, () => this.close());
-		this.panel = el(document.body, "div", "tc-panel");
+		this.panel = this.overlay.add(el(null, "div", "tc-panel"));
 		this.showMenu();
-		requestAnimationFrame(() => this.panel.classList.add("is-shown"));
+		this.overlay.show();
 	}
 
 	/** The copy stands where the card does; a title the card cuts grows it past the column, kept inside the window, and the panel goes by the copy. */
@@ -179,15 +178,6 @@ export class TaskMenu {
 	}
 
 	close(): void {
-		if (this.closed) return;
-		this.closed = true;
-		this.backdrop.el.classList.remove("is-shown");
-		this.panel.classList.add("is-closing");
-		this.panel.classList.remove("is-shown");
-		window.setTimeout(() => {
-			this.backdrop.remove();
-			this.lifted.remove();
-			this.panel.remove();
-		}, tokenMs(this.panel, DURATION.collapse));
+		this.overlay.close();
 	}
 }

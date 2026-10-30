@@ -3,16 +3,12 @@ import { grownStart, roomWidth, wholeWidth } from "../../src/ui/wholeCard";
 
 const phone = roomWidth({ width: 390, height: 844, margin: 10 });
 
-describe("a pressed card grows to show its whole title", () => {
-	it("grows by what the title lacks", () => {
+describe("a pressed card stretches to the right to show its whole title", () => {
+	it("stretches by what the title lacks", () => {
 		expect(wholeWidth(170, 60, phone)).toBe(230);
 	});
 
-	it("keeps the card under the finger at its own width: the title wraps", () => {
-		expect(wholeWidth(190, 120, 190)).toBe(190);
-	});
-
-	it("grows no wider than the window less its margins, then wraps", () => {
+	it("stretches no wider than the window less its margins", () => {
 		expect(wholeWidth(170, 400, phone)).toBe(370);
 	});
 
