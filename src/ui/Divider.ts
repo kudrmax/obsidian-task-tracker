@@ -1,5 +1,6 @@
 import { LAYOUT } from "./design";
 import { capturePointer, el as make, releasePointer } from "./dom";
+import { PointerSpeed } from "./PointerSpeed";
 
 export interface DividerOptions {
 	width(): number;
@@ -12,9 +13,17 @@ export interface DividerOptions {
 	onSnap(): void;
 }
 
-/** The strip between the columns: dragging it, or its handle, sets the list's width; near the middle it holds to it. */
+interface Press {
+	readonly x: number;
+	readonly width: number;
+	readonly pointerId: number;
+	readonly speed: PointerSpeed;
+	snapped: boolean;
+}
+
+/** The strip between the columns: dragging it, or its handle, sets the list's width; brought slowly near the middle, it holds to it. */
 export class Divider {
-	private press: { readonly x: number; readonly width: number; readonly pointerId: number; snapped: boolean } | null = null;
+	private press: Press | null = null;
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -32,25 +41,33 @@ export class Divider {
 
 	private down(e: PointerEvent): void {
 		if (!e.isPrimary || e.button !== 0) return;
-		this.press = { x: e.clientX, width: this.opts.width(), pointerId: e.pointerId, snapped: false };
+		const width = this.opts.width();
+		const speed = new PointerSpeed(e.clientX, e.timeStamp);
+		this.press = { x: e.clientX, width, pointerId: e.pointerId, speed, snapped: width === this.opts.center() };
 		capturePointer(this.el, e.pointerId);
 		e.preventDefault();
 	}
 
-	private widthFor(e: PointerEvent): number {
-		const wanted = this.press!.width + e.clientX - this.press!.x;
-		const width = this.snaps(wanted) ? this.opts.center() : Math.round(wanted);
-		return Math.min(this.opts.max(), Math.max(this.opts.min, width));
+	/** Where the line goes for this event, and whether it holds to the middle there. */
+	private place(e: PointerEvent): { width: number; snapped: boolean } {
+		const press = this.press!;
+		press.speed.update(e.clientX, e.timeStamp);
+		const wanted = press.width + e.clientX - press.x;
+		const snapped = this.snaps(wanted);
+		const width = snapped ? this.opts.center() : Math.round(wanted);
+		return { width: Math.min(this.opts.max(), Math.max(this.opts.min, width)), snapped };
 	}
 
 	private snaps(width: number): boolean {
-		return Math.abs(width - this.opts.center()) <= LAYOUT.dividerSnapDistance;
+		const center = this.opts.center();
+		const reachable = center >= this.opts.min && center <= this.opts.max();
+		const slow = this.press!.speed.value < LAYOUT.dividerSnapSpeed;
+		return reachable && slow && Math.abs(width - center) <= LAYOUT.dividerSnapDistance;
 	}
 
 	private move(e: PointerEvent): void {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
-		const width = this.widthFor(e);
-		const snapped = width === this.opts.center();
+		const { width, snapped } = this.place(e);
 		if (snapped && !this.press.snapped) this.opts.onSnap();
 		this.press.snapped = snapped;
 		this.opts.onWidth(width);
@@ -58,7 +75,7 @@ export class Divider {
 
 	private up(e: PointerEvent): void {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
-		const width = this.widthFor(e);
+		const { width } = this.place(e);
 		releasePointer(this.el, e.pointerId);
 		this.press = null;
 		this.opts.onWidth(width);
