@@ -134,12 +134,11 @@ describe("tasks the now line has passed", () => {
 	const y = (block: HTMLElement) => block.style.getPropertyValue("--tc-y");
 	const meta = (block: HTMLElement) => [...block.querySelectorAll(".tc-block-meta > span")].map((s) => s.textContent);
 
-	it("stands a task left undone past its time on the now line, ringed, its own time on the right", () => {
+	it("stands a task left undone past its time on the now line, marked no other way than a card on its time", () => {
 		const [late] = onToday([task(0, 600, null)]);
 		expect(y(late)).toBe(`${12 * hourPx + 1}px`);
-		expect(late.classList.contains("is-late")).toBe(true);
-		expect(late.querySelector(".tc-block-meta")!.classList.contains("is-hidden")).toBe(false);
-		expect(meta(late)).toEqual(["10", "00"]);
+		expect(late.className).toBe("tc-block");
+		expect(late.querySelector(".tc-block-meta")!.classList.contains("is-hidden")).toBe(true);
 	});
 
 	it("carries a task with a duration along whole", () => {
@@ -148,10 +147,9 @@ describe("tasks the now line has passed", () => {
 		expect(late.style.getPropertyValue("--tc-len")).toBe(`${2 * hourPx - 2}px`);
 	});
 
-	it("carries a task in progress too, without the ring", () => {
+	it("carries a task in progress too", () => {
 		const [doing] = onToday([task(0, 600, null, "inProgress")]);
 		expect(y(doing)).toBe(`${12 * hourPx + 1}px`);
-		expect(doing.classList.contains("is-late")).toBe(false);
 	});
 
 	it("writes a task in progress pushed down the stack at its own time, not the line's", () => {
@@ -163,7 +161,6 @@ describe("tasks the now line has passed", () => {
 	it("leaves a task at the very minute or later on its time", () => {
 		const [now, later] = onToday([task(0, 720, null), task(1, 840, null)]);
 		expect(y(now)).toBe(`${12 * hourPx + 1}px`);
-		expect(now.classList.contains("is-late")).toBe(false);
 		expect(y(later)).toBe(`${14 * hourPx + 1}px`);
 	});
 
@@ -177,6 +174,5 @@ describe("tasks the now line has passed", () => {
 	it("moves nothing on another day", () => {
 		const [past] = onToday([{ ...task(0, 600, null), slot: { date: "2026-11-02", start: 600, end: null } }], "2026-11-02");
 		expect(y(past)).toBe(`${10 * hourPx + 1}px`);
-		expect(past.classList.contains("is-late")).toBe(false);
 	});
 });
