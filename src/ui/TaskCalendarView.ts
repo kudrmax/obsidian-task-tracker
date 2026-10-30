@@ -196,7 +196,7 @@ export class TaskCalendarView extends ItemView {
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(this.rightEl, "div", "tc-fade");
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx), floor: () => this.postponeZones?.top() ?? null });
+		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		this.pull = new PullToRefresh(timeline.el, {
@@ -218,7 +218,7 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
-		this.postponeZones = new PostponeZones(root, () => this.today());
+		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today());
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -367,7 +367,7 @@ export class TaskCalendarView extends ItemView {
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
-	/** The bar that puts a task off, over the bottom of the screen, then the two columns the window shows. */
+	/** The zones that put a task off, under the Today column, then the two columns the window shows. */
 	private dropTargets(): DropTarget[] {
 		const shown: Record<RightMode, (DropTarget | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
