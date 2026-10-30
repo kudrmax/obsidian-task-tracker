@@ -11,6 +11,11 @@ describe("settingsFrom", () => {
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
 	});
 
+	it("draws cards 35 px high, 2 px apart, unless set", () => {
+		expect(settingsFrom(null)).toMatchObject({ cardHeight: 35, cardGap: 2 });
+		expect(settingsFrom({ cardHeight: 30, cardGap: 0 })).toMatchObject({ cardHeight: 30, cardGap: 0 });
+	});
+
 	it("keeps the other nested keys when one is saved", () => {
 		const s = settingsFrom({ google: { clientId: "id" }, sections: { now: "Today" } });
 		expect(s.google.clientId).toBe("id");

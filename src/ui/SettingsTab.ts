@@ -1,7 +1,7 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
-import { type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import { LevelEdits } from "./priorityLevels";
 import { formatTime } from "./dates";
 
@@ -44,6 +44,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 		this.tasksFileGroup(containerEl);
 		this.prioritiesGroup(containerEl);
+		this.cardsGroup(containerEl);
 		this.timelineGroup(containerEl);
 		this.googleGroup(containerEl);
 		this.workGroup(containerEl);
@@ -90,6 +91,13 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private async updateLevels(priorities: readonly PriorityLevel[]): Promise<void> {
 		await this.plugin.update({ priorities });
 		this.display();
+	}
+
+	/** The cards' size, the same in the list, on New task and in a stack on the timeline: they change as the slider moves. */
+	private cardsGroup(el: HTMLElement): void {
+		new Setting(el).setName("Cards").setHeading();
+		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.settings.cardHeight, (cardHeight) => ({ cardHeight }));
+		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.settings.cardGap, (cardGap) => ({ cardGap }));
 	}
 
 	private timelineGroup(el: HTMLElement): void {
@@ -203,6 +211,19 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName(name)
 			.setDesc(desc)
 			.addText((t) => t.setValue(value).onChange((v) => this.plugin.update(patch(v))));
+	}
+
+	private slider(el: HTMLElement, name: string, desc: string, min: number, max: number, value: number, patch: (value: number) => Partial<TaskCalendarSettings>): void {
+		new Setting(el)
+			.setName(name)
+			.setDesc(desc)
+			.addSlider((s) =>
+				s
+					.setLimits(min, max, 1)
+					.setValue(value)
+					.setDynamicTooltip()
+					.onChange((v) => this.plugin.update(patch(v))),
+			);
 	}
 
 	private number(el: HTMLElement, name: string, desc: string, value: number, patch: (value: number) => Partial<TaskCalendarSettings>): void {

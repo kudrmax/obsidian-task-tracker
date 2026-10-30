@@ -11,13 +11,8 @@ export const DESIGN = {
 	columnsTop: 64,
 	/** Where the timeline starts inside the right column, under one all-day row. */
 	timelineOffset: 34,
-	cardHeight: 40,
-	cardGap: 6,
-	/** One card and one gap: how far cards step aside to make room. */
-	cardShift: 46,
 	dividerWidth: 16,
 	floatWidth: 190,
-	floatHeight: 42,
 	nowPillHeight: 16,
 	/** A block starts one pixel under its hour line and ends two pixels short of its length. */
 	itemInset: 1,
@@ -31,12 +26,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	dayHours: "--tc-day-hours",
 	columnsTop: "--tc-columns-top",
 	timelineOffset: "--tc-timeline-top",
-	cardHeight: "--tc-card-h",
-	cardGap: "--tc-card-gap",
-	cardShift: "--tc-card-shift",
 	dividerWidth: "--tc-divider",
 	floatWidth: "--tc-float-w",
-	floatHeight: "--tc-float-h",
 	nowPillHeight: "--tc-now-h",
 	itemInset: "--tc-item-inset",
 	itemGap: "--tc-item-gap",
@@ -45,6 +36,9 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** The card's height and the gap between cards, from the settings: set on the body, where the tokens built on them live. */
+	cardHeight: "--tc-card-h",
+	cardGap: "--tc-card-gap",
 	hour: "--tc-hour",
 	navClear: "--tc-nav-clear",
 	allDayExtraRows: "--tc-allday-extra-rows",
@@ -107,8 +101,6 @@ export const LAYOUT = {
 	autoScrollSpeed: 12,
 	/** The fewest minutes a slot dropped near midnight keeps before it. */
 	minSlotMinutes: 5,
-	/** Between the head of a task card and the card pushed under it. */
-	stackGap: 4,
 	/** How far in a task card lies over a long task's body or an event. */
 	overlayInset: 18,
 	/** The steps a drag, a drop and a stretch snap to, finest first: 10 is left out, since tasks start at :15 and :45 more than at :10. */
