@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CalendarServiceImpl } from "../../src/application/CalendarServiceImpl";
 import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
 import type { EventBatch, EventSource } from "../../src/application/EventSource";
@@ -17,6 +17,8 @@ function event(source: CalendarSource, id: string, start: Date, end: Date, allDa
 class FakeSource implements EventSource {
 	calls: { start: Date; end: Date }[] = [];
 	failWith: Error | null = null;
+	/** The network never answers. */
+	silent = false;
 	updatedAt = FETCHED;
 	detail: string | undefined;
 
@@ -29,6 +31,7 @@ class FakeSource implements EventSource {
 
 	async eventsBetween(start: Date, end: Date): Promise<EventBatch> {
 		this.calls.push({ start, end });
+		if (this.silent) return new Promise(() => {});
 		if (this.failWith) throw this.failWith;
 		return { events: this.events, updatedAt: this.updatedAt, detail: this.detail };
 	}
@@ -113,6 +116,34 @@ describe("CalendarServiceImpl", () => {
 			{ source: "google", ok: false, message: "Google API 500", updatedAt: FETCHED, detail: null, stale: true },
 			{ source: "work", ok: false, message: "file missing", updatedAt: FETCHED, detail: "iPhone", stale: true },
 		]);
+	});
+
+	it("a source with no answer in 15 s keeps its last good events, reports stale, and is asked afresh next time", async () => {
+		vi.useFakeTimers();
+		try {
+			const google = new FakeSource("google", [event("google", "g1", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+			const work = new FakeSource("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
+			const svc = service([google, work]);
+			await svc.eventsOn("2026-10-30");
+			google.silent = true;
+			const waiting = svc.eventsOn("2026-10-30");
+			await vi.advanceTimersByTimeAsync(14_999);
+			let settled = false;
+			void waiting.then(() => (settled = true));
+			await vi.advanceTimersByTimeAsync(0);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			const day = await waiting;
+			expect(day.events.map((e) => e.id)).toEqual(["w1", "g1"]);
+			expect(day.statuses[0]).toEqual({ source: "google", ok: false, message: "no answer in 15 s", updatedAt: FETCHED, detail: null, stale: true });
+			expect(day.statuses[1].ok).toBe(true);
+			google.silent = false;
+			const next = await svc.eventsOn("2026-10-30");
+			expect(google.calls).toHaveLength(3);
+			expect(next.statuses[0].ok).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("a source that never succeeded reports with no events and no time", async () => {
