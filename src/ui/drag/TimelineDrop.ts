@@ -8,7 +8,7 @@ export interface TimelineDropOptions {
 	step(): number;
 }
 
-/** The timeline as a place to drop: a dashed card snapped to the grid, with the start time, that scrolls the day near the edges. */
+/** The timeline as a place to drop: a line at the start the task will take, snapped to the grid, that scrolls the day near the edges. */
 export class TimelineDrop implements DropTarget {
 	private start: number | null = null;
 	private duration: number | null = null;
@@ -25,7 +25,7 @@ export class TimelineDrop implements DropTarget {
 		return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
 	}
 
-	/** The dashed card's top stays where the dragged card's top is under the finger. */
+	/** The start follows the dragged card's top as the finger holds it. */
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
 		this.show(this.timeline.minutesAt(y - drag.grabPx), drag.durationMin);
@@ -47,9 +47,8 @@ export class TimelineDrop implements DropTarget {
 		const latest = LAYOUT.minutesPerDay - (duration ?? LAYOUT.minSlotMinutes);
 		const start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
 		this.duration = duration;
-		if (start === this.start) return;
 		this.start = start;
-		this.timeline.showDrop(start);
+		this.timeline.showDrop({ start, end: duration === null ? null : start + duration });
 	}
 
 	/** Near the top or bottom edge the day scrolls under the finger, faster the closer to the edge. */
@@ -69,7 +68,7 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	landing(): DOMRect | null {
-		return this.timeline.dropRect();
+		return this.timeline.landing();
 	}
 
 	clear(): void {

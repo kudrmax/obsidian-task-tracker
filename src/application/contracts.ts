@@ -92,8 +92,8 @@ export interface TaskService {
 
 	/** Drop on the timeline, move or resize there. Moves a Now task to Soon when `slot.date` is not today. */
 	setSlot(key: TaskKey, slot: Slot): Promise<void>;
-	/** Drop from the timeline back on the list: the slot goes, due date and section stay. */
-	clearSlot(key: TaskKey): Promise<void>;
+	/** Drop from the timeline back on the list: the slot goes, due date stays; with `place`, the task moves there as `moveBefore` would. */
+	clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void>;
 
 	/** Soon → left column. Today: end of Now. Another day D: due date D, stays in Soon. */
 	moveToList(key: TaskKey, date: LocalDate): Promise<void>;

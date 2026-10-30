@@ -106,8 +106,13 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.setSlot(doc, this.entryOf(doc, key), slot, today, boundary));
 	}
 
-	async clearSlot(key: TaskKey): Promise<void> {
-		await this.mutate((doc) => ops.clearSlot(doc, this.entryOf(doc, key)));
+	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
+		await this.mutate((doc, today) => {
+			const entry = this.entryOf(doc, key);
+			const before = place?.before ? this.entryOf(doc, place.before) : null;
+			const cleared = ops.clearSlot(doc, entry);
+			return place ? ops.moveBefore(cleared, cleared.tasks(entry.section)[entry.index], before && cleared.tasks(before.section)[before.index], place.date, today) : cleared;
+		});
 	}
 
 	async moveToList(key: TaskKey, date: LocalDate): Promise<void> {

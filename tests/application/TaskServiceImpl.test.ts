@@ -146,6 +146,17 @@ describe("writing", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] A\n\n## Backlog\n\n## Done\n");
 	});
 
+	it("clearSlot with a place puts the task where it was dropped on the list", async () => {
+		const { store, svc } = setup("## Now\n- [ ] A ⏰ 2026-10-30 10:00\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");
+		let view = await svc.dayView(T);
+		await svc.clearSlot(view.slotted[0].key, { before: null, date: T });
+		expect(store.text).toBe("## Now\n- [ ] B\n- [ ] C\n- [ ] A\n\n## Soon\n\n## Done\n");
+		await svc.setSlot((await svc.dayView(T)).list[2].key, { date: T, start: 600, end: null });
+		view = await svc.dayView(T);
+		await svc.clearSlot(view.slotted[0].key, { before: view.list[1].key, date: T });
+		expect(store.text).toBe("## Now\n- [ ] B\n- [ ] A\n- [ ] C\n\n## Soon\n\n## Done\n");
+	});
+
 	it("normalize writes only when a rule changed something", async () => {
 		const { store, svc } = setup("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
 		await svc.normalize();

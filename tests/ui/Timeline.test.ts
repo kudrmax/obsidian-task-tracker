@@ -83,7 +83,7 @@ describe("task cards", () => {
 		expect(over.style.getPropertyValue("--tc-x")).toBe("19px");
 	});
 
-	it("shows the dots over the selected card only, and the drop card takes its place in the stack", () => {
+	it("shows the dots over the selected card only", () => {
 		const tasks = [task(0, 1020, null), task(1, 1020, null)];
 		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
 		const grips = view.itemsEl.querySelector<HTMLElement>(".tc-grips")!;
@@ -91,8 +91,16 @@ describe("task cards", () => {
 		view.select(tasks[1]);
 		expect(grips.classList.contains("is-shown")).toBe(true);
 		expect(grips.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1 + 44}px`);
-		view.showDrop(1020);
-		const tops = [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-drop, .tc-block")].map((e) => e.style.getPropertyValue("--tc-y"));
-		expect(tops).toEqual([`${17 * 56 + 45}px`, `${17 * 56 + 89}px`, `${17 * 56 + 1}px`]);
+	});
+
+	it("marks a drop with a line at its very minute and leaves the cards where they are", () => {
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 1020, null)]);
+		view.showDrop({ start: 1035, end: null });
+		const line = document.body.querySelector<HTMLElement>(".tc-drop")!;
+		expect(line.style.getPropertyValue("--tc-y")).toBe(`${17.25 * 56}px`);
+		expect(line.textContent).toBe("17:15");
+		expect(view.itemsEl.querySelector<HTMLElement>(".tc-block")!.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1}px`);
+		view.clearDrop();
+		expect(document.body.querySelector(".tc-drop")).toBeNull();
 	});
 });

@@ -201,8 +201,10 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async clearSlot(key: TaskKey): Promise<void> {
-		this.find(key).slot = null;
+	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
+		const t = this.find(key);
+		if (place) await this.moveBefore(key, place.before, place.date);
+		t.slot = null;
 		this.changed();
 	}
 
