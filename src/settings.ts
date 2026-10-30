@@ -23,6 +23,16 @@ export interface GoogleSettings {
 	readonly refreshSeconds: number;
 }
 
+/** The fixed set of colours a priority level takes; the order the settings offer them in. */
+export const PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"] as const;
+export type PriorityColor = (typeof PRIORITY_COLORS)[number];
+
+/** A priority level: a task whose text starts with `prefix` gets the tint of `color`. */
+export interface PriorityLevel {
+	readonly prefix: string;
+	readonly color: PriorityColor;
+}
+
 export interface TaskCalendarSettings {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;

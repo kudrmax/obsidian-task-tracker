@@ -35,5 +35,5 @@ export function placementOf(state: SheetState, today: LocalDate): Placement {
 }
 
 export function draftOf(text: string, state: SheetState, today: LocalDate): TaskDraft {
-	return { text: text.trim(), placement: placementOf(state, today) };
+	return { text: text.trim(), placement: placementOf(state, today), priority: null };
 }

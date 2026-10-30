@@ -44,6 +44,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.statusChar === b.statusChar &&
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
+		a.priority === b.priority &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&

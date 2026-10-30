@@ -67,6 +67,7 @@ describe("toItem", () => {
 			status: "inProgress",
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
+			priority: null,
 		});
 	});
 });
@@ -82,5 +83,16 @@ describe("a day that starts at 4", () => {
 
 	it("the list leaves out what the timeline shows", () => {
 		expect(texts(listOn(night, T, T, atFour))).toEqual(["Early", "Plain"]);
+	});
+});
+
+describe("toItem with priority levels", () => {
+	const RED = { prefix: "p1", color: "red" } as const;
+	const levelOf = (prefix: string) => (prefix === "p1" ? RED : null);
+
+	it("gives the level of the task's prefix, none without one", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] p1 A\n- [ ] B\n", SECTIONS, { ...M, priorities: ["p1"] });
+		expect(toItem(d.tasks("now")[0], levelOf)).toMatchObject({ text: "A", priority: RED });
+		expect(toItem(d.tasks("now")[1], levelOf).priority).toBeNull();
 	});
 });

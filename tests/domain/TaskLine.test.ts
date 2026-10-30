@@ -102,6 +102,7 @@ describe("formatTaskLine", () => {
 					task: {
 						status: "todo",
 						statusChar: " ",
+						priority: null,
 						text: "A",
 						dueDate: "2026-11-03",
 						slot: { date: "2026-11-02", start: 600, end: 660 },
@@ -116,7 +117,7 @@ describe("formatTaskLine", () => {
 	it("formats a slot ending at midnight", () => {
 		expect(
 			formatTaskLine(
-				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, children: [] } },
+				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, priority: null, children: [] } },
 				M,
 			),
 		).toBe("- [x] A ⏰ 2026-11-02 23:00-24:00");
@@ -130,5 +131,29 @@ describe("statusOf", () => {
 		expect(statusOf("x")).toBe("done");
 		expect(statusOf("-")).toBe("cancelled");
 		expect(statusOf("?")).toBe("todo");
+	});
+});
+
+describe("priority prefix", () => {
+	const P: Markers = { ...M, priorities: ["p1", "p2"] };
+
+	it("reads the first word as the priority when it is a level's prefix, and writes it back first", () => {
+		const p = parseTaskLine("- [ ] p1 Позвонить 📅 2026-11-03", P)!;
+		expect(p.task).toMatchObject({ priority: "p1", text: "Позвонить", dueDate: "2026-11-03" });
+		expect(formatTaskLine(p, P)).toBe("- [ ] p1 Позвонить 📅 2026-11-03");
+	});
+
+	it("leaves a word that is no level's prefix in the text", () => {
+		expect(parseTaskLine("- [ ] p3 X", P)!.task).toMatchObject({ priority: null, text: "p3 X" });
+		expect(parseTaskLine("- [ ] p1X", P)!.task).toMatchObject({ priority: null, text: "p1X" });
+	});
+
+	it("reads a line that is only the prefix as plain text", () => {
+		expect(parseTaskLine("- [ ] p1", P)!.task).toMatchObject({ priority: null, text: "p1" });
+		expect(parseTaskLine("- [ ] p1 📅 2026-11-03", P)!.task).toMatchObject({ priority: null, text: "p1" });
+	});
+
+	it("reads no priority without levels", () => {
+		expect(parseTaskLine("- [ ] p1 X", M)!.task).toMatchObject({ priority: null, text: "p1 X" });
 	});
 });

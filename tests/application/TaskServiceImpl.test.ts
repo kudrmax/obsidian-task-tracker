@@ -183,41 +183,41 @@ describe("writing", () => {
 describe("the task sheet", () => {
 	it("create places by the tile and keeps a slot", async () => {
 		const { store, svc } = setup(FULL);
-		await svc.create({ text: "S", placement: { kind: "soon" } });
-		await svc.create({ text: "N", placement: { kind: "now" } });
-		await svc.create({ text: "D", placement: { kind: "date", date: D } }, { date: D, start: 600, end: 660 });
-		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" } });
+		await svc.create({ text: "S", placement: { kind: "soon" }, priority: null });
+		await svc.create({ text: "N", placement: { kind: "now" }, priority: null });
+		await svc.create({ text: "D", placement: { kind: "date", date: D }, priority: null }, { date: D, start: 600, end: 660 });
+		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" }, priority: null });
 		expect(store.writes).toBe(4);
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] N\n- [ ] P 📅 2026-10-01\n\n## Soon\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 ⏰ 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("create with blank text writes nothing", async () => {
 		const { store, svc } = setup(FULL);
-		await svc.create({ text: " ", placement: { kind: "now" } });
+		await svc.create({ text: " ", placement: { kind: "now" }, priority: null });
 		expect(store.writes).toBe(0);
 	});
 
 	it("edit with the same placement only renames in place", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "A2", placement: { kind: "now" } });
+		await svc.edit(view.list[0].key, { text: "A2", placement: { kind: "now" }, priority: null });
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A2\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("edit with another placement moves the task", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "A", placement: { kind: "soon" } });
+		await svc.edit(view.list[0].key, { text: "A", placement: { kind: "soon" }, priority: null });
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("edit with blank text writes nothing and a stale key is rejected", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
-		await svc.edit(view.list[0].key, { text: "", placement: { kind: "soon" } });
+		await svc.edit(view.list[0].key, { text: "", placement: { kind: "soon" }, priority: null });
 		expect(store.writes).toBe(0);
 		store.text = "## Now\n- [ ] Changed\n";
-		await expect(svc.edit(view.list[0].key, { text: "X", placement: { kind: "soon" } })).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.edit(view.list[0].key, { text: "X", placement: { kind: "soon" }, priority: null })).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe("## Now\n- [ ] Changed\n");
 	});
 

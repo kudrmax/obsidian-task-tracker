@@ -9,6 +9,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	priority: null,
 	...extra,
 });
 

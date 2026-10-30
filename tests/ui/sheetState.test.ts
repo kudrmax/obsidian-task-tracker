@@ -25,8 +25,8 @@ describe("sheet state", () => {
 	});
 
 	it("makes the draft: a date tile without a day means today", () => {
-		expect(draftOf("  Call  ", { tile: "now", date: null, pickerOpen: false }, "2026-10-30")).toEqual({ text: "Call", placement: { kind: "now" } });
-		expect(draftOf("Call", { tile: "date", date: null, pickerOpen: true }, "2026-10-30")).toEqual({ text: "Call", placement: { kind: "date", date: "2026-10-30" } });
+		expect(draftOf("  Call  ", { tile: "now", date: null, pickerOpen: false }, "2026-10-30")).toEqual({ text: "Call", placement: { kind: "now" }, priority: null });
+		expect(draftOf("Call", { tile: "date", date: null, pickerOpen: true }, "2026-10-30")).toEqual({ text: "Call", placement: { kind: "date", date: "2026-10-30" }, priority: null });
 		expect(draftOf("Call", { tile: "date", date: "2026-11-03", pickerOpen: false }, "2026-10-30").placement).toEqual({ kind: "date", date: "2026-11-03" });
 	});
 });

@@ -363,7 +363,7 @@ export class TaskCalendarView extends ItemView {
 	newTaskSheet(placement: Placement, slot: Slot | null): void {
 		TaskSheet.open(this.contentEl, {
 			mode: "new",
-			initial: { text: "", placement },
+			initial: { text: "", placement, priority: null },
 			slot,
 			today: this.today(),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
@@ -374,7 +374,7 @@ export class TaskCalendarView extends ItemView {
 	private editSheet(item: TaskItem): void {
 		TaskSheet.open(this.contentEl, {
 			mode: "edit",
-			initial: { text: item.text, placement: this.deps.tasks.placementOf(item) },
+			initial: { text: item.text, placement: this.deps.tasks.placementOf(item), priority: item.priority?.prefix ?? null },
 			slot: item.slot,
 			today: this.today(),
 			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),

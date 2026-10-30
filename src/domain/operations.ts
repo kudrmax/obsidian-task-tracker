@@ -6,7 +6,7 @@ import type { TaskDocument, TaskEntry } from "./TaskDocument";
 const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, priority: null, children: [], ...patch };
 }
 
 function listSection(date: LocalDate, today: LocalDate): SectionKey {
@@ -47,6 +47,10 @@ export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatu
 
 export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate | null): TaskDocument {
 	return patch(doc, entry, { dueDate: date });
+}
+
+export function setPriority(doc: TaskDocument, entry: TaskEntry, priority: string | null): TaskDocument {
+	return patch(doc, entry, { priority });
 }
 
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
@@ -106,8 +110,9 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 
 export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
-	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: slot ?? null }));
-	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate });
+	const { priority } = draft;
+	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: slot ?? null, priority }));
+	const edited = patch(doc, entry, { text: draft.text.trim(), dueDate, priority });
 	if (samePlacement(placementOfEntry(entry), draft.placement) || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }

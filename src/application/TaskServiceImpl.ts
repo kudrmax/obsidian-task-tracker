@@ -41,12 +41,12 @@ export class TaskServiceImpl implements TaskService {
 
 	async dayView(date: LocalDate): Promise<DayView> {
 		const { doc, today, boundary } = await this.readNormalized();
-		return { date, list: listOn(doc, date, today, boundary).map(toItem), slotted: slottedOn(doc, date, boundary).map(toItem) };
+		return { date, list: listOn(doc, date, today, boundary).map((e) => toItem(e)), slotted: slottedOn(doc, date, boundary).map((e) => toItem(e)) };
 	}
 
 	async soonView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
-		return soonList(doc).map(toItem);
+		return soonList(doc).map((e) => toItem(e));
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
