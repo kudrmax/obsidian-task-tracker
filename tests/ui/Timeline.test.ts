@@ -111,3 +111,72 @@ describe("task cards", () => {
 		expect(document.body.querySelector(".tc-drop")).toBeNull();
 	});
 });
+
+describe("tasks the now line has passed", () => {
+	const hourPx = 56;
+	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, priority: null });
+
+	function onToday(tasks: TaskItem[], date = "2026-10-31"): HTMLElement[] {
+		const view = new Timeline(document.createElement("div"), {
+			theme: () => "dark",
+			date: () => date,
+			today: () => "2026-10-31",
+			boundary: () => DayBoundary.MIDNIGHT,
+			hourPx: () => hourPx,
+			tasks: () => tasks,
+			events: () => [],
+			now: () => new Date(2026, 9, 31, 12, 0),
+		});
+		view.render();
+		return tasks.map((t) => [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-block")].find((b) => b.textContent?.startsWith(t.text))!);
+	}
+
+	const y = (block: HTMLElement) => block.style.getPropertyValue("--tc-y");
+	const meta = (block: HTMLElement) => [...block.querySelectorAll(".tc-block-meta > span")].map((s) => s.textContent);
+
+	it("stands a task left undone past its time on the now line, ringed, its own time on the right", () => {
+		const [late] = onToday([task(0, 600, null)]);
+		expect(y(late)).toBe(`${12 * hourPx + 1}px`);
+		expect(late.classList.contains("is-late")).toBe(true);
+		expect(late.querySelector(".tc-block-meta")!.classList.contains("is-hidden")).toBe(false);
+		expect(meta(late)).toEqual(["10", "00"]);
+	});
+
+	it("carries a task with a duration along whole", () => {
+		const [late] = onToday([task(0, 600, 720)]);
+		expect(y(late)).toBe(`${12 * hourPx + 1}px`);
+		expect(late.style.getPropertyValue("--tc-len")).toBe(`${2 * hourPx - 2}px`);
+	});
+
+	it("carries a task in progress too, without the ring", () => {
+		const [doing] = onToday([task(0, 600, null, "inProgress")]);
+		expect(y(doing)).toBe(`${12 * hourPx + 1}px`);
+		expect(doing.classList.contains("is-late")).toBe(false);
+	});
+
+	it("writes a task in progress pushed down the stack at its own time, not the line's", () => {
+		const [, doing] = onToday([task(0, 540, null), task(1, 600, null, "inProgress")]);
+		expect(y(doing)).toBe(`${12 * hourPx + 1 + 44}px`);
+		expect(meta(doing)).toEqual(["10", "00"]);
+	});
+
+	it("leaves a task at the very minute or later on its time", () => {
+		const [now, later] = onToday([task(0, 720, null), task(1, 840, null)]);
+		expect(y(now)).toBe(`${12 * hourPx + 1}px`);
+		expect(now.classList.contains("is-late")).toBe(false);
+		expect(y(later)).toBe(`${14 * hourPx + 1}px`);
+	});
+
+	it("stacks several late tasks under the line in their order", () => {
+		const [first, second] = onToday([task(0, 540, null), task(1, 600, null)]);
+		expect(y(first)).toBe(`${12 * hourPx + 1}px`);
+		expect(y(second)).toBe(`${12 * hourPx + 1 + 44}px`);
+		expect(meta(second)).toEqual(["10", "00"]);
+	});
+
+	it("moves nothing on another day", () => {
+		const [past] = onToday([{ ...task(0, 600, null), slot: { date: "2026-11-02", start: 600, end: null } }], "2026-11-02");
+		expect(y(past)).toBe(`${10 * hourPx + 1}px`);
+		expect(past.classList.contains("is-late")).toBe(false);
+	});
+});

@@ -5,7 +5,7 @@ import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority } from "./TaskCard";
-import { durationParts, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
+import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -54,6 +54,10 @@ interface Stretch {
 }
 
 const MINUTES_PER_HOUR = 60;
+
+function isOpen(item: TaskItem): boolean {
+	return item.status === "todo" || item.status === "inProgress";
+}
 
 /**
  * A day of hours that scrolls: the hour lines and labels, finer ones as it zooms in, the events, the task cards over them,
@@ -117,6 +121,13 @@ export class Timeline {
 	/** The slot at the minutes from `start` to `end` of the shown day. */
 	slotAt(start: number, end: number | null): Slot {
 		return this.deps.boundary().slotAt(this.deps.date(), start, end);
+	}
+
+	/** Where the card of a slotted task stands: on its time, or on the now line once the task, still open, has passed it. */
+	shownSpan(item: TaskItem): TaskSpan {
+		const span = this.spanOf(item.slot!);
+		const now = this.nowMinutes();
+		return now !== null && isOpen(item) ? followNow(span, now) : span;
 	}
 
 	/** Lays out at the current hour's height, then scrolls so that `minutes` stays under `clientY`. */
@@ -252,6 +263,7 @@ export class Timeline {
 			const box = boxes[i];
 			this.placeBox(task.el, box.top, box.height, box.left);
 			task.el.classList.toggle("is-over", box.overlay);
+			task.el.classList.toggle("is-late", this.isLate(task.item));
 			this.fillMeta(task, spans[i], box.stacked, box.hiddenDuration);
 			bottom = Math.max(bottom, box.top + box.height);
 		});
@@ -276,7 +288,18 @@ export class Timeline {
 
 	private taskSpan(task: PlacedTask): TaskSpan {
 		if (this.stretch?.el === task.el) return this.stretch.span;
-		return this.spanOf(task.item.slot!);
+		return this.shownSpan(task.item);
+	}
+
+	/** Minutes from the start of the shown day to now; null on another day than today. */
+	private nowMinutes(): number | null {
+		return this.deps.date() === this.deps.today() ? this.deps.boundary().offsetOf(this.deps.date(), this.deps.now()) : null;
+	}
+
+	/** Not begun though its time has passed: the card is ringed in the now line's colour and keeps its time on the right. */
+	private isLate(item: TaskItem): boolean {
+		const now = this.nowMinutes();
+		return now !== null && item.status === "todo" && this.spanOf(item.slot!).start < now;
 	}
 
 	private placeBox(el: HTMLElement, top: number, height: number, left: number): void {
@@ -285,10 +308,13 @@ export class Timeline {
 		el.style.setProperty(PROPERTY.x, px(left));
 	}
 
-	/** On the right, a stacked card shows its start, a card shorter than its duration shows the duration; a stretched one shows neither, its pill instead. */
+	/**
+	 * On the right, a late or a stacked card shows the time it is put on in the file, a card shorter than its duration the
+	 * duration; a stretched one shows none, its pill instead.
+	 */
 	private fillMeta(task: PlacedTask, span: TaskSpan, stacked: boolean, hiddenDuration: boolean): void {
 		const stretching = this.stretch?.el === task.el;
-		const parts = stretching ? null : stacked ? timeParts(this.slotAt(span.start, null).start) : hiddenDuration && span.end !== null ? durationParts(span.end - span.start) : null;
+		const parts = stretching ? null : this.isLate(task.item) || stacked ? timeParts(task.item.slot!.start) : hiddenDuration && span.end !== null ? durationParts(span.end - span.start) : null;
 		task.meta.classList.toggle("is-hidden", parts === null);
 		const [top, bottom] = task.meta.children;
 		top.textContent = parts?.[0] ?? "";
