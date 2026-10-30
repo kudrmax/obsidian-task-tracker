@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Calendar: privacy policy</title>
+<style>
+	body { margin: 0; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; line-height: 1.5; }
+	main { max-width: 640px; margin: 0 auto; padding: 48px 24px 64px; }
+	h1 { font-size: 32px; margin: 0 0 8px; }
+	h2 { font-size: 20px; margin: 32px 0 8px; }
+	p, li { font-size: 17px; color: #E5E5EA; }
+	.muted { color: #8E8E93; }
+	a { color: #9580FF; }
+</style>
+</head>
+<body>
+<main>
+	<h1>Privacy policy</h1>
+	<p class="muted">Task Calendar for Obsidian. Last updated 30 October 2026.</p>
+	<h2>What the plugin accesses</h2>
+	<p>With your permission, the plugin reads your Google Calendar events through the Google Calendar API, using the read-only scope (<code>calendar.readonly</code>). It never creates, changes or deletes events in Google Calendar.</p>
+	<h2>Where your data goes</h2>
+	<ul>
+		<li>Events are fetched by the plugin running inside Obsidian on your own devices and shown on the screen. They are not stored anywhere else and are not sent to anyone.</li>
+		<li>The login token Google issues is kept in the plugin's settings file inside your Obsidian vault. If you use Obsidian Sync, that file travels between your devices through Obsidian Sync, like the rest of your vault.</li>
+		<li>The page <a href="auth.html">auth.html</a> on this site only receives the one-time code from Google's login and hands it to Obsidian on your device. It stores nothing and sends nothing elsewhere.</li>
+	</ul>
+	<h2>No servers, no third parties</h2>
+	<p>The plugin has no server of its own. Your data is exchanged only between your devices and Google.</p>
+	<h2>Revoking access</h2>
+	<p>Press “Log out” in the plugin's settings, or remove the app at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+	<h2>Contact</h2>
+	<p>Questions go to the <a href="https://github.com/kudrmax/obsidian-task-tracker/issues">issue tracker on GitHub</a>.</p>
+</main>
+</body>
+</html>
