@@ -54,9 +54,10 @@ export class DayData {
 		return this.missing ? [] : this.dayEvents.statuses;
 	}
 
-	/** The view opens: both parts. */
+	/** The view opens: the events last fetched for the day at once, both parts afresh. */
 	load(): Promise<void> {
-		return Promise.all([this.tasks(), this.calendars()]).then(() => undefined);
+		this.showCached(this.dayEvents);
+		return this.fetchBoth();
 	}
 
 	/** The tasks file read afresh: after a change to it. */
@@ -71,8 +72,16 @@ export class DayData {
 
 	/** Another day is selected: its tasks, the events last fetched for it until the fresh ones come. */
 	selectDay(): Promise<void> {
-		this.dayEvents = this.deps.calendars.cached(this.deps.date()) ?? { events: [], statuses: this.dayEvents.statuses };
-		return this.load();
+		this.showCached({ events: [], statuses: this.dayEvents.statuses });
+		return this.fetchBoth();
+	}
+
+	private showCached(otherwise: DayEvents): void {
+		this.dayEvents = this.deps.calendars.cached(this.deps.date()) ?? otherwise;
+	}
+
+	private fetchBoth(): Promise<void> {
+		return Promise.all([this.tasks(), this.calendars()]).then(() => undefined);
 	}
 
 	private async readTasks(): Promise<TasksState> {

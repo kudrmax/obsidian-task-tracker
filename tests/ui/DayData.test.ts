@@ -22,7 +22,7 @@ const event = (title: string): CalendarEvent => ({
 class SlowCalendars implements CalendarService {
 	readonly asked: LocalDate[] = [];
 	private readonly waiting: (() => void)[] = [];
-	private readonly last = new Map<LocalDate, DayEvents>();
+	readonly last = new Map<LocalDate, DayEvents>();
 
 	eventsOn(date: LocalDate): Promise<DayEvents> {
 		this.asked.push(date);
@@ -86,6 +86,16 @@ describe("DayData", () => {
 		await selected;
 		expect(titles(data)).toEqual([`on ${TOMORROW}`]);
 		expect(updates()).toBe(shown + 1);
+	});
+
+	it("opens with the events last fetched for the day and swaps in the fresh ones when they come", async () => {
+		const { data, calendars } = setup();
+		calendars.last.set(TODAY, { events: [event("kept")], statuses: [] });
+		const opened = data.load();
+		expect(titles(data)).toEqual(["kept"]);
+		calendars.answer();
+		await opened;
+		expect(titles(data)).toEqual([`on ${TODAY}`]);
 	});
 
 	it("shows nothing of a missing file, and no events or statuses with it", async () => {
