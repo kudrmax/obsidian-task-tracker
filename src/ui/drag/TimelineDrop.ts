@@ -6,6 +6,8 @@ import { snapMinutes } from "./snap";
 
 export interface TimelineDropOptions {
 	step(): number;
+	/** Where something laid over the timeline's bottom begins (the postpone bar), in client pixels; the edge that scrolls sits above it. */
+	floor(): number | null;
 }
 
 /** The timeline as a place to drop: a line at the start the task will take, snapped to the grid, that scrolls the day near the edges. */
@@ -54,10 +56,11 @@ export class TimelineDrop implements DropTarget {
 	/** Near the top or bottom edge the day scrolls under the finger, faster the closer to the edge. */
 	private autoScroll(y: number): void {
 		const r = this.timeline.el.getBoundingClientRect();
+		const bottom = Math.min(r.bottom, this.opts.floor() ?? r.bottom);
 		const edge = LAYOUT.autoScrollEdge;
 		let velocity = 0;
 		if (y < r.top + edge) velocity = -(1 - Math.max(0, y - r.top) / edge) * LAYOUT.autoScrollSpeed;
-		else if (y > r.bottom - edge) velocity = (1 - Math.max(0, r.bottom - y) / edge) * LAYOUT.autoScrollSpeed;
+		else if (y > bottom - edge) velocity = (1 - Math.max(0, bottom - y) / edge) * LAYOUT.autoScrollSpeed;
 		if (velocity === 0 || this.frame) return;
 		this.frame = requestAnimationFrame(() => {
 			this.frame = 0;

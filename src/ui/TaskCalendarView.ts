@@ -81,7 +81,7 @@ export class TaskCalendarView extends ItemView {
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
-	private postponeZones: PostponeZones[] = [];
+	private postponeZones: PostponeZones | null = null;
 	private switching = 0;
 	private readonly unsubscribe: (() => void)[] = [];
 
@@ -195,7 +195,7 @@ export class TaskCalendarView extends ItemView {
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(this.rightEl, "div", "tc-fade");
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
+		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx), floor: () => this.postponeZones?.top() ?? null });
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		this.pull = new PullToRefresh(timeline.el, {
@@ -217,7 +217,7 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
-		this.postponeZones = [this.newTask, this.newSoon, this.newInbox].map((button) => new PostponeZones(button.el, () => this.today()));
+		this.postponeZones = new PostponeZones(root, () => this.today());
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -366,7 +366,7 @@ export class TaskCalendarView extends ItemView {
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
-	/** The zones that put a task off, over the bottoms of the lists, then the two columns the window shows. */
+	/** The bar that puts a task off, over the bottom of the screen, then the two columns the window shows. */
 	private dropTargets(): DropTarget[] {
 		const shown: Record<RightMode, (DropTarget | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
@@ -374,7 +374,7 @@ export class TaskCalendarView extends ItemView {
 			inbox: [this.inboxDrop, this.soonDrop],
 		};
 		const columns = shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
-		return [...this.postponeZones.flatMap((zones) => zones.targets), ...columns];
+		return [...(this.postponeZones?.targets ?? []), ...columns];
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */

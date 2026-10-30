@@ -12,9 +12,8 @@ function setup() {
 	document.body.appendChild(parent);
 	const zones = new PostponeZones(parent, () => "2026-10-30");
 	const [tomorrow, pick] = Array.from(parent.querySelectorAll<HTMLElement>(".tc-zone"));
-	const place = (zone: HTMLElement, top: number) => (zone.getBoundingClientRect = () => new DOMRect(10, top, 160, 40));
-	place(tomorrow, 700);
-	place(pick, 748);
+	tomorrow.getBoundingClientRect = () => new DOMRect(10, 700, 160, 40);
+	pick.getBoundingClientRect = () => new DOMRect(178, 700, 160, 40);
 	return { parent, zones, tomorrow, pick };
 }
 
@@ -37,16 +36,25 @@ describe("PostponeZones", () => {
 
 	it("asks for a day on a drop on Pick a date, the card going back to its place", () => {
 		const { zones, pick } = setup();
-		const target = zones.targets.find((t) => t.hitTest(50, 760, drag))!;
-		target.preview(50, 760, drag);
+		const target = zones.targets.find((t) => t.hitTest(250, 720, drag))!;
+		target.preview(250, 720, drag);
 		expect(pick.classList.contains("is-hot")).toBe(true);
 		expect(target.landing()).toBeNull();
-		expect(target.drop(50, 760, drag)).toEqual({ kind: "pickDate" });
+		expect(target.drop(250, 720, drag)).toEqual({ kind: "pickDate" });
 	});
 
 	it("misses outside the zones", () => {
 		const { zones } = setup();
 		expect(zones.targets.some((t) => t.hitTest(50, 600, drag))).toBe(false);
-		expect(zones.targets.some((t) => t.hitTest(200, 720, drag))).toBe(false);
+		expect(zones.targets.some((t) => t.hitTest(174, 720, drag))).toBe(false);
+	});
+
+	it("gives the bar's top only while it shows", () => {
+		const { parent, zones } = setup();
+		const bar = parent.querySelector<HTMLElement>(".tc-postpone")!;
+		bar.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
+		expect(zones.top()).toBeNull();
+		bar.getBoundingClientRect = () => new DOMRect(0, 692, 390, 56);
+		expect(zones.top()).toBe(692);
 	});
 });

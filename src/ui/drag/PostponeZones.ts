@@ -37,16 +37,23 @@ class PostponeDrop implements DropTarget {
 	}
 }
 
-/** Tomorrow and Pick a date: under a list, in place of New task while a card is dragged. */
+/** Tomorrow and Pick a date: one bar across the bottom of the screen while a card is dragged. */
 export class PostponeZones {
 	readonly targets: readonly DropTarget[];
+	private readonly bar: HTMLElement;
 
 	constructor(parent: HTMLElement, today: () => LocalDate) {
-		const box = el(parent, "div", "tc-postpone");
+		this.bar = el(parent, "div", "tc-postpone");
 		this.targets = [
-			new PostponeDrop(this.zone(box, "tomorrow", "Tomorrow"), "tomorrow", today),
-			new PostponeDrop(this.zone(box, "calendar", "Pick a date"), "pick", today),
+			new PostponeDrop(this.zone(this.bar, "tomorrow", "Tomorrow"), "tomorrow", today),
+			new PostponeDrop(this.zone(this.bar, "calendar", "Pick a date"), "pick", today),
 		];
+	}
+
+	/** The bar's top while it shows, in client pixels; null while it is hidden. */
+	top(): number | null {
+		const r = this.bar.getBoundingClientRect();
+		return r.height > 0 ? r.top : null;
 	}
 
 	private zone(box: HTMLElement, iconName: IconName, label: string): HTMLElement {
