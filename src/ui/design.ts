@@ -7,6 +7,8 @@ export const DESIGN = {
 	hourPx: 56,
 	/** Hours drawn on the timeline. */
 	dayHours: 24,
+	/** How far the timeline reaches over its first hour line, so that the first hour's label is not cut. */
+	labelLift: 7,
 	/** Where the columns start under the day row. */
 	columnsTop: 64,
 	/** Where the timeline starts inside the right column, under one all-day row. */
@@ -24,6 +26,7 @@ export type DesignMeasure = keyof typeof DESIGN;
 export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	hourPx: "--tc-hour",
 	dayHours: "--tc-day-hours",
+	labelLift: "--tc-label-lift",
 	columnsTop: "--tc-columns-top",
 	timelineOffset: "--tc-timeline-top",
 	dividerWidth: "--tc-divider",

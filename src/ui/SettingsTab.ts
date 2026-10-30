@@ -113,7 +113,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.number(el, "Scroll to hour", "Hour another day opens at.", this.settings.scrollToHour, (scrollToHour) => ({ scrollToHour }));
 		new Setting(el)
 			.setName("Zoom levels")
-			.setDesc("Pixels per hour the timeline settles on after a pinch, like 28, 56, 112, 224. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
+			.setDesc("Pixels per hour the timeline settles on after a pinch, like 28, 56, 112, 224. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
 			.addText((t) =>
 				t.setValue(formatZoomLevels(this.settings.zoomLevels)).onChange(async (value) => {
 					const zoomLevels = parseZoomLevels(value);

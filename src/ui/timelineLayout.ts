@@ -173,6 +173,7 @@ export function stretchedSpan(from: TaskSpan, span: Span, edge: "start" | "end",
 
 /** Puts a minute `fraction` down the visible height; one too near the day's first or last hour gets empty room beyond it to stand there all the same. */
 export function scrollPlace(box: ScrollBox, fraction: number): ScrollPlace {
+	if (box.canvasTop + box.canvasHeight <= box.visible) return { roomTop: 0, roomBottom: 0, scrollTop: 0 };
 	const above = fraction * box.visible;
 	const y = box.canvasTop + box.y;
 	const roomTop = Math.max(0, above - y);

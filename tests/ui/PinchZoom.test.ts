@@ -19,8 +19,8 @@ function zoomOf(el: HTMLElement, arbiter = new GestureArbiter()): { scales: numb
 	let hour = 56;
 	new PinchZoom(el, {
 		hourPx: () => hour,
-		min: 28,
-		max: 224,
+		min: () => 28,
+		max: () => 224,
 		arbiter,
 		minutesAt: (y) => y,
 		onScale: (h) => {
@@ -44,8 +44,8 @@ describe("PinchZoom", () => {
 		let hour = 56;
 		new PinchZoom(el, {
 			hourPx: () => hour,
-			min: 28,
-			max: 224,
+			min: () => 28,
+			max: () => 224,
 			arbiter,
 			minutesAt: (y) => y,
 			onScale: (h) => {
@@ -70,7 +70,7 @@ describe("PinchZoom", () => {
 	it("keeps within its bounds", () => {
 		const el = document.createElement("div");
 		const scales: number[] = [];
-		new PinchZoom(el, { hourPx: () => 56, min: 28, max: 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => scales.push(h), onRelease: () => {} });
+		new PinchZoom(el, { hourPx: () => 56, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => scales.push(h), onRelease: () => {} });
 		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
 		el.dispatchEvent(pointer("pointerdown", 2, 100, 110));
 		el.dispatchEvent(pointer("pointermove", 2, 100, 700));
@@ -83,7 +83,7 @@ describe("PinchZoom", () => {
 		const scales: number[] = [];
 		const released: number[] = [];
 		let hour = 56;
-		new PinchZoom(el, { hourPx: () => hour, min: 28, max: 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => { hour = h; scales.push(h); }, onRelease: (h) => released.push(h) });
+		new PinchZoom(el, { hourPx: () => hour, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => { hour = h; scales.push(h); }, onRelease: (h) => released.push(h) });
 		const zoomIn = new WheelEvent("wheel", { deltaY: -100, clientY: 300, bubbles: true, cancelable: true });
 		Object.defineProperty(zoomIn, "ctrlKey", { value: true });
 		el.dispatchEvent(zoomIn);

@@ -195,6 +195,12 @@ describe("scrollPlace", () => {
 	it("puts the hour of another day at the very top", () => {
 		expect(scrollPlace({ ...day, y: 9 * 56 }, 0)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 7 + 9 * 56 });
 	});
+
+	it("leaves no room and no scroll when the whole day fits", () => {
+		const whole = { canvasTop: 7, canvasHeight: 24 * 24, visible: 7 + 24 * 24 };
+		expect(scrollPlace({ ...whole, y: 21.5 * 24 }, 0.5)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 0 });
+		expect(scrollPlace({ ...whole, y: 24 }, 0.5)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 0 });
+	});
 });
 
 describe("followNow", () => {
