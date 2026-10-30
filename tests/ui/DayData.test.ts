@@ -39,6 +39,10 @@ class SlowCalendars implements CalendarService {
 		return this.last.get(date) ?? null;
 	}
 
+	onChange(): () => void {
+		return () => {};
+	}
+
 	answer(): void {
 		for (const answer of this.waiting.splice(0)) answer();
 	}

@@ -3,6 +3,7 @@ import { type CalendarService, type Placement, StaleTaskError, type TaskItem, ty
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
+import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
 import { addDays, localDateOf, minutesOf } from "./dates";
 import { DayData } from "./DayData";
@@ -31,6 +32,7 @@ import type { LocalDate, Slot } from "./types";
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
 const MINUTES_PER_HOUR = 60;
+const SECOND_MS = 1000;
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -52,6 +54,7 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private readonly data: DayData;
+	private readonly polling: CalendarPolling;
 	private renderPending = false;
 	private scrolledFor: LocalDate | null = null;
 	private readonly arbiter = new GestureArbiter();
@@ -62,7 +65,7 @@ export class TaskCalendarView extends ItemView {
 	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
-	private unsubscribe: (() => void) | null = null;
+	private readonly unsubscribe: (() => void)[] = [];
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -71,6 +74,12 @@ export class TaskCalendarView extends ItemView {
 		super(leaf);
 		this.selectedDate = this.today();
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: () => this.render() });
+		this.polling = new CalendarPolling({
+			refresh: () => this.data.calendars(),
+			intervalMs: () => this.settings.google.refreshSeconds * SECOND_MS,
+			hidden: () => document.hidden,
+			timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) },
+		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
 			newTaskMinutes: () => this.settings.newTaskMinutes,
@@ -158,7 +167,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			statuses: () => this.data.statuses,
 			now: () => this.deps.clock.now(),
-			onRefresh: () => this.data.calendars(),
+			onRefresh: () => this.polling.refresh(),
 		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
@@ -171,7 +180,14 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.newTask = new NewTaskButton(root, false, () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, true, () => this.newTaskSheet({ kind: "soon" }, null));
-		this.unsubscribe = this.deps.tasks.onChange(() => void this.data.tasks());
+		this.unsubscribe.push(
+			this.deps.tasks.onChange(() => void this.data.tasks()),
+			this.deps.calendars.onChange(() => void this.data.calendars()),
+		);
+		this.registerDomEvent(window, "focus", () => void this.polling.refresh());
+		this.registerDomEvent(document, "visibilitychange", () => {
+			if (!document.hidden) void this.polling.refresh();
+		});
 		this.registerDomEvent(root, "touchmove", (e) => {
 			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
 			e.stopPropagation();
@@ -181,6 +197,7 @@ export class TaskCalendarView extends ItemView {
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		requestAnimationFrame(() => this.measureNavigation());
+		this.polling.start();
 		await this.data.load();
 	}
 
@@ -191,8 +208,8 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onClose(): Promise<void> {
-		this.unsubscribe?.();
-		this.unsubscribe = null;
+		this.polling.stop();
+		this.unsubscribe.splice(0).forEach((off) => off());
 	}
 
 	override onResize(): void {
@@ -286,7 +303,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private showSources(anchor: HTMLElement): void {
-		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.data.calendars() });
+		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.polling.refresh() });
 	}
 
 	/** The task screen for a new task; with a slot, from a long tap on the timeline. */

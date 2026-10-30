@@ -3,6 +3,7 @@ import { GoogleAuth } from "../infrastructure/GoogleAuth";
 import { GoogleCalendarSource } from "../infrastructure/GoogleCalendarSource";
 import { browserLoginDeps, GoogleRedirectLogin } from "../infrastructure/GoogleRedirectLogin";
 import { requestToken } from "../infrastructure/GoogleToken";
+import { VaultPathWatcher } from "../infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "../infrastructure/VaultTaskFileStore";
 import { WorkCalendarFileSource } from "../infrastructure/WorkCalendarFileSource";
 import { CalendarServiceImpl } from "./CalendarServiceImpl";
@@ -24,7 +25,7 @@ export function createServices(app: App, settings: SettingsStore, clock: Clock =
 	const login = new GoogleRedirectLogin(browserLoginDeps((fields) => requestToken(settings.get().google.clientId, settings.get().google.clientSecret, fields)));
 	const google = new GoogleAuth(settings, login);
 	const googleSource = new GoogleCalendarSource(google, settings);
-	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings);
+	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
 	return {
 		tasks: new TaskServiceImpl(store, settings, clock),
 		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings),

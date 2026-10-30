@@ -24,6 +24,8 @@ class FakeSource implements EventSource {
 		public events: CalendarEvent[] = [],
 	) {}
 
+	readonly changeListeners = new Set<() => void>();
+
 	async eventsBetween(start: Date, end: Date): Promise<EventBatch> {
 		this.calls.push({ start, end });
 		if (this.failWith) throw this.failWith;
@@ -130,5 +132,32 @@ describe("CalendarServiceImpl", () => {
 		expect(work.calls).toHaveLength(1);
 		const again = await svc.eventsOn("2026-10-30");
 		expect(svc.cached("2026-10-30")).toBe(again);
+	});
+});
+
+class ChangingSource extends FakeSource {
+	onChange(listener: () => void): () => void {
+		this.changeListeners.add(listener);
+		return () => this.changeListeners.delete(listener);
+	}
+
+	change(): void {
+		for (const listener of this.changeListeners) listener();
+	}
+}
+
+describe("CalendarServiceImpl.onChange", () => {
+	it("fires when a source says its data changed, and unsubscribes from every source", () => {
+		const google = new FakeSource("google");
+		const work = new ChangingSource("work");
+		const svc = service([google, work]);
+		let fired = 0;
+		const off = svc.onChange(() => fired++);
+		work.change();
+		expect(fired).toBe(1);
+		off();
+		work.change();
+		expect(fired).toBe(1);
+		expect(work.changeListeners.size).toBe(0);
 	});
 });

@@ -55,4 +55,8 @@ export class DemoCalendarService implements CalendarService {
 	cached(date: LocalDate): DayEvents | null {
 		return this.last.get(date) ?? null;
 	}
+
+	onChange(): () => void {
+		return () => {};
+	}
 }

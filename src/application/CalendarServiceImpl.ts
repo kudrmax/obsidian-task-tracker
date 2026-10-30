@@ -52,6 +52,11 @@ export class CalendarServiceImpl implements CalendarService {
 		return this.lastDay.get(date) ?? null;
 	}
 
+	onChange(listener: () => void): () => void {
+		const offs = this.sources.flatMap((s) => (s.onChange ? [s.onChange(listener)] : []));
+		return () => offs.forEach((off) => off());
+	}
+
 	private async fetch(source: EventSource, start: Date, end: Date): Promise<SourceResult> {
 		try {
 			const batch = await source.eventsBetween(start, end);
