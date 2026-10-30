@@ -23,6 +23,30 @@ export interface GoogleSettings {
 	readonly refreshSeconds: number;
 }
 
+/** The fixed set of colours a priority level takes; the order the settings offer them in. */
+export const PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"] as const;
+export type PriorityColor = (typeof PRIORITY_COLORS)[number];
+
+/** A priority level: a task whose text starts with `prefix` gets the tint of `color`. */
+export interface PriorityLevel {
+	readonly prefix: string;
+	readonly color: PriorityColor;
+}
+
+/** A prefix marks a task only when it is one word: a line's first word is matched against it. */
+export function usablePrefix(prefix: string): boolean {
+	return /^\S+$/.test(prefix);
+}
+
+export function sameLevels(a: readonly PriorityLevel[], b: readonly PriorityLevel[]): boolean {
+	return a.length === b.length && a.every((level, i) => level.prefix === b[i].prefix && level.color === b[i].color);
+}
+
+/** The levels that mark tasks: a one-word prefix, the first of two with the same one. */
+export function usableLevels(levels: readonly PriorityLevel[]): readonly PriorityLevel[] {
+	return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+}
+
 export interface TaskCalendarSettings {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;
@@ -44,6 +68,8 @@ export interface TaskCalendarSettings {
 	readonly rightMode: RightMode;
 	/** A calendar source whose last update is older than this gets the orange dot. */
 	readonly staleAfterMinutes: number;
+	/** Priority levels in the order the menu and the task screen offer them. */
+	readonly priorities: readonly PriorityLevel[];
 }
 
 export const LIST_WIDTH_MIN = 110;
@@ -69,6 +95,10 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
 	staleAfterMinutes: 180,
+	priorities: [
+		{ prefix: "p1", color: "red" },
+		{ prefix: "p2", color: "orange" },
+	],
 };
 
 /** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */

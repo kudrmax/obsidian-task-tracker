@@ -6,6 +6,8 @@ import { STATUS_CHARS, type Slot, type Task, type TaskStatus } from "./Task";
 export interface Markers {
 	readonly dueDate: string;
 	readonly slot: string;
+	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
+	readonly priorities?: readonly string[];
 }
 
 export interface ParsedTaskLine {
@@ -16,6 +18,7 @@ export interface ParsedTaskLine {
 
 const LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
 const DATE = "(\\d{4}-\\d{2}-\\d{2})";
+const FIRST_WORD_RE = /^(\S+)\s+(\S.*)$/;
 const TIME = "(\\d{2}:\\d{2})";
 
 export function statusOf(char: string): TaskStatus {
@@ -82,13 +85,19 @@ export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | 
 	return {
 		indent: m[1],
 		bullet: m[2],
-		task: { status: statusOf(statusChar), statusChar, ...fields, children: [] },
+		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOf(fields.text, markers), children: [] },
 	};
+}
+
+function priorityOf(text: string, markers: Markers): { text: string; priority: string | null } {
+	const m = FIRST_WORD_RE.exec(text);
+	if (!m || !markers.priorities?.includes(m[1])) return { text, priority: null };
+	return { text: m[2], priority: m[1] };
 }
 
 export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string {
 	const { indent, bullet, task } = parsed;
-	let line = `${indent}${bullet} [${task.statusChar}] ${task.text}`;
+	let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
 		const { date, start, end } = task.slot;

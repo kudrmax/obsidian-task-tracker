@@ -1,7 +1,8 @@
-import { Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
-import type { GoogleSettings, SectionNames, TaskCalendarSettings } from "../settings";
+import { type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { LevelEdits } from "./priorityLevels";
 import { formatTime } from "./dates";
 
 export interface GoogleCalendarOption {
@@ -42,6 +43,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		this.tasksFileGroup(containerEl);
+		this.prioritiesGroup(containerEl);
 		this.timelineGroup(containerEl);
 		this.googleGroup(containerEl);
 		this.workGroup(containerEl);
@@ -61,6 +63,33 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		}
 		this.text(el, "Due date marker", "Precedes the due date on a task line.", this.settings.dueDateMarker, (dueDateMarker) => ({ dueDateMarker }));
 		this.text(el, "Slot marker", "Precedes the time slot on a task line.", this.settings.slotMarker, (slotMarker) => ({ slotMarker }));
+	}
+
+	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */
+	private prioritiesGroup(el: HTMLElement): void {
+		new Setting(el).setName("Priorities").setHeading();
+		const saved = new LevelEdits(() => this.settings.priorities, (priorities) => this.plugin.update({ priorities }));
+		const redrawn = new LevelEdits(() => this.settings.priorities, (priorities) => this.updateLevels(priorities));
+		this.settings.priorities.forEach((level, index) => {
+			const row = el.createDiv("setting-item tc-level-row");
+			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void saved.rename(index, value));
+			prefix.inputEl.addClass("tc-level-prefix");
+			const swatches = row.createDiv("tc-swatches");
+			for (const color of PRIORITY_COLORS) {
+				const swatch = swatches.createDiv({ cls: "tc-swatch", attr: { role: "button", tabindex: "0", "aria-label": color, "data-priority": color } });
+				swatch.toggleClass("is-on", color === level.color);
+				swatch.addEventListener("click", () => void redrawn.recolour(index, color));
+			}
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void redrawn.remove(index));
+		});
+		new Setting(el)
+			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
+			.addButton((b) => b.setButtonText("Add priority").onClick(() => void redrawn.add()));
+	}
+
+	private async updateLevels(priorities: readonly PriorityLevel[]): Promise<void> {
+		await this.plugin.update({ priorities });
+		this.display();
 	}
 
 	private timelineGroup(el: HTMLElement): void {

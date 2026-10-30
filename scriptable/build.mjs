@@ -21,7 +21,8 @@ const SETTINGS = {
 	// Как в настройках плагина Task Calendar.
 	tasksFile: "TODOs Tasks.md",
 	sections: { now: "Now", soon: "Soon", done: "Done" },
-	markers: { dueDate: "📅", slot: "⏰" },
+	// Префиксы приоритетов: в заголовке уведомления их нет.
+	markers: { dueDate: "📅", slot: "⏰", priorities: ["p1", "p2"] },
 };
 `;
 

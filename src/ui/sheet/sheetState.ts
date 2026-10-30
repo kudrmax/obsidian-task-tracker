@@ -8,6 +8,8 @@ export interface SheetState {
 	readonly tile: Tile;
 	readonly date: LocalDate | null;
 	readonly pickerOpen: boolean;
+	/** The prefix of the chosen level, or none. */
+	readonly priority: string | null;
 }
 
 export function tileLabel(placement: Placement, _today: LocalDate): string {
@@ -16,8 +18,8 @@ export function tileLabel(placement: Placement, _today: LocalDate): string {
 	return dayMonth(placement.date);
 }
 
-export function initialState(placement: Placement): SheetState {
-	return { tile: placement.kind, date: placement.kind === "date" ? placement.date : null, pickerOpen: false };
+export function initialState(placement: Placement, priority: string | null = null): SheetState {
+	return { tile: placement.kind, date: placement.kind === "date" ? placement.date : null, pickerOpen: false, priority };
 }
 
 /** A tap on a tile: Soon and Now take it; Date takes it and opens the calendar, again when a day is already chosen. */
@@ -26,7 +28,11 @@ export function togglePlacement(state: SheetState, tile: Tile): SheetState {
 }
 
 export function pickDate(state: SheetState, date: LocalDate): SheetState {
-	return { tile: "date", date, pickerOpen: false };
+	return { ...state, tile: "date", date, pickerOpen: false };
+}
+
+export function pickPriority(state: SheetState, priority: string | null): SheetState {
+	return { ...state, priority };
 }
 
 export function placementOf(state: SheetState, today: LocalDate): Placement {
@@ -35,5 +41,5 @@ export function placementOf(state: SheetState, today: LocalDate): Placement {
 }
 
 export function draftOf(text: string, state: SheetState, today: LocalDate): TaskDraft {
-	return { text: text.trim(), placement: placementOf(state, today) };
+	return { text: text.trim(), placement: placementOf(state, today), priority: state.priority };
 }

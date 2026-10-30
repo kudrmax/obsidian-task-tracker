@@ -1,4 +1,5 @@
 import type { LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { PriorityLevel } from "../settings";
 
 export type { SectionKey };
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
@@ -21,6 +22,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** The level whose prefix starts the task's text, which `text` then goes without. */
+	readonly priority: PriorityLevel | null;
 }
 
 export interface DayView {
@@ -51,6 +54,8 @@ export type Placement = { readonly kind: "soon" } | { readonly kind: "now" } | {
 export interface TaskDraft {
 	readonly text: string;
 	readonly placement: Placement;
+	/** A level's prefix, or none. */
+	readonly priority: string | null;
 }
 
 /**
@@ -84,6 +89,8 @@ export interface TaskService {
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
+	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
+	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
 

@@ -72,11 +72,11 @@ describe(SCRIPT, () => {
 	});
 
 	it("starts with the plugin's default settings", () => {
-		const { tasksFile, sections, dueDateMarker, slotMarker } = DEFAULT_SETTINGS;
+		const { tasksFile, sections, dueDateMarker, slotMarker, priorities } = DEFAULT_SETTINGS;
 		for (const line of [
 			`tasksFile: ${JSON.stringify(tasksFile)},`,
 			`sections: { now: ${JSON.stringify(sections.now)}, soon: ${JSON.stringify(sections.soon)}, done: ${JSON.stringify(sections.done)} },`,
-			`markers: { dueDate: ${JSON.stringify(dueDateMarker)}, slot: ${JSON.stringify(slotMarker)} },`,
+			`markers: { dueDate: ${JSON.stringify(dueDateMarker)}, slot: ${JSON.stringify(slotMarker)}, priorities: [${priorities.map((l) => JSON.stringify(l.prefix)).join(", ")}] },`,
 		]) {
 			expect(committed).toContain(line);
 		}
@@ -86,7 +86,7 @@ describe(SCRIPT, () => {
 		const ahead = new Date(Date.now() + 3_600_000);
 		const pad = (n: number) => String(n).padStart(2, "0");
 		const slot = `${ahead.getFullYear()}-${pad(ahead.getMonth() + 1)}-${pad(ahead.getDate())} ${pad(ahead.getHours())}:${pad(ahead.getMinutes())}`;
-		const scriptable = fakeScriptable(["## Now", `- [ ] Call the doctor ⏰ ${slot}`, "## Soon", "## Done", ""].join("\n"));
+		const scriptable = fakeScriptable(["## Now", `- [ ] p1 Call the doctor ⏰ ${slot}`, "## Soon", "## Done", ""].join("\n"));
 		Object.assign(globalThis, scriptable.globals);
 		installed.push(...Object.keys(scriptable.globals));
 

@@ -1,3 +1,4 @@
+import type { PriorityColor } from "../../settings";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { icon } from "../icons";
@@ -6,6 +7,8 @@ import { type MenuIconName, menuIcon } from "./menuIcons";
 export interface MenuRowSpec {
 	readonly label: string;
 	readonly value?: string;
+	/** A priority's colour, as a dot before the value. */
+	readonly dot?: PriorityColor | null;
 	readonly icon?: MenuIconName;
 	readonly danger?: boolean;
 	readonly onPick: () => void;
@@ -16,8 +19,26 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec, cls = "tc-menu-r
 	const row = el(parent, "button", cls);
 	row.classList.toggle("is-danger", spec.danger === true);
 	el(row, "span", "tc-menu-label", spec.label);
+	if (spec.dot) priorityDot(row, spec.dot, "tc-menu-dot");
 	if (spec.value) el(row, "span", "tc-menu-value", spec.value);
 	if (spec.icon) row.appendChild(menuIcon(spec.icon));
+	row.addEventListener("click", spec.onPick);
+	return row;
+}
+
+/** A dot of a priority level's colour. */
+export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: string): HTMLElement {
+	const dot = el(parent, "span", `tc-priority-dot ${cls}`);
+	dot.dataset.priority = color;
+	return dot;
+}
+
+/** A row of the priority submenu: the level's dot, its prefix, a check on the current one. */
+export function levelRow(parent: HTMLElement, spec: { readonly color: PriorityColor; readonly label: string; readonly on: boolean; readonly onPick: () => void }): HTMLButtonElement {
+	const row = el(parent, "button", "tc-menu-row");
+	priorityDot(row, spec.color, "tc-level-dot");
+	el(row, "span", "tc-menu-label", spec.label);
+	if (spec.on) row.appendChild(menuIcon("check")).classList.add("tc-menu-check");
 	row.addEventListener("click", spec.onPick);
 	return row;
 }

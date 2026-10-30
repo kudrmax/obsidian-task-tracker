@@ -1,4 +1,5 @@
 import type { TaskItem } from "../application/contracts";
+import type { PriorityLevel } from "../settings";
 import { DayBoundary } from "./DayBoundary";
 import type { LocalDate } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
@@ -30,12 +31,13 @@ export function soonList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
 }
 
-export function toItem(entry: TaskEntry): TaskItem {
+export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null): TaskItem {
 	return {
 		key: { section: entry.section, index: entry.index, raw: entry.raw },
 		text: entry.task.text,
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
+		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 	};
 }
