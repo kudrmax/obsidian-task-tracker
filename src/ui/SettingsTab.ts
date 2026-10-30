@@ -63,7 +63,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 
 	private timelineGroup(el: HTMLElement): void {
 		new Setting(el).setName("Timeline").setHeading();
-		this.number(el, "New task duration", "Minutes a task gets when dropped on the timeline.", this.settings.newTaskMinutes, (newTaskMinutes) => ({ newTaskMinutes }));
 		this.number(el, "Long press delay", "Milliseconds before a touch becomes a drag.", this.settings.longPressMs, (longPressMs) => ({ longPressMs }));
 		new Setting(el)
 			.setName("Day starts at")

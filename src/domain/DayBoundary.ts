@@ -5,9 +5,10 @@ const DAY_MINUTES = 1440;
 const HOUR_MINUTES = 60;
 const DAY_HOURS = 24;
 
+/** Minutes from the start of a day; a null `end` is a task at a time, without a duration. */
 export interface Span {
 	readonly start: number;
-	readonly end: number;
+	readonly end: number | null;
 }
 
 /**
@@ -45,15 +46,15 @@ export class DayBoundary {
 	/** Minutes from the start of `day` to the start and the end of `slot`. */
 	spanOf(slot: Slot, day: LocalDate): Span {
 		const start = this.offsetOfClock(day, slot.date, slot.start);
-		return { start, end: start + slot.end - slot.start };
+		return { start, end: slot.end === null ? null : start + slot.end - slot.start };
 	}
 
 	/** The slot that takes the minutes from `start` to `end` past the start of `day`, at the clock's date and time. */
-	slotAt(day: LocalDate, start: number, end: number): Slot {
+	slotAt(day: LocalDate, start: number, end: number | null): Slot {
 		const clock = this.startMinute + start;
 		const nextDay = clock >= DAY_MINUTES;
 		const slotStart = nextDay ? clock - DAY_MINUTES : clock;
-		return { date: nextDay ? addDays(day, 1) : day, start: slotStart, end: slotStart + end - start };
+		return { date: nextDay ? addDays(day, 1) : day, start: slotStart, end: end === null ? null : slotStart + end - start };
 	}
 
 	/** The clock hour the `index`-th hour line of a day stands at. */
@@ -66,10 +67,12 @@ export class DayBoundary {
 		return ((hour - this.startHour + DAY_HOURS) % DAY_HOURS) * HOUR_MINUTES;
 	}
 
-	/** The slot moved and cut to lie within its day and last at least `stepMinutes`. */
+	/** The slot moved and cut to lie within its day and last at least `stepMinutes`; one without a duration starts a step before the day ends. */
 	clamp(slot: Slot, stepMinutes: number): Slot {
 		const day = this.dayOfClock(slot.date, Math.max(0, slot.start));
-		let { start, end } = this.spanOf(slot, day);
+		const span = this.spanOf(slot, day);
+		if (span.end === null) return this.slotAt(day, Math.max(0, Math.min(span.start, DAY_MINUTES - stepMinutes)), null);
+		let { start, end } = span;
 		if (start < 0) {
 			end -= start;
 			start = 0;

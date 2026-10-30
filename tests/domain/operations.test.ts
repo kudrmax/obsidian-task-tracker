@@ -48,16 +48,16 @@ describe("create", () => {
 		expect(createInSoon(parse("## Soon\n- [ ] C\n\n## Done\n"), "New").serialize()).toBe("## Soon\n- [ ] C\n- [ ] New\n\n## Done\n");
 	});
 
-	it("createAtTime today lands in Now with a slot of the given length", () => {
-		expect(createAtTime(parse("## Now\n\n## Soon\n"), T, T, 600, 60, "New").serialize()).toBe("## Now\n- [ ] New ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n");
+	it("createAtTime today lands in Now with a slot at the time, without a duration", () => {
+		expect(createAtTime(parse("## Now\n\n## Soon\n"), T, T, 600, "New").serialize()).toBe("## Now\n- [ ] New ⏰ 2026-10-30 10:00\n\n## Soon\n");
 	});
 
-	it("createAtTime clips the end where the day ends", () => {
-		expect(createAtTime(parse("## Now\n\n## Soon\n"), "2026-10-31", T, 180, 120, "Late", new DayBoundary(4)).serialize()).toBe("## Now\n- [ ] Late ⏰ 2026-10-31 03:00-04:00\n\n## Soon\n");
+	it("createAtTime counts the day from its start hour: 3:00 on the 31st belongs to the 30th", () => {
+		expect(createAtTime(parse("## Now\n\n## Soon\n"), "2026-10-31", T, 180, "Late", new DayBoundary(4)).serialize()).toBe("## Now\n- [ ] Late ⏰ 2026-10-31 03:00\n\n## Soon\n");
 	});
 
-	it("createAtTime on another day lands in Soon and clips the end at midnight", () => {
-		expect(createAtTime(parse("## Now\n\n## Soon\n"), D, T, 1410, 60, "New").serialize()).toBe("## Now\n\n## Soon\n- [ ] New ⏰ 2026-11-03 23:30-24:00\n");
+	it("createAtTime on another day lands in Soon", () => {
+		expect(createAtTime(parse("## Now\n\n## Soon\n"), D, T, 1410, "New").serialize()).toBe("## Now\n\n## Soon\n- [ ] New ⏰ 2026-11-03 23:30\n");
 	});
 });
 
@@ -139,6 +139,11 @@ describe("slots", () => {
 	it("clearSlot drops the slot and keeps the due date and the section", () => {
 		const d = parse("## Soon\n- [ ] A 📅 2026-11-03 ⏰ 2026-11-03 10:00-11:00\n");
 		expect(clearSlot(d, d.tasks("soon")[0]).serialize()).toBe("## Soon\n- [ ] A 📅 2026-11-03\n");
+	});
+
+	it("setSlot writes a slot without a duration as its start alone", () => {
+		const d = parse("## Now\n- [ ] A ⏰ 2026-10-30 10:00-11:00\n");
+		expect(setSlot(d, d.tasks("now")[0], { date: T, start: 630, end: null }, T).serialize()).toBe("## Now\n- [ ] A ⏰ 2026-10-30 10:30\n");
 	});
 
 });

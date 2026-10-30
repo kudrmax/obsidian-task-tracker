@@ -34,11 +34,10 @@ export function createAtTime(
 	date: LocalDate,
 	today: LocalDate,
 	start: number,
-	minutes: number,
 	text: string,
 	boundary = DayBoundary.MIDNIGHT,
 ): TaskDocument {
-	const slot = boundary.clamp({ date, start, end: start + minutes }, SLOT_STEP);
+	const slot = boundary.clamp({ date, start, end: null }, SLOT_STEP);
 	return doc.insert(listSection(boundary.dayOfSlot(slot), today), "end", newTask(text, { slot }));
 }
 

@@ -43,6 +43,8 @@ export interface TaskMenuContext {
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
 	readonly actions: MenuActions;
+	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
+	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 }
 
 /** The task menu over a blurred screen: the tapped card stays as it is above the blur, the panel grows out under it; the due submenu and the month picker take its place. */
@@ -63,13 +65,13 @@ export class TaskMenu {
 		this.lifted = el(document.body, "div", "tc-lifted");
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
-			if (context.item.status === "inProgress") el(this.lifted, "span", "tc-strip");
-			el(this.lifted, "div", "tc-item-title", context.item.text);
+			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { showDue: true });
 		this.lifted.style.left = px(this.anchor.left);
 		this.lifted.style.top = px(this.anchor.top);
 		this.lifted.style.width = px(this.anchor.width);
 		this.lifted.style.height = px(this.anchor.height);
+		context.lifted?.(this.lifted, () => this.close());
 		this.panel = el(document.body, "div", "tc-panel");
 		this.showMenu();
 		requestAnimationFrame(() => this.panel.classList.add("is-shown"));

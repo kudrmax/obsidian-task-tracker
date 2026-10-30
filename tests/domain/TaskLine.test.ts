@@ -21,6 +21,12 @@ describe("parseTaskLine", () => {
 		expect(p.task).toMatchObject({ text: "A", dueDate: "2026-11-03", slot: { date: "2026-11-02", start: 600, end: 660 } });
 	});
 
+	it("reads a slot without a duration: the start alone", () => {
+		const p = parseTaskLine("- [ ] A ⏰ 2026-11-02 10:00 📅 2026-11-03", M)!;
+		expect(p.task).toMatchObject({ text: "A", dueDate: "2026-11-03", slot: { date: "2026-11-02", start: 600, end: null } });
+		expect(formatTaskLine(p, M)).toBe("- [ ] A 📅 2026-11-03 ⏰ 2026-11-02 10:00");
+	});
+
 	it("reads the four statuses", () => {
 		expect(parseTaskLine("- [ ] a", M)!.task.status).toBe("todo");
 		expect(parseTaskLine("- [/] a", M)!.task.status).toBe("inProgress");

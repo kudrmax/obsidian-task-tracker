@@ -50,6 +50,10 @@ export const PROPERTY = {
 	allDayExtraRows: "--tc-allday-extra-rows",
 	y: "--tc-y",
 	length: "--tc-len",
+	/** A task card's left edge in the items area: further in when it lies over another card or an event. */
+	x: "--tc-x",
+	/** The bottom of the last task card: a stack that runs past midnight lengthens the day. */
+	stackEnd: "--tc-stack-end",
 	column: "--tc-col",
 	columns: "--tc-cols",
 	eventBg: "--tc-event-bg",
@@ -98,8 +102,14 @@ export const LAYOUT = {
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
 	autoScrollSpeed: 12,
-	/** The fewest minutes a resized slot keeps. */
+	/** The fewest minutes a slot dropped near midnight keeps before it. */
 	minSlotMinutes: 5,
+	/** Between the head of a task card and the card pushed under it. */
+	stackGap: 4,
+	/** How far in a task card lies over a long task's body or an event. */
+	overlayInset: 18,
+	/** A task's dots stretch it by this step, whatever the zoom. */
+	resizeStepMinutes: 15,
 	minutesPerDay: 1440,
 	/** A pull let go past this far refreshes the sources. */
 	pullThreshold: 60,

@@ -84,7 +84,7 @@ body{margin:0;background:#000}
 <div style="flex: 1; min-width: 0; padding: 0 6px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: {{allDay.text}}; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">День рождения Ани</div>
 </div>
 
-<div style="position: absolute; top: {{timelineTop}}px; left: 0; right: 0; height: 640px; z-index: 1;">
+<div style="position: absolute; top: {{timelineTop}}px; left: 0; right: 0; height: {{timelineHeight}}px; z-index: 1;">
 <sc-for list="{{hours}}" as="h" hint-placeholder-count="11">
 <sc-if value="{{h.showLabel}}" hint-placeholder-val="{{true}}">
 <div style="position: absolute; top: {{h.labelTop}}px; left: 0; width: 22px; text-align: right; font-size: 11px; line-height: 14px; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{h.label}}</div>
@@ -113,7 +113,33 @@ body{margin:0;background:#000}
 </sc-if>
 </sc-for>
 
-<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
+<sc-for list="{{cards}}" as="k" hint-placeholder-count="0">
+<sc-if value="{{k.isTask}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; top: {{k.top}}px; height: {{k.height}}px; {{k.x}} box-sizing: border-box; overflow: hidden; border-radius: 12px; background: {{c.card}}; box-shadow: {{k.ring}}; padding: {{k.pad}}; display: flex; align-items: flex-start; gap: 6px; z-index: 2;">
+<sc-if value="{{k.progress}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{stripColor}};"></span>
+</sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; line-height: 18px; color: {{c.text}}; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{k.title}}</div>
+<sc-if value="{{k.hasMeta}}" hint-placeholder-val="{{false}}">
+<span style="width: 14px; flex-shrink: 0; margin-top: -1px; display: flex; flex-direction: column; align-items: center;"><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{k.metaTop}}</span><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{k.metaBottom}}</span></span>
+</sc-if>
+<sc-if value="{{k.resizing}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; right: 8px; bottom: 10px; height: 18px; padding: 0 6px; border-radius: 6px; background: {{accent}}; color: #FFFFFF; font-size: 12px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{k.endLabel}}</span>
+</sc-if>
+</div>
+<sc-if value="{{k.resizing}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; top: {{k.handleTop}}px; right: 15px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid {{accent}}; background: {{c.bg}}; z-index: 3;"></span>
+<span style="position: absolute; top: {{k.handleBottom}}px; left: {{k.handleLeft}}px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid {{accent}}; background: {{c.bg}}; z-index: 3;"></span>
+</sc-if>
+</sc-if>
+<sc-if value="{{k.isDrop}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; top: {{k.top}}px; height: {{k.height}}px; {{k.x}} box-sizing: border-box; border-radius: 12px; border: 1.5px dashed {{accent}}; background: {{c.placeholder}}; padding: 0 8px 0 12px; display: flex; align-items: center; z-index: 2;">
+<span style="font-size: 15px; font-weight: 600; color: {{accent}}; font-variant-numeric: tabular-nums;">{{k.meta}}</span>
+</div>
+</sc-if>
+</sc-for>
+
+<sc-if value="{{oldDrop}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; top: {{drop.top}}px; height: {{drop.height}}px; left: 1px; width: calc(50% - 2px); box-sizing: border-box; border-radius: 8px; border: 1.5px dashed {{accent}}; background: {{c.placeholder}}; padding: 4px 7px; z-index: 2;">
 <span style="font-size: 12px; font-weight: 600; color: {{accent}}; font-variant-numeric: tabular-nums;">16:30</span>
 </div>
@@ -155,7 +181,7 @@ body{margin:0;background:#000}
 </nav>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"listWidth":{"editor":"range","default":187,"min":110,"max":280,"step":1,"unit":"px"},"dragging":{"editor":"boolean","default":false},"rightMode":{"editor":"enum","default":"calendar","options":["calendar","soon"]},"progress":{"editor":"range","default":-1,"min":-1,"max":1,"step":0.05},"taskStyle":{"editor":"enum","default":"card","options":["card","event"]},"scenario":{"editor":"enum","default":"day","options":["day","stack","stretch","zoomIn","zoomOut","split","long"]},"scrollHours":{"editor":"range","default":0,"min":0,"max":6,"step":0.5,"unit":"h"},"newSlot":{"editor":"boolean","default":false},"sourceDot":{"editor":"boolean","default":false},"listScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"soonScroll":{"editor":"range","default":0,"min":0,"max":300,"step":1,"unit":"px"},"accent":{"editor":"color","default":"#9580FF","options":["#9580FF","#0A84FF","#30D158","#FF9F0A"]},"stripColor":{"editor":"color","default":"#8A6CEF","options":["#8A6CEF","#3B3266"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   themes() {
     return {
@@ -207,7 +233,11 @@ class Component extends DCLogic {
       { title: 'Настроить бэкап ноутбука' }
     ].map((t) => ({ ...t, progress: !!t.progress }));
     const accent = light ? c.accent : (this.props.accent ?? '#9580FF');
-    const HOUR = 56;
+    const cardMode = (this.props.taskStyle ?? 'card') !== 'event';
+    const scenario = cardMode ? (this.props.scenario ?? 'day') : 'day';
+    const HOURS_BY_SCENARIO = { zoomIn: 112, zoomOut: 28 };
+    const HOUR = HOURS_BY_SCENARIO[scenario] ?? 56;
+    const SCROLL_BY_SCENARIO = { zoomIn: 1.75, long: 4.5, stack: 3 };
     const START = 9;
     const COLUMNS_TOP = 166;
     const TIMELINE_OFFSET = 34;
@@ -237,9 +267,109 @@ class Component extends DCLogic {
       { kind: 'task', title: 'Заказать продукты', s: 17, e: 17.5 },
       { kind: 'event', title: 'Тренировка', s: 18, e: 19.5, cal: 'green' }
     ];
+    const TASK_H = 40;
+    const STACK_GAP = 4;
+    const EVENT_INSET = 18;
+    const fmt = (h) => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+    const timeParts = (h) => [String(Math.floor(h)), String(Math.round((h % 1) * 60)).padStart(2, '0')];
+    const durationParts = (h) => (h >= 1 ? [h % 1 ? Math.floor(h) + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0') : String(h), 'H'] : [String(Math.round(h * 60)), 'MIN']);
+    const TASK_SETS = {
+      day: [
+        { title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true },
+        { title: 'Разобрать почту', s: 14 },
+        { title: 'Подготовить вопросы к планированию', s: 16 },
+        { title: 'Заказать продукты', s: 17 }
+      ],
+      stack: [
+        { title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true },
+        { title: 'Разобрать почту', s: 14 },
+        { title: 'Заказать продукты', s: 17 },
+        { title: 'Позвонить в банк', s: 17 },
+        { title: 'Купить корм коту', s: 17 + 5 / 60 },
+        { title: 'Оплатить интернет', s: 17 + 10 / 60 }
+      ],
+      stretch: [
+        { title: 'Написать отчёт по проекту', s: 11, e: 12, progress: true },
+        { title: 'Разобрать почту', s: 14, e: 15.5, resizing: true },
+        { title: 'Заказать продукты', s: 17 }
+      ],
+      long: [
+        { title: 'Разобрать почту', s: 14 },
+        { title: 'Ревью дизайна с командой', s: 14.5, e: 16.5 },
+        { title: 'Ответить Вадиму', s: 15 },
+        { title: 'Заказать продукты', s: 17 }
+      ]
+    };
+    TASK_SETS.zoomIn = TASK_SETS.day;
+    TASK_SETS.split = TASK_SETS.day;
+    TASK_SETS.zoomOut = [...TASK_SETS.day, { title: 'Оплатить интернет', s: 14.5 }];
+    const eventsRaw = raw.filter((r) => r.kind === 'event');
+    const eventSpans = eventsRaw.map((r) => ({ top: (r.s - START) * HOUR, bottom: (r.e - START) * HOUR }));
+    const overlapsEvent = (top, bottom) => eventSpans.some((ev) => top < ev.bottom && bottom > ev.top);
+    const cardSource = [
+      ...TASK_SETS[scenario].map((t, i) => ({ ...t, order: i })),
+      ...(cardMode && (dragging || newSlot) ? [{ drop: true, s: 16.5, order: -1 }] : [])
+    ].sort((a, b) => a.s - b.s || a.order - b.order);
+    const cards = [];
+    const bodies = [];
+    let stackBottom = -Infinity;
+    for (const t of cardSource) {
+      const natural = (t.s - START) * HOUR + 1;
+      const durationPx = t.e ? (t.e - t.s) * HOUR - 2 : 0;
+      const top = Math.max(natural, stackBottom + STACK_GAP);
+      const height = t.e ? Math.max(TASK_H, (t.e - START) * HOUR - 1 - top) : TASK_H;
+      stackBottom = top + TASK_H;
+      const displaced = top - natural > 0.5;
+      const parent = bodies.filter((b) => top < b.bottom && top + TASK_H > b.top).pop();
+      const overEvent = overlapsEvent(top, top + height) || !!parent;
+      const left = parent ? parent.left + EVENT_INSET : overEvent ? EVENT_INSET : 1;
+      if (height > TASK_H) bodies.push({ top: top + TASK_H, bottom: top + height, left });
+      const split = scenario === 'split' && overEvent;
+      const x = split
+        ? 'left: calc(50% + 1px); right: 1px;'
+        : 'left: ' + left + 'px; right: 1px;';
+      const hiddenDuration = t.e && durationPx < TASK_H;
+      if (displaced && cards.length) cards[cards.length - 1].inStack = true;
+      const meta = t.drop ? fmt(t.s) : '';
+      cards.push({
+        title: t.title,
+        isTask: !t.drop,
+        isDrop: !!t.drop,
+        progress: !!t.progress,
+        top,
+        height,
+        x,
+        pad: '11px 8px 0 12px',
+        ring: [t.resizing ? 'inset 0 0 0 1.5px ' + accent : '', overEvent && !split ? '0 0 0 2px ' + c.bg : ''].filter(Boolean).join(', ') || 'none',
+        meta,
+        inStack: displaced,
+        hiddenDuration: !!hiddenDuration,
+        s: t.s,
+        e: t.e,
+        resizing: !!t.resizing,
+        endLabel: t.e ? fmt(t.e) : '',
+        handleTop: top - 5,
+        handleBottom: top + height - 5,
+        handleLeft: (split ? 0 : left) + 14
+      });
+    }
+    for (const k of cards) {
+      const parts = k.resizing ? null : k.inStack ? timeParts(k.s) : k.hiddenDuration ? durationParts(k.e - k.s) : null;
+      k.hasMeta = !!parts && k.isTask;
+      k.metaTop = parts ? parts[0] : '';
+      k.metaBottom = parts ? parts[1] : '';
+    }
+    const splitEvent = (r) => scenario === 'split' && TASK_SETS.split.some((t) => {
+      const top = (t.s - START) * HOUR;
+      return top < (r.e - START) * HOUR && top + TASK_H > (r.s - START) * HOUR;
+    });
     const items = raw
+      .filter((r) => !(cardMode && r.kind === 'task'))
       .map((r) => {
-        const sharesWithNewSlot = (newSlot || dragging) && r.s === 17;
+        if (splitEvent(r)) {
+          r = { ...r, col: (r.col ?? 0), cols: (r.cols ?? 1) * 2 };
+        }
+        const sharesWithNewSlot = !cardMode && (newSlot || dragging) && r.s === 17;
         const col = sharesWithNewSlot ? 1 : (r.col ?? 0);
         const cols = sharesWithNewSlot ? 2 : (r.cols ?? 1);
         const top = (r.s - START) * HOUR + 1;
@@ -260,7 +390,8 @@ class Component extends DCLogic {
       });
     const nowY = (14 + 20 / 60 - START) * HOUR;
     const hours = [];
-    for (let h = START; h <= 19; h++) {
+    const lastHour = cardMode ? Math.min(START + Math.ceil(640 / HOUR), 24) : 19;
+    for (let h = START; h <= lastHour; h++) {
       const top = (h - START) * HOUR;
       hours.push({ label: String(h), top, labelTop: top - 7, showLabel: Math.abs(top - nowY) > 20 });
     }
@@ -323,7 +454,10 @@ class Component extends DCLogic {
       items,
       hours,
       drop,
-      timelineTop: TIMELINE_OFFSET - Number(this.props.scrollHours ?? 0) * HOUR,
+      timelineTop: TIMELINE_OFFSET - (SCROLL_BY_SCENARIO[scenario] ?? Number(this.props.scrollHours ?? 0)) * HOUR,
+      timelineHeight: cardMode ? (lastHour - START + 1) * HOUR : 640,
+      cards: cardMode ? cards : [],
+      oldDrop: dragging && !cardMode,
       listScroll: Number(this.props.listScroll ?? 0),
       soonScroll: Number(this.props.soonScroll ?? 0),
       nowTop: nowY - 8,

@@ -6,10 +6,10 @@ export type DragOrigin = "left" | "soon" | "timeline";
 export interface DragPayload {
 	readonly item: TaskItem;
 	readonly from: DragOrigin;
-	/** How long a slot the task takes on the timeline: its own, or the default for a task without one. */
-	readonly durationMin: number;
-	/** How far into the slot the finger holds it: a block keeps its grip, a card hangs by its middle. */
-	readonly anchorMin: number;
+	/** The duration a task on the timeline keeps when it moves; null for a task without one, and for every task from a list. */
+	readonly durationMin: number | null;
+	/** How far under the card's top the finger holds it: a timeline card keeps its grip, a list card hangs by its middle. */
+	readonly grabPx: number;
 }
 
 export type DropResult =

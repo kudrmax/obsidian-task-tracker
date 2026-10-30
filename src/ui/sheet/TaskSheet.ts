@@ -61,7 +61,8 @@ export class TaskSheet {
 		if (opts.slot) {
 			const time = el(body, "div", "tc-sheet-time");
 			time.appendChild(sheetIcon("clock"));
-			time.appendChild(document.createTextNode(`${formatTime(opts.slot.start)}–${formatTime(opts.slot.end)}`));
+			const { start, end } = opts.slot;
+			time.appendChild(document.createTextNode(end === null ? formatTime(start) : `${formatTime(start)}–${formatTime(end)}`));
 		}
 		this.body.addEventListener("pointerdown", (e) => this.keepKeyboard(e));
 		this.body.addEventListener("click", (e) => this.refocus(e));

@@ -10,18 +10,16 @@ interface DemoTask {
 }
 
 const DEMO_DATE = "2026-10-30";
-const DEFAULT_MINUTES = 60;
-const MINUTES_PER_DAY = 1440;
 const STATUS_CHAR: Record<TaskStatus, string> = { todo: " ", inProgress: "/", done: "x", cancelled: "-" };
 
 const task = (text: string, extra: Partial<DemoTask> = {}): DemoTask => ({ text, status: "todo", dueDate: null, slot: null, ...extra });
-const slot = (start: number, end: number): Slot => ({ date: DEMO_DATE, start: start * 60, end: end * 60 });
+const slot = (start: number, end: number | null = null): Slot => ({ date: DEMO_DATE, start: start * 60, end: end === null ? null : end * 60 });
 
 const two = (n: number) => String(n).padStart(2, "0");
 const time = (m: number) => `${two(Math.floor(m / 60))}:${two(m % 60)}`;
 const localDateOf = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
-/** The board's tasks, in memory: the same seven on the list, three on the timeline, eight in Soon. */
+/** The board's tasks, in memory: the same seven on the list, four on the timeline, eight in Soon. */
 export class DemoTaskService implements TaskService {
 	private sections: Record<SectionKey, DemoTask[]> = {
 		now: [
@@ -33,8 +31,9 @@ export class DemoTaskService implements TaskService {
 			task("Чай масала"),
 			task("Позвонить маме"),
 			task("Написать отчёт по проекту", { status: "inProgress", slot: slot(11, 12) }),
-			task("Разобрать почту", { slot: slot(14, 15) }),
-			task("Заказать продукты", { slot: slot(17, 17.5) }),
+			task("Разобрать почту", { slot: slot(14) }),
+			task("Подготовить вопросы к планированию", { slot: slot(16) }),
+			task("Заказать продукты", { slot: slot(17) }),
 		],
 		soon: [
 			task("Продлить страховку"),
@@ -48,10 +47,18 @@ export class DemoTaskService implements TaskService {
 		],
 		done: [],
 	};
+	private readonly day = this.sections.now.filter((t) => t.slot);
 	private exists = true;
 	private readonly listeners = new Set<() => void>();
 
 	constructor(private readonly clock: Clock) {}
+
+	/** The timeline boards lay tasks of their own on the day; the pixel comparison swaps them in, and null brings the day's back. */
+	showTimeline(tasks: readonly { text: string; start: number; end: number | null; inProgress?: boolean }[] | null): void {
+		const slotted = tasks?.map((t) => task(t.text, { status: t.inProgress ? "inProgress" : "todo", slot: { date: DEMO_DATE, start: t.start, end: t.end } })) ?? this.day;
+		this.sections.now = [...this.sections.now.filter((t) => !t.slot), ...slotted];
+		this.changed();
+	}
 
 	private today(): LocalDate {
 		return localDateOf(this.clock.now());
@@ -59,7 +66,7 @@ export class DemoTaskService implements TaskService {
 
 	private raw(t: DemoTask): string {
 		const due = t.dueDate ? ` 📅 ${t.dueDate}` : "";
-		const s = t.slot ? ` ⏰ ${t.slot.date} ${time(t.slot.start)}-${time(t.slot.end)}` : "";
+		const s = t.slot ? ` ⏰ ${t.slot.date} ${time(t.slot.start)}${t.slot.end === null ? "" : `-${time(t.slot.end)}`}` : "";
 		return `- [${STATUS_CHAR[t.status]}] ${t.text}${due}${s}`;
 	}
 
@@ -116,8 +123,7 @@ export class DemoTaskService implements TaskService {
 
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
 		if (!text.trim()) return;
-		const end = Math.min(MINUTES_PER_DAY, start + DEFAULT_MINUTES);
-		this.sections[date === this.today() ? "now" : "soon"].push(task(text.trim(), { slot: { date, start, end } }));
+		this.sections[date === this.today() ? "now" : "soon"].push(task(text.trim(), { slot: { date, start, end: null } }));
 		this.changed();
 	}
 

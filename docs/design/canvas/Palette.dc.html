@@ -65,9 +65,11 @@ body{margin:0;background:#000}
 <span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{th.c.dueDay}};">2</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{th.c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
 </div>
 
-<div style="position: relative; height: 52px; box-sizing: border-box; border-radius: 8px; background: {{th.c.card}}; box-shadow: inset 0 0 0 1px {{th.c.outline}}; padding: 4px 6px;">
-<span style="font-size: 12px; line-height: 15px; font-weight: 600;">Разобрать почту</span>
-<span style="position: absolute; bottom: 3px; left: 50%; width: 16px; height: 3px; margin-left: -8px; border-radius: 2px; background: {{th.c.grabber}};"></span>
+<div style="position: relative; height: 40px; box-sizing: border-box; border-radius: 12px; background: {{th.c.card}}; box-shadow: inset 0 0 0 1.5px {{th.c.accent}}; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 6px;">
+<span style="flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden;">Позвонить в банк</span>
+<span style="width: 14px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;"><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: {{th.c.muted}};">17</span><span style="font-size: 9px; line-height: 10px; font-weight: 600; color: {{th.c.muted}};">05</span></span>
+<span style="position: absolute; top: -5px; right: 15px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid {{th.c.accent}}; background: {{th.c.bg}};"></span>
+<span style="position: absolute; bottom: -5px; left: 14px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 5px; border: 2px solid {{th.c.accent}}; background: {{th.c.bg}};"></span>
 </div>
 
 <div style="height: 52px; box-sizing: border-box; border-radius: 8px; border: 1.5px dashed {{th.c.accent}}; background: {{th.c.placeholder}}; padding: 4px 7px;">
@@ -138,7 +140,6 @@ class Component extends DCLogic {
       { title: 'Линии', rows: [
         row(c, 'separator', 'Разделитель', 'Между колонками'),
         row(c, 'grid', 'Сетка часов', 'Таймлайн'),
-        row(c, 'outline', 'Обводка задачи', 'Блок задачи в календаре'),
         row(c, 'dash', 'Пунктир', 'Кнопка New task')
       ] },
       { title: 'Выбор и сигналы', rows: [

@@ -32,10 +32,10 @@ describe("a day that starts at 4", () => {
 		expect(labels.slice(-4)).toEqual(["0", "1", "2", "3"]);
 	});
 
-	it("places a slot after midnight below the evening", () => {
+	it("places a slot after midnight below the evening, a pixel under its line", () => {
 		const view = timeline({ hourPx: 56 }, new DayBoundary(4), [late]);
 		const block = view.itemsEl.querySelector<HTMLElement>(".tc-block")!;
-		expect(block.style.getPropertyValue("--tc-y")).toBe(`${21 * 56}px`);
+		expect(block.style.getPropertyValue("--tc-y")).toBe(`${21 * 56 + 1}px`);
 		expect(view.slotAt(21 * 60, 22 * 60)).toEqual(late.slot);
 	});
 });
@@ -68,5 +68,31 @@ describe("Timeline grid", () => {
 		const view = timeline({ hourPx: 112 });
 		const first = view.canvas.querySelector<HTMLElement>(".tc-hour-line.is-minor")!;
 		expect(first.style.getPropertyValue("--tc-y")).toBe("56px");
+	});
+});
+
+describe("task cards", () => {
+	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end } });
+
+	it("stands the cards in the page in the stack's order, so a card over a long one is drawn over it", () => {
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 900, null), task(1, 840, 960)]);
+		const titles = [...view.itemsEl.querySelectorAll(".tc-block")].map((b) => b.textContent);
+		expect(titles).toEqual(["T1", "T0"]);
+		const over = view.itemsEl.querySelectorAll<HTMLElement>(".tc-block")[1];
+		expect(over.classList.contains("is-over")).toBe(true);
+		expect(over.style.getPropertyValue("--tc-x")).toBe("19px");
+	});
+
+	it("shows the dots over the selected card only, and the drop card takes its place in the stack", () => {
+		const tasks = [task(0, 1020, null), task(1, 1020, null)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const grips = view.itemsEl.querySelector<HTMLElement>(".tc-grips")!;
+		expect(grips.classList.contains("is-shown")).toBe(false);
+		view.select(tasks[1]);
+		expect(grips.classList.contains("is-shown")).toBe(true);
+		expect(grips.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1 + 44}px`);
+		view.showDrop(1020);
+		const tops = [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-drop, .tc-block")].map((e) => e.style.getPropertyValue("--tc-y"));
+		expect(tops).toEqual([`${17 * 56 + 45}px`, `${17 * 56 + 89}px`, `${17 * 56 + 1}px`]);
 	});
 });
