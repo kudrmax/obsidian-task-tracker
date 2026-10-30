@@ -68,7 +68,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ hourPx: 224, stepMinutes: 5 },
 	],
 	scrollToHour: 9,
-	dayStartHour: 0,
+	dayStartHour: 5,
 	listWidth: 187,
 	rightMode: "calendar",
 	staleAfterMinutes: 180,

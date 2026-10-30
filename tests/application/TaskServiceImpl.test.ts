@@ -115,7 +115,7 @@ describe("writing", () => {
 		await svc.createAtTime(T, 600, "Call");
 		expect(store.text).toContain("## Now\n- [ ] A\n- [ ] B\n- [ ] Call ⏰ 2026-10-30 10:00-10:45\n");
 		await svc.createAtTime(D, 1420, "Late");
-		expect(store.text).toContain("## Soon\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40-24:00\n");
+		expect(store.text).toContain("## Soon\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40-00:25\n");
 	});
 
 	it("normalizes after every write", async () => {

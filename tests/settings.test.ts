@@ -6,8 +6,8 @@ describe("settingsFrom", () => {
 		expect(settingsFrom(null)).toEqual(DEFAULT_SETTINGS);
 	});
 
-	it("starts the day at midnight unless set", () => {
-		expect(settingsFrom(null).dayStartHour).toBe(0);
+	it("starts the day at 5 unless set", () => {
+		expect(settingsFrom(null).dayStartHour).toBe(5);
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
 	});
 
