@@ -70,7 +70,7 @@ export class Timeline {
 	private tasks: PlacedTask[] = [];
 	private nowEl: HTMLElement | null = null;
 	private dropEl: HTMLElement | null = null;
-	private dropStart: number | null = null;
+	private drop: TaskSpan | null = null;
 	private stretch: Stretch | null = null;
 	private selected: TaskKey | null = null;
 	private readonly grips: HTMLElement;
@@ -132,7 +132,6 @@ export class Timeline {
 
 	render(): void {
 		clear(this.itemsEl);
-		this.dropEl = null;
 		this.stretch = null;
 		const boundary = this.deps.boundary();
 		this.hours.forEach(({ label }, index) => (label.textContent = String(boundary.hourAt(index))));
@@ -142,7 +141,6 @@ export class Timeline {
 		this.events = events.map((event, i) => this.placeEvent(event, spans[i], boxes[i].col, boxes[i].cols));
 		this.tasks = this.deps.tasks().filter((task) => task.slot).map((task) => this.placeTask(task));
 		this.itemsEl.appendChild(this.grips);
-		if (this.dropStart !== null) this.showDrop(this.dropStart);
 		this.nowEl?.remove();
 		this.nowEl = null;
 		if (this.deps.date() === this.deps.today()) {
@@ -174,6 +172,7 @@ export class Timeline {
 		}
 		this.layoutTasks();
 		this.nowEl?.style.setProperty(PROPERTY.y, px(nowY));
+		this.placeDrop();
 	}
 
 	/** The task the long press chose: ringed, with the dots that stretch it. Kept across a redraw while the task is there. */
@@ -187,25 +186,47 @@ export class Timeline {
 		return this.tasks.find((t) => t.el.classList.contains("is-selected"))?.item ?? null;
 	}
 
-	/** The dashed card of a drop or a long tap at `start`: it takes its place in the stack and moves the cards after it. */
-	showDrop(start: number): void {
-		this.dropStart = start;
-		this.dropEl ??= make(this.itemsEl, "div", "tc-drop");
-		this.dropEl.textContent = formatTime(this.slotAt(start, null).start);
-		this.el.classList.add("is-dropping");
-		this.layoutTasks();
+	/**
+	 * Where a drop or a long tap puts a task's start: a line across the day at that very minute, its time on a pill like the
+	 * now line's. It lies over everything, the dragged card too, and the cards stay where they are; `span` is the task as it
+	 * would land, for `landing`.
+	 */
+	showDrop(span: TaskSpan): void {
+		this.drop = span;
+		if (!this.dropEl) {
+			this.dropEl = make(document.body, "div", "tc-drop");
+			make(this.dropEl, "span", "tc-drop-pill");
+			make(this.dropEl, "div", "tc-drop-line");
+		}
+		this.dropEl.firstElementChild!.textContent = formatTime(this.slotAt(span.start, null).start);
+		this.placeDrop();
+	}
+
+	/** The line in the window's pixels, where the minute is on screen now; hidden while that minute is scrolled out of the day's view. */
+	private placeDrop(): void {
+		if (!this.drop || !this.dropEl) return;
+		const view = this.el.getBoundingClientRect();
+		const y = this.canvas.getBoundingClientRect().top + this.yOf(this.drop.start);
+		this.dropEl.style.setProperty(PROPERTY.y, px(y));
+		this.dropEl.style.left = px(view.left);
+		this.dropEl.style.width = px(view.width);
+		this.dropEl.classList.toggle("is-hidden", y < view.top || y > view.bottom);
 	}
 
 	clearDrop(): void {
-		this.dropStart = null;
+		this.drop = null;
 		this.dropEl?.remove();
 		this.dropEl = null;
-		this.layoutTasks();
-		this.el.classList.remove("is-dropping");
 	}
 
-	dropRect(): DOMRect | null {
-		return this.dropEl?.getBoundingClientRect() ?? null;
+	/** Where the dropped task will come to rest once the stack takes it in, in client pixels. */
+	landing(): DOMRect | null {
+		if (!this.drop) return null;
+		const present = this.present();
+		const box = stackTasks([this.drop, ...present.map((t) => this.taskSpan(t))], this.eventSpans(), this.hourPx)[0];
+		const items = this.itemsEl.getBoundingClientRect();
+		const top = this.canvas.getBoundingClientRect().top + box.top;
+		return new DOMRect(items.left + box.left, top, items.width - box.left - DESIGN.itemInset, box.height);
 	}
 
 	/** Shows a card stretched to `span` while its dot moves, the moving edge's time on the pill; null puts it back. */
@@ -220,32 +241,36 @@ export class Timeline {
 	 * stack's order, so a card that lies over another is drawn over it; the dots of the selected card lie over them all.
 	 */
 	layoutTasks(): void {
-		const present = this.tasks
-			.filter((t) => !t.el.classList.contains("is-lifted"))
-			.map((task, index) => ({ task, index, span: this.taskSpan(task) }))
-			.sort((a, b) => a.span.start - b.span.start || a.index - b.index)
-			.map(({ task }) => task);
+		const present = this.present();
 		const placed = Array.from(this.itemsEl.querySelectorAll(":scope > .tc-block:not(.is-lifted)"));
 		if (present.some((task, i) => placed[i] !== task.el)) for (const task of present) this.itemsEl.insertBefore(task.el, this.grips);
 		const spans: TaskSpan[] = present.map((t) => this.taskSpan(t));
-		if (this.dropStart !== null) spans.unshift({ start: this.dropStart, end: null });
-		const events: Span[] = this.events.map((e) => ({ start: e.start, end: e.end }));
-		const boxes = stackTasks(spans, events, this.hourPx);
-		const offset = this.dropStart !== null ? 1 : 0;
-		if (this.dropEl && offset) this.placeBox(this.dropEl, boxes[0].top, DESIGN.cardHeight, boxes[0].left);
+		const boxes = stackTasks(spans, this.eventSpans(), this.hourPx);
 		let bottom = 0;
 		present.forEach((task, i) => {
-			const box = boxes[i + offset];
+			const box = boxes[i];
 			this.placeBox(task.el, box.top, box.height, box.left);
 			task.el.classList.toggle("is-over", box.overlay);
-			this.fillMeta(task, spans[i + offset], box.stacked, box.hiddenDuration);
+			this.fillMeta(task, spans[i], box.stacked, box.hiddenDuration);
 			bottom = Math.max(bottom, box.top + box.height);
 		});
-		if (this.dropEl && offset) bottom = Math.max(bottom, boxes[0].top + DESIGN.cardHeight);
 		this.canvas.style.setProperty(PROPERTY.stackEnd, px(bottom));
 		const selected = present.find((t) => t.el.classList.contains("is-selected"));
 		this.grips.classList.toggle("is-shown", !!selected);
 		if (selected) for (const property of [PROPERTY.y, PROPERTY.length, PROPERTY.x]) this.grips.style.setProperty(property, selected.el.style.getPropertyValue(property));
+	}
+
+	/** The cards in the stack, in its order: by start, ties in file order; a card lifted for a drag is not among them. */
+	private present(): PlacedTask[] {
+		return this.tasks
+			.filter((t) => !t.el.classList.contains("is-lifted"))
+			.map((task, index) => ({ task, index, span: this.taskSpan(task) }))
+			.sort((a, b) => a.span.start - b.span.start || a.index - b.index)
+			.map(({ task }) => task);
+	}
+
+	private eventSpans(): Span[] {
+		return this.events.map((e) => ({ start: e.start, end: e.end }));
 	}
 
 	private taskSpan(task: PlacedTask): TaskSpan {

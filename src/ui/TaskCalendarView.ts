@@ -346,7 +346,8 @@ export class TaskCalendarView extends ItemView {
 		const tasks = this.deps.tasks;
 		return this.act(() => {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
-			if (result.kind === "clearSlot" || drag.from === "timeline") return tasks.clearSlot(key);
+			if (result.kind === "clearSlot") return tasks.clearSlot(key);
+			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (drag.from === result.column) return tasks.moveBefore(key, result.before, this.selectedDate);
 			return result.column === "left" ? tasks.moveToList(key, this.selectedDate) : tasks.moveToSoon(key, this.selectedDate);
 		});
