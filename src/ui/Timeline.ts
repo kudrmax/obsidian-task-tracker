@@ -5,7 +5,7 @@ import { formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority } from "./TaskCard";
-import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
+import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -46,6 +46,12 @@ interface PlacedTask {
 	readonly pill: HTMLElement;
 }
 
+/** A minute held at a share of the visible height. */
+interface Anchor {
+	readonly minutes: number;
+	readonly fraction: number;
+}
+
 /** A card being resized: the minutes it shows while the finger moves, and which edge moves. */
 interface Stretch {
 	readonly el: HTMLElement;
@@ -78,6 +84,7 @@ export class Timeline {
 	private drop: TaskSpan | null = null;
 	private stretch: Stretch | null = null;
 	private selected: TaskKey | null = null;
+	private anchor: Anchor | null = null;
 	private readonly grips: HTMLElement;
 
 	constructor(
@@ -90,6 +97,8 @@ export class Timeline {
 		this.minorEl = make(this.canvas, "div");
 		this.itemsEl = make(this.canvas, "div", "tc-items");
 		this.grips = make(null, "div", "tc-grips");
+		new ResizeObserver(() => this.holdAnchor()).observe(el);
+		for (const type of ["pointerdown", "wheel", "touchstart"] as const) el.addEventListener(type, () => (this.anchor = null), { passive: true });
 		for (const edge of ["start", "end"] as const) {
 			make(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
 				const task = this.tasks.find((t) => t.el.classList.contains("is-selected"));
@@ -137,9 +146,26 @@ export class Timeline {
 		this.el.scrollTop = origin + this.yOf(minutes) - clientY;
 	}
 
-	/** Puts the minute at `fraction` of the visible height. */
+	/**
+	 * Puts the minute at `fraction` of the visible height and keeps it there while the timeline settles its height (a view
+	 * opened before Obsidian has laid it out, the all-day rows coming in), until the user scrolls it.
+	 */
 	scrollTo(minutes: number, fraction: number): void {
-		this.el.scrollTop = Math.max(0, this.yOf(minutes) - fraction * this.el.clientHeight);
+		this.anchor = { minutes, fraction };
+		this.holdAnchor();
+	}
+
+	private holdAnchor(): void {
+		if (!this.anchor) return;
+		this.canvas.style.setProperty(PROPERTY.roomTop, px(0));
+		this.canvas.style.setProperty(PROPERTY.roomBottom, px(0));
+		const visible = this.el.clientHeight - parseFloat(getComputedStyle(this.el).paddingBottom);
+		if (visible <= 0) return;
+		const box = { y: this.yOf(this.anchor.minutes), canvasTop: this.canvas.offsetTop, canvasHeight: this.canvas.offsetHeight, visible };
+		const place = scrollPlace(box, this.anchor.fraction);
+		this.canvas.style.setProperty(PROPERTY.roomTop, px(place.roomTop));
+		this.canvas.style.setProperty(PROPERTY.roomBottom, px(place.roomBottom));
+		this.el.scrollTop = place.scrollTop;
 	}
 
 	render(): void {

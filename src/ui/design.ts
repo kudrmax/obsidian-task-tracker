@@ -54,6 +54,9 @@ export const PROPERTY = {
 	x: "--tc-x",
 	/** The bottom of the last task card: a stack that runs past midnight lengthens the day. */
 	stackEnd: "--tc-stack-end",
+	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
+	roomTop: "--tc-room-top",
+	roomBottom: "--tc-room-bottom",
 	column: "--tc-col",
 	columns: "--tc-cols",
 	eventBg: "--tc-event-bg",
@@ -89,7 +92,7 @@ export const LAYOUT = {
 	/** A block under this height is drawn tiny: one small line, no padding. */
 	tinyItemHeight: 24,
 	/** How far the now line stands down the visible timeline when today opens. */
-	nowFraction: 0.45,
+	nowFraction: 0.5,
 	/** A finger may wander this far during a long press; farther is a scroll. */
 	pressTolerance: 8,
 	/** On a computer a drag starts after the pointer moves this far. */

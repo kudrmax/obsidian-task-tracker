@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, followNow, gridAt, itemBox, layoutColumns, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, followNow, gridAt, itemBox, layoutColumns, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -156,6 +156,30 @@ describe("gridAt", () => {
 		expect(gridAt(160).lines).toBe(15);
 		expect(gridAt(192)).toEqual({ labels: 15, lines: 5 });
 		expect(gridAt(224)).toEqual({ labels: 15, lines: 5 });
+	});
+});
+
+describe("scrollPlace", () => {
+	const day = { canvasTop: 7, canvasHeight: 24 * 56, visible: 600 };
+
+	it("scrolls a minute in the middle of the day to the middle of the visible height, with no room beyond the day", () => {
+		expect(scrollPlace({ ...day, y: 12 * 56 }, 0.5)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 7 + 12 * 56 - 300 });
+	});
+
+	it("leaves room under the day's last hour for a minute near it: 02:30 of a day that starts at 5 stands in the middle", () => {
+		const y = 21.5 * 56;
+		const place = scrollPlace({ ...day, y }, 0.5);
+		expect(place.roomTop).toBe(0);
+		expect(place.roomBottom).toBe(300 - (24 * 56 - y));
+		expect(place.scrollTop).toBe(7 + y - 300);
+	});
+
+	it("leaves room over the day's first hour for a minute near it, and the timeline stays at its top", () => {
+		expect(scrollPlace({ ...day, y: 56 }, 0.5)).toEqual({ roomTop: 300 - 7 - 56, roomBottom: 0, scrollTop: 0 });
+	});
+
+	it("puts the hour of another day at the very top", () => {
+		expect(scrollPlace({ ...day, y: 9 * 56 }, 0)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 7 + 9 * 56 });
 	});
 });
 
