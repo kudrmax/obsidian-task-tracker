@@ -180,26 +180,12 @@ body{margin:0;background:#000}
 <sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </sc-if>
-<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<sc-for list="{{zones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
-</sc-for>
-</div>
-</sc-if>
 </div>
 
 <sc-if value="{{inboxPanel.visible}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; left: {{inboxPanel.left}}px; width: {{inboxPanel.width}}px; bottom: 76px; padding: 8px 2px 8px 10px; box-sizing: border-box; background: {{c.bg}}; z-index: 4;">
 <sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
-</sc-if>
-<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<sc-for list="{{idleZones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
-</sc-for>
-</div>
 </sc-if>
 </div>
 </sc-if>
@@ -209,13 +195,14 @@ body{margin:0;background:#000}
 <sc-if value="{{showNew}}" hint-placeholder-val="{{true}}">
 <button style="width: 100%; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px dashed {{c.dash}}; background: transparent; padding: 0 10px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: {{c.muted}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
 </sc-if>
-<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
-<div style="display: flex; flex-direction: column; gap: 8px;">
-<sc-for list="{{idleZones}}" as="z">
-<div style="height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
-</sc-for>
 </div>
 </sc-if>
+
+<sc-if value="{{dragging}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; bottom: 76px; padding: 8px 10px; box-sizing: border-box; background: {{c.bg}}; display: flex; gap: 8px; z-index: 4;">
+<sc-for list="{{zones}}" as="z">
+<div style="flex: 1; min-width: 0; height: 40px; box-sizing: border-box; border-radius: 12px; border: 1px {{z.border}}; background: {{z.bg}}; padding: 0 10px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.path}}"></path></svg><span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{z.label}}</span></div>
+</sc-for>
 </div>
 </sc-if>
 
@@ -513,18 +500,15 @@ class Component extends DCLogic {
       cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
     };
     const ZONE_H = 40, ZONE_GAP = 8, FLOAT_W = 190, FLOAT_H = 42;
-    const ZONES_TOP = 844 - 76 - (ZONE_GAP + ZONE_H + ZONE_GAP + ZONE_H + ZONE_GAP) + ZONE_GAP;
-    const zone = (key, label, path, idle = false) => {
-      const hot = !idle && dropZone === key;
+    const ZONES_TOP = 844 - 76 - ZONE_GAP - ZONE_H;
+    const ZONE_W = (SCREEN - 2 * 10 - ZONE_GAP) / 2;
+    const zone = (key, label, path) => {
+      const hot = dropZone === key;
       return { label, path, border: hot ? `solid ${accent}` : `dashed ${c.dash}`, bg: hot ? c.placeholder : 'transparent', color: hot ? c.text : c.muted };
     };
     const zones = [
       zone('tomorrow', 'Tomorrow', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14'),
       zone('pick', 'Pick a date', chipPaths.cal)
-    ];
-    const idleZones = [
-      zone('tomorrow', 'Tomorrow', 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14', true),
-      zone('pick', 'Pick a date', chipPaths.cal, true)
     ];
     const firstChip = isInbox ? 0 : leftSide ? 2 : 1;
     const sourceDot = this.props.sourceDot === true || this.props.sourceDot === 'true';
@@ -554,7 +538,6 @@ class Component extends DCLogic {
       dragging,
       showNew: !dragging,
       zones,
-      idleZones,
       isCal: calLeft < SCREEN,
       soon,
       inbox,
@@ -570,8 +553,8 @@ class Component extends DCLogic {
       listScroll: Number(this.props.listScroll ?? 0),
       soonScroll: Number(this.props.soonScroll ?? 0),
       nowTop: nowY - 8,
-      floatLeft: dropZone === 'none' ? Math.max(calLeft - 60, 10) : Math.min(now.left + 64, SCREEN - FLOAT_W - 6),
-      floatTop: dropZone === 'none' ? COLUMNS_TOP + TIMELINE_OFFSET + drop.top - 20 : ZONES_TOP + (dropZone === 'pick' ? ZONE_H + ZONE_GAP : 0) - FLOAT_H + 16,
+      floatLeft: dropZone === 'none' ? Math.max(calLeft - 60, 10) : Math.min(10 + (dropZone === 'pick' ? ZONE_W + ZONE_GAP : 0) + ZONE_W / 2 - FLOAT_W / 2 + 24, SCREEN - FLOAT_W - 6),
+      floatTop: dropZone === 'none' ? COLUMNS_TOP + TIMELINE_OFFSET + drop.top - 20 : ZONES_TOP - FLOAT_H + 16,
       accent,
       stripColor
     };
