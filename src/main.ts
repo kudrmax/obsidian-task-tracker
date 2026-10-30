@@ -27,7 +27,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	/** The real services over the vault and the network; the demo build replaces them with fakes. */
 	protected createDeps(clock: Clock = systemClock): ViewDeps {
-		const services = createServices(this.app, this, clock);
+		const services = createServices(this.app, this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`, this, clock);
+		this.register(services.workExport.keepInstalled());
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
 			services.login.receive(params).then(
 				() => new Notice("Google Calendar: logged in"),
@@ -39,6 +40,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				login: () => services.google.login(),
 				logout: () => services.google.logout(),
 				listCalendars: () => services.googleSource.listCalendars(),
+				scriptableLoader: () => services.workExport.loader,
 			}),
 		);
 		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock };

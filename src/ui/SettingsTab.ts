@@ -14,6 +14,8 @@ export interface SettingsTabDeps {
 	login(): Promise<string>;
 	logout(): Promise<void>;
 	listCalendars(): Promise<GoogleCalendarOption[]>;
+	/** The script to paste into Scriptable. */
+	scriptableLoader(): string;
 }
 
 const HOURS_PER_DAY = 24;
@@ -152,6 +154,15 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.text(el, "Calendars", "Titles to take from the file, comma-separated. Empty means all.", this.settings.workCalendarTitles.join(", "), (value) => ({
 			workCalendarTitles: value.split(",").map((t) => t.trim()).filter((t) => t !== ""),
 		}));
+		new Setting(el)
+			.setName("Scriptable script")
+			.setDesc("Paste once into a Scriptable script named Export Work Calendar. The export it runs comes with the plugin and updates with it.")
+			.addButton((b) =>
+				b.setButtonText("Copy").onClick(async () => {
+					await navigator.clipboard.writeText(this.deps.scriptableLoader());
+					new Notice("Scriptable script copied");
+				}),
+			);
 	}
 
 	private google(patch: Partial<GoogleSettings>): Partial<TaskCalendarSettings> {
