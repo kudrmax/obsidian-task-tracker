@@ -9,6 +9,10 @@
     {
       "id": "brainstorm",
       "name": "Brainstorm"
+    },
+    {
+      "id": "postpone22",
+      "name": "Отложить #22"
     }
   ],
   "boards": {
@@ -963,6 +967,38 @@
       "h": 844,
       "title": "Экран задачи: New task из Inbox",
       "page": "prod"
+    },
+    "Postpone22SoonNow.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Soon и сегодня: задачу из Soon несут на Tomorrow",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "Postpone22Calendar.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Сегодня и календарь: задачу несут на Pick a date",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "Postpone22Inbox.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Inbox и Soon: зон нет, сначала в Soon",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "Postpone22Light.dc.html": {
+      "h": 844,
+      "page": "postpone22",
+      "title": "Soon и сегодня, светлая",
+      "w": 390,
+      "x": 1410,
+      "y": 0
     }
   },
   "createdOnFiles": {
@@ -1196,6 +1232,15 @@
       "fill": "gray",
       "size": "s",
       "page": "prod"
+    },
+    "postpone22Title": {
+      "kind": "title1",
+      "maxW": 1800,
+      "page": "postpone22",
+      "text": "Отложить: Tomorrow и Pick a date под колонкой сегодня",
+      "w": 240,
+      "x": 0,
+      "y": -300
     }
   },
   "order": [
@@ -1317,7 +1362,11 @@
     "ScreenLightPrioritySettings.dc.html",
     "ScreenInbox.dc.html",
     "ScreenLightInbox.dc.html",
-    "ScreenSheetInbox.dc.html"
+    "ScreenSheetInbox.dc.html",
+    "Postpone22SoonNow.dc.html",
+    "Postpone22Calendar.dc.html",
+    "Postpone22Inbox.dc.html",
+    "Postpone22Light.dc.html"
   ],
   "title": "Task Calendar"
 }

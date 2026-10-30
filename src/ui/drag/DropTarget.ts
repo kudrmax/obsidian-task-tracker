@@ -1,5 +1,5 @@
 import type { TaskItem, TaskKey } from "../../application/contracts";
-import type { Slot } from "../types";
+import type { LocalDate, Slot } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
 export type ListColumn = "left" | "soon" | "inbox";
@@ -18,7 +18,12 @@ export interface DragPayload {
 export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
-	| { readonly kind: "clearSlot" };
+	| { readonly kind: "clearSlot" }
+	| { readonly kind: "postpone"; readonly date: LocalDate }
+	| { readonly kind: "pickDate" };
+
+/** A drop that changes the file at once; Pick a date asks for the day first. */
+export type PlacedResult = Exclude<DropResult, { readonly kind: "pickDate" }>;
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 export interface DropTarget {

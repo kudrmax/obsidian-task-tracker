@@ -354,3 +354,12 @@ describe("priority", () => {
 		expect(view.list[1]).toMatchObject({ text: "x y B", priority: null });
 	});
 });
+
+describe("postpone", () => {
+	it("takes a task off today: the due date, no time, the end of Soon", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A ⏰ 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
+		const view = await svc.dayView(T);
+		await svc.postpone(view.slotted[0].key, "2026-10-31");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A 📅 2026-10-31\n\n## Backlog\n\n## Done\n");
+	});
+});
