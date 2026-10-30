@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Task Calendar: back to Obsidian</title>
+<style>
+	body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; text-align: center; }
+	main { padding: 32px 24px; max-width: 420px; }
+	h1 { font-size: 22px; font-weight: 700; margin: 0 0 12px; }
+	p { font-size: 15px; color: #8E8E93; margin: 0 0 24px; line-height: 1.4; }
+	a.button { display: inline-block; padding: 14px 24px; border-radius: 12px; background: #9580FF; color: #000; font-size: 17px; font-weight: 600; text-decoration: none; }
+	.error { color: #FF453A; }
+</style>
+</head>
+<body>
+<main>
+	<h1 id="title">Returning to Obsidian…</h1>
+	<p id="text">If nothing happens, press the button.</p>
+	<a id="open" class="button" href="#">Open Obsidian</a>
+</main>
+<script>
+	// Google sends the browser here with ?code=…&state=… (or ?error=…). The code goes on to the plugin through
+	// obsidian://task-calendar; nothing is stored or sent anywhere else.
+	(function () {
+		var query = new URLSearchParams(location.search);
+		var forward = new URLSearchParams();
+		["code", "state", "error"].forEach(function (key) {
+			var value = query.get(key);
+			if (value) forward.set(key, value);
+		});
+		var target = "obsidian://task-calendar?" + forward.toString();
+		var open = document.getElementById("open");
+		open.href = target;
+		if (!query.get("code") && !query.get("error")) {
+			document.getElementById("title").textContent = "Nothing to hand over";
+			document.getElementById("text").textContent = "Open this page from the login in Task Calendar's settings.";
+			open.style.display = "none";
+			return;
+		}
+		if (query.get("error")) {
+			document.getElementById("title").textContent = "Google refused the login";
+			document.getElementById("title").className = "error";
+			document.getElementById("text").textContent = query.get("error");
+		}
+		history.replaceState(null, "", location.pathname);
+		location.href = target;
+	})();
+</script>
+</body>
+</html>

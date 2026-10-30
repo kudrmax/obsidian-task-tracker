@@ -1,6 +1,8 @@
 import type { App } from "obsidian";
 import { GoogleAuth } from "../infrastructure/GoogleAuth";
 import { GoogleCalendarSource } from "../infrastructure/GoogleCalendarSource";
+import { browserLoginDeps, GoogleRedirectLogin } from "../infrastructure/GoogleRedirectLogin";
+import { requestToken } from "../infrastructure/GoogleToken";
 import { VaultTaskFileStore } from "../infrastructure/VaultTaskFileStore";
 import { WorkCalendarFileSource } from "../infrastructure/WorkCalendarFileSource";
 import { CalendarServiceImpl } from "./CalendarServiceImpl";
@@ -13,11 +15,14 @@ export interface Services {
 	readonly calendars: CalendarService;
 	readonly google: GoogleAuth;
 	readonly googleSource: GoogleCalendarSource;
+	/** Receives Google's answer from the obsidian:// handler. */
+	readonly login: GoogleRedirectLogin;
 }
 
 export function createServices(app: App, settings: SettingsStore, clock: Clock = systemClock): Services {
 	const store = new VaultTaskFileStore(app, () => settings.get().tasksFile);
-	const google = new GoogleAuth(settings);
+	const login = new GoogleRedirectLogin(browserLoginDeps((fields) => requestToken(settings.get().google.clientId, settings.get().google.clientSecret, fields)));
+	const google = new GoogleAuth(settings, login);
 	const googleSource = new GoogleCalendarSource(google, settings);
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings);
 	return {
@@ -25,5 +30,6 @@ export function createServices(app: App, settings: SettingsStore, clock: Clock =
 		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings),
 		google,
 		googleSource,
+		login,
 	};
 }

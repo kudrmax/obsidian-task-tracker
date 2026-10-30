@@ -1,6 +1,10 @@
 import type { SettingsStore } from "../application/ports";
-import { login } from "./GoogleLoopbackLogin";
 import { requestToken } from "./GoogleToken";
+
+/** How the consent screen is shown and answered; the redirect login on Obsidian, a fake in tests. */
+export interface LoginFlow {
+	login(clientId: string): Promise<string>;
+}
 
 const EXPIRY_MARGIN_MS = 60_000;
 
@@ -8,17 +12,20 @@ export class GoogleAuth {
 	private accessTokenValue = "";
 	private expiresAt = 0;
 
-	constructor(private readonly settings: SettingsStore) {}
+	constructor(
+		private readonly settings: SettingsStore,
+		private readonly flow: LoginFlow,
+	) {}
 
 	isLoggedIn(): boolean {
 		return this.settings.get().google.refreshToken !== "";
 	}
 
-	/** Desktop only: runs the loopback login and stores the refresh token in the settings. */
+	/** Runs the login flow and stores the refresh token in the settings; the same on the Mac and on the phone. */
 	async login(): Promise<string> {
 		const { clientId, clientSecret } = this.settings.get().google;
 		if (!clientId || !clientSecret) throw new Error("Client id and secret are required");
-		const refreshToken = await login(clientId, clientSecret);
+		const refreshToken = await this.flow.login(clientId);
 		await this.saveRefreshToken(refreshToken);
 		return refreshToken;
 	}

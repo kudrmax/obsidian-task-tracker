@@ -1,4 +1,4 @@
-import { Notice, Platform, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
+import { Notice, Plugin, PluginSettingTab, Setting, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
 import type { GoogleSettings, SectionNames, TaskCalendarSettings } from "../settings";
@@ -77,7 +77,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el).setName("Calendar sources").setHeading();
 		this.number(el, "Stale after", "Minutes without an update before a source gets the orange dot.", this.settings.staleAfterMinutes, (staleAfterMinutes) => ({ staleAfterMinutes }));
 		new Setting(el).setName("Google Calendar").setHeading();
-		this.text(el, "Client id", "OAuth client of type Desktop app.", this.settings.google.clientId, (clientId) => this.google({ clientId }));
+		this.text(el, "Client id", "OAuth client of type Web application with the redirect URI from the README.", this.settings.google.clientId, (clientId) => this.google({ clientId }));
 		new Setting(el)
 			.setName("Client secret")
 			.addText((t) => {
@@ -94,11 +94,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private loginRow(el: HTMLElement): void {
 		const loggedIn = this.settings.google.refreshToken !== "";
 		const row = new Setting(el).setName(loggedIn ? "Logged in" : "Not logged in");
-		if (!Platform.isDesktop) {
-			row.setDesc("Log in on the Mac; the token syncs to the phone");
-			return;
-		}
-		row.setDesc(loggedIn ? "The token syncs to the phone." : "Opens the browser; the token syncs to the phone.");
+		row.setDesc(loggedIn ? "The token syncs to your other devices." : "Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {
 				try {

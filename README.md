@@ -43,16 +43,24 @@ Left: the tasks of the selected day (today: everything in Now that has no slot t
 
 ## Google Calendar
 
-The plugin reads your Google calendars through the Calendar API (read-only). You create a Google Cloud project once; the login happens on the Mac, the token syncs to the phone through Obsidian Sync (it lives in the plugin’s `data.json`).
+The plugin reads your Google calendars through the Calendar API (read-only). You create a Google Cloud project once; the login works the same on the Mac and on the phone, and the token syncs between your devices through Obsidian Sync (it lives in the plugin’s `data.json`, which Sync carries with “Installed community plugins”).
 
 1. Open <https://console.cloud.google.com/>, create a project (any name).
 2. APIs & Services → Library → “Google Calendar API” → Enable.
 3. APIs & Services → OAuth consent screen → External → fill in the app name and your email → Save. Add your own Google account under Test users.
-4. APIs & Services → Credentials → Create credentials → OAuth client ID → Application type **Desktop app** → Create. Copy the Client ID and Client secret.
-5. In Obsidian on the Mac: Settings → Task Calendar → Google Calendar → paste both → **Log in**. The browser opens; Google warns that the app is unverified → Advanced → Go to … → allow. The tab says it is done.
+4. APIs & Services → Credentials → Create credentials → OAuth client ID → Application type **Web application**. Under Authorized redirect URIs add exactly `https://kudrmax.github.io/obsidian-task-calendar/auth.html` → Create. Copy the Client ID and Client secret.
+5. In Obsidian, on either device: Settings → Task Calendar → Google Calendar → paste both → **Log in**. The browser opens; Google warns that the app is unverified → Advanced → Go to … → allow. Google sends the browser to the redirect page, which opens Obsidian again; a notice says you are logged in.
 6. Below the login, tick the calendars you want to see.
 
-While the Google project is in “Testing”, the token expires after 7 days and you log in again. To make it permanent, publish the app (OAuth consent screen → Publish app). Google then asks for an application home page, a privacy policy page and an authorized domain; a GitHub Pages site of this repository will serve for that.
+The redirect page is [`docs/auth.html`](docs/auth.html), served by GitHub Pages: it only passes the code on to `obsidian://task-calendar`, stores nothing and talks to no one else.
+
+### Keep the login from expiring
+
+While the project’s publishing status is **Testing**, Google makes every refresh token expire after 7 days, whatever the app does. To stop that:
+
+1. APIs & Services → OAuth consent screen → **Publish app** → Confirm. The status becomes **In production**.
+2. Google may say the app needs verification because `calendar.readonly` is a sensitive scope. You do not need to submit it: an unverified app in production keeps working for up to 100 users, the consent screen just keeps its “unverified” warning (Advanced → Go to …).
+3. Log in once more in the plugin settings. Tokens issued after publishing do not expire; they are revoked only if you revoke them at <https://myaccount.google.com/permissions> or stay unused for six months.
 
 ## Work calendar (Exchange on the iPhone)
 
