@@ -1,9 +1,9 @@
 import type { TaskItem } from "../../application/contracts";
-import { LAYOUT, PROPERTY } from "../design";
-import { capturePointer, px, releasePointer } from "../dom";
+import { DESIGN, LAYOUT } from "../design";
+import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
-import type { Timeline } from "../Timeline";
+import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
@@ -14,7 +14,6 @@ import { snapMinutes } from "./snap";
 
 export interface DragControllerDeps {
 	longPressMs(): number;
-	newTaskMinutes(): number;
 	step(): number;
 	date(): LocalDate;
 	timeline(): Timeline | null;
@@ -22,11 +21,16 @@ export interface DragControllerDeps {
 	readonly haptics: Haptics;
 	readonly arbiter: GestureArbiter;
 	onResult(drag: DragPayload, result: DropResult): Promise<void>;
-	onResize(item: TaskItem, end: number): Promise<void>;
-	onMenu(item: TaskItem, source: HTMLElement, at: { x: number; y: number }): void;
+	onResize(item: TaskItem, slot: Slot): Promise<void>;
+	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
+	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
 	/** A long tap on an empty place of the timeline, let go: a new task in the slot the target showed. */
 	newSlot(): TimelineDrop | null;
 	onNewSlot(slot: Slot): void;
+}
+
+export interface OpenMenu {
+	close(): void;
 }
 
 const DRAG = "drag";
@@ -34,39 +38,97 @@ const RESIZE = "resize";
 const NEW_SLOT = "newslot";
 
 /**
- * Gives a card or a block its gestures: the tap that opens its menu, the long press that lifts it, the drag that follows,
- * the handle that resizes a block. While a gesture owns the screen the view keeps the browser from scrolling (see the arbiter).
+ * Gives a card its gestures: the tap that opens its menu, the long press that lifts it, the drag that follows. A card on
+ * the timeline answers a long press like Apple Calendar: it is selected, its menu opens, and moving the finger on from
+ * there drags it; the dots of a selected card stretch it. While a gesture owns the screen the view keeps the browser from
+ * scrolling (see the arbiter).
  */
 export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
 
 	attachCard(card: HTMLElement, item: TaskItem, from: DragOrigin): void {
-		this.attachMenu(card, item);
+		card.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.deps.onMenu(item, card);
+		});
 		new LongPress(card, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
-			onStart: (e) => this.begin(card, this.payload(item, from, e), e),
-			onTap: (e) => this.deps.onMenu(item, card, { x: e.clientX, y: e.clientY }),
+			onStart: (e) => this.begin(card, this.payload(card, item, from, e), e),
+			onTap: () => this.deps.onMenu(item, card),
 		});
 	}
 
 	attachBlock(block: HTMLElement, item: TaskItem): void {
-		this.attachCard(block, item, "timeline");
-		const handle = block.querySelector<HTMLElement>(".tc-resize-hit");
-		if (!handle) return;
-		handle.addEventListener("pointerdown", (e) => e.stopPropagation());
-		new LongPress(handle, {
+		block.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.selectWithMenu(block, item);
+		});
+		new LongPress(block, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
-			onStart: (e) => this.beginResize(block, handle, item, e),
+			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
+			onTap: () => this.deps.onMenu(item, block),
+			onLongTap: () => this.selectWithMenu(block, item),
 		});
 	}
 
-	private payload(item: TaskItem, from: DragOrigin, e: PointerEvent): DragPayload {
-		const durationMin = item.slot ? item.slot.end - item.slot.start : this.deps.newTaskMinutes();
-		const timeline = this.deps.timeline();
-		const anchorMin = from === "timeline" && item.slot && timeline ? timeline.minutesAt(e.clientY) - item.slot.start : durationMin / 2;
-		return { item, from, durationMin, anchorMin };
+	private payload(card: HTMLElement, item: TaskItem, from: DragOrigin, e: PointerEvent): DragPayload {
+		const onTimeline = from === "timeline" && item.slot;
+		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
+		const grabPx = onTimeline ? e.clientY - card.getBoundingClientRect().top : DESIGN.cardHeight / 2;
+		return { item, from, durationMin, grabPx };
+	}
+
+	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
+	private selectWithMenu(block: HTMLElement, item: TaskItem): OpenMenu {
+		this.deps.timeline()?.select(item);
+		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close));
+	}
+
+	/** A dot of the selected card taken. */
+	grip(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
+		if (!this.deps.arbiter.busy) this.beginResize(block, item, edge, e);
+	}
+
+	/** A finger held on a timeline card: selected, the menu open; moving on closes the menu and drags the card. */
+	private hold(block: HTMLElement, item: TaskItem, e: PointerEvent): void {
+		this.deps.haptics.tap();
+		const menu = this.selectWithMenu(block, item);
+		capturePointer(block, e.pointerId);
+		const detach = () => {
+			document.removeEventListener("pointermove", move);
+			document.removeEventListener("pointerup", end);
+			document.removeEventListener("pointercancel", end);
+		};
+		const move = (ev: PointerEvent) => {
+			if (ev.pointerId !== e.pointerId || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= LAYOUT.pressTolerance) return;
+			detach();
+			menu.close();
+			this.deps.timeline()?.select(null);
+			this.begin(block, this.payload(block, item, "timeline", e), ev);
+		};
+		const end = (ev: PointerEvent) => {
+			if (ev.pointerId !== e.pointerId) return;
+			detach();
+			releasePointer(block, e.pointerId);
+		};
+		document.addEventListener("pointermove", move);
+		document.addEventListener("pointerup", end);
+		document.addEventListener("pointercancel", end);
+	}
+
+	/** The dots on the copy of the card over the menu's blur stretch the card itself; a dot taken closes the menu. */
+	private gripsOn(copy: HTMLElement, block: HTMLElement, item: TaskItem, closeMenu: () => void): void {
+		for (const edge of ["start", "end"] as const) {
+			el(copy, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
+				if (!e.isPrimary || e.button !== 0 || this.deps.arbiter.busy) return;
+				e.stopPropagation();
+				e.preventDefault();
+				closeMenu();
+				this.beginResize(block, item, edge, e);
+			});
+		}
 	}
 
 	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the task screen. */
@@ -85,10 +147,11 @@ export class DragController {
 		const drop = this.deps.newSlot();
 		if (!drop || !this.deps.arbiter.claim(NEW_SLOT)) return;
 		this.deps.haptics.tap();
-		drop.previewNew(e.clientY, this.deps.newTaskMinutes());
+		this.deps.timeline()?.select(null);
+		drop.previewNew(e.clientY);
 		capturePointer(canvas, e.pointerId);
 		const move = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) drop.previewNew(ev.clientY, this.deps.newTaskMinutes());
+			if (ev.pointerId === e.pointerId) drop.previewNew(ev.clientY);
 		};
 		const finish = (ev: PointerEvent, open: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
@@ -107,27 +170,25 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private attachMenu(el: HTMLElement, item: TaskItem): void {
-		el.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			this.deps.onMenu(item, el, { x: e.clientX, y: e.clientY });
-		});
-	}
-
 	private begin(source: HTMLElement, payload: DragPayload, e: PointerEvent): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
+		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
 		source.classList.add("is-lifted");
+		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		const session = new DragSession({
 			payload,
 			targets: this.deps.targets(),
 			float,
 			origin,
-			onReturn: () => source.classList.remove("is-lifted"),
+			onReturn: () => {
+				source.classList.remove("is-lifted");
+				timeline?.layoutTasks();
+			},
 			onEnd: async (result) => {
 				detach();
 				this.deps.arbiter.release(DRAG);
@@ -156,44 +217,53 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private beginResize(block: HTMLElement, handle: HTMLElement, item: TaskItem, e: PointerEvent): void {
+	/**
+	 * A dot moves one edge by 15 minutes at a time and the stack follows. Let go at 40 px or less, the task loses its
+	 * duration; the start dot of a task without one pulls the start earlier, the old start becoming the end.
+	 */
+	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
 		const timeline = this.deps.timeline();
 		const slot = item.slot;
 		if (!timeline || !slot || !this.deps.arbiter.claim(RESIZE)) return;
 		this.deps.haptics.tap();
-		block.classList.add("is-resizing");
-		capturePointer(handle, e.pointerId);
-		let end = slot.end;
-		const place = () => {
-			block.style.setProperty(PROPERTY.length, px(timeline.yOf(end) - timeline.yOf(slot.start)));
-			block.classList.toggle("is-tiny", timeline.yOf(end) - timeline.yOf(slot.start) < LAYOUT.tinyItemHeight);
-		};
+		capturePointer(block, e.pointerId);
+		const step = LAYOUT.resizeStepMinutes;
+		let start = slot.start;
+		let end = slot.end ?? slot.start;
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
-			const step = this.deps.step();
-			end = Math.min(LAYOUT.minutesPerDay, Math.max(slot.start + step, snapMinutes(timeline.minutesAt(ev.clientY), step)));
-			place();
+			const at = snapMinutes(timeline.minutesAt(ev.clientY), step);
+			if (edge === "end") end = Math.max(start, at);
+			else if (slot.end === null) start = Math.min(at, slot.start);
+			else start = Math.min(at, end);
+			timeline.stretchTo(block, { start, end }, edge);
 		};
 		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
-			releasePointer(handle, e.pointerId);
-			this.deps.arbiter.release(RESIZE);
-			block.classList.remove("is-resizing");
-			if (apply && end !== slot.end) {
+			releasePointer(block, e.pointerId);
+			const next = this.resized(slot, start, end, edge, timeline);
+			const changed = next.start !== slot.start || next.end !== slot.end;
+			if (apply && changed) {
 				this.deps.haptics.tap();
-				await this.deps.onResize(item, end);
-			} else {
-				end = slot.end;
-				place();
-			}
+				await this.deps.onResize(item, next);
+			} else timeline.stretchTo(block, null, edge);
+			this.deps.arbiter.release(RESIZE);
 		};
 		const up = (ev: PointerEvent) => void finish(ev, true);
 		const cancel = (ev: PointerEvent) => void finish(ev, false);
+		timeline.stretchTo(block, { start, end }, edge);
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);
+	}
+
+	private resized(slot: Slot, start: number, end: number, edge: ResizeEdge, timeline: Timeline): Slot {
+		const keepsDuration = timeline.yOf(end) - timeline.yOf(start) - DESIGN.itemGap > DESIGN.cardHeight;
+		if (keepsDuration) return { date: slot.date, start, end };
+		const unmoved = edge === "start" && slot.end === null;
+		return { date: slot.date, start: unmoved ? slot.start : start, end: null };
 	}
 }

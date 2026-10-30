@@ -88,7 +88,6 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
-			newTaskMinutes: () => this.settings.newTaskMinutes,
 			step: () => stepFor(this.hourPx, this.settings.zoomLevels),
 			date: () => this.selectedDate,
 			timeline: () => this.timeline,
@@ -96,8 +95,8 @@ export class TaskCalendarView extends ItemView {
 			haptics: detectHaptics(window as unknown as HapticsHost),
 			arbiter: this.arbiter,
 			onResult: (drag, result) => this.applyDrop(drag, result),
-			onResize: (item, end) => this.act(() => this.deps.tasks.setSlot(item.key, { ...item.slot!, end })),
-			onMenu: (item, source) => this.showMenu(item, source),
+			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
+			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, slot),
 		});
@@ -167,6 +166,7 @@ export class TaskCalendarView extends ItemView {
 			events: () => this.data.events,
 			now: () => this.deps.clock.now(),
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
+			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels), date: () => this.selectedDate });
 		this.drag.attachCanvas(this.timeline.canvas);
@@ -202,6 +202,7 @@ export class TaskCalendarView extends ItemView {
 			e.stopPropagation();
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
+		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
@@ -263,6 +264,13 @@ export class TaskCalendarView extends ItemView {
 		root.classList.toggle("is-lists", mode === "soon");
 		await this.deps.settings.update({ rightMode: mode });
 		this.render();
+	}
+
+	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
+	private deselectUnless(target: EventTarget | null): void {
+		if (!this.timeline?.selection) return;
+		if (target instanceof Element && target.closest(".tc-block.is-selected, .tc-grips, .tc-lifted, .tc-panel, .tc-backdrop")) return;
+		this.timeline.select(null);
 	}
 
 	/** Runs one change to the file and resolves once the screen shows it; a task changed under us is reported instead. */
@@ -346,11 +354,12 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	private showMenu(item: TaskItem, source: HTMLElement): void {
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
 		const tasks = this.deps.tasks;
-		TaskMenu.open({
+		return TaskMenu.open({
 			item,
 			source,
+			lifted,
 			today: this.today(),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),

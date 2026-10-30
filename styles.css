@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
- * --tc-len, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
+ * --tc-len, --tc-x, --tc-stack-end, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -22,13 +22,13 @@ body {
 	--tc-muted: #8E8E93;
 	--tc-on-strong: #000000;
 	--tc-now-ink: #FFFFFF;
+	/* Text on the accent: the time pill of a stretched task. */
+	--tc-on-accent: #FFFFFF;
 	--tc-line: #2C2C2E;
 	--tc-handle: #48484A;
 	--tc-hour-line: #232325;
-	/* The ring round a task block and the dashed edge of New task. */
-	--tc-ring: #3A3A3C;
+	/* The dashed edge of New task. */
 	--tc-dash: #3A3A3C;
-	--tc-resize: #636366;
 	--tc-now: #D92C24;
 	--tc-accent: #9580FF;
 	--tc-drop-bg: #251F3D;
@@ -56,12 +56,11 @@ body {
 
 	/* Shape */
 	--tc-radius-card: 12px;
-	--tc-radius-block: 8px;
 	--tc-radius-event: 6px;
+	--tc-radius-time-pill: 6px;
 	--tc-radius-seg: 16px;
 	--tc-radius-seg-btn: 14px;
 	--tc-radius-handle: 5px;
-	--tc-radius-resize: 2px;
 	--tc-radius-pill: 8px;
 	--tc-radius-circle: 50%;
 	--tc-radius-panel: 14px;
@@ -77,7 +76,6 @@ body {
 	/* Obsidian 1.14 draws its buttons as squircles; ours keep the board's round corners. */
 	--tc-corner: round;
 	--tc-hairline: 1px;
-	--tc-ring-w: 1px;
 	--tc-bar: 3px;
 	--tc-drop-border: 1.5px;
 	--tc-stroke-chevron: 2.2px;
@@ -190,11 +188,21 @@ body {
 	--tc-items-right: 4px;
 	--tc-item-inset: 1px;
 	--tc-item-gap: 2px;
-	--tc-resize-w: 16px;
-	--tc-resize-h: 3px;
-	--tc-resize-bottom: 3px;
-	--tc-resize-hit-w: 44px;
-	--tc-resize-hit-h: 24px;
+	/* The bottom of the last task card; the code sets it on the canvas. */
+	--tc-stack-end: 0px;
+	--tc-block-pad-top: 11px;
+	--tc-overlay-ring: 2px;
+	--tc-select-ring: 1.5px;
+	--tc-meta-w: 14px;
+	--tc-meta-lift: 1px;
+	--tc-pill-h: 18px;
+	--tc-grip: 10px;
+	--tc-grip-border: 2px;
+	/* The dots sit on the top edge near the right and on the bottom edge near the left. */
+	--tc-grip-start-right: 14px;
+	--tc-grip-end-left: 14px;
+	/* How far past a dot a finger still takes it. */
+	--tc-grip-hit: 17px;
 	--tc-now-h: 16px;
 	--tc-now-pill-w: 34px;
 	--tc-now-line: 2px;
@@ -211,6 +219,9 @@ body {
 	--tc-tracking-mon: 0.3px;
 	--tc-font-block: 12px;
 	--tc-leading-block: 15px;
+	--tc-leading-card: 18px;
+	--tc-font-meta: 9px;
+	--tc-leading-meta: 10px;
 	--tc-font-tiny: 10px;
 	--tc-font-hour: 11px;
 	--tc-leading-hour: 14px;
@@ -236,7 +247,6 @@ body {
 	--tc-space-4: 4px;
 	--tc-space-5: 5px;
 	--tc-space-6: 6px;
-	--tc-space-7: 7px;
 	--tc-space-8: 8px;
 	--tc-space-10: 10px;
 	--tc-space-12: 12px;
@@ -247,6 +257,8 @@ body {
 	/* Layers */
 	--tc-layer-block: 1;
 	--tc-layer-drop: 2;
+	/* The dots of the selected card lie over every card. */
+	--tc-layer-selected: 2;
 	--tc-layer-now: 3;
 	--tc-layer-backing: 3;
 	--tc-layer-allday: 4;
@@ -291,9 +303,7 @@ body.theme-light {
 	--tc-line: #E5E5EA;
 	--tc-handle: #C7C7CC;
 	--tc-hour-line: #EFEFF4;
-	--tc-ring: #D1D1D6;
 	--tc-dash: #C7C7CC;
-	--tc-resize: #AEAEB2;
 	--tc-now: #FF3B30;
 	--tc-accent: var(--interactive-accent);
 	--tc-drop-bg: #F1ECFE;
@@ -420,7 +430,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* It ends level with the bottom of the New task button, above Obsidian's phone navigation, so the whole day fits at the smallest zoom. */
 .tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
-.tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: calc(var(--tc-hour) * var(--tc-day-hours)); }
+.tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
@@ -432,21 +442,34 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-event { border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; }
 .tc-event-body { flex: 1; min-width: 0; padding: var(--tc-space-4) var(--tc-space-6); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
-.tc-item.is-tiny .tc-event-body, .tc-block.is-tiny { padding: 0 var(--tc-space-5); }
-.tc-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring); padding: var(--tc-space-4) var(--tc-space-6); z-index: var(--tc-layer-block); touch-action: pan-y; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), box-shadow var(--tc-duration-collapse) var(--tc-ease-out); }
-.tc-block .tc-item-title { color: var(--tc-text); }
-.tc-block.is-lifted { opacity: 0; }
-.tc-block.is-resizing { box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-accent); }
-.tc-resize { position: absolute; bottom: var(--tc-resize-bottom); left: 50%; width: var(--tc-resize-w); height: var(--tc-resize-h); margin-left: calc(-1 * var(--tc-resize-w) / 2); border-radius: var(--tc-radius-resize); background: var(--tc-resize); }
-.tc-resize-hit { position: absolute; bottom: 0; left: 50%; width: var(--tc-resize-hit-w); height: min(var(--tc-resize-hit-h), 50%); margin-left: calc(-1 * var(--tc-resize-hit-w) / 2); touch-action: none; cursor: ns-resize; }
+.tc-item.is-tiny .tc-event-body { padding: 0 var(--tc-space-5); }
 
 /* The now line: the time in a pill, the line to the right edge. */
+/* A task on the timeline is the card of the list: 40 px at a time, its duration's length when it has one; selected, it is ringed and gets the two dots that stretch it. */
+.tc-block { position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-block); touch-action: pan-y; }
+.tc-block.is-lifted { visibility: hidden; }
+.tc-timeline.is-dropping .tc-block, .tc-timeline.is-dropping .tc-drop { transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out), left var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
+.tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
+.tc-block.is-over .tc-block-card { box-shadow: 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
+.tc-block.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
+.tc-block.is-over.is-selected .tc-block-card { box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent), 0 0 0 var(--tc-overlay-ring) var(--tc-bg); }
+.tc-block-meta { width: var(--tc-meta-w); flex-shrink: 0; margin-top: calc(-1 * var(--tc-meta-lift)); display: flex; flex-direction: column; align-items: center; font-size: var(--tc-font-meta); line-height: var(--tc-leading-meta); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.tc-block-meta.is-hidden { display: none; }
+.tc-block-pill { display: none; position: absolute; right: var(--tc-space-8); bottom: var(--tc-space-10); height: var(--tc-pill-h); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-time-pill); background: var(--tc-accent); color: var(--tc-on-accent); font-size: var(--tc-font-block); line-height: var(--tc-pill-h); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
+.tc-block.is-resizing .tc-block-pill { display: block; }
+.tc-grips { display: none; position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-selected); pointer-events: none; }
+.tc-grips.is-shown { display: block; }
+.tc-grip { position: absolute; pointer-events: auto; width: var(--tc-grip); height: var(--tc-grip); box-sizing: border-box; border-radius: var(--tc-radius-circle); border: var(--tc-grip-border) solid var(--tc-accent); background: var(--tc-bg); touch-action: none; cursor: ns-resize; }
+.tc-grip::after { content: ""; position: absolute; inset: calc(-1 * var(--tc-grip-hit)); }
+.tc-grip.is-start { top: calc(-1 * var(--tc-grip) / 2); right: var(--tc-grip-start-right); }
+.tc-grip.is-end { bottom: calc(-1 * var(--tc-grip) / 2); left: var(--tc-grip-end-left); }
+.tc-drop { position: absolute; top: var(--tc-y); height: var(--tc-card-h); left: var(--tc-x); right: var(--tc-item-inset); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; z-index: var(--tc-layer-drop); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; }
 .tc-now { position: absolute; top: calc(var(--tc-y) - var(--tc-now-h) / 2); left: 0; right: 0; height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-now); pointer-events: none; }
 .tc-now-pill { width: var(--tc-now-pill-w); height: var(--tc-now-h); flex-shrink: 0; border-radius: var(--tc-radius-pill); background: var(--tc-now); color: var(--tc-now-ink); font-size: var(--tc-font-now); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
 .tc-now-line { flex: 1; height: var(--tc-now-line); background: var(--tc-now); }
 
 /* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
-.tc-drop { border-radius: var(--tc-radius-block); border: var(--tc-drop-border) dashed var(--tc-accent); background: var(--tc-drop-bg); padding: var(--tc-space-4) var(--tc-space-7); z-index: var(--tc-layer-drop); font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-accent); font-variant-numeric: tabular-nums; pointer-events: none; transition: top var(--tc-duration-snap) var(--tc-ease-out), height var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */
@@ -457,8 +480,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; gap: var(--tc-space-6); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
-.tc-lifted.is-block { border-radius: var(--tc-radius-block); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-ring-w) var(--tc-ring); padding: var(--tc-space-4) var(--tc-space-6); align-items: flex-start; }
-.tc-lifted.is-block .tc-item-title { color: var(--tc-text); }
+.tc-lifted.is-block { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.tc-lifted.is-block > .tc-block { top: 0; left: 0; right: 0; height: 100%; }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }

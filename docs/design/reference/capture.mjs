@@ -95,6 +95,38 @@ const slideTo = (ms) => evaluate(`(async () => { const v = ${view}; const toggle
 const endSlide = () => evaluate(`(async () => { for (const a of document.getAnimations()) a.finish(); ${view}.contentEl.classList.remove('is-switching'); ${view}.header.switcher.el.classList.remove('is-settling'); await ${plugin}.update({ rightMode: 'calendar' }); ${view}.render(); })()`);
 const closeOverlay = () => click(200, 700);
 
+/** The tasks each board of «Задачи на таймлайне» lays on the day (Screen.dc.html, TASK_SETS), in minutes. */
+const TASKS = {
+	day: [
+		{ text: "Написать отчёт по проекту", start: 660, end: 720, inProgress: true },
+		{ text: "Разобрать почту", start: 840, end: null },
+		{ text: "Подготовить вопросы к планированию", start: 960, end: null },
+		{ text: "Заказать продукты", start: 1020, end: null },
+	],
+	stack: [
+		{ text: "Написать отчёт по проекту", start: 660, end: 720, inProgress: true },
+		{ text: "Разобрать почту", start: 840, end: null },
+		{ text: "Заказать продукты", start: 1020, end: null },
+		{ text: "Позвонить в банк", start: 1020, end: null },
+		{ text: "Купить корм коту", start: 1025, end: null },
+		{ text: "Оплатить интернет", start: 1030, end: null },
+	],
+	stretch: [
+		{ text: "Написать отчёт по проекту", start: 660, end: 720, inProgress: true },
+		{ text: "Разобрать почту", start: 840, end: null },
+		{ text: "Заказать продукты", start: 1020, end: null },
+	],
+	long: [
+		{ text: "Разобрать почту", start: 840, end: null },
+		{ text: "Ревью дизайна с командой", start: 870, end: 990 },
+		{ text: "Ответить Вадиму", start: 900, end: null },
+		{ text: "Заказать продукты", start: 1020, end: null },
+	],
+};
+/** A board's tasks at its hour's height, the day scrolled to the minute the board shows at the top. */
+const timelineBoard = (tasks, hourPx, top) => evaluate(`(async () => { const v = ${view}; v.deps.tasks.showTimeline(${JSON.stringify(tasks)}); await v.data.tasks(); v.hourPx = ${hourPx}; v.render(); v.timeline.scrollTo(${top}, 0); return 'ok'; })()`);
+const dayBack = () => evaluate(`(async () => { const v = ${view}; v.timeline.select(null); v.deps.tasks.showTimeline(null); await v.data.tasks(); v.hourPx = 56; v.render(); return 'ok'; })()`);
+
 /** The main screen's content region, and the task screen's region above the board's keyboard. */
 const SCREEN = { dy: 18, region: [0, 236, 780, 1140] };
 const SHEET = { dy: 114, region: [0, 108, 780, 980] };
@@ -145,10 +177,34 @@ const STATES = [
 	},
 	{
 		board: "ScreenNewSlot", frame: SCREEN,
-		// A mouse held still on an empty place at 16:40: the target shows while the button is down; letting go opens the task screen.
-		run: async () => { await mouse("mouseMoved", 300, 640, { button: "none" }); await mouse("mousePressed", 300, 640); await sleep(500); },
+		// The board's target at 16:30 stands where the 16:00 card lies, so no press reaches it there: the target is shown by hand.
+		run: () => evaluate(`(() => { ${view}.timelineDrop.previewNew(${view}.timeline.canvas.getBoundingClientRect().top + ${view}.timeline.yOf(990)); return 'ok'; })()`),
+		after: () => evaluate(`(() => { ${view}.timelineDrop.clear(); return 'ok'; })()`),
+	},
+	{ board: "ScreenTasksStack", frame: SCREEN, run: () => timelineBoard(TASKS.stack, 56, 720), after: dayBack },
+	{ board: "ScreenTasksLong", frame: SCREEN, run: () => timelineBoard(TASKS.long, 56, 810), after: dayBack },
+	{ board: "ScreenTasksZoomIn", frame: SCREEN, run: () => timelineBoard(TASKS.day, 112, 645), after: dayBack },
+	{ board: "ScreenTasksZoomOut", frame: SCREEN, run: () => timelineBoard([...TASKS.day, { text: "Оплатить интернет", start: 870, end: null }], 28, 540), after: dayBack },
+	{
+		board: "ScreenTasksResize", frame: SCREEN,
+		// The card at 14:00 selected, its bottom dot carried by a mouse to 15:30; the shot while the button is down.
+		run: async () => {
+			await timelineBoard(TASKS.stretch, 56, 540);
+			const at = await evaluate(`(() => { const v = ${view}; const item = v.data.day.slotted.find((t) => t.text === "Разобрать почту"); v.timeline.select(item); const grip = [...v.timeline.itemsEl.querySelectorAll(".tc-grips .tc-grip.is-end")][0].getBoundingClientRect(); const top = v.timeline.canvas.getBoundingClientRect().top; return [grip.x + grip.width / 2, grip.y + grip.height / 2, top + v.timeline.yOf(930)]; })()`);
+			await mouse("mouseMoved", at[0], at[1], { button: "none" });
+			await mouse("mousePressed", at[0], at[1]);
+			for (let i = 1; i <= 10; i++) {
+				await mouse("mouseMoved", at[0], at[1] + ((at[2] - at[1]) * i) / 10);
+				await sleep(25);
+			}
+			await sleep(300);
+		},
 		shotWhileHeld: true,
-		after: async () => { await mouse("mouseReleased", 300, 640); await sleep(400); await cancelSheet(); },
+		after: async () => {
+			await mouse("mouseReleased", 300, 400);
+			await sleep(400);
+			await dayBack();
+		},
 	},
 ];
 
