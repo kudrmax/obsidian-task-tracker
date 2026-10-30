@@ -963,6 +963,30 @@
       "h": 844,
       "title": "Экран задачи: New task из Inbox",
       "page": "prod"
+    },
+    "ScreenPostpone.dc.html": {
+      "h": 844,
+      "title": "Отложить: задача над Tomorrow",
+      "w": 390,
+      "x": 0,
+      "y": 9300,
+      "page": "prod"
+    },
+    "ScreenPostponePick.dc.html": {
+      "h": 844,
+      "title": "Отложить: задача над Pick a date",
+      "w": 390,
+      "x": 470,
+      "y": 9300,
+      "page": "prod"
+    },
+    "ScreenLightPostpone.dc.html": {
+      "h": 844,
+      "title": "Отложить: светлая тема",
+      "w": 390,
+      "x": 940,
+      "y": 9300,
+      "page": "prod"
     }
   },
   "createdOnFiles": {
@@ -1317,7 +1341,10 @@
     "ScreenLightPrioritySettings.dc.html",
     "ScreenInbox.dc.html",
     "ScreenLightInbox.dc.html",
-    "ScreenSheetInbox.dc.html"
+    "ScreenSheetInbox.dc.html",
+    "ScreenPostpone.dc.html",
+    "ScreenPostponePick.dc.html",
+    "ScreenLightPostpone.dc.html"
   ],
   "title": "Task Calendar"
 }
