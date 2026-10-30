@@ -24,7 +24,7 @@ function minorLabels(view: Timeline): string[] {
 }
 
 describe("a day that starts at 4", () => {
-	const late: TaskItem = { key: { section: "now", index: 0, raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 } };
+	const late: TaskItem = { key: { section: "now", index: 0, raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, priority: null };
 
 	it("labels the hours from 4 round to 3", () => {
 		const labels = [...timeline({ hourPx: 56 }, new DayBoundary(4)).canvas.querySelectorAll(".tc-hour-label")].map((l) => l.textContent);
@@ -72,7 +72,7 @@ describe("Timeline grid", () => {
 });
 
 describe("task cards", () => {
-	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end } });
+	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null });
 
 	it("stands the cards in the page in the stack's order, so a card over a long one is drawn over it", () => {
 		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 900, null), task(1, 840, 960)]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf } from "../src/settings";
+import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf, usablePrefix } from "../src/settings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -30,5 +30,22 @@ describe("the device's part of the settings", () => {
 		expect("listShare" in shared).toBe(false);
 		expect("rightMode" in shared).toBe(false);
 		expect(shared.google).toEqual(DEFAULT_SETTINGS.google);
+	});
+});
+
+describe("priority levels", () => {
+	it("are p1 red and p2 orange unless set, and an empty list stays empty", () => {
+		expect(settingsFrom(null).priorities).toEqual([
+			{ prefix: "p1", color: "red" },
+			{ prefix: "p2", color: "orange" },
+		]);
+		expect(settingsFrom({ priorities: [] }).priorities).toEqual([]);
+	});
+
+	it("take only a prefix that is one word", () => {
+		expect(usablePrefix("p1")).toBe(true);
+		expect(usablePrefix("!!")).toBe(true);
+		expect(usablePrefix("")).toBe(false);
+		expect(usablePrefix("p 1")).toBe(false);
 	});
 });

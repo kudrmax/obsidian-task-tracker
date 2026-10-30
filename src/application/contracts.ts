@@ -89,6 +89,8 @@ export interface TaskService {
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
+	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
+	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
 

@@ -276,3 +276,41 @@ describe("a day that starts at 4", () => {
 		expect(store.text).toBe("## Now\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
 	});
 });
+
+describe("priority", () => {
+	const withLevels = (priorities: typeof DEFAULT_SETTINGS.priorities) => new FakeSettingsStore({ ...DEFAULT_SETTINGS, priorities });
+
+	it("gives an item its level and the text without the prefix", async () => {
+		const { svc } = setup("## Now\n- [ ] p1 A\n- [ ] B\n");
+		const view = await svc.dayView(T);
+		expect(view.list[0]).toMatchObject({ text: "A", priority: { prefix: "p1", color: "red" } });
+		expect(view.list[1].priority).toBeNull();
+	});
+
+	it("setPriority writes the prefix, null takes it off", async () => {
+		const { store, svc } = setup("## Now\n- [ ] p1 A\n\n## Soon\n\n## Done\n");
+		await svc.setPriority((await svc.dayView(T)).list[0].key, "p2");
+		expect(store.text).toBe("## Now\n- [ ] p2 A\n\n## Soon\n\n## Done\n");
+		await svc.setPriority((await svc.dayView(T)).list[0].key, null);
+		expect(store.text).toBe("## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+	});
+
+	it("reads a prefix no level has as text, and leaves the line alone", async () => {
+		const { store, svc } = setup("## Now\n- [ ] p1 A\n- [ ] B\n\n## Soon\n\n## Done\n", withLevels([]));
+		const view = await svc.dayView(T);
+		expect(view.list[0]).toMatchObject({ text: "p1 A", priority: null });
+		await svc.rename(view.list[1].key, "C");
+		expect(store.text).toBe("## Now\n- [ ] p1 A\n- [ ] C\n\n## Soon\n\n## Done\n");
+	});
+
+	it("takes the first of two levels with one prefix, and ignores a prefix with a space", async () => {
+		const { svc } = setup("## Now\n- [ ] p1 A\n- [ ] x y B\n", withLevels([
+			{ prefix: "p1", color: "blue" },
+			{ prefix: "p1", color: "red" },
+			{ prefix: "x y", color: "green" },
+		]));
+		const view = await svc.dayView(T);
+		expect(view.list[0].priority).toEqual({ prefix: "p1", color: "blue" });
+		expect(view.list[1]).toMatchObject({ text: "x y B", priority: null });
+	});
+});

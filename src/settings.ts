@@ -33,6 +33,11 @@ export interface PriorityLevel {
 	readonly color: PriorityColor;
 }
 
+/** A prefix marks a task only when it is one word: a line's first word is matched against it. */
+export function usablePrefix(prefix: string): boolean {
+	return /^\S+$/.test(prefix);
+}
+
 export interface TaskCalendarSettings {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;
@@ -54,6 +59,8 @@ export interface TaskCalendarSettings {
 	readonly rightMode: RightMode;
 	/** A calendar source whose last update is older than this gets the orange dot. */
 	readonly staleAfterMinutes: number;
+	/** Priority levels in the order the menu and the task screen offer them. */
+	readonly priorities: readonly PriorityLevel[];
 }
 
 export const LIST_WIDTH_MIN = 110;
@@ -79,6 +86,10 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
 	staleAfterMinutes: 180,
+	priorities: [
+		{ prefix: "p1", color: "red" },
+		{ prefix: "p2", color: "orange" },
+	],
 };
 
 /** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */
