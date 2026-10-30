@@ -14,7 +14,8 @@ const SETTINGS = {
 	// Как в настройках плагина Task Calendar.
 	tasksFile: "TODOs Tasks.md",
 	sections: { now: "Now", soon: "Soon", done: "Done" },
-	markers: { dueDate: "📅", slot: "⏰" },
+	// Префиксы приоритетов: в заголовке уведомления их нет.
+	markers: { dueDate: "📅", slot: "⏰", priorities: ["p1", "p2"] },
 };
 
 
@@ -194,6 +195,7 @@ var STATUS_CHARS = {
 var DAY_MINUTES2 = 1440;
 var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
 var DATE = "(\\d{4}-\\d{2}-\\d{2})";
+var FIRST_WORD_RE = /^(\S+)\s+(\S.*)$/;
 var TIME = "(\\d{2}:\\d{2})";
 function statusOf(char) {
   for (const status of Object.keys(STATUS_CHARS)) {
@@ -251,12 +253,17 @@ function parseTaskLine(line, markers) {
   return {
     indent: m[1],
     bullet: m[2],
-    task: { status: statusOf(statusChar), statusChar, ...fields, children: [] }
+    task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOf(fields.text, markers), children: [] }
   };
+}
+function priorityOf(text, markers) {
+  const m = FIRST_WORD_RE.exec(text);
+  if (!m || !markers.priorities?.includes(m[1])) return { text, priority: null };
+  return { text: m[2], priority: m[1] };
 }
 function formatTaskLine(parsed, markers) {
   const { indent, bullet, task } = parsed;
-  let line = `${indent}${bullet} [${task.statusChar}] ${task.text}`;
+  let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
   if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
   if (task.slot) {
     const { date, start, end } = task.slot;
@@ -274,7 +281,7 @@ function indentWidth(line) {
   return INDENT_RE.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.children.length === b.children.length && a.children.every((c, i) => c === b.children[i]);
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.children.length === b.children.length && a.children.every((c, i) => c === b.children[i]);
 }
 var TaskDocument = class _TaskDocument {
   constructor(lines, eol, trailingEol, names, markers) {
