@@ -8,7 +8,7 @@ import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DragOrigin, DragPayload, DropResult, DropTarget } from "./DropTarget";
+import type { DragOrigin, DragPayload, DropTarget, PlacedResult } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
@@ -20,7 +20,11 @@ export interface DragControllerDeps {
 	targets(): readonly DropTarget[];
 	readonly haptics: Haptics;
 	readonly arbiter: GestureArbiter;
-	onResult(drag: DragPayload, result: DropResult): Promise<void>;
+	/** A card is lifted or settled: the lists swap New task for the zones that put it off. */
+	onDragging(active: boolean): void;
+	onResult(drag: DragPayload, result: PlacedResult): Promise<void>;
+	/** A card dropped on Pick a date, back in its place: the date picker opens over it. */
+	onPickDate(item: TaskItem, source: HTMLElement): void;
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
@@ -180,6 +184,8 @@ export class DragController {
 		source.classList.add("is-lifted");
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
+		this.deps.onDragging(true);
+		let picked = false;
 		const session = new DragSession({
 			payload,
 			targets: this.deps.targets(),
@@ -191,20 +197,34 @@ export class DragController {
 			},
 			onEnd: async (result) => {
 				detach();
+				if (result?.kind === "pickDate") {
+					picked = true;
+					return;
+				}
 				this.deps.arbiter.release(DRAG);
 				if (!result) return;
 				this.deps.haptics.tap();
 				await this.deps.onResult(payload, result);
 			},
 		});
+		/** The card has come to rest. One dropped on Pick a date shows again, and the screen is held until the picker covers it. */
+		const settled = () => {
+			this.deps.onDragging(false);
+			if (!picked) return;
+			source.classList.remove("is-lifted");
+			timeline?.layoutTasks();
+			this.deps.haptics.tap();
+			this.deps.onPickDate(payload.item, source);
+			this.deps.arbiter.release(DRAG);
+		};
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};
 		const up = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) void session.release(ev.clientX, ev.clientY);
+			if (ev.pointerId === e.pointerId) void session.release(ev.clientX, ev.clientY).then(settled);
 		};
 		const cancel = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) void session.cancel();
+			if (ev.pointerId === e.pointerId) void session.cancel().then(settled);
 		};
 		const detach = () => {
 			document.removeEventListener("pointermove", move);

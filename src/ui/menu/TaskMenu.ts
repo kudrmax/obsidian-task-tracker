@@ -61,6 +61,8 @@ export interface TaskMenuContext {
 	readonly actions: MenuActions;
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
+	/** `picker`: the menu opens on its date picker (a card dropped on Pick a date). */
+	readonly opening?: "picker";
 }
 
 /** The task menu over a blurred screen: the tapped card stays as it is above the blur, the panel grows out under it; the due submenu and the month picker take its place. */
@@ -85,7 +87,8 @@ export class TaskMenu {
 		this.anchor = this.liftWhole(context.source.getBoundingClientRect());
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = el(document.body, "div", "tc-panel");
-		this.showMenu();
+		if (context.opening === "picker") this.showPicker();
+		else this.showMenu();
 		requestAnimationFrame(() => this.panel.classList.add("is-shown"));
 	}
 

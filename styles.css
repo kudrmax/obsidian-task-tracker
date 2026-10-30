@@ -32,6 +32,7 @@ body {
 	--tc-minor-line: #161618;
 	/* The dashed edge of New task. */
 	--tc-dash: #3A3A3C;
+	--tc-drop-bg: #251F3D;
 	--tc-now: #D92C24;
 	--tc-accent: #9580FF;
 	--tc-strip-color: var(--interactive-accent);
@@ -345,6 +346,7 @@ body.theme-light {
 	--tc-minor-label: #AEAEB2;
 	--tc-minor-line: #F6F6F9;
 	--tc-dash: #C7C7CC;
+	--tc-drop-bg: #F1ECFE;
 	--tc-now: #FF3B30;
 	--tc-accent: var(--interactive-accent);
 	--tc-float-bg: #FFFFFF;
@@ -487,6 +489,13 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar.is-inbox .tc-new.is-inbox { left: 0; padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
+.tc-postpone { display: none; flex-direction: column; gap: var(--tc-space-8); }
+.task-calendar.is-dragging .tc-new-btn { display: none; }
+.task-calendar.is-dragging .tc-postpone { display: flex; }
+.tc-zone { height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-space-10); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
+.tc-zone.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); color: var(--tc-text); }
+.tc-zone svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-seg); }
+.tc-zone-label { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 
 /* The all-day events over the timeline, in their calendar's colour. */
 .tc-allday-backing { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-allday-backing); background: var(--tc-bg); z-index: var(--tc-layer-backing); }
