@@ -24,10 +24,18 @@ export function isValidLocalDate(s: string): boolean {
 }
 
 export function addDays(date: LocalDate, n: number): LocalDate {
+	return formatUtc(new Date(utcMs(date) + n * DAY_MS));
+}
+
+/** Whole days from `from` to `to`. */
+export function daysBetween(from: LocalDate, to: LocalDate): number {
+	return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);
+}
+
+function utcMs(date: LocalDate): number {
 	const m = DATE_RE.exec(date);
 	if (!m) throw new Error(`Not a date: ${date}`);
-	const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) + n * DAY_MS;
-	return formatUtc(new Date(ms));
+	return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
 
 export function minutesToHHMM(minutes: number): string {

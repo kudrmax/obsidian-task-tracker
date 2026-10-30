@@ -1,11 +1,11 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
+import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MAX, LIST_WIDTH_MIN, type RightMode } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
-import { addDays, localDateOf, minutesOf } from "./dates";
+import { addDays } from "./dates";
 import { DayData } from "./DayData";
 import { DayHeader } from "./DayHeader";
 import { DragController } from "./drag/DragController";
@@ -22,6 +22,7 @@ import { nearestLevel, stepFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
+import { centeredListWidth, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -31,7 +32,6 @@ import type { LocalDate, Slot } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
-const MINUTES_PER_HOUR = 60;
 const SECOND_MS = 1000;
 
 export interface ViewDeps {
@@ -62,7 +62,9 @@ export class TaskCalendarView extends ItemView {
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
 	private scrolledFor: LocalDate | null = null;
+	private dayStartHour: number;
 	private readonly arbiter = new GestureArbiter();
+	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
@@ -78,6 +80,7 @@ export class TaskCalendarView extends ItemView {
 		private readonly deps: ViewDeps,
 	) {
 		super(leaf);
+		this.dayStartHour = this.settings.dayStartHour;
 		this.selectedDate = this.today();
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: () => this.render() });
 		this.polling = new CalendarPolling({
@@ -89,10 +92,9 @@ export class TaskCalendarView extends ItemView {
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
 			step: () => stepFor(this.hourPx, this.settings.zoomLevels),
-			date: () => this.selectedDate,
 			timeline: () => this.timeline,
 			targets: () => this.dropTargets(),
-			haptics: detectHaptics(window as unknown as HapticsHost),
+			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
@@ -122,7 +124,7 @@ export class TaskCalendarView extends ItemView {
 		const root = this.contentEl;
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
-		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
+		this.fitListWidth();
 		this.header = new DayHeader(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
 			onStep: (days) => this.select(addDays(this.selectedDate, days)),
@@ -149,11 +151,13 @@ export class TaskCalendarView extends ItemView {
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
-			width: () => this.settings.listWidth,
+			width: () => shownListWidth(this.settings.listWidth, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
 			onRelease: (width) => void this.deps.settings.update({ listWidth: width }).then(() => this.render()),
 			min: LIST_WIDTH_MIN,
-			max: LIST_WIDTH_MAX,
+			max: () => listWidthMax(root.clientWidth),
+			center: () => centeredListWidth(root.clientWidth),
+			onSnap: () => this.haptics.tap(),
 		});
 		this.rightEl = el(root, "div", "tc-right");
 		this.allDayEl = el(this.rightEl, "div");
@@ -161,6 +165,7 @@ export class TaskCalendarView extends ItemView {
 			theme: () => this.theme(),
 			date: () => this.selectedDate,
 			today: () => this.today(),
+			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			tasks: () => this.data.day?.slotted ?? [],
 			events: () => this.data.events,
@@ -168,7 +173,8 @@ export class TaskCalendarView extends ItemView {
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels), date: () => this.selectedDate });
+		el(this.rightEl, "div", "tc-fade");
+		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx, this.settings.zoomLevels) });
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		this.pull = new PullToRefresh(timeline.el, {
@@ -192,6 +198,7 @@ export class TaskCalendarView extends ItemView {
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
+			this.deps.settings.onChange(() => this.onSettings()),
 		);
 		this.registerDomEvent(window, "focus", () => void this.polling.refresh());
 		this.registerDomEvent(document, "visibilitychange", () => {
@@ -224,6 +231,7 @@ export class TaskCalendarView extends ItemView {
 
 	override onResize(): void {
 		this.measureNavigation();
+		this.fitListWidth();
 	}
 
 	private get settings() {
@@ -231,12 +239,28 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private today(): LocalDate {
-		return localDateOf(this.deps.clock.now());
+		return this.boundary().dayOf(this.deps.clock.now());
+	}
+
+	private boundary(): DayBoundary {
+		return new DayBoundary(this.settings.dayStartHour);
+	}
+
+	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. */
+	private onSettings(): void {
+		if (this.settings.dayStartHour === this.dayStartHour) return;
+		this.dayStartHour = this.settings.dayStartHour;
+		this.scrolledFor = null;
+		this.select(this.today());
 	}
 
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
 	private theme(): Theme {
 		return document.body.classList.contains("theme-light") ? "light" : "dark";
+	}
+
+	private fitListWidth(): void {
+		this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listWidth, this.contentEl.clientWidth)));
 	}
 
 	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
@@ -379,7 +403,7 @@ export class TaskCalendarView extends ItemView {
 		this.renderPending = false;
 		const root = this.contentEl;
 		if (!this.header || !this.leftEl || !this.soonEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.list || !this.soonList) return;
-		root.style.setProperty(PROPERTY.listWidth, px(this.settings.listWidth));
+		this.fitListWidth();
 		this.header.render();
 		this.list.render();
 		const missing = this.data.missing;
@@ -394,8 +418,9 @@ export class TaskCalendarView extends ItemView {
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
-			if (this.selectedDate === this.today()) this.timeline.scrollTo(minutesOf(this.deps.clock.now()), LAYOUT.nowFraction);
-			else this.timeline.scrollTo(this.settings.scrollToHour * MINUTES_PER_HOUR, 0);
+			const boundary = this.boundary();
+			if (this.selectedDate === this.today()) this.timeline.scrollTo(boundary.offsetOf(this.selectedDate, this.deps.clock.now()), LAYOUT.nowFraction);
+			else this.timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
 		}
 	}
 

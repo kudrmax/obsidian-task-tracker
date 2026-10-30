@@ -1,6 +1,8 @@
 import type { LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
 
 export type { SectionKey };
+/** Where a day begins: the UI places slots, events and now on the timeline by it. */
+export { DayBoundary } from "../domain/DayBoundary";
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section,

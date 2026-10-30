@@ -1,12 +1,12 @@
 import type { TaskItem } from "../../application/contracts";
 import { DESIGN, LAYOUT } from "../design";
-import { stretchedSlot } from "../timelineLayout";
+import { stretchedSpan } from "../timelineLayout";
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
-import type { LocalDate, Slot } from "../types";
+import type { Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DragOrigin, DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
@@ -16,7 +16,6 @@ import { snapMinutes } from "./snap";
 export interface DragControllerDeps {
 	longPressMs(): number;
 	step(): number;
-	date(): LocalDate;
 	timeline(): Timeline | null;
 	targets(): readonly DropTarget[];
 	readonly haptics: Haptics;
@@ -161,7 +160,7 @@ export class DragController {
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(canvas, e.pointerId);
 			this.deps.arbiter.release(NEW_SLOT);
-			if (open) this.deps.onNewSlot({ date: this.deps.date(), ...drop.slot });
+			if (open) this.deps.onNewSlot(drop.slot);
 			else drop.clear();
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
@@ -224,8 +223,8 @@ export class DragController {
 	 */
 	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
 		const timeline = this.deps.timeline();
-		const slot = item.slot;
-		if (!timeline || !slot || !this.deps.arbiter.claim(RESIZE)) return;
+		if (!timeline || !item.slot || !this.deps.arbiter.claim(RESIZE)) return;
+		const slot = timeline.spanOf(item.slot);
 		this.deps.haptics.tap();
 		capturePointer(block, e.pointerId);
 		const step = LAYOUT.resizeStepMinutes;
@@ -234,9 +233,9 @@ export class DragController {
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
 			const at = snapMinutes(timeline.minutesAt(ev.clientY), step);
-			if (edge === "end") end = Math.max(start, at);
-			else if (slot.end === null) start = Math.min(at, slot.start);
-			else start = Math.min(at, end);
+			if (edge === "end") end = Math.min(LAYOUT.minutesPerDay, Math.max(start, at));
+			else if (slot.end === null) start = Math.max(0, Math.min(at, slot.start));
+			else start = Math.max(0, Math.min(at, end));
 			timeline.stretchTo(block, { start, end }, edge);
 		};
 		const finish = async (ev: PointerEvent, apply: boolean) => {
@@ -245,11 +244,11 @@ export class DragController {
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
-			const next = stretchedSlot(slot, { start, end }, edge, timeline.hourPx);
+			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx);
 			const changed = next.start !== slot.start || next.end !== slot.end;
 			if (apply && changed) {
 				this.deps.haptics.tap();
-				await this.deps.onResize(item, next);
+				await this.deps.onResize(item, timeline.slotAt(next.start, next.end));
 			} else timeline.stretchTo(block, null, edge);
 			this.deps.arbiter.release(RESIZE);
 		};

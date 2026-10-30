@@ -1,4 +1,6 @@
 import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
+
+const DAY_MINUTES = 1440;
 import { STATUS_CHARS, type Slot, type Task, type TaskStatus } from "./Task";
 
 export interface Markers {
@@ -15,7 +17,6 @@ export interface ParsedTaskLine {
 const LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
 const DATE = "(\\d{4}-\\d{2}-\\d{2})";
 const TIME = "(\\d{2}:\\d{2})";
-const MINUTES_PER_DAY = 1440;
 
 export function statusOf(char: string): TaskStatus {
 	for (const status of Object.keys(STATUS_CHARS) as TaskStatus[]) {
@@ -65,11 +66,11 @@ class FieldSlicer {
 	private slotOf(m: RegExpExecArray): Slot | null {
 		const date = m[1];
 		const start = parseHHMM(m[2]);
-		if (!isValidLocalDate(date) || start === null) return null;
-		if (m[3] === undefined) return start < MINUTES_PER_DAY ? { date, start, end: null } : null;
+		if (!isValidLocalDate(date) || start === null || start >= DAY_MINUTES) return null;
+		if (m[3] === undefined) return { date, start, end: null };
 		const end = parseHHMM(m[3]);
-		if (end === null || start >= end) return null;
-		return { date, start, end };
+		if (end === null || start === end) return null;
+		return { date, start, end: end < start ? end + DAY_MINUTES : end };
 	}
 }
 
@@ -91,7 +92,7 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
 		const { date, start, end } = task.slot;
-		line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end)}`}`;
+		line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES ? end - DAY_MINUTES : end)}`}`;
 	}
 	return line;
 }

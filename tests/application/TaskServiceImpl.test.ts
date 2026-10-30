@@ -244,3 +244,24 @@ describe("onChange", () => {
 		expect(fired).toBe(1);
 	});
 });
+
+describe("a day that starts at 4", () => {
+	const night: Clock = { now: () => new Date(2026, 9, 31, 2, 0) };
+	const settings = () => new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 4 });
+
+	it("at 2 at night today is still the day before", async () => {
+		const store = new InMemoryTaskFileStore("## Now\n\n## Soon\n- [ ] Due 📅 2026-10-31\n");
+		const svc = new TaskServiceImpl(store, settings(), night);
+		await svc.createInList(T, "Late");
+		expect(store.text).toBe("## Now\n- [ ] Late\n\n## Soon\n- [ ] Due 📅 2026-10-31\n\n## Done\n");
+	});
+
+	it("the day's timeline takes the slots after midnight and a slot there keeps a Now task in Now", async () => {
+		const store = new InMemoryTaskFileStore("## Now\n- [ ] A\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
+		const svc = new TaskServiceImpl(store, settings(), night);
+		const day = await svc.dayView(T);
+		expect(day.slotted.map((i) => i.text)).toEqual(["B"]);
+		await svc.setSlot(day.list[0].key, { date: "2026-10-31", start: 180, end: 300 });
+		expect(store.text).toBe("## Now\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n");
+	});
+});

@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { DeviceEventCache } from "../infrastructure/DeviceEventCache";
 import { GoogleAuth } from "../infrastructure/GoogleAuth";
 import { GoogleCalendarSource } from "../infrastructure/GoogleCalendarSource";
 import { browserLoginDeps, GoogleRedirectLogin } from "../infrastructure/GoogleRedirectLogin";
@@ -28,7 +29,7 @@ export function createServices(app: App, settings: SettingsStore, clock: Clock =
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
 	return {
 		tasks: new TaskServiceImpl(store, settings, clock),
-		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings),
+		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app)),
 		google,
 		googleSource,
 		login,

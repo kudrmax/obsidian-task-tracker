@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, itemBox, layoutColumns, stackTasks, stretchedSlot, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, gridAt, itemBox, layoutColumns, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -120,21 +120,41 @@ describe("durationParts and timeParts", () => {
 	});
 });
 
-describe("stretchedSlot", () => {
-	const D = "2026-10-30";
-
+describe("stretchedSpan", () => {
 	it("keeps a duration taller than a card", () => {
-		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 930 }, "end", 56)).toEqual({ date: D, start: 840, end: 930 });
+		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 930 }, "end", 56)).toEqual({ start: 840, end: 930 });
 	});
 
 	it("drops a duration of 40 px or less: 45 minutes at 56 px an hour, 15 at 112", () => {
-		expect(stretchedSlot({ date: D, start: 840, end: 960 }, { start: 840, end: 885 }, "end", 56)).toEqual({ date: D, start: 840, end: null });
-		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 870 }, "end", 112)).toEqual({ date: D, start: 840, end: 870 });
-		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 855 }, "end", 112)).toEqual({ date: D, start: 840, end: null });
+		expect(stretchedSpan({ start: 840, end: 960 }, { start: 840, end: 885 }, "end", 56)).toEqual({ start: 840, end: null });
+		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 870 }, "end", 112)).toEqual({ start: 840, end: 870 });
+		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 855 }, "end", 112)).toEqual({ start: 840, end: null });
 	});
 
 	it("makes the old start the end when the start dot of a task without a duration is pulled up", () => {
-		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 750, end: 840 }, "start", 56)).toEqual({ date: D, start: 750, end: 840 });
-		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 825, end: 840 }, "start", 56)).toEqual({ date: D, start: 840, end: null });
+		expect(stretchedSpan({ start: 840, end: null }, { start: 750, end: 840 }, "start", 56)).toEqual({ start: 750, end: 840 });
+		expect(stretchedSpan({ start: 840, end: null }, { start: 825, end: 840 }, "start", 56)).toEqual({ start: 840, end: null });
+	});
+});
+
+describe("gridAt", () => {
+	it("draws only the hours up to the base zoom: half an hour there is too close for a label", () => {
+		expect(gridAt(28)).toEqual({ labels: 60, lines: 60 });
+		expect(gridAt(56)).toEqual({ labels: 60, lines: 60 });
+	});
+
+	it("labels the half hours once they have room, then the quarters, then every five minutes", () => {
+		expect(gridAt(80).labels).toBe(30);
+		expect(gridAt(112).labels).toBe(30);
+		expect(gridAt(160).labels).toBe(15);
+		expect(gridAt(224).labels).toBe(15);
+		expect(gridAt(480).labels).toBe(5);
+	});
+
+	it("adds bare lines every five minutes once those stand apart, between the labelled ones", () => {
+		expect(gridAt(112).lines).toBe(30);
+		expect(gridAt(160).lines).toBe(15);
+		expect(gridAt(192)).toEqual({ labels: 15, lines: 5 });
+		expect(gridAt(224)).toEqual({ labels: 15, lines: 5 });
 	});
 });

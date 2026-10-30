@@ -1,12 +1,11 @@
 import { LAYOUT } from "../design";
 import type { Timeline } from "../Timeline";
-import type { LocalDate } from "../types";
+import type { Slot } from "../types";
 import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
 export interface TimelineDropOptions {
 	step(): number;
-	date(): LocalDate;
 }
 
 /** The timeline as a place to drop: a dashed card snapped to the grid, with the start time, that scrolls the day near the edges. */
@@ -39,9 +38,9 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	/** The slot the target shows now: a task keeps its duration, a new one has none. */
-	get slot(): { start: number; end: number | null } {
+	get slot(): Slot {
 		const start = this.start ?? 0;
-		return { start, end: this.duration === null ? null : start + this.duration };
+		return this.timeline.slotAt(start, this.duration === null ? null : start + this.duration);
 	}
 
 	private show(wanted: number, duration: number | null): void {
@@ -82,6 +81,6 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	drop(): DropResult {
-		return { kind: "slot", slot: { date: this.opts.date(), ...this.slot } };
+		return { kind: "slot", slot: this.slot };
 	}
 }

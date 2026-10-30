@@ -1,24 +1,12 @@
 import type { Placement, TaskDraft } from "../application/contracts";
+import { DayBoundary } from "./DayBoundary";
 import { STATUS_CHARS, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
-const DAY_MINUTES = 1440;
 const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
 	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, children: [], ...patch };
-}
-
-export function clampSlot(slot: Slot, stepMinutes: number): Slot {
-	if (slot.end === null) return { date: slot.date, start: Math.max(0, Math.min(slot.start, DAY_MINUTES - stepMinutes)), end: null };
-	let { start, end } = slot;
-	if (start < 0) {
-		end -= start;
-		start = 0;
-	}
-	end = Math.min(Math.max(end, stepMinutes), DAY_MINUTES);
-	start = Math.max(0, Math.min(start, end - stepMinutes));
-	return { date: slot.date, start, end };
 }
 
 function listSection(date: LocalDate, today: LocalDate): SectionKey {
@@ -47,9 +35,10 @@ export function createAtTime(
 	today: LocalDate,
 	start: number,
 	text: string,
+	boundary = DayBoundary.MIDNIGHT,
 ): TaskDocument {
-	const slot: Slot = { date, start, end: null };
-	return doc.insert(listSection(date, today), "end", newTask(text, { slot }));
+	const slot = boundary.clamp({ date, start, end: null }, SLOT_STEP);
+	return doc.insert(listSection(boundary.dayOfSlot(slot), today), "end", newTask(text, { slot }));
 }
 
 export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatus): TaskDocument {
@@ -80,10 +69,10 @@ export function moveBefore(
 	return doc.moveEntry(entry, before.section, before.index);
 }
 
-export function setSlot(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate): TaskDocument {
-	const clamped = clampSlot(slot, SLOT_STEP);
+export function setSlot(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+	const clamped = boundary.clamp(slot, SLOT_STEP);
 	const slotted = patch(doc, entry, { slot: clamped });
-	if (clamped.date === today || entry.section !== "now") return slotted;
+	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return slotted;
 	return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
 }
 

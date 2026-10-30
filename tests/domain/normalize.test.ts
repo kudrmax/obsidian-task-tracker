@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalize } from "../../src/domain/normalize";
+import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
+
+const AT_FOUR = new DayBoundary(4);
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { now: "Now", soon: "Soon", done: "Done" };
@@ -87,5 +90,17 @@ describe("as a whole", () => {
 	it("returns the same object when nothing changes", () => {
 		const clean = parse("## Now\n- [ ] A\n\n## Soon\n- [ ] B 📅 2026-11-01\n\n## Done\n- [x] C\n");
 		expect(normalize(clean, T)).toBe(clean);
+	});
+});
+
+describe("a day that starts at 4", () => {
+	it("erases a slot before 4 today: it belonged to the day before", () => {
+		const text = "## Now\n- [ ] A ⏰ 2026-10-30 02:00-03:00\n";
+		expect(normalize(parse(text), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] A\n");
+		expect(normalize(parse(text), T).serialize()).toBe(text);
+	});
+
+	it("keeps a slot after midnight of today and brings its Soon task to Now", () => {
+		expect(normalize(parse("## Now\n\n## Soon\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n"), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n");
 	});
 });

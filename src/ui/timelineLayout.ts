@@ -1,5 +1,4 @@
 import { DESIGN, LAYOUT } from "./design";
-import type { Slot } from "./types";
 
 export interface Span {
 	readonly start: number;
@@ -27,6 +26,12 @@ export interface StackBox {
 	readonly stacked: boolean;
 	/** Its duration is shorter than a card at this zoom: the card shows the duration. */
 	readonly hiddenDuration: boolean;
+}
+
+/** The minutes between the grid's labelled lines and between all its lines. */
+export interface Grid {
+	readonly labels: number;
+	readonly lines: number;
 }
 
 export interface ItemBox {
@@ -61,6 +66,13 @@ export function layoutColumns(spans: readonly Span[]): ColumnBox[] {
 	}
 	close();
 	return boxes;
+}
+
+/** The grid at this zoom: labels at the finest division that still has room for them, else the hour; lines as often as they stay apart. */
+export function gridAt(hourPx: number): Grid {
+	const labels = LAYOUT.gridDivisions.find((minutes) => minutesToPx(minutes, hourPx) >= LAYOUT.gridLabelGap) ?? MINUTES_PER_HOUR;
+	const ticks = minutesToPx(LAYOUT.gridTickMinutes, hourPx) >= LAYOUT.gridTickGap;
+	return { labels, lines: ticks ? LAYOUT.gridTickMinutes : labels };
 }
 
 export function minutesToPx(minutes: number, hourPx: number): number {
@@ -126,11 +138,11 @@ function pad(n: number): string {
 }
 
 /**
- * The slot a stretch lets go at: no taller than a card at this zoom, the task loses its duration and stands at its start;
- * a task without one whose start dot was pulled keeps its start, the pull having come to nothing.
+ * Where a stretch lets go: no taller than a card at this zoom, the task loses its duration and stands at its start; a task
+ * without one (`from.end` null) whose start dot was pulled keeps its start, the pull having come to nothing.
  */
-export function stretchedSlot(slot: Slot, span: Span, edge: "start" | "end", hourPx: number): Slot {
-	if (minutesToPx(span.end - span.start, hourPx) - DESIGN.itemGap > DESIGN.cardHeight) return { date: slot.date, start: span.start, end: span.end };
-	const unmoved = edge === "start" && slot.end === null;
-	return { date: slot.date, start: unmoved ? slot.start : span.start, end: null };
+export function stretchedSpan(from: TaskSpan, span: Span, edge: "start" | "end", hourPx: number): TaskSpan {
+	if (minutesToPx(span.end - span.start, hourPx) - DESIGN.itemGap > DESIGN.cardHeight) return { start: span.start, end: span.end };
+	const unmoved = edge === "start" && from.end === null;
+	return { start: unmoved ? from.start : span.start, end: null };
 }

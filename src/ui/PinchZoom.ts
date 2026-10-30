@@ -1,3 +1,4 @@
+import { capturePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 
 export interface ZoomAnchor {
@@ -22,7 +23,11 @@ const WHEEL_SETTLE_MS = 150;
 /** One wheel notch of a hundred units doubles or halves the hour. */
 const WHEEL_UNITS_PER_DOUBLING = 100;
 
-/** Two fingers scale the hour; a computer uses ctrl or cmd with the wheel. The minute between the fingers stays where it is. */
+/**
+ * Two fingers scale the hour; a computer uses ctrl or cmd with the wheel. The minute between the fingers stays where it is.
+ * iOS sends a finger's lift to the element it touched, and a redraw may have taken that element away: a finger that comes
+ * down alone proves the others gone, and a pinch holds its fingers on the timeline itself.
+ */
 export class PinchZoom {
 	private readonly pointers = new Map<number, { x: number; y: number }>();
 	private pinch: { readonly distance: number; readonly hourPx: number; readonly anchor: ZoomAnchor } | null = null;
@@ -55,11 +60,12 @@ export class PinchZoom {
 
 	private down(e: PointerEvent): void {
 		if (e.pointerType === "mouse") return;
+		if (e.isPrimary) this.end();
 		this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (this.pointers.size !== 2 || this.pinch || !this.opts.arbiter.claim(PINCH)) return;
 		const { distance, midY } = this.geometry();
 		this.pinch = { distance: Math.max(distance, 1), hourPx: this.opts.hourPx(), anchor: { minutes: this.opts.minutesAt(midY), clientY: midY } };
-		this.el.setPointerCapture?.(e.pointerId);
+		for (const id of this.pointers.keys()) capturePointer(this.el, id);
 	}
 
 	private move(e: PointerEvent): void {
@@ -73,9 +79,14 @@ export class PinchZoom {
 	private up(e: PointerEvent): void {
 		if (!this.pointers.delete(e.pointerId)) return;
 		if (!this.pinch || this.pointers.size >= 2) return;
+		this.end();
+	}
+
+	private end(): void {
+		this.pointers.clear();
+		if (!this.pinch) return;
 		const anchor = this.pinch.anchor;
 		this.pinch = null;
-		this.pointers.clear();
 		this.opts.arbiter.release(PINCH);
 		this.opts.onRelease(this.opts.hourPx(), anchor);
 	}

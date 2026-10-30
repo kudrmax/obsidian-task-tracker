@@ -80,6 +80,12 @@ export const DURATION = {
 export const LAYOUT = {
 	/** An hour's label hides when its line comes this close to the now line. */
 	labelHideDistance: 20,
+	/** The grid labels a division of the hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
+	gridDivisions: [5, 15, 30],
+	gridLabelGap: 40,
+	/** Unlabelled lines every `gridTickMinutes` join them once those stand at least `gridTickGap` apart. */
+	gridTickMinutes: 5,
+	gridTickGap: 16,
 	/** A block under this height is drawn tiny: one small line, no padding. */
 	tinyItemHeight: 24,
 	/** How far the now line stands down the visible timeline when today opens. */
@@ -88,6 +94,10 @@ export const LAYOUT = {
 	pressTolerance: 8,
 	/** On a computer a drag starts after the pointer moves this far. */
 	dragStartDistance: 4,
+	/** The divider holds to the middle of the window while dragged this close to it. */
+	dividerSnapDistance: 8,
+	/** It holds only while moving slower than this, px per ms: a quick swipe passes the middle by, without a tick. */
+	dividerSnapSpeed: 0.25,
 	/** The timeline scrolls itself while a drag comes this close to its edge. */
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
