@@ -59,7 +59,7 @@ The redirect page is [`docs/auth.html`](docs/auth.html), served by GitHub Pages:
 While the project’s publishing status is **Testing**, Google makes every refresh token expire after 7 days, whatever the app does. To stop that:
 
 1. APIs & Services → OAuth consent screen → **Publish app** → Confirm. The status becomes **In production**.
-2. Google may say the app needs verification because `calendar.readonly` is a sensitive scope. You do not need to submit it: an unverified app in production keeps working for up to 100 users, the consent screen just keeps its “unverified” warning (Advanced → Go to …).
+2. If the console asks for the app's details first (Branding): home page `https://kudrmax.github.io/obsidian-task-tracker/`, privacy policy `https://kudrmax.github.io/obsidian-task-tracker/privacy.html`, authorized domain `kudrmax.github.io`; both pages live in [`docs/`](docs/). Google may say the app needs verification because `calendar.readonly` is a sensitive scope. You do not need to submit it: an unverified app in production keeps working for up to 100 users, the consent screen just keeps its “unverified” warning (Advanced → Go to …).
 3. Log in once more in the plugin settings. Tokens issued after publishing do not expire; they are revoked only if you revoke them at <https://myaccount.google.com/permissions> or stay unused for six months.
 
 ## Work calendar (Exchange on the iPhone)
