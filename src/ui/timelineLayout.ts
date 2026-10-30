@@ -40,6 +40,23 @@ export interface ItemBox {
 	readonly tiny: boolean;
 }
 
+/** The timeline's scroll box as measured with no room beyond the day. */
+export interface ScrollBox {
+	/** The minute's height in the canvas. */
+	readonly y: number;
+	readonly canvasTop: number;
+	readonly canvasHeight: number;
+	/** The height the fade at the bottom leaves visible. */
+	readonly visible: number;
+}
+
+/** Empty room over the day's first hour and under its last, and the scroll that puts the minute where it was asked. */
+export interface ScrollPlace {
+	readonly roomTop: number;
+	readonly roomBottom: number;
+	readonly scrollTop: number;
+}
+
 const MINUTES_PER_HOUR = 60;
 /** Under half a pixel off its time a card still stands on it. */
 const STACK_SLACK = 0.5;
@@ -145,4 +162,13 @@ export function stretchedSpan(from: TaskSpan, span: Span, edge: "start" | "end",
 	if (minutesToPx(span.end - span.start, hourPx) - DESIGN.itemGap > DESIGN.cardHeight) return { start: span.start, end: span.end };
 	const unmoved = edge === "start" && from.end === null;
 	return { start: unmoved ? from.start : span.start, end: null };
+}
+
+/** Puts a minute `fraction` down the visible height; one too near the day's first or last hour gets empty room beyond it to stand there all the same. */
+export function scrollPlace(box: ScrollBox, fraction: number): ScrollPlace {
+	const above = fraction * box.visible;
+	const y = box.canvasTop + box.y;
+	const roomTop = Math.max(0, above - y);
+	const roomBottom = Math.max(0, box.visible - above - (box.canvasTop + box.canvasHeight - y));
+	return { roomTop, roomBottom, scrollTop: roomTop + y - above };
 }

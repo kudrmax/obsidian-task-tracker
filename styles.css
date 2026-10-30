@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
- * --tc-len, --tc-x, --tc-stack-end, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
+ * --tc-len, --tc-x, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -220,6 +220,9 @@ body {
 	--tc-item-gap: 2px;
 	/* The bottom of the last task card; the code sets it on the canvas. */
 	--tc-stack-end: 0px;
+	/* Empty room over the day's first hour and under its last; the code sets it on the canvas. */
+	--tc-room-top: 0px;
+	--tc-room-bottom: 0px;
 	--tc-block-pad-top: 11px;
 	--tc-overlay-ring: 2px;
 	--tc-select-ring: 1.5px;
@@ -497,7 +500,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; box-sizing: border-box; padding-bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
 .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); background: linear-gradient(to bottom, transparent, var(--tc-bg) var(--tc-fade-stop)); z-index: var(--tc-layer-fade); pointer-events: none; }
-.tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
+.tc-canvas { position: relative; margin-top: calc(var(--tc-label-lift) + var(--tc-room-top)); margin-bottom: var(--tc-room-bottom); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
 .tc-hour-line { position: absolute; top: var(--tc-y); left: var(--tc-line-left); right: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
