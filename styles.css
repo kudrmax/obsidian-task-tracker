@@ -119,6 +119,8 @@ body {
 	--tc-due-gap: 1px;
 	--tc-fade-card: 24px;
 	--tc-fade-block: 16px;
+	/* The timeline's end fades into the background: solid from this far down the fade. */
+	--tc-fade-stop: 70%;
 	--tc-new-h: calc(var(--tc-card-h) + 2 * var(--tc-space-8));
 	--tc-float-w: 190px;
 	--tc-float-h: 42px;
@@ -252,6 +254,7 @@ body {
 	--tc-layer-drop: 2;
 	--tc-layer-now: 3;
 	--tc-layer-backing: 3;
+	--tc-layer-fade: 3;
 	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
@@ -422,9 +425,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 
 /* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
 /* The scroll box starts a label's lift above the first line, so the hour at its top keeps its whole label, as on the board. */
-/* It ends level with the bottom of the New task button, above Obsidian's phone navigation, so the whole day fits at the smallest zoom. */
-.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+/* It runs to the bottom and fades out there; scrolled to the end, the day ends level with the bottom of the New task button, above Obsidian's phone navigation. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; box-sizing: border-box; padding-bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
+.tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); background: linear-gradient(to bottom, transparent, var(--tc-bg) var(--tc-fade-stop)); z-index: var(--tc-layer-fade); pointer-events: none; }
 .tc-canvas { position: relative; margin-top: var(--tc-label-lift); height: calc(var(--tc-hour) * var(--tc-day-hours)); }
 .tc-hour-label { position: absolute; top: calc(var(--tc-y) - var(--tc-label-lift)); left: 0; width: var(--tc-label-w); text-align: right; font-size: var(--tc-font-hour); line-height: var(--tc-leading-hour); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-hour-label.is-hidden { visibility: hidden; }
