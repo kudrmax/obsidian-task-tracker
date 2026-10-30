@@ -71,10 +71,17 @@ export interface TaskCalendarSettings {
 	readonly staleAfterMinutes: number;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
+	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
+	readonly cardHeight: number;
+	/** Between two cards, px: in the list and in a stack on the timeline alike. */
+	readonly cardGap: number;
 }
 
 export const LIST_WIDTH_MIN = 110;
 export const LIST_WIDTH_MAX = 280;
+export const CARD_HEIGHT_MIN = 28;
+export const CARD_HEIGHT_MAX = 40;
+export const CARD_GAP_MAX = 10;
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -100,6 +107,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ prefix: "p1", color: "red" },
 		{ prefix: "p2", color: "orange" },
 	],
+	cardHeight: 35,
+	cardGap: 2,
 };
 
 /** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */
