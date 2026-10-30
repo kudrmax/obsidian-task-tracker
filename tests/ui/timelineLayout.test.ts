@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, itemBox, layoutColumns, stackTasks, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, itemBox, layoutColumns, stackTasks, stretchedSlot, timeParts } from "../../src/ui/timelineLayout";
 
 describe("layoutColumns", () => {
 	it("gives a lone event the whole width", () => {
@@ -117,5 +117,24 @@ describe("durationParts and timeParts", () => {
 	it("writes a start as the hours over the minutes", () => {
 		expect(timeParts(17 * 60)).toEqual(["17", "00"]);
 		expect(timeParts(9 * 60 + 5)).toEqual(["9", "05"]);
+	});
+});
+
+describe("stretchedSlot", () => {
+	const D = "2026-10-30";
+
+	it("keeps a duration taller than a card", () => {
+		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 930 }, "end", 56)).toEqual({ date: D, start: 840, end: 930 });
+	});
+
+	it("drops a duration of 40 px or less: 45 minutes at 56 px an hour, 15 at 112", () => {
+		expect(stretchedSlot({ date: D, start: 840, end: 960 }, { start: 840, end: 885 }, "end", 56)).toEqual({ date: D, start: 840, end: null });
+		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 870 }, "end", 112)).toEqual({ date: D, start: 840, end: 870 });
+		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 840, end: 855 }, "end", 112)).toEqual({ date: D, start: 840, end: null });
+	});
+
+	it("makes the old start the end when the start dot of a task without a duration is pulled up", () => {
+		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 750, end: 840 }, "start", 56)).toEqual({ date: D, start: 750, end: 840 });
+		expect(stretchedSlot({ date: D, start: 840, end: null }, { start: 825, end: 840 }, "start", 56)).toEqual({ date: D, start: 840, end: null });
 	});
 });

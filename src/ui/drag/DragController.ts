@@ -1,5 +1,6 @@
 import type { TaskItem } from "../../application/contracts";
 import { DESIGN, LAYOUT } from "../design";
+import { stretchedSlot } from "../timelineLayout";
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
@@ -244,7 +245,7 @@ export class DragController {
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
-			const next = this.resized(slot, start, end, edge, timeline);
+			const next = stretchedSlot(slot, { start, end }, edge, timeline.hourPx);
 			const changed = next.start !== slot.start || next.end !== slot.end;
 			if (apply && changed) {
 				this.deps.haptics.tap();
@@ -260,10 +261,4 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private resized(slot: Slot, start: number, end: number, edge: ResizeEdge, timeline: Timeline): Slot {
-		const keepsDuration = timeline.yOf(end) - timeline.yOf(start) - DESIGN.itemGap > DESIGN.cardHeight;
-		if (keepsDuration) return { date: slot.date, start, end };
-		const unmoved = edge === "start" && slot.end === null;
-		return { date: slot.date, start: unmoved ? slot.start : start, end: null };
-	}
 }
