@@ -149,6 +149,10 @@ body {
 	--tc-group-gap: 8px;
 	--tc-menu-icon: 20px;
 	--tc-back-icon: 18px;
+	/* A priority's dot beside the value of Priority, and before a level in its submenu. */
+	--tc-dot-menu: 10px;
+	--tc-dot-level: 12px;
+	--tc-stroke-check: 2.4px;
 	--tc-month-btn: 32px;
 	--tc-month-icon: 18px;
 	--tc-day: 36px;
@@ -559,6 +563,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-menu-row.is-apart { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
 .tc-menu-label { flex: 1; min-width: 0; }
 .tc-menu-value { font-size: var(--tc-font-value); color: var(--tc-muted); }
+.tc-menu-dot { width: var(--tc-dot-menu); height: var(--tc-dot-menu); }
+.tc-level-dot { width: var(--tc-dot-level); height: var(--tc-dot-level); }
+.tc-menu-row svg.tc-menu-check { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
 .tc-menu-row svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-panel .tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-group-gap) solid var(--tc-gap-ink); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }

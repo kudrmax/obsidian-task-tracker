@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf, usablePrefix } from "../src/settings";
+import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf, usableLevels, usablePrefix } from "../src/settings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -47,5 +47,17 @@ describe("priority levels", () => {
 		expect(usablePrefix("!!")).toBe(true);
 		expect(usablePrefix("")).toBe(false);
 		expect(usablePrefix("p 1")).toBe(false);
+	});
+
+	it("drop a level without a usable prefix and the second of two with one prefix", () => {
+		expect(usableLevels([
+			{ prefix: "p1", color: "blue" },
+			{ prefix: "", color: "green" },
+			{ prefix: "p1", color: "red" },
+			{ prefix: "p2", color: "orange" },
+		])).toEqual([
+			{ prefix: "p1", color: "blue" },
+			{ prefix: "p2", color: "orange" },
+		]);
 	});
 });

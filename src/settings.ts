@@ -38,6 +38,11 @@ export function usablePrefix(prefix: string): boolean {
 	return /^\S+$/.test(prefix);
 }
 
+/** The levels that mark tasks: a one-word prefix, the first of two with the same one. */
+export function usableLevels(levels: readonly PriorityLevel[]): readonly PriorityLevel[] {
+	return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+}
+
 export interface TaskCalendarSettings {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;

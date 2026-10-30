@@ -1,7 +1,7 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type RightMode } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode, usableLevels } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
@@ -388,9 +388,11 @@ export class TaskCalendarView extends ItemView {
 			source,
 			lifted,
 			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => tasks.setDueDate(item.key, date)),
+				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: () => this.editSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},

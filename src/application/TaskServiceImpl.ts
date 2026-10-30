@@ -4,7 +4,7 @@ import * as ops from "../domain/operations";
 import { listOn, slottedOn, soonList, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
-import { type PriorityLevel, type TaskCalendarSettings, usablePrefix } from "../settings";
+import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
 	StaleTaskError,
 	TasksFileMissingError,
@@ -190,7 +190,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
-		return settings.priorities.filter((l) => usablePrefix(l.prefix));
+		return usableLevels(settings.priorities);
 	}
 
 	private itemOf(): (entry: TaskEntry) => TaskItem {

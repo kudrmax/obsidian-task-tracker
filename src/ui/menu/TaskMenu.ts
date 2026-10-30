@@ -1,4 +1,5 @@
 import type { TaskItem } from "../../application/contracts";
+import type { PriorityColor, PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
 import { DURATION, tokenMs, tokenPx } from "../design";
 import { clear, el, px } from "../dom";
@@ -7,33 +8,45 @@ import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { Backdrop } from "./Backdrop";
 import { dueOptions } from "./dueOptions";
-import { backRow, menuGroup, type MenuRowSpec, menuRow, placePanel } from "./MenuPanel";
+import { backRow, levelRow, menuGroup, type MenuRowSpec, menuRow, placePanel } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 
-export type MenuRowId = "progress" | "done" | "wontdo" | "due" | "rename" | "delete";
+export type MenuRowId = "progress" | "done" | "wontdo" | "due" | "priority" | "rename" | "delete";
 
 export interface MenuRow {
 	readonly id: MenuRowId;
 	readonly label: string;
 	readonly value: string;
+	readonly dot: PriorityColor | null;
 	readonly icon: MenuIconName;
 	readonly danger: boolean;
 }
 
 /** The three groups of the task menu, as the board lists them. */
 export function menuRows(item: TaskItem): readonly (readonly MenuRow[])[] {
-	const row = (id: MenuRowId, label: string, icon: MenuIconName, value = "", danger = false): MenuRow => ({ id, label, value, icon, danger });
+	const row = (id: MenuRowId, label: string, icon: MenuIconName, value = "", danger = false): MenuRow => ({ id, label, value, dot: null, icon, danger });
+	const priority: MenuRow = { ...row("priority", "Priority", "priority", item.priority?.prefix ?? ""), dot: item.priority?.color ?? null };
 	return [
 		[row("progress", item.status === "inProgress" ? "Stop progress" : "In progress", "progress"), row("done", "Done", "done"), row("wontdo", "Won’t do", "wontdo")],
-		[row("due", "Due date", "due", item.dueDate ? dayMonth(item.dueDate) : ""), row("rename", "Rename", "rename")],
+		[row("due", "Due date", "due", item.dueDate ? dayMonth(item.dueDate) : ""), priority, row("rename", "Rename", "rename")],
 		[row("delete", "Delete", "delete", "", true)],
 	];
+}
+
+export interface LevelRow extends PriorityLevel {
+	readonly on: boolean;
+}
+
+/** The priority submenu's levels, in the settings' order, the task's own checked. */
+export function priorityRows(item: TaskItem, levels: readonly PriorityLevel[]): readonly LevelRow[] {
+	return levels.map((level) => ({ prefix: level.prefix, color: level.color, on: level.prefix === item.priority?.prefix }));
 }
 
 export interface MenuActions {
 	setStatus(status: TaskStatus): Promise<void>;
 	setDueDate(date: LocalDate | null): Promise<void>;
+	setPriority(prefix: string | null): Promise<void>;
 	rename(): void;
 	remove(): Promise<void>;
 }
@@ -43,6 +56,8 @@ export interface TaskMenuContext {
 	/** The card or block tapped; a copy of it stays over the backdrop, grown only to show a title the card cuts. */
 	readonly source: HTMLElement;
 	readonly today: LocalDate;
+	/** The priority levels the submenu offers. */
+	readonly levels: readonly PriorityLevel[];
 	readonly actions: MenuActions;
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
@@ -106,10 +121,11 @@ export class TaskMenu {
 			done: this.pick(() => actions.setStatus("done")),
 			wontdo: this.pick(() => actions.setStatus("cancelled")),
 			due: () => this.showDue(),
+			priority: () => this.showPriority(),
 			rename: this.pick(() => actions.rename()),
 			delete: this.pick(() => actions.remove()),
 		};
-		for (const group of menuRows(item)) menuGroup(this.panel, group.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, danger: row.danger, onPick: handlers[row.id] })));
+		for (const group of menuRows(item)) menuGroup(this.panel, group.map((row): MenuRowSpec => ({ label: row.label, value: row.value, dot: row.dot, icon: row.icon, danger: row.danger, onPick: handlers[row.id] })));
 		this.place();
 	}
 
@@ -127,6 +143,19 @@ export class TaskMenu {
 			{ label: "Pick a date", value: options.pick.label, onPick: () => this.showPicker() },
 		]);
 		if (options.canRemove) menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.setDueDate(null)) }, "tc-menu-row is-tall is-apart");
+		this.place();
+	}
+
+	private showPriority(): void {
+		clear(this.panel);
+		this.panel.classList.remove("is-picker");
+		const { item, actions, levels } = this.context;
+		backRow(this.panel, "Priority", () => this.showMenu());
+		const group = el(this.panel, "div", "tc-menu-group");
+		for (const level of priorityRows(item, levels)) {
+			levelRow(group, { color: level.color, label: level.prefix, on: level.on, onPick: this.pick(() => actions.setPriority(level.prefix)) });
+		}
+		if (item.priority) menuRow(this.panel, { label: "Remove priority", icon: "removeDue", onPick: this.pick(() => actions.setPriority(null)) }, "tc-menu-row is-tall is-apart");
 		this.place();
 	}
 
