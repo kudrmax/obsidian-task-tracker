@@ -425,3 +425,42 @@ describe("groups", () => {
 		expect(groupIndex(d, "now", "Y")).toBe(-1);
 	});
 });
+
+describe("groups spaced by blank lines, as written by hand", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const SPACED = "## Now\n- [ ] U\n\n### A\n- [ ] a\n\n### B\n- [ ] b\n\n### C\n- [ ] c\n\n## Soon\n- [ ] S\n";
+	const blanks = (text: string) => text.split("\n").filter((l) => l === "").length;
+
+	it("removing sections one by one piles up no blank lines", () => {
+		const one = removeGroup(parseG(SPACED), "now", "A");
+		expect(one.serialize()).toBe("## Now\n- [ ] U\n- [ ] a\n\n### B\n- [ ] b\n\n### C\n- [ ] c\n\n## Soon\n- [ ] S\n");
+		const two = removeGroup(one, "now", "B");
+		expect(two.serialize()).toBe("## Now\n- [ ] U\n- [ ] a\n- [ ] b\n\n### C\n- [ ] c\n\n## Soon\n- [ ] S\n");
+		const three = renameGroup(two, "now", "C", "No section", "No section");
+		expect(three.serialize()).toBe("## Now\n- [ ] U\n- [ ] a\n- [ ] b\n- [ ] c\n\n## Soon\n- [ ] S\n");
+	});
+
+	it("moving a section away and back keeps the blank lines", () => {
+		const d = parseG(SPACED);
+		const back = moveGroupTo(moveGroupTo(d, "now", "A", "end"), "now", "A", { before: "B" });
+		expect(blanks(back.serialize())).toBe(blanks(SPACED));
+		const lastUp = moveGroupTo(moveGroupTo(d, "now", "C", { before: "A" }), "now", "C", "end");
+		expect(blanks(lastUp.serialize())).toBe(blanks(SPACED));
+	});
+
+	it("an emptied last section goes with the blank line before it", () => {
+		const d = parseG("## Now\n- [ ] U\n\n### A\n- [ ] a 📅 2026-11-03\n\n## Soon\n");
+		expect(normalize(d, T).serialize()).toBe("## Now\n- [ ] U\n- [ ] a 📅 2026-11-03\n\n## Soon\n");
+	});
+
+	it("a top block of blank lines only: a section put above No section moves alone, no other section dissolves", () => {
+		const d = parseG("## Now\n\n### A\n- [ ] a\n- [ ] a2\n\n### B\n- [ ] b\n");
+		const moved = normalize(moveGroupTo(d, "now", "B", { before: null }), T);
+		expect(moved.groups("now").map((g) => [g.name, g.entries.map((e) => e.task.text)])).toEqual([
+			[null, []],
+			["B", ["b"]],
+			["A", ["a", "a2"]],
+		]);
+	});
+});

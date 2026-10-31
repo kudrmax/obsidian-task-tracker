@@ -203,7 +203,8 @@ export function moveGroupTo(doc: TaskDocument, list: GroupedList, group: GroupNa
 	const before = place === "end" ? doc.groups(list).length : groupIndex(doc, list, place.before);
 	if (before === from) return doc;
 	if (before > 0) return doc.moveGroup(list, from, before);
-	return doc.moveGroup(list, from, 1).moveGroup(list, 0, 2);
+	const moved = doc.moveGroup(list, from, 1);
+	return doc.groups(list)[0].entries.length === 0 ? moved : moved.moveGroup(list, 0, 2);
 }
 
 /** A blank or unchanged name does nothing; the No section name hands the tasks over to it; a twin name merges (rule 6). */

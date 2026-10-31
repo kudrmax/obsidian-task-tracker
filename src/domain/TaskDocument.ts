@@ -191,14 +191,14 @@ export class TaskDocument {
 		if (before < 1) throw new Error("No group goes above the tasks outside any section");
 		if (before === from || before === from + 1) return this;
 		const block = this.blockOf(section, from);
-		const first = block.headingLine ?? this.firstFilled(block);
-		const last = this.lastFilled(block);
-		const moved = this.lines.slice(first, last);
-		if (block.headingLine === null) moved.unshift(`### ${this.ungroupedName()}`);
-		const target = this.groupStartLine(section, before);
-		const lines = this.splice(first, last - first, []);
-		lines.splice(target > first ? target - (last - first) : target, 0, ...moved);
-		return this.withLines(lines);
+		const content = this.contentOf(block);
+		const core = this.lines.slice(block.headingLine ?? content.first, content.last);
+		if (block.headingLine === null) core.unshift(`### ${this.ungroupedName()}`);
+		const cut = this.cutOf(section, from);
+		const apart = Array<string>(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
+		const last = before === this.blockLists.get(section)!.length;
+		const moved = last ? [...apart, ...core] : [...core, ...apart];
+		return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved));
 	}
 
 	renameGroup(section: SectionKey, index: number, name: string): TaskDocument {
@@ -210,15 +210,9 @@ export class TaskDocument {
 	/** What group `from` holds goes to the start or the end of the tasks of group `into`; the heading of `from` goes. */
 	mergeGroup(section: SectionKey, from: number, into: number, at: "start" | "end"): TaskDocument {
 		if (from === into) throw new Error("A group merges into another one");
-		const block = this.blockOf(section, from);
-		const first = this.firstFilled(block);
-		const last = this.lastFilled(block);
-		const removeFrom = block.headingLine ?? first;
-		const content = this.lines.slice(first, last);
-		const target = this.groupInsertionLine(section, into, at);
-		const lines = this.splice(removeFrom, last - removeFrom, []);
-		lines.splice(target > removeFrom ? target - (last - removeFrom) : target, 0, ...content);
-		return this.withLines(lines);
+		const content = this.contentOf(this.blockOf(section, from));
+		const moved = this.lines.slice(content.first, content.last);
+		return this.withLines(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved));
 	}
 
 	/** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
@@ -226,9 +220,8 @@ export class TaskDocument {
 		const group = this.groups(section)[index];
 		const block = this.blockOf(section, index);
 		if (!group?.blank || block.headingLine === null) throw new Error("Only an empty section is deleted");
-		const isLast = index === this.groups(section).length - 1;
-		const count = isLast ? 1 : block.end - block.headingLine;
-		return this.withLines(this.splice(block.headingLine, count, []));
+		const cut = this.cutOf(section, index);
+		return this.withLines(this.splice(cut.from, cut.to - cut.from, []));
 	}
 
 	ensureSections(all: readonly string[]): TaskDocument {
@@ -310,6 +303,37 @@ export class TaskDocument {
 		const block = this.blockLists.get(section)?.[index];
 		if (!block) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
 		return block;
+	}
+
+	/** A block's filled lines under its heading, from the first to past the last; empty, at its start, when all are blank. */
+	private contentOf(block: Block): { first: number; last: number } {
+		const first = this.firstFilled(block);
+		if (first === block.end) return { first: block.start, last: block.start };
+		return { first, last: this.lastFilled(block) };
+	}
+
+	/**
+	 * The lines a block takes with it when it leaves: its heading, its lines and the blank lines under them. The last
+	 * block of a list leaves its blank lines to part the list from the next one and takes those above it instead, so
+	 * a block cut anywhere leaves the blank lines around it as they were.
+	 */
+	private cutOf(section: SectionKey, index: number): { from: number; to: number } {
+		const block = this.blockOf(section, index);
+		const content = this.contentOf(block);
+		const start = block.headingLine ?? content.first;
+		if (index < this.blockLists.get(section)!.length - 1) return { from: start, to: block.end };
+		let from = start;
+		const top = this.sections.get(section)!.firstLine;
+		while (from > top && this.lines[from - 1].trim() === "") from--;
+		return { from, to: Math.max(start, content.last) };
+	}
+
+	/** Removes the cut and puts `moved` in at `target`, a line of the document before the cut. */
+	private cutAndInsert(cut: { from: number; to: number }, target: number, moved: readonly string[]): string[] {
+		const size = cut.to - cut.from;
+		const lines = this.splice(cut.from, size, []);
+		lines.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved);
+		return lines;
 	}
 
 	/** The first line under the block's heading that is not blank; its end when there is none. */
