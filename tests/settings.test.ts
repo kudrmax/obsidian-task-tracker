@@ -37,14 +37,16 @@ describe("groups", () => {
 });
 
 describe("the device's part of the settings", () => {
-	it("keeps the divider's place and the column shown apart from what the file holds", () => {
-		expect(partition({ listShare: 0.4, rightMode: "soon", longPressMs: 300 })).toEqual({ device: { listShare: 0.4, rightMode: "soon" }, shared: { longPressMs: 300 } });
+	it("keeps the divider's place, the column shown and the zoom apart from what the file holds", () => {
+		expect(partition({ listShare: 0.4, rightMode: "soon", zoom: 112, longPressMs: 300 })).toEqual({ device: { listShare: 0.4, rightMode: "soon", zoom: 112 }, shared: { longPressMs: 300 } });
+		expect(partition({ zoom: "wholeDay" }).device).toEqual({ zoom: "wholeDay" });
 	});
 
 	it("leaves them out of what is written to the file", () => {
 		const shared = sharedOf(DEFAULT_SETTINGS) as Record<string, unknown>;
 		expect("listShare" in shared).toBe(false);
 		expect("rightMode" in shared).toBe(false);
+		expect("zoom" in shared).toBe(false);
 		expect(shared.google).toEqual(DEFAULT_SETTINGS.google);
 	});
 });

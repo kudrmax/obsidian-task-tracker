@@ -7,6 +7,9 @@ export interface ZoomLevel {
 	readonly hourPx: number;
 }
 
+/** Where the timeline was zoomed to: an hour's height, or the whole day, whatever the screen's height. */
+export type Zoom = number | "wholeDay";
+
 export interface SectionNames {
 	readonly inbox: string;
 	readonly now: string;
@@ -67,6 +70,8 @@ export interface TaskCalendarSettings {
 	readonly google: GoogleSettings;
 	readonly longPressMs: number;
 	readonly zoomLevels: readonly ZoomLevel[];
+	/** The zoom a pinch last settled on: the timeline opens at it. */
+	readonly zoom: Zoom;
 	/** The hour a day other than today scrolls to when opened. */
 	readonly scrollToHour: number;
 	/** The hour one day ends and the next begins, 0..23: today, the due dates and the timeline count from it. */
@@ -101,6 +106,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
 	longPressMs: 250,
+	zoom: 56,
 	zoomLevels: [
 		{ hourPx: 28 },
 		{ hourPx: 56 },
@@ -121,8 +127,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	cardGap: 2,
 };
 
-/** What belongs to the device, not the vault: the divider's place and the column shown are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listShare", "rightMode"] as const;
+/** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
+export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const;
 export type DeviceKey = (typeof DEVICE_KEYS)[number];
 export type DeviceState = Pick<TaskCalendarSettings, DeviceKey>;
 export type SharedSettings = Omit<TaskCalendarSettings, DeviceKey>;
@@ -140,7 +146,7 @@ export function partition(patch: Partial<TaskCalendarSettings>): { device: Parti
 
 /** The settings without the device's part: what the synced file holds. */
 export function sharedOf(settings: TaskCalendarSettings): SharedSettings {
-	const { listShare: _s, rightMode: _m, ...shared } = settings;
+	const { listShare: _s, rightMode: _m, zoom: _z, ...shared } = settings;
 	return shared;
 }
 

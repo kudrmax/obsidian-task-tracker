@@ -168,6 +168,7 @@ export class TaskCalendarView extends ItemView {
 		const root = this.contentEl;
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
+		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
@@ -404,6 +405,13 @@ export class TaskCalendarView extends ItemView {
 		return levelsFor(this.timeline?.wholeDayHourPx() ?? Math.min(...configured.map((l) => l.hourPx)), configured);
 	}
 
+	/** The timeline opens at the zoom it was left at; the whole day takes its height once the timeline is laid out. */
+	private restoreZoom(): void {
+		const zoom = this.settings.zoom;
+		this.wholeDay = zoom === "wholeDay";
+		if (typeof zoom === "number" && zoom > 0) this.hourPx = zoom;
+	}
+
 	/** Zoomed out to the whole day, the day keeps fitting when the timeline's height changes; a timeline grown past its day zooms in to fill it. */
 	private fitWholeDay(): void {
 		const whole = this.timeline?.wholeDayHourPx() ?? null;
@@ -424,7 +432,7 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** Released, the scale glides to the nearest level. */
+	/** Released, the scale glides to the nearest level, and the timeline opens at it next time. */
 	private settleZoom(from: number, anchor: ZoomAnchor): void {
 		const levels = this.zoomLevels();
 		const to = nearestLevel(from, levels).hourPx;
@@ -436,6 +444,7 @@ export class TaskCalendarView extends ItemView {
 			this.hourPx = from + (to - from) * eased;
 			this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
 			this.zoomFrame = t < 1 ? requestAnimationFrame(frame) : 0;
+			if (t === 1) void this.deps.settings.update({ zoom: this.wholeDay ? "wholeDay" : to });
 		};
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
