@@ -15,18 +15,27 @@ const CARDS: PlacedCard[] = [
 ].map((c, i) => ({ ...c, top: i * STEP, height: H }));
 
 describe("placeAt", () => {
+	const gap = (index: number) => ({ kind: "gap", index, level: 0 }) as const;
+
 	it("opens the gap where the finger is, at the level its edge picks within what the neighbours allow", () => {
-		expect(placeAt(CARDS, 2 * STEP - 1, 1, STEP)).toEqual({ kind: "gap", index: 2, level: 1 });
-		expect(placeAt(CARDS, 2 * STEP - 1, 5, STEP)).toEqual({ kind: "gap", index: 2, level: 2 });
-		expect(placeAt(CARDS, 2 * STEP - 1, -3, STEP)).toEqual({ kind: "gap", index: 2, level: 1 });
-		expect(placeAt(CARDS, 4 * STEP - 1, 0.4, STEP)).toEqual({ kind: "gap", index: 4, level: 0 });
-		expect(placeAt(CARDS, -10, 3, STEP)).toEqual({ kind: "gap", index: 0, level: 0 });
-		expect(placeAt(CARDS, 9 * STEP, 9, STEP)).toEqual({ kind: "gap", index: 5, level: 1 });
+		expect(placeAt(CARDS, 2 * STEP - 1, 1, STEP, gap(5))).toEqual({ kind: "gap", index: 2, level: 1 });
+		expect(placeAt(CARDS, 2 * STEP - 1, 5, STEP, gap(5))).toEqual({ kind: "gap", index: 2, level: 2 });
+		expect(placeAt(CARDS, 2 * STEP - 1, -3, STEP, gap(5))).toEqual({ kind: "gap", index: 2, level: 1 });
+		expect(placeAt(CARDS, -10, 3, STEP, gap(5))).toEqual({ kind: "gap", index: 0, level: 0 });
+		expect(placeAt(CARDS, 9 * STEP, 9, STEP, gap(5))).toEqual({ kind: "gap", index: 5, level: 1 });
 	});
 
-	it("takes the card in when the finger is over its middle as it stands, the gap open before it or not", () => {
-		expect(placeAt(CARDS, 4 * STEP + H * 0.6, 0, STEP)).toEqual({ kind: "into", index: 4 });
-		expect(placeAt(CARDS, 4 * STEP + H * 0.4, 0, STEP)).toEqual({ kind: "gap", index: 4, level: 0 });
+	it("keeps the gap where the card was lifted while the finger stays about there", () => {
+		const lifted = 4 * STEP + H / 2;
+		expect(placeAt(CARDS, lifted + 3, 0, STEP, gap(4))).toEqual(gap(4));
+		expect(placeAt(CARDS, lifted - 3, 0, STEP, gap(4))).toEqual(gap(4));
+	});
+
+	it("takes a card in over its middle as it stands, and opens the gap on past it", () => {
+		expect(placeAt(CARDS, 4 * STEP + H / 2 + STEP, 0, STEP, gap(4))).toEqual({ kind: "into", index: 4 });
+		expect(placeAt(CARDS, 4 * STEP + H * 0.3, 0, STEP, { kind: "into", index: 4 })).toEqual({ kind: "into", index: 4 });
+		expect(placeAt(CARDS, 4 * STEP + H * 0.9, 0, STEP, { kind: "into", index: 4 })).toEqual(gap(5));
+		expect(placeAt(CARDS, 4 * STEP + H * 0.1, 0, STEP, { kind: "into", index: 4 })).toEqual(gap(4));
 	});
 });
 

@@ -18,7 +18,8 @@ interface Measured {
  */
 export class ListDrop implements DropTarget {
 	private measured: Measured[] | null = null;
-	private place: ListPlace = { kind: "gap", index: 0, level: 0 };
+	/** What the list shows; a drag in its own list starts with the gap where the card was. */
+	private place: ListPlace | null = null;
 	private gap: HTMLElement | null = null;
 
 	constructor(
@@ -56,7 +57,7 @@ export class ListDrop implements DropTarget {
 		const reorder = drag.from === this.column;
 		const level = (x - drag.grabX - this.baseLeft()) / this.indent();
 		const card = shownCardSize();
-		const place: ListPlace = reorder ? placeAt(this.placed(), y, level, card.height + card.gap) : { kind: "gap", index: cards.length, level: 0 };
+		const place: ListPlace = reorder ? placeAt(this.placed(), y, level, card.height + card.gap, this.place ?? this.liftedFrom()) : { kind: "gap", index: cards.length, level: 0 };
 		this.place = place;
 		cards.forEach(({ entry }, i) => {
 			entry.card.classList.toggle("is-shifted", reorder && place.kind === "gap" && i >= place.index);
@@ -66,7 +67,7 @@ export class ListDrop implements DropTarget {
 	}
 
 	landing(): DOMRect | null {
-		if (!this.measured) return null;
+		if (!this.measured || !this.place) return null;
 		const cards = this.measured;
 		if (this.place.kind === "into") return cards[this.place.index].rect;
 		const card = shownCardSize();
@@ -84,14 +85,22 @@ export class ListDrop implements DropTarget {
 		for (const entry of this.list.cards) entry.card.classList.remove("is-shifted", "is-target");
 		this.showGap(null);
 		this.measured = null;
-		this.place = { kind: "gap", index: 0, level: 0 };
+		this.place = null;
 	}
 
 	drop(_x: number, _y: number, drag: DragPayload): DropResult | null {
 		if (!this.accepts(drag)) return null;
 		if (drag.from !== this.column) return { kind: "listBefore", before: null, column: this.column };
+		if (!this.place) return null;
 		const result = resultOf(this.placed(), this.place);
 		return result.kind === "task" ? { kind: "listBefore", before: result.before, column: this.column } : { kind: "nest", parent: result.parent, before: result.before };
+	}
+
+	/** The gap where the dragged card stood: the cards before it stay above. */
+	private liftedFrom(): ListPlace {
+		const all = this.list.cards;
+		const at = all.findIndex((entry) => entry.card.classList.contains("is-lifted"));
+		return at < 0 ? { kind: "gap", index: this.cards().length, level: 0 } : { kind: "gap", index: at, level: all[at].level };
 	}
 
 	private placed(): PlacedCard[] {
