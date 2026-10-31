@@ -232,3 +232,50 @@ describe("groups inside a list", () => {
 		expect(d.groups("now").map((g) => [g.name, g.blank])).toEqual([[null, true], ["X", true], ["Y", false], ["Z", false]]);
 	});
 });
+
+describe("group blocks", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+
+	it("adds a group before another and at the end", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n\n## Soon\n");
+		expect(d.addGroup("now", "Y", 2).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n\n## Soon\n");
+		expect(d.addGroup("now", "Y", 1).serialize()).toBe("## Now\n- [ ] A\n### Y\n### X\n- [ ] B\n\n## Soon\n");
+		expect(parseG("## Now\n\n## Soon\n").addGroup("now", "Y", 1).serialize()).toBe("## Now\n### Y\n\n## Soon\n");
+		expect(() => d.addGroup("now", "Y", 0)).toThrow();
+	});
+
+	it("moves the headless top block down under the ungrouped heading", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(d.moveGroup("now", 0, 2).serialize()).toBe("## Now\n### X\n- [ ] B\n### No section\n- [ ] A\n");
+	});
+
+	it("moves a group up, children and text with it", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n  - child\nnote\n\n## Soon\n");
+		expect(d.moveGroup("now", 2, 1).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n  - child\nnote\n### X\n- [ ] B\n\n## Soon\n");
+		expect(d.moveGroup("now", 1, 3).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n  - child\nnote\n### X\n- [ ] B\n\n## Soon\n");
+		expect(d.moveGroup("now", 1, 2).serialize()).toBe(d.serialize());
+	});
+
+	it("merges a group into the end of another and drops its heading", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n- [ ] D\n\n## Soon\n");
+		expect(d.mergeGroup("now", 2, 1, "end").serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n- [ ] D\n\n## Soon\n");
+		expect(d.mergeGroup("now", 1, 0, "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n### Y\n- [ ] C\n- [ ] D\n\n## Soon\n");
+	});
+
+	it("merges the top tasks into the start of the ungrouped heading group", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### No section\n- [ ] C\n");
+		expect(d.mergeGroup("now", 0, 2, "start").serialize()).toBe("## Now\n### X\n- [ ] B\n### No section\n- [ ] A\n- [ ] C\n");
+	});
+
+	it("renames a group's heading", () => {
+		expect(parseG("## Now\n### X\n- [ ] B\n").renameGroup("now", 1, "Вечер").serialize()).toBe("## Now\n### Вечер\n- [ ] B\n");
+	});
+
+	it("deletes a blank group with its blank lines; refuses one with text", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### Z\n\n## Soon\n");
+		expect(d.deleteGroup("now", 1).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] B\n### Z\n\n## Soon\n");
+		expect(d.deleteGroup("now", 3).serialize()).toBe("## Now\n- [ ] A\n### X\n\n### Y\n- [ ] B\n\n## Soon\n");
+		expect(() => d.deleteGroup("now", 2)).toThrow();
+	});
+});

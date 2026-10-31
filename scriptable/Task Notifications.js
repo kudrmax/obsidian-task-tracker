@@ -358,6 +358,52 @@ var TaskDocument = class _TaskDocument {
     const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
     return without.withLines(without.splice(target, 0, moved));
   }
+  /** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
+  addGroup(section, name, before) {
+    if (before < 1) throw new Error("No group goes above the tasks outside any section");
+    return this.withLines(this.splice(this.groupStartLine(section, before), 0, [`### ${name}`]));
+  }
+  /** Group `from` goes before group `before`. The top block moved down gets the heading of the tasks outside any section. */
+  moveGroup(section, from, before) {
+    if (before < 1) throw new Error("No group goes above the tasks outside any section");
+    if (before === from || before === from + 1) return this;
+    const block = this.blockOf(section, from);
+    const first = block.headingLine ?? this.firstFilled(block);
+    const last = this.lastFilled(block);
+    const moved = this.lines.slice(first, last);
+    if (block.headingLine === null) moved.unshift(`### ${this.ungroupedName()}`);
+    const target = this.groupStartLine(section, before);
+    const lines = this.splice(first, last - first, []);
+    lines.splice(target > first ? target - (last - first) : target, 0, ...moved);
+    return this.withLines(lines);
+  }
+  renameGroup(section, index, name) {
+    const line = this.blockOf(section, index).headingLine;
+    if (line === null) throw new Error("The tasks outside any section have no heading");
+    return this.withLines(this.splice(line, 1, [`### ${name}`]));
+  }
+  /** What group `from` holds goes to the start or the end of the tasks of group `into`; the heading of `from` goes. */
+  mergeGroup(section, from, into, at) {
+    if (from === into) throw new Error("A group merges into another one");
+    const block = this.blockOf(section, from);
+    const first = this.firstFilled(block);
+    const last = this.lastFilled(block);
+    const removeFrom = block.headingLine ?? first;
+    const content = this.lines.slice(first, last);
+    const target = this.groupInsertionLine(section, into, at);
+    const lines = this.splice(removeFrom, last - removeFrom, []);
+    lines.splice(target > removeFrom ? target - (last - removeFrom) : target, 0, ...content);
+    return this.withLines(lines);
+  }
+  /** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
+  deleteGroup(section, index) {
+    const group = this.groups(section)[index];
+    const block = this.blockOf(section, index);
+    if (!group?.blank || block.headingLine === null) throw new Error("Only an empty section is deleted");
+    const isLast = index === this.groups(section).length - 1;
+    const count2 = isLast ? 1 : block.end - block.headingLine;
+    return this.withLines(this.splice(block.headingLine, count2, []));
+  }
   ensureSections(all) {
     const present = new Set(this.headingNames());
     const missing = all.filter((name) => !present.has(name));
@@ -407,6 +453,43 @@ var TaskDocument = class _TaskDocument {
     if (group.entries.length === 0) return block.start;
     if (position === "start") return this.spans.get(group.entries[0]).line;
     return this.lineAfter(group.entries[group.entries.length - 1]);
+  }
+  groupInsertionLine(section, index, at) {
+    const group = this.groups(section)[index];
+    if (!group) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
+    if (group.entries.length === 0) return this.blockOf(section, index).start;
+    return at === "start" ? this.spans.get(group.entries[0]).line : this.lineAfter(group.entries[group.entries.length - 1]);
+  }
+  /** Where group `index` begins; the number of groups: after the list's last filled line. */
+  groupStartLine(section, index) {
+    const blocks = this.blockLists.get(section);
+    if (!blocks) throw new Error(`Section missing: ${this.names[section]}`);
+    if (index < blocks.length) return blocks[index].headingLine ?? blocks[index].start;
+    const list = this.sections.get(section);
+    let line = list.endLine;
+    while (line > list.firstLine && this.lines[line - 1].trim() === "") line--;
+    return line;
+  }
+  blockOf(section, index) {
+    const block = this.blockLists.get(section)?.[index];
+    if (!block) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
+    return block;
+  }
+  /** The first line under the block's heading that is not blank; its end when there is none. */
+  firstFilled(block) {
+    let line = block.start;
+    while (line < block.end && this.lines[line].trim() === "") line++;
+    return line;
+  }
+  /** Past the block's last line that is not blank: the blank lines after it stay where they are. */
+  lastFilled(block) {
+    let line = block.end;
+    while (line > block.start && this.lines[line - 1].trim() === "") line--;
+    return line;
+  }
+  ungroupedName() {
+    if (this.names.ungrouped === void 0) throw new Error("No name for the tasks outside any section");
+    return this.names.ungrouped;
   }
   lineAfter(entry) {
     const span = this.spans.get(entry);
