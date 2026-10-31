@@ -1,7 +1,7 @@
 import type { CalendarEvent, DayBoundary, TaskItem, TaskKey } from "../application/contracts";
 import { paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
-import { formatTime, minutesOf } from "./dates";
+import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority, renderProgress } from "./TaskCard";
@@ -193,7 +193,7 @@ export class Timeline {
 		clear(this.itemsEl);
 		this.stretch = null;
 		const boundary = this.deps.boundary();
-		this.hours.forEach(({ label }, index) => (label.textContent = String(boundary.hourAt(index))));
+		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
 		const events = this.deps.events().filter((e) => !e.allDay);
 		const spans = events.map((e) => this.eventSpan(e));
 		const boxes = layoutColumns(spans);

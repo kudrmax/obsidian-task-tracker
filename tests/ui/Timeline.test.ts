@@ -30,10 +30,10 @@ function minorLabels(view: Timeline): string[] {
 describe("a day that starts at 4", () => {
 	const late: TaskItem = { key: { section: "now", index: 0, path: [], raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, priority: null, subtasks: [], progress: null, parentText: null, group: null };
 
-	it("labels the hours from 4 round to 4 the next morning", () => {
+	it("labels the hours from 04 round to 04 the next morning, two digits each", () => {
 		const labels = [...timeline({ hourPx: 56 }, new DayBoundary(4)).canvas.querySelectorAll(".tc-hour-label")].map((l) => l.textContent);
-		expect(labels.slice(0, 2)).toEqual(["4", "5"]);
-		expect(labels.slice(-5)).toEqual(["0", "1", "2", "3", "4"]);
+		expect(labels.slice(0, 2)).toEqual(["04", "05"]);
+		expect(labels.slice(-5)).toEqual(["00", "01", "02", "03", "04"]);
 	});
 
 	it("places a slot after midnight below the evening, a pixel under its line", () => {
@@ -92,13 +92,13 @@ describe("hour labels by the now line", () => {
 	}
 
 	it("hides only the label the now pill covers, however small the hour", () => {
-		expect(hidden(20, 0, 52)).toEqual(["1"]);
-		expect(hidden(56, 0, 52)).toEqual(["1"]);
+		expect(hidden(20, 0, 52)).toEqual(["01"]);
+		expect(hidden(56, 0, 52)).toEqual(["01"]);
 	});
 
 	it("hides the label the pill touches from either side", () => {
-		expect(hidden(20, 0, 38)).toEqual(["0", "1"]);
-		expect(hidden(56, 0, 14)).toEqual(["0"]);
+		expect(hidden(20, 0, 38)).toEqual(["00", "01"]);
+		expect(hidden(56, 0, 14)).toEqual(["00"]);
 		expect(hidden(56, 0, 17)).toEqual([]);
 	});
 });
