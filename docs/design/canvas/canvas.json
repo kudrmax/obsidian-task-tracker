@@ -17,6 +17,10 @@
     {
       "id": "headers25",
       "name": "Заголовки #25"
+    },
+    {
+      "id": "sections",
+      "name": "Секции"
     }
   ],
   "boards": {
@@ -1075,6 +1079,62 @@
       "y": 1084,
       "page": "headers25",
       "title": "Принято: Soon и Now, длинная дата"
+    },
+    "SecFinal.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 2600,
+      "y": 0,
+      "page": "sections",
+      "title": "Компонент экранов секций (его показывают доски «Секции»)"
+    },
+    "SecFlow1.dc.html": {
+      "h": 1076,
+      "w": 1928,
+      "x": 0,
+      "y": 0,
+      "page": "sections",
+      "title": "1. Секции в списке"
+    },
+    "SecFlow2.dc.html": {
+      "h": 1076,
+      "w": 2398,
+      "x": 0,
+      "y": 1276,
+      "page": "sections",
+      "title": "2. Завести секцию броском"
+    },
+    "SecFlow3.dc.html": {
+      "h": 1076,
+      "w": 1458,
+      "x": 0,
+      "y": 2552,
+      "page": "sections",
+      "title": "3. Задачи и секции перетаскиванием"
+    },
+    "SecFlow4.dc.html": {
+      "h": 1076,
+      "w": 1128,
+      "x": 0,
+      "y": 3828,
+      "page": "sections",
+      "title": "4. Заголовок секции: меню и имя"
+    },
+    "SecFlowLight.dc.html": {
+      "h": 1076,
+      "w": 1458,
+      "x": 0,
+      "y": 5104,
+      "page": "sections",
+      "title": "Светлая тема"
+    },
+    "SecSettings.dc.html": {
+      "h": 1076,
+      "w": 1128,
+      "x": 0,
+      "y": 6380,
+      "page": "sections",
+      "title": "Настройки: раздел Sections"
     }
   },
   "createdOnFiles": {
@@ -1110,7 +1170,8 @@
     "step13tasks",
     "tasksRules",
     "tasksTitle",
-    "tasksRulesProd"
+    "tasksRulesProd",
+    "sectionsTitle"
   ],
   "notes": {
     "main": {
@@ -1326,6 +1387,14 @@
       "w": 240,
       "x": 0,
       "y": -300
+    },
+    "sectionsTitle": {
+      "kind": "title1",
+      "maxW": 2398,
+      "page": "sections",
+      "text": "Секции внутри списков: заводятся броском, пустых не бывает (принято Максом 31.10)",
+      "x": 0,
+      "y": -300
     }
   },
   "order": [
@@ -1460,7 +1529,14 @@
     "Headers25BottomInbox.dc.html",
     "Headers25BottomSoon.dc.html",
     "Headers25BottomCal.dc.html",
-    "Headers25BottomLong.dc.html"
+    "Headers25BottomLong.dc.html",
+    "SecFinal.dc.html",
+    "SecFlow1.dc.html",
+    "SecFlow2.dc.html",
+    "SecFlow3.dc.html",
+    "SecFlow4.dc.html",
+    "SecFlowLight.dc.html",
+    "SecSettings.dc.html"
   ],
   "title": "Task Calendar"
 }

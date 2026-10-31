@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Секции: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<dc-import name="Screen" theme="{{theme}}" right-mode="{{mode}}" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<sc-for list="{{cols}}" as="col" hint-placeholder-count="1">
+<div style="position: absolute; left: {{col.x0}}px; top: 166px; width: 187px; height: 554px; overflow: hidden; background: {{c.bg}}; z-index: 3;">
+<sc-for list="{{col.items}}" as="it" hint-placeholder-count="8">
+
+<sc-if value="{{it.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{it.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{it.title}}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isHeader}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: {{it.height}}px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; gap: 8px; white-space: nowrap; overflow: hidden;">
+<span style="flex-shrink: 1; min-width: 0; overflow: hidden; font-size: 13px; line-height: 20px; font-weight: 600; color: {{it.color}};">{{it.name}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isField}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; background: {{c.card}}; box-shadow: inset 0 0 0 1.5px {{c.accent}}; padding: 0 14px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; font-size: 15px; font-weight: 600;">
+<sc-if value="{{it.selected}}" hint-placeholder-val="{{false}}"><span style="background: {{c.selection}}; border-radius: 2px;">{{it.value}}</span></sc-if>
+<sc-if value="{{it.empty}}" hint-placeholder-val="{{false}}"><span style="width: 2px; height: 20px; background: {{c.accent}}; border-radius: 1px; margin-right: 1px;"></span><span style="color: {{c.muted}}; font-weight: 400;">Section name</span></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isGap}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}};"></div>
+</sc-if>
+
+<sc-if value="{{it.isNewTask}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}}; padding: 0 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{c.muted}}; white-space: nowrap;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 5v14 M5 12h14"></path></svg>New task</div>
+</sc-if>
+
+<sc-if value="{{it.isZoneBg}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: {{it.top}}px; width: 187px; height: {{it.height}}px; background: {{c.bg}};"></div>
+</sc-if>
+
+<sc-if value="{{it.isZone}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: {{it.border}}; background: {{it.bg}}; padding: 0 12px 0 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{it.color}}; white-space: nowrap; overflow: hidden;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{it.icon}}"></path></svg>
+<span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">{{it.label}}</span>
+</div>
+</sc-if>
+
+</sc-for>
+</div>
+</sc-for>
+
+<sc-if value="{{drag.on}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{drag.stack}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{drag.l2}}px; top: {{drag.t2}}px; width: {{drag.w2}}px; height: 37px; border-radius: 18.5px; background: {{c.under2}}; box-shadow: {{c.floatShadow}}; z-index: 7;"></div>
+<div style="position: absolute; left: {{drag.l1}}px; top: {{drag.t1}}px; width: {{drag.w1}}px; height: 37px; border-radius: 18.5px; background: {{c.under1}}; box-shadow: {{c.floatShadow}}; z-index: 7;"></div>
+</sc-if>
+<div style="position: absolute; left: {{drag.left}}px; top: {{drag.top}}px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; padding: 0 12px 0 14px; display: flex; align-items: center; gap: 8px; box-shadow: {{c.floatShadow}}; z-index: 7;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; font-weight: {{drag.weight}}; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{drag.title}}</div>
+<sc-if value="{{drag.isSection}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{drag.count}}</span></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{menu.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.top}}px; width: 175px; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; gap: 8px; white-space: nowrap; z-index: 11;">
+<span style="font-size: 13px; line-height: 20px; font-weight: 600; color: {{c.headInk}};">{{menu.name}}</span>
+</div>
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.panelTop}}px; width: 250px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-for list="{{menu.rows}}" as="m" hint-placeholder-count="2">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{m.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{m.label}}</span>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{m.d}}"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{kbd.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; bottom: 0; width: 390px; height: 291px; box-sizing: border-box; padding: 8px 3px 0; background: {{c.kbd}}; display: flex; flex-direction: column; gap: 12px; z-index: 12;">
+<sc-for list="{{kbd.rows}}" as="r" hint-placeholder-count="4">
+<div style="display: flex; gap: 5px; padding: 0 {{r.pad}}px;">
+<sc-for list="{{r.keys}}" as="k" hint-placeholder-count="10">
+<div style="flex: {{k.flex}}; height: 42px; border-radius: 5px; background: {{k.bg}}; box-shadow: {{c.keyShadow}}; display: flex; align-items: center; justify-content: center; font-size: {{k.size}}px; color: {{k.color}};">{{k.label}}</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="k" hint-placeholder-count="0">
+<div style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; width: {{k.width}}px; height: {{k.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{k.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"list","options":["plain","list","moved","single","drag","dragCal","dragInbox","dropped","newName","named","gapInto","lift","menu","rename"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'list';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', headInk: '#6C6C70', dash: '#C7C7CC', strip: '#8A5CF5', accent: '#8A5CF5', target: '#F1ECFE', selection: 'rgba(138,92,245,0.28)', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', under1: '#F7F7F9', under2: '#EFEFF2', mark: '#FF9500', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyInk: '#000000', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', headInk: '#AEAEB2', dash: '#3A3A3C', strip: '#8A6CEF', accent: '#9580FF', target: '#251F3D', selection: 'rgba(149,128,255,0.38)', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', under1: '#242426', under2: '#1C1C1E', mark: '#FFD60A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyInk: '#FFFFFF', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+
+    const CARD = 35, STEP = 37, TOP = 166, HEAD = 26, GROUP = 10, COL_H = 554, KBD_TOP = 844 - 291;
+    const ICON = {
+      plus: 'M12 5v14 M5 12h14',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      date: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5',
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      remove: 'M4 6h9 M4 12h9 M4 18h9 M16 9l5 5 M21 9l-5 5'
+    };
+    const NS = 'No section';
+    const t = (title, extra) => ({ title, ...extra });
+    const noSec = [t('Созвониться с врачом'), t('Записаться в барбершоп', { progress: true }), t('Позвонить маме', { id: 'mom' })];
+    const morning = [t('Чай масала'), t('Разобрать почту'), t('Оплатить интернет')];
+    const trip = [t('Купить билеты в музей'), t('Зарядить пауэрбанк'), t('Скачать офлайн-карту')];
+    const soon = [t('Продлить страховку'), t('Купить подарок Ане'), t('Разобрать фото с поездки', { progress: true }), t('Записаться к стоматологу'), t('Починить велосипед', { id: 'bike' }), t('Прочитать Deep Work'), t('Заменить фильтр для воды')];
+    const inbox = [t('Узнать про курсы итальянского'), t('Идея подарка на Новый год', { id: 'gift' }), t('Ответить Лёше про поход'), t('Посмотреть «Дюну 2»'), t('Сменить тариф мобильной связи')];
+    const without = (list, id) => list.filter((x) => x.id !== id);
+    const G = (name, tasks, extra) => ({ name, tasks, ...extra });
+    const nowGroups = (hide) => [G(NS, without(noSec, hide), { none: true }), G('Morning', morning), G('Экскурсия', trip, { id: 'trip' })];
+
+    const sectionZones = (names, hot, isNew) => [...names.map((n) => ({ label: n, icon: ICON.section, hot: hot === n })), { label: 'New section', icon: ICON.plus, hot: hot === 'New section', isNew: true }];
+    const dateZones = (hot) => [{ label: 'Tomorrow', icon: ICON.tomorrow, hot: hot === 'Tomorrow' }, { label: 'Pick a date', icon: ICON.date, hot: hot === 'Pick a date' }];
+
+    const V = {
+      plain: { mode: 'calendar', cols: [{ groups: [G(null, [...noSec, ...morning])], headers: false }] },
+      list: { mode: 'calendar', cols: [{ groups: nowGroups(), headers: true }], mark: 'headers' },
+      moved: { mode: 'calendar', cols: [{ groups: [G('Morning', morning), G('Экскурсия', trip), G(NS, noSec, { none: true, id: 'ns' })], headers: true }], mark: 'group:ns' },
+      single: { mode: 'calendar', cols: [{ groups: [G('Экскурсия', [...trip, t('Взять наличные'), t('Проверить расписание')], { id: 'trip' })], headers: true }], mark: 'header:trip' },
+      drag: { mode: 'soon', cols: [
+        { groups: [G(null, without(soon, 'bike'))], headers: false, zones: { sections: sectionZones(['Morning', 'Afternoon', 'Evening']) } },
+        { groups: nowGroups(), headers: true, zones: { sections: sectionZones(['Afternoon', 'Evening'], 'Evening'), dates: dateZones() } }
+      ], float: { title: 'Починить велосипед', zone: [1, 'Evening'] }, mark: 'zones' },
+      dragCal: { mode: 'calendar', cols: [
+        { groups: nowGroups('mom'), headers: true, zones: { sections: sectionZones(['Afternoon', 'Evening'], 'New section'), dates: dateZones() } }
+      ], float: { title: 'Позвонить маме', zone: [0, 'New section'] }, mark: 'zones' },
+      dragInbox: { mode: 'inbox', cols: [
+        { groups: [G(null, without(inbox, 'gift'))], headers: false, zones: { sections: sectionZones(['Morning', 'Afternoon', 'Evening']) } },
+        { groups: [G(null, soon)], headers: false, zones: { sections: sectionZones(['Morning', 'Afternoon', 'Evening'], 'Morning') } }
+      ], float: { title: 'Идея подарка на Новый год', zone: [1, 'Morning'] }, mark: 'zones' },
+      dropped: { mode: 'soon', cols: [
+        { groups: [G(null, without(soon, 'bike'))], headers: false },
+        { groups: [G(NS, noSec, { none: true }), G('Morning', morning), G('Evening', [t('Починить велосипед')], { id: 'eve' }), G('Экскурсия', trip)], headers: true }
+      ], mark: 'group:eve' },
+      newName: { mode: 'calendar', cols: [
+        { groups: [...nowGroups('mom'), G('', [t('Позвонить маме')], { field: 'empty', id: 'new' })], headers: true, kbd: true }
+      ], mark: 'field' },
+      named: { mode: 'calendar', cols: [
+        { groups: [...nowGroups('mom'), G('Вечером дома', [t('Позвонить маме')], { id: 'new' })], headers: true }
+      ], mark: 'group:new' },
+      gapInto: { mode: 'calendar', cols: [
+        { groups: nowGroups('mom'), headers: true, gap: { group: 'trip', index: 1 } }
+      ], float: { title: 'Позвонить маме', gap: true }, mark: 'gap' },
+      lift: { mode: 'calendar', cols: [
+        { groups: [G(NS, noSec, { none: true }), G('Экскурсия', trip)], headers: true, lift: 2 }
+      ], float: { title: 'Morning', count: '3', section: true }, mark: 'lift' },
+      menu: { mode: 'calendar', cols: [{ groups: nowGroups(), headers: true }], menu: 'trip' },
+      rename: { mode: 'calendar', cols: [
+        { groups: [G(NS, noSec, { none: true }), G('Morning', morning), G('Экскурсия', trip, { field: 'rename', id: 'trip' })], headers: true, kbd: true }
+      ], mark: 'field' }
+    };
+    const cfg = V[view] ?? V.list;
+    const geo = {
+      calendar: [{ x0: 0, padL: 10 }],
+      soon: [{ x0: 0, padL: 10 }, { x0: 203, padL: 2 }],
+      inbox: [{ x0: 0, padL: 10 }, { x0: 203, padL: 2 }]
+    }[cfg.mode];
+
+    const marks = [];
+    const box = (left, top, width, height) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: Math.min(height + 8, 44) / 2 });
+    let floatAt = null;
+    let menuAt = null;
+
+    const cols = cfg.cols.map((col, ci) => {
+      const g0 = geo[ci];
+      const L = g0.padL, W = 175;
+      const items = [];
+      let y = 0;
+      const groupBoxes = [];
+      const headerBoxes = [];
+      const visible = col.groups.filter((g) => g.tasks.length > 0 || g.field);
+      const showHeads = col.headers && !(visible.length === 1 && visible[0].none);
+      visible.forEach((g, gi) => {
+        if (col.lift === gi) {
+          if (gi > 0) y += GROUP;
+          items.push({ isGap: true, left: L, top: y, width: W });
+          marks.push(box(g0.x0 + L, TOP + y, W, CARD));
+          y += STEP;
+        }
+        const start = y + (showHeads && gi > 0 ? GROUP : 0);
+        if (showHeads) {
+          if (gi > 0) y += GROUP;
+          if (g.field) {
+            items.push({ isField: true, left: L, top: y, width: W, selected: g.field === 'rename', empty: g.field === 'empty', value: g.name });
+            if (cfg.mark === 'field') marks.push(box(g0.x0 + L, TOP + y, W, CARD));
+            y += STEP;
+          } else {
+            items.push({ isHeader: true, left: L, top: y, width: W, height: HEAD, name: g.name, color: g.none ? c.muted : c.headInk });
+            headerBoxes.push({ id: g.id, y });
+            if (cfg.menu && cfg.menu === g.id) menuAt = { left: g0.x0 + L, top: TOP + y, name: g.name };
+            y += HEAD;
+          }
+        }
+        g.tasks.forEach((task, ti) => {
+          if (col.gap && col.gap.group === g.id && col.gap.index === ti) {
+            items.push({ isGap: true, left: L, top: y, width: W });
+            marks.push(box(g0.x0 + L, TOP + y, W, CARD));
+            floatAt = { left: g0.x0 + L + 18, top: TOP + y + 10 };
+            y += STEP;
+          }
+          items.push({ isCard: true, left: L, top: y, width: W, title: task.title, progress: !!task.progress });
+          y += STEP;
+        });
+        groupBoxes.push({ id: g.id, top: start, bottom: y - 2 });
+      });
+      if (col.lift === visible.length) {
+        y += GROUP;
+        items.push({ isGap: true, left: L, top: y, width: W });
+        marks.push(box(g0.x0 + L, TOP + y, W, CARD));
+        floatAt = { left: g0.x0 + L + 22, top: TOP + y + 12 };
+        y += STEP;
+      }
+      if (cfg.mark === 'headers') headerBoxes.forEach((hb) => marks.push(box(g0.x0 + L, TOP + hb.y, W, HEAD)));
+      if (cfg.mark && cfg.mark.startsWith('header:')) headerBoxes.filter((hb) => hb.id === cfg.mark.slice(7)).forEach((hb) => marks.push(box(g0.x0 + L, TOP + hb.y, W, HEAD)));
+      if (cfg.mark && cfg.mark.startsWith('group:')) groupBoxes.filter((gb) => gb.id === cfg.mark.slice(6)).forEach((gb) => marks.push(box(g0.x0 + L, TOP + gb.top, W, gb.bottom - gb.top)));
+
+      if (col.kbd) {
+        const limit = KBD_TOP - TOP - 16;
+        const shift = Math.max(0, y - 2 - limit);
+        items.forEach((it) => { it.top -= shift; });
+        marks.forEach((m) => { if (m.top > TOP) m.top -= shift; });
+      }
+
+      if (col.zones) {
+        const z = [];
+        col.zones.sections.forEach((s) => z.push({ ...s, group: 's' }));
+        (col.zones.dates ?? []).forEach((d) => z.push({ ...d, group: 'd' }));
+        let total = 0;
+        z.forEach((zz, i) => { total += CARD + (i === 0 ? 0 : (zz.group !== z[i - 1].group ? 16 : 8)); });
+        let zy = COL_H - 8 - total;
+        items.push({ isZoneBg: true, top: zy - 8, height: COL_H - zy + 8 });
+        const zoneTop = zy;
+        z.forEach((zz, i) => {
+          if (i > 0) zy += zz.group !== z[i - 1].group ? 16 : 8;
+          items.push({ isZone: true, left: L, top: zy, width: W, label: zz.label, icon: zz.icon,
+            border: zz.hot ? '1px solid ' + c.accent : '1px dashed ' + c.dash, bg: zz.hot ? c.target : 'transparent', color: zz.hot ? c.text : c.muted });
+          if (cfg.float && cfg.float.zone && cfg.float.zone[0] === ci && zz.label === cfg.float.zone[1]) {
+            floatAt = { left: g0.x0 + L - 4, top: TOP + zy + 14 };
+          }
+          zy += CARD;
+        });
+        if (cfg.mark === 'zones') marks.push(box(g0.x0 + L, TOP + zoneTop, W, zy - zoneTop));
+      } else if (!col.kbd) {
+        items.push({ isNewTask: true, left: L, top: 677 - TOP, width: W });
+      }
+      return { x0: g0.x0, items };
+    });
+
+    const f = cfg.float;
+    const drag = f && floatAt
+      ? { on: true, title: f.title, left: floatAt.left, top: floatAt.top, isSection: !!f.section, count: f.count ?? '', weight: f.section ? 600 : 400,
+          stack: !!f.section, l1: floatAt.left + 7, t1: floatAt.top + 6, w1: 176, l2: floatAt.left + 14, t2: floatAt.top + 12, w2: 162 }
+      : { on: false };
+
+    const sep = (list) => list.map((r, i) => ({ ...r, sep: i < list.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const menu = menuAt
+      ? { on: true, left: menuAt.left, top: menuAt.top, name: menuAt.name, panelTop: menuAt.top + HEAD + 12,
+          rows: sep([{ label: 'Rename', d: ICON.rename }, { label: 'Remove section', d: ICON.remove }]) }
+      : { on: false };
+
+    const key = (label, extra) => ({ label, flex: '1', bg: c.key, color: c.keyInk, size: 22, ...extra });
+    const fn = (label, flex) => key(label, { flex, bg: c.fnKey, size: 15 });
+    const kbdOn = cfg.cols.some((col) => col.kbd);
+    const kbd = kbdOn
+      ? { on: true, rows: [
+          { pad: 0, keys: ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'].map((k) => key(k)) },
+          { pad: 0, keys: ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э'].map((k) => key(k)) },
+          { pad: 0, keys: [fn('⇧', '1.4'), ...['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю'].map((k) => key(k)), fn('⌫', '1.4')] },
+          { pad: 0, keys: [fn('123', '1.3'), key('пробел', { flex: '6', size: 16 }), fn('Готово', '2.2')] }
+        ] }
+      : { on: false };
+
+    return {
+      c,
+      theme: light ? 'light' : 'dark',
+      mode: cfg.mode,
+      cols,
+      drag,
+      menu,
+      kbd,
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>
