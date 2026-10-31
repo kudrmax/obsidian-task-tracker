@@ -16,6 +16,8 @@ export interface TaskSheetOptions {
 	readonly today: LocalDate;
 	/** The priority levels the pills offer. */
 	readonly levels: readonly PriorityLevel[];
+	/** A subtask's: the title of the task it belongs to, over its own. */
+	readonly parent?: string | null;
 	onSubmit(draft: TaskDraft): Promise<void>;
 	onClose?(): void;
 }
@@ -23,7 +25,7 @@ export interface TaskSheetOptions {
 /** How tall the keyboard was the last time it shrank the view: the next screen leaves that room from its first frame. */
 let rememberedKeyboard = 0;
 
-/** The task screen over the whole view: the title to type, the four tiles, the priorities or the calendar under them, Cancel and Add. */
+/** The task screen over the whole view: a subtask's task, the title to type, the four tiles, the priorities or the calendar under them, Cancel and Add. */
 export class TaskSheet {
 	readonly el: HTMLElement;
 	private state: SheetState;
@@ -57,6 +59,11 @@ export class TaskSheet {
 		this.body = el(this.el, "div", "tc-sheet-body");
 		const body = el(this.body, "div", "tc-sheet-content");
 		this.content = body;
+		if (opts.parent) {
+			const parent = el(body, "div", "tc-sheet-parent");
+			parent.appendChild(sheetIcon("subtask"));
+			el(parent, "span", "tc-sheet-parent-title", opts.parent);
+		}
 		this.title = el(body, "div", "tc-sheet-title", opts.initial.text);
 		this.title.contentEditable = "true";
 		this.title.setAttribute("enterkeyhint", "done");

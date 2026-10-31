@@ -43,6 +43,9 @@ body {
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
+	/* The layers of a dragged task's subtasks, under it. */
+	--tc-float-under-1: #242426;
+	--tc-float-under-2: #1C1C1E;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
 	--tc-accent-ui: var(--interactive-accent);
@@ -164,6 +167,11 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
+	/* Each layer under a dragged task with subtasks hangs this much lower, and this much narrower on each side. */
+	--tc-stack-step: 6px;
+	--tc-stack-inset: 7px;
+	/* A subtask's card stands this much further in per level. */
+	--tc-subtask-indent: 20px;
 	/* Pressed, a card shows its whole title: it stretches to the right past its column, up to this far from the window's edges. */
 	--tc-whole-margin: 10px;
 
@@ -280,6 +288,7 @@ body {
 	--tc-leading-due-mon: 9px;
 	--tc-tracking-mon: 0.3px;
 	--tc-font-block: 12px;
+	--tc-font-count: 12px;
 	--tc-leading-block: 15px;
 	--tc-leading-card: 18px;
 	--tc-font-meta: 9px;
@@ -299,7 +308,6 @@ body {
 	--tc-font-sheet-btn: 17px;
 	--tc-font-sub: 13px;
 	--tc-font-group: 13px;
-	--tc-font-count: 12px;
 	--tc-leading-group: 20px;
 	--tc-font-pull: 12px;
 	--tc-leading-pull: 16px;
@@ -335,6 +343,7 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
+	--tc-layer-drop-gap: 999;
 	--tc-layer-pull: 5;
 	--tc-layer-switch: 5;
 	--tc-layer-sheet: 20;
@@ -387,6 +396,8 @@ body.theme-light {
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+	--tc-float-under-1: #F7F7F9;
+	--tc-float-under-2: #EFEFF2;
 	--tc-danger: #FF3B30;
 	--tc-ink-dim: #C7C7CC;
 	--tc-separator: #D1D1D6;
@@ -528,12 +539,17 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Where a lifted section lands: a dashed capsule between the sections. */
 .tc-group-drop { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); margin-top: var(--tc-section-gap); }
 .tc-group-drop:first-child { margin-top: 0; }
-/* Where a dragged card lands in a list with sections: a dashed capsule opens there. */
-.tc-gap-mark { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); }
+.tc-group-head.is-shifted { transform: translateY(var(--tc-card-shift)); }
 .tc-group-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
 .tc-card.is-lifted { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
 .tc-card.is-shifted { transform: translateY(var(--tc-card-shift)); }
+.tc-list > .tc-card { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); }
+/* A card another one is dragged over: it will take it as its last subtask. */
+.tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
+.tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+/* Where a card dragged in its own list will land, at the level its left edge picks. */
+.tc-drop-gap { position: fixed; height: var(--tc-card-h); box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); z-index: var(--tc-layer-drop-gap); pointer-events: none; }
 .tc-strip { position: absolute; left: 0; top: 0; bottom: 0; width: var(--tc-bar); background: var(--tc-strip-color); }
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
@@ -633,6 +649,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
+.tc-float-under { position: fixed; left: 0; top: 0; height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-float-shadow); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
+.tc-float-under.is-1 { margin: var(--tc-stack-step) 0 0 var(--tc-stack-inset); background: var(--tc-float-under-1); }
+.tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step)) 0 0 calc(2 * var(--tc-stack-inset)); background: var(--tc-float-under-2); }
+.tc-float-under.is-gone { opacity: 0; }
 /* The whole title of a pressed card: the card stretches to the right on its one line; the copy over the menu then wraps a title still too long, its first line where it stood. */
 .is-stretched .tc-card-title, .is-whole .tc-card-title { -webkit-mask-image: none; mask-image: none; }
 .tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); align-items: flex-start; }
@@ -657,7 +677,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-lifted.is-block { background: none; padding: 0; border-radius: 0; overflow: visible; }
 .tc-lifted.is-block > .tc-block { top: 0; left: 0; right: 0; height: 100%; }
 /* Closing, the copy fades with the sheet and the panel: they go together. */
-.tc-lifted.is-closing, .tc-seg-copy.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+/* A timeline card's subtasks, between its copy and the menu. */
+.tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
+.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. */
 [data-priority="red"] { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); --tc-priority-meta: var(--tc-priority-red-meta); }
@@ -741,6 +763,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); margin-right: auto; }
 .tc-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); cursor: pointer; }
 .tc-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
+/* A subtask's task, over its title: closer to it than the sheet's gap. */
+.tc-sheet-parent { margin-bottom: calc(var(--tc-space-8) - var(--tc-sheet-gap)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); line-height: var(--tc-leading-card); color: var(--tc-muted); }
+.tc-sheet-parent svg { flex-shrink: 0; width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
+.tc-sheet-parent-title { min-width: 0; overflow-wrap: anywhere; }
 .tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
 

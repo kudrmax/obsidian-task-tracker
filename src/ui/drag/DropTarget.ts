@@ -13,6 +13,8 @@ export interface DragPayload {
 	readonly durationMin: number | null;
 	/** How far under the card's top the finger holds it: a timeline card keeps its grip, a list card hangs by its middle. */
 	readonly grabPx: number;
+	/** How far right of the card's left edge the finger holds it: in its own list, the card's left edge picks the level it lands on. */
+	readonly grabX: number;
 }
 
 export type DropResult =
@@ -20,6 +22,7 @@ export type DropResult =
 	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
 	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
 	| { readonly kind: "group"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null }
+	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "clearSlot" }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	/** A zone that starts a section of that name in the list, or the one it has. */

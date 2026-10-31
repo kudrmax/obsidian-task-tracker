@@ -2,15 +2,19 @@
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { renderTaskCard } from "../../src/ui/TaskCard";
+import { TaskList } from "../../src/ui/TaskList";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
-	key: { section: "now", index: 0, raw: "- [ ] Купить билеты" },
+	key: { section: "now", index: 0, path: [], raw: "- [ ] Купить билеты" },
 	text: "Купить билеты в Белград",
 	status: "todo",
 	dueDate: null,
 	slot: null,
 	priority: null,
 	group: null,
+	subtasks: [],
+	progress: null,
+	parentText: null,
 	...extra,
 });
 
@@ -54,5 +58,36 @@ describe("a task's priority", () => {
 		expect(tinted.dataset.priority).toBe("red");
 		expect(tinted.querySelector(".tc-card-title")?.textContent).toBe("Купить билеты в Белград");
 		expect(renderTaskCard(document.createElement("div"), item(), { day: null }).hasAttribute("data-priority")).toBe(false);
+	});
+});
+
+describe("a task with subtasks", () => {
+	it("shows the counter before the due date, and nothing without subtasks", () => {
+		const card = renderTaskCard(document.createElement("div"), item({ progress: { done: 2, total: 5 }, dueDate: "2026-11-03" }), { day: null });
+		expect([...card.children].map((c) => c.className)).toEqual(["tc-card-title", "tc-count", "tc-due"]);
+		expect(card.querySelector(".tc-count")?.textContent).toBe("2/5");
+		expect(renderTaskCard(document.createElement("div"), item(), { day: null }).querySelector(".tc-count")).toBeNull();
+	});
+
+	it("lists the subtasks right under their task, a level further in, and hands each task its subtree", () => {
+		const sub = (text: string, subtasks: TaskItem[] = []) => item({ text, subtasks, parentText: "p" });
+		const tree = [item({ text: "A", subtasks: [sub("A1", [sub("A11")]), sub("A2")] }), item({ text: "B" })];
+		const subtrees = new Map<string, string[]>();
+		const list = new TaskList(document.createElement("div"), {
+			items: () => tree,
+			day: () => null,
+			onCard: (_card, task, subtree) => subtrees.set(task.text, subtree.map((c) => c.textContent ?? "")),
+		});
+		list.render();
+		expect(list.cards.map((e) => [e.item.text, e.level, e.card.style.getPropertyValue("--tc-level")])).toEqual([
+			["A", 0, "0"],
+			["A1", 1, "1"],
+			["A11", 2, "2"],
+			["A2", 1, "1"],
+			["B", 0, "0"],
+		]);
+		expect(subtrees.get("A")).toEqual(["A1", "A11", "A2"]);
+		expect(subtrees.get("A1")).toEqual(["A11"]);
+		expect(subtrees.get("B")).toEqual([]);
 	});
 });

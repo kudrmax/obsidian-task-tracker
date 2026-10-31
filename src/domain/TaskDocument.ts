@@ -13,12 +13,18 @@ export interface SectionNamesOf {
 
 export interface TaskEntry {
 	readonly section: SectionKey;
+	/** Among the tasks of the section: the task's own index, or that of the task a subtask belongs to. */
 	readonly index: number;
+	/** Indexes among the subtasks, from that task down to this one; empty for a task. */
+	readonly path: readonly number[];
 	readonly raw: string;
 	readonly indent: string;
 	readonly bullet: string;
 	readonly task: Task;
+	/** The section of its list it sits in; a subtask's is its task's. */
 	readonly group: GroupName;
+	/** The task lines nested right under this one, in file order. */
+	readonly subtasks: readonly TaskEntry[];
 }
 
 /** A block of a list: the tasks above its first `###`, or a `###` heading and what is under it, up to the next. */
@@ -49,6 +55,11 @@ interface Span {
 	readonly lineCount: number;
 }
 
+interface Place {
+	readonly index: number;
+	readonly path: readonly number[];
+}
+
 interface Section {
 	readonly headingLine: number;
 	readonly firstLine: number;
@@ -69,6 +80,7 @@ const LIST_END_RE = /^#{1,2}(\s|$)/;
 const GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 const SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
 const INDENT_RE = /^[ \t]*/;
+const DEFAULT_INDENT_UNIT = "\t";
 
 function indentWidth(line: string): number {
 	return INDENT_RE.exec(line)![0].length;
@@ -87,6 +99,16 @@ function sameTask(a: Task, b: Task): boolean {
 		a.children.length === b.children.length &&
 		a.children.every((c, i) => c === b.children[i])
 	);
+}
+
+function contains(entry: TaskEntry, other: TaskEntry): boolean {
+	return entry.section === other.section && entry.index === other.index && entry.path.every((i, k) => other.path[k] === i) && other.path.length >= entry.path.length;
+}
+
+/** The lines of an entry under another indent: its own line and the deeper ones keep their depth below it. */
+function reindented(lines: readonly string[], from: string, to: string): string[] {
+	if (from === to) return [...lines];
+	return lines.map((line) => (line.startsWith(from) ? to + line.slice(from.length) : line));
 }
 
 export class TaskDocument {
@@ -152,6 +174,13 @@ export class TaskDocument {
 		return this.groupLists.get(section) ?? [];
 	}
 
+	/** The task or subtask at that place, if there is one. */
+	find(section: SectionKey, index: number, path: readonly number[]): TaskEntry | undefined {
+		let entry: TaskEntry | undefined = this.tasks(section)[index];
+		for (const i of path) entry = entry?.subtasks[i];
+		return entry;
+	}
+
 	allTasks(): readonly TaskEntry[] {
 		return SECTION_KEYS.flatMap((key) => this.tasks(key));
 	}
@@ -172,9 +201,10 @@ export class TaskDocument {
 		return this.withLines(this.splice(span.line, span.lineCount, []));
 	}
 
+	/** A subtask moved here leaves its task and becomes a task of `section`. */
 	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition): TaskDocument {
 		const span = this.spanOf(entry);
-		const moved = this.lines.slice(span.line, span.line + span.lineCount);
+		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
 		const without = this.withLines(this.splice(span.line, span.lineCount, []));
 		const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
 		return without.withLines(without.splice(target, 0, moved));
@@ -224,6 +254,22 @@ export class TaskDocument {
 		return this.withLines(this.splice(cut.from, cut.to - cut.from, []));
 	}
 
+	/** Puts the entry with its subtasks among `parent`'s subtasks, right before `before` (one of them) or last. */
+	nestEntry(entry: TaskEntry, parent: TaskEntry, before: TaskEntry | null): TaskDocument {
+		if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
+		const span = this.spanOf(entry);
+		const target = before ? this.spanOf(before).line : this.endOf(parent);
+		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
+		const without = this.splice(span.line, span.lineCount, []);
+		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
+		return this.withLines(without);
+	}
+
+	/** A new last subtask of `parent`. */
+	insertUnder(parent: TaskEntry, task: Task): TaskDocument {
+		return this.withLines(this.splice(this.endOf(parent), 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
+	}
+
 	ensureSections(all: readonly string[]): TaskDocument {
 		const present = new Set(this.headingNames());
 		const missing = all.filter((name) => !present.has(name));
@@ -251,14 +297,40 @@ export class TaskDocument {
 	}
 
 	private spanOf(entry: TaskEntry): Span {
-		const own = this.tasks(entry.section)[entry.index];
+		const own = this.find(entry.section, entry.index, entry.path);
 		const span = own && own.raw === entry.raw ? this.spans.get(own) : undefined;
-		if (!span) throw new Error(`Task not found in the document: ${entry.section}[${entry.index}] ${entry.raw}`);
+		if (!span) throw new Error(`Task not found in the document: ${entry.section}[${entry.index}]${entry.path.map((i) => `[${i}]`).join("")} ${entry.raw}`);
 		return span;
 	}
 
+	private endOf(entry: TaskEntry): number {
+		const span = this.spanOf(entry);
+		return span.line + span.lineCount;
+	}
+
+	/** The indent of `parent`'s subtasks: the one they have, else one level deeper by the file's own step. */
+	private childIndent(parent: TaskEntry): string {
+		return parent.subtasks[0]?.indent ?? parent.indent + this.indentUnit();
+	}
+
+	private indentUnit(): string {
+		const step = (entry: TaskEntry): string | null => {
+			for (const sub of entry.subtasks) {
+				if (sub.indent.startsWith(entry.indent) && sub.indent.length > entry.indent.length) return sub.indent.slice(entry.indent.length);
+				const deeper = step(sub);
+				if (deeper) return deeper;
+			}
+			return null;
+		};
+		for (const entry of this.allTasks()) {
+			const unit = step(entry);
+			if (unit) return unit;
+		}
+		return DEFAULT_INDENT_UNIT;
+	}
+
 	private positionAfterRemoval(entry: TaskEntry, section: SectionKey, position: InsertPosition): InsertPosition {
-		if (typeof position !== "number" || section !== entry.section || position <= entry.index) return position;
+		if (typeof position !== "number" || entry.path.length > 0 || section !== entry.section || position <= entry.index) return position;
 		return position - 1;
 	}
 
@@ -404,34 +476,34 @@ export class TaskDocument {
 		return blocks;
 	}
 
+	/** A block's tasks, numbered on from the tasks of the blocks above it in `entries`. */
 	private readGroup(key: SectionKey, block: Block, index: number, entries: TaskEntry[], spans: Map<TaskEntry, Span>): TaskGroup {
-		const own: TaskEntry[] = [];
-		let blank = true;
-		let i = block.start;
-		while (i < block.end) {
+		const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
+		const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans);
+		entries.push(...own);
+		return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+	}
+
+	/** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
+	private readLevel(section: SectionKey, from: number, end: number, parent: Place | null, group: GroupName, firstIndex: number, spans: Map<TaskEntry, Span>): TaskEntry[] {
+		const entries: TaskEntry[] = [];
+		let i = from;
+		while (i < end) {
 			const raw = this.lines[i];
-			if (raw.trim() !== "") blank = false;
 			const parsed = parseTaskLine(raw, this.markers);
 			if (!parsed) {
 				i++;
 				continue;
 			}
-			const children = this.childrenOf(i, block.end, parsed.indent.length);
-			const entry: TaskEntry = {
-				section: key,
-				index: entries.length,
-				raw,
-				indent: parsed.indent,
-				bullet: parsed.bullet,
-				task: { ...parsed.task, children },
-				group: block.name,
-			};
+			const children = this.childrenOf(i, end, parsed.indent.length);
+			const place: Place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
+			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans);
+			const entry: TaskEntry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, subtasks };
 			entries.push(entry);
-			own.push(entry);
 			spans.set(entry, { line: i, lineCount: 1 + children.length });
 			i += 1 + children.length;
 		}
-		return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+		return entries;
 	}
 
 	private childrenOf(taskLine: number, endLine: number, indent: number): string[] {

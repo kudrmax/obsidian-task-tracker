@@ -1,4 +1,4 @@
-import type { TaskItem } from "../application/contracts";
+import type { SubtaskProgress, TaskItem } from "../application/contracts";
 import type { PriorityLevel } from "../settings";
 import { DayBoundary } from "./DayBoundary";
 import type { LocalDate } from "./Task";
@@ -37,14 +37,28 @@ export function inboxList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("inbox");
 }
 
-export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null): TaskItem {
+function isOpen(entry: TaskEntry): boolean {
+	return entry.task.status === "todo" || entry.task.status === "inProgress";
+}
+
+/** Of the task's own subtasks, the done ones out of all but those given up. */
+function progressOf(entry: TaskEntry): SubtaskProgress | null {
+	if (entry.subtasks.length === 0) return null;
+	const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
+	return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
+}
+
+export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null, parentText: string | null = null): TaskItem {
 	return {
-		key: { section: entry.section, index: entry.index, raw: entry.raw },
+		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
 		text: entry.task.text,
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 		group: entry.group,
+		subtasks: entry.subtasks.filter(isOpen).map((sub) => toItem(sub, levelOf, entry.task.text)),
+		progress: progressOf(entry),
+		parentText,
 	};
 }

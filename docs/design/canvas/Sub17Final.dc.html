@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Подзадачи: итог</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<sc-if value="{{onMain}}" hint-placeholder-val="{{true}}">
+<dc-import name="Screen" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" scroll-hours="{{scroll}}" hint-size="390px,844px"></dc-import>
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 503px; background: {{c.bg}}; z-index: 3;"></div>
+<div style="position: absolute; left: 10px; top: 166px; width: 175px; height: 503px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; z-index: 4;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; flex-shrink: 0; margin-left: {{r.indent}}px; overflow: hidden; height: 35px; box-sizing: border-box; background: {{r.bg}}; box-shadow: {{r.ring}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasSubs}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+<sc-if value="{{r.due}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">{{r.mon}}</span></span>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{r.isGap}}" hint-placeholder-val="{{false}}">
+<div style="flex-shrink: 0; margin-left: {{r.indent}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}};"></div>
+</sc-if>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{drag.on}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{drag.stack}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{drag.layer2Left}}px; top: {{drag.layer2Top}}px; width: {{drag.layer2W}}px; height: 37px; border-radius: 18.5px; background: {{c.under2}}; box-shadow: {{c.floatShadow}}; z-index: 7;"></div>
+<div style="position: absolute; left: {{drag.layer1Left}}px; top: {{drag.layer1Top}}px; width: {{drag.layer1W}}px; height: 37px; border-radius: 18.5px; background: {{c.under1}}; box-shadow: {{c.floatShadow}}; z-index: 7;"></div>
+</sc-if>
+<div style="position: absolute; left: {{drag.left}}px; top: {{drag.top}}px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; box-shadow: {{c.floatShadow}}; z-index: 7;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{drag.title}}</div>
+<sc-if value="{{drag.hasSubs}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{drag.count}}</span></sc-if>
+<sc-if value="{{drag.due}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.floatMonth}}; letter-spacing: 0.3px;">NOV</span></span>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{withBackdrop}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+</sc-if>
+
+<sc-if value="{{cal.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 231px; top: {{cal.top}}px; width: 155px; height: 54px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 8.5px 10px 0 14px; display: flex; align-items: flex-start; gap: 6px; z-index: 11;">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; line-height: 18px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Написать отчёт по проекту</div>
+<span style="flex-shrink: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">1/4</span>
+</div>
+<sc-if value="{{cal.subsUnder}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{cal.subsLeft}}px; top: {{cal.subsTop}}px; width: {{cal.subsW}}px; display: flex; flex-direction: column; gap: 2px; z-index: 11;">
+<sc-for list="{{calSubs}}" as="s" hint-placeholder-count="3">
+<div style="position: relative; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{s.title}}</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{cal.menu}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 130px; top: {{cal.menuTop}}px; width: 250px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-for list="{{taskMenu}}" as="g" hint-placeholder-count="3">
+<div style="border-top: {{g.gap}};">
+<sc-for list="{{g.rows}}" as="m" hint-placeholder-count="2">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{m.sep}}; background: transparent; color: {{m.color}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{m.label}}</span>
+<sc-if value="{{m.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{m.value}}</span></sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{m.d}}"></path><path d="{{m.fd}}" fill="currentColor" stroke="none"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{menu.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.top}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; z-index: 11;">
+<sc-if value="{{menu.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span></sc-if>
+<div style="white-space: nowrap; font-size: 15px;">{{menu.title}}</div>
+<span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{menu.count}}</span>
+<sc-if value="{{menu.due}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">3</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
+</sc-if>
+</div>
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.panelTop}}px; width: 250px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-for list="{{taskMenu}}" as="g" hint-placeholder-count="3">
+<div style="border-top: {{g.gap}};">
+<sc-for list="{{g.rows}}" as="m" hint-placeholder-count="2">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{m.sep}}; background: transparent; color: {{m.color}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{m.label}}</span>
+<sc-if value="{{m.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{m.value}}</span></sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{m.d}}"></path><path d="{{m.fd}}" fill="currentColor" stroke="none"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isNewSub}}" hint-placeholder-val="{{false}}">
+<dc-import name="NewSheet" mode="sub" theme="{{theme}}" hint-size="390px,844px"></dc-import>
+</sc-if>
+
+<sc-for list="{{marks}}" as="k" hint-placeholder-count="0">
+<div style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; width: {{k.width}}px; height: {{k.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{k.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"list","options":["list","menu","menuTask","newSub","added","dragTask","dragSub","dragOut","dragInto","calList","calMenu"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'list';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', dash: '#C7C7CC', strip: '#8A5CF5', accent: '#8A5CF5', target: '#F1ECFE', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', danger: '#FF3B30', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', floatMonth: '#8E8E93', under1: '#F7F7F9', under2: '#EFEFF2', mark: '#FF9500', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', dash: '#3A3A3C', strip: '#8A6CEF', accent: '#9580FF', target: '#251F3D', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', danger: '#FF453A', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', floatMonth: '#AEAEB2', under1: '#242426', under2: '#1C1C1E', mark: '#FFD60A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+    const INDENT = 20;
+    const CARD = 35;
+    const STEP = CARD + 2;
+    const TOP = 166;
+    const tree = [
+      { title: 'Созвониться с врачом' },
+      { id: 'belgrade', title: 'Купить билеты в Белград', day: '3', mon: 'NOV', subs: [
+        { title: 'Сравнить цены на рейсы', done: true },
+        { title: 'Согласовать даты с Аней', done: true },
+        { id: 'seats', title: 'Выбрать места', progress: true, subs: [
+          { title: 'Окно для Ани' },
+          { title: 'Проход для меня' }
+        ] },
+        { id: 'pay', title: 'Оплатить билеты' },
+        { id: 'wallet', title: 'Добавить посадочные в Wallet' },
+        { id: 'bag', title: 'Взять багаж', added: true }
+      ] },
+      { id: 'taxes', title: 'Сдать налоговую декларацию', subs: [
+        { title: 'Собрать справки о доходах', done: true },
+        { title: 'Заполнить в личном кабинете' },
+        { title: 'Подписать и отправить' }
+      ] },
+      { title: 'Записаться в барбершоп', progress: true, day: '2', mon: 'NOV' },
+      { title: 'Посмотреть доклад про local-first приложения', progress: true },
+      { title: 'Чай масала' },
+      { id: 'mom', title: 'Позвонить маме' },
+      { title: 'Оплатить интернет' },
+      { title: 'Забрать посылку' }
+    ];
+    const expanded = ['belgrade', 'seats', 'taxes'];
+    const hidden = { dragTask: 'belgrade', dragSub: 'pay', dragOut: 'pay', dragInto: 'mom' }[view];
+    const gapAfter = { dragSub: { id: 'wallet', level: 1 }, dragOut: { id: 'taxes', level: 0 } }[view];
+    const target = view === 'dragInto' ? 'taxes' : null;
+    const rows = [];
+    let gapTop = 0;
+    const walk = (items, level) => {
+      for (const t of items) {
+        if (t.done || (hidden && t.id === hidden) || (t.added && view !== 'added')) continue;
+        const subs = t.subs ?? [];
+        const isTarget = t.id === target;
+        rows.push({
+          isCard: true, isGap: false, indent: level * INDENT,
+          title: t.title, progress: !!t.progress, due: !!t.day, day: t.day, mon: t.mon,
+          hasSubs: subs.length > 0, count: subs.filter((s) => s.done).length + '/' + subs.filter((s) => !s.added || view === 'added').length,
+          bg: isTarget ? c.target : c.card,
+          ring: isTarget ? 'inset 0 0 0 1.5px ' + c.accent : 'none',
+          id: t.id, level
+        });
+        if (expanded.includes(t.id)) walk(subs, level + 1);
+        if (gapAfter && t.id === gapAfter.id) {
+          gapTop = TOP + rows.length * STEP;
+          rows.push({ isCard: false, isGap: true, indent: gapAfter.level * INDENT });
+        }
+      }
+    };
+    walk(tree, 0);
+    const targetIndex = rows.findIndex((r) => r.id === target);
+    const drags = {
+      dragTask: { title: 'Купить билеты в Белград', hasSubs: true, count: '2/5', due: true, left: 34, top: 360, stack: true },
+      dragSub: { title: 'Оплатить билеты', left: 10 + INDENT + 14, top: gapTop + 6 },
+      dragOut: { title: 'Оплатить билеты', left: 22, top: gapTop + 6 },
+      dragInto: { title: 'Позвонить маме', left: 40, top: TOP + targetIndex * STEP + 14 }
+    };
+    const d = drags[view];
+    const drag = d
+      ? { on: true, stack: !!d.stack, hasSubs: !!d.hasSubs, due: !!d.due, count: d.count ?? '', title: d.title, left: d.left, top: d.top,
+          layer1Left: d.left + 7, layer1Top: d.top + 6, layer1W: 176, layer2Left: d.left + 14, layer2Top: d.top + 12, layer2W: 162 }
+      : { on: false };
+    const SCROLL = 1.5;
+    const calView = ['calList', 'calMenu'].includes(view);
+    const blockTop = TOP + 34 + (11 - 9 - SCROLL) * 56 + 1;
+    const calSubs = [{ title: 'Собрать цифры за квартал' }, { title: 'Написать выводы' }, { title: 'Отправить Косте' }];
+    const cal = calView
+      ? { on: true, top: blockTop,
+          subsUnder: view === 'calMenu', subsLeft: 231, subsW: 155, subsTop: blockTop + 56,
+          menu: view === 'calMenu', menuTop: blockTop + 56 + calSubs.length * STEP + 10 }
+      : { on: false };
+    const box = (left, top, width, height) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: Math.min(height + 8, 44) / 2 });
+    const rowTop = (i) => TOP + i * STEP;
+    const rowBox = (i) => box(10 + rows[i].indent, rowTop(i), 175 - rows[i].indent, CARD);
+    const span = (from, to) => box(10 + Math.min(...rows.slice(from, to + 1).map((r) => r.indent)), rowTop(from), 175 - Math.min(...rows.slice(from, to + 1).map((r) => r.indent)), (to - from) * STEP + CARD);
+    const subsOf = (id) => {
+      const at = rows.findIndex((r) => r.id === id);
+      let end = at;
+      while (end + 1 < rows.length && rows[end + 1].indent > rows[at].indent) end++;
+      return end > at ? span(at + 1, end) : null;
+    };
+    const menuOf = { menu: 'seats', menuTask: 'belgrade' }[view];
+    const menuAt = rows.findIndex((r) => r.id === menuOf);
+    const menuRow = menuOf ? rows[menuAt] : null;
+    const menu = menuRow
+      ? { on: true, left: 10 + menuRow.indent, top: rowTop(menuAt), panelTop: rowTop(menuAt) + CARD + 12,
+          title: menuRow.title, count: menuRow.count, progress: menuRow.progress, due: menuRow.due }
+      : { on: false };
+    const ROW = 44;
+    const addSubRow = (panelTop, left) => box(left, panelTop + 3 * ROW + 8 + 3 * ROW, 250, ROW);
+    const marksByView = {
+      list: () => [subsOf('belgrade'), subsOf('taxes')].filter(Boolean),
+      menu: () => [addSubRow(menu.panelTop, menu.left)],
+      menuTask: () => [addSubRow(menu.panelTop, menu.left)],
+      newSub: () => [box(20, 242, 350, 18)],
+      added: () => [rowBox(rows.findIndex((r) => r.id === 'bag'))],
+      dragTask: () => d ? [box(d.left, d.top + 6, 190, 43)] : [],
+      dragSub: () => [rowBox(rows.findIndex((r) => r.isGap))],
+      dragOut: () => [rowBox(rows.findIndex((r) => r.isGap))],
+      dragInto: () => [rowBox(targetIndex)],
+      calList: () => [box(231, blockTop, 155, 54)],
+      calMenu: () => [box(231, blockTop + 56, 155, 3 * STEP - 2)]
+    };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const sep = (list) => list.map((r, i) => ({ ...r, sep: i < list.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const row = (label, dd, extra) => ({ label, d: dd, fd: '', color: c.text, hasValue: false, value: '', ...extra });
+    const statusRows = [row('Stop progress', CIRCLE), row('Done', CIRCLE, { fd: CIRCLE }), row('Won’t do', CIRCLE + ' M8 12h8')];
+    const renameRow = row('Rename', 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4');
+    const deleteRows = sep([row('Delete', 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13', { color: c.danger })]);
+    const taskMenu = [
+      { gap: '0', rows: sep(statusRows) },
+      { gap: '8px solid ' + c.gap, rows: sep([row('Due date', 'M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4'), row('Priority', 'M5.5 21V4 M5.5 4.5h12l-2.5 4 2.5 4h-12'), renameRow, row('Add subtask', 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4')]) },
+      { gap: '8px solid ' + c.gap, rows: deleteRows }
+    ];
+    return {
+      c,
+      theme: light ? 'light' : 'dark',
+      scroll: calView ? SCROLL : 0,
+      onMain: view !== 'newSub',
+      menu,
+      isNewSub: view === 'newSub',
+      withBackdrop: menu.on || view === 'calMenu',
+      rows,
+      marks: this.props.marks === false || !marksByView[view] ? [] : marksByView[view](),
+      drag,
+      cal,
+      calSubs,
+      taskMenu,
+      letterRows: [
+        ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'],
+        ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э']
+      ],
+      row3: ['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю']
+    };
+  }
+}
+</script>
+</body>
+</html>

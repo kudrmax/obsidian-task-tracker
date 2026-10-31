@@ -6,13 +6,16 @@ import { ListDrop } from "../../src/ui/drag/ListDrop";
 import { TaskList } from "../../src/ui/TaskList";
 
 const item = (section: SectionKey, index: number, text: string, group: GroupName): TaskItem => ({
-	key: { section, index, raw: `- [ ] ${text}` },
+	key: { section, index, path: [], raw: `- [ ] ${text}` },
 	text,
 	status: "todo",
 	dueDate: null,
 	slot: null,
 	priority: null,
 	group,
+	subtasks: [],
+	progress: null,
+	parentText: null,
 });
 
 function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | null) {
@@ -32,7 +35,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	return { list, drop };
 }
 
-const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17 });
+const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17, grabX: 17 });
 
 describe("ListDrop", () => {
 	it("draws a header per group once a list has a section", () => {
@@ -46,7 +49,8 @@ describe("ListDrop", () => {
 		const { drop, list } = setup([item("soon", 0, "A", null), b, item("soon", 2, "C", "Morning")], "soon", "soon");
 		const from = drag("left", item("now", 0, "N", null));
 		drop.preview(50, 100 + 3 * 40 + 2, from);
-		expect(list.el.querySelector(".tc-gap-mark")?.nextElementSibling).toBe(list.elements[3]);
+		expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, false, true, true]);
+		expect(document.querySelector(".tc-drop-gap")).not.toBeNull();
 		expect(drop.drop(50, 100 + 3 * 40 + 2, from)).toEqual({ kind: "group", list: "soon", group: "Morning", before: b.key });
 		drop.clear();
 		expect(drop.drop(50, 100 + 5 * 40, from)).toEqual({ kind: "group", list: "soon", group: "Morning", before: null });

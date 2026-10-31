@@ -82,7 +82,18 @@ export class DemoTaskService implements TaskService {
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
-		return { key: { section, index, raw: this.raw(t) }, text: t.text, status: t.status, dueDate: t.dueDate, slot: t.slot, priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null, group: null };
+		return {
+			key: { section, index, path: [], raw: this.raw(t) },
+			text: t.text,
+			status: t.status,
+			dueDate: t.dueDate,
+			slot: t.slot,
+			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
+			subtasks: [],
+			progress: null,
+			parentText: null,
+			group: null,
+		};
 	}
 
 	private items(section: SectionKey): TaskItem[] {
@@ -121,6 +132,11 @@ export class DemoTaskService implements TaskService {
 	async inboxView(): Promise<readonly TaskItem[]> {
 		return this.items("inbox");
 	}
+
+	/** The board's tasks have no subtasks, and the pixel comparison makes none. */
+	async createSubtask(): Promise<void> {}
+
+	async nest(): Promise<void> {}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
 		if (!text.trim()) return;

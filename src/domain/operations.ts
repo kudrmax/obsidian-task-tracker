@@ -19,7 +19,23 @@ function patch(doc: TaskDocument, entry: TaskEntry, changes: Partial<Task>): Tas
 }
 
 function sameEntryIn(doc: TaskDocument, entry: TaskEntry): TaskEntry {
-	return doc.tasks(entry.section)[entry.index];
+	return doc.find(entry.section, entry.index, entry.path)!;
+}
+
+function samePlace(a: TaskEntry, b: TaskEntry): boolean {
+	return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+}
+
+type EntryOperation<A extends unknown[]> = (doc: TaskDocument, entry: TaskEntry, ...rest: A) => TaskDocument;
+
+/** A subtask that goes to another column or the timeline leaves its task first: it becomes the last task of that task's section. */
+function leavingItsTask<A extends unknown[]>(operation: EntryOperation<A>): EntryOperation<A> {
+	return (doc, entry, ...rest) => {
+		if (entry.path.length === 0) return operation(doc, entry, ...rest);
+		const moved = doc.moveEntry(entry, entry.section, "end");
+		const ungrouped = moved.groups(entry.section)[ungroupedIndex(moved.groups(entry.section))].entries;
+		return operation(moved, ungrouped[ungrouped.length - 1], ...rest);
+	};
 }
 
 /** Now is today: a task put into it takes today's due date. */
@@ -77,11 +93,29 @@ export function moveBefore(
 	today: LocalDate,
 ): TaskDocument {
 	if (before === null) return moveInto(doc, entry, listSection(date, today), "end", today);
-	if (before.section === entry.section && before.index === entry.index) return doc;
+	if (samePlace(before, entry)) return doc;
 	return moveInto(doc, entry, before.section, before.index, today);
 }
 
-export function setSlot(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+/** Under `parent`, right before its subtask `before` or last, with all the entry's own subtasks. */
+export function nest(doc: TaskDocument, entry: TaskEntry, parent: TaskEntry, before: TaskEntry | null): TaskDocument {
+	if (before && samePlace(before, entry)) return doc;
+	return doc.nestEntry(entry, parent, before);
+}
+
+/** The due date a subtask takes from the sheet: none for the place it would have anyway, today's for Now, the day for Date. */
+function subtaskDueDate(placement: Placement, inherited: Placement, today: LocalDate): LocalDate | null {
+	if (samePlacement(placement, inherited)) return null;
+	if (placement.kind === "now") return today;
+	return placement.kind === "date" ? placement.date : null;
+}
+
+export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
+	const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
+	return doc.insertUnder(parent, newTask(draft.text, { dueDate, priority: draft.priority }));
+}
+
+function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const clamped = boundary.clamp(slot, SLOT_STEP);
 	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
 	const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
@@ -92,7 +126,7 @@ export function clearSlot(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 	return patch(doc, entry, { slot: null });
 }
 
-export function moveToList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
+function toList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
 	return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
 }
 
@@ -127,26 +161,34 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	const { priority } = draft;
 	const unsorted = section === "inbox";
 	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }));
+	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
 	const edited = patch(doc, entry, { text: draft.text.trim(), priority, ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) });
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 
+/** A subtask stays under its task: another placement only gives it a due date of its own, or takes it away. */
+function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
+	const current = placementOfEntry(entry, today);
+	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
+	return patch(doc, entry, { text: draft.text.trim(), priority: draft.priority, dueDate });
+}
+
 /** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
-export function moveToEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" | "soon"): TaskDocument {
+function toEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" | "soon"): TaskDocument {
 	const prepared = section === "inbox" ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
 	return prepared.moveEntry(sameEntryIn(prepared, entry), section, "end");
 }
 
 /** The Soon column holds tasks without a date: the task loses it, and today's one also leaves Now for the end of Soon. */
-export function moveToSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
+function toSoon(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
 	const undated = setDueDate(doc, entry, null);
 	return date === today ? undated.moveEntry(sameEntryIn(undated, entry), "soon", "end") : undated;
 }
 
 /** Put off to `date`: the time goes, and the task waits in Soon for a later day or comes to the end of Now for today. */
-export function postpone(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
+function putOff(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {
 	const postponed = patch(doc, entry, { dueDate: date, slot: null });
 	const section: SectionKey = date <= today ? "now" : "soon";
 	return entry.section === section ? postponed : postponed.moveEntry(sameEntryIn(postponed, entry), section, "end");
@@ -180,7 +222,7 @@ function enteringList(list: GroupedList, today: LocalDate): Partial<Task> {
 }
 
 export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate): TaskDocument {
-	if (before !== null && before.section === entry.section && before.index === entry.index) return doc;
+	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
 	const entered = patch(doc, entry, enteringList(list, today));
 	const position: InsertPosition = before !== null ? before.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
 	return entered.moveEntry(sameEntryIn(entered, entry), list, position);
@@ -218,3 +260,9 @@ export function renameGroup(doc: TaskDocument, list: GroupedList, from: string, 
 export function removeGroup(doc: TaskDocument, list: GroupedList, name: string): TaskDocument {
 	return doc.mergeGroup(list, groupIndex(doc, list, name), ungroupedIndex(doc.groups(list)), "end");
 }
+
+export const setSlot = leavingItsTask(placeOnTimeline);
+export const moveToList = leavingItsTask(toList);
+export const moveToSoon = leavingItsTask(toSoon);
+export const postpone = leavingItsTask(putOff);
+export const moveToEnd = leavingItsTask(toEnd);

@@ -4,8 +4,8 @@ import type { TaskItem } from "../../src/application/contracts";
 import type { DragPayload } from "../../src/ui/drag/DropTarget";
 import { GroupZones } from "../../src/ui/drag/GroupZones";
 
-const item: TaskItem = { key: { section: "soon", index: 0, raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, group: null };
-const drag: DragPayload = { item, from: "soon", durationMin: null, grabPx: 17 };
+const item: TaskItem = { key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, group: null, subtasks: [], progress: null, parentText: null };
+const drag: DragPayload = { item, from: "soon", durationMin: null, grabPx: 17, grabX: 17 };
 
 function setup(presets: string[], present: string[], offered = true) {
 	const parent = document.createElement("div");

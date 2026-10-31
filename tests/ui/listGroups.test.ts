@@ -4,13 +4,16 @@ import { gapPlace, listGaps, listGroups, showsHeaders } from "../../src/ui/listG
 
 let n = 0;
 const item = (text: string, group: GroupName): TaskItem => ({
-	key: { section: "now", index: n++, raw: `- [ ] ${text}` },
+	key: { section: "now", index: n++, path: [], raw: `- [ ] ${text}` },
 	text,
 	status: "todo",
 	dueDate: null,
 	slot: null,
 	priority: null,
 	group,
+	subtasks: [],
+	progress: null,
+	parentText: null,
 });
 
 describe("listGroups", () => {

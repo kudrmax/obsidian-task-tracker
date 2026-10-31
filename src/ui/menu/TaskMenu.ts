@@ -3,7 +3,7 @@ import type { PriorityColor, PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard } from "../TaskCard";
+import { fillCard, renderTaskCard } from "../TaskCard";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { Overlay } from "./Overlay";
@@ -12,7 +12,7 @@ import { backRow, levelRow, menuGroup, type MenuRowSpec, menuRow, placePanel } f
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 
-export type MenuRowId = "progress" | "done" | "wontdo" | "due" | "priority" | "rename" | "delete";
+export type MenuRowId = "progress" | "done" | "wontdo" | "due" | "priority" | "rename" | "subtask" | "delete";
 
 export interface MenuRow {
 	readonly id: MenuRowId;
@@ -29,7 +29,7 @@ export function menuRows(item: TaskItem): readonly (readonly MenuRow[])[] {
 	const priority: MenuRow = { ...row("priority", "Priority", "priority", item.priority?.prefix ?? ""), dot: item.priority?.color ?? null };
 	return [
 		[row("progress", item.status === "inProgress" ? "Stop progress" : "In progress", "progress"), row("done", "Done", "done"), row("wontdo", "Won’t do", "wontdo")],
-		[row("due", "Due date", "due", item.dueDate ? dayMonth(item.dueDate) : ""), priority, row("rename", "Rename", "rename")],
+		[row("due", "Due date", "due", item.dueDate ? dayMonth(item.dueDate) : ""), priority, row("rename", "Rename", "rename"), row("subtask", "Add subtask", "subtask")],
 		[row("delete", "Delete", "delete", "", true)],
 	];
 }
@@ -48,6 +48,7 @@ export interface MenuActions {
 	setDueDate(date: LocalDate | null): Promise<void>;
 	setPriority(prefix: string | null): Promise<void>;
 	rename(): void;
+	addSubtask(): void;
 	remove(): Promise<void>;
 }
 
@@ -65,9 +66,14 @@ export interface TaskMenuContext {
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
 	/** `picker`: the menu opens on its date picker (a card dropped on Pick a date). */
 	readonly opening?: "picker";
+	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
+	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
 }
 
-/** The task menu over a blurred screen: the tapped card stays as it is above the blur, the panel grows out under it; the due submenu and the month picker take its place. */
+/**
+ * The task menu over a blurred screen: the tapped card stays as it is above the blur, a timeline card with its subtasks
+ * under it, and the panel grows out under them; the due submenu and the month picker take its place.
+ */
 export class TaskMenu {
 	private readonly overlay: Overlay;
 	private readonly lifted: HTMLElement;
@@ -85,7 +91,8 @@ export class TaskMenu {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		this.anchor = this.liftWhole(context.source.getBoundingClientRect());
+		const copy = this.liftWhole(context.source.getBoundingClientRect());
+		this.anchor = context.source.classList.contains("tc-block") && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = this.overlay.add(el(null, "div", "tc-panel"));
 		if (context.opening === "picker") this.showPicker();
@@ -102,6 +109,23 @@ export class TaskMenu {
 		this.lifted.style.left = px(left);
 		this.lifted.style.top = px(top);
 		return new DOMRect(left, top, size.width, size.height);
+	}
+
+	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */
+	private showSubtasks(copy: DOMRect): DOMRect {
+		const { item, day, onSubtask } = this.context;
+		const list = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
+		list.style.left = px(copy.left);
+		list.style.top = px(copy.bottom);
+		list.style.width = px(copy.width);
+		for (const subtask of item.subtasks) {
+			const card = renderTaskCard(list, subtask, { day });
+			card.addEventListener("click", () => {
+				this.close();
+				onSubtask?.(subtask, card);
+			});
+		}
+		return new DOMRect(copy.left, copy.top, copy.width, list.getBoundingClientRect().bottom - copy.top);
 	}
 
 	private place(): void {
@@ -127,6 +151,7 @@ export class TaskMenu {
 			due: () => this.showDue(),
 			priority: () => this.showPriority(),
 			rename: this.pick(() => actions.rename()),
+			subtask: this.pick(() => actions.addSubtask()),
 			delete: this.pick(() => actions.remove()),
 		};
 		for (const group of menuRows(item)) menuGroup(this.panel, group.map((row): MenuRowSpec => ({ label: row.label, value: row.value, dot: row.dot, icon: row.icon, danger: row.danger, onPick: handlers[row.id] })));

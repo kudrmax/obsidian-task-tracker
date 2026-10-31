@@ -19,6 +19,14 @@
       "name": "Заголовки #25"
     },
     {
+      "id": "subtasks17final",
+      "name": "Подзадачи #17"
+    },
+    {
+      "id": "components",
+      "name": "Служебное: компоненты"
+    },
+    {
       "id": "sections",
       "name": "Секции"
     }
@@ -1079,6 +1087,62 @@
       "y": 1084,
       "page": "headers25",
       "title": "Принято: Soon и Now, длинная дата"
+    },
+    "Sub17Final.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 0,
+      "y": 0,
+      "page": "components",
+      "title": "Компонент экранов подзадач (его показывают сценарии #17)"
+    },
+    "Sub17Flow1.dc.html": {
+      "h": 1076,
+      "w": 1128,
+      "x": 0,
+      "y": 0,
+      "page": "subtasks17final",
+      "title": "1. Подзадачи в списке"
+    },
+    "Sub17Flow2.dc.html": {
+      "h": 1076,
+      "w": 2348,
+      "x": 0,
+      "y": 1276,
+      "page": "subtasks17final",
+      "title": "2. Добавить подзадачу"
+    },
+    "Sub17Flow3.dc.html": {
+      "h": 2140,
+      "w": 1738,
+      "x": 0,
+      "y": 2552,
+      "page": "subtasks17final",
+      "title": "3. Перенести подзадачу"
+    },
+    "Sub17Flow4.dc.html": {
+      "h": 1076,
+      "w": 1128,
+      "x": 0,
+      "y": 4892,
+      "page": "subtasks17final",
+      "title": "4. Перенести задачу с подзадачами"
+    },
+    "Sub17Flow5.dc.html": {
+      "h": 1076,
+      "w": 1128,
+      "x": 0,
+      "y": 6168,
+      "page": "subtasks17final",
+      "title": "5. Задача с подзадачами на календаре"
+    },
+    "Sub17FlowLight.dc.html": {
+      "h": 1076,
+      "w": 1928,
+      "x": 0,
+      "y": 7444,
+      "page": "subtasks17final",
+      "title": "Светлая тема"
     },
     "SecFinal.dc.html": {
       "h": 844,

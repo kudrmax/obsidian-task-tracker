@@ -11,6 +11,7 @@ export const SHEET_ICONS = {
 	now: "M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4",
 	date: "M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4",
 	clock: "M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M12 7.5V12l3 2",
+	subtask: "M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4",
 } as const;
 
 export function sheetIcon(name: keyof typeof SHEET_ICONS): SVGSVGElement {

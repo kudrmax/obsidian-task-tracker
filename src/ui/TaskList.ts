@@ -1,4 +1,5 @@
 import type { TaskItem } from "../application/contracts";
+import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { clear, el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
@@ -14,16 +15,19 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
-	onCard?(card: HTMLElement, item: TaskItem): void;
+	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
+	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
 }
 
 export interface ListEntry {
 	readonly card: HTMLElement;
 	readonly item: TaskItem;
+	/** 0 for a task, one more for each task above a subtask. */
+	readonly level: number;
 }
 
-/** A column of cards that scrolls; with sections, a header over each. */
+/** A column of cards that scrolls: each task with its open subtasks right under it, a level further in; with sections, a header over each. */
 export class TaskList {
 	private entries: ListEntry[] = [];
 	private rendered: ListGroup[] = [];
@@ -40,20 +44,24 @@ export class TaskList {
 
 	render(): void {
 		clear(this.el);
+		this.entries = [];
+		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
 		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 		this.withHeaders = showsHeaders(this.rendered);
-		this.entries = [];
-		this.nodes = [];
+		const add = (item: TaskItem, level: number): void => {
+			const card = renderTaskCard(this.el, item, { day });
+			card.style.setProperty(PROPERTY.level, String(level));
+			this.entries.push({ card, item, level });
+			this.nodes.push(card);
+			const from = this.entries.length;
+			for (const sub of item.subtasks) add(sub, level + 1);
+			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));
+		};
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			for (const item of group.items) {
-				const card = renderTaskCard(this.el, item, { day });
-				this.deps.onCard?.(card, item);
-				this.entries.push({ card, item });
-				this.nodes.push(card);
-			}
+			for (const item of group.items) add(item, 0);
 		}
 		const pending = this.deps.pending?.() ?? null;
 		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;

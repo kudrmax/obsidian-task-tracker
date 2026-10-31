@@ -184,7 +184,7 @@ export class TaskCalendarView extends ItemView {
 			pending: () => this.namingIn("now"),
 			onHeader: (head, group) => this.groupDrag.attach(head, "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
+			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => (this.selectedDate === this.today() ? "now" : null));
 		this.inboxEl = el(root, "div", "tc-inbox");
@@ -195,7 +195,7 @@ export class TaskCalendarView extends ItemView {
 			pending: () => this.namingIn("inbox"),
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
+			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "inbox", subtree),
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => "inbox");
 		this.soonEl = el(root, "div", "tc-soon");
@@ -206,7 +206,7 @@ export class TaskCalendarView extends ItemView {
 			pending: () => this.namingIn("soon"),
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
+			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "soon", subtree),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => "soon");
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -461,6 +461,7 @@ export class TaskCalendarView extends ItemView {
 			if (result.kind === "postpone") return tasks.postpone(key, result.date);
 			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before);
 			if (result.kind === "newGroup") return tasks.createGroup(key, result.list, result.name);
+			if (result.kind === "nest") return tasks.nest(key, result.parent, result.before);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
 			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
@@ -557,6 +558,19 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
+	/** The task screen for a new subtask of `parent`: the parent's placement chosen, its title over the new one. */
+	private subtaskSheet(parent: TaskItem): void {
+		TaskSheet.open(this.contentEl, {
+			mode: "new",
+			initial: { text: "", placement: this.deps.tasks.placementOf(parent), priority: null },
+			slot: null,
+			today: this.today(),
+			levels: usableLevels(this.settings.priorities),
+			parent: parent.text,
+			onSubmit: (draft) => this.act(() => this.deps.tasks.createSubtask(parent.key, draft)),
+		});
+	}
+
 	private editSheet(item: TaskItem): void {
 		TaskSheet.open(this.contentEl, {
 			mode: "edit",
@@ -564,6 +578,7 @@ export class TaskCalendarView extends ItemView {
 			slot: item.slot,
 			today: this.today(),
 			levels: usableLevels(this.settings.priorities),
+			parent: item.parentText,
 			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
 		});
 	}
@@ -577,6 +592,7 @@ export class TaskCalendarView extends ItemView {
 			source,
 			lifted,
 			opening,
+			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			today: this.today(),
 			day: this.selectedDate,
 			levels: usableLevels(this.settings.priorities),
@@ -585,6 +601,7 @@ export class TaskCalendarView extends ItemView {
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: () => this.editSheet(item),
+				addSubtask: () => this.subtaskSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},
 		});

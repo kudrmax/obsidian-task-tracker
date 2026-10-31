@@ -65,6 +65,8 @@ export const PROPERTY = {
 	pull: "--tc-pull",
 	/** The keyboard's height reserved under the task screen's content before the host shrinks the view for it. */
 	keyboard: "--tc-keyboard",
+	/** How deep a subtask's card stands under its task: 0 for a task. */
+	level: "--tc-level",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
