@@ -7,7 +7,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "no
 describe("menuRows", () => {
 	it("offers the three groups for a task to do", () => {
 		const groups = menuRows(item({ dueDate: "2026-11-03" }));
-		expect(groups.map((g) => g.map((r) => r.id))).toEqual([["progress", "done", "wontdo"], ["due", "priority", "rename"], ["delete"]]);
+		expect(groups.map((g) => g.map((r) => r.id))).toEqual([["progress", "done", "wontdo"], ["due", "priority", "rename", "subtask"], ["delete"]]);
 		expect(groups[0][0].label).toBe("In progress");
 		expect(groups[1][0].value).toBe("3 Nov");
 		expect(groups[2][0].danger).toBe(true);

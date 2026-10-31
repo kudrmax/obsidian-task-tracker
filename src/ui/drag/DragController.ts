@@ -53,7 +53,8 @@ const NEW_SLOT = "newslot";
 export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
 
-	attachCard(card: HTMLElement, item: TaskItem, from: DragOrigin): void {
+	/** `subtree`: the cards of the task's subtasks, which gather under it while it is dragged. */
+	attachCard(card: HTMLElement, item: TaskItem, from: DragOrigin, subtree: readonly HTMLElement[] = []): void {
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
 			this.deps.onMenu(item, card);
@@ -61,7 +62,7 @@ export class DragController {
 		new LongPress(card, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
-			onStart: (e) => this.begin(card, this.payload(card, item, from, e), e),
+			onStart: (e) => this.begin(card, this.payload(card, item, from, e), e, subtree),
 			onTap: () => this.deps.onMenu(item, card),
 		});
 	}
@@ -83,8 +84,9 @@ export class DragController {
 	private payload(card: HTMLElement, item: TaskItem, from: DragOrigin, e: PointerEvent): DragPayload {
 		const onTimeline = from === "timeline" && item.slot;
 		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
-		const grabPx = onTimeline ? e.clientY - card.getBoundingClientRect().top : shownCardSize().height / 2;
-		return { item, from, durationMin, grabPx };
+		const rect = card.getBoundingClientRect();
+		const grabPx = onTimeline ? e.clientY - rect.top : shownCardSize().height / 2;
+		return { item, from, durationMin, grabPx, grabX: e.clientX - rect.left };
 	}
 
 	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
@@ -177,20 +179,21 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private begin(source: HTMLElement, payload: DragPayload, e: PointerEvent): void {
+	private begin(source: HTMLElement, payload: DragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = []): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
-		source.classList.add("is-lifted");
+		const lifted = [source, ...subtree];
+		for (const card of lifted) card.classList.add("is-lifted");
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		let picked = false;
 		const reopen = () => {
-			source.classList.remove("is-lifted");
+			for (const card of lifted) card.classList.remove("is-lifted");
 			timeline?.layoutTasks();
 		};
 		const session = new DragSession({
