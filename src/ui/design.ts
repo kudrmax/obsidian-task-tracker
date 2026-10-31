@@ -67,6 +67,8 @@ export const PROPERTY = {
 	keyboard: "--tc-keyboard",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
+	/** How many levels back from a subtask's card a line of a task further up passes it. */
+	pass: "--tc-pass",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
