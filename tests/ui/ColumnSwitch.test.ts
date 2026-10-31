@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RightMode } from "../../src/settings";
 import { ColumnSwitch } from "../../src/ui/ColumnSwitch";
+import { GestureArbiter } from "../../src/ui/gestures";
 
 const LONG_PRESS = 250;
 const STEP = 38;
@@ -11,7 +12,7 @@ function pointer(type: string, clientX: number): PointerEvent {
 }
 
 /** happy-dom lays nothing out: the icon's width and the pill's place are what the stylesheet would give. */
-function setUp(initial: RightMode, dot = false) {
+function setUp(initial: RightMode, dot = false, arbiter = new GestureArbiter()) {
 	let mode = initial;
 	const changes: RightMode[] = [];
 	let sources = 0;
@@ -25,6 +26,7 @@ function setUp(initial: RightMode, dot = false) {
 		dot: () => dot,
 		onSources: () => sources++,
 		longPressMs: () => LONG_PRESS,
+		arbiter,
 	});
 	const icons = [...control.el.querySelectorAll<HTMLElement>(".tc-seg-reel")[0].querySelectorAll<HTMLElement>(".tc-seg-icon")];
 	for (const icon of control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")) Object.defineProperty(icon, "offsetWidth", { get: () => STEP });
@@ -125,6 +127,32 @@ describe("ColumnSwitch", () => {
 		expect(s.changes).toEqual(["soon", "calendar"]);
 		s.drag(100, 180);
 		expect(s.changes).toEqual(["soon", "calendar", "inbox"]);
+	});
+
+	it("holds the screen while the wheel is turned, and waits while another gesture holds it", () => {
+		const arbiter = new GestureArbiter();
+		const s = setUp("calendar", false, arbiter);
+		s.control.el.dispatchEvent(pointer("pointerdown", 100));
+		s.control.el.dispatchEvent(pointer("pointermove", 115));
+		expect(arbiter.busy).toBe(true);
+		s.control.el.dispatchEvent(pointer("pointermove", 180));
+		s.control.el.dispatchEvent(pointer("pointerup", 180));
+		expect(arbiter.busy).toBe(false);
+		expect(s.changes).toEqual(["inbox"]);
+		arbiter.claim("swipe");
+		s.drag(100, 0);
+		expect(s.changes).toEqual(["inbox"]);
+		expect(s.wheel()).toBe(0);
+	});
+
+	it("glides to a place the screen asks for, as after a tap", () => {
+		const s = setUp("soon");
+		s.control.show("calendar");
+		expect(s.changes).toEqual(["calendar"]);
+		expect(s.lit()).toEqual([2, 3]);
+		expect(s.control.el.classList.contains("is-settling")).toBe(true);
+		s.control.show("calendar");
+		expect(s.changes).toEqual(["calendar"]);
 	});
 
 	it("opens the sources when held while the calendar shows, and does not flip", () => {

@@ -127,6 +127,10 @@ export const LAYOUT = {
 	pullThreshold: 60,
 	/** A released pinch settles on the nearest zoom level over this long. */
 	zoomSnapMs: 200,
+	/** A finger drawn sideways this far steps to the next screen when let go. */
+	swipeDistance: 48,
+	/** So does a shorter flick still this fast when let go, px per ms. */
+	swipeFlickSpeed: 0.3,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */

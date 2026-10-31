@@ -33,6 +33,8 @@ import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
+import { type Shift, stepScreen } from "./screens";
+import { Swipe } from "./Swipe";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate, Slot } from "./types";
@@ -220,6 +222,7 @@ export class TaskCalendarView extends ItemView {
 			max: () => listWidthMax(root.clientWidth),
 			center: () => centeredListWidth(root.clientWidth),
 			onSnap: () => this.haptics.tap(),
+			arbiter: this.arbiter,
 		});
 		this.rightEl = el(root, "div", "tc-right");
 		this.allDayEl = el(this.rightEl, "div");
@@ -272,8 +275,14 @@ export class TaskCalendarView extends ItemView {
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
+			arbiter: this.arbiter,
 		});
 		this.switcher = switcher;
+		new Swipe(root, {
+			arbiter: this.arbiter,
+			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet")),
+			onSwipe: (shift) => this.step(shift),
+		});
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -360,6 +369,14 @@ export class TaskCalendarView extends ItemView {
 	private select(date: LocalDate): void {
 		this.selectedDate = date;
 		void this.data.selectDay();
+	}
+
+	/** A swipe walks the row of screens: the switch carries the window to its place, and the day turns as the arrows turn it. */
+	private step(shift: Shift): void {
+		const to = stepScreen({ mode: this.settings.rightMode, date: this.selectedDate }, shift, this.today());
+		if (!to) return;
+		if (to.date !== this.selectedDate) this.select(to.date);
+		if (to.mode !== this.settings.rightMode) this.switcher?.show(to.mode);
 	}
 
 	/**
