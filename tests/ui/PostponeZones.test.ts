@@ -4,7 +4,7 @@ import type { TaskItem } from "../../src/application/contracts";
 import type { DragPayload } from "../../src/ui/drag/DropTarget";
 import { PostponeZones } from "../../src/ui/drag/PostponeZones";
 
-const item: TaskItem = { key: { section: "now", index: 0, raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null };
+const item: TaskItem = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null };
 const drag: DragPayload = { item, from: "soon", durationMin: null, grabPx: 20 };
 const TODAY = "2026-10-30";
 

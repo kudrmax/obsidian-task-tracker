@@ -73,12 +73,15 @@ describe("soonWithoutDate", () => {
 describe("toItem", () => {
 	it("carries the key and the fields the UI shows", () => {
 		expect(toItem(doc.tasks("now")[1])).toEqual({
-			key: { section: "now", index: 1, raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00" },
+			key: { section: "now", index: 1, path: [], raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00" },
 			text: "Slotted today",
 			status: "inProgress",
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
 			priority: null,
+			subtasks: [],
+			progress: null,
+			parentText: null,
 		});
 	});
 });

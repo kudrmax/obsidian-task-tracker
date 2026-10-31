@@ -4,12 +4,15 @@ import type { TaskItem } from "../../src/application/contracts";
 import { renderTaskCard } from "../../src/ui/TaskCard";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
-	key: { section: "now", index: 0, raw: "- [ ] Купить билеты" },
+	key: { section: "now", index: 0, path: [], raw: "- [ ] Купить билеты" },
 	text: "Купить билеты в Белград",
 	status: "todo",
 	dueDate: null,
 	slot: null,
 	priority: null,
+	subtasks: [],
+	progress: null,
+	parentText: null,
 	...extra,
 });
 

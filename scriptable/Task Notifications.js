@@ -277,11 +277,19 @@ var SECTION_KEYS = ["inbox", "now", "soon", "done"];
 var HEADING_RE = /^#{1,6}(\s|$)/;
 var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
 var INDENT_RE = /^[ \t]*/;
+var DEFAULT_INDENT_UNIT = "	";
 function indentWidth(line) {
   return INDENT_RE.exec(line)[0].length;
 }
 function sameTask(a, b) {
   return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.children.length === b.children.length && a.children.every((c, i) => c === b.children[i]);
+}
+function contains(entry, other) {
+  return entry.section === other.section && entry.index === other.index && entry.path.every((i, k) => other.path[k] === i) && other.path.length >= entry.path.length;
+}
+function reindented(lines, from, to) {
+  if (from === to) return [...lines];
+  return lines.map((line) => line.startsWith(from) ? to + line.slice(from.length) : line);
 }
 var TaskDocument = class _TaskDocument {
   constructor(lines, eol, trailingEol, names, markers) {
@@ -318,6 +326,12 @@ var TaskDocument = class _TaskDocument {
   tasks(section) {
     return this.entries.get(section) ?? [];
   }
+  /** The task or subtask at that place, if there is one. */
+  find(section, index, path) {
+    let entry = this.tasks(section)[index];
+    for (const i of path) entry = entry?.subtasks[i];
+    return entry;
+  }
   allTasks() {
     return SECTION_KEYS.flatMap((key) => this.tasks(key));
   }
@@ -334,12 +348,27 @@ var TaskDocument = class _TaskDocument {
     const span = this.spanOf(entry);
     return this.withLines(this.splice(span.line, span.lineCount, []));
   }
+  /** A subtask moved here leaves its task and becomes a task of `section`. */
   moveEntry(entry, section, position) {
     const span = this.spanOf(entry);
-    const moved = this.lines.slice(span.line, span.line + span.lineCount);
+    const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
     const without = this.withLines(this.splice(span.line, span.lineCount, []));
     const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
     return without.withLines(without.splice(target, 0, moved));
+  }
+  /** Puts the entry with its subtasks among `parent`'s subtasks, right before `before` (one of them) or last. */
+  nestEntry(entry, parent, before) {
+    if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
+    const span = this.spanOf(entry);
+    const target = before ? this.spanOf(before).line : this.endOf(parent);
+    const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
+    const without = this.splice(span.line, span.lineCount, []);
+    without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
+    return this.withLines(without);
+  }
+  /** A new last subtask of `parent`. */
+  insertUnder(parent, task) {
+    return this.withLines(this.splice(this.endOf(parent), 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
   }
   ensureSections(all) {
     const present = new Set(this.headingNames());
@@ -364,13 +393,36 @@ var TaskDocument = class _TaskDocument {
     return [formatTaskLine({ indent, bullet, task }, this.markers), ...task.children];
   }
   spanOf(entry) {
-    const own = this.tasks(entry.section)[entry.index];
+    const own = this.find(entry.section, entry.index, entry.path);
     const span = own && own.raw === entry.raw ? this.spans.get(own) : void 0;
-    if (!span) throw new Error(`Task not found in the document: ${entry.section}[${entry.index}] ${entry.raw}`);
+    if (!span) throw new Error(`Task not found in the document: ${entry.section}[${entry.index}]${entry.path.map((i) => `[${i}]`).join("")} ${entry.raw}`);
     return span;
   }
+  endOf(entry) {
+    const span = this.spanOf(entry);
+    return span.line + span.lineCount;
+  }
+  /** The indent of `parent`'s subtasks: the one they have, else one level deeper by the file's own step. */
+  childIndent(parent) {
+    return parent.subtasks[0]?.indent ?? parent.indent + this.indentUnit();
+  }
+  indentUnit() {
+    const step = (entry) => {
+      for (const sub of entry.subtasks) {
+        if (sub.indent.startsWith(entry.indent) && sub.indent.length > entry.indent.length) return sub.indent.slice(entry.indent.length);
+        const deeper = step(sub);
+        if (deeper) return deeper;
+      }
+      return null;
+    };
+    for (const entry of this.allTasks()) {
+      const unit = step(entry);
+      if (unit) return unit;
+    }
+    return DEFAULT_INDENT_UNIT;
+  }
   positionAfterRemoval(entry, section, position) {
-    if (typeof position !== "number" || section !== entry.section || position <= entry.index) return position;
+    if (typeof position !== "number" || entry.path.length > 0 || section !== entry.section || position <= entry.index) return position;
     return position - 1;
   }
   insertionLine(section, position) {
@@ -410,24 +462,23 @@ var TaskDocument = class _TaskDocument {
     return this.lines.length;
   }
   readTasks(key, section, spans) {
+    return this.readLevel(key, section.firstLine, section.endLine, null, spans);
+  }
+  /** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
+  readLevel(section, from, end, parent, spans) {
     const entries = [];
-    let i = section.firstLine;
-    while (i < section.endLine) {
+    let i = from;
+    while (i < end) {
       const raw = this.lines[i];
       const parsed = parseTaskLine(raw, this.markers);
       if (!parsed) {
         i++;
         continue;
       }
-      const children = this.childrenOf(i, section.endLine, parsed.indent.length);
-      const entry = {
-        section: key,
-        index: entries.length,
-        raw,
-        indent: parsed.indent,
-        bullet: parsed.bullet,
-        task: { ...parsed.task, children }
-      };
+      const children = this.childrenOf(i, end, parsed.indent.length);
+      const place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: entries.length, path: [] };
+      const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, spans);
+      const entry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, subtasks };
       entries.push(entry);
       spans.set(entry, { line: i, lineCount: 1 + children.length });
       i += 1 + children.length;

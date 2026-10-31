@@ -73,7 +73,7 @@ describe("writing", () => {
 	it("keys refer to the normalized file even before it was written", async () => {
 		const { store, svc } = setup("## Now\n- [x] Old\n- [ ] A\n\n## Done\n");
 		const view = await svc.dayView(T);
-		expect(view.list[0].key).toEqual({ section: "now", index: 0, raw: "- [ ] A" });
+		expect(view.list[0].key).toEqual({ section: "now", index: 0, path: [], raw: "- [ ] A" });
 		await svc.rename(view.list[0].key, "A2");
 		expect(store.text).toBe("## Now\n- [ ] A2\n\n## Done\n- [x] Old\n\n## Inbox\n\n## Soon\n");
 	});
@@ -283,7 +283,7 @@ describe("Inbox", () => {
 		const { svc } = setup("## Inbox\n- [ ] I\n- [/] J\n\n## Now\n- [ ] A\n\n## Soon\n- [ ] C\n");
 		const inbox = await svc.inboxView();
 		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
-		expect(inbox[1].key).toEqual({ section: "inbox", index: 1, raw: "- [/] J" });
+		expect(inbox[1].key).toEqual({ section: "inbox", index: 1, path: [], raw: "- [/] J" });
 		expect(svc.placementOf(inbox[0])).toEqual({ kind: "inbox" });
 		expect((await svc.dayView(T)).list.map((i) => i.text)).toEqual(["A"]);
 	});
@@ -361,5 +361,35 @@ describe("postpone", () => {
 		const view = await svc.dayView(T);
 		await svc.postpone(view.slotted[0].key, "2026-10-31");
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A 📅 2026-10-31\n\n## Backlog\n\n## Done\n");
+	});
+});
+
+describe("subtasks", () => {
+	const TRIP = "## Inbox\n\n## Now\n- [ ] Trip\n\t- [x] Compare\n\t- [ ] Pay\n- [ ] Call\n\n## Soon\n\n## Done\n";
+
+	it("shows a task's open subtasks under it, with keys of their own", async () => {
+		const { svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		expect(trip.progress).toEqual({ done: 1, total: 2 });
+		expect(trip.subtasks.map((s) => s.key)).toEqual([{ section: "now", index: 0, path: [1], raw: "\t- [ ] Pay" }]);
+	});
+
+	it("acts on a subtask by its key and rejects a stale one", async () => {
+		const { store, svc } = setup(TRIP);
+		const pay = (await svc.dayView(T)).list[0].subtasks[0];
+		await svc.rename(pay.key, "Pay all");
+		expect(store.text).toContain("\t- [ ] Pay all\n");
+		await expect(svc.setStatus(pay.key, "done")).rejects.toBeInstanceOf(StaleTaskError);
+	});
+
+	it("adds a subtask last under its task and nests a task under another", async () => {
+		const { store, svc } = setup(TRIP);
+		const [trip, call] = (await svc.dayView(T)).list;
+		await svc.createSubtask(trip.key, { text: "Bag", placement: svc.placementOf(trip), priority: null });
+		expect(store.text).toContain("\t- [ ] Pay\n\t- [ ] Bag\n- [ ] Call\n");
+		const fresh = (await svc.dayView(T)).list;
+		await svc.nest(fresh[1].key, fresh[0].key, fresh[0].subtasks[0].key);
+		expect(store.text).toContain("- [ ] Trip\n\t- [x] Compare\n\t- [ ] Call\n\t- [ ] Pay\n\t- [ ] Bag\n");
+		expect(call.text).toBe("Call");
 	});
 });

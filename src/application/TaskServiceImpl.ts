@@ -75,6 +75,11 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today) => ops.placeTask(doc, null, draft, today, slot));
 	}
 
+	async createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
+		if (this.blank(draft.text)) return;
+		await this.mutate((doc, today) => ops.createSubtask(doc, this.entryOf(doc, parent), draft, today));
+	}
+
 	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
 		if (this.blank(draft.text)) return;
 		await this.mutate((doc, today) => ops.placeTask(doc, this.entryOf(doc, key), draft, today));
@@ -112,6 +117,10 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today) =>
 			ops.moveBefore(doc, this.entryOf(doc, key), before ? this.entryOf(doc, before) : null, date, today),
 		);
+	}
+
+	async nest(key: TaskKey, parent: TaskKey, before: TaskKey | null): Promise<void> {
+		await this.mutate((doc) => ops.nest(doc, this.entryOf(doc, key), this.entryOf(doc, parent), before ? this.entryOf(doc, before) : null));
 	}
 
 	async setSlot(key: TaskKey, slot: Slot): Promise<void> {
@@ -214,7 +223,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {
-		const entry = doc.tasks(key.section)[key.index];
+		const entry = doc.find(key.section, key.index, key.path);
 		if (!entry || entry.raw !== key.raw) throw new StaleTaskError();
 		return entry;
 	}
