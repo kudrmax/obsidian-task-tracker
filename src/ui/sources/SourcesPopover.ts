@@ -6,7 +6,7 @@ import { sourceIcon } from "./sourceIcons";
 import { sourceText } from "./sourceText";
 
 export interface SourcesPopoverOptions {
-	/** The switch in the day row; a copy of it stays over the backdrop, and the panel hangs under it. */
+	/** The switch at the bottom; a copy of it stays over the backdrop, and the panel stands over it, centred on it. */
 	readonly anchor: HTMLElement;
 	readonly statuses: readonly SourceStatus[];
 	readonly now: Date;
@@ -29,7 +29,8 @@ export class SourcesPopover {
 		copy.style.left = px(rect.left);
 		copy.style.top = px(rect.top);
 		const panel = this.overlay.add(el(null, "div", "tc-popover"));
-		panel.style.setProperty(PROPERTY.panelY, px(rect.bottom));
+		panel.style.left = px(rect.left + rect.width / 2);
+		panel.style.setProperty(PROPERTY.panelY, px(window.innerHeight - rect.top));
 		for (const status of opts.statuses) {
 			const text = sourceText(status, opts.now);
 			const row = el(panel, "div", "tc-source-row");

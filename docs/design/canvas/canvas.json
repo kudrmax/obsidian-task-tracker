@@ -13,6 +13,10 @@
     {
       "id": "postpone22",
       "name": "Отложить #22"
+    },
+    {
+      "id": "headers25",
+      "name": "Заголовки #25"
     }
   ],
   "boards": {
@@ -1015,6 +1019,62 @@
       "w": 390,
       "x": 2350,
       "y": 0
+    },
+    "Headers25NowInbox.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 0,
+      "y": 0,
+      "page": "headers25",
+      "title": "Сейчас: Inbox и Soon"
+    },
+    "Headers25NowSoon.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 470,
+      "y": 0,
+      "page": "headers25",
+      "title": "Сейчас: Soon и Now"
+    },
+    "Headers25NowCal.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 940,
+      "y": 0,
+      "page": "headers25",
+      "title": "Сейчас: Now и календарь"
+    },
+    "Headers25BottomInbox.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 0,
+      "y": 1084,
+      "page": "headers25",
+      "title": "Принято: Inbox и Soon"
+    },
+    "Headers25BottomSoon.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 470,
+      "y": 1084,
+      "page": "headers25",
+      "title": "Принято: Soon и Now"
+    },
+    "Headers25BottomCal.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 940,
+      "y": 1084,
+      "page": "headers25",
+      "title": "Принято: Now и календарь"
+    },
+    "Headers25BottomLong.dc.html": {
+      "h": 844,
+      "w": 390,
+      "x": 1410,
+      "y": 1084,
+      "page": "headers25",
+      "title": "Принято: Soon и Now, длинная дата"
     }
   },
   "createdOnFiles": {
@@ -1257,6 +1317,15 @@
       "w": 240,
       "x": 0,
       "y": -300
+    },
+    "headers25Title": {
+      "kind": "title1",
+      "maxW": 1300,
+      "page": "headers25",
+      "text": "Заголовок у каждой колонки, едет вместе с ней. Выбран ряд 1: переключатель внизу по центру (31.10)",
+      "w": 240,
+      "x": 0,
+      "y": -300
     }
   },
   "order": [
@@ -1384,7 +1453,14 @@
     "Postpone22Inbox.dc.html",
     "Postpone22Light.dc.html",
     "Postpone22OnTomorrow.dc.html",
-    "Postpone22OnLater.dc.html"
+    "Postpone22OnLater.dc.html",
+    "Headers25NowInbox.dc.html",
+    "Headers25NowSoon.dc.html",
+    "Headers25NowCal.dc.html",
+    "Headers25BottomInbox.dc.html",
+    "Headers25BottomSoon.dc.html",
+    "Headers25BottomCal.dc.html",
+    "Headers25BottomLong.dc.html"
   ],
   "title": "Task Calendar"
 }
