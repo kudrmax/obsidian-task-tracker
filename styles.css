@@ -1,6 +1,6 @@
 /*
  * Task Calendar's design system: docs/design/canvas/Screen.dc.html, token by token. Every value lives here, in the
- * body block: colours (the design's own, explicit; only the in-progress strip takes Obsidian's accent), shapes, sizes,
+ * body block: colours (the design's own, explicit; the in-progress strip takes Obsidian's accent, the ground is the theme's), shapes, sizes,
  * then the colours the light theme changes in the body.theme-light block (the same names, nothing else),
  * type, spacing, layers and motion. Component rules below only read these tokens; tests/styles.test.ts fails on a
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
@@ -12,9 +12,12 @@
  */
 body {
 	/* Colour */
-	--tc-bg: #000000;
+	--tc-bg: var(--background-primary);
 	--tc-text: #FFFFFF;
-	--tc-card-bg: #1C1C1E;
+	/* A plain card stands this far from the theme's ground towards the text, whatever the ground: black on the phone, grey on the desktop. */
+	--tc-card-lift: 11%;
+	--tc-card-lift-light: 5%;
+	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift));
 	/* Chevrons, the due day, the chosen segment's ground. */
 	--tc-ink-soft: #E5E5EA;
 	/* The due day, a tile's label, the chosen segment's and tile's ground. */
@@ -62,7 +65,7 @@ body {
 	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
 	--tc-pull-ink: #AEAEB2;
 	/* The segmented control's ground, and the bands between a menu's groups. */
-	--tc-track-bg: #1C1C1E;
+	--tc-track-bg: var(--tc-card-bg);
 	--tc-gap-ink: #1C1C1E;
 	/* Priority levels: a dot of the colour itself, and a card's ground: the colour 26 % over the card. */
 	--tc-priority-red: #FF453A;
@@ -380,9 +383,8 @@ body {
 
 /* The light theme follows Obsidian's: the same roles, the values of the board «Палитра» (docs/design/README.md, «Светлая тема»). */
 body.theme-light {
-	--tc-bg: #FFFFFF;
 	--tc-text: #000000;
-	--tc-card-bg: #F2F2F7;
+	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift-light));
 	--tc-ink-soft: #3A3A3C;
 	--tc-ink-strong: #1C1C1E;
 	--tc-on-strong: #FFFFFF;
@@ -414,7 +416,6 @@ body.theme-light {
 	--tc-popover-bg: rgba(250, 250, 252, 0.97);
 	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-pull-ink: #6C6C70;
-	--tc-track-bg: #EEEEF0;
 	--tc-gap-ink: #E5E5EA;
 	--tc-priority-red: #FF3B30;
 	--tc-priority-red-card: #F4D5D7;

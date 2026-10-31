@@ -162,7 +162,7 @@ describe("styles.css keeps to its design system", () => {
 		const dark = sheet.tokens;
 		const light = sheet.lightTokens;
 		expect([...light.keys()].filter((name) => !dark.has(name))).toEqual([]);
-		const colour = /#[0-9a-f]{6}|rgba?[(]|var[(]--interactive-accent[)]/i;
+		const colour = /#[0-9a-f]{6}|rgba?[(]|color-mix[(]|var[(]--interactive-accent[)]/i;
 		expect([...light.entries()].filter(([, value]) => !colour.test(value))).toEqual([]);
 		expect(light.size).toBeGreaterThan(0);
 	});
@@ -217,13 +217,31 @@ describe("the time on a card with a priority", () => {
 		const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
 		return (high + 0.05) / (low + 0.05);
 	};
+	const resolve = (t: Map<string, string>, value: string): string => {
+		const reference = /^var\((--[\w-]+)\)$/.exec(value);
+		if (reference) return resolve(t, t.get(reference[1])!);
+		const mix = /^color-mix\(in srgb, (var\(--[\w-]+\)), (var\(--[\w-]+\)) (var\(--[\w-]+\))\)$/.exec(value);
+		if (!mix) return value;
+		const [from, to] = [mix[1], mix[2]].map((part) => resolve(t, part));
+		const share = parseFloat(resolve(t, mix[3])) / 100;
+		const channel = (hex: string, i: number): number => parseInt(hex.slice(i, i + 2), 16);
+		return `#${[1, 3, 5].map((i) => Math.round(channel(from, i) * (1 - share) + channel(to, i) * share).toString(16).padStart(2, "0")).join("")}`;
+	};
+	/** Obsidian's own grounds (black on the phone, grey on the desktop, white in the light theme), each with the board's card on its board's ground. */
+	const GROUNDS = [
+		["dark, phone", () => new Map([...sheet.tokens, ["--background-primary", "#000000"]]), ["#1C1C1E", "#000000"]],
+		["dark, desktop", () => new Map([...sheet.tokens, ["--background-primary", "#1C1C1C"]]), ["#1C1C1E", "#000000"]],
+		["light", () => new Map([...sheet.tokens, ...sheet.lightTokens, ["--background-primary", "#FFFFFF"]]), ["#F2F2F7", "#FFFFFF"]],
+	] as const;
 
-	it.each([
-		["dark", () => sheet.tokens],
-		["light", () => new Map([...sheet.tokens, ...sheet.lightTokens])],
-	])("takes the level's hue and reads as well as the grey on a plain card, %s", (_, tokens) => {
+	it.each(GROUNDS)("leaves a plain card standing out from the ground as much as the board's, %s", (_, tokens, [boardCard, boardGround]) => {
 		const t = tokens();
-		const grey = contrast(t.get("--tc-muted")!, t.get("--tc-card-bg")!);
+		expect(contrast(resolve(t, "var(--tc-card-bg)"), resolve(t, "var(--tc-bg)"))).toBeGreaterThanOrEqual(contrast(boardCard, boardGround) - 0.01);
+	});
+
+	it.each(GROUNDS)("takes the level's hue and reads as well as the grey on a plain card, %s", (_, tokens) => {
+		const t = tokens();
+		const grey = contrast(t.get("--tc-muted")!, resolve(t, "var(--tc-card-bg)"));
 		for (const level of LEVELS) {
 			const meta = t.get(`--tc-priority-${level}-meta`)!;
 			expect(contrast(meta, t.get(`--tc-priority-${level}-card`)!), level).toBeGreaterThanOrEqual(grey - 0.01);
