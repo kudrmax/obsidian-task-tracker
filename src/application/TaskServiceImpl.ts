@@ -9,6 +9,9 @@ import {
 	StaleTaskError,
 	TasksFileMissingError,
 	type DayView,
+	type GroupedList,
+	type GroupName,
+	type GroupPlace,
 	type Placement,
 	type TaskDraft,
 	type TaskItem,
@@ -143,24 +146,38 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}
 
-	async moveToGroup(): Promise<void> {
-		throw new Error("Sections are not built yet");
+	async moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null): Promise<void> {
+		await this.mutate((doc, today) => {
+			this.groupOf(doc, list, group);
+			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today);
+		});
 	}
 
-	async createGroup(): Promise<void> {
-		throw new Error("Sections are not built yet");
+	async createGroup(key: TaskKey, list: GroupedList, name: string): Promise<void> {
+		if (this.blank(name)) return;
+		await this.mutate((doc, today, settings) => ops.createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today));
 	}
 
-	async moveGroup(): Promise<void> {
-		throw new Error("Sections are not built yet");
+	async moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void> {
+		await this.mutate((doc) => {
+			this.groupOf(doc, list, group);
+			if (place !== "end") this.groupOf(doc, list, place.before);
+			return ops.moveGroupTo(doc, list, group, place);
+		});
 	}
 
-	async renameGroup(): Promise<void> {
-		throw new Error("Sections are not built yet");
+	async renameGroup(list: GroupedList, group: string, name: string): Promise<void> {
+		await this.mutate((doc, _today, settings) => {
+			this.groupOf(doc, list, group);
+			return ops.renameGroup(doc, list, group, name, settings.groups.ungrouped);
+		});
 	}
 
-	async removeGroup(): Promise<void> {
-		throw new Error("Sections are not built yet");
+	async removeGroup(list: GroupedList, group: string): Promise<void> {
+		await this.mutate((doc) => {
+			this.groupOf(doc, list, group);
+			return ops.removeGroup(doc, list, group);
+		});
 	}
 
 	async normalize(): Promise<void> {
@@ -219,7 +236,7 @@ export class TaskServiceImpl implements TaskService {
 		const s = settings.sections;
 		return TaskDocument.parse(
 			text,
-			{ inbox: s.inbox, now: s.now, soon: s.soon, done: s.done },
+			{ inbox: s.inbox, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
 			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
 		);
 	}
@@ -231,6 +248,13 @@ export class TaskServiceImpl implements TaskService {
 	private itemOf(): (entry: TaskEntry) => TaskItem {
 		const levels = this.levels(this.settings.get());
 		return (entry) => toItem(entry, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
+	}
+
+	/** A section the UI names must still be in the file, as a task must. */
+	private groupOf(doc: TaskDocument, list: GroupedList, group: GroupName): number {
+		const index = ops.groupIndex(doc, list, group);
+		if (index < 0) throw new StaleTaskError();
+		return index;
 	}
 
 	private entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {

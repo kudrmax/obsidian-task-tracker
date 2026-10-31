@@ -363,3 +363,48 @@ describe("postpone", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] C\n- [ ] A 📅 2026-10-31\n\n## Backlog\n\n## Done\n");
 	});
 });
+
+describe("sections", () => {
+	const TEXT = "## Inbox\n\n## Now\n- [ ] A\n### X\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Done\n";
+
+	it("items carry their section", async () => {
+		const { svc } = setup(TEXT);
+		expect((await svc.dayView(T)).list.map((i) => i.group)).toEqual([null, "X"]);
+	});
+
+	it("createGroup makes a section from a drop and normalizes", async () => {
+		const { store, svc } = setup(TEXT);
+		const [c] = await svc.soonWithoutDateView();
+		await svc.createGroup(c.key, "now", "Evening");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n### X\n- [ ] B\n### Evening\n- [ ] C 📅 2026-10-30\n\n## Soon\n\n## Done\n");
+	});
+
+	it("reads the No section heading by the name in settings", async () => {
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, groups: { presets: [], ungrouped: "Без секции" } });
+		const { svc } = setup("## Now\n### X\n- [ ] B\n### Без секции\n- [ ] A\n", settings);
+		expect((await svc.dayView(T)).list.map((i) => [i.text, i.group])).toEqual([["B", "X"], ["A", null]]);
+	});
+
+	it("moveToGroup, renameGroup, removeGroup and moveGroup write once each", async () => {
+		const { store, svc } = setup(TEXT);
+		const [a] = (await svc.dayView(T)).list;
+		await svc.moveToGroup(a.key, "now", "X", null);
+		expect(store.text).toBe("## Inbox\n\n## Now\n### X\n- [ ] B\n- [ ] A 📅 2026-10-30\n\n## Soon\n- [ ] C\n\n## Done\n");
+		await svc.renameGroup("now", "X", "Вечер");
+		expect(store.text).toContain("### Вечер\n");
+		await svc.removeGroup("now", "Вечер");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n- [ ] A 📅 2026-10-30\n\n## Soon\n- [ ] C\n\n## Done\n");
+		expect(store.writes).toBe(3);
+	});
+
+	it("a group missing from the file rejects with StaleTaskError and writes nothing", async () => {
+		const { store, svc } = setup(TEXT);
+		const [a] = (await svc.dayView(T)).list;
+		await expect(svc.renameGroup("now", "Y", "Z")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.removeGroup("now", "Y")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.moveGroup("now", "Y", "end")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.moveGroup("now", "X", { before: "Y" })).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.moveToGroup(a.key, "now", "Y", null)).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(TEXT);
+	});
+});

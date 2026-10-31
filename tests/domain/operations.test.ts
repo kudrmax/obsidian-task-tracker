@@ -2,15 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
 	clearSlot,
 	createAtTime,
+	createGroup,
 	createInList,
+	groupIndex,
 	createInSoon,
 	moveBefore,
+	moveGroupTo,
+	moveToGroup,
 	moveToEnd,
 	moveToList,
 	moveToSoon,
 	newTask,
 	placeTask,
 	placementOfEntry,
+	presetPlace,
+	removeGroup,
+	renameGroup,
 	postpone,
 	remove,
 	rename,
@@ -20,6 +27,7 @@ import {
 	setStatus,
 } from "../../src/domain/operations";
 import { DayBoundary } from "../../src/domain/DayBoundary";
+import { normalize } from "../../src/domain/normalize";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -337,5 +345,83 @@ describe("postpone", () => {
 	it("puts a task due today or earlier at the end of Now", () => {
 		const d = parse("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n");
 		expect(postpone(d, d.tasks("soon")[0], T, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] S 📅 2026-10-30\n\n## Soon\n");
+	});
+});
+
+describe("groups", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const SETTINGS = { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" };
+	const names = (text: string) => parseG(text).groups("now");
+
+	it("presetPlace", () => {
+		expect(presetPlace(names("## Now\n- [ ] A\n### Morning\n- [ ] B\n### Экскурсия\n- [ ] C\n"), "Evening", SETTINGS.presets)).toBe(2);
+		expect(presetPlace(names("## Now\n- [ ] A\n### Evening\n- [ ] B\n"), "Morning", SETTINGS.presets)).toBe(1);
+		expect(presetPlace(names("## Now\n- [ ] A\n### Экскурсия\n- [ ] C\n"), "Afternoon", SETTINGS.presets)).toBe(2);
+	});
+
+	it("moveToGroup from Now into a Soon group drops today's due date", () => {
+		const d = parseG("## Now\n- [ ] A 📅 2026-10-30\n\n## Soon\n### X\n- [ ] B\n");
+		expect(moveToGroup(d, d.tasks("now")[0], "soon", "X", null, T).serialize()).toBe("## Now\n\n## Soon\n### X\n- [ ] B\n- [ ] A\n");
+	});
+
+	it("moveToGroup into Now comes due today, before a task of a group", () => {
+		const d = parseG("## Now\n### X\n- [ ] B\n\n## Soon\n- [ ] A\n");
+		expect(moveToGroup(d, d.tasks("soon")[0], "now", "X", d.tasks("now")[0], T).serialize()).toBe("## Now\n### X\n- [ ] A 📅 2026-10-30\n- [ ] B\n\n## Soon\n");
+	});
+
+	it("moveToGroup into No section at its end", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(moveToGroup(d, d.tasks("now")[1], "now", null, null, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-30\n### X\n- [ ] C\n");
+	});
+
+	it("createGroup puts a preset in order and any other name last", () => {
+		const d = parseG("## Now\n- [ ] A\n### Morning\n- [ ] B\n### Экскурсия\n- [ ] C\n\n## Soon\n");
+		expect(createGroup(d, d.tasks("now")[0], "now", "Evening", SETTINGS, T).serialize()).toBe(
+			"## Now\n### Morning\n- [ ] B\n### Evening\n- [ ] A 📅 2026-10-30\n### Экскурсия\n- [ ] C\n\n## Soon\n",
+		);
+		expect(createGroup(d, d.tasks("now")[0], "now", "  Вечером дома ", SETTINGS, T).serialize()).toBe(
+			"## Now\n### Morning\n- [ ] B\n### Экскурсия\n- [ ] C\n### Вечером дома\n- [ ] A 📅 2026-10-30\n\n## Soon\n",
+		);
+	});
+
+	it("createGroup with an existing name joins it; with the ungrouped name goes to No section", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(createGroup(d, d.tasks("now")[0], "now", "X", SETTINGS, T).serialize()).toBe("## Now\n### X\n- [ ] B\n- [ ] C\n- [ ] A 📅 2026-10-30\n");
+		expect(createGroup(d, d.tasks("now")[1], "now", "No section", SETTINGS, T).serialize()).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-30\n### X\n- [ ] C\n");
+	});
+
+	it("renameGroup to an existing name merges; to the ungrouped name empties into No section", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(normalize(renameGroup(d, "now", "Y", "X", "No section"), T).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(renameGroup(d, "now", "Y", "No section", "No section").serialize()).toBe("## Now\n- [ ] A\n- [ ] C\n### X\n- [ ] B\n");
+		expect(renameGroup(d, "now", "Y", "  ", "No section")).toBe(d);
+		expect(renameGroup(d, "now", "Y", "Вечер", "No section").serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n### Вечер\n- [ ] C\n");
+	});
+
+	it("removeGroup keeps the tasks at the end of No section, in order", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n### Y\n- [ ] D\n");
+		expect(removeGroup(d, "now", "X").serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n- [ ] C\n### Y\n- [ ] D\n");
+	});
+
+	it("moveGroupTo moves a section, and No section below and back", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(moveGroupTo(d, "now", "Y", { before: "X" }).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n### X\n- [ ] B\n");
+		const down = normalize(moveGroupTo(d, "now", null, "end"), T);
+		expect(down.serialize()).toBe("## Now\n### X\n- [ ] B\n### Y\n- [ ] C\n### No section\n- [ ] A\n");
+		expect(normalize(moveGroupTo(down, "now", null, { before: "X" }), T).serialize()).toBe(d.serialize());
+		expect(normalize(moveGroupTo(d, "now", "Y", { before: null }), T).serialize()).toBe("## Now\n### Y\n- [ ] C\n### No section\n- [ ] A\n### X\n- [ ] B\n");
+	});
+
+	it("moving the last task out of a group removes the group and, with only No section left, its heading", () => {
+		const d = parseG("## Now\n### X\n- [ ] B\n### No section\n- [ ] A\n");
+		expect(normalize(moveToGroup(d, d.tasks("now")[0], "now", null, null, T), T).serialize()).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-30\n");
+	});
+
+	it("groupIndex finds a section by name, No section always, a missing one never", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(groupIndex(d, "now", "X")).toBe(1);
+		expect(groupIndex(d, "now", null)).toBe(0);
+		expect(groupIndex(d, "now", "Y")).toBe(-1);
 	});
 });
