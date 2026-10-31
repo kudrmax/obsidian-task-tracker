@@ -35,6 +35,8 @@ body {
 	--tc-drop-bg: #251F3D;
 	--tc-now: #D92C24;
 	--tc-accent: #9580FF;
+	/* Typed text selected in a section's name field: the accent, see-through. */
+	--tc-selection: rgba(149, 128, 255, 0.38);
 	--tc-strip-color: var(--interactive-accent);
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
@@ -147,6 +149,8 @@ body {
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
 	--tc-section-gap: 10px;
+	/* Between the zones that start a section and those that put a task off, under the day column. */
+	--tc-zone-group-gap: 16px;
 	--tc-fade-block: 16px;
 	/* The timeline's end fades into the background: solid from this far down the fade. */
 	--tc-fade-stop: 70%;
@@ -371,6 +375,7 @@ body.theme-light {
 	--tc-drop-bg: #F1ECFE;
 	--tc-now: #FF3B30;
 	--tc-accent: var(--interactive-accent);
+	--tc-selection: rgba(138, 92, 245, 0.28);
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
@@ -535,8 +540,18 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
 .tc-postpone { display: none; flex-direction: column; gap: var(--tc-space-8); }
-.task-calendar.is-dragging :is(.tc-new.is-soon, .tc-new.is-inbox, .tc-new-btn) { display: none; }
+.task-calendar.is-dragging .tc-new-btn { display: none; }
 .task-calendar.is-dragging .tc-postpone { display: flex; }
+/* The zones that start a section, over the dates under the day column; under Inbox and Soon they stand alone. */
+.tc-section-zones { display: none; flex-direction: column; gap: var(--tc-space-8); }
+.task-calendar.is-dragging .tc-section-zones.is-offered { display: flex; }
+.tc-new:not(.is-soon):not(.is-inbox) .tc-section-zones { margin-bottom: var(--tc-zone-group-gap); }
+/* A new section's name, typed where its header will stand, over the card that starts it. */
+.tc-group-slot { flex-shrink: 0; display: flex; flex-direction: column; margin-top: var(--tc-section-gap); }
+.tc-group-field { height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; }
+.task-calendar input[type="text"].tc-group-input { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
+.task-calendar input[type="text"].tc-group-input::placeholder { color: var(--tc-muted); font-weight: var(--tc-weight-normal); }
+.task-calendar input[type="text"].tc-group-input::selection { background: var(--tc-selection); }
 .tc-zone { height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-zone[hidden] { display: none; }
 .tc-zone.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); color: var(--tc-text); }

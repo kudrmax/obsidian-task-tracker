@@ -12,6 +12,8 @@ export interface TaskListDeps {
 	grouped?(): boolean;
 	/** The header over the tasks outside any section. */
 	ungroupedName?(): string;
+	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
+	pending?(): TaskItem | null;
 	onCard?(card: HTMLElement, item: TaskItem): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
 }
@@ -27,6 +29,7 @@ export class TaskList {
 	private rendered: ListGroup[] = [];
 	private nodes: HTMLElement[] = [];
 	private withHeaders = false;
+	private slot: HTMLElement | null = null;
 
 	constructor(
 		readonly el: HTMLElement,
@@ -52,6 +55,14 @@ export class TaskList {
 				this.nodes.push(card);
 			}
 		}
+		const pending = this.deps.pending?.() ?? null;
+		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
+		if (pending) renderTaskCard(this.el, pending, { day });
+	}
+
+	/** Where the name of the section a pending card starts is typed; null without one. */
+	get pendingSlot(): HTMLElement | null {
+		return this.slot;
 	}
 
 	get cards(): readonly ListEntry[] {

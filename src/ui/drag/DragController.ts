@@ -7,6 +7,7 @@ import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
+import type { GroupedList } from "../../application/contracts";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DragOrigin, DragPayload, DropTarget, PlacedResult } from "./DropTarget";
@@ -28,6 +29,8 @@ export interface DragControllerDeps {
 	onResult(drag: DragPayload, result: PlacedResult): Promise<void>;
 	/** A card dropped on Pick a date, back in its place: the date picker opens over it. */
 	onPickDate(item: TaskItem, source: HTMLElement): void;
+	/** A card dropped on New section, back in its place: the list asks for the section's name. */
+	onNameGroup(item: TaskItem, list: GroupedList): void;
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
@@ -188,7 +191,8 @@ export class DragController {
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
-		let picked = false;
+		/** A drop that asks first: the day on Pick a date, the name on New section. */
+		let asking: { readonly kind: "pickDate" } | { readonly kind: "nameGroup"; readonly list: GroupedList } | null = null;
 		const reopen = () => {
 			source.classList.remove("is-lifted");
 			timeline?.layoutTasks();
@@ -201,8 +205,8 @@ export class DragController {
 			onReturn: reopen,
 			onEnd: async (result) => {
 				detach();
-				if (result?.kind === "pickDate") {
-					picked = true;
+				if (result?.kind === "pickDate" || result?.kind === "nameGroup") {
+					asking = result;
 					reopen();
 					return;
 				}
@@ -215,10 +219,15 @@ export class DragController {
 		/** The card has come to rest. Over one dropped on Pick a date, back in its place by now, the picker opens; the screen is held until it does. */
 		const settled = () => {
 			this.deps.onDragging(false);
-			if (!picked) return;
+			if (!asking) return;
 			this.deps.haptics.tap();
-			this.deps.onPickDate(payload.item, source);
+			if (asking.kind === "pickDate") {
+				this.deps.onPickDate(payload.item, source);
+				this.deps.arbiter.release(DRAG);
+				return;
+			}
 			this.deps.arbiter.release(DRAG);
+			this.deps.onNameGroup(payload.item, asking.list);
 		};
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);

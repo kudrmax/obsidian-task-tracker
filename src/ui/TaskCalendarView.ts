@@ -1,5 +1,5 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, DayBoundary, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
+import { type CalendarService, DayBoundary, type GroupedList, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -12,7 +12,9 @@ import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
 import type { DragPayload, DropTarget, PlacedResult } from "./drag/DropTarget";
+import { GroupZones } from "./drag/GroupZones";
 import { PostponeZones } from "./drag/PostponeZones";
+import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
@@ -35,6 +37,8 @@ import type { LocalDate, Slot } from "./types";
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
+/** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
+const NAMING = "naming";
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -86,6 +90,9 @@ export class TaskCalendarView extends ItemView {
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
 	private postponeZones: PostponeZones | null = null;
+	private groupZones: GroupZones[] = [];
+	/** A card dropped on New section, waiting at the end of its list for the section's name. */
+	private naming: { readonly item: TaskItem; readonly list: GroupedList } | null = null;
 	private switching = 0;
 	private readonly unsubscribe: (() => void)[] = [];
 
@@ -113,11 +120,15 @@ export class TaskCalendarView extends ItemView {
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
-				if (active) this.postponeZones?.show();
+				if (active) {
+					this.postponeZones?.show();
+					for (const zones of this.groupZones) zones.show();
+				}
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onPickDate: (item, source) => this.showMenu(item, source, undefined, "picker"),
+			onNameGroup: (item, list) => this.askGroupName(item, list),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
@@ -155,27 +166,30 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
-			items: () => this.data.day?.list ?? [],
+			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
 			grouped: () => this.selectedDate === this.today(),
+			pending: () => this.namingIn("now"),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => (this.selectedDate === this.today() ? "now" : null));
 		this.inboxEl = el(root, "div", "tc-inbox");
 		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
-			items: () => this.data.inbox,
+			items: () => this.unnamed(this.data.inbox),
 			day: () => null,
 			grouped: () => true,
+			pending: () => this.namingIn("inbox"),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => "inbox");
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
-			items: () => this.data.soon,
+			items: () => this.unnamed(this.data.soon),
 			day: () => null,
 			grouped: () => true,
+			pending: () => this.namingIn("soon"),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
 		});
@@ -229,6 +243,12 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
+		const sections = (items: () => readonly TaskItem[]) => () => items().flatMap((item) => (item.group === null ? [] : [item.group]));
+		this.groupZones = [
+			new GroupZones(this.newTask.el, "now", { presets: () => this.settings.groups.presets, present: sections(() => this.data.day?.list ?? []), offered: () => this.selectedDate === this.today() }),
+			new GroupZones(this.newSoon.el, "soon", { presets: () => this.settings.groups.presets, present: sections(() => this.data.soon), offered: () => true }),
+			new GroupZones(this.newInbox.el, "inbox", { presets: () => this.settings.groups.presets, present: sections(() => this.data.inbox), offered: () => true }),
+		];
 		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.settings.rightMode,
@@ -413,7 +433,7 @@ export class TaskCalendarView extends ItemView {
 			inbox: [this.inboxDrop, this.soonDrop],
 		};
 		const columns = shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
-		return [...(this.postponeZones?.targets ?? []), ...columns];
+		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...columns];
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
@@ -425,12 +445,51 @@ export class TaskCalendarView extends ItemView {
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
 			if (result.kind === "postpone") return tasks.postpone(key, result.date);
 			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before);
+			if (result.kind === "newGroup") return tasks.createGroup(key, result.list, result.name);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
 			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
 			if (drag.from === "left") return tasks.moveToSoon(key, this.selectedDate);
 			return tasks.moveToEnd(key, result.column);
 		});
+	}
+
+	/** The card waits at the end of `list` under a field for the section's name; Enter makes the section, anything else puts it back. */
+	private askGroupName(item: TaskItem, list: GroupedList): void {
+		this.naming = { item, list };
+		this.render();
+		const slot = this.listOf(list)?.pendingSlot;
+		if (!slot || !this.arbiter.claim(NAMING)) {
+			this.naming = null;
+			this.render();
+			return;
+		}
+		const field = GroupNameField.open(slot, {
+			value: "",
+			select: false,
+			onDone: (name) => {
+				this.naming = null;
+				this.arbiter.release(NAMING);
+				if (name) void this.act(() => this.deps.tasks.createGroup(item.key, list, name));
+				else this.render();
+			},
+		});
+		field.scrollIntoView({ block: "nearest" });
+	}
+
+	private listOf(list: GroupedList): TaskList | null {
+		return { now: this.list, soon: this.soonList, inbox: this.inboxList }[list];
+	}
+
+	/** The lists leave out the card waiting for its section's name; its own list draws it last. */
+	private unnamed(items: readonly TaskItem[]): readonly TaskItem[] {
+		const naming = this.naming;
+		if (!naming) return items;
+		return items.filter((item) => item.key.section !== naming.item.key.section || item.key.index !== naming.item.key.index);
+	}
+
+	private namingIn(list: GroupedList): TaskItem | null {
+		return this.naming?.list === list ? this.naming.item : null;
 	}
 
 	private showSources(anchor: HTMLElement): void {

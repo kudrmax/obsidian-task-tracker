@@ -36,6 +36,7 @@ Left: the tasks of the selected day (today: everything in Now that has no slot t
 
 - Drag a task from the list onto the timeline to give it a time; drag it back to remove the time; drag inside the timeline to move it, pull the handle to resize it.
 - Drag between the Soon list and the day list to move a task between Soon and Now (on another day: to set or remove its due date).
+- **Sections.** While a task is dragged, zones show under Inbox, Soon and today’s Now: the preset sections that list doesn’t have yet (Settings → Sections) and “New section”. Drop a task on a preset to start that section with it. Drop it on “New section” and type the name: Enter makes the section, an empty name or a tap elsewhere puts the task back. Once a list has a section, the tasks outside any get a “No section” header of their own. Drag a task into a gap to put it in that section. A section that empties goes away, its header too.
 - Long press a task for its menu: In progress, Done, Won’t do, Due date, Rename, Delete.
 - “New task” opens the task screen: a title and three tiles, Soon / Now / Date. A long press on an empty spot of the timeline creates a task at that time.
 - Pinch to zoom the timeline; the drag step follows the grid.

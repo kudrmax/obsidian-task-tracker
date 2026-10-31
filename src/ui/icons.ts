@@ -21,6 +21,7 @@ const ICONS = {
 		shapes: [["path", { d: "M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4" }]],
 	},
 	tomorrow: { fill: false, join: true, shapes: [["path", { d: "M4 12h13 M12 6l6 6-6 6 M20.5 5v14" }]] },
+	section: { fill: false, join: true, shapes: [["path", { d: "M4 6h9 M4 12h16 M4 18h16" }]] },
 	plus: {
 		fill: false,
 		join: false,
