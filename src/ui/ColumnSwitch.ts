@@ -40,7 +40,7 @@ interface Press {
 }
 
 /**
- * The switch in the day row: four icons, Inbox, Soon, Now and the calendar, with a pill over the two columns the screen
+ * The switch at the bottom of the screen: four icons, Inbox, Soon, Now and the calendar, with a pill over the two columns the screen
  * shows, in one of three places. A tap on an icon the pill leaves uncovered moves it to the nearest place that covers
  * the icon; the pill follows a finger and settles on the nearest place when let go, and only then does the screen
  * slide. Held while the calendar shows, it opens the sources window.

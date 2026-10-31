@@ -7,7 +7,8 @@ import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
 import { addDays } from "./dates";
 import { DayData } from "./DayData";
-import { DayHeader } from "./DayHeader";
+import { ColumnHeaders } from "./ColumnHeaders";
+import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
 import type { DragPayload, DropTarget, PlacedResult } from "./drag/DropTarget";
@@ -45,13 +46,14 @@ export interface ViewDeps {
 }
 
 /**
- * The screen: the day row over a window two columns wide on a strip of four, Inbox, Soon, the list of the day (Now) and
- * the day's timeline. The window shows Inbox and Soon or Soon and Now, halved by a fixed divider, or Now and the timeline,
- * parted by the divider that sets the list's width; switching slides the strip.
+ * The screen: a window two columns wide on a strip of four, Inbox, Soon, the list of the day (Now) and the day's timeline,
+ * each list under its header. The window shows Inbox and Soon or Soon and Now, halved by a fixed divider, or Now and the
+ * timeline, parted by the divider that sets the list's width; the switch at the bottom slides the strip, headers and all.
  */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
-	private header: DayHeader | null = null;
+	private headers: ColumnHeaders | null = null;
+	private switcher: ColumnSwitch | null = null;
 	private leftEl: HTMLElement | null = null;
 	private list: TaskList | null = null;
 	private soonEl: HTMLElement | null = null;
@@ -144,15 +146,12 @@ export class TaskCalendarView extends ItemView {
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
 		this.fitListWidth();
-		this.header = new DayHeader(root, {
+		this.headers = new ColumnHeaders(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
 			onStep: (days) => this.select(addDays(this.selectedDate, days)),
 			onToday: () => this.select(this.today()),
-			mode: () => this.settings.rightMode,
-			onMode: (mode) => void this.setMode(mode),
-			dot: () => this.data.statuses.some((s) => s.stale),
-			onSources: (anchor) => this.showSources(anchor),
-			longPressMs: () => this.settings.longPressMs,
+			inboxName: () => this.settings.sections.inbox,
+			soonName: () => this.settings.sections.soon,
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -225,6 +224,14 @@ export class TaskCalendarView extends ItemView {
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
 		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
+		const switcher = new ColumnSwitch(root, {
+			value: () => this.settings.rightMode,
+			onChange: (mode) => void this.setMode(mode),
+			dot: () => this.data.statuses.some((s) => s.stale),
+			onSources: () => this.showSources(switcher.el),
+			longPressMs: () => this.settings.longPressMs,
+		});
+		this.switcher = switcher;
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
@@ -482,9 +489,10 @@ export class TaskCalendarView extends ItemView {
 		}
 		this.renderPending = false;
 		const root = this.contentEl;
-		if (!this.header || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.list || !this.soonList || !this.inboxList) return;
+		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.list || !this.soonList || !this.inboxList) return;
 		this.fitListWidth();
-		this.header.render();
+		this.headers.render();
+		this.switcher.render();
 		this.list.render();
 		const missing = this.data.missing;
 		root.classList.toggle("is-missing", missing);

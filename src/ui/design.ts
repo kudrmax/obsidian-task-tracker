@@ -9,7 +9,7 @@ export const DESIGN = {
 	dayHours: 24,
 	/** How far an hour's label rises over its line, and hangs under it: the timeline keeps this much room over its first hour and under its closing one. */
 	labelLift: 7,
-	/** Where the columns start under the day row. */
+	/** Where the columns start under their headers. */
 	columnsTop: 64,
 	/** Where the timeline starts inside the right column, under one all-day row. */
 	timelineOffset: 34,

@@ -104,16 +104,20 @@ body {
 	--tc-stroke-chevron: 2.2px;
 	--tc-stroke-seg: 2px;
 
-	/* Sizes: the day row */
+	/* Sizes: the column headers */
 	--tc-day-row-top: 16px;
 	--tc-day-row: 36px;
 	--tc-arrow: 36px;
+	/* Over a half-wide column the day's arrows close in, so that the longest day's name fits between them. */
+	--tc-arrow-narrow: 28px;
 	--tc-chevron: 20px;
 	--tc-seg: 32px;
 	--tc-seg-pad: 2px;
 	--tc-seg-btn-w: 38px;
 	--tc-seg-btn-h: 28px;
 	--tc-seg-icon: 18px;
+	/* The switch's row at the bottom, between New task and Obsidian's phone navigation. */
+	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
 
 	/* Sizes: the columns */
 	--tc-columns-top: 64px;
@@ -190,7 +194,6 @@ body {
 	--tc-dot-top: 2px;
 	--tc-dot-right: 6px;
 	--tc-popover-w: 268px;
-	--tc-popover-right: 12px;
 	--tc-popover-gap: 10px;
 	--tc-source-row: 56px;
 	--tc-source-icon: 20px;
@@ -318,6 +321,7 @@ body {
 	--tc-layer-new: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-pull: 5;
+	--tc-layer-switch: 5;
 	--tc-layer-sheet: 20;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
@@ -407,12 +411,23 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-level-pill:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
 .task-calendar svg { display: block; }
 
-/* The day row: the arrows round the day's name, the switch of the right column. */
-.tc-day-row { position: absolute; left: 0; right: 0; top: var(--tc-day-row-top); height: var(--tc-day-row); padding: 0 var(--tc-space-12) 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: var(--tc-space-8); }
-.tc-day-nav { display: flex; align-items: center; gap: var(--tc-space-4); min-width: 0; }
+/* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
+.tc-head { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); width: var(--tc-half-column); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; }
+.tc-head.is-inbox { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-lists .tc-head.is-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-inbox .tc-head.is-inbox { left: 0; }
+.tc-head.is-soon { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-lists .tc-head.is-soon { left: 0; }
+.task-calendar.is-inbox .tc-head.is-soon { left: calc(var(--tc-half-column) + var(--tc-divider)); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); }
+.task-calendar .tc-head-title { min-width: 0; height: var(--tc-day-row); line-height: var(--tc-day-row); padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-head.tc-day-nav { left: 0; width: 100%; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); gap: var(--tc-space-4); }
+.task-calendar.is-lists .tc-day-nav { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); gap: var(--tc-space-2); }
+.task-calendar.is-inbox .tc-day-nav { left: calc(100% + var(--tc-divider)); width: var(--tc-half-column); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); gap: var(--tc-space-2); }
+.task-calendar:is(.is-lists, .is-inbox) .tc-day-nav .tc-arrow { width: var(--tc-arrow-narrow); }
 .task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; border-radius: var(--tc-radius-circle); color: var(--tc-ink-soft); display: flex; align-items: center; justify-content: center; }
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
-.task-calendar .tc-day-title { height: var(--tc-day-row); padding: 0 var(--tc-space-4); color: var(--tc-text); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
+/* The switch stands at the bottom, in the middle, over the lists' ground and over the timeline. */
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - 2 * var(--tc-seg-btn-w) - var(--tc-seg-pad)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; touch-action: none; cursor: pointer; outline: none; }
 .tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + 2 * var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); }
 .tc-seg.is-lists .tc-seg-pill { left: calc(var(--tc-seg-pad) + var(--tc-seg-btn-w)); }
@@ -428,7 +443,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 
 /* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */
 .tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
-.tc-popover { position: fixed; right: var(--tc-popover-right); top: calc(var(--tc-panel-y) + var(--tc-popover-gap)); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-popover-bg); box-shadow: var(--tc-popover-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-popover { position: fixed; bottom: calc(var(--tc-panel-y) + var(--tc-popover-gap)); margin-left: calc(-1 * var(--tc-popover-w) / 2); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-popover-bg); box-shadow: var(--tc-popover-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-popover.is-shown { opacity: 1; }
 .tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-14); display: flex; align-items: center; gap: var(--tc-space-10); }
 .tc-source-row:not(:last-of-type) { border-bottom: var(--tc-hairline-half) solid var(--tc-separator); }
@@ -480,10 +495,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
-.task-calendar.is-switching :is(.tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-new) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip); }
+.task-calendar.is-switching :is(.tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-new, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip), gap 0s linear var(--tc-slide-flip); }
 
 /* A list of cards scrolls under its New task button. */
-.tc-list { height: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); padding-bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-new-h)); }
+.tc-list { height: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); padding-bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-switch-row) + var(--tc-new-h)); }
 .tc-list::-webkit-scrollbar { display: none; }
 
 /* A card: the strip of a task in progress, the title fading out on the right, the due date. */
@@ -496,8 +511,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
 .tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
 
-/* New task: a dashed button pinned under its list, which turns into a card with a field. */
-.tc-new { position: absolute; left: 0; bottom: calc(var(--tc-nav-clear) + var(--tc-space-8)); width: var(--tc-list-width); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); box-sizing: border-box; background: var(--tc-bg); z-index: var(--tc-layer-new); }
+/* New task: a dashed button pinned under its list, over the switch's row; it carries the ground on down to Obsidian's phone navigation. */
+.tc-new { position: absolute; left: 0; bottom: calc(var(--tc-nav-clear) + var(--tc-space-8) + var(--tc-switch-row)); width: var(--tc-list-width); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); box-sizing: border-box; background: var(--tc-bg); z-index: var(--tc-layer-new); }
 .task-calendar.is-lists .tc-new { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-8) var(--tc-space-2); }
 .tc-new.is-soon { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); width: var(--tc-half-column); }
 .task-calendar.is-lists .tc-new.is-soon { left: 0; padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
@@ -506,6 +521,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-new.is-inbox { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); width: var(--tc-half-column); }
 .task-calendar.is-lists .tc-new.is-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
 .task-calendar.is-inbox .tc-new.is-inbox { left: 0; padding: var(--tc-space-8) var(--tc-space-2) var(--tc-space-8) var(--tc-space-10); }
+.tc-new::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--tc-switch-row) + var(--tc-space-8)); background: var(--tc-bg); }
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
 .tc-postpone { display: none; flex-direction: column; gap: var(--tc-space-8); }
@@ -525,8 +541,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 
 /* The timeline: a day of hours that scrolls; the code puts --tc-y and --tc-len on what it lays out. */
 /* The scroll box starts a label's lift above the first line, so the hour at its top keeps its whole label, as on the board. */
-/* It runs to the bottom and fades out there; scrolled to the end, the day ends level with the bottom of the New task button, above Obsidian's phone navigation. */
-.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; box-sizing: border-box; padding-bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+/* It runs to the bottom, under the switch, and fades out there; scrolled to the end, the day ends level with the bottom of the New task button, above the switch. */
+.tc-timeline { position: absolute; top: calc(var(--tc-timeline-top) - var(--tc-label-lift) + var(--tc-allday-extra-rows) * (var(--tc-allday-h) + var(--tc-allday-gap))); left: 0; right: 0; bottom: 0; box-sizing: border-box; padding-bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + var(--tc-switch-row)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
 .tc-timeline::-webkit-scrollbar { display: none; }
 .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); background: linear-gradient(to bottom, transparent, var(--tc-bg) var(--tc-fade-stop)); z-index: var(--tc-layer-fade); pointer-events: none; }
 .tc-canvas { position: relative; margin-top: calc(var(--tc-label-lift) + var(--tc-room-top)); margin-bottom: calc(var(--tc-label-lift) + var(--tc-room-bottom)); height: max(calc(var(--tc-hour) * var(--tc-day-hours)), var(--tc-stack-end)); }
