@@ -22,6 +22,11 @@ describe("listGroups", () => {
 		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["A"]], ["X", ["B", "C"]], ["Y", ["D"]]]);
 	});
 
+	it("gathers a section's tasks where it first shows: a later day lists Now's tasks before Soon's", () => {
+		const groups = listGroups([item("N", null), item("A", null), item("M", "Morning"), item("B", null)]);
+		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["N", "A", "B"]], ["Morning", ["M"]]]);
+	});
+
 	it("no headers without a named group", () => {
 		expect(showsHeaders(listGroups([item("A", null), item("B", null)]))).toBe(false);
 		expect(showsHeaders(listGroups([]))).toBe(false);

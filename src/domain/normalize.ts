@@ -1,5 +1,6 @@
 import { DayBoundary } from "./DayBoundary";
 import type { LocalDate, SectionKey, Task } from "./Task";
+import { presetPlace } from "./operations";
 import { type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
 
 function isOpen(task: Task): boolean {
@@ -52,20 +53,41 @@ function datedOutOfInbox(doc: TaskDocument): TaskDocument {
 	}
 }
 
-function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
-	return gatherAtStart(doc, "now", (e) => {
+/**
+ * A Soon task whose day has come goes to Now. One in a section keeps it: it joins the end of Now's section of that name,
+ * made when Now has none (a preset in the presets' order, any other name last). The others go to the start of No section.
+ */
+function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary, presets: readonly string[]): TaskDocument {
+	const came = (e: TaskEntry): boolean => {
 		if (e.section !== "soon" || !isOpen(e.task)) return false;
 		const due = e.task.dueDate !== null && e.task.dueDate <= today;
 		const slotted = e.task.slot !== null && boundary.dayOfSlot(e.task.slot) <= today;
 		return due || slotted;
-	});
+	};
+	if (!doc.hasSection("now")) return doc;
+	for (;;) {
+		const entry = doc.tasks("soon").find((e) => e.group !== null && came(e));
+		if (!entry?.group) return gatherAtStart(doc, "now", came);
+		doc = intoGroup(doc, entry, entry.group, presets);
+	}
+}
+
+/** The entry goes to the end of Now's section `name`, the section made first when Now has none. */
+function intoGroup(doc: TaskDocument, entry: TaskEntry, name: string, presets: readonly string[]): TaskDocument {
+	let index = doc.groups("now").findIndex((g) => g.index > 0 && g.name === name);
+	if (index < 0) {
+		const groups = doc.groups("now");
+		index = presets.includes(name) ? presetPlace(groups, name, presets) : groups.length;
+		doc = doc.addGroup("now", name, index);
+	}
+	return doc.moveEntry(doc.tasks(entry.section)[entry.index], "now", { endOf: index });
 }
 
 const GROUPED: readonly SectionKey[] = ["inbox", "now", "soon"];
 
 /** What a section of the list may hold: what the list's column shows (sections spec §3.3). */
 function fitsGroup(section: SectionKey, task: Task, today: LocalDate): boolean {
-	if (section === "soon") return task.dueDate === null && task.slot === null;
+	if (section === "soon") return task.slot === null;
 	if (section === "now") return task.slot === null && (task.dueDate === null || task.dueDate <= today);
 	return true;
 }
@@ -123,8 +145,9 @@ function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
 	return placeUngrouped(dropEmptyGroups(mergeDuplicates(misplacedOutOfGroups(doc, today))));
 }
 
-export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
-	const listed = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary);
+/** `presets`: the section presets in their order, for a section rule 4 has to make in Now. */
+export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT, presets: readonly string[] = []): TaskDocument {
+	const listed = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
 	const result = normalizeGroups(listed, today);
 	return result.serialize() === doc.serialize() ? doc : result;
 }

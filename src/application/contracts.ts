@@ -161,16 +161,17 @@ export interface TaskService {
 
 	/**
 	 * A drop into a gap of a list that shows sections (sections spec §5.3): right before `before`, in its section, or at
-	 * the end of `group` when `before` is null. The slot goes; into Inbox and Soon the due date goes too, into Now it
-	 * comes due today.
+	 * the end of `group` when `before` is null (or a task of another list: a later day's column shows Now's tasks too).
+	 * The slot goes. Into Now it comes due today; into Inbox no due date; into Soon `date`, the later day of the column
+	 * dropped on, or none.
 	 */
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null): Promise<void>;
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Promise<void>;
 	/**
 	 * A drop on a section zone with the name it gives (sections spec §5.2): a preset goes in the presets' order among the
 	 * presets the list has, any other name last. A name the list has already takes the task in; the No section name puts
 	 * it among the tasks outside any section. The task enters the list as with `moveToGroup`.
 	 */
-	createGroup(key: TaskKey, list: GroupedList, name: string): Promise<void>;
+	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
 	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */

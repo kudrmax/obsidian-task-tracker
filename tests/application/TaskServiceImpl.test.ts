@@ -438,3 +438,19 @@ describe("subtasks", () => {
 		expect(call.text).toBe("Call");
 	});
 });
+
+describe("sections of a later day", () => {
+	const TEXT = "## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n\n## Done\n";
+
+	it("planned in the evening for tomorrow, the task is in the same section of Now when tomorrow comes", async () => {
+		const evening = setup(TEXT);
+		const [a] = (await evening.svc.dayView(T)).list;
+		await evening.svc.createGroup(a.key, "soon", "Morning", "2026-10-31");
+		expect(evening.store.text).toBe("## Inbox\n\n## Now\n\n## Soon\n### Morning\n- [ ] A 📅 2026-10-31\n\n## Done\n");
+		expect((await evening.svc.dayView("2026-10-31")).list.map((i) => [i.text, i.group])).toEqual([["A", "Morning"]]);
+		const morning = new TaskServiceImpl(evening.store, new FakeSettingsStore(), { now: () => new Date(2026, 9, 31, 9, 0) });
+		expect((await morning.dayView("2026-10-31")).list.map((i) => [i.text, i.group])).toEqual([["A", "Morning"]]);
+		await morning.normalize();
+		expect(evening.store.text).toBe("## Inbox\n\n## Now\n### Morning\n- [ ] A 📅 2026-10-31\n\n## Soon\n\n## Done\n");
+	});
+});

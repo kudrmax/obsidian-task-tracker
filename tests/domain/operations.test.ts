@@ -464,3 +464,28 @@ describe("groups spaced by blank lines, as written by hand", () => {
 		]);
 	});
 });
+
+describe("sections of a later day", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const SETTINGS = { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" };
+
+	it("a drop into a Soon section on a later day's column keeps that day as the due date", () => {
+		const d = parseG("## Now\n- [ ] A\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n");
+		expect(moveToGroup(d, d.tasks("now")[0], "soon", "Morning", null, T, "2026-10-31").serialize()).toBe(
+			"## Now\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n- [ ] A 📅 2026-10-31\n",
+		);
+	});
+
+	it("a zone on a later day's column makes the section in Soon with that day", () => {
+		const d = parseG("## Now\n- [ ] A\n\n## Soon\n- [ ] S\n");
+		expect(createGroup(d, d.tasks("now")[0], "soon", "Evening", SETTINGS, T, "2026-10-31").serialize()).toBe("## Now\n\n## Soon\n- [ ] S\n### Evening\n- [ ] A 📅 2026-10-31\n");
+	});
+
+	it("a gap before a task of another list puts the card at the end of the section", () => {
+		const d = parseG("## Now\n- [ ] N 📅 2026-10-31\n- [ ] A\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n");
+		expect(moveToGroup(d, d.tasks("now")[1], "soon", "Morning", d.tasks("now")[0], T, "2026-10-31").serialize()).toBe(
+			"## Now\n- [ ] N 📅 2026-10-31\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n- [ ] A 📅 2026-10-31\n",
+		);
+	});
+});

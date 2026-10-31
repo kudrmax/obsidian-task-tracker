@@ -9,9 +9,9 @@ import { addDays } from "./dates";
 import { DayData } from "./DayData";
 import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
-import { DragController } from "./drag/DragController";
+import { DragController, type NameGroup } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import type { DragPayload, DropTarget, PlacedResult } from "./drag/DropTarget";
+import type { ColumnSections, DragPayload, DropTarget, ListColumn, PlacedResult } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupZones } from "./drag/GroupZones";
 import { GroupMenu } from "./menu/GroupMenu";
@@ -96,7 +96,7 @@ export class TaskCalendarView extends ItemView {
 	private groupZones: GroupZones[] = [];
 	private readonly groupDrag: GroupDrag;
 	/** A card dropped on New section, waiting at the end of its list for the section's name. */
-	private naming: { readonly item: TaskItem; readonly list: GroupedList } | null = null;
+	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
 	private switching = 0;
 	private readonly unsubscribe: (() => void)[] = [];
 
@@ -140,7 +140,7 @@ export class TaskCalendarView extends ItemView {
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
 			onPickDate: (item, source) => this.showMenu(item, source, undefined, "picker"),
-			onNameGroup: (item, list) => this.askGroupName(item, list),
+			onNameGroup: (item, asked) => this.askGroupName(item, asked),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
@@ -180,35 +180,35 @@ export class TaskCalendarView extends ItemView {
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
-			grouped: () => this.selectedDate === this.today(),
-			pending: () => this.namingIn("now"),
-			onHeader: (head, group) => this.groupDrag.attach(head, "now", this.list!, group),
+			grouped: () => this.sectionsOf("left") !== null,
+			pending: () => this.namingIn("left"),
+			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "left", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => (this.selectedDate === this.today() ? "now" : null));
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
 		this.inboxEl = el(root, "div", "tc-inbox");
 		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
 			items: () => this.unnamed(this.data.inbox),
 			day: () => null,
-			grouped: () => true,
+			grouped: () => this.sectionsOf("inbox") !== null,
 			pending: () => this.namingIn("inbox"),
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => "inbox");
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => this.sectionsOf("inbox"));
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
 			day: () => null,
-			grouped: () => true,
+			grouped: () => this.sectionsOf("soon") !== null,
 			pending: () => this.namingIn("soon"),
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => "soon");
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -260,9 +260,9 @@ export class TaskCalendarView extends ItemView {
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
 		const sections = (items: () => readonly TaskItem[]) => () => items().flatMap((item) => (item.group === null ? [] : [item.group]));
 		this.groupZones = [
-			new GroupZones(this.newTask.el, "now", { presets: () => this.settings.groups.presets, present: sections(() => this.data.day?.list ?? []), offered: () => this.selectedDate === this.today() }),
-			new GroupZones(this.newSoon.el, "soon", { presets: () => this.settings.groups.presets, present: sections(() => this.data.soon), offered: () => true }),
-			new GroupZones(this.newInbox.el, "inbox", { presets: () => this.settings.groups.presets, present: sections(() => this.data.inbox), offered: () => true }),
+			new GroupZones(this.newTask.el, "left", { presets: () => this.settings.groups.presets, present: sections(() => this.data.day?.list ?? []), sections: () => this.sectionsOf("left") }),
+			new GroupZones(this.newSoon.el, "soon", { presets: () => this.settings.groups.presets, present: sections(() => this.data.soon), sections: () => this.sectionsOf("soon") }),
+			new GroupZones(this.newInbox.el, "inbox", { presets: () => this.settings.groups.presets, present: sections(() => this.data.inbox), sections: () => this.sectionsOf("inbox") }),
 		];
 		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		const switcher = new ColumnSwitch(root, {
@@ -459,8 +459,8 @@ export class TaskCalendarView extends ItemView {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
 			if (result.kind === "postpone") return tasks.postpone(key, result.date);
-			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before);
-			if (result.kind === "newGroup") return tasks.createGroup(key, result.list, result.name);
+			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before, result.date ?? undefined);
+			if (result.kind === "newGroup") return tasks.createGroup(key, result.list, result.name, result.date ?? undefined);
 			if (result.kind === "nest") return tasks.nest(key, result.parent, result.before);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
@@ -470,11 +470,11 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** The card waits at the end of `list` under a field for the section's name; Enter makes the section, anything else puts it back. */
-	private askGroupName(item: TaskItem, list: GroupedList): void {
-		this.naming = { item, list };
+	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */
+	private askGroupName(item: TaskItem, asked: NameGroup): void {
+		this.naming = { item, asked };
 		this.render();
-		const slot = this.listOf(list)?.pendingSlot;
+		const slot = this.listOf(asked.column)?.pendingSlot;
 		if (!slot || !this.arbiter.claim(NAMING)) {
 			this.naming = null;
 			this.render();
@@ -486,7 +486,7 @@ export class TaskCalendarView extends ItemView {
 			onDone: (name) => {
 				this.naming = null;
 				this.arbiter.release(NAMING);
-				if (name) void this.act(() => this.deps.tasks.createGroup(item.key, list, name));
+				if (name) void this.act(() => this.deps.tasks.createGroup(item.key, asked.list, name, asked.date ?? undefined));
 				else this.render();
 			},
 		});
@@ -521,8 +521,19 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	private listOf(list: GroupedList): TaskList | null {
-		return { now: this.list, soon: this.soonList, inbox: this.inboxList }[list];
+	/**
+	 * Whose sections a column shows (sections spec §5.1): the list its tasks lie in. Inbox and Soon their own; the day
+	 * column Now's for today and Soon's for a later day, whose tasks lie in Soon with that day; a past day's none.
+	 */
+	private sectionsOf(column: ListColumn): ColumnSections | null {
+		if (column !== "left") return { list: column, date: null };
+		const today = this.today();
+		if (this.selectedDate === today) return { list: "now", date: null };
+		return this.selectedDate > today ? { list: "soon", date: this.selectedDate } : null;
+	}
+
+	private listOf(column: ListColumn): TaskList | null {
+		return { left: this.list, soon: this.soonList, inbox: this.inboxList }[column];
 	}
 
 	/** The lists leave out the card waiting for its section's name; its own list draws it last. */
@@ -532,8 +543,8 @@ export class TaskCalendarView extends ItemView {
 		return items.filter((item) => item.key.section !== naming.item.key.section || item.key.index !== naming.item.key.index);
 	}
 
-	private namingIn(list: GroupedList): TaskItem | null {
-		return this.naming?.list === list ? this.naming.item : null;
+	private namingIn(column: ListColumn): TaskItem | null {
+		return this.naming?.asked.column === column ? this.naming.item : null;
 	}
 
 	private showSources(anchor: HTMLElement): void {
