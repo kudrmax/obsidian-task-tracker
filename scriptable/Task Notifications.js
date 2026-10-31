@@ -273,8 +273,13 @@ function formatTaskLine(parsed, markers) {
 }
 
 // src/domain/TaskDocument.ts
+function ungroupedIndex(groups) {
+  for (let i = groups.length - 1; i > 0; i--) if (groups[i].name === null) return i;
+  return 0;
+}
 var SECTION_KEYS = ["inbox", "now", "soon", "done"];
-var HEADING_RE = /^#{1,6}(\s|$)/;
+var LIST_END_RE = /^#{1,2}(\s|$)/;
+var GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
 var INDENT_RE = /^[ \t]*/;
 function indentWidth(line) {
@@ -293,11 +298,19 @@ var TaskDocument = class _TaskDocument {
     this.sections = this.findSections();
     const entries = /* @__PURE__ */ new Map();
     const spans = /* @__PURE__ */ new Map();
+    const groups = /* @__PURE__ */ new Map();
+    const blocks = /* @__PURE__ */ new Map();
     for (const [key, section] of this.sections) {
-      entries.set(key, this.readTasks(key, section, spans));
+      const listBlocks = this.findBlocks(section);
+      const listEntries = [];
+      groups.set(key, listBlocks.map((block, index) => this.readGroup(key, block, index, listEntries, spans)));
+      entries.set(key, listEntries);
+      blocks.set(key, listBlocks);
     }
     this.entries = entries;
     this.spans = spans;
+    this.groupLists = groups;
+    this.blockLists = blocks;
   }
   static parse(text, sections, markers) {
     const eol = text.includes("\r\n") ? "\r\n" : "\n";
@@ -317,6 +330,10 @@ var TaskDocument = class _TaskDocument {
   }
   tasks(section) {
     return this.entries.get(section) ?? [];
+  }
+  /** The list's groups in file order, the top block first even when empty. Before normalization names may repeat. */
+  groups(section) {
+    return this.groupLists.get(section) ?? [];
   }
   allTasks() {
     return SECTION_KEYS.flatMap((key) => this.tasks(key));
@@ -376,14 +393,24 @@ var TaskDocument = class _TaskDocument {
   insertionLine(section, position) {
     const s = this.sections.get(section);
     if (!s) throw new Error(`Section missing: ${this.names[section]}`);
-    const tasks = this.tasks(section);
-    if (tasks.length === 0) return s.firstLine;
-    const index = position === "start" ? 0 : position === "end" ? tasks.length : position;
-    if (index >= tasks.length) {
-      const last = this.spans.get(tasks[tasks.length - 1]);
-      return last.line + last.lineCount;
+    if (typeof position === "number") {
+      const tasks = this.tasks(section);
+      if (tasks.length === 0) return s.firstLine;
+      if (position >= tasks.length) return this.lineAfter(tasks[tasks.length - 1]);
+      return this.spans.get(tasks[Math.max(0, position)]).line;
     }
-    return this.spans.get(tasks[Math.max(0, index)]).line;
+    const groups = this.groups(section);
+    const index = typeof position === "object" ? position.endOf : ungroupedIndex(groups);
+    const group = groups[index];
+    if (!group) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
+    const block = this.blockLists.get(section)[index];
+    if (group.entries.length === 0) return block.start;
+    if (position === "start") return this.spans.get(group.entries[0]).line;
+    return this.lineAfter(group.entries[group.entries.length - 1]);
+  }
+  lineAfter(entry) {
+    const span = this.spans.get(entry);
+    return span.line + span.lineCount;
   }
   headingNames() {
     const names = [];
@@ -405,34 +432,54 @@ var TaskDocument = class _TaskDocument {
   }
   sectionEnd(from) {
     for (let i = from; i < this.lines.length; i++) {
-      if (HEADING_RE.test(this.lines[i])) return i;
+      if (LIST_END_RE.test(this.lines[i])) return i;
     }
     return this.lines.length;
   }
-  readTasks(key, section, spans) {
-    const entries = [];
-    let i = section.firstLine;
-    while (i < section.endLine) {
+  findBlocks(section) {
+    const blocks = [];
+    let name = null;
+    let headingLine = null;
+    let start = section.firstLine;
+    for (let i = section.firstLine; i <= section.endLine; i++) {
+      const m = i < section.endLine ? GROUP_HEADING_RE.exec(this.lines[i]) : null;
+      if (!m && i < section.endLine) continue;
+      blocks.push({ name, headingLine, start, end: i });
+      if (!m) break;
+      name = m[1] === this.names.ungrouped ? null : m[1];
+      headingLine = i;
+      start = i + 1;
+    }
+    return blocks;
+  }
+  readGroup(key, block, index, entries, spans) {
+    const own = [];
+    let blank = true;
+    let i = block.start;
+    while (i < block.end) {
       const raw = this.lines[i];
+      if (raw.trim() !== "") blank = false;
       const parsed = parseTaskLine(raw, this.markers);
       if (!parsed) {
         i++;
         continue;
       }
-      const children = this.childrenOf(i, section.endLine, parsed.indent.length);
+      const children = this.childrenOf(i, block.end, parsed.indent.length);
       const entry = {
         section: key,
         index: entries.length,
         raw,
         indent: parsed.indent,
         bullet: parsed.bullet,
-        task: { ...parsed.task, children }
+        task: { ...parsed.task, children },
+        group: block.name
       };
       entries.push(entry);
+      own.push(entry);
       spans.set(entry, { line: i, lineCount: 1 + children.length });
       i += 1 + children.length;
     }
-    return entries;
+    return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
   }
   childrenOf(taskLine, endLine, indent) {
     const children = [];

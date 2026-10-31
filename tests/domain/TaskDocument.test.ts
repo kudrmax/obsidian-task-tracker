@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../src/domain/Task";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { TaskDocument, ungroupedIndex } from "../../src/domain/TaskDocument";
 import type { Markers } from "../../src/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
@@ -50,10 +50,10 @@ describe("TaskDocument.parse", () => {
 		expect(parse("- [ ] outside\n## Now\n").allTasks()).toHaveLength(0);
 	});
 
-	it("ends a section at a heading of any level and matches the name after trim", () => {
-		const d = parse("##  Now  \n- [ ] A\n# Top\n- [ ] not now\n## Soon\n- [ ] S\n### Sub\n- [ ] not soon\n");
+	it("ends a section at a first or second level heading and matches the name after trim", () => {
+		const d = parse("##  Now  \n- [ ] A\n# Top\n- [ ] not now\n## Soon\n- [ ] S\n### Sub\n- [ ] in a group of Soon\n## Done\n");
 		expect(d.tasks("now").map((e) => e.task.text)).toEqual(["A"]);
-		expect(d.tasks("soon").map((e) => e.task.text)).toEqual(["S"]);
+		expect(d.tasks("soon").map((e) => e.task.text)).toEqual(["S", "in a group of Soon"]);
 	});
 
 	it("stops the children at a blank line or a shallower line", () => {
@@ -151,5 +151,84 @@ describe("TaskDocument operations", () => {
 
 	it("builds an empty file with every section", () => {
 		expect(TaskDocument.empty(ALL)).toBe("## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n");
+	});
+});
+
+describe("groups inside a list", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const shape = (d: TaskDocument) => d.groups("now").map((g) => ({ name: g.name, heading: g.heading, tasks: g.entries.map((e) => e.task.text) }));
+
+	it("keeps reading a list past ###", () => {
+		const text = "## Now\n- [ ] A\n### Вечер\n- [ ] B\n#### note\n- [ ] C\n## Soon\n";
+		const d = parseG(text);
+		expect(d.tasks("now").map((e) => e.task.text)).toEqual(["A", "B", "C"]);
+		expect(d.tasks("now").map((e) => e.group)).toEqual([null, "Вечер", "Вечер"]);
+		expect(d.tasks("soon")).toHaveLength(0);
+		expect(d.serialize()).toBe(text);
+	});
+
+	it("reads the ungrouped heading as null", () => {
+		const d = parseG("## Now\n### Morning\n- [ ] A\n### No section\n- [ ] B\n");
+		expect(shape(d)).toEqual([
+			{ name: null, heading: false, tasks: [] },
+			{ name: "Morning", heading: true, tasks: ["A"] },
+			{ name: null, heading: true, tasks: ["B"] },
+		]);
+		expect(ungroupedIndex(d.groups("now"))).toBe(2);
+		expect(d.tasks("now").map((e) => e.group)).toEqual(["Morning", null]);
+	});
+
+	it("reads every ### as a named group without an ungrouped name", () => {
+		const d = TaskDocument.parse("## Now\n### No section\n- [ ] B\n", SECTIONS, M);
+		expect(d.tasks("now")[0].group).toBe("No section");
+	});
+
+	it("trims heading names", () => {
+		expect(parseG("## Now\n### Вечер  \n- [ ] A\n").tasks("now")[0].group).toBe("Вечер");
+	});
+
+	it("names are case-sensitive", () => {
+		const d = parseG("## Now\n### Evening\n- [ ] A\n### evening\n- [ ] B\n");
+		expect(d.groups("now").map((g) => g.name)).toEqual([null, "Evening", "evening"]);
+	});
+
+	it("a heading ends a task's children", () => {
+		const d = parseG("## Now\n- [ ] A\n  - child\n### X\n- [ ] B\n");
+		expect(d.tasks("now")[0].task.children).toEqual(["  - child"]);
+		expect(d.tasks("now")[1].group).toBe("X");
+	});
+
+	it("inserts at start and end of the ungrouped group", () => {
+		expect(parseG("## Now\n- [ ] A\n### X\n- [ ] B\n").insert("now", "end", task("N")).serialize()).toBe("## Now\n- [ ] A\n- [ ] N\n### X\n- [ ] B\n");
+		expect(parseG("## Now\n- [ ] A\n### X\n- [ ] B\n").insert("now", "start", task("N")).serialize()).toBe("## Now\n- [ ] N\n- [ ] A\n### X\n- [ ] B\n");
+		expect(parseG("## Now\n### X\n- [ ] B\n").insert("now", "end", task("N")).serialize()).toBe("## Now\n- [ ] N\n### X\n- [ ] B\n");
+		expect(parseG("## Now\n### X\n- [ ] B\n### No section\n- [ ] C\n\n## Soon\n").insert("now", "end", task("N")).serialize()).toBe(
+			"## Now\n### X\n- [ ] B\n### No section\n- [ ] C\n- [ ] N\n\n## Soon\n",
+		);
+		expect(parseG("## Now\n### X\n- [ ] B\n### No section\n- [ ] C\n").insert("now", "start", task("N")).serialize()).toBe(
+			"## Now\n### X\n- [ ] B\n### No section\n- [ ] N\n- [ ] C\n",
+		);
+	});
+
+	it("moves a task to the end of the ungrouped group, out of its group", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(d.moveEntry(d.tasks("now")[1], "now", "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n### X\n");
+	});
+
+	it("inserts at the end of a group", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(d.insert("now", { endOf: 1 }, task("N")).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] N\n### Y\n- [ ] C\n");
+		expect(parseG("## Now\n### X\n\n### Y\n").insert("now", { endOf: 1 }, task("N")).serialize()).toBe("## Now\n### X\n- [ ] N\n\n### Y\n");
+	});
+
+	it("a number inserts before that task, inside its group", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(d.insert("now", 1, task("N")).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] N\n- [ ] B\n");
+	});
+
+	it("marks a group with only blank lines as blank", () => {
+		const d = parseG("## Now\n### X\n\n### Y\ntext\n### Z\n- [ ] A\n");
+		expect(d.groups("now").map((g) => [g.name, g.blank])).toEqual([[null, true], ["X", true], ["Y", false], ["Z", false]]);
 	});
 });

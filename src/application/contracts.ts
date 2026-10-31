@@ -1,7 +1,7 @@
-import type { LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { GroupName, LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
 import type { PriorityLevel } from "../settings";
 
-export type { SectionKey };
+export type { GroupName, SectionKey };
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
 
@@ -15,9 +15,6 @@ export interface TaskKey {
 	readonly index: number;
 	readonly raw: string;
 }
-
-/** A `###` section of a list by its name, or null for the tasks outside any (sections spec §3.2). */
-export type GroupName = string | null;
 
 /** The lists that hold sections. */
 export type GroupedList = "inbox" | "soon" | "now";

@@ -4,6 +4,9 @@ export type LocalDate = string;
 /** Which of the plugin's sections a task sits in. Backlog is never read. */
 export type SectionKey = "inbox" | "now" | "soon" | "done";
 
+/** A `###` section of a list by its name, or null for the tasks outside any. */
+export type GroupName = string | null;
+
 /** `[ ]`, `[/]`, `[x]`, `[-]`. Any other character reads as todo and is written back unchanged. */
 export type TaskStatus = "todo" | "inProgress" | "done" | "cancelled";
 
