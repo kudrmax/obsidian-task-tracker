@@ -10,6 +10,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	dueDate: null,
 	slot: null,
 	priority: null,
+	group: null,
 	...extra,
 });
 

@@ -15,6 +15,14 @@ export interface SectionNames {
 	readonly done: string;
 }
 
+/** The `###` sections inside a list: the names a drag offers to start one with, and the name of the tasks outside any. */
+export interface GroupSettings {
+	/** In the order the zones under a dragged card offer them. */
+	readonly presets: readonly string[];
+	/** The heading over the tasks outside any section, once a list has sections; `### <this>` in the file is that group. */
+	readonly ungrouped: string;
+}
+
 export interface GoogleSettings {
 	readonly clientId: string;
 	readonly clientSecret: string;
@@ -71,6 +79,7 @@ export interface TaskCalendarSettings {
 	readonly staleAfterMinutes: number;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
+	readonly groups: GroupSettings;
 	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
 	readonly cardHeight: number;
 	/** Between two cards, px: in the list and in a stack on the timeline alike. */
@@ -107,6 +116,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ prefix: "p1", color: "red" },
 		{ prefix: "p2", color: "orange" },
 	],
+	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 	cardHeight: 35,
 	cardGap: 2,
 };
@@ -142,5 +152,6 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		...s,
 		sections: { ...DEFAULT_SETTINGS.sections, ...(s.sections ?? {}) },
 		google: { ...DEFAULT_SETTINGS.google, ...(s.google ?? {}) },
+		groups: { ...DEFAULT_SETTINGS.groups, ...(s.groups ?? {}) },
 	};
 }

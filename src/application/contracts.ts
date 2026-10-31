@@ -16,6 +16,15 @@ export interface TaskKey {
 	readonly raw: string;
 }
 
+/** A `###` section of a list by its name, or null for the tasks outside any (sections spec §3.2). */
+export type GroupName = string | null;
+
+/** The lists that hold sections. */
+export type GroupedList = "inbox" | "soon" | "now";
+
+/** Where a section goes among the sections of its list: before another one, or last. */
+export type GroupPlace = { readonly before: GroupName } | "end";
+
 export interface TaskItem {
 	readonly key: TaskKey;
 	readonly text: string;
@@ -24,6 +33,8 @@ export interface TaskItem {
 	readonly slot: Slot | null;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
+	/** The section of its list it sits in; null outside any. */
+	readonly group: GroupName;
 }
 
 export interface DayView {
@@ -120,6 +131,25 @@ export interface TaskService {
 	postpone(key: TaskKey, date: LocalDate): Promise<void>;
 	/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
 	moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void>;
+
+	/**
+	 * A drop into a gap of a list that shows sections (sections spec §5.3): right before `before`, in its section, or at
+	 * the end of `group` when `before` is null. The slot goes; into Inbox and Soon the due date goes too, into Now it
+	 * comes due today.
+	 */
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null): Promise<void>;
+	/**
+	 * A drop on a section zone with the name it gives (sections spec §5.2): a preset goes in the presets' order among the
+	 * presets the list has, any other name last. A name the list has already takes the task in; the No section name puts
+	 * it among the tasks outside any section. The task enters the list as with `moveToGroup`.
+	 */
+	createGroup(key: TaskKey, list: GroupedList, name: string): Promise<void>;
+	/** A lifted section let go (sections spec §5.4); No section moves too. */
+	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
+	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */
+	renameGroup(list: GroupedList, group: string, name: string): Promise<void>;
+	/** The heading goes; its tasks, in order, join the end of No section. */
+	removeGroup(list: GroupedList, group: string): Promise<void>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

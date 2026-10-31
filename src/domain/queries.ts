@@ -45,5 +45,6 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
+		group: null,
 	};
 }

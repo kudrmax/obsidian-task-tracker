@@ -82,7 +82,7 @@ export class DemoTaskService implements TaskService {
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
-		return { key: { section, index, raw: this.raw(t) }, text: t.text, status: t.status, dueDate: t.dueDate, slot: t.slot, priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null };
+		return { key: { section, index, raw: this.raw(t) }, text: t.text, status: t.status, dueDate: t.dueDate, slot: t.slot, priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null, group: null };
 	}
 
 	private items(section: SectionKey): TaskItem[] {
@@ -249,6 +249,17 @@ export class DemoTaskService implements TaskService {
 		this.sections[date <= this.today() ? "now" : "soon"].push(t);
 		this.changed();
 	}
+
+	/** The demo keeps no sections. */
+	async moveToGroup(): Promise<void> {}
+
+	async createGroup(): Promise<void> {}
+
+	async moveGroup(): Promise<void> {}
+
+	async renameGroup(): Promise<void> {}
+
+	async removeGroup(): Promise<void> {}
 
 	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
 		const t = this.take(key);

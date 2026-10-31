@@ -25,6 +25,17 @@ describe("settingsFrom", () => {
 	});
 });
 
+describe("groups", () => {
+	it("merges saved groups over the defaults", () => {
+		expect(settingsFrom({}).groups).toEqual({ presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" });
+		const s = settingsFrom({ groups: { ungrouped: "Без секции" } });
+		expect(s.groups.ungrouped).toBe("Без секции");
+		expect(s.groups.presets).toHaveLength(3);
+		const groups = { presets: ["Утро"], ungrouped: "No section" };
+		expect(partition({ groups }).shared).toEqual({ groups });
+	});
+});
+
 describe("the device's part of the settings", () => {
 	it("keeps the divider's place and the column shown apart from what the file holds", () => {
 		expect(partition({ listShare: 0.4, rightMode: "soon", longPressMs: 300 })).toEqual({ device: { listShare: 0.4, rightMode: "soon" }, shared: { longPressMs: 300 } });

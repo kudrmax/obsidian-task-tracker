@@ -143,6 +143,26 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}
 
+	async moveToGroup(): Promise<void> {
+		throw new Error("Sections are not built yet");
+	}
+
+	async createGroup(): Promise<void> {
+		throw new Error("Sections are not built yet");
+	}
+
+	async moveGroup(): Promise<void> {
+		throw new Error("Sections are not built yet");
+	}
+
+	async renameGroup(): Promise<void> {
+		throw new Error("Sections are not built yet");
+	}
+
+	async removeGroup(): Promise<void> {
+		throw new Error("Sections are not built yet");
+	}
+
 	async normalize(): Promise<void> {
 		const text = await this.store.read();
 		if (text === null) return;
