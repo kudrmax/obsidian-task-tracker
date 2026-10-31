@@ -1,4 +1,4 @@
-import type { TaskItem, TaskKey } from "../../application/contracts";
+import type { GroupedList, GroupName, TaskItem, TaskKey } from "../../application/contracts";
 import type { LocalDate, Slot } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
@@ -18,6 +18,8 @@ export interface DragPayload {
 export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
+	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
+	| { readonly kind: "group"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "clearSlot" }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	| { readonly kind: "pickDate" };

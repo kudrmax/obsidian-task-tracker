@@ -157,23 +157,29 @@ export class TaskCalendarView extends ItemView {
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.data.day?.list ?? [],
 			day: () => this.selectedDate,
+			grouped: () => this.selectedDate === this.today(),
+			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true);
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => (this.selectedDate === this.today() ? "now" : null));
 		this.inboxEl = el(root, "div", "tc-inbox");
 		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
 			items: () => this.data.inbox,
 			day: () => null,
+			grouped: () => true,
+			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon");
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => "inbox");
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.data.soon,
 			day: () => null,
+			grouped: () => true,
+			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline");
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => "soon");
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -418,6 +424,7 @@ export class TaskCalendarView extends ItemView {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
 			if (result.kind === "postpone") return tasks.postpone(key, result.date);
+			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
 			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
