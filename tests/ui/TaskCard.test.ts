@@ -90,4 +90,24 @@ describe("a task with subtasks", () => {
 		expect(subtrees.get("A1")).toEqual(["A11"]);
 		expect(subtrees.get("B")).toEqual([]);
 	});
+
+	it("runs a branch from each task to its subtasks, bending in at the last, and the task's line on past its subtasks' own", () => {
+		const sub = (text: string, subtasks: TaskItem[] = []) => item({ text, subtasks, parentText: "p" });
+		const tree = [item({ text: "A", subtasks: [sub("A1", [sub("A11"), sub("A12")]), sub("A2", [sub("A21")])] }), item({ text: "B" })];
+		const list = new TaskList(document.createElement("div"), { items: () => tree, day: () => null });
+		list.render();
+		const lines = (card: HTMLElement) => [
+			card.querySelector(".tc-branch")?.className ?? null,
+			...[...card.querySelectorAll<HTMLElement>(".tc-branch-pass")].map((pass) => pass.style.getPropertyValue("--tc-pass")),
+		];
+		expect(list.cards.map((e) => [e.item.text, ...lines(e.card)])).toEqual([
+			["A", null],
+			["A1", "tc-branch"],
+			["A11", "tc-branch", "1"],
+			["A12", "tc-branch is-last", "1"],
+			["A2", "tc-branch is-last"],
+			["A21", "tc-branch is-last"],
+			["B", null],
+		]);
+	});
 });

@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
- * --tc-len, --tc-x, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
+ * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -46,6 +46,7 @@ body {
 	/* The layers of a dragged task's subtasks, under it. */
 	--tc-float-under-1: #242426;
 	--tc-float-under-2: #1C1C1E;
+	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
 	--tc-accent-ui: var(--interactive-accent);
@@ -86,6 +87,7 @@ body {
 	/* Shape */
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
+	--tc-radius-branch: 6px;
 	--tc-radius-float: calc(var(--tc-float-h) / 2);
 	--tc-radius-event: 6px;
 	--tc-radius-time-pill: 6px;
@@ -108,6 +110,7 @@ body {
 	--tc-corner: round;
 	--tc-hairline: 1px;
 	--tc-bar: 3px;
+	--tc-branch-w: 1.5px;
 	--tc-stroke-chevron: 2.2px;
 	--tc-stroke-seg: 2px;
 
@@ -172,6 +175,8 @@ body {
 	--tc-stack-inset: 7px;
 	/* A subtask's card stands this much further in per level. */
 	--tc-subtask-indent: 20px;
+	/* A branch runs up through the gap and a little under the card above, to the curve of its bottom. */
+	--tc-branch-rise: calc(var(--tc-card-gap) + 2px);
 	/* Pressed, a card shows its whole title: it stretches to the right past its column, up to this far from the window's edges. */
 	--tc-whole-margin: 10px;
 
@@ -398,6 +403,7 @@ body.theme-light {
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
 	--tc-float-under-1: #F7F7F9;
 	--tc-float-under-2: #EFEFF2;
+	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
 	--tc-ink-dim: #C7C7CC;
 	--tc-separator: #D1D1D6;
@@ -544,7 +550,15 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
 .tc-card.is-lifted { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
 .tc-card.is-shifted { transform: translateY(var(--tc-card-shift)); }
-.tc-list > .tc-card { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); }
+.tc-list > .tc-card { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
+.tc-list > .tc-card > .tc-strip { inset: 0; width: auto; border-radius: var(--tc-radius-card); background: linear-gradient(to right, var(--tc-strip-color) var(--tc-bar), transparent var(--tc-bar)); }
+/* A subtask's branch from its task: on down past it to the next subtask, bending in at the last; the lines of the tasks further up that go on past it. */
+.tc-branch, .tc-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
+.tc-branch { left: calc(-1 * (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); width: calc((var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); }
+.tc-branch::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--tc-branch-rise) + (var(--tc-card-h) - var(--tc-branch-w)) / 2); border-top: var(--tc-branch-w) solid var(--tc-branch); }
+.tc-branch.is-last { height: calc(var(--tc-branch-rise) + 50% + var(--tc-branch-w) / 2); border-bottom: var(--tc-branch-w) solid var(--tc-branch); border-bottom-left-radius: var(--tc-radius-branch); }
+.tc-branch.is-last::after { content: none; }
+.tc-branch-pass { left: calc(-1 * (var(--tc-pass) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 /* A card another one is dragged over: it will take it as its last subtask. */
 .tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }

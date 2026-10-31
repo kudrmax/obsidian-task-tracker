@@ -20,6 +20,7 @@ body{margin:0}
 <dc-import name="Screen" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" scroll-hours="{{scroll}}" hint-size="390px,844px"></dc-import>
 <div style="position: absolute; left: 0; top: 166px; width: 187px; height: 503px; background: {{c.bg}}; z-index: 3;"></div>
 <div style="position: absolute; left: 10px; top: 166px; width: 175px; height: 503px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; z-index: 4;">
+<svg width="175" height="503" viewBox="0 0 175 503" style="position: absolute; left: 0; top: 0; width: 175px; height: 503px;" aria-hidden="true"><path d="{{branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
 <sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
 <div style="position: relative; flex-shrink: 0; margin-left: {{r.indent}}px; overflow: hidden; height: 35px; box-sizing: border-box; background: {{r.bg}}; box-shadow: {{r.ring}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
@@ -122,14 +123,14 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"list","options":["list","menu","menuTask","newSub","added","dragTask","dragSub","dragOut","dragInto","calList","calMenu"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"list","options":["list","menu","menuTask","newSub","added","dragTask","dragSub","dragOut","dragInto","calList","calMenu"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"tree":{"editor":"enum","default":"branches","options":["branches","none"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'list';
     const light = this.props.theme === 'light';
     const c = light
-      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', dash: '#C7C7CC', strip: '#8A5CF5', accent: '#8A5CF5', target: '#F1ECFE', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', danger: '#FF3B30', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', floatMonth: '#8E8E93', under1: '#F7F7F9', under2: '#EFEFF2', mark: '#FF9500', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
-      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', dash: '#3A3A3C', strip: '#8A6CEF', accent: '#9580FF', target: '#251F3D', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', danger: '#FF453A', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', floatMonth: '#AEAEB2', under1: '#242426', under2: '#1C1C1E', mark: '#FFD60A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', dash: '#C7C7CC', strip: '#8A5CF5', accent: '#8A5CF5', target: '#F1ECFE', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', danger: '#FF3B30', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', floatMonth: '#8E8E93', under1: '#F7F7F9', under2: '#EFEFF2', mark: '#FF9500', branch: '#C7C7CC', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', dash: '#3A3A3C', strip: '#8A6CEF', accent: '#9580FF', target: '#251F3D', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', danger: '#FF453A', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', floatMonth: '#AEAEB2', under1: '#242426', under2: '#1C1C1E', mark: '#FFD60A', branch: '#48484A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
     const INDENT = 20;
     const CARD = 35;
     const STEP = CARD + 2;
@@ -187,6 +188,24 @@ class Component extends DCLogic {
     };
     walk(tree, 0);
     const targetIndex = rows.findIndex((r) => r.id === target);
+    const lines = this.props.tree ?? 'branches';
+    const branches = [];
+    rows.forEach((r, i) => {
+      if (lines === 'none' || !r.isCard) return;
+      const kids = [];
+      for (let j = i + 1; j < rows.length && rows[j].isCard && rows[j].level > r.level; j++) {
+        if (rows[j].level === r.level + 1) kids.push(j);
+      }
+      if (!kids.length) return;
+      const x = r.indent + INDENT / 2;
+      const mid = (j) => j * STEP + CARD / 2;
+      const last = mid(kids[kids.length - 1]);
+      if (lines === 'branches') {
+        const R = 6;
+        branches.push(`M${x} ${mid(i)}V${last - R}Q${x} ${last} ${x + R} ${last}H${x + INDENT / 2}`);
+        kids.slice(0, -1).forEach((k) => branches.push(`M${x} ${mid(k)}H${x + INDENT / 2}`));
+      }
+    });
     const drags = {
       dragTask: { title: 'Купить билеты в Белград', hasSubs: true, count: '2/5', due: true, left: 34, top: 360, stack: true },
       dragSub: { title: 'Оплатить билеты', left: 10 + INDENT + 14, top: gapTop + 6 },
@@ -260,6 +279,7 @@ class Component extends DCLogic {
       withBackdrop: menu.on || view === 'calMenu',
       rows,
       marks: this.props.marks === false || !marksByView[view] ? [] : marksByView[view](),
+      branches: branches.join('') || 'M0 0',
       drag,
       cal,
       calSubs,

@@ -27,7 +27,10 @@ export interface ListEntry {
 	readonly level: number;
 }
 
-/** A column of cards that scrolls: each task with its open subtasks right under it, a level further in; with sections, a header over each. */
+/**
+ * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
+ * from the task to each; with sections, a header over each.
+ */
 export class TaskList {
 	private entries: ListEntry[] = [];
 	private rendered: ListGroup[] = [];
@@ -50,18 +53,21 @@ export class TaskList {
 		const items = this.deps.items();
 		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 		this.withHeaders = showsHeaders(this.rendered);
-		const add = (item: TaskItem, level: number): void => {
+		/** `through`: for each task above the subtask's own, whether its line goes on past the card to a later subtask. */
+		const add = (item: TaskItem, level: number, through: readonly boolean[], last: boolean): void => {
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
+			if (level > 0) branch(card, through, last);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
 			const from = this.entries.length;
-			for (const sub of item.subtasks) add(sub, level + 1);
+			const below = level > 0 ? [...through, !last] : [];
+			item.subtasks.forEach((sub, i) => add(sub, level + 1, below, i === item.subtasks.length - 1));
 			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));
 		};
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			for (const item of group.items) add(item, 0);
+			for (const item of group.items) add(item, 0, [], false);
 		}
 		const pending = this.deps.pending?.() ?? null;
 		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
@@ -97,4 +103,12 @@ export class TaskList {
 		this.deps.onHeader?.(head, group);
 		return head;
 	}
+}
+
+/** A subtask's branch from its task, bending in if it is the last; and the lines of the tasks further up that go on past it. */
+function branch(card: HTMLElement, through: readonly boolean[], last: boolean): void {
+	el(card, "span", last ? "tc-branch is-last" : "tc-branch");
+	through.forEach((goesOn, i) => {
+		if (goesOn) el(card, "span", "tc-branch-pass").style.setProperty(PROPERTY.pass, String(through.length - i));
+	});
 }
