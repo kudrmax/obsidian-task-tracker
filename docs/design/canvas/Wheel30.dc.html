@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Колёсико колонок</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 280px; position: relative; overflow: hidden; background: {{c.bg}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<div style="position: absolute; left: 73px; top: 24px; width: 244px; height: 84px; box-sizing: border-box; border: 2px solid {{c.frame}}; border-radius: 16px;"></div>
+<sc-for list="{{columns}}" as="col" hint-placeholder-count="4">
+<div style="position: absolute; left: {{col.left}}px; top: 32px; width: 110px; height: 68px; border-radius: 10px; background: {{c.track}}; opacity: {{col.opacity}}; color: {{c.muted}}; display: flex; align-items: center; justify-content: center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{col.path}}"></path></svg></div>
+</sc-for>
+
+<div style="position: absolute; left: {{sw.left}}px; top: 156px; width: {{sw.width}}px; height: 32px; transform: scale(2); transform-origin: 50% 50%;">
+<div role="group" aria-label="Columns" style="position: relative; width: {{sw.width}}px; height: 32px; box-sizing: border-box; border-radius: 16px; background: {{c.track}}; overflow: hidden;">
+<div style="position: absolute; left: 2px; right: 2px; top: 2px; height: 28px; -webkit-mask-image: {{sw.mask}}; mask-image: {{sw.mask}};">
+<sc-for list="{{icons}}" as="o" hint-placeholder-count="4">
+<span aria-label="{{o.label}}" style="position: absolute; left: {{o.left}}px; top: 0; width: 38px; height: 28px; color: {{c.muted}}; opacity: {{o.opacity}}; transform: scale({{o.scale}}); display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
+</sc-for>
+</div>
+<div style="position: absolute; left: {{sw.lensLeft}}px; top: 2px; width: 76px; height: 28px; border-radius: 14px; background: {{c.selectedBg}}; overflow: hidden;">
+<sc-for list="{{icons}}" as="o" hint-placeholder-count="4">
+<span aria-hidden="true" style="position: absolute; left: {{o.lensLeft}}px; top: 0; width: 38px; height: 28px; color: {{c.onSelected}}; transform: scale({{o.scale}}); display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
+</sc-for>
+</div>
+</div>
+</div>
+
+<sc-if value="{{finger.shown}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{finger.left}}px; top: 158px; width: 28px; height: 28px; border-radius: 14px; background: {{c.finger}}; box-shadow: 0 0 0 1px {{c.fingerRing}};"></div>
+<div style="position: absolute; left: {{finger.arrowLeft}}px; top: 222px; width: 120px; height: 24px; color: {{c.arrow}}; display: flex; align-items: center; justify-content: center;"><svg width="120" height="24" viewBox="0 0 120 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{finger.arrow}}"></path></svg></div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","default":"drum","options":["drum","flat"]},"pos":{"editor":"range","default":2,"min":0,"max":2,"step":0.05},"stripPos":{"editor":"range","default":-1,"min":-1,"max":2,"step":1},"finger":{"editor":"enum","default":"none","options":["none","left","right"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', track: '#F2F2F2', selectedBg: '#1C1C1E', onSelected: '#FFFFFF', muted: '#8E8E93', frame: '#C7C7CC', finger: 'rgba(0,0,0,0.10)', fingerRing: 'rgba(0,0,0,0.25)', arrow: '#8A5CF5' }
+      : { bg: '#000000', track: '#1C1C1C', selectedBg: '#E5E5EA', onSelected: '#000000', muted: '#8E8E93', frame: '#48484A', finger: 'rgba(255,255,255,0.18)', fingerRing: 'rgba(255,255,255,0.45)', arrow: '#9580FF' };
+    const paths = [
+      { key: 'inbox', label: 'Inbox', path: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z' },
+      { key: 'soon', label: 'Soon', path: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5' },
+      { key: 'now', label: 'Now', path: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4' },
+      { key: 'calendar', label: 'Calendar', path: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5' }
+    ];
+    const drum = (this.props.variant ?? 'drum') === 'drum';
+    const pos = Number(this.props.pos ?? 2);
+    const stripPos = Number(this.props.stripPos ?? -1) < 0 ? Math.round(pos) : Number(this.props.stripPos);
+    const width = drum ? 194 : 156;
+    const inner = width - 4;
+    const lensLeft = (width - 76) / 2;
+    const fade = drum ? 26 : 10;
+    const icons = paths.map((p, i) => {
+      const d = Math.abs(i - pos - 0.5);
+      const off = Math.max(0, d - 0.5);
+      const left = inner / 2 + (i - pos - 0.5) * 38 - 19;
+      return {
+        ...p,
+        left,
+        lensLeft: left + 2 - lensLeft,
+        scale: drum ? Math.max(0.6, 1 - 0.14 * off).toFixed(3) : 1,
+        opacity: drum ? Math.max(0, 1 - 0.28 * off).toFixed(3) : 1
+      };
+    });
+    const columns = paths.map((p, i) => ({ path: p.path, left: 81 + (i - stripPos) * 118, opacity: i === stripPos || i === stripPos + 1 ? 1 : 0.35 }));
+    const finger = this.props.finger ?? 'none';
+    const fingerX = 195 + (finger === 'left' ? -38 : 38);
+    return {
+      c,
+      icons,
+      columns,
+      sw: {
+        width,
+        left: (390 - width) / 2,
+        lensLeft,
+        mask: 'linear-gradient(to right, transparent 0, #000 ' + fade + 'px, #000 calc(100% - ' + fade + 'px), transparent 100%)'
+      },
+      finger: {
+        shown: finger !== 'none',
+        left: fingerX - 14,
+        arrowLeft: 135,
+        arrow: finger === 'left' ? 'M108 12H12 M22 4l-10 8 10 8' : 'M12 12h96 M98 4l10 8-10 8'
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

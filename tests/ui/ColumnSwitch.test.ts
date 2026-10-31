@@ -26,12 +26,11 @@ function setUp(initial: RightMode, dot = false) {
 		onSources: () => sources++,
 		longPressMs: () => LONG_PRESS,
 	});
-	const pill = control.el.querySelector<HTMLElement>(".tc-seg-pill")!;
+	const icons = [...control.el.querySelectorAll<HTMLElement>(".tc-seg-reel")[0].querySelectorAll<HTMLElement>(".tc-seg-icon")];
 	for (const icon of control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")) Object.defineProperty(icon, "offsetWidth", { get: () => STEP });
-	const place = { inbox: 0, soon: 1, calendar: 2 } as const;
-	Object.defineProperty(pill, "offsetLeft", { get: () => (pill.style.left ? parseFloat(pill.style.left) : 2 + place[mode] * STEP) });
-	const lit = () => [...control.el.querySelectorAll(".tc-seg-icon.is-on")].map((icon) => [...control.el.querySelectorAll(".tc-seg-icon")].indexOf(icon));
-	const icons = [...control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")];
+	const wheel = () => parseFloat(control.el.style.getPropertyValue("--tc-seg-pos"));
+	const lit = () => [Math.round(wheel()), Math.round(wheel()) + 1];
+	const depth = (column: number) => icons[column].style.getPropertyValue("--tc-seg-depth");
 	const tap = (column: number) => {
 		control.el.dispatchEvent(pointer("pointerdown", 50));
 		control.el.dispatchEvent(pointer("pointerup", 50));
@@ -43,23 +42,30 @@ function setUp(initial: RightMode, dot = false) {
 		control.el.dispatchEvent(pointer("pointerup", xs[xs.length - 1]));
 		control.el.click();
 	};
-	return { control, pill, changes, sources: () => sources, lit, tap, drag };
+	return { control, changes, sources: () => sources, wheel, lit, depth, tap, drag };
 }
 
 describe("ColumnSwitch", () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());
 
-	it("lights the two columns the window shows and puts the pill over them", () => {
+	it("turns the wheel so that its window shows the two columns on the screen, the icons out of it standing deeper", () => {
 		const calendar = setUp("calendar");
 		expect(calendar.lit()).toEqual([2, 3]);
-		expect(calendar.control.el.className).toBe("tc-seg");
-		const lists = setUp("soon");
-		expect(lists.lit()).toEqual([1, 2]);
-		expect(lists.control.el.classList.contains("is-lists")).toBe(true);
+		expect([0, 1, 2, 3].map(calendar.depth)).toEqual(["2", "1", "0", "0"]);
+		expect(setUp("soon").lit()).toEqual([1, 2]);
 		const inbox = setUp("inbox");
 		expect(inbox.lit()).toEqual([0, 1]);
-		expect(inbox.control.el.classList.contains("is-inbox")).toBe(true);
+		expect([0, 1, 2, 3].map(inbox.depth)).toEqual(["0", "0", "1", "2"]);
+	});
+
+	it("draws the wheel twice, the copy under the window turning with it", () => {
+		const s = setUp("soon");
+		const [track, lens] = s.control.el.querySelectorAll(".tc-seg-reel");
+		expect(lens.parentElement!.classList.contains("tc-seg-pill")).toBe(true);
+		expect([...lens.querySelectorAll<HTMLElement>(".tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-depth"))).toEqual(
+			[...track.querySelectorAll<HTMLElement>(".tc-seg-icon")].map((icon) => icon.style.getPropertyValue("--tc-seg-depth")),
+		);
 	});
 
 	it("moves to the nearest place that shows a tapped column, and stays for a column already shown", () => {
@@ -80,33 +86,33 @@ describe("ColumnSwitch", () => {
 		expect(far.changes).toEqual(["inbox"]);
 	});
 
-	it("carries the pill under the finger within its track, the screen staying put until let go", () => {
-		const s = setUp("calendar");
+	it("turns the wheel the way the finger goes, within its ends, the screen staying put until let go", () => {
+		const s = setUp("soon");
 		s.control.el.dispatchEvent(pointer("pointerdown", 100));
-		s.control.el.dispatchEvent(pointer("pointermove", 85));
-		expect(s.pill.style.left).toBe("63px");
+		s.control.el.dispatchEvent(pointer("pointermove", 81));
+		expect(s.wheel()).toBe(1.5);
+		expect(s.depth(0)).toBe("1.5");
+		s.control.el.dispatchEvent(pointer("pointermove", 75));
 		expect(s.lit()).toEqual([2, 3]);
-		s.control.el.dispatchEvent(pointer("pointermove", 70));
-		expect(s.lit()).toEqual([1, 2]);
-		s.control.el.dispatchEvent(pointer("pointermove", 30));
-		expect(s.lit()).toEqual([0, 1]);
 		s.control.el.dispatchEvent(pointer("pointermove", 0));
-		expect(s.pill.style.left).toBe("2px");
+		expect(s.wheel()).toBe(2);
+		s.control.el.dispatchEvent(pointer("pointermove", 130));
+		expect(s.lit()).toEqual([0, 1]);
 		s.control.el.dispatchEvent(pointer("pointermove", 300));
-		expect(s.pill.style.left).toBe("78px");
+		expect(s.wheel()).toBe(0);
 		expect(s.changes).toEqual([]);
 	});
 
 	it("settles on the nearest place when let go, and a drag is not a tap", () => {
 		const s = setUp("calendar");
-		s.drag(100, 85);
+		s.drag(100, 115);
 		expect(s.changes).toEqual([]);
-		expect(s.pill.style.left).toBe("");
-		s.drag(100, 75);
+		expect(s.wheel()).toBe(2);
+		s.drag(100, 125);
 		expect(s.changes).toEqual(["soon"]);
-		s.drag(100, 110, 125);
+		s.drag(100, 90, 75);
 		expect(s.changes).toEqual(["soon", "calendar"]);
-		s.drag(100, 20);
+		s.drag(100, 180);
 		expect(s.changes).toEqual(["soon", "calendar", "inbox"]);
 	});
 
@@ -115,7 +121,7 @@ describe("ColumnSwitch", () => {
 		s.control.el.dispatchEvent(pointer("pointerdown", 50));
 		vi.advanceTimersByTime(LONG_PRESS);
 		s.control.el.dispatchEvent(pointer("pointerup", 50));
-		s.control.el.querySelectorAll<HTMLElement>(".tc-seg-icon")[0].click();
+		s.control.el.querySelector<HTMLElement>(".tc-seg-icon")!.click();
 		expect(s.sources()).toBe(1);
 		expect(s.changes).toEqual([]);
 		const lists = setUp("soon");
@@ -124,8 +130,8 @@ describe("ColumnSwitch", () => {
 		expect(lists.sources()).toBe(0);
 	});
 
-	it("puts the dot of a stale source on the calendar", () => {
-		expect(setUp("soon", true).control.el.querySelector(".tc-dot.is-shown")).not.toBeNull();
+	it("puts the dot of a stale source on the calendar, under the window too", () => {
+		expect(setUp("soon", true).control.el.querySelectorAll(".tc-dot.is-shown").length).toBe(2);
 		expect(setUp("soon").control.el.querySelector(".tc-dot.is-shown")).toBeNull();
 	});
 });
