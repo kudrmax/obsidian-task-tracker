@@ -733,6 +733,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* A level stays one row on the phone too, where Obsidian stacks a setting's parts. */
 .setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-12); }
 .tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; }
+.tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
+.tc-preset-grip { touch-action: none; cursor: grab; }
+.tc-preset-row.is-dragging { opacity: var(--tc-pressed); }
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); margin-right: auto; }
 .tc-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); cursor: pointer; }
 .tc-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }

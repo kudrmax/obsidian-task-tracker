@@ -29,6 +29,7 @@ A task is a list item with a checkbox. Two optional fields at the end of the lin
 - `[/]` is “in progress”, `[x]` done, `[-]` won’t do. Done and won’t-do tasks move to the top of Done at once.
 - A Soon task whose due date (or slot) has come moves to the top of Now.
 - Nested lines under a task travel with it.
+- A third-level heading inside Inbox, Now or Soon is a **section** (`### Evening`). Tasks above the first one are outside any section; once that group is moved lower, its heading is `### No section` (Settings → Sections). A section the plugin finds empty is removed; a task that gets a time or a later day leaves its section.
 
 ## The screen
 
