@@ -12,6 +12,7 @@ export const MENU_ICONS = {
 	removeDue: { d: `${CIRCLE} M9 9l6 6 M15 9l-6 6`, fill: "" },
 	priority: { d: "M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5", fill: "" },
 	check: { d: "M5 12.5l5 5 9-10.5", fill: "" },
+	removeSection: { d: "M4 6h9 M4 12h9 M4 18h9 M16 9l5 5 M21 9l-5 5", fill: "" },
 } as const;
 
 export type MenuIconName = keyof typeof MENU_ICONS;

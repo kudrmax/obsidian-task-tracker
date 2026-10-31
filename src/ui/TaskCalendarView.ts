@@ -12,7 +12,10 @@ import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
 import type { DragPayload, DropTarget, PlacedResult } from "./drag/DropTarget";
+import { GroupDrag } from "./drag/GroupDrag";
 import { GroupZones } from "./drag/GroupZones";
+import { GroupMenu } from "./menu/GroupMenu";
+import type { ListGroup } from "./listGroups";
 import { PostponeZones } from "./drag/PostponeZones";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
@@ -91,6 +94,7 @@ export class TaskCalendarView extends ItemView {
 	private newInbox: NewTaskButton | null = null;
 	private postponeZones: PostponeZones | null = null;
 	private groupZones: GroupZones[] = [];
+	private readonly groupDrag: GroupDrag;
 	/** A card dropped on New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly list: GroupedList } | null = null;
 	private switching = 0;
@@ -110,6 +114,14 @@ export class TaskCalendarView extends ItemView {
 			intervalMs: () => this.settings.google.refreshSeconds * SECOND_MS,
 			hidden: () => document.hidden,
 			timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) },
+		});
+		this.groupDrag = new GroupDrag({
+			longPressMs: () => this.settings.longPressMs,
+			arbiter: this.arbiter,
+			haptics: this.haptics,
+			ungroupedName: () => this.settings.groups.ungrouped,
+			onTap: (head, list, group) => this.showGroupMenu(head, list, group),
+			onMove: (list, group, place) => this.act(() => this.deps.tasks.moveGroup(list, group, place)),
 		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
@@ -170,6 +182,7 @@ export class TaskCalendarView extends ItemView {
 			day: () => this.selectedDate,
 			grouped: () => this.selectedDate === this.today(),
 			pending: () => this.namingIn("now"),
+			onHeader: (head, group) => this.groupDrag.attach(head, "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "left"),
 		});
@@ -180,6 +193,7 @@ export class TaskCalendarView extends ItemView {
 			day: () => null,
 			grouped: () => true,
 			pending: () => this.namingIn("inbox"),
+			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "inbox"),
 		});
@@ -190,6 +204,7 @@ export class TaskCalendarView extends ItemView {
 			day: () => null,
 			grouped: () => true,
 			pending: () => this.namingIn("soon"),
+			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item) => this.drag.attachCard(card, item, "soon"),
 		});
@@ -475,6 +490,34 @@ export class TaskCalendarView extends ItemView {
 			},
 		});
 		field.scrollIntoView({ block: "nearest" });
+	}
+
+	/** A section's menu; No section has none. */
+	private showGroupMenu(head: HTMLElement, list: GroupedList, group: ListGroup): void {
+		const name = group.name;
+		if (name === null) return;
+		GroupMenu.open(head, {
+			name,
+			onRename: () => this.renameInPlace(head, list, name),
+			onRemove: () => void this.act(() => this.deps.tasks.removeGroup(list, name)),
+		});
+	}
+
+	/** The name is edited where the header stands, selected to be typed over. */
+	private renameInPlace(head: HTMLElement, list: GroupedList, name: string): void {
+		if (!this.arbiter.claim(NAMING)) return;
+		const slot = el(null, "div", "tc-group-slot");
+		head.before(slot);
+		head.hidden = true;
+		GroupNameField.open(slot, {
+			value: name,
+			select: true,
+			onDone: (to) => {
+				this.arbiter.release(NAMING);
+				if (to && to !== name) void this.act(() => this.deps.tasks.renameGroup(list, name, to));
+				else this.render();
+			},
+		});
 	}
 
 	private listOf(list: GroupedList): TaskList | null {
