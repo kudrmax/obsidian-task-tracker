@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>4. Заголовок секции: меню и имя</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1128px; height: 1076px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">4. Заголовок секции: меню и имя</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 1000px; font-size: 18px; line-height: 24px; color: #6B6A65;">Тап по заголовку — меню из двух строк. Remove section убирает только заголовок: задачи уходят в конец No section. У No section меню нет</div>
+<svg width="64" height="8" viewBox="0 0 64 8" style="position: absolute; left: 462px; top: 586px; width: 64px; height: 8px; overflow: visible; fill: none; stroke: #8A8378; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round" aria-hidden="true"><path d="M 0 4 L 58 4 M 52 -1 L 58 4 L 52 9"></path></svg>
+<sc-for list="{{phones}}" as="p" hint-placeholder-count="2">
+<div style="position: absolute; left: {{p.left}}px; top: 168px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="SecFinal" view="{{p.view}}" theme="dark" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: 1026px; width: 390px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1128,"height":1076}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      phones: [
+        { left: 64, view: 'menu', caption: 'Тап по заголовку Экскурсия' },
+        { left: 534, view: 'rename', caption: 'Rename: имя правят на месте заголовка' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

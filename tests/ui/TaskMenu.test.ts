@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { menuRows, priorityRows } from "../../src/ui/menu/TaskMenu";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, group: null, ...extra });
 
 describe("menuRows", () => {
 	it("offers the three groups for a task to do", () => {

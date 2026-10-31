@@ -146,3 +146,72 @@ describe("rule 3: a sorted Inbox task leaves Inbox", () => {
 		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 });
+
+describe("sections: rules 5-8", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const run = (text: string) => normalize(TaskDocument.parse(text, G, M), T).serialize();
+
+	it("rule 5: a slotted task leaves its group, and the empty group goes (rule 8)", () => {
+		expect(run("## Now\n- [ ] A\n### Вечер\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n### X\n- [ ] C\n")).toBe("## Now\n- [ ] A\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n### X\n- [ ] C\n");
+	});
+
+	it("rule 5: a Now task due tomorrow leaves its group", () => {
+		expect(run("## Now\n- [ ] A\n### X\n- [ ] B 📅 2026-10-31\n- [ ] C\n")).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-31\n### X\n- [ ] C\n");
+	});
+
+	it("rule 5: a Soon task with a due date leaves its group", () => {
+		expect(run("## Soon\n### X\n- [ ] B 📅 2026-11-03\n- [ ] C\n")).toBe("## Soon\n- [ ] B 📅 2026-11-03\n### X\n- [ ] C\n");
+	});
+
+	it("rule 5: an Inbox group keeps any task", () => {
+		const text = "## Inbox\n### X\n- [ ] B\n";
+		expect(run(text)).toBe(text);
+	});
+
+	it("rule 6: duplicates merge into the first, in order", () => {
+		expect(run("## Now\n### X\n- [ ] A\n### Y\n- [ ] B\n### X\n- [ ] C\n- [ ] D\n")).toBe("## Now\n### X\n- [ ] A\n- [ ] C\n- [ ] D\n### Y\n- [ ] B\n");
+	});
+
+	it("rule 7: top tasks join the ungrouped heading group at its start", () => {
+		expect(run("## Now\n- [ ] A\n### X\n- [ ] B\n### No section\n- [ ] C\n")).toBe("## Now\n### X\n- [ ] B\n### No section\n- [ ] A\n- [ ] C\n");
+	});
+
+	it("rule 7: the ungrouped heading as the first ### goes", () => {
+		expect(run("## Now\n### No section\n- [ ] A\n### X\n- [ ] B\n")).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n");
+	});
+
+	it("rule 7 after rule 8: an emptied group above the ungrouped heading leaves it first, and it goes", () => {
+		expect(run("## Now\n### X\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n### No section\n- [ ] C\n### Y\n- [ ] D\n")).toBe("## Now\n- [ ] C\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n### Y\n- [ ] D\n");
+	});
+
+	it("rule 8 keeps a group with text and no tasks", () => {
+		const text = "## Now\n- [ ] A\n### X\nsome text\n";
+		expect(run(text)).toBe(text);
+	});
+
+	it("rule 8 deletes an empty group and an empty ungrouped heading", () => {
+		expect(run("## Now\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### No section\n\n## Soon\n")).toBe("## Now\n- [ ] A\n### Y\n- [ ] B\n\n## Soon\n");
+	});
+
+	it("rule 4 puts today's Soon tasks at the start of No section, in order", () => {
+		expect(run("## Now\n### X\n- [ ] A\n\n## Soon\n- [ ] S1 📅 2026-10-30\n- [ ] S2 📅 2026-10-30\n")).toBe("## Now\n- [ ] S1 📅 2026-10-30\n- [ ] S2 📅 2026-10-30\n### X\n- [ ] A\n\n## Soon\n");
+	});
+
+	it("leaves ### in Done alone", () => {
+		const text = "## Done\n- [x] A\n### Old\n- [x] B\n\n### Empty\n";
+		expect(run(text)).toBe(text);
+	});
+
+	it("is idempotent", () => {
+		for (const text of [
+			"## Now\n- [ ] A\n### Вечер\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n",
+			"## Now\n### X\n- [ ] A\n### Y\n- [ ] B\n### X\n- [ ] C\n",
+			"## Now\n- [ ] A\n### X\n- [ ] B\n### No section\n- [ ] C\n",
+			"## Now\n### X\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n### No section\n- [ ] C\n### Y\n- [ ] D\n",
+			"## Now\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### No section\n\n## Soon\n",
+		]) {
+			const once = normalize(TaskDocument.parse(text, G, M), T);
+			expect(normalize(once, T).serialize()).toBe(once.serialize());
+		}
+	});
+});

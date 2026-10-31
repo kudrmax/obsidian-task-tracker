@@ -1,4 +1,4 @@
-import type { TaskItem, TaskKey } from "../../application/contracts";
+import type { GroupedList, GroupName, TaskItem, TaskKey } from "../../application/contracts";
 import type { LocalDate, Slot } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
@@ -20,13 +20,19 @@ export interface DragPayload {
 export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
+	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
+	| { readonly kind: "group"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "clearSlot" }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
+	/** A zone that starts a section of that name in the list, or the one it has. */
+	| { readonly kind: "newGroup"; readonly list: GroupedList; readonly name: string }
+	/** New section: the card goes back, and the list asks for the name. */
+	| { readonly kind: "nameGroup"; readonly list: GroupedList }
 	| { readonly kind: "pickDate" };
 
 /** A drop that changes the file at once; Pick a date asks for the day first. */
-export type PlacedResult = Exclude<DropResult, { readonly kind: "pickDate" }>;
+export type PlacedResult = Exclude<DropResult, { readonly kind: "pickDate" } | { readonly kind: "nameGroup" }>;
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 export interface DropTarget {

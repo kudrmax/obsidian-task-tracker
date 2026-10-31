@@ -11,6 +11,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	dueDate: null,
 	slot: null,
 	priority: null,
+	group: null,
 	subtasks: [],
 	progress: null,
 	parentText: null,

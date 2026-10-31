@@ -92,6 +92,7 @@ export class DemoTaskService implements TaskService {
 			subtasks: [],
 			progress: null,
 			parentText: null,
+			group: null,
 		};
 	}
 
@@ -264,6 +265,17 @@ export class DemoTaskService implements TaskService {
 		this.sections[date <= this.today() ? "now" : "soon"].push(t);
 		this.changed();
 	}
+
+	/** The demo keeps no sections. */
+	async moveToGroup(): Promise<void> {}
+
+	async createGroup(): Promise<void> {}
+
+	async moveGroup(): Promise<void> {}
+
+	async renameGroup(): Promise<void> {}
+
+	async removeGroup(): Promise<void> {}
 
 	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
 		const t = this.take(key);

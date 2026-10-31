@@ -1,7 +1,8 @@
-import type { Placement, TaskDraft } from "../application/contracts";
+import type { GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
+import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
-import { STATUS_CHARS, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
-import type { TaskDocument, TaskEntry } from "./TaskDocument";
+import { STATUS_CHARS, type GroupName, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const SLOT_STEP = 5;
 
@@ -32,8 +33,8 @@ function leavingItsTask<A extends unknown[]>(operation: EntryOperation<A>): Entr
 	return (doc, entry, ...rest) => {
 		if (entry.path.length === 0) return operation(doc, entry, ...rest);
 		const moved = doc.moveEntry(entry, entry.section, "end");
-		const tasks = moved.tasks(entry.section);
-		return operation(moved, tasks[tasks.length - 1], ...rest);
+		const ungrouped = moved.groups(entry.section)[ungroupedIndex(moved.groups(entry.section))].entries;
+		return operation(moved, ungrouped[ungrouped.length - 1], ...rest);
 	};
 }
 
@@ -191,6 +192,73 @@ function putOff(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: Loc
 	const postponed = patch(doc, entry, { dueDate: date, slot: null });
 	const section: SectionKey = date <= today ? "now" : "soon";
 	return entry.section === section ? postponed : postponed.moveEntry(sameEntryIn(postponed, entry), section, "end");
+}
+
+/** The group of that name in the list, the tasks outside any section for null; -1 when the list has none of the name. */
+export function groupIndex(doc: TaskDocument, list: GroupedList, name: GroupName): number {
+	const groups = doc.groups(list);
+	return name === null ? ungroupedIndex(groups) : groups.findIndex((g) => g.index > 0 && g.name === name);
+}
+
+/** The presets that can name a section: not blank, the first of two alike. */
+function usablePresets(presets: readonly string[]): readonly string[] {
+	const trimmed = presets.map((p) => p.trim());
+	return trimmed.filter((p, i) => p !== "" && trimmed.indexOf(p) === i);
+}
+
+/** A new preset section goes after the last preset the list has that comes before it, else before the first that comes after it, else last. */
+export function presetPlace(groups: readonly TaskGroup[], name: string, presets: readonly string[]): number {
+	const rank = (g: TaskGroup) => (g.index > 0 && g.name !== null ? presets.indexOf(g.name) : -1);
+	const own = presets.indexOf(name);
+	const earlier = groups.filter((g) => rank(g) >= 0 && rank(g) < own);
+	if (earlier.length > 0) return earlier[earlier.length - 1].index + 1;
+	const later = groups.find((g) => rank(g) > own);
+	return later ? later.index : groups.length;
+}
+
+/** What a task leaves behind entering a list: Inbox and Soon hold tasks without a date or a slot, Now is today. */
+function enteringList(list: GroupedList, today: LocalDate): Partial<Task> {
+	return list === "now" ? { dueDate: today, slot: null } : { dueDate: null, slot: null };
+}
+
+export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate): TaskDocument {
+	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
+	const entered = patch(doc, entry, enteringList(list, today));
+	const position: InsertPosition = before !== null ? before.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
+	return entered.moveEntry(sameEntryIn(entered, entry), list, position);
+}
+
+export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, name: string, groups: GroupSettings, today: LocalDate): TaskDocument {
+	const trimmed = name.trim();
+	if (trimmed === "") return doc;
+	if (trimmed === groups.ungrouped) return moveToGroup(doc, entry, list, null, null, today);
+	if (groupIndex(doc, list, trimmed) >= 0) return moveToGroup(doc, entry, list, trimmed, null, today);
+	const presets = usablePresets(groups.presets);
+	const at = presets.includes(trimmed) ? presetPlace(doc.groups(list), trimmed, presets) : doc.groups(list).length;
+	const added = doc.addGroup(list, trimmed, at);
+	return moveToGroup(added, sameEntryIn(added, entry), list, trimmed, null, today);
+}
+
+/** A section goes before another one or last; one put above the tasks outside any section pushes them under their heading. */
+export function moveGroupTo(doc: TaskDocument, list: GroupedList, group: GroupName, place: GroupPlace): TaskDocument {
+	const from = groupIndex(doc, list, group);
+	const before = place === "end" ? doc.groups(list).length : groupIndex(doc, list, place.before);
+	if (before === from) return doc;
+	if (before > 0) return doc.moveGroup(list, from, before);
+	const moved = doc.moveGroup(list, from, 1);
+	return doc.groups(list)[0].entries.length === 0 ? moved : moved.moveGroup(list, 0, 2);
+}
+
+/** A blank or unchanged name does nothing; the No section name hands the tasks over to it; a twin name merges (rule 6). */
+export function renameGroup(doc: TaskDocument, list: GroupedList, from: string, to: string, ungrouped: string): TaskDocument {
+	const name = to.trim();
+	if (name === "" || name === from) return doc;
+	if (name === ungrouped) return removeGroup(doc, list, from);
+	return doc.renameGroup(list, groupIndex(doc, list, from), name);
+}
+
+export function removeGroup(doc: TaskDocument, list: GroupedList, name: string): TaskDocument {
+	return doc.mergeGroup(list, groupIndex(doc, list, name), ungroupedIndex(doc.groups(list)), "end");
 }
 
 export const setSlot = leavingItsTask(placeOnTimeline);

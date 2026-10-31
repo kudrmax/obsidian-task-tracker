@@ -1,6 +1,6 @@
 import { DayBoundary } from "./DayBoundary";
 import type { LocalDate, SectionKey, Task } from "./Task";
-import type { TaskDocument, TaskEntry } from "./TaskDocument";
+import { type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
 
 function isOpen(task: Task): boolean {
 	return task.status === "todo" || task.status === "inProgress";
@@ -24,18 +24,17 @@ function pastDatesToToday(doc: TaskDocument, today: LocalDate): TaskDocument {
 	}
 }
 
+/** The candidates go to the start of the tasks outside any section of `target`, in file order: the last one goes first. */
 function gatherAtStart(
 	doc: TaskDocument,
 	target: SectionKey,
 	candidate: (e: TaskEntry) => boolean,
 ): TaskDocument {
 	if (!doc.hasSection(target)) return doc;
-	let moved = 0;
 	for (;;) {
-		const entry = doc.allTasks().find((e) => e.section !== target && candidate(e));
+		const entry = [...doc.allTasks()].reverse().find((e) => e.section !== target && candidate(e));
 		if (!entry) return doc;
-		doc = doc.moveEntry(entry, target, moved);
-		moved++;
+		doc = doc.moveEntry(entry, target, "start");
 	}
 }
 
@@ -62,7 +61,70 @@ function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): T
 	});
 }
 
+const GROUPED: readonly SectionKey[] = ["inbox", "now", "soon"];
+
+/** What a section of the list may hold: what the list's column shows (sections spec §3.3). */
+function fitsGroup(section: SectionKey, task: Task, today: LocalDate): boolean {
+	if (section === "soon") return task.dueDate === null && task.slot === null;
+	if (section === "now") return task.slot === null && (task.dueDate === null || task.dueDate <= today);
+	return true;
+}
+
+/** Rule 5: a task its section may not hold goes to the end of the tasks outside any section. */
+function misplacedOutOfGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
+	for (const section of GROUPED) {
+		for (;;) {
+			const entry = doc.tasks(section).find((e) => e.group !== null && !fitsGroup(section, e.task, today));
+			if (!entry) break;
+			doc = doc.moveEntry(entry, section, "end");
+		}
+	}
+	return doc;
+}
+
+/** Rule 6: a second section of the same name, or a second No section heading, joins the end of the first. */
+function mergeDuplicates(doc: TaskDocument): TaskDocument {
+	for (const section of GROUPED) {
+		for (;;) {
+			const groups = doc.groups(section);
+			const twin = groups.find((g, i) => i > 0 && groups.some((o) => o.index > 0 && o.index < i && o.name === g.name));
+			if (!twin) break;
+			const first = groups.find((o) => o.index > 0 && o.name === twin.name)!;
+			doc = doc.mergeGroup(section, twin.index, first.index, "end");
+		}
+	}
+	return doc;
+}
+
+/** Rule 8: a section with nothing but blank lines goes. */
+function dropEmptyGroups(doc: TaskDocument): TaskDocument {
+	for (const section of GROUPED) {
+		for (;;) {
+			const empty = doc.groups(section).find((g) => g.index > 0 && g.blank);
+			if (!empty) break;
+			doc = doc.deleteGroup(section, empty.index);
+		}
+	}
+	return doc;
+}
+
+/** Rule 7: with a No section heading, the tasks above the first heading join it; first of all, it needs no heading. */
+function placeUngrouped(doc: TaskDocument): TaskDocument {
+	for (const section of GROUPED) {
+		const u = ungroupedIndex(doc.groups(section));
+		if (u === 0) continue;
+		if (doc.groups(section)[0].entries.length > 0) doc = doc.mergeGroup(section, 0, u, "start");
+		if (u === 1 && doc.groups(section)[0].entries.length === 0) doc = doc.mergeGroup(section, 1, 0, "end");
+	}
+	return doc;
+}
+
+function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
+	return placeUngrouped(dropEmptyGroups(mergeDuplicates(misplacedOutOfGroups(doc, today))));
+}
+
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
-	const result = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary);
+	const listed = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary);
+	const result = normalizeGroups(listed, today);
 	return result.serialize() === doc.serialize() ? doc : result;
 }

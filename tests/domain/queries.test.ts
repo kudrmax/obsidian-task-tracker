@@ -79,6 +79,7 @@ describe("toItem", () => {
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
 			priority: null,
+			group: null,
 			subtasks: [],
 			progress: null,
 			parentText: null,

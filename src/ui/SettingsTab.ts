@@ -1,8 +1,9 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
 import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type GoogleSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import { LevelEdits } from "./priorityLevels";
+import { PresetEdits } from "./presetEdits";
 import { formatTime } from "./dates";
 
 export interface GoogleCalendarOption {
@@ -44,6 +45,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		containerEl.empty();
 		this.tasksFileGroup(containerEl);
 		this.prioritiesGroup(containerEl);
+		this.sectionsGroup(containerEl);
 		this.cardsGroup(containerEl);
 		this.timelineGroup(containerEl);
 		this.googleGroup(containerEl);
@@ -86,6 +88,64 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el)
 			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void redrawn.add()));
+	}
+
+	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */
+	private sectionsGroup(el: HTMLElement): void {
+		new Setting(el).setName("Sections").setHeading();
+		const saved = new PresetEdits(() => this.settings.groups.presets, (presets) => this.plugin.update(this.groups({ presets })));
+		const redrawn = new PresetEdits(() => this.settings.groups.presets, async (presets) => {
+			await this.plugin.update(this.groups({ presets }));
+			this.display();
+		});
+		const rows = el.createDiv("tc-preset-rows");
+		this.settings.groups.presets.forEach((name, index) => {
+			const row = rows.createDiv("setting-item tc-level-row tc-preset-row");
+			const grip = new ExtraButtonComponent(row).setIcon("menu").setTooltip("Drag to reorder");
+			grip.extraSettingsEl.addClass("tc-preset-grip");
+			grip.extraSettingsEl.addEventListener("pointerdown", (e) => this.dragPreset(rows, row, index, e, redrawn));
+			const field = new TextComponent(row).setValue(name).onChange((value) => void saved.rename(index, value));
+			field.inputEl.addClass("tc-preset-name");
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete preset").onClick(() => void redrawn.remove(index));
+		});
+		new Setting(el)
+			.setDesc("While a task is dragged, presets the list doesn’t have yet show under it as places to drop, in this order.")
+			.addButton((b) => b.setButtonText("Add preset").onClick(() => void redrawn.add()));
+		this.text(el, "No section", "The heading over tasks outside any section, shown once a list has sections.", this.settings.groups.ungrouped, (value) =>
+			this.groups({ ungrouped: value.trim() || DEFAULT_SETTINGS.groups.ungrouped }),
+		);
+	}
+
+	/** A preset's row follows the grip up and down among the others; let go, the presets take that order. */
+	private dragPreset(rows: HTMLElement, row: HTMLElement, from: number, e: PointerEvent, edits: PresetEdits): void {
+		if (!e.isPrimary || e.button !== 0) return;
+		e.preventDefault();
+		row.addClass("is-dragging");
+		let to = from;
+		const move = (ev: PointerEvent) => {
+			if (ev.pointerId !== e.pointerId) return;
+			const others = Array.from(rows.children).filter((child): child is HTMLElement => child !== row);
+			to = others.filter((other) => {
+				const r = other.getBoundingClientRect();
+				return ev.clientY > r.top + r.height / 2;
+			}).length;
+			rows.insertBefore(row, others[to] ?? null);
+		};
+		const up = (ev: PointerEvent) => {
+			if (ev.pointerId !== e.pointerId) return;
+			document.removeEventListener("pointermove", move);
+			document.removeEventListener("pointerup", up);
+			document.removeEventListener("pointercancel", up);
+			row.removeClass("is-dragging");
+			if (to !== from) void edits.move(from, to);
+		};
+		document.addEventListener("pointermove", move);
+		document.addEventListener("pointerup", up);
+		document.addEventListener("pointercancel", up);
+	}
+
+	private groups(patch: Partial<GroupSettings>): Partial<TaskCalendarSettings> {
+		return { groups: { ...this.settings.groups, ...patch } };
 	}
 
 	private async updateLevels(priorities: readonly PriorityLevel[]): Promise<void> {
