@@ -40,7 +40,7 @@ interface Press {
 
 /**
  * The switch at the bottom of the screen: a wheel of four icons, Inbox, Soon, Now and the calendar, under a window two
- * icons wide that stands still in the middle and shows the two columns on the screen. The wheel turns with a finger, as
+ * icons wide that stands still in the middle of the screen and shows the two columns on it, with a neighbour on either side. The wheel turns with a finger, as
  * the screen would: a finger moving left brings the columns on the right into the window, and the wheel settles on the
  * nearest place when let go; only then does the screen slide. A tap on an icon outside the window turns it to the
  * nearest place that shows the icon. Held while the calendar shows, it opens the sources window.
@@ -150,9 +150,14 @@ export class ColumnSwitch {
 		if (mode !== this.opts.value()) this.opts.onChange(mode);
 	}
 
-	/** Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out they stand. */
+	/**
+	 * Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out
+	 * they stand. The track holds one neighbour on each side, and only where the wheel has one: past an end it stops at the window.
+	 */
 	private turn(position: number): void {
 		this.el.style.setProperty(PROPERTY.wheel, String(position));
+		this.el.style.setProperty(PROPERTY.before, String(Math.min(1, position)));
+		this.el.style.setProperty(PROPERTY.after, String(Math.min(1, PLACES.length - 1 - position)));
 		this.icons.forEach((cell, i) => {
 			const out = Math.max(0, Math.abs((i % COLUMNS.length) - position - 0.5) - 0.5);
 			cell.style.setProperty(PROPERTY.depth, String(out));
