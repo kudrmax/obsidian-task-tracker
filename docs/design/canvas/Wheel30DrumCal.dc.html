@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Барабан: Now и календарь</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<dc-import name="Wheel30" pos="{{pos}}" strip-pos="{{stripPos}}" finger="none" theme="dark" hint-size="390px,280px"></dc-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":280}}'>
+class Component extends DCLogic {
+renderVals() {
+return { pos: 2, stripPos: -1 };
+}
+}
+</script>
+</body>
+</html>
