@@ -1,7 +1,7 @@
 import type { CalendarEvent, DayBoundary, TaskItem, TaskKey } from "../application/contracts";
 import { paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
-import { formatTime, minutesOf } from "./dates";
+import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority, renderProgress } from "./TaskCard";
@@ -193,7 +193,7 @@ export class Timeline {
 		clear(this.itemsEl);
 		this.stretch = null;
 		const boundary = this.deps.boundary();
-		this.hours.forEach(({ label }, index) => (label.textContent = String(boundary.hourAt(index))));
+		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
 		const events = this.deps.events().filter((e) => !e.allDay);
 		const spans = events.map((e) => this.eventSpan(e));
 		const boxes = layoutColumns(spans);
@@ -222,7 +222,8 @@ export class Timeline {
 			const y = this.yOf(minutes);
 			line.style.setProperty(PROPERTY.y, px(y));
 			label?.style.setProperty(PROPERTY.y, px(y));
-			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) <= LAYOUT.labelHideDistance);
+			const lift = label?.classList.contains("is-minor") ? DESIGN.minorLift : DESIGN.labelLift;
+			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) < lift + DESIGN.nowPillHeight / 2);
 		}
 		for (const { el, start, end } of this.events) {
 			el.style.setProperty(PROPERTY.y, px(this.yOf(start)));
