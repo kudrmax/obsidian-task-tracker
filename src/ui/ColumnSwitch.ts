@@ -1,6 +1,6 @@
 import type { RightMode } from "../settings";
-import { DURATION, LAYOUT, tokenMs } from "./design";
-import { capturePointer, el, px, releasePointer } from "./dom";
+import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
+import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./icons";
 import { PLACES } from "./screens";
@@ -24,7 +24,7 @@ const DRAG = "switch";
 
 const placeOf = (mode: RightMode): number => PLACES.indexOf(mode);
 
-/** The place a tap on a column moves to: none when the window shows it, else the nearest that does. */
+/** The place a tap on a column turns to: none when the window shows it, else the nearest that does. */
 function placeShowing(column: number, from: number): number | null {
 	if (column === from || column === from + 1) return null;
 	return column < from ? column : column - 1;
@@ -33,25 +33,25 @@ function placeShowing(column: number, from: number): number | null {
 interface Press {
 	readonly pointerId: number;
 	readonly x: number;
-	/** The pill's left edge when pressed, and where it stands over Inbox and Soon: it travels an icon's width per place. */
-	readonly left: number;
-	readonly min: number;
+	/** Where the wheel stood when pressed; it turns a place per icon's width the finger travels. */
+	readonly from: number;
 	readonly step: number;
 	readonly hold: number;
 	dragging: boolean;
 }
 
 /**
- * The switch at the bottom of the screen: four icons, Inbox, Soon, Now and the calendar, with a pill over the two columns the screen
- * shows, in one of three places. A tap on an icon the pill leaves uncovered moves it to the nearest place that covers
- * the icon; the pill follows a finger and settles on the nearest place when let go, and only then does the screen
- * slide. Held while the calendar shows, it opens the sources window.
+ * The switch at the bottom of the screen: a wheel of four icons, Inbox, Soon, Now and the calendar, under a window two
+ * icons wide that stands still in the middle and shows the two columns on the screen. The wheel turns with a finger, as
+ * the screen would: a finger moving left brings the columns on the right into the window, and the wheel settles on the
+ * nearest place when let go; only then does the screen slide. A tap on an icon outside the window turns it to the
+ * nearest place that shows the icon. Held while the calendar shows, it opens the sources window.
  */
 export class ColumnSwitch {
 	readonly el: HTMLElement;
-	private readonly pill: HTMLElement;
-	private readonly icons = new Map<Column, HTMLElement>();
-	private readonly dot: HTMLElement;
+	/** The wheel's icons twice: grey under the track, dark under the window. */
+	private readonly icons: HTMLElement[] = [];
+	private readonly dots: HTMLElement[] = [];
 	private press: Press | null = null;
 	/** The click that ends a drag or a hold is not a tap. */
 	private swallowClick = false;
@@ -62,11 +62,8 @@ export class ColumnSwitch {
 		this.el.setAttribute("role", "group");
 		this.el.setAttribute("aria-label", "Columns");
 		this.el.tabIndex = 0;
-		this.pill = el(this.el, "span", "tc-seg-pill");
-		this.add("inbox");
-		this.add("soon");
-		this.add("now");
-		this.dot = el(this.add("calendar"), "span", "tc-dot");
+		this.reel(el(this.el, "div", "tc-seg-view"), false);
+		this.reel(el(this.el, "span", "tc-seg-pill"), true);
 		this.el.addEventListener("pointerdown", (e) => this.down(e));
 		this.el.addEventListener("pointermove", (e) => this.move(e));
 		this.el.addEventListener("pointerup", (e) => this.up(e, true));
@@ -82,23 +79,25 @@ export class ColumnSwitch {
 		this.render();
 	}
 
-	private add(column: Column): HTMLElement {
-		const cell = el(this.el, "span", "tc-seg-icon");
-		cell.dataset.column = column;
-		cell.setAttribute("aria-label", column === "calendar" ? "Calendar" : column[0].toUpperCase() + column.slice(1));
-		cell.appendChild(icon(column));
-		this.icons.set(column, cell);
-		return cell;
+	private reel(parent: HTMLElement, lens: boolean): void {
+		const reel = el(parent, "span", "tc-seg-reel");
+		for (const column of COLUMNS) {
+			const cell = el(reel, "span", "tc-seg-icon");
+			cell.dataset.column = column;
+			if (lens) cell.setAttribute("aria-hidden", "true");
+			else cell.setAttribute("aria-label", column === "calendar" ? "Calendar" : column[0].toUpperCase() + column.slice(1));
+			cell.appendChild(icon(column));
+			if (column === "calendar") this.dots.push(el(cell, "span", "tc-dot"));
+			this.icons.push(cell);
+		}
 	}
 
 	private down(e: PointerEvent): void {
 		if (!e.isPrimary || e.button !== 0) return;
 		this.swallowClick = false;
-		const step = this.icons.get("now")!.offsetWidth;
-		const left = this.pill.offsetLeft;
-		const min = left - placeOf(this.opts.value()) * step;
+		const step = this.icons[0].offsetWidth;
 		const hold = window.setTimeout(() => this.held(), this.opts.longPressMs());
-		this.press = { pointerId: e.pointerId, x: e.clientX, left, min, step, hold, dragging: false };
+		this.press = { pointerId: e.pointerId, x: e.clientX, from: placeOf(this.opts.value()), step, hold, dragging: false };
 	}
 
 	private held(): void {
@@ -123,13 +122,7 @@ export class ColumnSwitch {
 			this.el.classList.remove("is-settling");
 			capturePointer(this.el, press.pointerId);
 		}
-		const left = Math.min(press.min + (PLACES.length - 1) * press.step, Math.max(press.min, press.left + dx));
-		this.pill.style.left = px(left);
-		this.light(this.nearest(press));
-	}
-
-	private nearest(press: Press): RightMode {
-		return PLACES[Math.round((this.pill.offsetLeft - press.min) / press.step)];
+		this.turn(Math.min(PLACES.length - 1, Math.max(0, press.from - dx / press.step)));
 	}
 
 	private up(e: PointerEvent, released: boolean): void {
@@ -141,7 +134,7 @@ export class ColumnSwitch {
 		releasePointer(this.el, press.pointerId);
 		this.opts.arbiter.release(DRAG);
 		this.swallowClick = true;
-		this.show(released ? this.nearest(press) : this.opts.value());
+		this.show(released ? PLACES[Math.round(this.position())] : this.opts.value());
 	}
 
 	private tap(target: EventTarget | null): void {
@@ -156,25 +149,30 @@ export class ColumnSwitch {
 		if (place !== null) this.show(PLACES[place]);
 	}
 
-	/** The pill glides from where it stands to its place; a place other than the one shown moves the screen with it. */
+	/** The wheel rolls from where it stands to its place; a place other than the one shown moves the screen with it. */
 	show(mode: RightMode): void {
 		window.clearTimeout(this.settling);
 		this.el.classList.add("is-settling");
 		this.settling = window.setTimeout(() => this.el.classList.remove("is-settling"), tokenMs(this.el, DURATION.slide));
-		this.pill.style.left = "";
-		this.light(mode);
+		this.turn(placeOf(mode));
 		if (mode !== this.opts.value()) this.opts.onChange(mode);
 	}
 
-	private light(mode: RightMode): void {
-		this.el.classList.toggle("is-inbox", mode === "inbox");
-		this.el.classList.toggle("is-lists", mode === "soon");
-		const first = placeOf(mode);
-		COLUMNS.forEach((column, i) => this.icons.get(column)!.classList.toggle("is-on", i === first || i === first + 1));
+	/** Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out they stand. */
+	private turn(position: number): void {
+		this.el.style.setProperty(PROPERTY.wheel, String(position));
+		this.icons.forEach((cell, i) => {
+			const out = Math.max(0, Math.abs((i % COLUMNS.length) - position - 0.5) - 0.5);
+			cell.style.setProperty(PROPERTY.depth, String(out));
+		});
+	}
+
+	private position(): number {
+		return parseFloat(this.el.style.getPropertyValue(PROPERTY.wheel));
 	}
 
 	render(): void {
-		if (!this.press?.dragging) this.light(this.opts.value());
-		this.dot.classList.toggle("is-shown", this.opts.dot());
+		if (!this.press?.dragging) this.turn(placeOf(this.opts.value()));
+		for (const dot of this.dots) dot.classList.toggle("is-shown", this.opts.dot());
 	}
 }

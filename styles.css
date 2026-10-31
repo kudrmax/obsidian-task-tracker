@@ -129,6 +129,15 @@ body {
 	--tc-seg-btn-w: 38px;
 	--tc-seg-btn-h: 28px;
 	--tc-seg-icon: 18px;
+	/* The switch is a wheel: a window two icons wide stands still in the middle of a track five wide, and the four icons roll under it. */
+	--tc-seg-slots: 5;
+	--tc-seg-window: calc(2 * var(--tc-seg-btn-w));
+	--tc-seg-w: calc(var(--tc-seg-slots) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad));
+	--tc-seg-window-start: calc((var(--tc-seg-slots) * var(--tc-seg-btn-w) - var(--tc-seg-window)) / 2);
+	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these, and it fades out at the track's ends. */
+	--tc-seg-shrink: 0.14;
+	--tc-seg-dim: 0.28;
+	--tc-seg-fade: 26px;
 	/* The switch's row at the bottom, between New task and Obsidian's phone navigation. */
 	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
 
@@ -463,17 +472,19 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-arrow { width: var(--tc-arrow); height: var(--tc-arrow); flex-shrink: 0; border-radius: var(--tc-radius-circle); color: var(--tc-ink-soft); display: flex; align-items: center; justify-content: center; }
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
 /* The switch stands at the bottom, in the middle, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - 2 * var(--tc-seg-btn-w) - var(--tc-seg-pad)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
-.tc-seg { position: relative; height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); display: flex; touch-action: none; cursor: pointer; outline: none; }
-.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + 2 * var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); }
-.tc-seg.is-lists .tc-seg-pill { left: calc(var(--tc-seg-pad) + var(--tc-seg-btn-w)); }
-.tc-seg.is-inbox .tc-seg-pill { left: var(--tc-seg-pad); }
-.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); color: var(--tc-muted); display: flex; align-items: center; justify-content: center; }
-.tc-seg-icon.is-on { color: var(--tc-on-strong); }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-w) / 2); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
+.tc-seg { position: relative; width: var(--tc-seg-w); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+.tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); -webkit-mask-image: linear-gradient(to right, transparent, var(--tc-mask-ink) var(--tc-seg-fade), var(--tc-mask-ink) calc(100% - var(--tc-seg-fade)), transparent); mask-image: linear-gradient(to right, transparent, var(--tc-mask-ink) var(--tc-seg-fade), var(--tc-mask-ink) calc(100% - var(--tc-seg-fade)), transparent); }
+/* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
+.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-window-start)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }
+.tc-seg-reel { position: absolute; top: 0; left: calc(var(--tc-seg-window-start) - var(--tc-seg-pos) * var(--tc-seg-btn-w)); display: flex; }
+.tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-pos) * var(--tc-seg-btn-w)); }
+.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
+.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
-/* Let go, the pill glides to its side; the icons it covers change colour halfway. */
-.tc-seg.is-settling .tc-seg-pill { transition: left var(--tc-duration-slide) var(--tc-ease-in-out); }
-.tc-seg.is-settling .tc-seg-icon { transition: color 0s linear var(--tc-slide-flip); }
+/* Let go, the wheel rolls on to its place. */
+.tc-seg.is-settling .tc-seg-reel { transition: left var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-seg.is-settling .tc-seg-icon { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
 .tc-dot { display: none; position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-dot); background: var(--tc-stale); }
 .tc-dot.is-shown { display: block; }
 
