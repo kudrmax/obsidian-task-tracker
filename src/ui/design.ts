@@ -107,8 +107,13 @@ export const LAYOUT = {
 	dragStartDistance: 4,
 	/** The divider holds to the middle of the window while dragged this close to it. */
 	dividerSnapDistance: 8,
-	/** It holds only while moving slower than this, px per ms: a quick swipe passes the middle by, without a tick. */
-	dividerSnapSpeed: 0.08,
+	/**
+	 * A finger slower than this, px per ms, is placing something with care: the divider holds to the middle only then, so a
+	 * quick swipe passes it by without a tick, and the switch's wheel turns freely only then, a quick swipe turning it one place.
+	 */
+	slowSpeed: 0.08,
+	/** The wheel turns freely once the finger has gone slowly this long in a drag, and stays free to its end. */
+	carefulMs: 100,
 	/** The timeline scrolls itself while a drag comes this close to its edge. */
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
