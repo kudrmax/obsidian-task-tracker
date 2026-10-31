@@ -22,7 +22,12 @@ body{margin:0;background:#000}
 </div>
 
 <div style="position: absolute; left: 20px; right: 20px; top: 98px; height: 446px; display: flex; flex-direction: column; justify-content: center; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<sc-if value="{{hasParent}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; line-height: 18px; color: #8E8E93;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4"></path></svg><span style="min-width: 0; overflow-wrap: anywhere;">{{parent}}</span></div>
+</sc-if>
 <div style="text-align: center; font-size: 28px; line-height: 34px; font-weight: 700; overflow-wrap: anywhere;">{{title}}<span style="display: inline-block; width: 3px; height: 30px; margin-left: 2px; vertical-align: -6px; border-radius: 2px; background: {{accent}};"></span></div>
+</div>
 
 <sc-if value="{{styles.segment}}" hint-placeholder-val="{{true}}">
 <div style="height: 40px; box-sizing: border-box; padding: 3px; border-radius: 20px; background: #1C1C1E; display: flex; gap: 3px;">
@@ -67,15 +72,6 @@ body{margin:0;background:#000}
 
 <sc-if value="{{hasTime}}" hint-placeholder-val="{{false}}">
 <div style="margin-top: -8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; color: #8E8E93; font-variant-numeric: tabular-nums;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M12 7.5V12l3 2"></path></svg>16:30</div>
-</sc-if>
-
-<sc-if value="{{showLevels}}" hint-placeholder-val="{{true}}">
-<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;">
-<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
-<button style="height: 36px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: 18px; background: {{l.bg}}; box-shadow: {{l.ring}}; color: {{l.color}}; font: inherit; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-<sc-if value="{{l.hasDot}}" hint-placeholder-val="{{true}}"><span style="width: 10px; height: 10px; border-radius: 5px; background: {{l.dot}};"></span></sc-if>{{l.label}}</button>
-</sc-for>
-</div>
 </sc-if>
 
 <sc-if value="{{showPicker}}" hint-placeholder-val="{{false}}">
@@ -123,7 +119,7 @@ body{margin:0;background:#000}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long","inbox"]},"priority":{"editor":"enum","default":"none","options":["none","p1","p2"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"list","options":["list","slot","edit","picker","long","inbox","sub"]},"pickerStyle":{"editor":"enum","default":"tiles","options":["segment","pills","tiles","circles","accent"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const mode = this.props.mode ?? 'list';
@@ -132,27 +128,13 @@ class Component extends DCLogic {
       ? { bg: '#FFFFFF', text: '#000000', card: '#F2F2F7', soft: '#1C1C1E', outside: '#C7C7CC', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)', onBg: '#1C1C1E', onText: '#FFFFFF', accent: '#8A5CF5' }
       : { bg: '#000000', text: '#FFFFFF', card: '#1C1C1E', soft: '#E5E5EA', outside: '#636366', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)', onBg: '#E5E5EA', onText: '#000000', accent: '#8A6CEF' };
     const accent = tk.accent;
-    const LEVELS = light
-      ? [{ label: 'p1', dot: '#FF3B30', card: '#F4D5D7' }, { label: 'p2', dot: '#FF9500', card: '#F4E3CF' }]
-      : [{ label: 'p1', dot: '#FF453A', card: '#572725' }, { label: 'p2', dot: '#FF9F0A', card: '#573E19' }];
-    const chosen = this.props.priority ?? 'none';
-    const levels = [{ label: 'None', dot: '', card: tk.card, ringColor: tk.soft }, ...LEVELS.map((l) => ({ ...l, ringColor: l.dot }))].map((l) => {
-      const on = (l.label === 'None' ? 'none' : l.label) === chosen;
-      return {
-        ...l,
-        hasDot: !!l.dot,
-        bg: on ? l.card : tk.card,
-        ring: on ? 'inset 0 0 0 1.5px ' + l.ringColor : 'none',
-        color: on ? tk.text : tk.soft
-      };
-    });
     const ON = { bg: tk.onBg, color: tk.onText };
     const OFF = { bg: 'transparent', color: tk.soft };
     const isEdit = mode === 'edit';
     const isPicker = mode === 'picker';
-    const dateLabels = { edit: '2 Nov', picker: '3 Nov' };
+    const dateLabels = { edit: '2 Nov', picker: '3 Nov', sub: '3 Nov' };
     const dateLabel = dateLabels[mode] ?? 'Date';
-    const selected = mode === 'inbox' ? 'inbox' : isEdit || isPicker ? 'date' : 'now';
+    const selected = mode === 'inbox' ? 'inbox' : isEdit || isPicker || mode === 'sub' ? 'date' : 'now';
     const pickerStyle = this.props.pickerStyle ?? 'tiles';
     const paths = {
       inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
@@ -201,7 +183,11 @@ class Component extends DCLogic {
     }
     return {
       tk,
-      title: isEdit
+      hasParent: mode === 'sub',
+      parent: 'Купить билеты в Белград',
+      title: mode === 'sub'
+        ? 'Взять багаж'
+        : isEdit
         ? 'Записаться в барбершоп'
         : mode === 'long'
           ? 'Позвонить в банк и узнать, почему списали комиссию за обслуживание карты'
@@ -211,8 +197,6 @@ class Component extends DCLogic {
       doneLabel: isEdit ? 'Save' : 'Add',
       hasTime: mode === 'slot',
       showPicker: isPicker,
-      showLevels: !isPicker,
-      levels,
       places,
       styles,
       days,

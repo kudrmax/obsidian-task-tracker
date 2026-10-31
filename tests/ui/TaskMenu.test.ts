@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { menuRows, priorityRows } from "../../src/ui/menu/TaskMenu";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, ...extra });
 
 describe("menuRows", () => {
 	it("offers the three groups for a task to do", () => {
 		const groups = menuRows(item({ dueDate: "2026-11-03" }));
-		expect(groups.map((g) => g.map((r) => r.id))).toEqual([["progress", "done", "wontdo"], ["due", "priority", "rename"], ["delete"]]);
+		expect(groups.map((g) => g.map((r) => r.id))).toEqual([["progress", "done", "wontdo"], ["due", "priority", "rename", "subtask"], ["delete"]]);
 		expect(groups[0][0].label).toBe("In progress");
 		expect(groups[1][0].value).toBe("3 Nov");
 		expect(groups[2][0].danger).toBe(true);

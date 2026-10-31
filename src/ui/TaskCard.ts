@@ -9,7 +9,7 @@ export interface TaskCardOptions {
 	readonly day: LocalDate | null;
 }
 
-/** A card of the list: the strip of a task in progress, the title fading out on the right, the due date. */
+/** A card of the list: the strip of a task in progress, the title fading out on the right, the subtask counter, the due date. */
 export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts: TaskCardOptions): HTMLElement {
 	const card = el(parent, "div", "tc-card");
 	fillCard(card, item, opts);
@@ -20,11 +20,17 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	markPriority(card, item.priority);
 	if (item.status === "inProgress") el(card, "span", "tc-strip");
 	el(card, "div", "tc-card-title", item.text);
+	renderProgress(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {
 		const due = el(card, "span", "tc-due");
 		el(due, "span", "tc-due-day", dayOfMonth(item.dueDate));
 		el(due, "span", "tc-due-mon", monthAbbreviation(item.dueDate));
 	}
+}
+
+/** «2/5»: of the task's own subtasks, the done ones out of those not given up. */
+export function renderProgress(card: HTMLElement, item: TaskItem): void {
+	if (item.progress) el(card, "span", "tc-count", `${item.progress.done}/${item.progress.total}`);
 }
 
 /** Gives a card, or a dot, the colour of a priority level; none takes it away. */
