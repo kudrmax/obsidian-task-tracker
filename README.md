@@ -29,7 +29,7 @@ A task is a list item with a checkbox. Two optional fields at the end of the lin
 - `[/]` is “in progress”, `[x]` done, `[-]` won’t do. Done and won’t-do tasks move to the top of Done at once.
 - A Soon task whose due date (or slot) has come moves to the top of Now.
 - Nested lines under a task travel with it.
-- A third-level heading inside Inbox, Now or Soon is a **section** (`### Evening`). Tasks above the first one are outside any section; once that group is moved lower, its heading is `### No section` (Settings → Sections). A section the plugin finds empty is removed; a task that gets a time or a later day leaves its section.
+- A third-level heading inside Inbox, Now or Soon is a **section** (`### Evening`). Tasks above the first one are outside any section; once that group is moved lower, its heading is `### No section` (Settings → Sections). A section the plugin finds empty is removed. A task that gets a time leaves its section, and so does a Now task that gets a later day. A Soon task keeps its section with a due date, and when its day comes it moves to Now’s section of the same name (made if Now has none).
 
 ## The screen
 
@@ -37,7 +37,7 @@ Left: the tasks of the selected day (today: everything in Now that has no slot t
 
 - Drag a task from the list onto the timeline to give it a time; drag it back to remove the time; drag inside the timeline to move it, pull the handle to resize it.
 - Drag between the Soon list and the day list to move a task between Soon and Now (on another day: to set or remove its due date).
-- **Sections.** While a task is dragged, zones show under Inbox, Soon and today’s Now: the preset sections that list doesn’t have yet (Settings → Sections) and “New section”. Drop a task on a preset to start that section with it. Drop it on “New section” and type the name: Enter makes the section, an empty name or a tap elsewhere puts the task back. Once a list has a section, the tasks outside any get a “No section” header of their own. Drag a task into a gap to put it in that section. A section that empties goes away, its header too.
+- **Sections.** A column shows the sections of the list its tasks are in: Inbox and Soon their own, the day column Now’s for today and Soon’s for a later day. So you can open tomorrow in the evening and sort its tasks into Morning, Evening and so on; in the morning they are in Now in the same sections. While a task is dragged, zones show under Inbox, Soon and the day column (today or later): the preset sections that list doesn’t have yet (Settings → Sections) and “New section”. Drop a task on a preset to start that section with it. Drop it on “New section” and type the name: Enter makes the section, an empty name or a tap elsewhere puts the task back. Once a list has a section, the tasks outside any get a “No section” header of their own. Drag a task into a gap to put it in that section. A section that empties goes away, its header too.
 - Long press a task for its menu: In progress, Done, Won’t do, Due date, Rename, Delete.
 - “New task” opens the task screen: a title and three tiles, Soon / Now / Date. A long press on an empty spot of the timeline creates a task at that time.
 - Pinch to zoom the timeline; the drag step follows the grid.

@@ -7,10 +7,12 @@ import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
-import type { GroupedList } from "../../application/contracts";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DragOrigin, DragPayload, DropTarget, PlacedResult } from "./DropTarget";
+import type { DragOrigin, DragPayload, DropResult, DropTarget, PlacedResult } from "./DropTarget";
+
+/** A drop on New section: the column it was under, and whose sections. */
+export type NameGroup = Extract<DropResult, { readonly kind: "nameGroup" }>;
 import { FloatingCard } from "./FloatingCard";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
@@ -30,7 +32,7 @@ export interface DragControllerDeps {
 	/** A card dropped on Pick a date, back in its place: the date picker opens over it. */
 	onPickDate(item: TaskItem, source: HTMLElement): void;
 	/** A card dropped on New section, back in its place: the list asks for the section's name. */
-	onNameGroup(item: TaskItem, list: GroupedList): void;
+	onNameGroup(item: TaskItem, asked: NameGroup): void;
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
@@ -195,7 +197,7 @@ export class DragController {
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		/** A drop that asks first: the day on Pick a date, the name on New section. */
-		let asking: { readonly kind: "pickDate" } | { readonly kind: "nameGroup"; readonly list: GroupedList } | null = null;
+		let asking: { readonly kind: "pickDate" } | NameGroup | null = null;
 		const reopen = () => {
 			for (const card of lifted) card.classList.remove("is-lifted");
 			timeline?.layoutTasks();
@@ -230,7 +232,7 @@ export class DragController {
 				return;
 			}
 			this.deps.arbiter.release(DRAG);
-			this.deps.onNameGroup(payload.item, asking.list);
+			this.deps.onNameGroup(payload.item, asking);
 		};
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);

@@ -201,7 +201,7 @@ export function groupIndex(doc: TaskDocument, list: GroupedList, name: GroupName
 }
 
 /** The presets that can name a section: not blank, the first of two alike. */
-function usablePresets(presets: readonly string[]): readonly string[] {
+export function usablePresets(presets: readonly string[]): readonly string[] {
 	const trimmed = presets.map((p) => p.trim());
 	return trimmed.filter((p, i) => p !== "" && trimmed.indexOf(p) === i);
 }
@@ -216,27 +216,36 @@ export function presetPlace(groups: readonly TaskGroup[], name: string, presets:
 	return later ? later.index : groups.length;
 }
 
-/** What a task leaves behind entering a list: Inbox and Soon hold tasks without a date or a slot, Now is today. */
-function enteringList(list: GroupedList, today: LocalDate): Partial<Task> {
-	return list === "now" ? { dueDate: today, slot: null } : { dueDate: null, slot: null };
+/**
+ * What a task takes entering a list: Now is today; Soon and Inbox hold tasks without a slot, Soon on a later day's column
+ * with that day as the due date, else with none.
+ */
+function enteringList(list: GroupedList, today: LocalDate, date: LocalDate | null): Partial<Task> {
+	if (list === "now") return { dueDate: today, slot: null };
+	return { dueDate: list === "soon" && date !== null && date > today ? date : null, slot: null };
 }
 
-export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate): TaskDocument {
+/**
+ * `before`: a task of `list` the card goes right before; one of another list (a later day's column shows Now's tasks too)
+ * puts it at the end of `group`. `date`: the day of the column dropped on.
+ */
+export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate, date: LocalDate | null = null): TaskDocument {
 	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
-	const entered = patch(doc, entry, enteringList(list, today));
-	const position: InsertPosition = before !== null ? before.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
+	const entered = patch(doc, entry, enteringList(list, today, date));
+	const at = before !== null && before.section === list ? before : null;
+	const position: InsertPosition = at !== null ? at.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
 	return entered.moveEntry(sameEntryIn(entered, entry), list, position);
 }
 
-export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, name: string, groups: GroupSettings, today: LocalDate): TaskDocument {
+export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, name: string, groups: GroupSettings, today: LocalDate, date: LocalDate | null = null): TaskDocument {
 	const trimmed = name.trim();
 	if (trimmed === "") return doc;
-	if (trimmed === groups.ungrouped) return moveToGroup(doc, entry, list, null, null, today);
-	if (groupIndex(doc, list, trimmed) >= 0) return moveToGroup(doc, entry, list, trimmed, null, today);
+	if (trimmed === groups.ungrouped) return moveToGroup(doc, entry, list, null, null, today, date);
+	if (groupIndex(doc, list, trimmed) >= 0) return moveToGroup(doc, entry, list, trimmed, null, today, date);
 	const presets = usablePresets(groups.presets);
 	const at = presets.includes(trimmed) ? presetPlace(doc.groups(list), trimmed, presets) : doc.groups(list).length;
 	const added = doc.addGroup(list, trimmed, at);
-	return moveToGroup(added, sameEntryIn(added, entry), list, trimmed, null, today);
+	return moveToGroup(added, sameEntryIn(added, entry), list, trimmed, null, today, date);
 }
 
 /** A section goes before another one or last; one put above the tasks outside any section pushes them under their heading. */

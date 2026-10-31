@@ -159,8 +159,23 @@ describe("sections: rules 5-8", () => {
 		expect(run("## Now\n- [ ] A\n### X\n- [ ] B 📅 2026-10-31\n- [ ] C\n")).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-31\n### X\n- [ ] C\n");
 	});
 
-	it("rule 5: a Soon task with a due date leaves its group", () => {
-		expect(run("## Soon\n### X\n- [ ] B 📅 2026-11-03\n- [ ] C\n")).toBe("## Soon\n- [ ] B 📅 2026-11-03\n### X\n- [ ] C\n");
+	it("rule 5: a Soon task with a due date keeps its group, a slotted one leaves it", () => {
+		const dated = "## Soon\n### X\n- [ ] B 📅 2026-11-03\n- [ ] C\n";
+		expect(run(dated)).toBe(dated);
+		expect(run("## Soon\n### X\n- [ ] B ⏰ 2026-11-03 10:00-11:00\n- [ ] C\n")).toBe("## Soon\n- [ ] B ⏰ 2026-11-03 10:00-11:00\n### X\n- [ ] C\n");
+	});
+
+	it("rule 4 takes a Soon task whose day came into Now's section of the same name", () => {
+		expect(run("## Now\n- [ ] N\n### Morning\n- [ ] M\n\n## Soon\n### Morning\n- [ ] A 📅 2026-10-30\n- [ ] Later 📅 2026-11-03\n")).toBe(
+			"## Now\n- [ ] N\n### Morning\n- [ ] M\n- [ ] A 📅 2026-10-30\n\n## Soon\n### Morning\n- [ ] Later 📅 2026-11-03\n",
+		);
+	});
+
+	it("rule 4 makes the section in Now when it is missing, a preset in the presets' order", () => {
+		const doc = TaskDocument.parse("## Now\n- [ ] N\n### Evening\n- [ ] E\n\n## Soon\n### Morning\n- [ ] A 📅 2026-10-30\n### Trip\n- [ ] B 📅 2026-10-30\n", G, M);
+		expect(normalize(doc, T, undefined, ["Morning", "Afternoon", "Evening"]).serialize()).toBe(
+			"## Now\n- [ ] N\n### Morning\n- [ ] A 📅 2026-10-30\n### Evening\n- [ ] E\n### Trip\n- [ ] B 📅 2026-10-30\n\n## Soon\n",
+		);
 	});
 
 	it("rule 5: an Inbox group keeps any task", () => {

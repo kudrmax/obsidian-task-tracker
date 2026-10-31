@@ -18,12 +18,12 @@ export interface ListGap {
 	readonly at: number;
 }
 
-/** Consecutive items of the same section make a group; a list comes in file order, so each section is one run. */
+/** The items of each section, the sections in the order they first show; a later day's column lists Now's tasks before Soon's, so a section may show twice. */
 export function listGroups(items: readonly TaskItem[]): readonly ListGroup[] {
 	const groups: { name: GroupName; items: TaskItem[] }[] = [];
 	for (const item of items) {
-		const last = groups[groups.length - 1];
-		if (last && last.name === item.group) last.items.push(item);
+		const group = groups.find((g) => g.name === item.group);
+		if (group) group.items.push(item);
 		else groups.push({ name: item.group, items: [item] });
 	}
 	return groups;

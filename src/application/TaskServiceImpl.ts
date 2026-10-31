@@ -155,16 +155,16 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}
 
-	async moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null): Promise<void> {
+	async moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Promise<void> {
 		await this.mutate((doc, today) => {
 			this.groupOf(doc, list, group);
-			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today);
+			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null);
 		});
 	}
 
-	async createGroup(key: TaskKey, list: GroupedList, name: string): Promise<void> {
+	async createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void> {
 		if (this.blank(name)) return;
-		await this.mutate((doc, today, settings) => ops.createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today));
+		await this.mutate((doc, today, settings) => ops.createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today, date ?? null));
 	}
 
 	async moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void> {
@@ -195,7 +195,7 @@ export class TaskServiceImpl implements TaskService {
 		const settings = this.settings.get();
 		const doc = this.parse(text, settings);
 		const boundary = this.boundary(settings);
-		if (normalize(doc, boundary.dayOf(this.clock.now()), boundary) === doc) return;
+		if (normalize(doc, boundary.dayOf(this.clock.now()), boundary, ops.usablePresets(settings.groups.presets)) === doc) return;
 		await this.mutate((d) => d);
 	}
 
@@ -222,8 +222,9 @@ export class TaskServiceImpl implements TaskService {
 		let failure: unknown = null;
 		await this.store.write((text) => {
 			try {
-				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary);
-				return normalize(operation(doc, today, settings, boundary), today, boundary).serialize();
+				const presets = ops.usablePresets(settings.groups.presets);
+				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary, presets);
+				return normalize(operation(doc, today, settings, boundary), today, boundary, presets).serialize();
 			} catch (e) {
 				failure = e;
 				return text;
@@ -238,7 +239,7 @@ export class TaskServiceImpl implements TaskService {
 		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
 		const boundary = this.boundary(settings);
 		const today = boundary.dayOf(this.clock.now());
-		return { doc: normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary), today, boundary };
+		return { doc: normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary, ops.usablePresets(settings.groups.presets)), today, boundary };
 	}
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
