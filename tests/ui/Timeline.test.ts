@@ -75,6 +75,34 @@ describe("Timeline grid", () => {
 	});
 });
 
+describe("hour labels by the now line", () => {
+	function hidden(hourPx: number, hours: number, minutes: number): string[] {
+		const view = new Timeline(document.createElement("div"), {
+			theme: () => "dark",
+			date: () => "2026-10-31",
+			today: () => "2026-10-31",
+			boundary: () => new DayBoundary(4),
+			hourPx: () => hourPx,
+			tasks: () => [],
+			events: () => [],
+			now: () => new Date(2026, 10, 1, hours, minutes),
+		});
+		view.render();
+		return [...view.canvas.querySelectorAll(".tc-hour-label.is-hidden")].map((label) => label.textContent ?? "");
+	}
+
+	it("hides only the label the now pill covers, however small the hour", () => {
+		expect(hidden(20, 0, 52)).toEqual(["1"]);
+		expect(hidden(56, 0, 52)).toEqual(["1"]);
+	});
+
+	it("hides the label the pill touches from either side", () => {
+		expect(hidden(20, 0, 38)).toEqual(["0", "1"]);
+		expect(hidden(56, 0, 14)).toEqual(["0"]);
+		expect(hidden(56, 0, 17)).toEqual([]);
+	});
+});
+
 describe("task cards", () => {
 	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, group: null });
 

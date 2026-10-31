@@ -222,7 +222,8 @@ export class Timeline {
 			const y = this.yOf(minutes);
 			line.style.setProperty(PROPERTY.y, px(y));
 			label?.style.setProperty(PROPERTY.y, px(y));
-			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) <= LAYOUT.labelHideDistance);
+			const lift = label?.classList.contains("is-minor") ? DESIGN.minorLift : DESIGN.labelLift;
+			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) < lift + DESIGN.nowPillHeight / 2);
 		}
 		for (const { el, start, end } of this.events) {
 			el.style.setProperty(PROPERTY.y, px(this.yOf(start)));
