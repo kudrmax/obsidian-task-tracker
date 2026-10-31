@@ -1,5 +1,6 @@
 import type { GroupedList } from "../../application/contracts";
 import { shownCardSize } from "../cardSize";
+import { el } from "../dom";
 import { type ListGap, listGaps } from "../listGroups";
 import type { ListEntry, TaskList } from "../TaskList";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
@@ -13,6 +14,8 @@ export class ListDrop implements DropTarget {
 	private rects: DOMRect[] | null = null;
 	private index = 0;
 	private gap: ListGap | null = null;
+	/** In a list with sections, the gap the card would land in: a dashed capsule. */
+	private readonly mark = el(null, "div", "tc-gap-mark");
 
 	constructor(
 		private readonly list: TaskList,
@@ -36,8 +39,9 @@ export class ListDrop implements DropTarget {
 	preview(_x: number, y: number, drag: DragPayload): void {
 		if (this.grouped()) {
 			this.gap = this.gapAt(y, drag);
-			const at = this.gap.at;
-			this.list.elements.forEach((node, i) => node.classList.toggle("is-shifted", i >= at && !node.classList.contains("is-lifted")));
+			const next = this.list.elements[this.gap.at];
+			if (next) next.before(this.mark);
+			else this.list.el.appendChild(this.mark);
 			return;
 		}
 		const entries = this.entries();
@@ -48,8 +52,9 @@ export class ListDrop implements DropTarget {
 	}
 
 	landing(): DOMRect | null {
+		if (this.gap && this.mark.isConnected) return this.mark.getBoundingClientRect();
 		if (!this.rects) return null;
-		const at = this.gap ? this.rects[this.gap.at] : this.rects[this.index];
+		const at = this.rects[this.index];
 		if (at) return new DOMRect(at.left, at.top, at.width, shownCardSize().height);
 		const last = this.rects[this.rects.length - 1];
 		const card = shownCardSize();
@@ -60,6 +65,7 @@ export class ListDrop implements DropTarget {
 
 	clear(): void {
 		for (const node of this.list.elements) node.classList.remove("is-shifted");
+		this.mark.remove();
 		this.rects = null;
 		this.index = 0;
 		this.gap = null;

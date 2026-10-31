@@ -34,6 +34,14 @@ describe("GroupNameField", () => {
 		expect(blur.got).toEqual([null]);
 	});
 
+	it("keeps Escape and Enter to itself: Obsidian would take Escape as a step back", () => {
+		const { input } = open("Экскурсия");
+		const seen: string[] = [];
+		document.body.addEventListener("keydown", (e) => seen.push(e.key));
+		key(input, "Escape");
+		expect(seen).toEqual([]);
+	});
+
 	it("select puts the whole value in the selection", () => {
 		const { input } = open("Экскурсия", true);
 		expect(input.value).toBe("Экскурсия");

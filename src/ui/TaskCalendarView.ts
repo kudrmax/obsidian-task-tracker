@@ -508,7 +508,7 @@ export class TaskCalendarView extends ItemView {
 		if (!this.arbiter.claim(NAMING)) return;
 		const slot = el(null, "div", "tc-group-slot");
 		head.before(slot);
-		head.hidden = true;
+		head.classList.add("is-renamed");
 		GroupNameField.open(slot, {
 			value: name,
 			select: true,

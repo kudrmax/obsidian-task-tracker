@@ -46,7 +46,7 @@ describe("ListDrop", () => {
 		const { drop, list } = setup([item("soon", 0, "A", null), b, item("soon", 2, "C", "Morning")], "soon", "soon");
 		const from = drag("left", item("now", 0, "N", null));
 		drop.preview(50, 100 + 3 * 40 + 2, from);
-		expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, false, true, true]);
+		expect(list.el.querySelector(".tc-gap-mark")?.nextElementSibling).toBe(list.elements[3]);
 		expect(drop.drop(50, 100 + 3 * 40 + 2, from)).toEqual({ kind: "group", list: "soon", group: "Morning", before: b.key });
 		drop.clear();
 		expect(drop.drop(50, 100 + 5 * 40, from)).toEqual({ kind: "group", list: "soon", group: "Morning", before: null });

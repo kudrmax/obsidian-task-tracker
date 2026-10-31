@@ -524,10 +524,12 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-group-head { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; margin-top: var(--tc-section-gap); margin-bottom: calc(-1 * var(--tc-card-gap)); padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden; touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-group-head:first-child { margin-top: 0; }
 .tc-group-head.is-lifted { height: 0; margin-top: 0; opacity: 0; }
+.tc-group-head.is-renamed { display: none; }
 /* Where a lifted section lands: a dashed capsule between the sections. */
 .tc-group-drop { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); margin-top: var(--tc-section-gap); }
 .tc-group-drop:first-child { margin-top: 0; }
-.tc-group-head.is-shifted { transform: translateY(var(--tc-card-shift)); }
+/* Where a dragged card lands in a list with sections: a dashed capsule opens there. */
+.tc-gap-mark { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); }
 .tc-group-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
 .tc-card.is-lifted { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }

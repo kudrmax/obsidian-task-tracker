@@ -24,11 +24,11 @@ export const GroupNameField = {
 			opts.onDone(name);
 		};
 		input.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") {
-				e.preventDefault();
-				const name = input.value.trim();
-				finish(name === "" ? null : name);
-			} else if (e.key === "Escape") finish(null);
+			if (e.key !== "Enter" && e.key !== "Escape") return;
+			e.preventDefault();
+			e.stopPropagation();
+			const name = e.key === "Enter" ? input.value.trim() : "";
+			finish(name === "" ? null : name);
 		});
 		input.addEventListener("blur", () => finish(null));
 		input.focus();
