@@ -1328,38 +1328,6 @@
    "page": "wheel30",
    "title": "Барабан, светлая"
   },
-  "Wheel30FlatInbox.dc.html": {
-   "x": 0,
-   "y": 480,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Лента: Inbox и Soon"
-  },
-  "Wheel30FlatSoon.dc.html": {
-   "x": 470,
-   "y": 480,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Лента: Soon и Now"
-  },
-  "Wheel30FlatCal.dc.html": {
-   "x": 940,
-   "y": 480,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Лента: Now и календарь"
-  },
-  "Wheel30FlatDrag.dc.html": {
-   "x": 1410,
-   "y": 480,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Лента: палец ведёт влево"
-  },
   "Wheel30.dc.html": {
    "x": 940,
    "y": 0,
@@ -1404,8 +1372,7 @@
   "tasksTitle",
   "tasksRulesProd",
   "step14shape",
-  "wheel30Title",
-  "wheel30Rows"
+  "wheel30Title"
  ],
  "notes": {
   "lightTitle": {
@@ -1659,17 +1626,9 @@
    "kind": "title1",
    "maxW": 2270,
    "page": "wheel30",
-   "text": "Колёсико: окно стоит, иконки крутятся под пальцем",
+   "text": "Колёсико: окно стоит в центре экрана, иконки крутятся под пальцем, по бокам — только соседи",
    "x": 0,
    "y": -300
-  },
-  "wheel30Rows": {
-   "page": "wheel30",
-   "x": -560,
-   "y": 0,
-   "w": 400,
-   "text": "Ряд 1 — «Барабан»: трек 194, по краям иконки мельче и гаснут, крайние выглядывают наполовину; его делаю.\nРяд 2 — «Лента»: трек 156, как сейчас, плоская.",
-   "fill": "blue"
   }
  },
  "order": [
@@ -1839,10 +1798,6 @@
   "Wheel30DrumCal.dc.html",
   "Wheel30DrumDrag.dc.html",
   "Wheel30DrumLight.dc.html",
-  "Wheel30FlatInbox.dc.html",
-  "Wheel30FlatSoon.dc.html",
-  "Wheel30FlatCal.dc.html",
-  "Wheel30FlatDrag.dc.html",
   "Wheel30.dc.html"
  ],
  "pages": [

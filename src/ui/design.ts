@@ -73,6 +73,9 @@ export const PROPERTY = {
 	wheel: "--tc-seg-pos",
 	/** How many icons' widths an icon of the wheel stands out of its window. */
 	depth: "--tc-seg-depth",
+	/** How much of a neighbour's place the track holds on each side of the window: none past the wheel's ends. */
+	before: "--tc-seg-before",
+	after: "--tc-seg-after",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
