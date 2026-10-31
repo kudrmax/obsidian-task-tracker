@@ -84,3 +84,24 @@ describe("sections in the list", () => {
 		expect(resultOf(onlyX, place)).toEqual({ kind: "task", group: null, before: null });
 	});
 });
+
+describe("leaving a section when no task is outside any", () => {
+	const ONLY_X: PlacedCard[] = [{ key: key(1), level: 0, top: 26, height: H, group: "X" }];
+	const HEAD_X = [{ group: "X", firstCard: 0, top: 0, height: 26 }];
+	const inX = { kind: "gap", index: 1, level: 0, group: "X" } as const;
+
+	it("anywhere over the first header puts the card in No section, not only above its middle", () => {
+		const place = placeAt(ONLY_X, 22, 0, STEP, inX, HEAD_X);
+		expect(resultOf(ONLY_X, place)).toEqual({ kind: "task", group: null, before: null });
+	});
+
+	it("with the gap open above the header it stays there while the finger is over the header", () => {
+		const open = { kind: "gap", index: 0, level: 0, group: null } as const;
+		expect(placeAt(ONLY_X, STEP + 20, 0, STEP, open, HEAD_X)).toEqual(open);
+	});
+
+	it("the last card of the only section, lifted, can still leave it", () => {
+		const place = placeAt([], 10, 0, STEP, { kind: "gap", index: 0, level: 0, group: "X" }, HEAD_X);
+		expect(place).toEqual({ kind: "gap", index: 0, level: 0, group: null });
+	});
+});
