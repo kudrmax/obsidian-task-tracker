@@ -66,6 +66,15 @@ describe("ListDrop", () => {
 		expect(drop.drop(50, 95, drag("soon", item("soon", 1, "S", null)))).toEqual({ kind: "group", list: "soon", date: "2026-10-31", group: null, before: null });
 	});
 
+	it("a finger above the list, over the column's title, still drops into it: on top of the first header", () => {
+		const only = item("now", 0, "A", "X");
+		const { drop } = setup([only], "left", "now");
+		const from = drag("left", only);
+		expect(drop.hitTest(50, 60, from)).toBe(true);
+		expect(drop.drop(50, 60, from)).toEqual({ kind: "group", list: "now", date: null, group: null, before: null });
+		expect(drop.hitTest(50, 20, from)).toBe(false);
+	});
+
 	it("the left column of a past day keeps listBefore", () => {
 		const a = item("now", 0, "A", null);
 		const { drop } = setup([a, item("now", 1, "B", null)], "left", null);
