@@ -1,9 +1,8 @@
-import type { GroupedList } from "../../application/contracts";
 import { shownCardSize } from "../cardSize";
 import { tokenPx } from "../design";
 import { px } from "../dom";
 import type { ListEntry, TaskList } from "../TaskList";
-import type { DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
+import type { ColumnSections, DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
 import { type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
@@ -34,8 +33,8 @@ export class ListDrop implements DropTarget {
 		private readonly area: HTMLElement,
 		readonly column: ListColumn,
 		private readonly accepts: (drag: DragPayload) => boolean,
-		/** The list whose sections the column shows; null for the day column on another day. */
-		private readonly grouped: () => GroupedList | null = () => null,
+		/** Whose sections the column shows; null for a past day's column. */
+		private readonly sections: () => ColumnSections | null = () => null,
 	) {}
 
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
@@ -53,7 +52,7 @@ export class ListDrop implements DropTarget {
 		const card = shownCardSize();
 		const indent = this.indent();
 		const level = indent > 0 ? (x - drag.grabX - this.baseLeft()) / indent : 0;
-		const heads = this.grouped() ? layout.heads : [];
+		const heads = this.sections() ? layout.heads : [];
 		const place = placeAt(this.placed(), y, level, card.height + card.gap, this.place ?? this.liftedFrom(), heads);
 		this.place = place;
 		layout.cards.forEach(({ entry }, i) => {
@@ -93,19 +92,19 @@ export class ListDrop implements DropTarget {
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
 		if (!this.accepts(drag)) return null;
-		const list = this.grouped();
+		const sections = this.sections();
 		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;
 		const result = resultOf(this.placed(), this.place);
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
-		if (list) return { kind: "group", list, group: result.group, before: result.before };
+		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
 		return { kind: "listBefore", before: result.before, column: this.column };
 	}
 
 	/** A list with sections places a card from anywhere; another only one from itself. */
 	private placesAnywhere(drag: DragPayload): boolean {
-		return drag.from === this.column || this.grouped() !== null;
+		return drag.from === this.column || this.sections() !== null;
 	}
 
 	/**

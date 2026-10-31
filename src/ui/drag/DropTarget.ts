@@ -6,6 +6,13 @@ export type ListColumn = "left" | "soon" | "inbox";
 
 export type DragOrigin = ListColumn | "timeline";
 
+/** Whose sections a column shows: Inbox's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
+export interface ColumnSections {
+	readonly list: GroupedList;
+	/** The later day the column shows; null for one of no day or for today. */
+	readonly date: LocalDate | null;
+}
+
 export interface DragPayload {
 	readonly item: TaskItem;
 	readonly from: DragOrigin;
@@ -21,14 +28,14 @@ export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }
 	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
 	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
-	| { readonly kind: "group"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null }
+	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "clearSlot" }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	/** A zone that starts a section of that name in the list, or the one it has. */
-	| { readonly kind: "newGroup"; readonly list: GroupedList; readonly name: string }
+	| { readonly kind: "newGroup"; readonly list: GroupedList; readonly date: LocalDate | null; readonly name: string }
 	/** New section: the card goes back, and the list asks for the name. */
-	| { readonly kind: "nameGroup"; readonly list: GroupedList }
+	| { readonly kind: "nameGroup"; readonly column: ListColumn; readonly list: GroupedList; readonly date: LocalDate | null }
 	| { readonly kind: "pickDate" };
 
 /** A drop that changes the file at once; Pick a date asks for the day first. */

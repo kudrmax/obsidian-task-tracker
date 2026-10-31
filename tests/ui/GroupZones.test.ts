@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import type { DragPayload } from "../../src/ui/drag/DropTarget";
+import type { ColumnSections, DragPayload } from "../../src/ui/drag/DropTarget";
 import { GroupZones } from "../../src/ui/drag/GroupZones";
 
 const item: TaskItem = { key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, group: null, subtasks: [], progress: null, parentText: null };
 const drag: DragPayload = { item, from: "soon", durationMin: null, grabPx: 17, grabX: 17 };
 
-function setup(presets: string[], present: string[], offered = true) {
+function setup(presets: string[], present: string[], sections: ColumnSections | null = { list: "now", date: null }) {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
-	const zones = new GroupZones(parent, "now", { presets: () => presets, present: () => present, offered: () => offered });
+	const zones = new GroupZones(parent, "left", { presets: () => presets, present: () => present, sections: () => sections });
 	zones.show();
 	const shown = Array.from(parent.querySelectorAll<HTMLElement>(".tc-zone")).filter((z) => !z.hidden);
 	shown.forEach((zone, i) => (zone.getBoundingClientRect = () => new DOMRect(10, 500 + i * 43, 175, 35)));
@@ -35,13 +35,18 @@ describe("GroupZones", () => {
 	});
 
 	it("nothing where the column shows no sections", () => {
-		expect(setup(["Morning"], [], false).shown).toEqual([]);
+		expect(setup(["Morning"], [], null).shown).toEqual([]);
 	});
 
 	it("a drop on a preset is newGroup with its name; on New section it asks for the name", () => {
 		const { target, at } = setup(["Morning", "Evening"], []);
-		expect(target(1)!.drop(at(1).x, at(1).y, drag)).toEqual({ kind: "newGroup", list: "now", name: "Evening" });
-		expect(target(2)!.drop(at(2).x, at(2).y, drag)).toEqual({ kind: "nameGroup", list: "now" });
+		expect(target(1)!.drop(at(1).x, at(1).y, drag)).toEqual({ kind: "newGroup", list: "now", date: null, name: "Evening" });
+		expect(target(2)!.drop(at(2).x, at(2).y, drag)).toEqual({ kind: "nameGroup", column: "left", list: "now", date: null });
+	});
+
+	it("under a later day's column the zones start sections of Soon with that day", () => {
+		const { target, at } = setup(["Morning"], [], { list: "soon", date: "2026-10-31" });
+		expect(target(0)!.drop(at(0).x, at(0).y, drag)).toEqual({ kind: "newGroup", list: "soon", date: "2026-10-31", name: "Morning" });
 	});
 
 	it("lights the zone under the finger", () => {

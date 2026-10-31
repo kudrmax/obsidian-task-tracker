@@ -1,22 +1,22 @@
-import type { GroupedList } from "../../application/contracts";
 import { clear, el } from "../dom";
 import { icon, type IconName } from "../icons";
-import type { DropResult, DropTarget } from "./DropTarget";
+import type { ColumnSections, DropResult, DropTarget, ListColumn } from "./DropTarget";
 
 export interface GroupZonesDeps {
 	/** The presets from the settings, in their order. */
 	presets(): readonly string[];
 	/** The sections the list shows now. */
 	present(): readonly string[];
-	/** Whether the column shows sections at all: the day column only on today. */
-	offered(): boolean;
+	/** Whose sections the column shows; null for a past day's column, which offers none. */
+	sections(): ColumnSections | null;
 }
 
 /** One zone as a place to drop: a preset names the section; New section asks for the name. */
 class GroupDrop implements DropTarget {
 	constructor(
 		readonly zone: HTMLElement,
-		private readonly list: GroupedList,
+		private readonly column: ListColumn,
+		private readonly sections: ColumnSections,
 		private readonly name: string | null,
 	) {}
 
@@ -40,7 +40,8 @@ class GroupDrop implements DropTarget {
 	}
 
 	drop(): DropResult {
-		return this.name === null ? { kind: "nameGroup", list: this.list } : { kind: "newGroup", list: this.list, name: this.name };
+		const { list, date } = this.sections;
+		return this.name === null ? { kind: "nameGroup", column: this.column, list, date } : { kind: "newGroup", list, date, name: this.name };
 	}
 }
 
@@ -54,7 +55,7 @@ export class GroupZones {
 
 	constructor(
 		parent: HTMLElement,
-		private readonly list: GroupedList,
+		private readonly column: ListColumn,
 		private readonly deps: GroupZonesDeps,
 	) {
 		this.box = el(parent, "div", "tc-section-zones");
@@ -68,14 +69,14 @@ export class GroupZones {
 	show(): void {
 		clear(this.box);
 		this.drops = [];
-		const offered = this.deps.offered();
-		this.box.classList.toggle("is-offered", offered);
-		if (!offered) return;
+		const sections = this.deps.sections();
+		this.box.classList.toggle("is-offered", sections !== null);
+		if (!sections) return;
 		const present = new Set(this.deps.present());
 		for (const name of usablePresets(this.deps.presets())) {
-			if (!present.has(name)) this.drops.push(new GroupDrop(this.zone("section", name), this.list, name));
+			if (!present.has(name)) this.drops.push(new GroupDrop(this.zone("section", name), this.column, sections, name));
 		}
-		this.drops.push(new GroupDrop(this.zone("plus", "New section"), this.list, null));
+		this.drops.push(new GroupDrop(this.zone("plus", "New section"), this.column, sections, null));
 	}
 
 	private zone(iconName: IconName, label: string): HTMLElement {
