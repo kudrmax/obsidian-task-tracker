@@ -47,12 +47,15 @@ export function placeAt(cards: readonly PlacedCard[], y: number, level: number, 
 	const gap = current.kind === "gap" ? current : null;
 	const top = (i: number) => cards[i].top + (gap && i >= gap.index ? shift : 0);
 	const headAfterGap = (h: PlacedHead) => gap !== null && (h.firstCard > gap.index || (h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, gap.group)));
-	const headMiddle = (h: PlacedHead) => h.top + (headAfterGap(h) ? shift : 0) + h.height / 2;
+	/** Past this a finger is under the header. The first header with no task outside any section above it takes its whole height: above it is where a card leaves every section. */
+	const headEdge = (h: PlacedHead, i: number) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
 	const into = cards.findIndex((c, i) => y > top(i) + c.height * INTO_EDGE && y < top(i) + c.height * (1 - INTO_EDGE));
 	if (into >= 0) return { kind: "into", index: into };
 	const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
 	let group: GroupName = index > 0 ? cards[index - 1].group : heads.length > 0 ? null : (cards[0]?.group ?? null);
-	for (const head of heads) if (head.firstCard === index && y > headMiddle(head)) group = head.group;
+	heads.forEach((head, i) => {
+		if (head.firstCard === index && y > headEdge(head, i)) group = head.group;
+	});
 	const prev = cards[index - 1]?.group === group ? cards[index - 1] : undefined;
 	const next = cards[index]?.group === group ? cards[index] : undefined;
 	const deepest = prev ? prev.level + 1 : 0;

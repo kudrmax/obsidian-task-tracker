@@ -1,5 +1,5 @@
 import { shownCardSize } from "../cardSize";
-import { tokenPx } from "../design";
+import { DESIGN, tokenPx } from "../design";
 import { px } from "../dom";
 import type { ListEntry, TaskList } from "../TaskList";
 import type { ColumnSections, DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
@@ -37,10 +37,11 @@ export class ListDrop implements DropTarget {
 		private readonly sections: () => ColumnSections | null = () => null,
 	) {}
 
+	/** The list and the column's title over it: a finger carried up past the list puts the card on its top. */
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
 		if (!this.accepts(drag)) return false;
 		const r = this.area.getBoundingClientRect();
-		return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+		return x >= r.left && x < r.right && y >= r.top - DESIGN.columnsTop && y < r.bottom;
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
