@@ -9,6 +9,8 @@ export const DESIGN = {
 	dayHours: 24,
 	/** How far an hour's label rises over its line, and hangs under it: the timeline keeps this much room over its first hour and under its closing one. */
 	labelLift: 7,
+	/** The same for a label between the hours. */
+	minorLift: 4,
 	/** Where the columns start under their headers. */
 	columnsTop: 64,
 	/** Where the timeline starts inside the right column, under one all-day row. */
@@ -27,6 +29,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	hourPx: "--tc-hour",
 	dayHours: "--tc-day-hours",
 	labelLift: "--tc-label-lift",
+	minorLift: "--tc-minor-lift",
 	columnsTop: "--tc-columns-top",
 	timelineOffset: "--tc-timeline-top",
 	dividerWidth: "--tc-divider",
@@ -73,6 +76,9 @@ export const PROPERTY = {
 	wheel: "--tc-seg-pos",
 	/** How many icons' widths an icon of the wheel stands out of its window. */
 	depth: "--tc-seg-depth",
+	/** How much of a neighbour's place the track holds on each side of the window: none past the wheel's ends. */
+	before: "--tc-seg-before",
+	after: "--tc-seg-after",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
@@ -86,8 +92,6 @@ export const DURATION = {
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
 export const LAYOUT = {
-	/** An hour's label hides when its line comes this close to the now line. */
-	labelHideDistance: 20,
 	/** The grid labels a division of the hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
 	gridDivisions: [5, 15, 30],
 	gridLabelGap: 40,

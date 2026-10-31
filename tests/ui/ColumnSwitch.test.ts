@@ -61,6 +61,17 @@ describe("ColumnSwitch", () => {
 		expect([0, 1, 2, 3].map(inbox.depth)).toEqual(["0", "0", "1", "2"]);
 	});
 
+	it("holds a neighbour on each side of the window only where the wheel has one", () => {
+		const sides = (s: ReturnType<typeof setUp>) => ["--tc-seg-before", "--tc-seg-after"].map((name) => s.control.el.style.getPropertyValue(name));
+		expect(sides(setUp("inbox"))).toEqual(["0", "1"]);
+		expect(sides(setUp("soon"))).toEqual(["1", "1"]);
+		expect(sides(setUp("calendar"))).toEqual(["1", "0"]);
+		const s = setUp("calendar");
+		s.control.el.dispatchEvent(pointer("pointerdown", 100));
+		s.control.el.dispatchEvent(pointer("pointermove", 157));
+		expect(sides(s)).toEqual(["0.5", "1"]);
+	});
+
 	it("draws the wheel twice, the copy under the window turning with it", () => {
 		const s = setUp("soon");
 		const [track, lens] = s.control.el.querySelectorAll(".tc-seg-reel");

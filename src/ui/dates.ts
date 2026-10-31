@@ -39,6 +39,11 @@ export function formatTime(minutes: number): string {
 	return `${two(Math.floor(clock / MINUTES_PER_HOUR))}:${two(clock % MINUTES_PER_HOUR)}`;
 }
 
+/** An hour line's label: `04`, `00`. */
+export function formatHour(hour: number): string {
+	return two(hour);
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONDAY = 1;
