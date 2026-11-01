@@ -53,6 +53,11 @@ export function createInSoon(doc: TaskDocument, text: string): TaskDocument {
 	return doc.insert("soon", "end", newTask(text));
 }
 
+function createInSlot(doc: TaskDocument, slot: Slot, text: string, priority: string | null, today: LocalDate, boundary: DayBoundary): TaskDocument {
+	const clamped = boundary.clamp(slot, SLOT_STEP);
+	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, priority }));
+}
+
 export function createAtTime(
 	doc: TaskDocument,
 	date: LocalDate,
@@ -61,8 +66,7 @@ export function createAtTime(
 	text: string,
 	boundary = DayBoundary.MIDNIGHT,
 ): TaskDocument {
-	const slot = boundary.clamp({ date, start, end: null }, SLOT_STEP);
-	return doc.insert(listSection(boundary.dayOfSlot(slot), today), "end", newTask(text, { slot }));
+	return createInSlot(doc, { date, start, end: null }, text, null, today, boundary);
 }
 
 export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatus): TaskDocument {
@@ -235,6 +239,32 @@ export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedLi
 	const at = before !== null && before.section === list ? before : null;
 	const position: InsertPosition = at !== null ? at.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
 	return entered.moveEntry(sameEntryIn(entered, entry), list, position);
+}
+
+/**
+ * Where a new task goes: in a list before `before` (one of that list's tasks; else at the end of `group`), as a subtask
+ * of `parent` before its subtask `before` or last, or in a time slot. `date`: the day of the column typed in.
+ */
+export type CreatePlace =
+	| { kind: "list"; list: GroupedList; group: GroupName; before: TaskEntry | null; date: LocalDate | null }
+	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
+	| { kind: "slot"; slot: Slot };
+
+export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary): TaskDocument {
+	switch (place.kind) {
+		case "subtask":
+			return doc.insertUnder(place.parent, newTask(text, { priority }), place.before);
+		case "slot":
+			return createInSlot(doc, place.slot, text, priority, today, boundary);
+		case "list": {
+			const { list, group, before } = place;
+			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
+			const task = newTask(text, { dueDate, priority });
+			const at = before !== null && before.section === list ? before : null;
+			const position: InsertPosition = at !== null ? at.index : group === null ? "end" : { endOf: groupIndex(doc, list, group) };
+			return doc.insert(list, position, task);
+		}
+	}
 }
 
 export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, name: string, groups: GroupSettings, today: LocalDate, date: LocalDate | null = null): TaskDocument {
