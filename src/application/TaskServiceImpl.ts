@@ -126,6 +126,15 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.remove(doc, this.entryOf(doc, key)));
 	}
 
+	async lineOf(key: TaskKey): Promise<number> {
+		await this.normalize();
+		const settings = this.settings.get();
+		const text = await this.store.read();
+		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
+		const doc = this.parse(text, settings);
+		return doc.lineOf(this.entryOf(doc, key));
+	}
+
 	async moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
 		await this.mutate((doc, today) =>
 			ops.moveBefore(doc, this.entryOf(doc, key), before ? this.entryOf(doc, before) : null, date, today),

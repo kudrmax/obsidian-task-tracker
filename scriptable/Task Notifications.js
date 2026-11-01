@@ -448,6 +448,10 @@ var TaskDocument = class _TaskDocument {
     for (const i of path) entry = entry?.subtasks[i];
     return entry;
   }
+  /** The line the entry's task stands on, from 0. */
+  lineOf(entry) {
+    return this.spanOf(entry).line;
+  }
   allTasks() {
     return SECTION_KEYS.flatMap((key) => this.tasks(key));
   }

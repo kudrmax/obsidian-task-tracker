@@ -86,6 +86,8 @@ export interface MenuActions {
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
 	addSubtask(menu: TaskMenu): void;
 	remove(): Promise<void>;
+	/** The tasks file in Obsidian's editor, the cursor on the task's line. */
+	openInObsidian(): void;
 	openLink(link: TaskLink): void;
 }
 
@@ -313,6 +315,7 @@ export class TaskMenu {
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
 		const rows = editRows(item).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
+		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) }, "tc-menu-row is-tall is-apart");
 		menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: this.pick(() => actions.remove()) }, "tc-menu-row is-tall is-apart");
 		this.place();
 	}
