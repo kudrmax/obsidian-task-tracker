@@ -1,6 +1,7 @@
 import { minutesToHHMM } from "../domain/LocalDate";
 import { openSlotted } from "../domain/queries";
 import type { Slot } from "../domain/Task";
+import { plainText } from "../domain/TaskText";
 import { TaskDocument, type SectionNamesOf } from "../domain/TaskDocument";
 import type { Markers } from "../domain/TaskLine";
 
@@ -41,7 +42,7 @@ export class SlotReminders {
 		const [year, month, day] = slot.date.split("-").map(Number);
 		return {
 			id: `${SlotReminders.THREAD} ${slot.date} ${start} ${text}`,
-			title: text,
+			title: plainText(text),
 			body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % DAY_MINUTES)}`,
 			at: new Date(year, month - 1, day, 0, slot.start),
 		};

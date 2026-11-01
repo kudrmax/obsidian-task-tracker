@@ -22,6 +22,7 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
+import type { TaskLink } from "./TaskTitle";
 import { TaskSheet } from "./sheet/TaskSheet";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -643,8 +644,15 @@ export class TaskCalendarView extends ItemView {
 				rename: () => this.editSheet(item),
 				addSubtask: () => this.subtaskSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
+				openLink: (link) => this.openLink(link),
 			},
 		});
+	}
+
+	/** A note opens in a new tab, so the calendar stays where it is; an address goes to the browser. */
+	private openLink(link: TaskLink): void {
+		if (link.kind === "url") window.open(link.target);
+		else void this.app.workspace.openLinkText(link.target, this.settings.tasksFile, "tab");
 	}
 
 	/** A gesture keeps the elements it holds: the redraw waits until it ends. */

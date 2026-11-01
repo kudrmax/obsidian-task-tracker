@@ -4,6 +4,7 @@ import { formatTime } from "../dates";
 import { DURATION, PROPERTY, tokenMs } from "../design";
 import { el, px } from "../dom";
 import { MonthPicker } from "../menu/MonthPicker";
+import { fillTitle } from "../TaskTitle";
 import type { LocalDate, Slot } from "../types";
 import { PlacementTiles, sheetIcon } from "./PlacementTiles";
 import { PriorityPills } from "./PriorityPills";
@@ -62,7 +63,7 @@ export class TaskSheet {
 		if (opts.parent) {
 			const parent = el(body, "div", "tc-sheet-parent");
 			parent.appendChild(sheetIcon("subtask"));
-			el(parent, "span", "tc-sheet-parent-title", opts.parent);
+			fillTitle(el(parent, "span", "tc-sheet-parent-title"), opts.parent);
 		}
 		this.title = el(body, "div", "tc-sheet-title", opts.initial.text);
 		this.title.contentEditable = "true";
