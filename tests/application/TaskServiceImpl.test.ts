@@ -409,6 +409,67 @@ describe("sections", () => {
 	});
 });
 
+describe("createInPlace", () => {
+	const TEXT = "## Inbox\n\n## Now\n- [ ] A\n### X\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Done\n";
+
+	it("list before a key writes once and puts the task there with the list's rules", async () => {
+		const { store, svc } = setup(TEXT);
+		const [, b] = (await svc.dayView(T)).list;
+		await svc.createInPlace("N", "p1", { kind: "list", list: "now", group: "X", before: b.key });
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n### X\n- [ ] p1 N 📅 2026-10-30\n- [ ] B\n\n## Soon\n- [ ] C\n\n## Done\n");
+		expect(store.writes).toBe(1);
+	});
+
+	it("list with a date puts a later day in Soon with that due date", async () => {
+		const { store, svc } = setup(TEXT);
+		await svc.createInPlace("N", null, { kind: "list", list: "soon", group: null, before: null, date: D });
+		expect(store.text).toContain("## Soon\n- [ ] C\n- [ ] N 📅 2026-11-03\n");
+	});
+
+	it("list with a stale before rejects with StaleTaskError and writes nothing", async () => {
+		const { store, svc } = setup(TEXT);
+		const [a] = (await svc.dayView(T)).list;
+		store.text = TEXT.replace("A\n", "Changed\n");
+		const changed = store.text;
+		await expect(svc.createInPlace("N", null, { kind: "list", list: "now", group: null, before: a.key })).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(changed);
+	});
+
+	it("list in a section missing from the file rejects with StaleTaskError", async () => {
+		const { store, svc } = setup(TEXT);
+		await expect(svc.createInPlace("N", null, { kind: "list", list: "now", group: "Y", before: null })).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(TEXT);
+	});
+
+	it("blank text writes nothing", async () => {
+		const { store, svc } = setup(TEXT);
+		await svc.createInPlace("  \t", null, { kind: "list", list: "now", group: null, before: null });
+		expect(store.writes).toBe(0);
+		expect(store.text).toBe(TEXT);
+	});
+
+	it("subtask goes among the parent's subtasks, before a key or last", async () => {
+		const TRIP = "## Inbox\n\n## Now\n- [ ] Trip\n\t- [ ] Compare\n\t- [ ] Pay\n\n## Soon\n\n## Done\n";
+		const { store, svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		const pay = trip.subtasks[1];
+		await svc.createInPlace("Bag", null, { kind: "subtask", parent: trip.key, before: pay.key });
+		expect(store.text).toContain("\t- [ ] Compare\n\t- [ ] Bag\n\t- [ ] Pay\n");
+		await svc.createInPlace("Last", "p2", { kind: "subtask", parent: trip.key, before: null });
+		expect(store.text).toContain("\t- [ ] Pay\n\t- [ ] p2 Last\n");
+		expect(store.writes).toBe(2);
+	});
+
+	it("slot is created as createAtTime does", async () => {
+		const a = setup(FULL);
+		const b = setup(FULL);
+		await a.svc.createInPlace("Call", null, { kind: "slot", slot: { date: T, start: 600, end: null } });
+		await b.svc.createAtTime(T, 600, "Call");
+		expect(a.store.text).toBe(b.store.text);
+		expect(a.store.writes).toBe(1);
+	});
+});
+
 describe("subtasks", () => {
 	const TRIP = "## Inbox\n\n## Now\n- [ ] Trip\n\t- [x] Compare\n\t- [ ] Pay\n- [ ] Call\n\n## Soon\n\n## Done\n";
 

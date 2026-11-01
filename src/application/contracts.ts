@@ -22,6 +22,12 @@ export interface TaskKey {
 /** The lists that hold sections. */
 export type GroupedList = "inbox" | "soon" | "now";
 
+/** Where to create a task: a place in a list, a place among subtasks, or a slot on the calendar. */
+export type NewTaskPlace =
+	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
+	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
+	| { readonly kind: "slot"; readonly slot: Slot };
+
 /** Where a section goes among the sections of its list: before another one, or last. */
 export type GroupPlace = { readonly before: GroupName } | "end";
 
@@ -106,6 +112,14 @@ export interface TaskService {
 	createInSoon(text: string): Promise<void>;
 	/** A slot on `date` at `start`, without a duration; Now when `date` is today, else Soon. */
 	createAtTime(date: LocalDate, start: number, text: string): Promise<void>;
+
+	/**
+	 * Quick entry. `list`: in section `group` of the list right before `before` (null: at the end of the section), with the
+	 * due-date rules of `moveToGroup`: Now gets today, Inbox none, Soon `date` (the column's day) or none. `subtask`: among
+	 * `parent`'s subtasks before `before` or last; it has no due date of its own. `slot`: as `createAtTime`. `priority` is a
+	 * level's prefix or null; whitespace-only text creates nothing. One write per call.
+	 */
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void>;
 
 	/**
 	 * The task sheet. `inbox`: end of Inbox, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now

@@ -236,9 +236,13 @@ function enteringList(list: GroupedList, today: LocalDate, date: LocalDate | nul
 export function moveToGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedList, group: GroupName, before: TaskEntry | null, today: LocalDate, date: LocalDate | null = null): TaskDocument {
 	if (before !== null && entry.path.length === 0 && before.section === entry.section && before.index === entry.index) return doc;
 	const entered = patch(doc, entry, enteringList(list, today, date));
-	const at = before !== null && before.section === list ? before : null;
-	const position: InsertPosition = at !== null ? at.index : group === null ? "end" : { endOf: groupIndex(entered, list, group) };
-	return entered.moveEntry(sameEntryIn(entered, entry), list, position);
+	return entered.moveEntry(sameEntryIn(entered, entry), list, positionIn(entered, list, group, before));
+}
+
+/** Right before `before` when it is one of `list`'s tasks, else at the end of `group`. */
+function positionIn(doc: TaskDocument, list: GroupedList, group: GroupName, before: TaskEntry | null): InsertPosition {
+	if (before !== null && before.section === list) return before.index;
+	return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
 }
 
 /**
@@ -260,9 +264,7 @@ export function createInPlace(doc: TaskDocument, text: string, priority: string 
 			const { list, group, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
 			const task = newTask(text, { dueDate, priority });
-			const at = before !== null && before.section === list ? before : null;
-			const position: InsertPosition = at !== null ? at.index : group === null ? "end" : { endOf: groupIndex(doc, list, group) };
-			return doc.insert(list, position, task);
+			return doc.insert(list, positionIn(doc, list, group, before), task);
 		}
 	}
 }
