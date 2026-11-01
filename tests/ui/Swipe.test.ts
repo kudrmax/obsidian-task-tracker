@@ -121,14 +121,26 @@ describe("Swipe", () => {
 		beforeEach(() => vi.useFakeTimers());
 		afterEach(() => vi.useRealTimers());
 
+		/** A Mac's trackpad sends an event about every 8 ms, while the fingers move and through the glide after they lift. */
+		const FRAME_MS = 8;
+
 		/** happy-dom drops the modifier keys of a WheelEvent's init: a pinch's ctrl is set on the event itself. */
 		const wheel = (target: HTMLElement, deltaX: number, deltaY = 0, ctrlKey = false) => {
 			const e = new WheelEvent("wheel", { deltaX, deltaY, bubbles: true, cancelable: true });
 			if (ctrlKey) Object.defineProperty(e, "ctrlKey", { value: true });
+			now += FRAME_MS;
+			Object.defineProperty(e, "timeStamp", { value: now });
 			target.dispatchEvent(e);
-			vi.advanceTimersByTime(16);
+			vi.advanceTimersByTime(FRAME_MS);
 			return e;
 		};
+
+		/** Recorded on a MacBook's trackpad, rounded: two fingers to the right, then their glide decaying after the lift. */
+		const RIGHT = [-1, -5, -6, -5, -5, -8, -24, -31, -47, -25, -16, -16, -26, -42, -47, -49, -48, -49, -47, -47, -45, -45, -45, -42, -42, -41, -41, -37, -37, -37, -35, -35, -33, -33, -31, -29, -28, -27, -27, -26, -26, -25, -23, -23, -22, -21, -20, -19, -19, -17, -17, -17];
+		/** The fingers coming down again stop the glide: a dip, then the next stroke picks up. */
+		const NEXT_RIGHT = [-4, -8, -2, -11, -5, -15, -21, -36, -50, -60, -55, -50, -45];
+		const LEFT = [3, 11, 8, 6, 10, 21, 26, 43, 35, 32, 11, 5, 18, 43, 100, 51, 52, 49, 50, 47, 47, 46, 45, 43, 42, 41, 41, 39, 37, 37, 37, 36, 33, 33, 31, 31, 29, 28, 27, 27, 26, 26, 25, 24, 23, 21, 21, 20, 19, 19, 17];
+		const TURN_RIGHT = [-4, -16, -3, -17, -11, -33, -60, -70, -50];
 
 		it("steps on when two fingers go left, and back when they go right, once per stroke", () => {
 			const { inner, shifts } = setUp();
@@ -145,6 +157,32 @@ describe("Swipe", () => {
 			vi.advanceTimersByTime(1000);
 			for (const delta of [10, 40, 60]) expect(wheel(inner, delta / 4, delta).defaultPrevented).toBe(false);
 			expect(shifts).toEqual([]);
+		});
+
+		it("steps for each stroke, one begun while the last one still glides too", () => {
+			const { inner, shifts } = setUp();
+			for (const delta of [...RIGHT, ...NEXT_RIGHT]) wheel(inner, delta);
+			expect(shifts).toEqual([-1, -1]);
+		});
+
+		it("steps once for a stroke whose fingers speed up after it stepped, and once for its whole glide", () => {
+			const { inner, shifts } = setUp();
+			for (const delta of LEFT) wheel(inner, delta);
+			expect(shifts).toEqual([1]);
+		});
+
+		it("steps back for fingers turned the other way while the glide goes on", () => {
+			const { inner, shifts } = setUp();
+			for (const delta of [...LEFT, ...TURN_RIGHT]) wheel(inner, delta);
+			expect(shifts).toEqual([1, -1]);
+		});
+
+		it("does nothing while the fingers creep, and steps once they sweep", () => {
+			const { inner, shifts } = setUp();
+			for (let i = 0; i < 60; i++) wheel(inner, 3);
+			expect(shifts).toEqual([]);
+			for (const delta of [5, 8, 10, 14, 17, 20, 25]) wheel(inner, delta);
+			expect(shifts).toEqual([1]);
 		});
 
 		it("does nothing for a short stroke", () => {
