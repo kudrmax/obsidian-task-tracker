@@ -109,6 +109,8 @@ export const LAYOUT = {
 	nowFraction: 0.5,
 	/** A finger may wander this far during a long press; farther is a scroll. */
 	pressTolerance: 8,
+	/** How far past its edge the plus's ring reaches for a card brought back to it. */
+	plusRingReach: 24,
 	/** On a computer a drag starts after the pointer moves this far. */
 	dragStartDistance: 4,
 	/** The divider holds to the middle of the window while dragged this close to it. */

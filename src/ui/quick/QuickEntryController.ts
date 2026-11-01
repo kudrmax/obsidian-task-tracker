@@ -13,6 +13,7 @@ import type { ListEntryInput, TaskList } from "../TaskList";
 import type { Timeline } from "../Timeline";
 import type { LocalDate, Slot } from "../types";
 import { PlusButton } from "./PlusButton";
+import { PlusRing } from "./PlusRing";
 import { QuickBar, type QuickBarState } from "./QuickBar";
 import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
 import { levelOfText, QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
@@ -106,6 +107,7 @@ export class QuickEntryController {
 	private readonly entry: QuickEntry;
 	private readonly bar: QuickBar;
 	private readonly plus: PlusButton;
+	private readonly ring: PlusRing;
 	private state: EntryState | null = null;
 	private field: QuickFieldHandle | null = null;
 	/** The field took the focus with its own selection; after that a redraw only gives it back. */
@@ -139,6 +141,7 @@ export class QuickEntryController {
 			onError: (error) => deps.onError(error),
 		});
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPlus(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
+		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
 			levels: () => deps.levels(),
 			today: () => deps.today(),
@@ -164,9 +167,10 @@ export class QuickEntryController {
 	dragFromPlus(e: PointerEvent, source: HTMLElement): void {
 		const { lists, timeline } = this.deps.dropTargets();
 		this.droppedOn = null;
-		const targets = [...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
+		const targets = [this.ring, ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
 		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) return;
 		this.carrying = true;
+		this.ring.show();
 		this.showPlus();
 	}
 
@@ -342,6 +346,7 @@ export class QuickEntryController {
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
 	private dropped(result: PlacedResult | null): void {
 		this.carrying = false;
+		this.ring.hide();
 		const column = this.droppedOn;
 		const place = result && column ? placeResultOf(result) : null;
 		if (column && place) this.open({ kind: "list", column, place: gapOf(this.cards(column), place) });

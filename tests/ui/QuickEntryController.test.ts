@@ -212,22 +212,73 @@ describe("QuickEntryController", () => {
 			expect(plus.classList.contains("is-hidden")).toBe(false);
 		});
 
-		it("carried, starts the drag of a new task over the lists only, hides, and comes back when let go off them", () => {
+		it("carried, starts the drag of a new task over its ring and the lists, hides, and comes back when let go off them", () => {
 			const { controller, plus, beginNew, drops } = setUp({ items });
 			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			expect(beginNew).toHaveBeenCalledOnce();
-			expect(beginNew.mock.calls[0][2]).toHaveLength(1);
+			expect(beginNew.mock.calls[0][2]).toHaveLength(2);
 			expect(plus.classList.contains("is-hidden")).toBe(true);
 			beginNew.mock.calls[0][3](null);
 			expect(plus.classList.contains("is-hidden")).toBe(false);
 		});
 
 		it("stays put when the drag cannot start", () => {
-			const { controller, plus, beginNew } = setUp({ items });
+			const { controller, plus, beginNew, root } = setUp({ items });
 			beginNew.mockReturnValueOnce(false);
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			expect(plus.classList.contains("is-hidden")).toBe(false);
+			expect(root.querySelector(".tc-plus-ring")).toBeNull();
+		});
+
+		describe("its ring", () => {
+			const RING = { left: 100, top: 200, width: 44, height: 44 };
+			const carry = () => {
+				const made = setUp({ items });
+				made.controller.dragFromPlus(new PointerEvent("pointermove"), made.plus);
+				const ring = made.root.querySelector<HTMLElement>(".tc-plus-ring")!;
+				ring.getBoundingClientRect = () => new DOMRect(RING.left, RING.top, RING.width, RING.height);
+				const [, , targets, onDrop] = made.beginNew.mock.calls[0];
+				return { ...made, ring, target: targets[0], onDrop };
+			};
+
+			it("stands in the plus's place while it is carried and goes when it is let go", () => {
+				const { ring, root, onDrop } = carry();
+				expect(ring.isConnected).toBe(true);
+				onDrop(null);
+				expect(root.querySelector(".tc-plus-ring")).toBeNull();
+			});
+
+			it("is the first target, so it wins over a list under it", () => {
+				const { target, ring } = carry();
+				expect(target.landing()).toEqual(ring.getBoundingClientRect());
+			});
+
+			it("takes a finger closer to its centre than its radius plus 24 px", () => {
+				const { target } = carry();
+				const [cx, cy] = [RING.left + 22, RING.top + 22];
+				expect(target.hitTest(cx, cy, { from: "new" } as DragPayload)).toBe(true);
+				expect(target.hitTest(cx + 45, cy, { from: "new" } as DragPayload)).toBe(true);
+				expect(target.hitTest(cx + 46, cy, { from: "new" } as DragPayload)).toBe(false);
+				expect(target.hitTest(cx, cy - 46, { from: "new" } as DragPayload)).toBe(false);
+			});
+
+			it("lights up under the card and goes out when it leaves", () => {
+				const { target, ring } = carry();
+				target.preview(0, 0, { from: "new" } as DragPayload);
+				expect(ring.classList.contains("is-hot")).toBe(true);
+				target.clear();
+				expect(ring.classList.contains("is-hot")).toBe(false);
+			});
+
+			it("let go on, cancels: nothing is created and the plus is shown again", () => {
+				const { target, plus, created, onDrop } = carry();
+				const result = target.drop(0, 0, { from: "new" } as DragPayload);
+				expect(result).toBeNull();
+				onDrop(result as null);
+				expect(created).toEqual([]);
+				expect(plus.classList.contains("is-hidden")).toBe(false);
+			});
 		});
 
 		it("let go on a list, opens the field where the drop showed", () => {
@@ -236,7 +287,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", result));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			const dropped = targets[0].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult;
+			const dropped = targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult;
 			onDrop(dropped);
 			expect(rowsOf("left")).toEqual(["A", "field", "B"]);
 		});
@@ -247,7 +298,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", { kind: "nest", parent: parent.key, before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			onDrop(targets[0].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
+			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
 			const rows = [...lists.left.el.children] as HTMLElement[];
 			expect(rows[2].className).toBe("tc-quick-row");
 			expect(rows[2].style.getPropertyValue("--tc-level")).toBe("1");
@@ -459,7 +510,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			onDrop(targets[0].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
+			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
 			expect(rowsOf("left")).toEqual(["A", "B", "field"]);
 			type("C");
 			press("Enter");

@@ -141,6 +141,8 @@ body {
 	--tc-plus-size: 44px;
 	--tc-plus-icon: 22px;
 	--tc-stroke-plus: 2.6px;
+	/* The ring that holds the plus's place while it is carried: its plus is thinner. */
+	--tc-stroke-ring: 2.2px;
 	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 
 	/* Sizes: the columns */
@@ -528,9 +530,13 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus { position: absolute; right: calc(var(--tc-space-16) + var(--tc-status-clear)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: calc(var(--tc-space-16) + var(--tc-status-clear)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
 .tc-plus svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-plus); }
+.task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
+.task-calendar > .tc-plus-ring svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.task-calendar > .tc-plus-ring.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); }
 .tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
 .tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }
