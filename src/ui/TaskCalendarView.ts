@@ -262,6 +262,9 @@ export class TaskCalendarView extends ItemView {
 		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
 		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
 		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
+		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
+		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
+		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
 		const sections = (items: () => readonly TaskItem[]) => () => items().flatMap((item) => (item.group === null ? [] : [item.group]));
 		this.groupZones = [
 			new GroupZones(this.newTask.el, "left", { presets: () => this.settings.groups.presets, present: sections(() => this.data.day?.list ?? []), sections: () => this.sectionsOf("left") }),
