@@ -262,6 +262,18 @@ describe("QuickEntryController", () => {
 		await vi.waitFor(() => expect(created).toEqual([{ text: "Buy milk", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
 	});
 
+	it("lets the next field move in under the task just written once the list shows it", async () => {
+		const items: Partial<Record<ListColumn, TaskItem[]>> = { left: [item("A", key("now", 0))] };
+		const { controller, root, type, press, created, render } = setUp({ items });
+		controller.openAtEnd("left");
+		type("Buy milk");
+		press("Enter");
+		await vi.waitFor(() => expect(created).toHaveLength(1));
+		items.left = [item("A", key("now", 0)), item("Buy milk", key("now", 1))];
+		render();
+		expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
+	});
+
 	it("shows the bar while the field is open, and puts the switch and New task away", () => {
 		const { controller, root, press } = setUp();
 		controller.openAtEnd("soon");

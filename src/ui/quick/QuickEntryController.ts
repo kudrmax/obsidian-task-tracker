@@ -227,8 +227,12 @@ export class QuickEntryController {
 		this.showPlus();
 	}
 
-	/** The screen was drawn: New task for the window's place, the plus, and the field focused and in sight. */
+	/**
+	 * The screen was drawn: New task for the window's place, the plus, and the field focused and in sight. The cards may
+	 * have changed under the field, a written line landing, so what the field may do is read again.
+	 */
 	rendered(): void {
+		if (this.state) this.state = this.entry.state;
 		const shown = this.deps.mode() !== "calendar";
 		for (const button of this.deps.newTasks()) button.shown = shown;
 		this.deps.root.classList.toggle("is-entering", this.state !== null);
