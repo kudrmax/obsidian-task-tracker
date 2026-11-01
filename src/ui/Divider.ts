@@ -65,7 +65,7 @@ export class Divider {
 	private snaps(width: number): boolean {
 		const center = this.opts.center();
 		const reachable = center >= this.opts.min && center <= this.opts.max();
-		const slow = this.press!.speed.value < LAYOUT.dividerSnapSpeed;
+		const slow = this.press!.speed.value < LAYOUT.slowSpeed;
 		return reachable && slow && Math.abs(width - center) <= LAYOUT.dividerSnapDistance;
 	}
 

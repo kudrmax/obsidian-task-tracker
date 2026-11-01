@@ -7,9 +7,14 @@ import { GestureArbiter } from "../../src/ui/gestures";
 const LONG_PRESS = 250;
 const STEP = 38;
 
-function pointer(type: string, clientX: number): PointerEvent {
-	return new PointerEvent(type, { clientX, clientY: 10, pointerId: 1, isPrimary: true, button: 0, bubbles: true });
+function pointer(type: string, clientX: number, time = 0): PointerEvent {
+	const event = new PointerEvent(type, { clientX, clientY: 10, pointerId: 1, isPrimary: true, button: 0, bubbles: true });
+	Object.defineProperty(event, "timeStamp", { get: () => time });
+	return event;
 }
+
+/** A finger creeping a pixel per 20 ms, slower than the slow speed, for longer than a careful drag needs. */
+const CREEP = Array.from({ length: 7 }, (_, i) => ({ dx: i + 1, t: (i + 1) * 20 }));
 
 /** happy-dom lays nothing out: the icon's width and the pill's place are what the stylesheet would give. */
 function setUp(initial: RightMode, dot = false, arbiter = new GestureArbiter()) {
@@ -38,13 +43,28 @@ function setUp(initial: RightMode, dot = false, arbiter = new GestureArbiter()) 
 		control.el.dispatchEvent(pointer("pointerup", 50));
 		icons[column].click();
 	};
-	const drag = (...xs: number[]) => {
-		control.el.dispatchEvent(pointer("pointerdown", xs[0]));
-		for (const x of xs.slice(1)) control.el.dispatchEvent(pointer("pointermove", x));
-		control.el.dispatchEvent(pointer("pointerup", xs[xs.length - 1]));
+	/** A drag through [x, ms] points: pressed at the first, let go at the last. */
+	const drag = (...points: (readonly [number, number])[]) => {
+		const [x0, t0] = points[0];
+		control.el.dispatchEvent(pointer("pointerdown", x0, t0));
+		for (const [x, t] of points.slice(1)) control.el.dispatchEvent(pointer("pointermove", x, t));
+		const [x1, t1] = points[points.length - 1];
+		control.el.dispatchEvent(pointer("pointerup", x1, t1));
 		control.el.click();
 	};
-	return { control, changes, sources: () => sources, wheel, lit, depth, tap, drag };
+	/** Pressed at `x`, then creeping one way until the drag is careful; returns where and when the finger is. */
+	const creep = (x: number, way: 1 | -1) => {
+		control.el.dispatchEvent(pointer("pointerdown", x, 0));
+		for (const { dx, t } of CREEP) control.el.dispatchEvent(pointer("pointermove", x + way * dx, t));
+		const last = CREEP[CREEP.length - 1];
+		return { x: x + way * last.dx, t: last.t };
+	};
+	const move = (x: number, t: number) => control.el.dispatchEvent(pointer("pointermove", x, t));
+	const release = (x: number, t: number) => {
+		control.el.dispatchEvent(pointer("pointerup", x, t));
+		control.el.click();
+	};
+	return { control, changes, sources: () => sources, wheel, lit, depth, tap, drag, creep, move, release };
 }
 
 describe("ColumnSwitch", () => {
@@ -67,8 +87,8 @@ describe("ColumnSwitch", () => {
 		expect(sides(setUp("soon"))).toEqual(["1", "1"]);
 		expect(sides(setUp("calendar"))).toEqual(["1", "0"]);
 		const s = setUp("calendar");
-		s.control.el.dispatchEvent(pointer("pointerdown", 100));
-		s.control.el.dispatchEvent(pointer("pointermove", 157));
+		const at = s.creep(100, 1);
+		s.move(at.x + 50, at.t + 20);
 		expect(sides(s)).toEqual(["0.5", "1"]);
 	});
 
@@ -101,32 +121,72 @@ describe("ColumnSwitch", () => {
 
 	it("turns the wheel the way the finger goes, within its ends, the screen staying put until let go", () => {
 		const s = setUp("soon");
-		s.control.el.dispatchEvent(pointer("pointerdown", 100));
-		s.control.el.dispatchEvent(pointer("pointermove", 81));
+		const at = s.creep(100, -1);
+		s.move(at.x - 12, at.t + 20);
 		expect(s.wheel()).toBe(1.5);
 		expect(s.depth(0)).toBe("1.5");
-		s.control.el.dispatchEvent(pointer("pointermove", 75));
+		s.move(at.x - 18, at.t + 40);
 		expect(s.lit()).toEqual([2, 3]);
-		s.control.el.dispatchEvent(pointer("pointermove", 0));
+		s.move(0, at.t + 60);
 		expect(s.wheel()).toBe(2);
-		s.control.el.dispatchEvent(pointer("pointermove", 130));
+		s.move(at.x + 42, at.t + 80);
 		expect(s.lit()).toEqual([0, 1]);
-		s.control.el.dispatchEvent(pointer("pointermove", 300));
+		s.move(300, at.t + 100);
 		expect(s.wheel()).toBe(0);
 		expect(s.changes).toEqual([]);
 	});
 
-	it("settles on the nearest place when let go, and a drag is not a tap", () => {
+	it("turns one place on a quick swipe, however far or short it goes, and a swipe is not a tap", () => {
+		const s = setUp("soon");
+		s.drag([100, 0], [80, 16], [40, 32], [0, 48]);
+		expect(s.changes).toEqual(["calendar"]);
+		s.drag([100, 0], [140, 16], [200, 32], [260, 48]);
+		expect(s.changes).toEqual(["calendar", "soon"]);
+		s.drag([100, 0], [108, 16], [112, 24]);
+		expect(s.changes).toEqual(["calendar", "soon", "inbox"]);
+		s.drag([100, 0], [90, 16], [70, 32]);
+		expect(s.changes).toEqual(["calendar", "soon", "inbox", "soon"]);
+	});
+
+	it("holds the wheel within a place of where it stood while the swipe is quick", () => {
 		const s = setUp("calendar");
-		s.drag(100, 115);
+		s.control.el.dispatchEvent(pointer("pointerdown", 100, 0));
+		s.move(160, 16);
+		s.move(220, 32);
+		expect(s.wheel()).toBe(1);
+	});
+
+	it("turns freely once the finger goes slowly, and stays free when it speeds up again", () => {
+		const s = setUp("calendar");
+		const at = s.creep(100, 1);
+		s.move(at.x + 40, at.t + 16);
+		s.move(at.x + 80, at.t + 32);
+		s.release(at.x + 80, at.t + 40);
+		expect(s.changes).toEqual(["inbox"]);
+	});
+
+	it("turns freely when a quick swipe slows down, going on from where the swipe held the wheel", () => {
+		const s = setUp("calendar");
+		s.control.el.dispatchEvent(pointer("pointerdown", 100, 0));
+		s.move(140, 16);
+		s.move(180, 32);
+		expect(s.wheel()).toBe(1);
+		for (let i = 1; i <= 40; i++) s.move(180 + i * 1.2, 32 + i * 20);
+		expect(s.wheel()).toBeLessThan(0.5);
+		s.release(228, 32 + 41 * 20);
+		expect(s.changes).toEqual(["inbox"]);
+	});
+
+	it("settles a careful drag on the nearest place, and stays when it comes back", () => {
+		const s = setUp("calendar");
+		let at = s.creep(100, 1);
+		s.release(at.x, at.t + 20);
 		expect(s.changes).toEqual([]);
 		expect(s.wheel()).toBe(2);
-		s.drag(100, 125);
+		at = s.creep(100, 1);
+		s.move(at.x + 20, at.t + 200);
+		s.release(at.x + 20, at.t + 400);
 		expect(s.changes).toEqual(["soon"]);
-		s.drag(100, 90, 75);
-		expect(s.changes).toEqual(["soon", "calendar"]);
-		s.drag(100, 180);
-		expect(s.changes).toEqual(["soon", "calendar", "inbox"]);
 	});
 
 	it("holds the screen while the wheel is turned, and waits while another gesture holds it", () => {
@@ -138,11 +198,11 @@ describe("ColumnSwitch", () => {
 		s.control.el.dispatchEvent(pointer("pointermove", 180));
 		s.control.el.dispatchEvent(pointer("pointerup", 180));
 		expect(arbiter.busy).toBe(false);
-		expect(s.changes).toEqual(["inbox"]);
+		expect(s.changes).toEqual(["soon"]);
 		arbiter.claim("swipe");
-		s.drag(100, 0);
-		expect(s.changes).toEqual(["inbox"]);
-		expect(s.wheel()).toBe(0);
+		s.drag([100, 0], [180, 16]);
+		expect(s.changes).toEqual(["soon"]);
+		expect(s.wheel()).toBe(1);
 	});
 
 	it("glides to a place the screen asks for, as after a tap", () => {

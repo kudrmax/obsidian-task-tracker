@@ -1,4 +1,5 @@
 import type { RightMode } from "../settings";
+import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
@@ -32,19 +33,24 @@ function placeShowing(column: number, from: number): number | null {
 
 interface Press {
 	readonly pointerId: number;
-	readonly x: number;
-	/** Where the wheel stood when pressed; it turns a place per icon's width the finger travels. */
-	readonly from: number;
+	/** The place the wheel stood on when pressed. */
+	readonly start: number;
+	/** The wheel stands at `from` with the finger at `x`, and turns a place per icon's width the finger travels from there. */
+	x: number;
+	from: number;
+	lastX: number;
 	readonly step: number;
 	readonly hold: number;
+	readonly pace: CarefulPace;
 	dragging: boolean;
 }
 
 /**
  * The switch at the bottom of the screen: a wheel of four icons, Inbox, Soon, Now and the calendar, under a window two
  * icons wide that stands still in the middle of the screen and shows the two columns on it, with a neighbour on either side. The wheel turns with a finger, as
- * the screen would: a finger moving left brings the columns on the right into the window, and the wheel settles on the
- * nearest place when let go; only then does the screen slide. A tap on an icon outside the window turns it to the
+ * the screen would: a finger moving left brings the columns on the right into the window. A quick swipe turns it one
+ * place; a finger that goes slowly for a moment turns it freely, and it settles on the nearest place when let go. Only
+ * then does the screen slide. A tap on an icon outside the window turns it to the
  * nearest place that shows the icon. Held while the calendar shows, it opens the sources window.
  */
 export class ColumnSwitch {
@@ -97,7 +103,9 @@ export class ColumnSwitch {
 		this.swallowClick = false;
 		const step = this.icons[0].offsetWidth;
 		const hold = window.setTimeout(() => this.held(), this.opts.longPressMs());
-		this.press = { pointerId: e.pointerId, x: e.clientX, from: placeOf(this.opts.value()), step, hold, dragging: false };
+		const start = placeOf(this.opts.value());
+		const pace = new CarefulPace(e.clientX, e.timeStamp);
+		this.press = { pointerId: e.pointerId, start, x: e.clientX, from: start, lastX: e.clientX, step, hold, pace, dragging: false };
 	}
 
 	private held(): void {
@@ -109,9 +117,10 @@ export class ColumnSwitch {
 	private move(e: PointerEvent): void {
 		const press = this.press;
 		if (!press || e.pointerId !== press.pointerId) return;
-		const dx = e.clientX - press.x;
+		const careful = press.pace.careful;
+		press.pace.update(e.clientX, e.timeStamp);
 		if (!press.dragging) {
-			if (Math.abs(dx) < LAYOUT.pressTolerance) return;
+			if (Math.abs(e.clientX - press.x) < LAYOUT.pressTolerance) return;
 			window.clearTimeout(press.hold);
 			if (!this.opts.arbiter.claim(DRAG)) {
 				this.press = null;
@@ -122,7 +131,20 @@ export class ColumnSwitch {
 			this.el.classList.remove("is-settling");
 			capturePointer(this.el, press.pointerId);
 		}
-		this.turn(Math.min(PLACES.length - 1, Math.max(0, press.from - dx / press.step)));
+		if (press.pace.careful && !careful) {
+			press.from = this.position();
+			press.x = press.lastX;
+		}
+		press.lastX = e.clientX;
+		this.turn(this.under(press, e.clientX));
+	}
+
+	/** Where the finger puts the wheel: a quick swipe reaches no further than the next place, a careful one anywhere. */
+	private under(press: Press, x: number): number {
+		const reach = press.pace.careful ? PLACES.length : 1;
+		const least = Math.max(0, press.start - reach);
+		const most = Math.min(PLACES.length - 1, press.start + reach);
+		return Math.min(most, Math.max(least, press.from - (x - press.x) / press.step));
 	}
 
 	private up(e: PointerEvent, released: boolean): void {
@@ -134,7 +156,10 @@ export class ColumnSwitch {
 		releasePointer(this.el, press.pointerId);
 		this.opts.arbiter.release(DRAG);
 		this.swallowClick = true;
-		this.show(released ? PLACES[Math.round(this.position())] : this.opts.value());
+		if (!released) return this.show(this.opts.value());
+		press.pace.update(e.clientX, e.timeStamp);
+		const at = this.position();
+		this.show(PLACES[press.pace.careful ? Math.round(at) : press.start + Math.sign(at - press.start)]);
 	}
 
 	private tap(target: EventTarget | null): void {
