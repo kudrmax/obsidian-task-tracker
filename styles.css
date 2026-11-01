@@ -317,6 +317,13 @@ body {
 	--tc-tracking-mon: 0.3px;
 	--tc-font-block: 12px;
 	--tc-font-count: 12px;
+	/* The column of the subtask counter and the description mark under it; the mark alone is larger. */
+	--tc-leading-count-pair: 13px;
+	--tc-meta-gap: 2px;
+	--tc-meta-min: 22px;
+	--tc-desc-mark: 13px;
+	--tc-desc-mark-pair: 11px;
+	--tc-stroke-desc-mark: 2.8;
 	--tc-leading-block: 15px;
 	--tc-leading-card: 18px;
 	--tc-font-meta: 9px;
@@ -586,6 +593,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-branch-pass { left: calc(-1 * (var(--tc-pass) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 /* A card another one is dragged over: it will take it as its last subtask. */
 .tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
+.tc-meta { flex-shrink: 0; min-width: var(--tc-meta-min); display: flex; flex-direction: column; align-items: center; gap: var(--tc-meta-gap); color: var(--tc-muted); }
+.tc-meta.is-pair .tc-count { line-height: var(--tc-leading-count-pair); }
+.tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
+.tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* Where a card dragged in its own list will land, at the level its left edge picks. */
 .tc-drop-gap { position: fixed; height: var(--tc-card-h); box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); z-index: var(--tc-layer-drop-gap); pointer-events: none; }
@@ -698,6 +709,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
 .is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
+.tc-lifted.is-whole .tc-meta.is-pair { margin-top: calc((var(--tc-card-h) - var(--tc-leading-count-pair) - var(--tc-meta-gap) - var(--tc-desc-mark-pair)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
