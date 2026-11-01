@@ -82,7 +82,7 @@ describe("toItem", () => {
 			group: null,
 			subtasks: [],
 			progress: null,
-			parentText: null,
+			parentText: null, description: null,
 		});
 	});
 });

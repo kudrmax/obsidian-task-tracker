@@ -15,7 +15,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	group,
 	subtasks: [],
 	progress: null,
-	parentText: null,
+	parentText: null, description: null,
 });
 
 function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | null, date: string | null = null) {

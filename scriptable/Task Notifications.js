@@ -175,6 +175,38 @@ var DayBoundary = class _DayBoundary {
   }
 };
 
+// src/domain/description.ts
+var INDENT_RE = /^[ \t]*/;
+function indentOf(line) {
+  return INDENT_RE.exec(line)[0];
+}
+function descriptionLines(entry) {
+  const lines = [];
+  const children = entry.task.children;
+  let next = 0;
+  for (let i = 0; i < children.length; i++) {
+    const sub = entry.subtasks[next];
+    if (sub && children[i] === sub.raw) {
+      i += sub.task.children.length;
+      next++;
+    } else lines.push(children[i]);
+  }
+  return lines;
+}
+function descriptionIndent(entry) {
+  const lines = descriptionLines(entry);
+  if (lines.length === 0) return null;
+  return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
+}
+function descriptionMarkdown(entry) {
+  const indent = descriptionIndent(entry);
+  if (indent === null) return null;
+  return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
+}
+function markdownLines(markdown) {
+  return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
+}
+
 // src/domain/queries.ts
 function listed(doc) {
   return [...doc.tasks("now"), ...doc.tasks("soon")];
@@ -281,10 +313,10 @@ var SECTION_KEYS = ["inbox", "now", "soon", "done"];
 var LIST_END_RE = /^#{1,2}(\s|$)/;
 var GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
-var INDENT_RE = /^[ \t]*/;
+var INDENT_RE2 = /^[ \t]*/;
 var DEFAULT_INDENT_UNIT = "	";
 function indentWidth(line) {
-  return INDENT_RE.exec(line)[0].length;
+  return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
   return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.children.length === b.children.length && a.children.every((c, i) => c === b.children[i]);
@@ -421,6 +453,17 @@ var TaskDocument = class _TaskDocument {
     const without = this.splice(span.line, span.lineCount, []);
     without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
     return this.withLines(without);
+  }
+  /**
+   * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
+   * description has, else its subtasks'. The same text changes nothing; an empty one takes the description away.
+   */
+  setDescription(entry, markdown) {
+    const lines = markdownLines(markdown);
+    if (lines.join("\n") === (descriptionMarkdown(entry) ?? "")) return this;
+    const indent = descriptionIndent(entry) ?? this.childIndent(entry);
+    const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
+    return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
   }
   /** A new last subtask of `parent`. */
   insertUnder(parent, task) {

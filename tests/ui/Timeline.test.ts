@@ -28,7 +28,7 @@ function minorLabels(view: Timeline): string[] {
 }
 
 describe("a day that starts at 4", () => {
-	const late: TaskItem = { key: { section: "now", index: 0, path: [], raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, priority: null, subtasks: [], progress: null, parentText: null, group: null };
+	const late: TaskItem = { key: { section: "now", index: 0, path: [], raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null };
 
 	it("labels the hours from 04 round to 04 the next morning, two digits each", () => {
 		const labels = [...timeline({ hourPx: 56 }, new DayBoundary(4)).canvas.querySelectorAll(".tc-hour-label")].map((l) => l.textContent);
@@ -104,7 +104,7 @@ describe("hour labels by the now line", () => {
 });
 
 describe("task cards", () => {
-	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, group: null });
+	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
 
 	it("stands the cards in the page in the stack's order, so a card over a long one is drawn over it", () => {
 		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 900, null), task(1, 840, 960)]);
@@ -146,7 +146,7 @@ describe("task cards", () => {
 
 describe("tasks the now line has passed", () => {
 	const hourPx = 56;
-	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, priority: null, subtasks: [], progress: null, parentText: null, group: null });
+	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
 
 	function onToday(tasks: TaskItem[], date = "2026-10-31"): HTMLElement[] {
 		const view = new Timeline(document.createElement("div"), {
