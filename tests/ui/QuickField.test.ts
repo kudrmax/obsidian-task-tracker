@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import type { PriorityLevel } from "../../src/settings";
+import type { PendingText } from "../../src/ui/quick/QuickEntry";
 import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
 
@@ -150,7 +151,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 });
 
 describe("TaskList with a task being typed", () => {
-	const list = (items: TaskItem[], index: number, level: number, pending: string[] = ["Milk"]) => {
+	const list = (items: TaskItem[], index: number, level: number, pending: PendingText[] = [{ text: "Milk", level }]) => {
 		const l = new TaskList(document.createElement("div"), {
 			items: () => items,
 			day: () => null,
@@ -175,8 +176,23 @@ describe("TaskList with a task being typed", () => {
 	});
 
 	it("draws several typed texts before the field", () => {
-		const l = list([item("A")], 1, 0, ["x", "y"]);
+		const l = list([item("A")], 1, 0, [
+			{ text: "x", level: 0 },
+			{ text: "y", level: 0 },
+		]);
 		expect([...l.el.children].map((r) => r.textContent || r.className)).toEqual(["A", "x", "y", "tc-quick-row"]);
+	});
+
+	it("draws each typed text at its own level, its branches from those levels", () => {
+		const l = list([item("A")], 1, 1, [
+			{ text: "P", level: 0 },
+			{ text: "c1", level: 1 },
+		]);
+		const [, p, c1, field] = [...l.el.children] as HTMLElement[];
+		expect([p, c1, field].map((r) => r.style.getPropertyValue("--tc-level"))).toEqual(["0", "1", "1"]);
+		expect(p.querySelector(".tc-branch")).toBeNull();
+		expect(c1.querySelector(".tc-branch")?.className).toBe("tc-branch");
+		expect(field.querySelector(".tc-branch")?.className).toBe("tc-branch is-last");
 	});
 
 	it("counts the rows for the branches of the cards around them", () => {

@@ -59,8 +59,7 @@ export function placeAt(cards: readonly PlacedCard[], y: number, level: number, 
 	heads.forEach((head, i) => {
 		if (head.firstCard === index && y > headEdge(head, i)) group = head.group;
 	});
-	const { min, max } = levelRange(cards, index, group);
-	return { kind: "gap", index, level: Math.max(min, Math.min(max, Math.round(level))), group };
+	return fitLevel(cards, { kind: "gap", index, level: Math.round(level), group });
 }
 
 /**
@@ -71,6 +70,12 @@ export function levelRange(cards: readonly PlacedCard[], index: number, group: G
 	const prev = cards[index - 1]?.group === group ? cards[index - 1] : undefined;
 	const next = cards[index]?.group === group ? cards[index] : undefined;
 	return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
+}
+
+/** The place at the level nearest its own that the neighbours allow. */
+export function fitLevel(cards: readonly PlacedCard[], place: GapPlace): GapPlace {
+	const { min, max } = levelRange(cards, place.index, place.group);
+	return { ...place, level: Math.max(min, Math.min(max, place.level)) };
 }
 
 /** The place one level deeper (`delta` 1) or shallower (-1), or null when the neighbours do not allow it. */

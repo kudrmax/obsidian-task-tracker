@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, type PlacedCard, levelRange, placeAt, resultOf, shiftLevel } from "../../src/ui/drag/listPlace";
+import { type GapPlace, type PlacedCard, fitLevel, levelRange, placeAt, resultOf, shiftLevel } from "../../src/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;
@@ -138,5 +138,12 @@ describe("the level a place may take", () => {
 		expect(shiftLevel(SECTIONED, gapAt(2, 0), -1)).toBeNull();
 		expect(shiftLevel(SECTIONED, gapAt(2, 0, "X"), 1)).toBeNull();
 		expect(shiftLevel(CARDS, gapAt(2, 1), -1)).toBeNull();
+	});
+
+	it("fits a place to the nearest level the range allows", () => {
+		expect(fitLevel(SECTIONED, gapAt(2, 5))).toEqual(gapAt(2, 2));
+		expect(fitLevel(CARDS, gapAt(2, 0))).toEqual(gapAt(2, 1));
+		expect(fitLevel(SECTIONED, gapAt(2, 1, "X"))).toEqual(gapAt(2, 0, "X"));
+		expect(fitLevel(SECTIONED, gapAt(2, 1))).toEqual(gapAt(2, 1));
 	});
 });

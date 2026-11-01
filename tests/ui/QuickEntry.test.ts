@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NewTaskPlace, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
+import { type NewTaskPlace, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
 import type { PlacedCard } from "../../src/ui/drag/listPlace";
 import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
 import { WriteQueue } from "../../src/ui/quick/WriteQueue";
@@ -30,7 +30,10 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 	return { promise, resolve };
 }
 
-/** The file as the lists show it: a create lands where its place says, as the service would put it. */
+/**
+ * The file as the lists show it: a create lands where its place says, as the service would put it. An edit takes only a
+ * key the lists hand out now.
+ */
 class FakeTasks {
 	cards: PlacedCard[];
 	readonly created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
@@ -58,6 +61,7 @@ class FakeTasks {
 				this.land(text, place);
 			},
 			edit: async (k, draft) => {
+				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
 				this.edits.push({ key: k, draft });
 			},
 			placement: () => ({ kind: "now" }),
@@ -82,7 +86,8 @@ class FakeTasks {
 			while (index < this.cards.length && this.cards[index].level >= level) index++;
 		}
 		if (place.before) index = indexOf(place.before);
-		this.cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)];
+		// A write makes every key read before it stale: the lists hand out new ones.
+		this.cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)].map((c) => ({ ...c, key: { ...c.key } }));
 	}
 }
 
@@ -94,7 +99,7 @@ describe("QuickEntry", () => {
 		entry.type("New");
 		entry.setPriority("!");
 		entry.enter();
-		expect(entry.state).toMatchObject({ text: "", priority: null, pending: ["New"], spot: at(1) });
+		expect(entry.state).toMatchObject({ text: "", priority: null, pending: [{ text: "New", level: 0 }], spot: at(1) });
 		await entry.idle();
 		expect(tasks.created).toEqual([{ text: "New", priority: "!", place: { kind: "list", list: "now", group: null, before: key("B") } }]);
 		expect(tasks.names).toEqual(["A:0", "New:0", "B:0"]);
@@ -114,7 +119,7 @@ describe("QuickEntry", () => {
 		}
 		await Promise.resolve();
 		expect(tasks.created).toEqual([]);
-		expect(entry.state).toMatchObject({ pending: ["1", "2", "3", "4", "5"], spot: at(1) });
+		expect(entry.state).toMatchObject({ pending: ["1", "2", "3", "4", "5"].map((text) => ({ text, level: 0 })), spot: at(1) });
 		gate.resolve();
 		await entry.idle();
 		expect(tasks.created.map((c) => c.text)).toEqual(["1", "2", "3", "4", "5"]);
@@ -336,7 +341,7 @@ describe("QuickEntry", () => {
 		entry.open(stack);
 		entry.type("s1");
 		entry.enter();
-		expect(entry.state).toMatchObject({ spot: stack, text: "", pending: ["s1"] });
+		expect(entry.state).toMatchObject({ spot: stack, text: "", pending: [{ text: "s1", level: 0 }] });
 		entry.type("s2");
 		entry.enter();
 		entry.enter();
@@ -374,6 +379,132 @@ describe("QuickEntry", () => {
 		expect(tasks.names).toEqual(["good:0"]);
 		expect(entry.state).toMatchObject({ pending: [], spot: at(1) });
 	});
+
+	/** Types each text and Enter; "tab" and "shiftTab" move the field instead. */
+	const typeLines = (entry: QuickEntry, lines: readonly string[]) => {
+		for (const line of lines) {
+			if (line === "tab") entry.indent(1);
+			else if (line === "shiftTab") entry.indent(-1);
+			else {
+				entry.type(line);
+				entry.enter();
+			}
+		}
+	};
+
+	it("texts typed before an indent keep their level", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		typeLines(entry, ["P", "tab", "c1", "c2"]);
+		expect(entry.state?.pending).toEqual([
+			{ text: "P", level: 0 },
+			{ text: "c1", level: 1 },
+			{ text: "c2", level: 1 },
+		]);
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "P:0", "c1:1", "c2:1"]);
+		expect(tasks.created.map((c) => c.place)).toEqual([
+			{ kind: "list", list: "now", group: null, before: null },
+			{ kind: "subtask", parent: key("P"), before: null },
+			{ kind: "subtask", parent: key("P"), before: null },
+		]);
+		expect(entry.state).toMatchObject({ spot: at(4, 1) });
+	});
+
+	it("indents under a text not yet written", async () => {
+		const tasks = new FakeTasks([]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(0));
+		entry.type("P");
+		entry.enter();
+		expect(entry.state).toMatchObject({ canIndent: true, canOutdent: false });
+		typeLines(entry, ["tab", "c1"]);
+		expect(entry.state).toMatchObject({ spot: at(0, 1), canIndent: true, canOutdent: true });
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["P:0", "c1:1"]);
+	});
+
+	it("indents under a deeper text not yet written", async () => {
+		const tasks = new FakeTasks(["R", ["A", 1]]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(2, 1));
+		typeLines(entry, ["P", "tab", "c"]);
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["R:0", "A:1", "P:1", "c:2"]);
+	});
+
+	it("a text under one that failed goes at the level its neighbours allow", async () => {
+		const tasks = new FakeTasks([]);
+		tasks.failing.add("P");
+		const entry = tasks.entry();
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		entry.open(at(0));
+		typeLines(entry, ["P", "tab", "c"]);
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.errors).toHaveLength(1);
+		expect(tasks.names).toEqual(["c:0"]);
+	});
+
+	it("a field reopened at the column end stays under a task still being written", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.type("X");
+		entry.blur();
+		entry.open(at(1));
+		typeLines(entry, ["Y"]);
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "X:0", "Y:0"]);
+		expect(entry.state).toMatchObject({ spot: at(3) });
+	});
+
+	it("a field opened above a task still being written stays where it is", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(2));
+		entry.type("X");
+		entry.blur();
+		entry.open(at(1));
+		typeLines(entry, ["Y"]);
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "Y:0", "B:0", "X:0"]);
+	});
+
+	it("a rename waits for the writes above it and edits the task as the lists then show it", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(0));
+		entry.type("X");
+		entry.blur();
+		entry.open(at(1), { ...item("B"), key: tasks.cards[1].key });
+		entry.type("B2");
+		entry.blur();
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.errors).toEqual([]);
+		expect(tasks.names).toEqual(["X:0", "A:0", "B:0"]);
+		expect(tasks.edits).toEqual([{ key: tasks.cards[2].key, draft: { text: "B2", placement: { kind: "now" }, priority: "!" } }]);
+	});
 });
 
 describe("WriteQueue", () => {
@@ -399,5 +530,20 @@ describe("WriteQueue", () => {
 		await queue.idle();
 		expect(log).toEqual(["1 start", "1 end", "3"]);
 		expect(errors).toHaveLength(1);
+	});
+
+	it("goes on when the error handler itself throws", async () => {
+		const queue = new WriteQueue(() => {
+			throw new Error("handler");
+		});
+		const log: string[] = [];
+		queue.push(async () => {
+			throw new Error("job");
+		});
+		queue.push(async () => {
+			log.push("next");
+		});
+		await queue.idle();
+		expect(log).toEqual(["next"]);
 	});
 });

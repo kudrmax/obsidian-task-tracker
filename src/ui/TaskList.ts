@@ -4,12 +4,13 @@ import type { LocalDate } from "./types";
 import { clear, el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
 import type { GapPlace } from "./drag/listPlace";
+import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard } from "./TaskCard";
 
-/** A task being typed in the list: the texts already typed, as plain cards, and the field after them, in `place`. */
+/** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
 	readonly place: GapPlace;
-	readonly pending: readonly string[];
+	readonly pending: readonly PendingText[];
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -102,19 +103,18 @@ export class TaskList {
 	}
 
 	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[]): void {
-		const level = entry.place.level;
-		const put = (row: HTMLElement): void => {
+		const put = (row: HTMLElement, level: number): void => {
 			row.style.setProperty(PROPERTY.level, String(level));
 			rows.push({ node: row, level });
 		};
-		for (const text of entry.pending) {
+		for (const { text, level } of entry.pending) {
 			const card = el(this.el, "div", "tc-card");
 			el(card, "div", "tc-card-title", text);
-			put(card);
+			put(card, level);
 		}
 		const row = el(this.el, "div", "tc-quick-row");
 		entry.field(row);
-		put(row);
+		put(row, entry.place.level);
 	}
 
 	/** Where the name of the section a pending card starts is typed; null without one. */
