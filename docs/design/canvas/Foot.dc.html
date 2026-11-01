@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Низ списков: экран</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<div style="position: absolute; left: 0; right: 0; top: 56px; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; box-sizing: border-box; z-index: 6;">
+<button aria-label="Toggle sidebar" style="width: 46px; height: 46px; border-radius: 23px; border: 0; padding: 0; background: #1F1F21; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg></button>
+<span style="font-size: 17px; font-weight: 600; color: #FFFFFF;">Task Calendar</span>
+<button aria-label="More actions" style="width: 56px; height: 46px; border-radius: 23px; border: 0; padding: 0; background: #1F1F21; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button>
+</div>
+
+<sc-if value="{{isSoon}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; top: 118px; left: 0; width: 187px; height: 36px; padding: 0 2px 0 10px; box-sizing: border-box; display: flex; align-items: center;">
+<button aria-label="Soon" style="height: 36px; border: 0; padding: 0 4px; background: transparent; color: #FFFFFF; font: inherit; font-size: 20px; font-weight: 700; white-space: nowrap;">Soon</button>
+</div>
+</sc-if>
+<div style="position: absolute; top: 118px; left: {{dayHead.left}}px; width: {{dayHead.width}}px; height: 36px; padding: {{dayHead.pad}}; box-sizing: border-box; display: flex; align-items: center; gap: {{dayHead.gap}}px;">
+<button aria-label="Previous day" style="width: {{dayHead.chev}}px; height: 36px; flex-shrink: 0; border-radius: 18px; border: 0; padding: 0; background: transparent; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Today, back to today" style="height: 36px; border: 0; padding: 0 4px; background: transparent; color: #FFFFFF; font: inherit; font-size: 20px; font-weight: 700; white-space: nowrap;">Today</button>
+<button aria-label="Next day" style="width: {{dayHead.chev}}px; height: 36px; flex-shrink: 0; border-radius: 18px; border: 0; padding: 0; background: transparent; color: #E5E5EA; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+</div>
+
+<sc-for list="{{lists}}" as="col" hint-placeholder-count="1">
+<div style="position: absolute; left: {{col.left}}px; top: 0; width: 187px; height: 844px; overflow: hidden; z-index: 1;">
+<svg width="187" height="844" viewBox="0 0 187 844" style="position: absolute; left: 0; top: 0;" aria-hidden="true"><path d="{{col.branches}}" fill="none" stroke="#48484A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{col.rows}}" as="r" hint-placeholder-count="12">
+<sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; font-size: 13px; line-height: 20px; font-weight: 600; color: {{r.ink}}; white-space: nowrap;">{{r.title}}</div>
+</sc-if>
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; inset: 0; border-radius: 17.5px; background: linear-gradient(to right, #8A6CEF 3px, transparent 3px);"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: #8E8E93; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}"><span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: #E5E5EA;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #8E8E93; letter-spacing: 0.3px;">{{r.mon}}</span></span></sc-if>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</sc-for>
+
+<div style="position: absolute; left: 187px; top: 166px; bottom: 0; width: 16px; display: flex; justify-content: center; z-index: 1;">
+<div style="width: 1px; height: 100%; background: #2C2C2E;"></div>
+<sc-if value="{{isCal}}" hint-placeholder-val="{{true}}">
+<span style="position: absolute; top: 260px; left: 3px; width: 10px; height: 52px; border-radius: 5px; background: #48484A;"></span>
+</sc-if>
+</div>
+
+<sc-if value="{{isCal}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 203px; width: 187px; top: 166px; bottom: 0; overflow: hidden; z-index: 1;">
+<div style="position: relative; margin-left: 28px; margin-right: 4px; height: 22px; border-radius: 6px; background: rgba(48,209,88,0.22); display: flex; overflow: hidden;">
+<div style="width: 3px; flex-shrink: 0; background: #30D158;"></div>
+<div style="flex: 1; min-width: 0; padding: 0 6px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #86E3A0; white-space: nowrap;">День рождения Ани</div>
+</div>
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="12">
+<div style="position: absolute; top: {{h.labelTop}}px; left: 0; width: 22px; text-align: right; font-size: 11px; line-height: 14px; color: #8E8E93; font-variant-numeric: tabular-nums;">{{h.label}}</div>
+<div style="position: absolute; top: {{h.top}}px; left: 26px; right: 0; height: 1px; background: #232325;"></div>
+</sc-for>
+<sc-for list="{{events}}" as="e" hint-placeholder-count="7">
+<div style="position: absolute; top: {{e.top}}px; left: {{e.left}}px; width: {{e.width}}px; height: {{e.height}}px; box-sizing: border-box; overflow: hidden; border-radius: 6px; background: {{e.bg}}; display: flex;">
+<div style="width: 3px; flex-shrink: 0; background: {{e.bar}};"></div>
+<div style="flex: 1; min-width: 0; padding: 3px 6px; font-size: 12px; line-height: 15px; font-weight: 600; color: {{e.text}}; white-space: nowrap; overflow: hidden;">{{e.title}}</div>
+</div>
+</sc-for>
+<sc-for list="{{calTasks}}" as="k" hint-placeholder-count="3">
+<div style="position: absolute; top: {{k.top}}px; left: 28px; width: 155px; height: {{k.height}}px; box-sizing: border-box; overflow: hidden; border-radius: 17.5px; background: #1C1C1E; padding: {{k.pad}}; display: flex; align-items: {{k.align}}; gap: 6px; z-index: 2;">
+<sc-if value="{{k.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #8A6CEF;"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; line-height: 18px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{k.title}}</div>
+</div>
+</sc-for>
+<div style="position: absolute; top: {{nowTop}}px; left: 0; right: 0; height: 16px; display: flex; align-items: center; z-index: 3;">
+<span style="width: 34px; height: 16px; flex-shrink: 0; border-radius: 8px; background: #D92C24; color: #FFFFFF; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;">14:20</span>
+<div style="flex: 1; height: 2px; background: #D92C24;"></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{v.solid}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; width: {{solidWidth}}px; top: {{solidTop}}px; bottom: 0; background: #000000; z-index: 3;"></div>
+<sc-if value="{{isCal}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 203px; right: 0; top: 720px; bottom: 0; background: linear-gradient(to bottom, rgba(0,0,0,0), #000000 70%); z-index: 3;"></div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{v.fade}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: {{fadeTop}}px; bottom: 0; background: {{fadeGround}}; z-index: 3;"></div>
+</sc-if>
+
+<sc-if value="{{v.blur}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: {{fadeTop}}px; bottom: 0; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 34%); mask-image: linear-gradient(to bottom, transparent 0%, #000 34%); z-index: 3;"></div>
+<div style="position: absolute; left: 0; right: 0; top: {{fadeTop}}px; bottom: 0; background: {{blurGround}}; z-index: 3;"></div>
+</sc-if>
+
+<sc-if value="{{v.edge}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; width: {{solidWidth}}px; top: {{edgeTop}}px; height: 48px; background: linear-gradient(to bottom, rgba(0,0,0,0), #000000); z-index: 3;"></div>
+<div style="position: absolute; left: 0; width: {{solidWidth}}px; top: {{solidTop}}px; bottom: 0; background: #000000; z-index: 3;"></div>
+<sc-if value="{{isCal}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 203px; right: 0; top: 720px; bottom: 0; background: linear-gradient(to bottom, rgba(0,0,0,0), #000000 70%); z-index: 3;"></div>
+</sc-if>
+</sc-if>
+
+<sc-for list="{{newTasks}}" as="n" hint-placeholder-count="2">
+<div style="position: absolute; left: {{n.left}}px; top: 669px; width: 187px; padding: {{n.pad}}; box-sizing: border-box; background: {{n.ground}}; z-index: 4;">
+<button style="width: 100%; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed #3A3A3C; background: #000000; padding: 0 14px; display: flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; color: #8E8E93; white-space: nowrap; overflow: hidden;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9580FF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>New task</button>
+</div>
+</sc-for>
+
+<div style="position: absolute; left: {{wheel.left}}px; top: 728px; width: {{wheel.width}}px; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: #1C1C1E; display: flex; z-index: 5;">
+<span style="position: absolute; top: 2px; left: {{wheel.windowLeft}}px; width: 76px; height: 28px; border-radius: 14px; background: #E5E5EA;"></span>
+<sc-for list="{{wheel.icons}}" as="o" hint-placeholder-count="3">
+<button aria-label="{{o.label}}" style="position: relative; width: 38px; height: 28px; border: 0; padding: 0; background: transparent; color: {{o.color}}; opacity: {{o.opacity}}; transform: scale({{o.scale}}); display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></button>
+</sc-for>
+</div>
+
+<button aria-label="New task" style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: #9580FF; box-shadow: 0 6px 16px rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 6;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+
+<nav aria-label="Obsidian navigation" style="position: absolute; left: 42px; right: 42px; bottom: 19px; height: 49px; border-radius: 25px; background: #2A2A2C; display: flex; align-items: center; justify-content: space-around; z-index: 6; color: #E5E5EA;">
+<button aria-label="Back" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Forward" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: #6C6C70; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+<button aria-label="Search" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg></button>
+<button aria-label="New note" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+<button aria-label="Tabs" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="24" height="22" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="4" width="22" height="16" rx="3.5"></rect><text x="13" y="16" text-anchor="middle" font-size="10" font-family="-apple-system, Inter, sans-serif" fill="currentColor" stroke="none">3</text></svg></button>
+<button aria-label="Menu" style="width: 40px; height: 40px; border: 0; padding: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"cal","options":["cal","soon"]},"foot":{"editor":"enum","default":"now","options":["now","fade","blur","edge"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  dayRows(x) {
+    const CARD = 35, GAP = 2, HEAD = 26, SECTION_GAP = 10, INDENT = 20, R = 6;
+    const items = [
+      { head: 'Morning' },
+      { title: 'Созвониться с врачом' },
+      { head: 'No section', ungrouped: true },
+      { title: 'Купить билеты в Белград', count: '1/3', bg: '#572725' },
+      { title: 'Сравнить рейсы', level: 1 },
+      { title: 'Забронировать отель', level: 1, progress: true },
+      { title: 'Оформить страховку', level: 1 },
+      { title: 'Сдать налоговую декларацию', day: '30', mon: 'OCT', bg: '#573E19' },
+      { title: 'Записаться в барбершоп' },
+      { title: 'Посмотреть доклад про local-first' },
+      { title: 'Чай масала' },
+      { title: 'Позвонить маме' },
+      { title: 'Разобрать почту' },
+      { title: 'Оплатить интернет' },
+      { title: 'Купить корм коту' },
+      { title: 'Заказать продукты', bg: '#573E19' },
+      { title: 'Продлить страховку' },
+      { title: 'Починить велосипед' },
+      { title: 'Прочитать Deep Work' }
+    ];
+    let y = 166;
+    let first = true;
+    const rows = [];
+    for (const it of items) {
+      if (it.head) {
+        if (!first) y += SECTION_GAP;
+        rows.push({ isHead: true, isCard: false, top: y, title: it.head, ink: it.ungrouped ? '#8E8E93' : '#AEAEB2' });
+        y += HEAD;
+      } else {
+        const level = it.level || 0;
+        rows.push({
+          isHead: false, isCard: true, top: y, level,
+          left: 10 + level * INDENT, width: 175 - level * INDENT,
+          title: it.title, bg: it.bg || '#1C1C1E', progress: !!it.progress,
+          hasCount: !!it.count, count: it.count || '', hasDue: !!it.day, day: it.day || '', mon: it.mon || ''
+        });
+        y += CARD + GAP;
+      }
+      first = false;
+    }
+    const cards = rows.filter((r) => r.isCard);
+    let d = '';
+    cards.forEach((r, i) => {
+      if (r.level !== 1) return;
+      const mid = r.top + CARD / 2;
+      const lineX = 10 + INDENT;
+      const last = !(cards[i + 1] && cards[i + 1].level === 1);
+      const parentFirst = cards[i - 1] && cards[i - 1].level === 0;
+      if (parentFirst) d += 'M' + lineX + ' ' + (r.top - GAP - 2) + ' ';
+      if (last) {
+        const start = cards.slice(0, i).reverse().find((c) => c.level === 0);
+        d += 'M' + lineX + ' ' + (start.top + CARD) + ' V' + (mid - R) + ' Q' + lineX + ' ' + mid + ' ' + (lineX + R) + ' ' + mid + ' H' + (r.left + 1) + ' ';
+      } else {
+        d += 'M' + lineX + ' ' + mid + ' H' + (r.left + 1) + ' ';
+      }
+    });
+    return { rows, branches: d.trim() || 'M0 0' };
+  }
+  soonRows() {
+    const titles = ['Продлить страховку', 'Купить подарок Ане', 'Разобрать фото с поездки', 'Записаться к стоматологу', 'Починить велосипед', 'Прочитать Deep Work', 'Заменить фильтр для воды', 'Настроить бэкап ноутбука', 'Узнать про курсы итальянского', 'Ответить Лёше про поход', 'Посмотреть «Дюну 2»', 'Сменить тариф связи', 'Купить зимнюю резину', 'Отдать куртку в химчистку', 'Собрать вещи на дачу', 'Обновить загранпаспорт', 'Купить лампочки', 'Позвонить в управляющую'];
+    const rows = titles.map((t, i) => ({ isHead: false, isCard: true, top: 166 + i * 37, left: 10, width: 175, title: t, bg: i === 1 ? '#572725' : '#1C1C1E', progress: i === 2, hasCount: false, count: '', hasDue: false, day: '', mon: '' }));
+    return { rows, branches: 'M0 0' };
+  }
+  renderVals() {
+    const mode = this.props.mode === 'soon' ? 'soon' : 'cal';
+    const foot = ['now', 'fade', 'blur', 'edge'].includes(this.props.foot) ? this.props.foot : 'now';
+    const isCal = mode === 'cal';
+    const isSoon = !isCal;
+    const day = this.dayRows();
+    const lists = isCal ? [{ left: 0, ...day }] : [{ left: 0, ...this.soonRows() }, { left: 195, ...day }];
+    const HOUR = 56, START = 9, TOP = 34;
+    const y = (h) => TOP + (h - START) * HOUR;
+    const hours = [];
+    for (let h = START; h <= 21; h++) hours.push({ label: String(h), top: y(h), labelTop: y(h) - 7 });
+    const PAL = {
+      work: { bg: 'rgba(10,132,255,0.24)', bar: '#0A84FF', text: '#8CC6FF' },
+      google: { bg: 'rgba(255,159,10,0.22)', bar: '#FF9F0A', text: '#FFC56B' },
+      pink: { bg: 'rgba(255,55,95,0.22)', bar: '#FF375F', text: '#FF9AAE' },
+      green: { bg: 'rgba(48,209,88,0.22)', bar: '#30D158', text: '#86E3A0' }
+    };
+    const W = 155, L = 28;
+    const ev = (title, s, e, cal, col, cols) => {
+      const n = cols || 1, w = (W - 2 * (n - 1)) / n;
+      return { title, top: y(s) + 1, height: (e - s) * HOUR - 2, left: L + (col || 0) * (w + 2), width: w, ...PAL[cal] };
+    };
+    const events = [
+      ev('Стендап', 9, 9.25, 'work'),
+      ev('1:1 с Костей', 10, 11, 'work'),
+      ev('Обед с Вадимом', 12.5, 13.5, 'google'),
+      ev('Планирование спринта', 15, 16.5, 'work', 0, 2),
+      ev('Созвон с банком', 15.5, 16, 'pink', 1, 2),
+      ev('Тренировка', 18, 19.5, 'green'),
+      ev('Ужин с друзьями', 19.75, 21, 'pink')
+    ];
+    const calTasks = [
+      { title: 'Написать отчёт по проекту', top: y(11) + 1, height: HOUR - 2, pad: '8.5px 10px 0 14px', align: 'flex-start', progress: true },
+      { title: 'Разобрать почту', top: y(14) + 1, height: 35, pad: '0 10px 0 14px', align: 'center', progress: false },
+      { title: 'Заказать продукты', top: y(17) + 1, height: 35, pad: '0 10px 0 14px', align: 'center', progress: false }
+    ];
+    const P = {
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const inWin = { color: '#000000', opacity: 1, scale: 1 };
+    const aside = { color: '#8E8E93', opacity: 0.72, scale: 0.86 };
+    const icons = isCal
+      ? [{ label: 'Soon', path: P.soon, ...aside }, { label: 'Now', path: P.now, ...inWin }, { label: 'Calendar', path: P.cal, ...inWin }]
+      : [{ label: 'Inbox', path: P.inbox, ...aside }, { label: 'Soon', path: P.soon, ...inWin }, { label: 'Now', path: P.now, ...inWin }, { label: 'Calendar', path: P.cal, ...aside }];
+    const wheel = { left: 195 - 38 - 38 - 2, width: icons.length * 38 + 4, windowLeft: 40, icons };
+    const withNewTask = isSoon;
+    const solidTop = withNewTask ? 669 : 704;
+    return {
+      isCal,
+      isSoon,
+      lists,
+      hours,
+      events,
+      calTasks,
+      nowTop: y(14 + 20 / 60) - 8,
+      dayHead: isCal ? { left: 0, width: 390, pad: '0 12px 0 10px', chev: 36, gap: 4 } : { left: 203, width: 187, pad: '0 10px 0 2px', chev: 28, gap: 2 },
+      v: { solid: foot === 'now', fade: foot === 'fade', blur: foot === 'blur', edge: foot === 'edge' },
+      solidTop,
+      solidWidth: isCal ? 187 : 390,
+      edgeTop: solidTop - 48,
+      fadeTop: withNewTask ? 600 : 664,
+      fadeGround: withNewTask
+        ? 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 22%, rgba(0,0,0,0.86) 38%, #000000 52%)'
+        : 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 25%, rgba(0,0,0,0.86) 39%, #000000 60%)',
+      blurGround: withNewTask
+        ? 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 22%, rgba(0,0,0,0.66) 40%, rgba(0,0,0,0.9) 54%, #000000 72%)'
+        : 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 24%, rgba(0,0,0,0.62) 44%, rgba(0,0,0,0.88) 58%, #000000 66%)',
+      newTasks: withNewTask
+        ? [{ left: 0, pad: '8px 2px 8px 10px', ground: foot === 'now' ? '#000000' : 'transparent' }, { left: 203, pad: '8px 10px 8px 2px', ground: foot === 'now' ? '#000000' : 'transparent' }]
+        : [],
+      wheel
+    };
+  }
+}
+</script>
+</body>
+</html>
