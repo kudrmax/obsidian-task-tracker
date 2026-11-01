@@ -37,7 +37,17 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 
 /** «2/5»: of the task's own subtasks, the done ones out of those not given up. */
 export function renderProgress(card: HTMLElement, item: TaskItem): void {
-	if (item.progress) el(card, "span", "tc-count", `${item.progress.done}/${item.progress.total}`);
+	if (item.progress) el(card, "span", "tc-count", countText(item.progress));
+}
+
+const countText = ({ done, total }: NonNullable<TaskItem["progress"]>): string => `${done}/${total}`;
+
+/** The counter of a card already drawn, right after its title, as the task now stands: set, added, or taken away. */
+export function showProgress(card: HTMLElement, item: TaskItem): void {
+	const count = card.querySelector(":scope > .tc-count");
+	if (!item.progress) count?.remove();
+	else if (count) count.textContent = countText(item.progress);
+	else card.querySelector(":scope > .tc-card-title")?.after(el(null, "span", "tc-count", countText(item.progress)));
 }
 
 /** Gives a card, or a dot, the colour of a priority level; none takes it away. */

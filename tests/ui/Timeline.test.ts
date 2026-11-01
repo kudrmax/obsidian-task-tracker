@@ -201,6 +201,18 @@ describe("a field on the timeline", () => {
 		view.clearField();
 		expect(view.itemsEl.querySelector(".is-renaming")).toBeNull();
 	});
+
+	it("hides the dots of the selected task while the field renames it, and shows them again after", () => {
+		const tasks = [task(0, 900, 960)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		view.select(tasks[0]);
+		const grips = view.itemsEl.querySelector(".tc-grips")!;
+		expect(grips.classList.contains("is-shown")).toBe(true);
+		view.showRename(tasks[0], document.createElement("textarea"));
+		expect(grips.classList.contains("is-shown")).toBe(false);
+		view.clearField();
+		expect(grips.classList.contains("is-shown")).toBe(true);
+	});
 });
 
 describe("a renamed task in progress on the timeline", () => {

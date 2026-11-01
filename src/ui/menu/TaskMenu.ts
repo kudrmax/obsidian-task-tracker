@@ -3,7 +3,7 @@ import type { PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard, renderTaskCard, showStrip } from "../TaskCard";
+import { fillCard, renderTaskCard, showProgress, showStrip } from "../TaskCard";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { type CloseHow, Overlay } from "./Overlay";
@@ -201,12 +201,17 @@ export class TaskMenu {
 		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
 	}
 
-	/** The stack shows `subtasks`, then the texts typed and not yet written, over the field's row, which stays where it is. */
-	showStack(subtasks: readonly TaskItem[], pending: readonly string[]): void {
+	/**
+	 * The stack shows `task`'s subtasks, then the texts typed and not yet written, over the field's row, which stays where
+	 * it is; the copy's counter follows the task.
+	 */
+	showStack(task: TaskItem, pending: readonly string[]): void {
 		const stack = this.stack;
 		if (!stack) return;
 		for (const child of [...stack.children]) if (child !== this.stackRow) child.remove();
-		this.fillStack(stack, subtasks);
+		this.fillStack(stack, task.subtasks);
+		const copy = this.lifted.querySelector<HTMLElement>(".tc-block-card");
+		if (copy) showProgress(copy, task);
 		for (const text of pending) stack.insertBefore(el(null, "div", "tc-card"), this.stackRow).appendChild(el(null, "div", "tc-card-title", text));
 	}
 

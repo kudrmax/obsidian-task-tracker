@@ -149,9 +149,24 @@ describe("the calendar menu's stack for a new subtask", () => {
 		const { menu } = openOnBlock(item({ subtasks: [sub(0, "A1")] }));
 		const row = menu.openStack(() => {});
 		const field = row.appendChild(document.createElement("textarea"));
-		menu.showStack([sub(0, "A1"), sub(1, "A2")], ["A3"]);
+		menu.showStack(item({ subtasks: [sub(0, "A1"), sub(1, "A2")] }), ["A3"]);
 		expect(stack()).toEqual(["A1", "A2", "A3", "field"]);
 		expect(row.contains(field)).toBe(true);
+	});
+
+	it("keeps the copy's subtask counter up with the task as the screen shows it", () => {
+		const source = document.body.appendChild(document.createElement("div"));
+		source.className = "tc-block";
+		source.innerHTML = '<div class="tc-block-card"><div class="tc-card-title">A</div><span class="tc-block-meta"></span></div>';
+		const task = item();
+		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) } });
+		menu.openStack(() => {});
+		const count = () => [...document.querySelectorAll(".tc-lifted .tc-count")].map((c) => c.textContent);
+		menu.showStack({ ...task, subtasks: [sub(0, "A1")], progress: { done: 0, total: 1 } }, []);
+		expect(count()).toEqual(["0/1"]);
+		expect(document.querySelector(".tc-lifted .tc-card-title")!.nextElementSibling!.className).toBe("tc-count");
+		menu.showStack({ ...task, subtasks: [sub(0, "A1"), sub(1, "A2")], progress: { done: 0, total: 2 } }, []);
+		expect(count()).toEqual(["0/2"]);
 	});
 
 	it("tells the stack's holder once that it closed", () => {

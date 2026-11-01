@@ -375,7 +375,7 @@ export class QuickEntryController {
 		} else timeline?.clearField();
 		const stack = this.stack;
 		if (spot?.kind === "stack" && state && stack) {
-			if (stack.parent) stack.menu.showStack((this.deps.task(spot.parent) ?? stack.parent).subtasks, state.pending.map((line) => line.text));
+			if (stack.parent) stack.menu.showStack(this.deps.task(spot.parent) ?? stack.parent, state.pending.map((line) => line.text));
 			const field = this.offListField();
 			if (field.parentElement !== stack.row) stack.row.appendChild(field);
 		} else if (stack) {

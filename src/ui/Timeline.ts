@@ -383,7 +383,7 @@ export class Timeline {
 		});
 		this.canvas.style.setProperty(PROPERTY.stackEnd, px(bottom));
 		this.coverRenamed(present);
-		const selected = present.find((t) => t.el.classList.contains("is-selected"));
+		const selected = present.find((t) => t.el.classList.contains("is-selected") && !this.isRenamed(t.item));
 		this.grips.classList.toggle("is-shown", !!selected);
 		if (selected) for (const property of [PROPERTY.y, PROPERTY.length, PROPERTY.x]) this.grips.style.setProperty(property, selected.el.style.getPropertyValue(property));
 	}

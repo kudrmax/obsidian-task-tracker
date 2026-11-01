@@ -35,7 +35,7 @@ import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
-import { Swipe } from "./Swipe";
+import { Swipe, swipeStartsAt } from "./Swipe";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -326,7 +326,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
-			accepts: (target) => !(target instanceof Element && target.closest(".tc-quick-row, .tc-quick-bar")),
+			accepts: swipeStartsAt,
 			onSwipe: (shift) => void this.afterEntry(() => this.step(shift)),
 		});
 		this.unsubscribe.push(
