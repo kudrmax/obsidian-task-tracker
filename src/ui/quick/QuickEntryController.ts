@@ -212,13 +212,7 @@ export class QuickEntryController {
 	entryIn(column: ListColumn): ListEntryInput | null {
 		const state = this.state;
 		if (state?.spot.kind !== "list" || state.spot.column !== column) return null;
-		return { place: state.spot.place, pending: state.pending, field: (row) => this.fieldIn(row) };
-	}
-
-	/** A card the list draws: the one being renamed hides while the field stands for it. */
-	dress(card: HTMLElement, item: TaskItem): void {
-		const renaming = this.state?.renaming;
-		card.classList.toggle("is-renaming", !!renaming && sameTask(renaming.key, item.key));
+		return { place: state.spot.place, pending: state.pending, renaming: state.renaming?.key ?? null, field: (row) => this.fieldIn(row) };
 	}
 
 	/** A card is lifted or settled: the plus hides while it is carried. */

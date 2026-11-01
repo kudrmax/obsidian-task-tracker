@@ -375,6 +375,10 @@ body {
 	--tc-layer-switch: 5;
 	--tc-layer-plus: 5;
 	--tc-layer-bar: 6;
+	/* Inside the quick bar: its panels' shadows lie under its ground, its buttons over it. */
+	--tc-layer-bar-panel: 0;
+	--tc-layer-bar-ground: 1;
+	--tc-layer-bar-button: 2;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
 
@@ -802,7 +806,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
-.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); background: var(--tc-bar-bg); box-shadow: inset 0 var(--tc-hairline-half) 0 var(--tc-bar-line); }
+.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); }
+.tc-quick-bar::before { content: ""; position: absolute; inset: 0; z-index: var(--tc-layer-bar-ground); background: var(--tc-bar-bg); box-shadow: inset 0 var(--tc-hairline-half) 0 var(--tc-bar-line); }
+.tc-quick-bar > button { z-index: var(--tc-layer-bar-button); }
 .tc-bar-spacer { flex: 1; }
 .tc-quick-bar .tc-bar-shift, .tc-quick-bar .tc-bar-flag { width: var(--tc-bar-btn-w); height: var(--tc-bar-btn-h); flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); }
 .tc-quick-bar .tc-bar-shift:disabled { color: var(--tc-bar-off); cursor: default; }
@@ -819,7 +825,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Over a menu's blur the bar leaves the view for the page, at the view's bottom, which the code gives it. */
 .tc-quick-bar.is-over { position: fixed; right: auto; z-index: var(--tc-layer-panel); font-family: var(--tc-font-ui); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-quick-bar.is-over button { padding: 0; }
-.tc-quick-bar .tc-quick-panel { position: absolute; top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
+.tc-quick-bar .tc-quick-panel { position: absolute; z-index: var(--tc-layer-bar-panel); top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-ink-strong); }
 
 

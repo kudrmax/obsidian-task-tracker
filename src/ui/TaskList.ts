@@ -1,9 +1,9 @@
-import type { GroupName, TaskItem } from "../application/contracts";
+import type { GroupName, TaskItem, TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
-import type { GapPlace } from "./drag/listPlace";
+import { type GapPlace, sameTask } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard } from "./TaskCard";
 
@@ -11,6 +11,8 @@ import { renderTaskCard } from "./TaskCard";
 export interface ListEntryInput {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
+	/** The task whose text the field edits: its card keeps its place among the cards, hidden, and the branches pass it by. */
+	readonly renaming?: TaskKey | null;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -85,9 +87,11 @@ export class TaskList {
 			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
+			const renamed = !!entry?.renaming && sameTask(entry.renaming, item.key);
+			card.classList.toggle("is-renaming", renamed);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
-			rows.push({ node: card, level });
+			if (!renamed) rows.push({ node: card, level });
 			const from = this.entries.length;
 			item.subtasks.forEach((sub) => add(sub, level + 1, group));
 			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));

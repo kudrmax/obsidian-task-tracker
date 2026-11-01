@@ -58,7 +58,6 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			day: () => null,
 			grouped: () => column !== "left",
 			entry: () => controller?.entryIn(column) ?? null,
-			onCard: (card, it) => controller?.dress(card, it),
 		});
 	}
 	const timeline = new Timeline(root.appendChild(document.createElement("div")), {

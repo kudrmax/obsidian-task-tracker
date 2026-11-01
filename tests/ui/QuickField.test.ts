@@ -226,6 +226,22 @@ describe("TaskList with a task being typed", () => {
 		expect([...row.querySelectorAll<HTMLElement>(".tc-branch-pass")].map((p) => p.style.getPropertyValue("--tc-pass"))).toEqual(["1"]);
 	});
 
+	it("hides the card the field renames, and its branches pass it by: the field on the last subtask bends in", () => {
+		const keyed = (text: string, path: number[]): TaskItem => ({ ...item(text), key: { section: "now", index: 0, path, raw: text } });
+		const last = keyed("A2", [1]);
+		const l = new TaskList(document.createElement("div"), {
+			items: () => [{ ...keyed("A", []), subtasks: [keyed("A1", [0]), last] }],
+			day: () => null,
+			entry: () => ({ place: { kind: "gap", index: 2, level: 1, group: null }, pending: [], renaming: last.key, field: (parent) => parent }),
+		});
+		l.render();
+		const [, a1, field, hidden] = [...l.el.children] as HTMLElement[];
+		expect(hidden.classList.contains("is-renaming")).toBe(true);
+		expect(a1.querySelector(".tc-branch")?.className).toBe("tc-branch");
+		expect(field.querySelector(".tc-branch")?.className).toBe("tc-branch is-last");
+		expect(l.cards.map((e) => e.item.text)).toEqual(["A", "A1", "A2"]);
+	});
+
 	it("stands at the end of the list for a place past the last card", () => {
 		const l = list([item("A")], 1, 0);
 		expect([...l.el.children].map((r) => r.className)).toEqual(["tc-card", "tc-card", "tc-quick-row"]);

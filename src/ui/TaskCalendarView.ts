@@ -544,10 +544,9 @@ export class TaskCalendarView extends ItemView {
 		return shown[this.settings.rightMode].filter((target) => target !== null);
 	}
 
-	/** A list's card: its gestures, and hidden while the field renames it. */
+	/** A list's card: its gestures. */
 	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
 		this.drag.attachCard(card, item, column, subtree);
-		this.quick?.dress(card, item);
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
