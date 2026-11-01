@@ -29,6 +29,16 @@ describe("renderTaskCard", () => {
 		expect(card.querySelector(".tc-due")).toBeNull();
 	});
 
+	it("shows each link of the title by its word, the rest as typed", () => {
+		const card = renderTaskCard(document.createElement("div"), item({ text: "**Сдать** [[Отчёты/Q4|отчёт]] на https://x.ru" }), { day: null });
+		const title = card.querySelector(".tc-card-title")!;
+		expect(title.textContent).toBe("**Сдать** отчёт на https://x.ru");
+		expect([...title.querySelectorAll(".tc-link")].map((l) => [l.textContent, (l as HTMLElement).dataset.kind, (l as HTMLElement).dataset.target])).toEqual([
+			["отчёт", "note", "Отчёты/Q4"],
+			["https://x.ru", "url", "https://x.ru"],
+		]);
+	});
+
 	it("marks a task in progress with the strip", () => {
 		const card = renderTaskCard(document.createElement("div"), item({ status: "inProgress" }), { day: null });
 		expect(card.querySelector(".tc-strip")).not.toBeNull();

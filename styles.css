@@ -704,6 +704,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
+.tc-link { color: var(--tc-accent); }
+.tc-lifted .tc-link { pointer-events: auto; cursor: pointer; }
 .tc-lifted.is-head { background: none; border-radius: 0; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); align-items: flex-end; }
 /* A lifted section under the finger: its header as a lifted card, its count on the right, two layers of its cards beneath. */
 .tc-section-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; font-family: var(--tc-font-ui); line-height: var(--tc-leading-normal); color: var(--tc-text); }
@@ -790,6 +792,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-sheet-content { display: flex; flex-direction: column; gap: var(--tc-sheet-gap); }
 .tc-sheet-content.is-settling { transition: transform var(--tc-duration-fade) var(--tc-ease-out); }
 .task-calendar .tc-sheet-title { text-align: center; font-size: var(--tc-font-sheet-title); line-height: var(--tc-leading-sheet-title); font-weight: var(--tc-weight-bold); overflow-wrap: anywhere; outline: none; -webkit-user-select: text; user-select: text; caret-color: var(--tc-accent-ui); }
+.task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 { --link-color: var(--tc-accent); --link-color-hover: var(--tc-accent); --link-external-color: var(--tc-accent); --link-external-color-hover: var(--tc-accent); --link-unresolved-color: var(--tc-accent); }
+.task-calendar .tc-sheet-title .markdown-source-view.mod-cm6, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-editor, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-scroller, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-sizer, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-contentContainer, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-content, .task-calendar .tc-sheet-title .markdown-source-view.mod-cm6 .cm-line { font-family: var(--tc-font-inherit); font-size: inherit; line-height: inherit; padding: 0; margin: 0; max-width: none; overflow: visible; }
 .tc-tiles { display: flex; gap: var(--tc-space-10); }
 .task-calendar .tc-tile { flex: 1; height: var(--tc-tile-h); border-radius: var(--tc-radius-tile); background: var(--tc-card-bg); color: var(--tc-ink-strong); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-tile-icon-gap); }
 .task-calendar .tc-tile.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }

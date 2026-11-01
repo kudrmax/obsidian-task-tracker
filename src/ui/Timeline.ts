@@ -6,6 +6,7 @@ import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { markPriority, renderProgress } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
+import { fillTitle } from "./TaskTitle";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
@@ -412,7 +413,7 @@ export class Timeline {
 		const card = make(block, "div", "tc-block-card");
 		markPriority(card, item.priority);
 		if (item.status === "inProgress") make(card, "span", "tc-strip");
-		make(card, "div", "tc-card-title", item.text);
+		fillTitle(make(card, "div", "tc-card-title"), item.text);
 		renderProgress(card, item);
 		const meta = make(card, "span", "tc-block-meta is-hidden");
 		make(meta, "span");

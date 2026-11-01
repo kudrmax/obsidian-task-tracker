@@ -22,6 +22,9 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
+import { type EditorOwner, MarkdownTitleField } from "./sheet/MarkdownTitleField";
+import type { TitleFieldFactory } from "./sheet/TitleField";
+import type { TaskLink } from "./TaskTitle";
 import { TaskSheet } from "./sheet/TaskSheet";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -78,6 +81,8 @@ export class TaskCalendarView extends ItemView {
 	private readonly data: DayData;
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
+	/** The task screen's title while it has the focus: Obsidian's commands and hotkeys go to it. */
+	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
 	/** The levels the tasks were last read with: other levels colour them anew. */
@@ -593,10 +598,14 @@ export class TaskCalendarView extends ItemView {
 			slot,
 			today: this.today(),
 			levels: usableLevels(this.settings.priorities),
+			titleField: this.titleField,
 			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
 			onClose: () => this.timelineDrop?.clear(),
 		});
 	}
+
+	/** The task's title is typed in Obsidian's own editor; its links are made from the tasks file. */
+	private readonly titleField: TitleFieldFactory = (parent, text, events) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, text, events);
 
 	/** The task screen for a new subtask of `parent`: the parent's placement chosen, its title over the new one. */
 	private subtaskSheet(parent: TaskItem): void {
@@ -606,6 +615,7 @@ export class TaskCalendarView extends ItemView {
 			slot: null,
 			today: this.today(),
 			levels: usableLevels(this.settings.priorities),
+			titleField: this.titleField,
 			parent: parent.text,
 			onSubmit: (draft) => this.act(() => this.deps.tasks.createSubtask(parent.key, draft)),
 		});
@@ -618,6 +628,7 @@ export class TaskCalendarView extends ItemView {
 			slot: item.slot,
 			today: this.today(),
 			levels: usableLevels(this.settings.priorities),
+			titleField: this.titleField,
 			parent: item.parentText,
 			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
 		});
@@ -643,8 +654,15 @@ export class TaskCalendarView extends ItemView {
 				rename: () => this.editSheet(item),
 				addSubtask: () => this.subtaskSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
+				openLink: (link) => this.openLink(link),
 			},
 		});
+	}
+
+	/** A note opens in a new tab, so the calendar stays where it is; an address goes to the browser. */
+	private openLink(link: TaskLink): void {
+		if (link.kind === "url") window.open(link.target);
+		else void this.app.workspace.openLinkText(link.target, this.settings.tasksFile, "tab");
 	}
 
 	/** A gesture keeps the elements it holds: the redraw waits until it ends. */

@@ -62,13 +62,27 @@ describe("the menu", () => {
 	});
 
 	const open = (task: TaskItem) => {
-		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
 		return actions;
 	};
 	const panel = () => document.querySelector(".tc-panel") as HTMLElement;
 	const labels = (selector: string) => [...panel().querySelectorAll(selector)].map((node) => node.textContent);
+
+	it("follows a link from the card's copy and closes", () => {
+		const actions = open(item({ text: "Позвонить [[Люди/Петя|Пете]]" }));
+		(document.querySelector(".tc-lifted .tc-link") as HTMLElement).click();
+		expect(actions.openLink).toHaveBeenCalledWith({ kind: "note", target: "Люди/Петя" });
+		expect(document.querySelector(".tc-backdrop")?.classList.contains("is-closing")).toBe(true);
+	});
+
+	it("leaves the menu open on a tap beside the link", () => {
+		const actions = open(item({ text: "Позвонить [[Люди/Петя|Пете]]" }));
+		(document.querySelector(".tc-lifted .tc-card-title") as HTMLElement).click();
+		expect(actions.openLink).not.toHaveBeenCalled();
+		expect(document.querySelector(".tc-backdrop")?.classList.contains("is-closing")).toBe(false);
+	});
 
 	it("shows the statuses, the levels, the edits and Delete, each in its own group", () => {
 		open(item());
@@ -100,7 +114,7 @@ describe("the menu", () => {
 	});
 
 	it("leaves out the priority group when no level is set up", () => {
-		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openLink: vi.fn() };
 		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: [], actions });
 		expect(panel().querySelector(".tc-menu-tiles.is-priority")).toBeNull();
 	});
