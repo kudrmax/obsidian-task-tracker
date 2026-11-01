@@ -196,6 +196,12 @@ body {
 	--tc-menu-scale: 0.94;
 	--tc-menu-rise: 8px;
 	--tc-menu-gap: 12px;
+	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
+	--tc-desc-peek-w: 300px;
+	--tc-desc-peek-max: 214px;
+	--tc-desc-peek-pad: 10px 14px 10px 6px;
+	--tc-desc-fade: 40px;
+	--tc-font-desc-peek: 15px;
 	--tc-panel-w: 250px;
 	--tc-picker-w: 300px;
 	--tc-menu-w: 300px;
@@ -742,6 +748,14 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
 .tc-block-card[data-priority] .tc-block-meta { color: var(--tc-priority-meta); }
 .tc-priority-dot { flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
+.tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-desc-peek-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; overflow: hidden; padding: var(--tc-desc-peek-pad); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-desc-peek.is-under { transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
+.tc-desc-peek.is-shown { opacity: 1; transform: none; }
+.tc-desc-peek.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-desc-peek.is-cut { -webkit-mask-image: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent); mask-image: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent); }
+.tc-desc-peek .tc-desc-text { --font-text-size: var(--tc-font-desc-peek); font-size: var(--tc-font-desc-peek); }
+.tc-desc-text > :first-child { margin-top: 0; }
+.tc-desc-text > :last-child { margin-bottom: 0; }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }

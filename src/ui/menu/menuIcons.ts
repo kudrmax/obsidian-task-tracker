@@ -14,6 +14,7 @@ export const MENU_ICONS = {
 	cross: { d: "M6 6l12 12 M18 6L6 18", fill: "" },
 	removeSection: { d: "M4 6h9 M4 12h9 M4 18h9 M16 9l5 5 M21 9l-5 5", fill: "" },
 	subtask: { d: "M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4", fill: "" },
+	description: { d: "M4 6h16 M4 12h16 M4 18h10", fill: "" },
 } as const;
 
 export type MenuIconName = keyof typeof MENU_ICONS;

@@ -11,9 +11,11 @@ import { dueOptions } from "./dueOptions";
 import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, placePanel, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
+import type { MarkdownSurface } from "../markdown/MarkdownSurface";
+import { DescriptionPeek } from "./DescriptionPeek";
 
 export type StatusTileId = "done" | "progress" | "wontdo";
-export type EditRowId = "rename" | "due" | "subtask";
+export type EditRowId = "rename" | "description" | "due" | "subtask";
 
 export interface StatusTile {
 	readonly id: StatusTileId;
@@ -37,10 +39,11 @@ export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	];
 }
 
-/** The edit group: Rename, the due date with the date beside it, a subtask. */
+/** The edit group: Rename, Add description for a task without one, the due date with the date beside it, a subtask. */
 export function editRows(item: TaskItem): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
+		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
 		{ id: "due", label: "Due date", value: item.dueDate ? dayMonth(item.dueDate) : "", icon: "due" },
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
 	];
@@ -76,6 +79,8 @@ export interface MenuActions {
 	setDueDate(date: LocalDate | null): Promise<void>;
 	setPriority(prefix: string | null): Promise<void>;
 	rename(): void;
+	/** The description's screen: to read it, or straight in the editor. */
+	openDescription(editing: boolean): void;
 	addSubtask(): void;
 	remove(): Promise<void>;
 }
@@ -96,6 +101,8 @@ export interface TaskMenuContext {
 	readonly opening?: "picker";
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
 	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
+	/** Draws the start of the task's description over its copy; without it the menu shows none. */
+	readonly markdown?: MarkdownSurface;
 }
 
 /**
@@ -107,6 +114,7 @@ export class TaskMenu {
 	private readonly lifted: HTMLElement;
 	private readonly panel: HTMLElement;
 	private readonly anchor: DOMRect;
+	private readonly peek: DescriptionPeek | null;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
@@ -123,6 +131,7 @@ export class TaskMenu {
 		this.anchor = context.source.classList.contains("tc-block") && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.peek = this.peekOf(context);
 		if (context.opening === "picker") this.showPicker();
 		else this.showMenu();
 		this.overlay.show();
@@ -156,8 +165,19 @@ export class TaskMenu {
 		return new DOMRect(copy.left, copy.top, copy.width, list.getBoundingClientRect().bottom - copy.top);
 	}
 
+	/** The start of the description, over the copy; a tap on it reads the whole, a link in it opens as it is. */
+	private peekOf(context: TaskMenuContext): DescriptionPeek | null {
+		const { item, markdown, actions } = context;
+		if (item.description === null || !markdown) return null;
+		return new DescriptionPeek(this.overlay, markdown, item.description, {
+			onRead: this.pick(() => actions.openDescription(false)),
+			onLink: () => this.close(),
+		});
+	}
+
 	private place(): void {
 		placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), window.innerHeight);
+		this.peek?.place(this.anchor, this.panel);
 	}
 
 	private pick(action: () => void | Promise<void>): () => void {
@@ -179,6 +199,7 @@ export class TaskMenu {
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.pick(() => actions.rename()),
+			description: this.pick(() => actions.openDescription(true)),
 			due: () => this.showDue(),
 			subtask: this.pick(() => actions.addSubtask()),
 		};
