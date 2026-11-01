@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GestureArbiter } from "../../src/ui/gestures";
 import type { Shift } from "../../src/ui/screens";
 import { Swipe } from "../../src/ui/Swipe";
@@ -115,5 +115,56 @@ describe("Swipe", () => {
 		inner.dispatchEvent(pointer("pointercancel", 100));
 		expect(shifts).toEqual([]);
 		expect(arbiter.busy).toBe(false);
+	});
+
+	describe("on a trackpad", () => {
+		beforeEach(() => vi.useFakeTimers());
+		afterEach(() => vi.useRealTimers());
+
+		/** happy-dom drops the modifier keys of a WheelEvent's init: a pinch's ctrl is set on the event itself. */
+		const wheel = (target: HTMLElement, deltaX: number, deltaY = 0, ctrlKey = false) => {
+			const e = new WheelEvent("wheel", { deltaX, deltaY, bubbles: true, cancelable: true });
+			if (ctrlKey) Object.defineProperty(e, "ctrlKey", { value: true });
+			target.dispatchEvent(e);
+			vi.advanceTimersByTime(16);
+			return e;
+		};
+
+		it("steps on when two fingers go left, and back when they go right, once per stroke", () => {
+			const { inner, shifts } = setUp();
+			for (const delta of [10, 20, 30, 30, 20, 10, 5, 2, 1]) wheel(inner, delta);
+			expect(shifts).toEqual([1]);
+			vi.advanceTimersByTime(1000);
+			for (const delta of [-15, -25, -30, -10]) wheel(inner, delta);
+			expect(shifts).toEqual([1, -1]);
+		});
+
+		it("keeps the screen from scrolling sideways, and leaves an up-or-down scroll alone", () => {
+			const { inner, shifts } = setUp();
+			expect(wheel(inner, 20, 3).defaultPrevented).toBe(true);
+			vi.advanceTimersByTime(1000);
+			for (const delta of [10, 40, 60]) expect(wheel(inner, delta / 4, delta).defaultPrevented).toBe(false);
+			expect(shifts).toEqual([]);
+		});
+
+		it("does nothing for a short stroke", () => {
+			const { inner, shifts } = setUp();
+			for (const delta of [10, 10, 10]) wheel(inner, delta);
+			vi.advanceTimersByTime(1000);
+			for (const delta of [10, 10, 10]) wheel(inner, delta);
+			expect(shifts).toEqual([]);
+		});
+
+		it("leaves a pinch, what lies over the screen and a busy screen alone", () => {
+			const arbiter = new GestureArbiter();
+			const { inner, sheet, shifts } = setUp(arbiter);
+			for (const delta of [30, 30, 30]) wheel(inner, delta, 0, true);
+			vi.advanceTimersByTime(1000);
+			for (const delta of [30, 30, 30]) wheel(sheet, delta);
+			vi.advanceTimersByTime(1000);
+			arbiter.claim("drag");
+			for (const delta of [30, 30, 30]) wheel(inner, delta);
+			expect(shifts).toEqual([]);
+		});
 	});
 });
