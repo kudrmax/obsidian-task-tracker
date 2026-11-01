@@ -165,11 +165,12 @@ describe("the calendar menu's stack for a new subtask", () => {
 
 	const sub = (index: number, text: string): TaskItem => item({ key: { section: "now", index: 0, path: [index], raw: text }, text });
 
+	const surface = { render: vi.fn(async (el: HTMLElement) => void (el.textContent = "note")), edit: vi.fn() };
 	const openOnBlock = (task: TaskItem) => {
 		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";
-		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface });
 		return { menu, actions };
 	};
 	const panel = () => document.querySelector<HTMLElement>(".tc-panel.is-task")!;
@@ -189,6 +190,14 @@ describe("the calendar menu's stack for a new subtask", () => {
 		expect(panel().hidden).toBe(true);
 		expect(stack()).toEqual(["A1", "A2", "field"]);
 		expect(row.parentElement!.lastElementChild).toBe(row);
+	});
+
+	it("takes the start of the description away with the panel while a subtask is typed", () => {
+		const { menu } = openOnBlock(item({ description: "- note" }));
+		const peek = document.querySelector<HTMLElement>(".tc-desc-peek")!;
+		expect(peek.hidden).toBe(false);
+		menu.openStack(() => {});
+		expect(peek.hidden).toBe(true);
 	});
 
 	it("opens a stack under the copy for a task with no subtasks yet", () => {
@@ -254,17 +263,25 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 	});
 
 	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress" });
-	const openOnStackCard = () => {
+	const openOnStackCard = (description: string | null = null) => {
 		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openLink: vi.fn() };
 		const stack = document.body.appendChild(document.createElement("div"));
 		stack.className = "tc-menu-subtasks";
 		const source = stack.appendChild(document.createElement("div"));
 		source.className = "tc-card";
 		source.getBoundingClientRect = () => new DOMRect(200, 300, 150, 35);
-		const menu = TaskMenu.open({ item: subtask, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		const surface = { render: vi.fn(async () => {}), edit: vi.fn() };
+		const menu = TaskMenu.open({ item: { ...subtask, description }, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface });
 		return { menu, actions };
 	};
 	const panel = () => document.querySelector<HTMLElement>(".tc-panel.is-task")!;
+
+	it("takes the start of the description away with the panel while the subtask is renamed", () => {
+		const { menu } = openOnStackCard("- note");
+		const peek = document.querySelector<HTMLElement>(".tc-desc-peek")!;
+		menu.openRename(() => {});
+		expect(peek.hidden).toBe(true);
+	});
 
 	it("offers no Add subtask", () => {
 		const { menu } = openOnStackCard();

@@ -200,7 +200,7 @@ export class TaskMenu {
 	 * its place, the strip of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
 	 */
 	openRename(onClose: (how: CloseHow) => void): HTMLElement {
-		this.panel.hidden = true;
+		this.giveToField();
 		this.fieldClosed = onClose;
 		this.lifted.style.visibility = "hidden";
 		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row")));
@@ -216,10 +216,16 @@ export class TaskMenu {
 	 * yet, ends in a row for the field of a new one, which this returns. `onClose` hears when the menu closes, and how.
 	 */
 	openStack(onClose: (how: CloseHow) => void): HTMLElement {
-		this.panel.hidden = true;
+		this.giveToField();
 		this.fieldClosed = onClose;
 		const stack = (this.stack ??= this.stackUnder(this.copy));
 		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
+	}
+
+	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */
+	private giveToField(): void {
+		this.panel.hidden = true;
+		this.peek?.hide();
 	}
 
 	/**
