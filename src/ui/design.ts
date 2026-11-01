@@ -49,7 +49,6 @@ export const PROPERTY = {
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",
 	hour: "--tc-hour",
-	navClear: "--tc-nav-clear",
 	statusClear: "--tc-status-clear",
 	allDayExtraRows: "--tc-allday-extra-rows",
 	y: "--tc-y",

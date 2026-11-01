@@ -94,7 +94,7 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private readonly data: DayData;
-	/** Obsidian's navigation and status bar over the view's bottom. */
+	/** Obsidian's desktop status bar over the view's bottom right corner. */
 	private readonly clearance = new ChromeClearance(this.contentEl);
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
@@ -290,9 +290,9 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
 		});
-		this.newTask = new NewTaskButton(root, "now", () => this.quick?.openAtEnd("left"));
-		this.newSoon = new NewTaskButton(root, "soon", () => this.quick?.openAtEnd("soon"));
-		this.newInbox = new NewTaskButton(root, "inbox", () => this.quick?.openAtEnd("inbox"));
+		this.newTask = new NewTaskButton(this.leftEl, "now", () => this.quick?.openAtEnd("left"));
+		this.newSoon = new NewTaskButton(this.soonEl, "soon", () => this.quick?.openAtEnd("soon"));
+		this.newInbox = new NewTaskButton(this.inboxEl, "inbox", () => this.quick?.openAtEnd("inbox"));
 		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
 		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
 		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
@@ -362,7 +362,6 @@ export class TaskCalendarView extends ItemView {
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
-		this.clearance.follow((type, handler) => this.registerDomEvent(document, type, handler));
 		requestAnimationFrame(() => this.clearance.measure());
 		this.polling.start();
 		await this.data.load();
