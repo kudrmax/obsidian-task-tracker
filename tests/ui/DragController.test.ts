@@ -17,6 +17,7 @@ class StubTarget implements DropTarget {
 	landing(): DOMRect {
 		return landing;
 	}
+	leave(): void {}
 	clear(): void {
 		this.cleared++;
 	}
@@ -110,7 +111,7 @@ describe("DragController.beginNew", () => {
 	it("shows the target under the finger from the lift, before any move", () => {
 		const { controller, source } = setup();
 		const seen: number[][] = [];
-		const target: DropTarget = { ...new StubTarget({ kind: "clearSlot" }), hitTest: () => true, landing: () => landing, clear: () => {}, drop: () => null, preview: (x, y) => void seen.push([x, y]) };
+		const target: DropTarget = { ...new StubTarget({ kind: "clearSlot" }), hitTest: () => true, landing: () => landing, leave: () => {}, clear: () => {}, drop: () => null, preview: (x, y) => void seen.push([x, y]) };
 		controller.beginNew(source, down(120, 610), [target], vi.fn());
 		expect(seen).toEqual([[120, 610]]);
 	});

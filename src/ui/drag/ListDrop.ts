@@ -5,7 +5,7 @@ import type { ListEntry, TaskList } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
 import type { ColumnSections, DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
 import { DropGap } from "./DropGap";
-import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf } from "./listPlace";
+import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
@@ -95,16 +95,28 @@ export class ListDrop implements DropTarget {
 		return this.gapRect(this.place);
 	}
 
-	/** The finger has left the list, or the drag is over: the room closes, and with no card lifted from it the list stands as it was. */
+	/** The finger has left the list: the room goes back to where the card was lifted from, dashed, so it is plain where to bring it back. */
+	leave(): void {
+		this.reset(this.liftedFrom());
+		if (this.room) this.gap.show(this.gapRect(this.room), true);
+		else this.gap.hide();
+	}
+
+	/** The drag is over: the room closes, and with no card lifted from it the list stands as it was. */
 	clear(): void {
+		this.reset(null);
+		this.gap.hide();
+		this.layout = null;
+	}
+
+	private reset(room: GapPlace | null): void {
 		this.scroll.stop();
 		for (const node of this.list.elements) node.classList.remove(TARGET);
 		this.place = null;
-		this.room = null;
+		this.room = room;
 		this.last = null;
-		this.arrange();
-		this.gap.hide();
 		this.layout = null;
+		this.arrange();
 	}
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
@@ -112,11 +124,17 @@ export class ListDrop implements DropTarget {
 		const sections = this.sections();
 		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
 		if (!this.place) this.preview(x, y, drag);
-		if (!this.place) return null;
+		if (!this.place || this.isHome(this.place)) return null;
 		const result = resultOf(this.placed(), this.place);
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
 		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
 		return { kind: "listBefore", before: result.before, column: this.column };
+	}
+
+	/** The place the card was lifted from, at its level: let go there, the card only goes back. */
+	private isHome(place: ListPlace): boolean {
+		const home = this.liftedFrom();
+		return home !== null && place.kind === "gap" && samePlace(place, home) && place.level === home.level;
 	}
 
 	/** A list with sections places a card from anywhere, and any list a new task; another only a card from itself. */

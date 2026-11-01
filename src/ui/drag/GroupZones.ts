@@ -35,6 +35,10 @@ class GroupDrop implements DropTarget {
 		return this.name === null ? null : this.zone.getBoundingClientRect();
 	}
 
+	leave(): void {
+		this.clear();
+	}
+
 	clear(): void {
 		this.zone.classList.remove("is-hot");
 	}

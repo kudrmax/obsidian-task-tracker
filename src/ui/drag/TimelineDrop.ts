@@ -61,6 +61,10 @@ export class TimelineDrop implements DropTarget {
 		return this.timeline.landing();
 	}
 
+	leave(): void {
+		this.clear();
+	}
+
 	clear(): void {
 		this.scroll.stop();
 		this.start = null;

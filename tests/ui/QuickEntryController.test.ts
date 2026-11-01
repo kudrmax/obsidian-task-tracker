@@ -877,5 +877,5 @@ function tile(root: HTMLElement, label: string): HTMLElement {
 }
 
 function stubDrop(column: ListColumn, result: DropResult): ColumnDrop {
-	return { column, hitTest: () => true, preview: () => {}, landing: () => null, clear: () => {}, drop: () => result };
+	return { column, hitTest: () => true, preview: () => {}, landing: () => null, leave: () => {}, clear: () => {}, drop: () => result };
 }

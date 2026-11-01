@@ -352,6 +352,7 @@ export class QuickEntryController {
 			hitTest: (x, y, drag) => target.hitTest(x, y, drag),
 			preview: (x, y, drag) => target.preview(x, y, drag),
 			landing: () => target.landing(),
+			leave: () => target.leave(),
 			clear: () => target.clear(),
 			drop: (x, y, drag) => {
 				this.droppedOn = target.column;
