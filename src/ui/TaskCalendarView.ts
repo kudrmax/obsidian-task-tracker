@@ -168,6 +168,7 @@ export class TaskCalendarView extends ItemView {
 			onNameGroup: (item, asked) => this.askGroupName(item, asked),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
+			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.quick?.openSlot(slot),
 		});

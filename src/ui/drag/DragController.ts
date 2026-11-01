@@ -36,6 +36,8 @@ export interface DragControllerDeps {
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
+	/** A card or block double-clicked: its title is renamed in place, no menu. */
+	onRename(item: TaskItem): void;
 	/** A long tap on an empty place of the timeline, let go: the field of a new task in the slot the target showed. */
 	newSlot(): TimelineDrop | null;
 	onNewSlot(slot: Slot): void;
@@ -50,7 +52,7 @@ const RESIZE = "resize";
 const NEW_SLOT = "newslot";
 
 /**
- * Gives a card its gestures: the tap that opens its menu, the long press that lifts it, the drag that follows. A card on
+ * Gives a card its gestures: the tap that opens its menu, the double click that renames it, the long press that lifts it, the drag that follows. A card on
  * the timeline answers a long press like Apple Calendar: it is selected, its menu opens, and moving the finger on from
  * there drags it; the dots of a selected card stretch it. While a gesture owns the screen the view keeps the browser from
  * scrolling (see the arbiter).
@@ -69,6 +71,7 @@ export class DragController {
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => this.begin(card, this.payload(card, item, from, e), e, subtree),
 			onTap: () => this.deps.onMenu(item, card),
+			onDoubleTap: () => this.deps.onRename(item),
 		});
 	}
 
@@ -82,6 +85,7 @@ export class DragController {
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
 			onTap: () => this.deps.onMenu(item, block),
+			onDoubleTap: () => this.deps.onRename(item),
 			onLongTap: () => this.selectWithMenu(block, item),
 		});
 	}
