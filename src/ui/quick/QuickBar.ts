@@ -6,7 +6,7 @@ import { type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPa
 import { menuIcon } from "../menu/menuIcons";
 import { MonthPicker } from "../menu/MonthPicker";
 import { tileRows } from "../menu/TaskMenu";
-import { tileLabel } from "../sheet/sheetState";
+import { placeLabel } from "../placeLabel";
 import type { LocalDate } from "../types";
 
 export interface QuickBarState {
@@ -63,7 +63,7 @@ export class QuickBar {
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
 	private readonly place: HTMLButtonElement;
-	private readonly placeLabel: HTMLElement;
+	private readonly placeText: HTMLElement;
 	private state: QuickBarState | null = null;
 	private panel: OpenPanel | null = null;
 	private readonly pressOutside = (e: Event) => {
@@ -83,7 +83,7 @@ export class QuickBar {
 		this.flag.addEventListener("click", () => this.toggle("priority"));
 		this.place = el(this.bar, "button", "tc-bar-place");
 		this.place.setAttribute("aria-label", "Place");
-		this.placeLabel = el(this.place, "span", "tc-bar-place-label");
+		this.placeText = el(this.place, "span", "tc-bar-place-label");
 		this.place.addEventListener("click", () => this.toggle("place"));
 	}
 
@@ -122,7 +122,7 @@ export class QuickBar {
 	private showPlace(place: Placement): void {
 		this.place.querySelector("svg")?.remove();
 		this.place.prepend(icon(placeIcon(place)));
-		this.placeLabel.textContent = tileLabel(place, this.deps.today());
+		this.placeText.textContent = placeLabel(place);
 	}
 
 	private toggle(kind: PanelKind): void {

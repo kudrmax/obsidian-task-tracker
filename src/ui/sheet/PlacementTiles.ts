@@ -1,6 +1,7 @@
 import { el } from "../dom";
+import { placeLabel } from "../placeLabel";
 import type { LocalDate } from "../types";
-import { placementOf, type SheetState, type Tile, tileLabel } from "./sheetState";
+import { placementOf, type SheetState, type Tile } from "./sheetState";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -48,7 +49,7 @@ export class PlacementTiles {
 	render(state: SheetState, today: LocalDate): void {
 		for (const [tile, { button, label }] of this.buttons) {
 			button.classList.toggle("is-on", state.tile === tile);
-			label.textContent = tile === "date" ? (state.date ? tileLabel(placementOf(state, today), today) : "Date") : tileLabel({ kind: tile }, today);
+			label.textContent = tile === "date" ? (state.date ? placeLabel(placementOf(state, today)) : "Date") : placeLabel({ kind: tile });
 		}
 	}
 }

@@ -812,7 +812,6 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
 .tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); background: var(--tc-bar-bg); box-shadow: inset 0 var(--tc-hairline-half) 0 var(--tc-bar-line); }
-.tc-quick-bar[hidden], .tc-quick-bar [hidden] { display: none; }
 .tc-bar-spacer { flex: 1; }
 .tc-quick-bar .tc-bar-shift, .tc-quick-bar .tc-bar-flag { width: var(--tc-bar-btn-w); height: var(--tc-bar-btn-h); flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); }
 .tc-quick-bar .tc-bar-shift:disabled { color: var(--tc-bar-off); cursor: default; }
@@ -823,7 +822,9 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-quick-bar .tc-bar-place { width: var(--tc-place-w); height: var(--tc-place-h); flex-shrink: 0; margin-left: var(--tc-space-2); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); border-radius: var(--tc-radius-place); background: var(--tc-place-bg); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); }
 .tc-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
 .tc-bar-place-label { overflow: hidden; white-space: nowrap; }
+.task-calendar .tc-quick-bar .tc-bar-place, .task-calendar .tc-quick-bar .tc-bar-place:hover, .task-calendar .tc-quick-bar .tc-bar-place:active { background: var(--tc-place-bg); }
 .tc-quick-bar button:active:not(:disabled) { opacity: var(--tc-pressed); }
+.tc-quick-bar[hidden], .tc-quick-bar button[hidden] { display: none; }
 .tc-quick-bar .tc-quick-panel { position: absolute; top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-ink-strong); }
 
