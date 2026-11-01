@@ -63,7 +63,7 @@ interface MenuField {
 	readonly parent: TaskItem | null;
 }
 
-/** What closes the field when tapped: anything but the field, the bar with its panels, and the plus. */
+/** What closes the field when tapped: anything but the field and what its editor shows, the bar with its panels, and the plus. */
 const KEEPS_FIELD = ".tc-quick-row, .tc-quick-bar, .tc-plus";
 
 const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", soon: "soon", left: "now" };
@@ -121,7 +121,7 @@ export class QuickEntryController {
 	private pressEnding = false;
 	private readonly pressed = () => (this.pressEnding = false);
 	private readonly tapAway = (e: Event) => {
-		if (!this.state || this.pressEnding || (e.target instanceof Element && e.target.closest(KEEPS_FIELD))) return;
+		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
 		this.entry.blur();
 	};
 
@@ -507,7 +507,10 @@ export class QuickEntryController {
 			levels,
 			priority: state ? this.levelOf(state) : null,
 			titleField: this.deps.titleField,
-			onInput: (text) => this.entry.type(text),
+			onInput: (text) => {
+				this.entry.type(text);
+				this.reveal();
+			},
 			onPriority: () => this.state && this.sync(this.state),
 			onKey: (key) => this.key(key),
 			onBlur: () => this.blurred(handle),

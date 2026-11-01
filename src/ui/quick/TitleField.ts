@@ -30,6 +30,8 @@ export interface TitleField {
 	selectAll(): void;
 	/** The focus given back, the selection as it was, without scrolling. */
 	focus(): void;
+	/** Part of the typing: the field, or what its editor shows for it elsewhere on the page; a tap there is not a tap elsewhere. */
+	owns(target: Element): boolean;
 	destroy(): void;
 }
 

@@ -315,6 +315,29 @@ describe("QuickEntryController", () => {
 		await vi.waitFor(() => expect(created.map((c) => c.text)).toEqual(["Call"]));
 	});
 
+	it("keeps the field open on a tap in what its editor shows outside it, the note search", async () => {
+		const { controller, type, created, field, titleFields } = setUp();
+		controller.openAtEnd("inbox");
+		type("Call [[Ann");
+		titleFields[0].popup.click();
+		expect(field()).not.toBeNull();
+		expect(created).toEqual([]);
+	});
+
+	it("scrolls the list as the text wraps and the field grows, keeping it 16 px over the bar", () => {
+		const { controller, root, type, field, lists } = setUp();
+		controller.openAtEnd("inbox");
+		root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
+		const list = lists.inbox.el;
+		list.getBoundingClientRect = () => new DOMRect(0, 0, 175, 500);
+		list.scrollTop = 0;
+		let height = 35;
+		field()!.getBoundingClientRect = () => new DOMRect(10, 405 - list.scrollTop, 175, height);
+		height = 71;
+		type("A text long enough to wrap onto three lines");
+		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
+	});
+
 	describe("settling before the screen shows another day or column", () => {
 		const later = "2026-11-03";
 		const items = { left: [item("A", key("soon", 0)), item("B", key("soon", 1))] };

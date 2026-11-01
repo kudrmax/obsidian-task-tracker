@@ -4,6 +4,9 @@ import type { App, Editor, TFile } from "obsidian";
 import { el } from "../dom";
 import { composingKey, LINE_BREAK, oneLine, type TitleField, type TitleFieldEvents, type TitleFieldOptions } from "./TitleField";
 
+/** What Obsidian's editor shows for the field outside it: the note search, and on the phone its toolbar over the keyboard. */
+const EDITOR_PARTS = ".suggestion-container, .mobile-toolbar";
+
 /** The parts of Obsidian's own markdown editor the field uses; Obsidian doesn't publish them. */
 interface ObsidianEditor {
 	readonly cm: EditorView;
@@ -108,6 +111,10 @@ export class MarkdownTitleField implements TitleField {
 
 	focus(): void {
 		this.editor.cm.focus();
+	}
+
+	owns(target: Element): boolean {
+		return this.el.contains(target) || target.closest(EDITOR_PARTS) !== null;
 	}
 
 	destroy(): void {

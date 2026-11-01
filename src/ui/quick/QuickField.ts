@@ -33,6 +33,8 @@ export interface QuickFieldHandle {
 	setPriority(level: PriorityLevel | null): void;
 	/** A text set by the owner: a prefix in it counts as already reported. */
 	setValue(text: string): void;
+	/** Part of the typing: the field, or what its editor shows for it elsewhere on the page. */
+	owns(target: Element): boolean;
 	destroy(): void;
 }
 
@@ -90,6 +92,9 @@ export const QuickField = {
 			setValue(text) {
 				title.setText(text);
 				fromText = levelOfText(text, opts.levels);
+			},
+			owns(target) {
+				return title.owns(target);
 			},
 			destroy() {
 				title.destroy();

@@ -2,10 +2,12 @@ import { composingKey, oneLine, type TitleField, type TitleFieldFactory, type Ti
 
 /**
  * Obsidian's editor needs Obsidian: tests type in a plain textarea that keeps the same contract. Set `value` and send
- * `input` to type; Enter, Escape, Tab and Shift+Tab go to the owner and no further, a line break becomes a space.
+ * `input` to type; Enter, Escape, Tab and Shift+Tab go to the owner and no further, a line break becomes a space. `popup`
+ * stands for what the editor shows outside the field, as Obsidian's note search.
  */
 export class FakeTitleField implements TitleField {
 	readonly el: HTMLTextAreaElement;
+	readonly popup = document.body.appendChild(document.createElement("div"));
 
 	constructor(parent: HTMLElement, { text, placeholder, events }: TitleFieldOptions) {
 		this.el = parent.appendChild(document.createElement("textarea"));
@@ -52,8 +54,13 @@ export class FakeTitleField implements TitleField {
 		this.el.focus({ preventScroll: true });
 	}
 
+	owns(target: Element): boolean {
+		return this.el.contains(target) || this.popup.contains(target);
+	}
+
 	destroy(): void {
 		this.el.remove();
+		this.popup.remove();
 	}
 }
 
