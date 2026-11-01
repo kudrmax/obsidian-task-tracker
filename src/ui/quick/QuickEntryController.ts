@@ -15,6 +15,7 @@ import { PlusButton } from "./PlusButton";
 import { QuickBar, type QuickBarState } from "./QuickBar";
 import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
 import { levelOfText, QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
+import type { TitleFieldFactory } from "./TitleField";
 
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
@@ -25,6 +26,8 @@ export interface QuickEntryControllerDeps {
 	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
+	/** The field the text is typed in. */
+	readonly titleField: TitleFieldFactory;
 	list(column: ListColumn): TaskList | null;
 	timeline(): Timeline | null;
 	/** A task of the timeline as the screen shows it now; null once it is not there. */
@@ -242,7 +245,7 @@ export class QuickEntryController {
 		if (!this.focused) {
 			this.focused = true;
 			field.focus();
-		} else if (document.activeElement !== field.el) field.el.focus({ preventScroll: true });
+		} else if (!field.focused) field.refocus();
 		this.reveal();
 	}
 
@@ -289,8 +292,7 @@ export class QuickEntryController {
 	}
 
 	private open(spot: EntrySpot, renaming?: TaskItem): void {
-		this.field = null;
-		this.focused = false;
+		this.dropField();
 		this.entry.open(spot, renaming);
 	}
 
@@ -385,7 +387,7 @@ export class QuickEntryController {
 	}
 
 	/** The field for a holder off the lists, made the first time it is asked for. */
-	private offListField(): HTMLTextAreaElement {
+	private offListField(): HTMLElement {
 		return (this.field ??= this.openField(document.createElement("div"))).el;
 	}
 
@@ -410,8 +412,7 @@ export class QuickEntryController {
 		this.state = state;
 		if (state?.renaming !== before?.renaming) this.moved = false;
 		if (!state) {
-			this.field = null;
-			this.focused = false;
+			this.dropField();
 			this.bar.hide();
 			this.placeOffLists(null);
 		}
@@ -422,7 +423,7 @@ export class QuickEntryController {
 	/** The field and the bar show the state: its text, its level, what the field may do. */
 	private sync(state: EntryState): void {
 		const level = this.levelOf(state);
-		if (this.field && this.field.el.value !== state.text) this.field.setValue(state.text);
+		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setPriority(level);
 		this.bar.show(this.barState(state, level));
 		this.liftBar(state);
@@ -505,12 +506,20 @@ export class QuickEntryController {
 			select: state?.renaming != null,
 			levels,
 			priority: state ? this.levelOf(state) : null,
+			titleField: this.deps.titleField,
 			onInput: (text) => this.entry.type(text),
 			onPriority: () => this.state && this.sync(this.state),
 			onKey: (key) => this.key(key),
 			onBlur: () => this.blurred(handle),
 		});
 		return handle;
+	}
+
+	/** The field goes with its editor; the next one is made where the entry stands then. */
+	private dropField(): void {
+		this.field?.destroy();
+		this.field = null;
+		this.focused = false;
 	}
 
 	private key(key: QuickKey): void {
@@ -525,7 +534,7 @@ export class QuickEntryController {
 	 */
 	private blurred(handle: QuickFieldHandle): void {
 		window.setTimeout(() => {
-			if (this.field === handle && this.state && document.activeElement !== handle.el) this.entry.blur();
+			if (this.field === handle && this.state && !handle.focused) this.entry.blur();
 		});
 	}
 }

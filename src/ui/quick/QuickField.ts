@@ -1,6 +1,6 @@
 import type { PriorityLevel } from "../../settings";
-import { el } from "../dom";
 import { markPriority } from "../TaskCard";
+import type { TitleFieldFactory } from "./TitleField";
 
 export type QuickKey = "enter" | "escape" | "tab" | "shiftTab";
 
@@ -12,6 +12,8 @@ export interface QuickFieldOptions {
 	readonly levels: readonly PriorityLevel[];
 	/** The level the field starts with. */
 	readonly priority: PriorityLevel | null;
+	/** The field the text is typed in. */
+	readonly titleField: TitleFieldFactory;
 	onInput(text: string): void;
 	/** The level the text's prefix now stands for, null once it no longer starts with one; only when that changes. */
 	onPriority(level: PriorityLevel | null): void;
@@ -20,18 +22,19 @@ export interface QuickFieldOptions {
 }
 
 export interface QuickFieldHandle {
-	readonly el: HTMLTextAreaElement;
+	readonly el: HTMLElement;
+	readonly text: string;
+	readonly focused: boolean;
+	/** The focus taken the first time: the whole value selected for a rename, else the caret at the end. */
 	focus(): void;
+	/** The focus given back after a redraw moved the field, the selection as it was. */
+	refocus(): void;
 	/** A level chosen elsewhere; the field takes its colour. */
 	setPriority(level: PriorityLevel | null): void;
-	/** A text set by the owner: the field fits it, and a prefix in it counts as already reported. */
+	/** A text set by the owner: a prefix in it counts as already reported. */
 	setValue(text: string): void;
+	destroy(): void;
 }
-
-const KEYS: Readonly<Record<string, QuickKey>> = { Enter: "enter", Escape: "escape", Tab: "tab" };
-
-/** The key iOS sends while an input method commits a candidate, with `isComposing` already false. */
-const COMPOSING_KEY_CODE = 229;
 
 /** The level whose prefix, then a space, starts the text. */
 export function levelOfText(text: string, levels: readonly PriorityLevel[]): PriorityLevel | null {
@@ -44,53 +47,52 @@ export function levelOfText(text: string, levels: readonly PriorityLevel[]): Pri
  */
 export const QuickField = {
 	open(parent: HTMLElement, opts: QuickFieldOptions): QuickFieldHandle {
-		const field = el(parent, "textarea", "tc-quick-field");
-		field.rows = 1;
-		field.placeholder = "New task";
-		field.value = opts.value;
-		field.enterKeyHint = "next";
-		markPriority(field, opts.priority);
 		let fromText = levelOfText(opts.value, opts.levels);
-		const fit = () => {
-			field.style.height = "auto";
-			if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight}px`;
-		};
-		field.addEventListener("keydown", (e) => {
-			if (e.isComposing || e.keyCode === COMPOSING_KEY_CODE) return;
-			const key = e.key === "Tab" && e.shiftKey ? "shiftTab" : KEYS[e.key];
-			if (!key) return;
-			e.preventDefault();
-			e.stopPropagation();
-			opts.onKey(key);
+		const title = opts.titleField(parent, {
+			text: opts.value,
+			placeholder: "New task",
+			events: {
+				onInput: () => {
+					const text = title.text;
+					opts.onInput(text);
+					const level = levelOfText(text, opts.levels);
+					if (level?.prefix === fromText?.prefix) return;
+					fromText = level;
+					markPriority(title.el, level);
+					opts.onPriority(level);
+				},
+				onEnter: () => opts.onKey("enter"),
+				onEscape: () => opts.onKey("escape"),
+				onTab: (shift) => opts.onKey(shift ? "shiftTab" : "tab"),
+				onBlur: () => opts.onBlur(),
+			},
 		});
-		field.addEventListener("input", () => {
-			const flat = field.value.replace(/\s*\n\s*/g, " ");
-			if (flat !== field.value) field.value = flat;
-			fit();
-			opts.onInput(field.value);
-			const level = levelOfText(field.value, opts.levels);
-			if (level?.prefix === fromText?.prefix) return;
-			fromText = level;
-			markPriority(field, level);
-			opts.onPriority(level);
-		});
-		field.addEventListener("blur", () => opts.onBlur());
-		fit();
+		title.el.classList.add("tc-quick-field");
+		markPriority(title.el, opts.priority);
 		return {
-			el: field,
+			el: title.el,
+			get text() {
+				return title.text;
+			},
+			get focused() {
+				return title.focused;
+			},
 			focus() {
-				field.focus();
-				if (opts.select) field.setSelectionRange(0, field.value.length);
-				else field.setSelectionRange(field.value.length, field.value.length);
-				fit();
+				if (opts.select) title.selectAll();
+				else title.focusEnd();
+			},
+			refocus() {
+				title.focus();
 			},
 			setPriority(level) {
-				markPriority(field, level);
+				markPriority(title.el, level);
 			},
 			setValue(text) {
-				field.value = text;
+				title.setText(text);
 				fromText = levelOfText(text, opts.levels);
-				fit();
+			},
+			destroy() {
+				title.destroy();
 			},
 		};
 	},

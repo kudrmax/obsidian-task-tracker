@@ -6,6 +6,7 @@ import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
 import { type GapPlace, sameTask } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard } from "./TaskCard";
+import { fillTitle } from "./TaskTitle";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
@@ -134,7 +135,7 @@ export class TaskList {
 		for (let node = kept?.nextElementSibling ?? null; node; node = node.nextElementSibling) if (node instanceof HTMLElement) before.push(node);
 		for (const { text, level } of entry.pending) {
 			const card = el(this.el, "div", "tc-card");
-			el(card, "div", "tc-card-title", text);
+			fillTitle(el(card, "div", "tc-card-title"), text);
 			before.push(card);
 			put(card, level);
 		}

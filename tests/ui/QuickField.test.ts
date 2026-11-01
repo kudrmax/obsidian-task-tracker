@@ -5,6 +5,7 @@ import type { PriorityLevel } from "../../src/settings";
 import type { PendingText } from "../../src/ui/quick/QuickEntry";
 import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
+import { fakeTitleField } from "../fakes/FakeTitleField";
 
 const URGENT: PriorityLevel = { prefix: "p1", color: "red" };
 const LATER: PriorityLevel = { prefix: "p2", color: "blue" };
@@ -21,16 +22,18 @@ function open(value = "", priority: PriorityLevel | null = null, select = false)
 		select,
 		priority,
 		levels: [URGENT, LATER],
+		titleField: fakeTitleField,
 		onInput: (t) => texts.push(t),
 		onPriority: (p) => priorities.push(p),
 		onKey: (k) => keys.push(k),
 		onBlur: () => blurs++,
 	});
+	const field = handle.el as HTMLTextAreaElement;
 	const type = (text: string) => {
-		handle.el.value = text;
-		handle.el.dispatchEvent(new Event("input", { bubbles: true }));
+		field.value = text;
+		field.dispatchEvent(new Event("input", { bubbles: true }));
 	};
-	return { handle, field: handle.el, keys, texts, priorities, type, blurs: () => blurs };
+	return { handle, field, keys, texts, priorities, type, blurs: () => blurs };
 }
 
 const press = (field: HTMLElement, init: KeyboardEventInit) => {
@@ -40,13 +43,11 @@ const press = (field: HTMLElement, init: KeyboardEventInit) => {
 };
 
 describe("QuickField", () => {
-	it("is a textarea with the placeholder and the return key of a next task", () => {
-		const { field } = open("a");
-		expect(field.tagName).toBe("TEXTAREA");
-		expect(field.className).toBe("tc-quick-field");
+	it("is the title field, marked as the quick field, with the hint of a new task", () => {
+		const { field, handle } = open("a");
+		expect(field.classList.contains("tc-quick-field")).toBe(true);
 		expect(field.placeholder).toBe("New task");
-		expect(field.enterKeyHint).toBe("next");
-		expect(field.value).toBe("a");
+		expect(handle.text).toBe("a");
 	});
 
 	it("maps Enter, Escape, Tab and Shift+Tab to keys, and keeps them from the page", () => {
@@ -80,7 +81,7 @@ describe("QuickField", () => {
 		expect(enter.defaultPrevented).toBe(false);
 	});
 
-	it("takes a text set from outside, fitted, its prefix reported again only when typed over", () => {
+	it("takes a text set from outside, its prefix reported again only when typed over", () => {
 		const { handle, field, priorities, type } = open("p1 buy", URGENT);
 		handle.setValue("");
 		expect(field.value).toBe("");
@@ -149,6 +150,23 @@ describe("QuickField", () => {
 		const fresh = open("Buy milk");
 		fresh.handle.focus();
 		expect([fresh.field.selectionStart, fresh.field.selectionEnd]).toEqual([8, 8]);
+		expect(fresh.handle.focused).toBe(true);
+	});
+
+	it("gives the focus back with the selection as it was", () => {
+		const { handle, field } = open("Buy milk");
+		field.focus();
+		field.setSelectionRange(2, 5);
+		field.blur();
+		handle.refocus();
+		expect(handle.focused).toBe(true);
+		expect([field.selectionStart, field.selectionEnd]).toEqual([2, 5]);
+	});
+
+	it("goes, its field with it", () => {
+		const { handle, field } = open("Buy milk");
+		handle.destroy();
+		expect(field.isConnected).toBe(false);
 	});
 });
 
@@ -173,7 +191,7 @@ describe("TaskList with a task being typed", () => {
 			entry: () => ({
 				place: { kind: "gap", index, level, group: null },
 				pending,
-				field: (parent) => QuickField.open(parent, { value: "", select: false, levels: [], priority: null, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
+				field: (parent) => QuickField.open(parent, { value: "", select: false, levels: [], priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
 			}),
 		});
 		l.render();
@@ -188,6 +206,13 @@ describe("TaskList with a task being typed", () => {
 		expect(rows[2].querySelector("textarea")).not.toBeNull();
 		expect(rows.slice(1, 3).map((r) => r.style.getPropertyValue("--tc-level"))).toEqual(["1", "1"]);
 		expect(l.cards.map((e) => e.item.text)).toEqual(["A", "B"]);
+	});
+
+	it("shows a link in a typed text by its word, as a card does", () => {
+		const l = list([item("A")], 1, 0, [{ text: "Call [[People/Pete|Pete]]", level: 0 }]);
+		const typed = l.el.children[1];
+		expect(typed.textContent).toBe("Call Pete");
+		expect(typed.querySelector(".tc-link")?.textContent).toBe("Pete");
 	});
 
 	it("draws several typed texts before the field", () => {

@@ -168,6 +168,14 @@ describe("the calendar menu's stack for a new subtask", () => {
 		expect(row.contains(field)).toBe(true);
 	});
 
+	it("shows a link in a text not yet written by its word, as a card does", () => {
+		const { menu } = openOnBlock(item());
+		menu.openStack(() => {});
+		menu.showStack(item(), ["Call [[People/Pete|Pete]]"]);
+		expect(stack()).toEqual(["Call Pete", "field"]);
+		expect(document.querySelector(".tc-menu-subtasks .tc-link")?.textContent).toBe("Pete");
+	});
+
 	it("keeps the copy's subtask counter up with the task as the screen shows it", () => {
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";

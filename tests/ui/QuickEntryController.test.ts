@@ -9,6 +9,7 @@ import { TaskMenu } from "../../src/ui/menu/TaskMenu";
 import { TaskList } from "../../src/ui/TaskList";
 import { Timeline } from "../../src/ui/Timeline";
 import { DayBoundary } from "../../src/application/contracts";
+import { FakeTitleField } from "../fakes/FakeTitleField";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
@@ -52,6 +53,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const drops: ColumnDrop[] = [];
 	const lists = {} as Record<ListColumn, TaskList>;
 	let controller: QuickEntryController | null = null;
+	/** Every title field the entry made, in order. */
+	const titleFields: FakeTitleField[] = [];
 	for (const column of COLUMNS) {
 		lists[column] = new TaskList(root.appendChild(document.createElement("div")), {
 			items: () => items[column] ?? [],
@@ -88,6 +91,11 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		},
 		arbiter: new GestureArbiter(),
 		drag: { beginNew },
+		titleField: (parent, opts) => {
+			const made = new FakeTitleField(parent, opts);
+			titleFields.push(made);
+			return made;
+		},
 		list: (column) => lists[column],
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
@@ -131,7 +139,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	};
 	const holdWrites = () => (holdFresh = true);
 	const releaseWrites = () => freshWaiting.splice(0).forEach((resolve) => resolve());
-	return { controller, root, plus, field, lists, timeline, slotted, render, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
+	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
 }
 
 afterEach(() => {
@@ -259,6 +267,19 @@ describe("QuickEntryController", () => {
 		press("Enter");
 		expect(rowsOf("left")).toEqual(["A", "Buy milk", "field"]);
 		await vi.waitFor(() => expect(created).toEqual([{ text: "Buy milk", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
+	});
+
+	it("keeps its one title field, focused, across Enter and the redraws, and lets it go when the entry ends", () => {
+		const { controller, type, press, titleFields } = setUp({ items: { left: [item("A", key("now", 0))] } });
+		controller.openAtEnd("left");
+		type("Buy milk");
+		press("Enter");
+		type("Bread");
+		press("Enter");
+		expect(titleFields).toHaveLength(1);
+		expect(titleFields[0].focused).toBe(true);
+		press("Escape");
+		expect(titleFields[0].el.isConnected).toBe(false);
 	});
 
 	it("lets the next field move in under the task just written once the list shows it", async () => {

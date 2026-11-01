@@ -23,7 +23,7 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
-import type { EditorOwner } from "./quick/MarkdownTitleField";
+import { type EditorOwner, MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import type { TaskLink } from "./TaskTitle";
 import { PullToRefresh } from "./sources/PullToRefresh";
@@ -92,7 +92,7 @@ export class TaskCalendarView extends ItemView {
 	private readonly data: DayData;
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
-	/** The task screen's title while it has the focus: Obsidian's commands and hotkeys go to it. */
+	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
@@ -308,6 +308,7 @@ export class TaskCalendarView extends ItemView {
 			tasks: this.deps.tasks,
 			arbiter: this.arbiter,
 			drag: this.drag,
+			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
 			list: (column) => this.listOf(column),
 			timeline: () => this.timeline,
 			task: (key) => findTask(this.data.day?.slotted ?? [], key),
