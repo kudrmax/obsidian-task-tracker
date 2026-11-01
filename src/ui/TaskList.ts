@@ -1,9 +1,18 @@
-import type { TaskItem } from "../application/contracts";
+import type { GroupName, TaskItem } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { clear, el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
+import type { GapPlace } from "./drag/listPlace";
 import { renderTaskCard } from "./TaskCard";
+
+/** A task being typed in the list: the texts already typed, as plain cards, and the field after them, in `place`. */
+export interface ListEntryInput {
+	readonly place: GapPlace;
+	readonly pending: readonly string[];
+	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
+	field(parent: HTMLElement): HTMLElement;
+}
 
 export interface TaskListDeps {
 	items(): readonly TaskItem[];
@@ -15,6 +24,8 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
+	/** The task being typed, which takes its place among the cards without being one of them; null when none is. */
+	entry?(): ListEntryInput | null;
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
@@ -53,25 +64,57 @@ export class TaskList {
 		const items = this.deps.items();
 		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 		this.withHeaders = showsHeaders(this.rendered);
-		/** `through`: for each task above the subtask's own, whether its line goes on past the card to a later subtask. */
-		const add = (item: TaskItem, level: number, through: readonly boolean[], last: boolean): void => {
+		const entry = this.deps.entry?.() ?? null;
+		const rows: { node: HTMLElement; level: number }[] = [];
+		let entered = entry === null;
+		const enter = (group: GroupName): void => {
+			if (entered || !entry || entry.place.index !== this.entries.length || (this.withHeaders && entry.place.group !== group)) return;
+			entered = true;
+			this.enterRows(entry, rows);
+		};
+		const add = (item: TaskItem, level: number, group: GroupName): void => {
+			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
-			if (level > 0) branch(card, through, last);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
+			rows.push({ node: card, level });
 			const from = this.entries.length;
-			const below = level > 0 ? [...through, !last] : [];
-			item.subtasks.forEach((sub, i) => add(sub, level + 1, below, i === item.subtasks.length - 1));
+			item.subtasks.forEach((sub) => add(sub, level + 1, group));
 			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));
 		};
+		const aboveHeaders = this.withHeaders && entry?.place.group === null && !this.rendered.some((g) => g.name === null);
+		if (aboveHeaders) enter(null);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			for (const item of group.items) add(item, 0, [], false);
+			for (const item of group.items) add(item, 0, group.name);
+			enter(group.name);
 		}
+		if (!entered && entry) this.enterRows(entry, rows);
+		rows.forEach((row, i) => {
+			if (row.level === 0) return;
+			const { through, last } = linesOf(rows.map((r) => r.level), i);
+			branch(row.node, through, last);
+		});
 		const pending = this.deps.pending?.() ?? null;
 		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
 		if (pending) renderTaskCard(this.el, pending, { day });
+	}
+
+	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[]): void {
+		const level = entry.place.level;
+		const put = (row: HTMLElement): void => {
+			row.style.setProperty(PROPERTY.level, String(level));
+			rows.push({ node: row, level });
+		};
+		for (const text of entry.pending) {
+			const card = el(this.el, "div", "tc-card");
+			el(card, "div", "tc-card-title", text);
+			put(card);
+		}
+		const row = el(this.el, "div", "tc-quick-row");
+		entry.field(row);
+		put(row);
 	}
 
 	/** Where the name of the section a pending card starts is typed; null without one. */
@@ -103,6 +146,16 @@ export class TaskList {
 		this.deps.onHeader?.(head, group);
 		return head;
 	}
+}
+
+/**
+ * The branch lines of the row at `i` among rows of these `levels`: whether it is the last of its task's subtasks, and for each
+ * task above its own whether that one has a later sibling, so its line goes on past the row.
+ */
+function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {
+	const goesOn = (level: number): boolean => levels.slice(i + 1).find((l) => l <= level) === level;
+	const through = Array.from({ length: levels[i] - 1 }, (_, k) => goesOn(k + 1));
+	return { through, last: !goesOn(levels[i]) };
 }
 
 /** A subtask's branch from its task, bending in if it is the last; and the lines of the tasks further up that go on past it. */
