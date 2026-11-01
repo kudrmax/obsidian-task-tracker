@@ -228,7 +228,6 @@ export class QuickBar {
 			month: chosen ?? today,
 			today,
 			selected: chosen,
-			variant: "menu",
 			onPick: (day) => {
 				const placement: Placement = day === today ? { kind: "now" } : { kind: "date", date: day };
 				this.picked(() => (current && samePlacement(current, placement) ? undefined : this.deps.onPlace(placement)))();

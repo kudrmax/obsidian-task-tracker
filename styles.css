@@ -103,7 +103,6 @@ body {
 	--tc-radius-circle: 50%;
 	--tc-radius-panel: 14px;
 	--tc-radius-day: 18px;
-	--tc-radius-sheet-panel: 16px;
 	--tc-radius-dot: 4px;
 	--tc-stroke-source: 1.8px;
 	--tc-stroke-refresh: 1.9px;
@@ -223,11 +222,6 @@ body {
 	--tc-menu-badge-inset: 5px;
 	--tc-menu-badge-icon: 10px;
 	--tc-stroke-badge: 3.6px;
-	/* A priority's dot on the task screen's pills. */
-	--tc-dot-menu: 10px;
-	/* The task screen's priority pills. */
-	--tc-level-pill-h: 36px;
-	--tc-radius-chip: 18px;
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
 	--tc-level-prefix-w: 56px;
 	--tc-swatch: 26px;
@@ -237,9 +231,7 @@ body {
 	--tc-month-icon: 18px;
 	--tc-day: 36px;
 	--tc-weekday-h: 20px;
-	--tc-weekday-h-sheet: 18px;
 	--tc-grid-gap: 2px;
-	--tc-grid-gap-sheet: 1px;
 	--tc-picker-remove-gap: 6px;
 	/* The quick bar over the keyboard: shift buttons, the priority flag, the place button; its panels use the menu's. */
 	--tc-bar-h: 44px;
@@ -276,19 +268,6 @@ body {
 	--tc-pull-icon: 14px;
 	--tc-pull-shift: 84px;
 	--tc-pull: 0px;
-
-	/* Sizes: the task screen */
-	--tc-sheet-bar: 44px;
-	--tc-sheet-side: 20px;
-	--tc-sheet-gap: 20px;
-	--tc-tile-h: 78px;
-	--tc-radius-tile: 18px;
-	--tc-tile-icon: 24px;
-	--tc-stroke-tile: 1.9px;
-	--tc-tile-icon-gap: 7px;
-	--tc-time-icon: 15px;
-	/* The keyboard's height, when the host does not shrink the view for it. */
-	--tc-keyboard: 0px;
 
 	/* Sizes: the timeline */
 	--tc-hour: 56px;
@@ -357,15 +336,11 @@ body {
 	--tc-font-value: 15px;
 	--tc-font-weekday: 11px;
 	--tc-font-day: 16px;
-	--tc-font-sheet-btn: 17px;
 	--tc-font-sub: 13px;
 	--tc-font-group: 13px;
 	--tc-leading-group: 20px;
 	--tc-font-pull: 12px;
 	--tc-leading-pull: 16px;
-	--tc-font-sheet-title: 28px;
-	--tc-leading-sheet-title: 34px;
-	--tc-font-tile: 15px;
 	--tc-leading-normal: normal;
 	--tc-weight-normal: 400;
 	--tc-weight-semibold: 600;
@@ -399,13 +374,11 @@ body {
 	--tc-layer-pull: 5;
 	--tc-layer-switch: 5;
 	--tc-layer-plus: 5;
-	--tc-layer-sheet: 20;
 	--tc-layer-bar: 6;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
 
 	/* Opacity */
-	--tc-disabled: 0.4;
 	/* A row or a text button while the finger is on it. */
 	--tc-pressed: 0.55;
 
@@ -420,9 +393,6 @@ body {
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
 	--tc-duration-pull: 200ms;
-	--tc-duration-fade: 160ms;
-	/* The task screen rises this far as it fades in. */
-	--tc-rise: 12px;
 	--tc-duration-spin: 900ms;
 	--tc-turn: 1turn;
 }
@@ -497,7 +467,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
 .task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active, .tc-quick-bar button:hover, .tc-quick-bar button:active { background: transparent; box-shadow: none; }
-.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-sheet-cancel:active, .task-calendar .tc-sheet-submit:active, .task-calendar .tc-tile:active, .task-calendar .tc-level-pill:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-tile:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
+.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-tile:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
 .task-calendar svg { display: block; }
 
 /* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
@@ -817,18 +787,14 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-group-gap) solid var(--tc-gap-ink); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
 
-/* The month picker: in the menu's panel, or under the task sheet's tiles. */
+/* The month picker, in the menu's panel. */
 .tc-picker-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--tc-space-4) var(--tc-space-8); }
-.tc-picker.is-sheet { box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-10) var(--tc-space-10); border-radius: var(--tc-radius-sheet-panel); background: var(--tc-card-bg); }
-.tc-picker.is-sheet .tc-picker-head { padding-bottom: var(--tc-space-4); }
 .tc-picker-title { font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-picker-nav { display: flex; gap: var(--tc-space-4); }
 .tc-picker .tc-picker-arrow { width: var(--tc-month-btn); height: var(--tc-month-btn); padding: 0; border-radius: var(--tc-radius-circle); color: var(--tc-accent-ui); display: flex; align-items: center; justify-content: center; }
 .tc-picker-arrow svg { width: var(--tc-month-icon); height: var(--tc-month-icon); stroke-width: var(--tc-stroke-month); }
 .tc-picker-grid { display: grid; grid-template-columns: repeat(var(--tc-grid-columns), minmax(0, 1fr)); row-gap: var(--tc-grid-gap); }
-.tc-picker.is-sheet .tc-picker-grid { row-gap: var(--tc-grid-gap-sheet); }
 .tc-weekday { height: var(--tc-weekday-h); text-align: center; font-size: var(--tc-font-weekday); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
-.tc-picker.is-sheet .tc-weekday { height: var(--tc-weekday-h-sheet); }
 .tc-picker .tc-day { justify-self: center; display: flex; align-items: center; justify-content: center; width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); font-size: var(--tc-font-day); font-weight: var(--tc-weight-normal); font-variant-numeric: tabular-nums; color: var(--tc-text); }
 .tc-picker .tc-day.is-other { color: var(--tc-ink-dim); }
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
@@ -856,28 +822,6 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-quick-bar .tc-quick-panel { position: absolute; top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-ink-strong); }
 
-/* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
-.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
-.tc-sheet.is-shown { opacity: 1; transform: none; }
-.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
-.task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
-.task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }
-.task-calendar .tc-sheet-submit.is-disabled { opacity: var(--tc-disabled); cursor: default; }
-.tc-sheet-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: var(--tc-keyboard); display: flex; flex-direction: column; justify-content: center; }
-.tc-sheet-content { display: flex; flex-direction: column; gap: var(--tc-sheet-gap); }
-.tc-sheet-content.is-settling { transition: transform var(--tc-duration-fade) var(--tc-ease-out); }
-.task-calendar .tc-sheet-title { text-align: center; font-size: var(--tc-font-sheet-title); line-height: var(--tc-leading-sheet-title); font-weight: var(--tc-weight-bold); overflow-wrap: anywhere; outline: none; -webkit-user-select: text; user-select: text; caret-color: var(--tc-accent-ui); }
-.tc-tiles { display: flex; gap: var(--tc-space-10); }
-.task-calendar .tc-tile { flex: 1; height: var(--tc-tile-h); border-radius: var(--tc-radius-tile); background: var(--tc-card-bg); color: var(--tc-ink-strong); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-tile-icon-gap); }
-.task-calendar .tc-tile.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
-.tc-tile svg { width: var(--tc-tile-icon); height: var(--tc-tile-icon); stroke-width: var(--tc-stroke-tile); }
-.tc-tile-label { font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); }
-.tc-level-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tc-space-8); }
-.tc-level-pills.is-hidden { display: none; }
-.task-calendar .tc-level-pill { height: var(--tc-level-pill-h); box-sizing: border-box; padding: 0 var(--tc-space-14); border-radius: var(--tc-radius-chip); background: var(--tc-card-bg); color: var(--tc-ink-strong); font-size: var(--tc-font-tile); font-weight: var(--tc-weight-semibold); display: flex; align-items: center; gap: var(--tc-space-6); }
-.task-calendar .tc-level-pill.is-on { color: var(--tc-text); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
-.task-calendar .tc-level-pill[data-priority].is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
-.tc-level-pill-dot { width: var(--tc-dot-menu); height: var(--tc-dot-menu); }
 
 /* A level stays one row on the phone too, where Obsidian stacks a setting's parts. */
 .setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-12); }
@@ -888,12 +832,6 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); margin-right: auto; }
 .tc-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); cursor: pointer; }
 .tc-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
-/* A subtask's task, over its title: closer to it than the sheet's gap. */
-.tc-sheet-parent { margin-bottom: calc(var(--tc-space-8) - var(--tc-sheet-gap)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); line-height: var(--tc-leading-card); color: var(--tc-muted); }
-.tc-sheet-parent svg { flex-shrink: 0; width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
-.tc-sheet-parent-title { min-width: 0; overflow-wrap: anywhere; }
-.tc-sheet-time { margin-top: calc(-1 * var(--tc-space-8)); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-value); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
-.tc-sheet-time svg { width: var(--tc-time-icon); height: var(--tc-time-icon); stroke-width: var(--tc-stroke-chevron); }
 
 /* No tasks file yet. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }

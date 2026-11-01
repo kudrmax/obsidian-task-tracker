@@ -8,8 +8,6 @@ export interface MonthPickerOptions {
 	today: LocalDate;
 	selected: LocalDate | null;
 	onPick(date: LocalDate): void;
-	/** `menu`: in the task menu's panel; `sheet`: under the task sheet's tiles. */
-	variant: "menu" | "sheet";
 }
 
 const CELLS = 42;
@@ -26,7 +24,7 @@ export class MonthPicker {
 		private readonly opts: MonthPickerOptions,
 	) {
 		this.month = startOfMonth(opts.month);
-		el.classList.add("tc-picker", opts.variant === "sheet" ? "is-sheet" : "is-menu");
+		el.classList.add("tc-picker");
 		const head = make(el, "div", "tc-picker-head");
 		this.titleEl = make(head, "span", "tc-picker-title");
 		const nav = make(head, "div", "tc-picker-nav");

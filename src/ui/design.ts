@@ -69,8 +69,6 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How far the timeline is pulled down from its top. */
 	pull: "--tc-pull",
-	/** The keyboard's height reserved under the task screen's content before the host shrinks the view for it. */
-	keyboard: "--tc-keyboard",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
@@ -89,7 +87,6 @@ export const DURATION = {
 	collapse: "--tc-duration-collapse",
 	fly: "--tc-duration-fly",
 	pull: "--tc-duration-pull",
-	fade: "--tc-duration-fade",
 	slide: "--tc-duration-slide",
 } as const;
 

@@ -326,7 +326,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
-			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet, .tc-quick-row, .tc-quick-bar")),
+			accepts: (target) => !(target instanceof Element && target.closest(".tc-quick-row, .tc-quick-bar")),
 			onSwipe: (shift) => void this.afterEntry(() => this.step(shift)),
 		});
 		this.unsubscribe.push(
