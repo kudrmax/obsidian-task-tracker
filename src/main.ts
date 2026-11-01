@@ -1,4 +1,3 @@
-import { TouchProbe } from "./TouchProbe";
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
@@ -24,10 +23,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.registerEvent(this.watchSettingsFile());
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
-		if (Platform.isMobile) {
-			const probe = new TouchProbe(this.app);
-			this.register(() => probe.unload());
-		}
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
 	}
