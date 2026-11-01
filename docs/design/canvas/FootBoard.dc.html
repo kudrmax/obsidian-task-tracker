@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Низ списков: варианты</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1928px; height: 2260px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">Низ списков</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 1800px; font-size: 18px; line-height: 24px; color: #6B6A65;">Сейчас список обрывается чёрной полосой, а календарь рядом уходит под переключатель плавно. Три способа сделать низ одним целым</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="2">
+<div style="position: absolute; left: 64px; top: {{row.labelTop}}px; font-size: 22px; line-height: 28px; font-weight: 600; color: #1C1C1E;">{{row.label}}</div>
+<sc-for list="{{row.phones}}" as="p" hint-placeholder-count="4">
+<div style="position: absolute; left: {{p.left}}px; top: {{row.top}}px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="Foot" mode="{{row.mode}}" foot="{{p.foot}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{row.captionTop}}px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1928,"height":2260}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const lefts = [64, 534, 1004, 1474];
+    const variants = {
+      cal: [
+        { foot: 'now', name: 'Сейчас', caption: 'Список режется чёрной полосой над переключателем, календарь рядом гаснет плавно' },
+        { foot: 'fade', name: 'А. Общее затухание', caption: 'Список уходит под переключатель так же, как календарь, и гаснет к навигации Obsidian. Под навигацией уже чистый фон' },
+        { foot: 'blur', name: 'Б. Затухание с размытием', caption: 'Как А, но задачи под переключателем ещё и размываются, как под матовым стеклом. Переключатель читается чётче' },
+        { foot: 'edge', name: 'В. Мягкий край', caption: 'Чёрный низ остаётся, только край над переключателем растушёван. До переключателя список не доходит' }
+      ],
+      soon: [
+        { foot: 'now', name: 'Сейчас', caption: 'Под New task сплошная чёрная полоса на всю ширину' },
+        { foot: 'fade', name: 'А. Общее затухание', caption: 'Затухание начинается выше, чтобы New task встала уже на тёмное. Сама кнопка залита фоном' },
+        { foot: 'blur', name: 'Б. Затухание с размытием', caption: 'То же с размытием: за New task и переключателем задачи только угадываются' },
+        { foot: 'edge', name: 'В. Мягкий край', caption: 'Растушёванный край над кнопками New task, ниже сплошной фон' }
+      ]
+    };
+    const block = 844 + 260;
+    const rows = [
+      { mode: 'cal', label: 'Список и календарь', top: 220 },
+      { mode: 'soon', label: 'Soon и Now: под списками New task', top: 220 + block }
+    ].map((r) => ({
+      ...r,
+      labelTop: r.top - 44,
+      captionTop: r.top + 844 + 18,
+      phones: variants[r.mode].map((v, i) => ({ ...v, left: lefts[i] }))
+    }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

@@ -192,14 +192,19 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
 	});
 
-	it("ends a list where its column's foot begins: the list takes the room left, its rows never shrink, and it pads nothing", () => {
+	it("runs a list to the bottom under its foot and the fade, its end room a row rather than padding, the foot back under it while a card is carried", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(of(".tc-left, .tc-soon, .tc-inbox")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
 		const list = of(".tc-list");
 		expect([list.get("flex"), list.get("min-height")]).toEqual(["1 1 0", "0"]);
 		expect([...list.keys()].filter((property) => property.startsWith("padding"))).toEqual([]);
 		expect(of(".tc-list > *").get("flex-shrink")).toBe("0");
-		expect(of(".tc-new").get("flex-shrink")).toBe("0");
+		expect([of(".tc-list::after").get("flex-shrink"), of(".tc-list::after").get("height")]).toEqual(["0", "var(--tc-foot-fade-day)"]);
+		const foot = of(".tc-new");
+		expect([foot.get("flex-shrink"), foot.get("position"), foot.get("bottom"), foot.get("pointer-events")]).toEqual(["0", "absolute", "0", "none"]);
+		expect(of(".task-calendar.is-dragging .tc-new").get("position")).toBe("relative");
+		expect(of(".task-calendar > .tc-fade").get("height")).toBe("var(--tc-foot-fade-day)");
+		expect(of(".task-calendar:is(.is-lists, .is-inbox) > .tc-fade").get("height")).toBe("var(--tc-foot-fade-lists)");
 		expect(sheet.tokens.get("--tc-nav-room")).toBe("max(0px, var(--view-bottom-spacing, 0px))");
 	});
 });
