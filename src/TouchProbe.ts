@@ -93,7 +93,7 @@ function metrics(list: HTMLElement): string {
 	}
 	const view = list.closest(".tc-view") as HTMLElement | null;
 	const nav = document.querySelector(".mobile-navbar")?.getBoundingClientRect();
-	chain.push(`nav-clear=${view ? getComputedStyle(view).getPropertyValue("--tc-nav-clear") : "?"} navbar top=${nav ? Math.round(nav.top) : "none"} h=${nav ? Math.round(nav.height) : 0} window=${window.innerHeight}`);
+	chain.push(`nav-room=${view ? getComputedStyle(view).getPropertyValue("--tc-" + "nav-room") : "?"} view-bottom-spacing=${getComputedStyle(document.body).getPropertyValue("--view-bottom-spacing")} navbar top=${nav ? Math.round(nav.top) : "none"} h=${nav ? Math.round(nav.height) : 0} window=${window.innerHeight}`);
 	const r = list.getBoundingClientRect();
 	const kids = Array.from(list.children) as HTMLElement[];
 	const last = kids[kids.length - 1]?.getBoundingClientRect();
