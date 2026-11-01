@@ -42,7 +42,7 @@ import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
-import { navigationClear, statusClear } from "./chrome";
+import { ChromeClearance } from "./chrome";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -94,6 +94,8 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private readonly data: DayData;
+	/** Obsidian's navigation and status bar over the view's bottom. */
+	private readonly clearance = new ChromeClearance(this.contentEl);
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
 	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
@@ -360,7 +362,8 @@ export class TaskCalendarView extends ItemView {
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
-		requestAnimationFrame(() => this.measureNavigation());
+		this.clearance.follow((type, handler) => this.registerDomEvent(document, type, handler));
+		requestAnimationFrame(() => this.clearance.measure());
 		this.polling.start();
 		await this.data.load();
 	}
@@ -378,7 +381,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override onResize(): void {
-		this.measureNavigation();
+		this.clearance.measure();
 		this.fitListWidth();
 		this.quick?.reveal();
 	}
@@ -417,17 +420,6 @@ export class TaskCalendarView extends ItemView {
 	private fitListWidth(): void {
 		const width = this.contentEl.clientWidth;
 		if (width > 0) this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listShare, width)));
-	}
-
-	/**
-	 * Obsidian's phone navigation floats over the content, and on the desktop its status bar over the bottom right corner;
-	 * what is pinned to the bottom stays clear of them.
-	 */
-	private measureNavigation(): void {
-		const root = this.contentEl.getBoundingClientRect();
-		const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
-		this.contentEl.style.setProperty(PROPERTY.navClear, px(navigationClear(root, box(".mobile-navbar"))));
-		this.contentEl.style.setProperty(PROPERTY.statusClear, px(statusClear(root, box(".status-bar"))));
 	}
 
 	/**
