@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>7. Переименовать на месте и светлая тема</title>
+<title>7. Переименовать на месте, календарь и светлая тема</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -12,19 +12,19 @@
 body{margin:0}
 </style>
 </helmet>
-<div style="position: relative; width: 1928px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
-<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">7. Переименовать на месте и светлая тема</div>
-<div style="position: absolute; left: 64px; top: 100px; width: 1800px; font-size: 18px; line-height: 24px; color: #6B6A65;">Rename в меню задачи правит название прямо в карточке, как имя секции, без отдельного экрана. Справа те же состояния ввода в светлой теме</div>
-<sc-for list="{{phones}}" as="p" hint-placeholder-count="4">
+<div style="position: relative; width: 2868px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">7. Переименовать на месте, календарь и светлая тема</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 2740px; font-size: 18px; line-height: 24px; color: #6B6A65;">Rename в меню задачи правит название прямо в карточке, как имя секции, без отдельного экрана; у задачи на календаре — в её карточке на календаре, а подзадача добавляется в стопку меню календаря. Справа те же состояния ввода в светлой теме</div>
+<sc-for list="{{phones}}" as="p" hint-placeholder-count="6">
 <div style="position: absolute; left: {{p.left}}px; top: 168px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="QuickAdd" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
 <div style="position: absolute; left: {{p.left}}px; top: 1026px; width: 390px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
 </sc-for>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1928,"height":1120}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2868,"height":1120}}'>
 class Component extends DCLogic {
   renderVals() {
-    return { phones: [{"left": 64, "view": "rename", "theme": "dark", "caption": "Rename: название выделено и правится на месте"}, {"left": 534, "view": "typing", "theme": "light", "caption": "Светлая: пишут новую задачу"}, {"left": 1004, "view": "tabNext", "theme": "light", "caption": "Светлая: подзадача с веткой"}, {"left": 1474, "view": "v2Priority", "theme": "light", "caption": "Светлая: приоритет из полосы"}] };
+    return { phones: [{"left": 64, "view": "rename", "theme": "dark", "caption": "Rename: название выделено и правится на месте"}, {"left": 534, "view": "renameBlock", "theme": "dark", "caption": "Rename задачи, которая есть только на календаре: полем становится её карточка, в полосе только флажок"}, {"left": 1004, "view": "stackSub", "theme": "dark", "caption": "Add subtask у задачи на календаре: панель меню ушла, в конце стопки подзадач — поле новой"}, {"left": 1474, "view": "typing", "theme": "light", "caption": "Светлая: пишут новую задачу"}, {"left": 1944, "view": "tabNext", "theme": "light", "caption": "Светлая: подзадача с веткой"}, {"left": 2414, "view": "v2Priority", "theme": "light", "caption": "Светлая: приоритет из полосы"}] };
   }
 }
 </script>

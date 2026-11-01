@@ -1371,10 +1371,10 @@
   "QuickFlow5.dc.html": {
    "x": 0,
    "y": 7656,
-   "w": 1928,
+   "w": 2868,
    "h": 1120,
    "page": "quickadd",
-   "title": "7. Переименовать на месте и светлая тема"
+   "title": "7. Переименовать на месте, календарь и светлая тема"
   },
   "QuickAdd.dc.html": {
    "x": 1410,
@@ -1431,6 +1431,30 @@
    "h": 844,
    "page": "menuorder",
    "title": "Задача без приоритета: ничего не выбрано, крестика нет"
+  },
+  "Back23Screen.dc.html": {
+   "x": 2350,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов Backlog (его показывают доски «Backlog #23»)"
+  },
+  "Back23Flow1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1458,
+   "h": 1076,
+   "page": "backlog23",
+   "title": "Вариант 1. Зона Backlog при перетаскивании"
+  },
+  "Back23Flow2.dc.html": {
+   "x": 0,
+   "y": 1276,
+   "w": 988,
+   "h": 1076,
+   "page": "backlog23",
+   "title": "Вариант 2. Move to Backlog в меню задачи"
   }
  },
  "createdOnFiles": {
@@ -1469,7 +1493,8 @@
   "tasksRulesProd",
   "step14shape",
   "wheel30Title",
-  "menugroupedTitle"
+  "menugroupedTitle",
+  "backlog23Title"
  ],
  "notes": {
   "lightTitle": {
@@ -1742,6 +1767,14 @@
    "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
    "x": 0,
    "y": -300
+  },
+  "backlog23Title": {
+   "kind": "title1",
+   "maxW": 1458,
+   "page": "backlog23",
+   "text": "Backlog #23: как задача попадает в бэклог из Inbox и Soon (на обсуждении)",
+   "x": 0,
+   "y": -300
   }
  },
  "order": [
@@ -1923,7 +1956,10 @@
   "QuickFlow7.dc.html",
   "MenuGroupedShort.dc.html",
   "MenuGroupedLong.dc.html",
-  "MenuGroupedUnset.dc.html"
+  "MenuGroupedUnset.dc.html",
+  "Back23Screen.dc.html",
+  "Back23Flow1.dc.html",
+  "Back23Flow2.dc.html"
  ],
  "pages": [
   {
@@ -1973,6 +2009,10 @@
   {
    "id": "components",
    "name": "Служебное: компоненты"
+  },
+  {
+   "id": "backlog23",
+   "name": "Backlog #23"
   }
  ],
  "title": "Task Calendar"

@@ -1,42 +1,107 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import { menuRows, priorityRows } from "../../src/ui/menu/TaskMenu";
+import { editRows, nextPriority, priorityTiles, statusTiles, TaskMenu, tileRows } from "../../src/ui/menu/TaskMenu";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, group: null, ...extra });
 
-describe("menuRows", () => {
-	it("offers the three groups for a task to do", () => {
-		const groups = menuRows(item({ dueDate: "2026-11-03" }));
-		expect(groups.map((g) => g.map((r) => r.id))).toEqual([["progress", "done", "wontdo"], ["due", "priority", "rename", "subtask"], ["delete"]]);
-		expect(groups[0][0].label).toBe("In progress");
-		expect(groups[1][0].value).toBe("3 Nov");
-		expect(groups[2][0].danger).toBe(true);
+const LEVELS = [
+	{ prefix: "p1", color: "red" },
+	{ prefix: "p2", color: "orange" },
+] as const;
+
+describe("the status group", () => {
+	it("offers Done first, then In progress and Won’t do", () => {
+		const tiles = statusTiles(item());
+		expect(tiles.map((t) => t.id)).toEqual(["done", "progress", "wontdo"]);
+		expect(tiles.map((t) => t.label)).toEqual(["Done", "In progress", "Won’t do"]);
 	});
 
-	it("turns In progress into Stop progress for a task in progress, and shows no value without a date", () => {
-		const groups = menuRows(item({ status: "inProgress" }));
-		expect(groups[0][0].label).toBe("Stop progress");
-		expect(groups[1][0].value).toBe("");
+	it("turns In progress into Stop progress for a task in progress", () => {
+		expect(statusTiles(item({ status: "inProgress" }))[1].label).toBe("Stop progress");
 	});
 });
 
-describe("priority in the menu", () => {
-	const LEVELS = [
-		{ prefix: "p1", color: "red" },
-		{ prefix: "p2", color: "orange" },
-	] as const;
-
-	it("shows the level's dot and prefix beside Priority, nothing without one", () => {
-		const row = menuRows(item({ priority: LEVELS[0] }))[1][1];
-		expect(row).toMatchObject({ id: "priority", label: "Priority", value: "p1", dot: "red", icon: "priority" });
-		expect(menuRows(item())[1][1]).toMatchObject({ value: "", dot: null });
+describe("the edit group", () => {
+	it("holds Rename, Due date with the date beside it, and Add subtask", () => {
+		const rows = editRows(item({ dueDate: "2026-11-03" }));
+		expect(rows.map((r) => r.id)).toEqual(["rename", "due", "subtask"]);
+		expect(rows[1].value).toBe("3 Nov");
 	});
 
-	it("lists the levels in order with the current one checked", () => {
-		expect(priorityRows(item({ priority: LEVELS[1] }), LEVELS)).toEqual([
+	it("shows no date beside Due date without one", () => {
+		expect(editRows(item())[1].value).toBe("");
+	});
+});
+
+describe("the priority group", () => {
+	it("has a tile per level in the settings' order, the task's own on", () => {
+		expect(priorityTiles(item({ priority: LEVELS[1] }), LEVELS)).toEqual([
 			{ prefix: "p1", color: "red", on: false },
 			{ prefix: "p2", color: "orange", on: true },
 		]);
-		expect(priorityRows(item(), LEVELS).some((r) => r.on)).toBe(false);
+		expect(priorityTiles(item(), LEVELS).some((t) => t.on)).toBe(false);
+	});
+
+	it("sets another level, and takes the priority off on the task's own", () => {
+		expect(nextPriority(item({ priority: LEVELS[1] }), "p1")).toBe("p1");
+		expect(nextPriority(item(), "p2")).toBe("p2");
+		expect(nextPriority(item({ priority: LEVELS[1] }), "p2")).toBeNull();
+	});
+
+	it("lays the tiles in even rows of at most three, so no row is left with a hole", () => {
+		const sizes = (n: number) => tileRows(Array.from({ length: n }, (_, i) => i)).map((row) => row.length);
+		expect([1, 2, 3, 4, 5, 6].map(sizes)).toEqual([[1], [2], [3], [2, 2], [3, 2], [3, 3]]);
+		expect(tileRows([])).toEqual([]);
+	});
+});
+
+describe("the menu", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	const open = (task: TaskItem) => {
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		const source = document.body.appendChild(document.createElement("div"));
+		TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		return actions;
+	};
+	const panel = () => document.querySelector(".tc-panel") as HTMLElement;
+	const labels = (selector: string) => [...panel().querySelectorAll(selector)].map((node) => node.textContent);
+
+	it("shows the statuses, the levels, the edits and Delete, each in its own group", () => {
+		open(item());
+		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
+		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Due date", "Add subtask", "Delete"]);
+		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
+	});
+
+	it("marks the task's level with a badge, and a tap on it takes the priority off", () => {
+		const actions = open(item({ priority: LEVELS[0] }));
+		const tiles = panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile");
+		expect(tiles[0].classList.contains("is-on")).toBe(true);
+		expect(tiles[0].querySelector(".tc-menu-badge")).not.toBeNull();
+		tiles[0].click();
+		expect(actions.setPriority).toHaveBeenCalledWith(null);
+	});
+
+	it("sets the level tapped", () => {
+		const actions = open(item());
+		panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")[1].click();
+		expect(actions.setPriority).toHaveBeenCalledWith("p2");
+	});
+
+	it("marks the task done from its tile", () => {
+		const actions = open(item());
+		panel().querySelector<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")?.click();
+		expect(actions.setStatus).toHaveBeenCalledWith("done");
+	});
+
+	it("leaves out the priority group when no level is set up", () => {
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: [], actions });
+		expect(panel().querySelector(".tc-menu-tiles.is-priority")).toBeNull();
 	});
 });
