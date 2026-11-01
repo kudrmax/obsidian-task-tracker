@@ -3,6 +3,7 @@ import type { LocalDate } from "./types";
 import type { PriorityLevel } from "../settings";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
+import { fillTitle } from "./TaskTitle";
 
 export interface TaskCardOptions {
 	/** The day the card is shown on: a due date on that day goes without saying. */
@@ -26,7 +27,7 @@ export function showStrip(parent: HTMLElement, item: TaskItem): void {
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
 	markPriority(card, item.priority);
 	showStrip(card, item);
-	el(card, "div", "tc-card-title", item.text);
+	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderProgress(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {
 		const due = el(card, "span", "tc-due");

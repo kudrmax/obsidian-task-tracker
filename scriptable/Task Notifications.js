@@ -183,6 +183,73 @@ function openSlotted(doc) {
   return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
 }
 
+// src/domain/TaskText.ts
+var TOKEN_RE = new RegExp(
+  [
+    "(?<code>`[^`]*`)",
+    "(?<escape>\\\\.)",
+    "(?<embed>!\\[\\[[^\\]]*\\]\\]|!\\[[^\\]]*\\]\\([^)]*\\))",
+    "\\[\\[(?<wiki>[^\\[\\]|]+?)(?:\\|(?<alias>[^\\[\\]]+?))?\\]\\]",
+    "\\[(?<label>[^\\[\\]]+)\\]\\((?<href><[^>]+>|[^()\\s]+)\\)",
+    "(?<bare>https?://[^\\s<>]+)"
+  ].join("|"),
+  "gu"
+);
+var SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
+var TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}'"»]+$/u;
+function textParts(text) {
+  const parts = [];
+  const pushText = (s) => {
+    if (s === "") return;
+    const last = parts[parts.length - 1];
+    if (last?.kind === "text") parts[parts.length - 1] = { kind: "text", text: last.text + s };
+    else parts.push({ kind: "text", text: s });
+  };
+  let at = 0;
+  for (const m of text.matchAll(TOKEN_RE)) {
+    const link = linkOf(m.groups);
+    if (!link) continue;
+    pushText(text.slice(at, m.index));
+    parts.push(link.part);
+    pushText(link.rest);
+    at = m.index + m[0].length;
+  }
+  pushText(text.slice(at));
+  return parts;
+}
+function plainText(text) {
+  return textParts(text).map((p) => p.kind === "text" ? p.text : p.label).join("");
+}
+function linkOf(g) {
+  if (g.wiki !== void 0) {
+    const target = g.wiki.trim();
+    return { part: { kind: "note", label: g.alias?.trim() || noteLabel(target), target }, rest: "" };
+  }
+  if (g.label !== void 0 && g.href !== void 0) {
+    const href = g.href.startsWith("<") ? g.href.slice(1, -1) : g.href;
+    const part = SCHEME_RE.test(href) ? { kind: "url", label: g.label, target: href } : { kind: "note", label: g.label, target: decoded(href) };
+    return { part, rest: "" };
+  }
+  if (g.bare !== void 0) {
+    const rest = TRAILING_PUNCTUATION_RE.exec(g.bare)?.[0] ?? "";
+    const url = g.bare.slice(0, g.bare.length - rest.length);
+    return { part: { kind: "url", label: url, target: url }, rest };
+  }
+  return null;
+}
+function noteLabel(target) {
+  const [note, ...subpath] = target.split("#");
+  if (subpath.length === 0) return note;
+  return note === "" ? subpath.join(" > ") : [note, ...subpath].join(" > ");
+}
+function decoded(href) {
+  try {
+    return decodeURI(href);
+  } catch {
+    return href;
+  }
+}
+
 // src/domain/Task.ts
 var STATUS_CHARS = {
   todo: " ",
@@ -669,7 +736,7 @@ var SlotReminders = class _SlotReminders {
     const [year, month, day] = slot.date.split("-").map(Number);
     return {
       id: `${_SlotReminders.THREAD} ${slot.date} ${start} ${text}`,
-      title: text,
+      title: plainText(text),
       body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % DAY_MINUTES3)}`,
       at: new Date(year, month - 1, day, 0, slot.start)
     };

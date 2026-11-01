@@ -23,7 +23,9 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
+import type { EditorOwner } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
+import type { TaskLink } from "./TaskTitle";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
@@ -90,6 +92,8 @@ export class TaskCalendarView extends ItemView {
 	private readonly data: DayData;
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
+	/** The task screen's title while it has the focus: Obsidian's commands and hotkeys go to it. */
+	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
 	/** The levels the tasks were last read with: other levels colour them anew. */
@@ -678,8 +682,15 @@ export class TaskCalendarView extends ItemView {
 				rename: (menu) => this.quick?.rename(item, menu),
 				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
 				remove: () => this.act(() => tasks.remove(item.key)),
+				openLink: (link) => this.openLink(link),
 			},
 		});
+	}
+
+	/** A note opens in a new tab, so the calendar stays where it is; an address goes to the browser. */
+	private openLink(link: TaskLink): void {
+		if (link.kind === "url") window.open(link.target);
+		else void this.app.workspace.openLinkText(link.target, this.settings.tasksFile, "tab");
 	}
 
 	/** A gesture keeps the elements it holds: the redraw waits until it ends. */
