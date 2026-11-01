@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../src/application/contracts";
 import type { DragPayload, ListColumn, NewTaskPayload } from "../../src/ui/drag/DropTarget";
 import { ListDrop } from "../../src/ui/drag/ListDrop";
@@ -137,6 +137,88 @@ describe("ListDrop", () => {
 			expect(refusing.hitTest(50, 120, fresh)).toBe(false);
 			expect(refusing.drop(50, 120, fresh)).toBeNull();
 			expect(drop.hitTest(50, 120, fresh)).toBe(true);
+		});
+	});
+
+	describe("making room (the owner's decision of 02.11)", () => {
+		const STEP = 37;
+		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null), item("now", 3, "D", null)];
+		const room = (list: TaskList) => list.elements.map((n) => n.style.getPropertyValue("--tc-room"));
+		const gapEl = () => document.querySelector<HTMLElement>(".tc-drop-gap");
+
+		/** Cards a step apart, as drawn: the lifted one keeps its place in the layout. */
+		function lifted(at: number) {
+			const items = three();
+			const { list, drop } = setup(items, "left", null);
+			list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * STEP, 175, 35)));
+			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
+			list.elements[at].classList.add("is-lifted");
+			return { list, drop, items, from: drag("left", items[at]) };
+		}
+
+		beforeEach(() => document.body.replaceChildren());
+		afterEach(() => {
+			document.body.replaceChildren();
+			vi.useRealTimers();
+		});
+
+		it("keeps the lifted card's place open from the lift, dashed, the other cards where they were", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(10 + 17, 100 + STEP + 17, from);
+			expect(room(list)).toEqual(["0px", "0px", "0px", "0px"]);
+			expect(list.el.classList.contains("is-making-room")).toBe(true);
+			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
+			expect(gapEl()?.parentElement).toBe(list.el);
+			expect(drop.landing()?.top).toBe(100 + STEP);
+		});
+
+		it("moves the room only when the finger picks another gap: the cards step aside by transform, none reflows", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			expect(room(list)).toEqual(["0px", "0px", `-${STEP}px`, "0px"]);
+			expect(list.elements[1].classList.contains("is-lifted")).toBe(true);
+		});
+
+		it("keeps the room where it is while the finger is over a card: the card under it does not slide away", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			const before = room(list);
+			drop.preview(27, 100 + 2 * STEP + 17, from);
+			expect(list.elements[2].classList.contains("is-target")).toBe(true);
+			expect(room(list)).toEqual(before);
+			expect(gapEl()?.classList.contains("is-shown")).toBe(false);
+			drop.preview(27, 100 + 2 * STEP + 18, from);
+			expect(list.elements[2].classList.contains("is-target")).toBe(true);
+		});
+
+		it("closes over the lifted card when the finger leaves the list, and stands as drawn once the card is back", () => {
+			vi.useFakeTimers();
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			drop.clear();
+			expect(room(list)).toEqual(["0px", "0px", `-${STEP}px`, `-${STEP}px`]);
+			vi.runAllTimers();
+			expect(gapEl()).toBeNull();
+			list.elements[1].classList.remove("is-lifted");
+			drop.clear();
+			expect(room(list)).toEqual(["", "", "", ""]);
+			expect(list.el.classList.contains("is-making-room")).toBe(false);
+		});
+
+		it("scrolls the list under a finger held near its bottom edge, the place following", () => {
+			const frames: (() => void)[] = [];
+			vi.stubGlobal("requestAnimationFrame", (fn: () => void) => frames.push(fn));
+			const { list, drop, from } = lifted(1);
+			let scrollTop = 0;
+			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+			drop.preview(27, 100 + 554 - 2, from);
+			expect(frames.length).toBe(1);
+			frames.shift()!();
+			expect(scrollTop).toBeGreaterThan(0);
+			expect(frames.length).toBe(1);
+			drop.clear();
+			vi.unstubAllGlobals();
 		});
 	});
 });

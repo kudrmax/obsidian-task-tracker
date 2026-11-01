@@ -42,16 +42,42 @@ function orderOf(heads: readonly PlacedHead[], group: GroupName): number {
 	return heads.findIndex((h) => h.group === group);
 }
 
+/** The same place but perhaps for its level: the same card, or the same gap in the same section. */
+export function samePlace(a: ListPlace, b: ListPlace): boolean {
+	if (a.kind === "into" || b.kind === "into") return a.kind === b.kind && a.index === b.index;
+	return a.index === b.index && a.group === b.group;
+}
+
 /**
- * Where the finger at `y` puts the card, its left edge at `level` (fractional), seen against the list as it shows `current`:
- * the cards and headers standing as they do with the dragged card gone, those after an open gap on `shift` lower. Over the
- * middle of a card as it stands the card goes into it. Elsewhere it goes into the gap among the cards' middles as they
- * stand; between two sections, a header's middle says which side of it. The level is the one nearest `level` that the
- * neighbours in that section allow: no deeper than one under the card above, no shallower than the card below. A header
- * breaks nesting: the first card under it is a task.
+ * Where the finger at `y` puts the card, its left edge at `level` (fractional), seen against the list as it stands with
+ * `room` open: the cards and headers standing as they do with the dragged card gone, those after an open gap on `shift`
+ * lower (a card as the room opens nothing). Over the middle of a card as it stands the card goes into it. Elsewhere it goes
+ * into the gap among the cards' middles as they stand; between two sections, a header's middle says which side of it. The
+ * level is the one nearest `level` that the neighbours in that section allow: no deeper than one under the card above, no
+ * shallower than the card below. A header breaks nesting: the first card under it is a task.
+ *
+ * `held`, the place shown now, keeps the finger until it is more than `hysteresis` px past that place's edge, so at an
+ * edge the place does not flip between its two sides; its level still follows the finger.
  */
-export function placeAt(cards: readonly PlacedCard[], y: number, level: number, shift: number, current: ListPlace, heads: readonly PlacedHead[] = []): ListPlace {
-	const gap = current.kind === "gap" ? current : null;
+export function placeAt(
+	cards: readonly PlacedCard[],
+	y: number,
+	level: number,
+	shift: number,
+	room: ListPlace | null,
+	heads: readonly PlacedHead[] = [],
+	held: ListPlace | null = null,
+	hysteresis = 0,
+): ListPlace {
+	const at = (finger: number) => rawPlaceAt(cards, finger, level, shift, room, heads);
+	const place = at(y);
+	if (!held || hysteresis <= 0 || samePlace(place, held)) return place;
+	if (!samePlace(at(y - hysteresis), held) && !samePlace(at(y + hysteresis), held)) return place;
+	return held.kind === "into" ? held : fitLevel(cards, { ...held, level: Math.round(level) });
+}
+
+function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shift: number, room: ListPlace | null, heads: readonly PlacedHead[]): ListPlace {
+	const gap = room?.kind === "gap" ? room : null;
 	const top = (i: number) => cards[i].top + (gap && i >= gap.index ? shift : 0);
 	const headAfterGap = (h: PlacedHead) => gap !== null && (h.firstCard > gap.index || (h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, gap.group)));
 	/** Past this a finger is under the header. The first header with no task outside any section above it takes its whole height: above it is where a card leaves every section. */

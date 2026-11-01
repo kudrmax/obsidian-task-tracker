@@ -192,9 +192,12 @@ export class QuickEntryController {
 		const { lists, timeline } = this.deps.dropTargets();
 		this.droppedOn = null;
 		const targets = [this.ring, ...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
-		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) return;
-		this.carrying = true;
 		this.ring.show();
+		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) {
+			this.ring.hide();
+			return;
+		}
+		this.carrying = true;
 		this.showPlus();
 	}
 

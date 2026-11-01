@@ -71,6 +71,8 @@ export const PROPERTY = {
 	pull: "--tc-pull",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
+	/** How far a card of a list stands from its place while a drag makes room in the list, px. */
+	room: "--tc-room",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
 	/** Where the switch's wheel stands: 0 with Inbox and Soon in its window, 2 with Now and the calendar, in between under a finger. */
@@ -121,10 +123,15 @@ export const LAYOUT = {
 	slowSpeed: 0.08,
 	/** The wheel turns freely once the finger has gone slowly this long in a drag, and stays free to its end. */
 	carefulMs: 100,
-	/** The timeline scrolls itself while a drag comes this close to its edge. */
+	/** A list or the timeline scrolls itself while a drag comes this close to its edge. */
 	autoScrollEdge: 40,
 	/** Pixels per frame of that scroll at the very edge. */
 	autoScrollSpeed: 12,
+	/**
+	 * How far past the edge of the place a list shows the finger goes before another place is taken: at an edge the place
+	 * would otherwise flip between its two sides with every tremor of the finger.
+	 */
+	dropHysteresis: 6,
 	/** The fewest minutes a slot dropped near midnight keeps before it. */
 	minSlotMinutes: 5,
 	/** How far in a task card lies over a long task's body or an event. */

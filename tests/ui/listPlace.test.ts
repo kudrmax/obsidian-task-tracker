@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, type PlacedCard, fitLevel, gapOf, levelRange, placeAt, resultOf, shiftLevel } from "../../src/ui/drag/listPlace";
+import { type GapPlace, type PlacedCard, fitLevel, gapOf, levelRange, placeAt, resultOf, samePlace, shiftLevel } from "../../src/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;
@@ -16,6 +16,43 @@ const CARDS: PlacedCard[] = [
 
 describe("placeAt", () => {
 	const gap = (index: number) => ({ kind: "gap", index, level: 0, group: null }) as const;
+
+	describe("hysteresis: the place shown keeps a finger that trembles at its edge", () => {
+		const HOLD = 6;
+		/** B's top edge of the into zone, with the gap before A10 open: B stands a step lower. */
+		const intoEdge = 4 * STEP + STEP + H * 0.2;
+
+		it("keeps the place shown until the finger is more than the hysteresis past its edge", () => {
+			expect(placeAt(CARDS, intoEdge + 2, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual(gap(4));
+			expect(placeAt(CARDS, intoEdge + HOLD + 1, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual({ kind: "into", index: 4 });
+		});
+
+		it("holds a card the finger is over the same way when it slips off its middle", () => {
+			const into = { kind: "into", index: 4 } as const;
+			expect(placeAt(CARDS, intoEdge - 2, 0, STEP, gap(4), [], into, HOLD)).toEqual(into);
+			expect(placeAt(CARDS, intoEdge - HOLD - 1, 0, STEP, gap(4), [], into, HOLD)).toEqual(gap(4));
+		});
+
+		it("lets a fast finger, far past the edge, take the new place at once", () => {
+			expect(placeAt(CARDS, -20, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual(gap(0));
+		});
+
+		it("lets the level of a held gap follow the finger", () => {
+			const held = { kind: "gap", index: 4, level: 0, group: null } as const;
+			const place = placeAt(CARDS, 4 * STEP + 2, 1, STEP, held, [], held, HOLD);
+			expect(place).toEqual({ ...held, level: 1 });
+		});
+
+		it("sees one place in two that differ only by level", () => {
+			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 2, level: 1, group: null })).toBe(true);
+			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "into", index: 2 })).toBe(false);
+		});
+	});
+
+	it("measures the cards against the room left open while the finger is over a card, so the card does not slide from under it", () => {
+		const into = { kind: "into", index: 4 } as const;
+		expect(placeAt(CARDS, 4 * STEP + STEP + H / 2, 0, STEP, gap(4), [], into)).toEqual(into);
+	});
 
 	it("opens the gap where the finger is, at the level its edge picks within what the neighbours allow", () => {
 		expect(placeAt(CARDS, 2 * STEP - 1, 1, STEP, gap(5))).toEqual({ kind: "gap", index: 2, level: 1, group: null });

@@ -6,6 +6,9 @@ import type { ListGroup } from "../listGroups";
 import type { TaskList } from "../TaskList";
 import { LongPress } from "./LongPress";
 
+/** The lifted section's header and tasks fold away and the list closes over them. */
+const FOLDED = "is-folded";
+
 const DRAG = "drag";
 
 /** Where a section let go at slot `slot` goes: before the group standing there, or last; null at its own place. */
@@ -60,7 +63,7 @@ export class GroupDrag {
 		const grab = { dx: e.clientX - head.getBoundingClientRect().left, dy: e.clientY - head.getBoundingClientRect().top };
 		const float = this.float(group);
 		const cards = taskList.cards.filter((entry) => entry.item.group === group.name).map((entry) => entry.card);
-		for (const node of [head, ...cards]) node.classList.add("is-lifted");
+		for (const node of [head, ...cards]) node.classList.add(FOLDED);
 		const mark = el(null, "div", "tc-group-drop");
 		let slot = lifted;
 		const moveTo = (x: number, y: number) => {
@@ -80,7 +83,7 @@ export class GroupDrag {
 			releasePointer(head, e.pointerId);
 			float.remove();
 			mark.remove();
-			for (const node of [head, ...cards]) node.classList.remove("is-lifted");
+			for (const node of [head, ...cards]) node.classList.remove(FOLDED);
 			this.deps.arbiter.release(DRAG);
 			const place = apply ? liftedPlace(names, lifted, slot) : null;
 			if (!place) return;
