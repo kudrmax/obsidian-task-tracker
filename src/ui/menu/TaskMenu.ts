@@ -3,8 +3,8 @@ import type { PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard, renderTaskCard, showMeta, showStrip } from "../TaskCard";
-import { fillTitle, linkAt, type TaskLink } from "../TaskTitle";
+import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
+import { linkAt, type TaskLink } from "../TaskTitle";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { type CloseHow, Overlay } from "./Overlay";
@@ -239,10 +239,7 @@ export class TaskMenu {
 		this.fillStack(stack, task.subtasks);
 		const copy = this.lifted.querySelector<HTMLElement>(".tc-block-card");
 		if (copy) showMeta(copy, task);
-		for (const text of pending) {
-			const card = stack.insertBefore(el(null, "div", "tc-card"), this.stackRow);
-			fillTitle(el(card, "div", "tc-card-title"), text);
-		}
+		for (const text of pending) stack.insertBefore(renderUnwrittenCard(null, text), this.stackRow);
 	}
 
 	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */

@@ -147,7 +147,8 @@ export function placementOfEntry(entry: TaskEntry, today: LocalDate): Placement 
 	return entry.section === "soon" ? { kind: "soon" } : { kind: "now" };
 }
 
-function samePlacement(a: Placement, b: Placement): boolean {
+/** The same place: the same kind, and for a date the same day. */
+export function samePlacement(a: Placement, b: Placement): boolean {
 	return a.kind === b.kind && (a.kind !== "date" || b.kind !== "date" || a.date === b.date);
 }
 

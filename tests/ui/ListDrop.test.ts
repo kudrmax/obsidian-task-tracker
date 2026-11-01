@@ -81,6 +81,25 @@ describe("ListDrop", () => {
 		expect(drop.drop(50, 101, drag("left", item("now", 1, "B", null)))).toEqual({ kind: "listBefore", before: a.key, column: "left" });
 	});
 
+	describe("the left column of a past day, its tasks in sections it does not show", () => {
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
+		const two = () => [item("now", 0, "A", "Work"), item("now", 1, "B", "Home")];
+
+		it("a new task let go between cards of two sections goes before the one under it", () => {
+			const items = two();
+			const { drop } = setup(items, "left", null);
+			const y = 100 + 40 + 2;
+			drop.preview(50, y, fresh);
+			expect(drop.landing()?.top).toBe(140);
+			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[1].key, column: "left" });
+		});
+
+		it("gives each card the section it is drawn in: none", () => {
+			const { list } = setup(two(), "left", null);
+			expect(list.listCards.map((card) => card.group)).toEqual([null, null]);
+		});
+	});
+
 	describe("a new task", () => {
 		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
 		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null)];

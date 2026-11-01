@@ -66,6 +66,10 @@ class FakeTasks {
 				this.edits.push({ key: k, draft });
 			},
 			placement: () => ({ kind: "now" }),
+			levels: () => [
+				{ prefix: "!!", color: "red" },
+				{ prefix: "p1", color: "orange" },
+			],
 			onChange: (state) => this.changes.push(state),
 			onError: (e) => this.errors.push(e),
 		});
@@ -158,6 +162,38 @@ describe("QuickEntry", () => {
 		expect(tasks.changes[tasks.changes.length - 1]).toBeNull();
 		await entry.idle();
 		expect(tasks.created).toEqual([]);
+	});
+
+	it("a text that is only a priority's prefix is blank: Enter, a tap elsewhere and a rename write nothing", async () => {
+		const tasks = new FakeTasks(["A", ["A0", 1]]);
+		const entry = tasks.entry();
+		entry.open(at(2, 1));
+		entry.type("!! ");
+		entry.enter();
+		expect(entry.state).toMatchObject({ spot: at(2, 0), pending: [] });
+		entry.type("p1  ");
+		entry.enter();
+		expect(entry.state).toBeNull();
+		entry.open(at(2));
+		entry.type("!! ");
+		entry.blur();
+		entry.open(at(0), item("A"));
+		entry.type("p1 ");
+		entry.enter();
+		expect(entry.state).toBeNull();
+		await entry.idle();
+		expect(tasks.created).toEqual([]);
+		expect(tasks.edits).toEqual([]);
+	});
+
+	it("a text after a prefix is not blank", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.type("!! Call");
+		entry.enter();
+		await entry.idle();
+		expect(tasks.created.map((c) => c.text)).toEqual(["!! Call"]);
 	});
 
 	it("blur flushes the queue", async () => {

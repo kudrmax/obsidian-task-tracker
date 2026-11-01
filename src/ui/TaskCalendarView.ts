@@ -32,6 +32,7 @@ import type { TaskLink } from "./TaskTitle";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
+import { dayColumn } from "./dayColumn";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -208,6 +209,7 @@ export class TaskCalendarView extends ItemView {
 			grouped: () => this.sectionsOf("left") !== null,
 			pending: () => this.namingIn("left"),
 			entry: () => this.quick?.entryIn("left") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
@@ -220,6 +222,7 @@ export class TaskCalendarView extends ItemView {
 			grouped: () => this.sectionsOf("inbox") !== null,
 			pending: () => this.namingIn("inbox"),
 			entry: () => this.quick?.entryIn("inbox") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
@@ -232,6 +235,7 @@ export class TaskCalendarView extends ItemView {
 			grouped: () => this.sectionsOf("soon") !== null,
 			pending: () => this.namingIn("soon"),
 			entry: () => this.quick?.entryIn("soon") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
@@ -637,9 +641,8 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
 		if (column !== "left") return { list: column, date: null };
-		const today = this.today();
-		if (this.selectedDate === today) return { list: "now", date: null };
-		return this.selectedDate > today ? { list: "soon", date: this.selectedDate } : null;
+		const { list, date, sections } = dayColumn(this.selectedDate, this.today());
+		return sections ? { list, date } : null;
 	}
 
 	private listOf(column: ListColumn): TaskList | null {

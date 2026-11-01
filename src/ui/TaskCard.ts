@@ -18,6 +18,13 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 	return card;
 }
 
+/** A text typed and not yet written, drawn as a plain card with its title alone until the file has the task. */
+export function renderUnwrittenCard(parent: HTMLElement | null, text: string): HTMLElement {
+	const card = el(parent, "div", "tc-card");
+	fillTitle(el(card, "div", "tc-card-title"), text);
+	return card;
+}
+
 /** The strip of a task in progress at `parent`'s left, once; none for a task not in progress. */
 export function showStrip(parent: HTMLElement, item: TaskItem): void {
 	const strip = parent.querySelector(":scope > .tc-strip");

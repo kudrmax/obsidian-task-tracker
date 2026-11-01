@@ -1,10 +1,11 @@
 import type { NewTaskPlace, Placement, TaskItem, TaskKey, TaskService } from "../../application/contracts";
 import { type PriorityLevel, type RightMode, usableLevels } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
+import { type DayColumn, dayColumn } from "../dayColumn";
 import { DESIGN, LAYOUT } from "../design";
 import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, PlacedResult } from "../drag/DropTarget";
-import { gapOf, type PlaceResult, type PlacedCard, sameTask } from "../drag/listPlace";
+import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
@@ -133,6 +134,7 @@ export class QuickEntryController {
 			createInPlace: (text, priority, place) => deps.tasks.createInPlace(text, priority, place),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),
+			levels: () => usableLevels(deps.levels()),
 			onChange: (state) => this.changed(state),
 			onError: (error) => deps.onError(error),
 		});
@@ -215,7 +217,12 @@ export class QuickEntryController {
 	entryIn(column: ListColumn): ListEntryInput | null {
 		const state = this.state;
 		if (state?.spot.kind !== "list" || state.spot.column !== column) return null;
-		return { place: state.spot.place, pending: state.pending, renaming: state.renaming?.key ?? null, field: (row) => this.fieldIn(row) };
+		return { place: state.spot.place, pending: state.pending, field: (row) => this.fieldIn(row) };
+	}
+
+	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
+	renaming(): TaskKey | null {
+		return this.state?.renaming?.key ?? null;
 	}
 
 	/** A card is lifted or settled: the plus hides while it is carried. */
@@ -285,10 +292,8 @@ export class QuickEntryController {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
 		if (column !== "left") return { kind: "list", list: column, group, before };
-		const today = this.deps.today();
-		const day = this.deps.day();
-		if (day === today) return { kind: "list", list: "now", group, before };
-		return { kind: "list", list: day > today ? "soon" : "now", group, before, date: day };
+		const { list, date } = this.shownDay();
+		return date === null ? { kind: "list", list, group, before } : { kind: "list", list, group, before, date };
 	}
 
 	private open(spot: EntrySpot, renaming?: TaskItem): void {
@@ -303,11 +308,13 @@ export class QuickEntryController {
 		return { kind: "list", column, place: { kind: "gap", index: list?.cards.length ?? 0, level: 0, group: groups[groups.length - 1]?.name ?? null } };
 	}
 
-	private cards(column: ListColumn): PlacedCard[] {
-		return (this.deps.list(column)?.cards ?? []).map(({ card, item, level }) => {
-			const rect = card.getBoundingClientRect();
-			return { key: item.key, level, top: rect.top, height: rect.height, group: item.group };
-		});
+	private cards(column: ListColumn): readonly ListCard[] {
+		return this.deps.list(column)?.listCards ?? [];
+	}
+
+	/** What the day column stands for on the day it shows. */
+	private shownDay(): DayColumn {
+		return dayColumn(this.deps.day(), this.deps.today());
 	}
 
 	private find(key: TaskKey): { readonly column: ListColumn; readonly index: number } | null {
@@ -465,8 +472,8 @@ export class QuickEntryController {
 
 	private columnPlacement(column: ListColumn): Placement {
 		if (column !== "left") return { kind: column };
-		const day = this.deps.day();
-		return day === this.deps.today() ? { kind: "now" } : { kind: "date", date: day };
+		const { date } = this.shownDay();
+		return date === null ? { kind: "now" } : { kind: "date", date };
 	}
 
 	/**

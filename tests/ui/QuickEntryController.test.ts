@@ -6,6 +6,7 @@ import type { DragPayload, DropResult, DropTarget, ListColumn, PlacedResult } fr
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
 import { TaskMenu } from "../../src/ui/menu/TaskMenu";
+import { dayColumn } from "../../src/ui/dayColumn";
 import { TaskList } from "../../src/ui/TaskList";
 import { Timeline } from "../../src/ui/Timeline";
 import { DayBoundary } from "../../src/application/contracts";
@@ -60,8 +61,9 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		lists[column] = new TaskList(root.appendChild(document.createElement("div")), {
 			items: () => items[column] ?? [],
 			day: () => null,
-			grouped: () => column !== "left",
+			grouped: () => column !== "left" || dayColumn(day, TODAY).sections,
 			entry: () => controller?.entryIn(column) ?? null,
+			renaming: () => controller?.renaming() ?? null,
 		});
 	}
 	const timeline = new Timeline(root.appendChild(document.createElement("div")), {
@@ -403,6 +405,75 @@ describe("QuickEntryController", () => {
 		type("A2");
 		press("Enter");
 		await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A2", placement: { kind: "now" }, priority: null } }]));
+	});
+
+	describe("a rename the bar's place moves to another column", () => {
+		const a = item("A", key("now", 0));
+		const movedToSoon = () => {
+			const s = setUp({ mode: "soon", items: { left: [a, item("B", key("now", 1))], soon: [item("S", key("soon", 0))] } });
+			s.controller.rename(a);
+			s.root.querySelector<HTMLElement>(".tc-bar-place")!.click();
+			tile(s.root, "Soon").click();
+			return s;
+		};
+		const hiddenIn = (list: TaskList) => [...list.el.querySelectorAll(".is-renaming")].map((card) => card.textContent);
+
+		it("keeps the card hidden at its old place while the field stands at the end of the other column", () => {
+			const { rowsOf, lists, field } = movedToSoon();
+			expect(rowsOf("soon")).toEqual(["S", "field"]);
+			expect(field()!.value).toBe("A");
+			expect(hiddenIn(lists.left)).toEqual(["A"]);
+			expect(hiddenIn(lists.soon)).toEqual([]);
+		});
+
+		it("saves the task to the place chosen on Enter", async () => {
+			const { press, edits } = movedToSoon();
+			press("Enter");
+			await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A", placement: { kind: "soon" }, priority: null } }]));
+		});
+
+		it("saves the task to the place chosen on a tap elsewhere, and the field closes", async () => {
+			const { edits, field, lists } = movedToSoon();
+			document.body.click();
+			expect(field()).toBeNull();
+			expect(hiddenIn(lists.left)).toEqual([]);
+			await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A", placement: { kind: "soon" }, priority: null } }]));
+		});
+	});
+
+	describe("the day column of a past day, its tasks in sections it does not show", () => {
+		const PAST = "2026-10-28";
+		const work = () => [item("A", key("now", 0), "Work"), item("B", key("now", 1), "Work")];
+
+		it("Tab at the end of the list makes the field a subtask of the last card", () => {
+			const { controller, lists, press, root } = setUp({ day: PAST, items: { left: work() } });
+			controller.openAtEnd("left");
+			expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
+			press("Tab");
+			const row = lists.left.el.querySelector<HTMLElement>(".tc-quick-row")!;
+			expect(row.style.getPropertyValue("--tc-level")).toBe("1");
+		});
+
+		it("the plus let go at the end of the list opens the field there, and Enter writes the task at the end of Now", async () => {
+			const { controller, plus, beginNew, drops, rowsOf, type, press, created } = setUp({ day: PAST, items: { left: work() } });
+			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
+			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
+			const [, , targets, onDrop] = beginNew.mock.calls[0];
+			onDrop(targets[0].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
+			expect(rowsOf("left")).toEqual(["A", "B", "field"]);
+			type("C");
+			press("Enter");
+			await vi.waitFor(() => expect(created).toEqual([{ text: "C", priority: null, place: { kind: "list", list: "now", group: null, before: null, date: PAST } }]));
+		});
+	});
+
+	it("reads what the field may do from the cards without measuring them as the text is typed", () => {
+		const { controller, lists, type } = setUp({ items: { left: [item("A", key("now", 0)), item("B", key("now", 1))] } });
+		controller.openAtEnd("left");
+		const measured = lists.left.cards.map(({ card }) => vi.spyOn(card, "getBoundingClientRect"));
+		type("C");
+		type("Ca");
+		for (const spy of measured) expect(spy).not.toHaveBeenCalled();
 	});
 
 	it("moves the field to the end of the place chosen in the bar, turning the wheel to show it", () => {

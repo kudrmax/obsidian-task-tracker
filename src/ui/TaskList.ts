@@ -3,17 +3,14 @@ import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
-import { type GapPlace, sameTask } from "./drag/listPlace";
+import { type GapPlace, type ListCard, sameTask } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
-import { renderTaskCard } from "./TaskCard";
-import { fillTitle } from "./TaskTitle";
+import { renderTaskCard, renderUnwrittenCard } from "./TaskCard";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
-	/** The task whose text the field edits: its card keeps its place among the cards, hidden, and the branches pass it by. */
-	readonly renaming?: TaskKey | null;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -30,6 +27,11 @@ export interface TaskListDeps {
 	pending?(): TaskItem | null;
 	/** The task being typed, which takes its place among the cards without being one of them; null when none is. */
 	entry?(): ListEntryInput | null;
+	/**
+	 * The task whose text the field edits, wherever the field stands: its card keeps its place among the cards, hidden, and
+	 * the branches pass it by.
+	 */
+	renaming?(): TaskKey | null;
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
@@ -64,6 +66,7 @@ export class TaskList {
 
 	render(): void {
 		const entry = this.deps.entry?.() ?? null;
+		const renaming = this.deps.renaming?.() ?? null;
 		const kept = entry ? this.keptRow() : null;
 		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
@@ -88,7 +91,7 @@ export class TaskList {
 			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
-			const renamed = !!entry?.renaming && sameTask(entry.renaming, item.key);
+			const renamed = renaming !== null && sameTask(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
@@ -134,8 +137,7 @@ export class TaskList {
 		const before: HTMLElement[] = [];
 		for (let node = kept?.nextElementSibling ?? null; node; node = node.nextElementSibling) if (node instanceof HTMLElement) before.push(node);
 		for (const { text, level } of entry.pending) {
-			const card = el(this.el, "div", "tc-card");
-			fillTitle(el(card, "div", "tc-card-title"), text);
+			const card = renderUnwrittenCard(this.el, text);
 			before.push(card);
 			put(card, level);
 		}
@@ -153,6 +155,16 @@ export class TaskList {
 
 	get cards(): readonly ListEntry[] {
 		return this.entries;
+	}
+
+	/** The cards as places in the list see them, with no measuring: each in the section it is drawn in. */
+	get listCards(): readonly ListCard[] {
+		return this.entries.map((entry) => this.listCard(entry));
+	}
+
+	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */
+	listCard(entry: ListEntry): ListCard {
+		return { key: entry.item.key, level: entry.level, group: this.withHeaders ? entry.item.group : null };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */

@@ -258,7 +258,8 @@ describe("TaskList with a task being typed", () => {
 		const l = new TaskList(document.createElement("div"), {
 			items: () => [{ ...keyed("A", []), subtasks: [keyed("A1", [0]), last] }],
 			day: () => null,
-			entry: () => ({ place: { kind: "gap", index: 2, level: 1, group: null }, pending: [], renaming: last.key, field: (parent) => parent }),
+			entry: () => ({ place: { kind: "gap", index: 2, level: 1, group: null }, pending: [], field: (parent) => parent }),
+			renaming: () => last.key,
 		});
 		l.render();
 		const [, a1, field, hidden] = [...l.el.children] as HTMLElement[];

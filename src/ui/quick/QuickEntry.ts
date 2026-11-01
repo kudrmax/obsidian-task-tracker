@@ -1,7 +1,9 @@
 import type { NewTaskPlace, Placement, TaskItem, TaskKey, TaskService } from "../../application/contracts";
+import type { PriorityLevel } from "../../settings";
 import type { ListColumn } from "../drag/DropTarget";
-import { type GapPlace, type PlaceResult, type PlacedCard, fitLevel, resultOf, shiftLevel } from "../drag/listPlace";
+import { type GapPlace, type ListCard, type PlaceResult, fitLevel, resultOf, shiftLevel } from "../drag/listPlace";
 import type { Slot } from "../types";
+import { levelOfText } from "./QuickField";
 import { WriteQueue } from "./WriteQueue";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
@@ -31,7 +33,7 @@ export interface EntryState {
 
 export interface QuickEntryDeps {
 	/** The cards of `column` as it shows the file now. */
-	cards(column: ListColumn): readonly PlacedCard[];
+	cards(column: ListColumn): readonly ListCard[];
 	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace;
 	/** Resolves once the lists show the file as of the last write. */
 	fresh(): Promise<void>;
@@ -39,6 +41,8 @@ export interface QuickEntryDeps {
 	edit: TaskService["edit"];
 	/** The placement a rename at `spot` gives the task. */
 	placement(spot: EntrySpot): Placement;
+	/** The priority levels a text may start with: a text that is only one's prefix is blank. */
+	levels(): readonly PriorityLevel[];
 	/** After every change of the state; null once the field closed. */
 	onChange(state: EntryState | null): void;
 	/** A write that failed; the ones after it still go. */
@@ -69,10 +73,10 @@ class Run {
 	}
 
 	/** The place a level deeper or shallower, bound by `cards` with the texts entered here standing in before it. */
-	shifted(cards: readonly PlacedCard[], delta: 1 | -1): GapPlace | null {
+	shifted(cards: readonly ListCard[], delta: 1 | -1): GapPlace | null {
 		if (this.spot.kind !== "list") return null;
 		const { place } = this.spot;
-		const unwritten = this.pending.map((line): PlacedCard => ({ key: UNWRITTEN, level: line.level, top: 0, height: 0, group: place.group }));
+		const unwritten = this.pending.map((line): ListCard => ({ key: UNWRITTEN, level: line.level, group: place.group }));
 		const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
 		const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
 		return shifted && { ...place, level: shifted.level };
@@ -109,10 +113,6 @@ interface Field {
 	readonly text: string;
 	readonly priority: string | null;
 	readonly rename: Rename | null;
-}
-
-function blank(text: string): boolean {
-	return text.trim() === "";
 }
 
 /**
@@ -170,7 +170,7 @@ export class QuickEntry {
 		const field = this.field;
 		if (!field) return;
 		if (field.rename) this.enterRename(field, field.rename);
-		else if (blank(field.text)) this.enterBlank();
+		else if (this.blank(field.text)) this.enterBlank();
 		else this.enterTask(field);
 	}
 
@@ -199,7 +199,7 @@ export class QuickEntry {
 	/** Saved, then a new line under the task; a blank text cancels the rename. */
 	private enterRename(field: Field, rename: Rename): void {
 		const { spot } = field.run;
-		if (blank(field.text)) this.reset(null);
+		if (this.blank(field.text)) this.reset(null);
 		else {
 			this.saveRename(field, rename);
 			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, rename: null } : null);
@@ -228,7 +228,7 @@ export class QuickEntry {
 	}
 
 	private save(field: Field): void {
-		if (blank(field.text)) return;
+		if (this.blank(field.text)) return;
 		if (field.rename) this.saveRename(field, field.rename);
 		else this.create(field);
 	}
@@ -303,6 +303,12 @@ export class QuickEntry {
 		const field = this.field;
 		if (!field || field.rename || field.run.spot.kind !== "list") return null;
 		return field.run.shifted(this.deps.cards(field.run.spot.column), delta);
+	}
+
+	/** Nothing to write: no text, or a priority's prefix alone. */
+	private blank(text: string): boolean {
+		const level = levelOfText(text, this.deps.levels());
+		return (level ? text.slice(level.prefix.length) : text).trim() === "";
 	}
 
 	private changed(): void {

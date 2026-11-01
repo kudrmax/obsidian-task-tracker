@@ -1,4 +1,5 @@
 import type { Placement } from "../../application/contracts";
+import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { clear, el, px } from "../dom";
 import { icon } from "../icons";
@@ -47,10 +48,6 @@ const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string
 ];
 
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
-
-function samePlacement(a: Placement, b: Placement): boolean {
-	return a.kind === b.kind && (a.kind !== "date" || (b.kind === "date" && a.date === b.date));
-}
 
 /**
  * The bar over the keyboard while a task is typed: shift buttons on the left, the priority flag and the place on the right.
