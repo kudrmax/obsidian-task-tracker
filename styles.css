@@ -196,6 +196,12 @@ body {
 	--tc-menu-scale: 0.94;
 	--tc-menu-rise: 8px;
 	--tc-menu-gap: 12px;
+	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
+	--tc-desc-peek-w: 300px;
+	--tc-desc-peek-max: 214px;
+	--tc-desc-peek-pad: 10px 14px 10px 6px;
+	--tc-desc-fade: 40px;
+	--tc-font-desc-peek: 15px;
 	--tc-panel-w: 250px;
 	--tc-picker-w: 300px;
 	--tc-menu-w: 300px;
@@ -256,6 +262,15 @@ body {
 	/* Sizes: the task screen */
 	--tc-sheet-bar: 44px;
 	--tc-sheet-side: 20px;
+	/* A description's own screen: the title over the text; the text is Obsidian's, in its font, size, spacing and ink. */
+	--tc-font-desc-title: 22px;
+	--tc-leading-desc-title: 28px;
+	--tc-desc-title-gap: 12px;
+	--tc-desc-top: 8px;
+	--tc-font-desc: var(--font-text);
+	--tc-desc-size: var(--font-text-size);
+	--tc-desc-leading: var(--line-height-normal);
+	--tc-desc-ink: var(--text-normal);
 	--tc-sheet-gap: 20px;
 	--tc-tile-h: 78px;
 	--tc-radius-tile: 18px;
@@ -317,6 +332,13 @@ body {
 	--tc-tracking-mon: 0.3px;
 	--tc-font-block: 12px;
 	--tc-font-count: 12px;
+	/* The column of the subtask counter and the description mark under it; the mark alone is larger. */
+	--tc-leading-count-pair: 13px;
+	--tc-meta-gap: 2px;
+	--tc-meta-min: 22px;
+	--tc-desc-mark: 13px;
+	--tc-desc-mark-pair: 11px;
+	--tc-stroke-desc-mark: 2.8;
 	--tc-leading-block: 15px;
 	--tc-leading-card: 18px;
 	--tc-font-meta: 9px;
@@ -586,6 +608,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-branch-pass { left: calc(-1 * (var(--tc-pass) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 /* A card another one is dragged over: it will take it as its last subtask. */
 .tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
+.tc-meta { flex-shrink: 0; min-width: var(--tc-meta-min); display: flex; flex-direction: column; align-items: center; gap: var(--tc-meta-gap); color: var(--tc-muted); }
+.tc-meta.is-pair .tc-count { line-height: var(--tc-leading-count-pair); }
+.tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
+.tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* Where a card dragged in its own list will land, at the level its left edge picks. */
 .tc-drop-gap { position: fixed; height: var(--tc-card-h); box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); z-index: var(--tc-layer-drop-gap); pointer-events: none; }
@@ -698,6 +724,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
 .is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
+.tc-lifted.is-whole .tc-meta.is-pair { margin-top: calc((var(--tc-card-h) - var(--tc-leading-count-pair) - var(--tc-meta-gap) - var(--tc-desc-mark-pair)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
@@ -732,6 +759,14 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
 .tc-block-card[data-priority] .tc-block-meta { color: var(--tc-priority-meta); }
 .tc-priority-dot { flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
+.tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-desc-peek-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; overflow: hidden; padding: var(--tc-desc-peek-pad); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-desc-peek.is-under { transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
+.tc-desc-peek.is-shown { opacity: 1; transform: none; }
+.tc-desc-peek.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-desc-peek.is-cut { -webkit-mask-image: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent); mask-image: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent); }
+.tc-desc-peek .tc-desc-text { --font-text-size: var(--tc-font-desc-peek); font-size: var(--tc-font-desc-peek); }
+.tc-desc-text > :first-child { margin-top: 0; }
+.tc-desc-text > :last-child { margin-bottom: 0; }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }
@@ -782,6 +817,13 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
+.tc-desc-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: 0; padding-top: var(--tc-desc-top); overflow-y: auto; display: flex; flex-direction: column; gap: var(--tc-desc-title-gap); }
+.tc-desc-title { flex-shrink: 0; font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+.tc-desc-text { font-family: var(--tc-font-desc); font-size: var(--tc-desc-size); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.tc-desc-sheet .tc-desc-text { flex: 1; min-height: 0; }
+/* Obsidian's editor keeps a note's margins and, on the phone, room for the view's header: here it is a field under the title. */
+.task-calendar .tc-desc-text.is-editing { --file-margins: 0; --view-top-spacing-markdown: 0; --view-bottom-spacing-markdown: 0; }
+.task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-editor, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-scroller, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-sizer, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-contentContainer { padding: 0; margin: 0; max-width: none; min-height: 0; }
 .tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
 .tc-sheet.is-shown { opacity: 1; transform: none; }
 .tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }

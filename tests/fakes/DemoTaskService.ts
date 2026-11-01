@@ -9,6 +9,7 @@ interface DemoTask {
 	dueDate: LocalDate | null;
 	slot: Slot | null;
 	priority: string | null;
+	description?: string | null;
 }
 
 const DEMO_DATE = "2026-10-30";
@@ -92,6 +93,7 @@ export class DemoTaskService implements TaskService {
 			subtasks: [],
 			progress: null,
 			parentText: null,
+			description: t.description ?? null,
 			group: null,
 		};
 	}
@@ -205,6 +207,11 @@ export class DemoTaskService implements TaskService {
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		this.find(key).priority = priority;
+		this.changed();
+	}
+
+	async setDescription(key: TaskKey, markdown: string): Promise<void> {
+		this.find(key).description = markdown.trim() === "" ? null : markdown;
 		this.changed();
 	}
 

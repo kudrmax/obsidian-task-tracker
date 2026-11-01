@@ -92,6 +92,9 @@ export const DURATION = {
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
 export const LAYOUT = {
+	/** The start of a description stands this far from the copy of its card, and goes past the menu with less room than three lines and its padding. */
+	descPeekGap: 10,
+	descPeekLeast: 88,
 	/** The grid labels a division of the hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
 	gridDivisions: [5, 15, 30],
 	gridLabelGap: 40,

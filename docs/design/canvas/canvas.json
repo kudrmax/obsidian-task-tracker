@@ -1367,6 +1367,46 @@
    "h": 844,
    "page": "menuorder",
    "title": "Задача без приоритета: ничего не выбрано, крестика нет"
+  },
+  "Desc.dc.html": {
+   "x": 3290,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов описания (его показывают доски «Описание задачи»)"
+  },
+  "DescFlow1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1158,
+   "h": 1076,
+   "page": "description",
+   "title": "1. Описание в файле и на карточке"
+  },
+  "DescFlow2.dc.html": {
+   "x": 0,
+   "y": 1196,
+   "w": 1738,
+   "h": 1180,
+   "page": "description",
+   "title": "2. Начало описания над задачей"
+  },
+  "DescFlow3.dc.html": {
+   "x": 0,
+   "y": 2496,
+   "w": 2288,
+   "h": 1180,
+   "page": "description",
+   "title": "3. Правка и новое описание"
+  },
+  "DescFlowLight.dc.html": {
+   "x": 0,
+   "y": 3796,
+   "w": 1928,
+   "h": 1076,
+   "page": "description",
+   "title": "Светлая тема"
   }
  },
  "createdOnFiles": {
@@ -1405,7 +1445,8 @@
   "tasksRulesProd",
   "step14shape",
   "wheel30Title",
-  "menugroupedTitle"
+  "menugroupedTitle",
+  "descriptionTitle"
  ],
  "notes": {
   "lightTitle": {
@@ -1670,6 +1711,14 @@
    "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
    "x": 0,
    "y": -300
+  },
+  "descriptionTitle": {
+   "kind": "title1",
+   "maxW": 2288,
+   "page": "description",
+   "text": "Описание задачи: строки под задачей без чекбокса (принято 01.11)",
+   "x": 0,
+   "y": -300
   }
  },
  "order": [
@@ -1843,7 +1892,12 @@
   "MenuOrder.dc.html",
   "MenuGroupedShort.dc.html",
   "MenuGroupedLong.dc.html",
-  "MenuGroupedUnset.dc.html"
+  "MenuGroupedUnset.dc.html",
+  "Desc.dc.html",
+  "DescFlow1.dc.html",
+  "DescFlow2.dc.html",
+  "DescFlow3.dc.html",
+  "DescFlowLight.dc.html"
  ],
  "pages": [
   {
@@ -1889,6 +1943,10 @@
   {
    "id": "components",
    "name": "Служебное: компоненты"
+  },
+  {
+   "id": "description",
+   "name": "Описание задачи"
   }
  ],
  "title": "Task Calendar"
