@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../src/application/contracts";
-import type { DragPayload, ListColumn } from "../../src/ui/drag/DropTarget";
+import type { DragPayload, ListColumn, NewTaskPayload } from "../../src/ui/drag/DropTarget";
 import { ListDrop } from "../../src/ui/drag/ListDrop";
 import { TaskList } from "../../src/ui/TaskList";
 
@@ -79,5 +79,45 @@ describe("ListDrop", () => {
 		const a = item("now", 0, "A", null);
 		const { drop } = setup([a, item("now", 1, "B", null)], "left", null);
 		expect(drop.drop(50, 101, drag("left", item("now", 1, "B", null)))).toEqual({ kind: "listBefore", before: a.key, column: "left" });
+	});
+
+	describe("a new task", () => {
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
+		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null)];
+
+		it("takes a gap anywhere in a list without sections, in a column it is not from", () => {
+			const items = three();
+			const { drop, list } = setup(items, "soon", null);
+			const y = 100 + 2 * 40 + 2;
+			drop.preview(50, y, fresh);
+			expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, true]);
+			expect(document.querySelector(".tc-drop-gap")).not.toBeNull();
+			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
+		});
+
+		it("goes to the end of a list when let go below its cards", () => {
+			const { drop } = setup(three(), "inbox", null);
+			expect(drop.drop(50, 100 + 3 * 40 + 10, fresh)).toEqual({ kind: "listBefore", before: null, column: "inbox" });
+		});
+
+		it("goes into the card under the middle of it as a subtask", () => {
+			const items = three();
+			const { drop } = setup(items, "left", null);
+			expect(drop.drop(50, 140 + 17, fresh)).toEqual({ kind: "nest", parent: items[1].key, before: null });
+		});
+
+		it("takes the gap of a section in a list that shows sections", () => {
+			const b = item("soon", 1, "B", "Morning");
+			const { drop } = setup([item("soon", 0, "A", null), b], "soon", "soon");
+			expect(drop.drop(50, 100 + 3 * 40 + 2, fresh)).toEqual({ kind: "group", list: "soon", date: null, group: "Morning", before: b.key });
+		});
+
+		it("is refused by a list that does not accept it", () => {
+			const { drop, list } = setup(three(), "left", null);
+			const refusing = new ListDrop(list, list.el.parentElement!, "left", (d) => d.from !== "new");
+			expect(refusing.hitTest(50, 120, fresh)).toBe(false);
+			expect(refusing.drop(50, 120, fresh)).toBeNull();
+			expect(drop.hitTest(50, 120, fresh)).toBe(true);
+		});
 	});
 });

@@ -103,9 +103,9 @@ export class ListDrop implements DropTarget {
 		return { kind: "listBefore", before: result.before, column: this.column };
 	}
 
-	/** A list with sections places a card from anywhere; another only one from itself. */
+	/** A list with sections places a card from anywhere, and any list a new task; another only a card from itself. */
 	private placesAnywhere(drag: DragPayload): boolean {
-		return drag.from === this.column || this.sections() !== null;
+		return drag.from === "new" || drag.from === this.column || this.sections() !== null;
 	}
 
 	/**

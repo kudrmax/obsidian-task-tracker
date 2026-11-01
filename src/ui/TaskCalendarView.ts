@@ -11,7 +11,7 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController, type NameGroup } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import type { ColumnSections, DragPayload, DropTarget, ListColumn, PlacedResult } from "./drag/DropTarget";
+import type { ColumnSections, DropTarget, ListColumn, PlacedResult, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupZones } from "./drag/GroupZones";
 import { GroupMenu } from "./menu/GroupMenu";
@@ -481,7 +481,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
-	private applyDrop(drag: DragPayload, result: PlacedResult): Promise<void> {
+	private applyDrop(drag: TaskDragPayload, result: PlacedResult): Promise<void> {
 		const key = drag.item.key;
 		const tasks = this.deps.tasks;
 		return this.act(() => {

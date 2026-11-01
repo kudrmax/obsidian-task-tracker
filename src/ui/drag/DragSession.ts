@@ -1,6 +1,6 @@
 import type { DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
 
-export type { DragOrigin, DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
+export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 
 export interface DragSessionOptions {
 	readonly payload: DragPayload;

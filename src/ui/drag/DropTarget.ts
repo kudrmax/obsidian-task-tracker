@@ -4,7 +4,11 @@ import type { LocalDate, Slot } from "../types";
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
 export type ListColumn = "left" | "soon" | "inbox";
 
-export type DragOrigin = ListColumn | "timeline";
+/** Where a task that exists is dragged from. */
+export type TaskOrigin = ListColumn | "timeline";
+
+/** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */
+export type DragOrigin = TaskOrigin | "new";
 
 /** Whose sections a column shows: Inbox's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
 export interface ColumnSections {
@@ -13,9 +17,9 @@ export interface ColumnSections {
 	readonly date: LocalDate | null;
 }
 
-export interface DragPayload {
+export interface TaskDragPayload {
 	readonly item: TaskItem;
-	readonly from: DragOrigin;
+	readonly from: TaskOrigin;
 	/** The duration a task on the timeline keeps when it moves; null for a task without one, and for every task from a list. */
 	readonly durationMin: number | null;
 	/** How far under the card's top the finger holds it: a timeline card keeps its grip, a list card hangs by its middle. */
@@ -23,6 +27,17 @@ export interface DragPayload {
 	/** How far right of the card's left edge the finger holds it: in its own list, the card's left edge picks the level it lands on. */
 	readonly grabX: number;
 }
+
+/** The drag of a task that does not exist yet: it has no card in any list and no duration. */
+export interface NewTaskPayload {
+	readonly from: "new";
+	readonly item: null;
+	readonly durationMin: null;
+	readonly grabPx: number;
+	readonly grabX: number;
+}
+
+export type DragPayload = TaskDragPayload | NewTaskPayload;
 
 export type DropResult =
 	| { readonly kind: "slot"; readonly slot: Slot }

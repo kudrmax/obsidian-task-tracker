@@ -9,7 +9,7 @@ import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DragOrigin, DragPayload, DropResult, DropTarget, PlacedResult } from "./DropTarget";
+import type { DropResult, DropTarget, NewTaskPayload, PlacedResult, TaskDragPayload, TaskOrigin } from "./DropTarget";
 
 /** A drop on New section: the column it was under, and whose sections. */
 export type NameGroup = Extract<DropResult, { readonly kind: "nameGroup" }>;
@@ -28,7 +28,7 @@ export interface DragControllerDeps {
 	readonly arbiter: GestureArbiter;
 	/** A card is lifted or settled: the lists swap New task for the zones that put it off. */
 	onDragging(active: boolean): void;
-	onResult(drag: DragPayload, result: PlacedResult): Promise<void>;
+	onResult(drag: TaskDragPayload, result: PlacedResult): Promise<void>;
 	/** A card dropped on Pick a date, back in its place: the date picker opens over it. */
 	onPickDate(item: TaskItem, source: HTMLElement): void;
 	/** A card dropped on New section, back in its place: the list asks for the section's name. */
@@ -59,7 +59,7 @@ export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
 
 	/** `subtree`: the cards of the task's subtasks, which gather under it while it is dragged. */
-	attachCard(card: HTMLElement, item: TaskItem, from: DragOrigin, subtree: readonly HTMLElement[] = []): void {
+	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = []): void {
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
 			this.deps.onMenu(item, card);
@@ -86,7 +86,7 @@ export class DragController {
 		});
 	}
 
-	private payload(card: HTMLElement, item: TaskItem, from: DragOrigin, e: PointerEvent): DragPayload {
+	private payload(card: HTMLElement, item: TaskItem, from: TaskOrigin, e: PointerEvent): TaskDragPayload {
 		const onTimeline = from === "timeline" && item.slot;
 		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
 		const rect = card.getBoundingClientRect();
@@ -184,7 +184,7 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private begin(source: HTMLElement, payload: DragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = []): void {
+	private begin(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = []): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
@@ -202,25 +202,6 @@ export class DragController {
 			for (const card of lifted) card.classList.remove("is-lifted");
 			timeline?.layoutTasks();
 		};
-		const session = new DragSession({
-			payload,
-			targets: this.deps.targets(),
-			float,
-			origin,
-			onReturn: reopen,
-			onEnd: async (result) => {
-				detach();
-				if (result?.kind === "pickDate" || result?.kind === "nameGroup") {
-					asking = result;
-					reopen();
-					return;
-				}
-				this.deps.arbiter.release(DRAG);
-				if (!result) return;
-				this.deps.haptics.tap();
-				await this.deps.onResult(payload, result);
-			},
-		});
 		/** The card has come to rest. Over one dropped on Pick a date, back in its place by now, the picker opens; the screen is held until it does. */
 		const settled = () => {
 			this.deps.onDragging(false);
@@ -234,6 +215,72 @@ export class DragController {
 			this.deps.arbiter.release(DRAG);
 			this.deps.onNameGroup(payload.item, asking);
 		};
+		this.follow(
+			source,
+			e,
+			(detach) =>
+				new DragSession({
+					payload,
+					targets: this.deps.targets(),
+					float,
+					origin,
+					onReturn: reopen,
+					onEnd: async (result) => {
+						detach();
+						if (result?.kind === "pickDate" || result?.kind === "nameGroup") {
+							asking = result;
+							reopen();
+							return;
+						}
+						this.deps.arbiter.release(DRAG);
+						if (!result) return;
+						this.deps.haptics.tap();
+						await this.deps.onResult(payload, result);
+					},
+				}),
+			settled,
+		);
+	}
+
+	/**
+	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted and no
+	 * zone appears. Let go off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let
+	 * go on one, `onDrop` hears where once the card has landed.
+	 */
+	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void): void {
+		if (!this.deps.arbiter.claim(DRAG)) return;
+		this.deps.haptics.tap();
+		const origin = source.getBoundingClientRect();
+		const float = new FloatingCard(null, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
+		float.moveTo(e.clientX, e.clientY);
+		capturePointer(source, e.pointerId);
+		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: shownCardSize().height / 2, grabX: e.clientX - origin.left };
+		let placed: PlacedResult | null = null;
+		this.follow(
+			source,
+			e,
+			(detach) =>
+				new DragSession({
+					payload,
+					targets,
+					float,
+					origin,
+					onEnd: async (result) => {
+						detach();
+						placed = result && result.kind !== "pickDate" && result.kind !== "nameGroup" ? result : null;
+					},
+				}),
+			() => {
+				this.deps.arbiter.release(DRAG);
+				if (placed) this.deps.haptics.tap();
+				onDrop(placed);
+			},
+		);
+	}
+
+	/** Routes the pointer of `e` to the session until it ends; `settled` runs once the card has come to rest. */
+	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
+		const session = makeSession(() => detach());
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};
