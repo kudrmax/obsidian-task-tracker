@@ -207,6 +207,19 @@ describe("styles.css keeps to its design system", () => {
 		expect(of(".task-calendar:is(.is-lists, .is-inbox) > .tc-fade").get("height")).toBe("var(--tc-foot-fade-lists)");
 		expect(sheet.tokens.get("--tc-nav-room")).toBe("max(0px, var(--view-bottom-spacing, 0px))");
 	});
+
+	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
+		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
+		expect(of('body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"]))').get("--tc-status-room")).toBe("var(--tc-status-bar)");
+		const seg = of(".task-calendar > .tc-seg");
+		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
+		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8))");
+		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2)");
+		expect(plus.get("right")).toBe("var(--tc-space-16)");
+		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-status-room)");
+	});
 });
 
 describe("the code keeps to the design system", () => {

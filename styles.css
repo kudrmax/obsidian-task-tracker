@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-status-clear, --tc-allday-extra-rows, --tc-y,
+ * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-allday-extra-rows, --tc-y,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -161,12 +161,20 @@ body {
 	 * over the content; elsewhere (desktop, tablet, a docked navigation) there is nothing to clear.
 	 */
 	--tc-nav-room: max(0px, var(--view-bottom-spacing, 0px));
-	/* Under a list column, below its New task: the switch's row, and Obsidian's navigation under it. */
-	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-nav-room));
+	/*
+	 * Obsidian's desktop status bar lies over the bottom of the window; its height from Obsidian's own measures: the top
+	 * border, the padding above and below, and a text item (word count, backlinks), the small interface type with 3 px above
+	 * and below. It takes room from the view only while it is shown (the rule after this block); on the phone Obsidian hides it.
+	 */
+	--tc-status-item-pad: 3px;
+	--tc-status-bar: calc(var(--border-width, 0px) + 2 * var(--size-4-1, 0px) + var(--font-ui-smaller, 0px) + 2 * var(--tc-status-item-pad));
+	--tc-status-room: 0px;
+	/* What Obsidian keeps under the view's bottom row (the switch and the plus): the phone's navigation, the desktop's status bar. */
+	--tc-chrome-room: calc(var(--tc-nav-room) + var(--tc-status-room));
+	/* Under a list column, below its New task: the switch's row, and Obsidian's navigation or status bar under it. */
+	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room));
 	/* While a task is typed, the list's end can rise this far: over the bar at the view's bottom, with the field 16 px above it. */
 	--tc-entry-room: calc(var(--tc-bar-h) + var(--tc-space-16));
-	/* How far Obsidian's desktop status bar reaches in from the right over the view's bottom; the code measures it. */
-	--tc-status-clear: 0px;
 
 	/* Sizes: cards */
 	/* The card's height and the gap between cards, in the list and in a stack on the timeline: the settings set them on the body. */
@@ -200,7 +208,7 @@ body {
 	--tc-foot-fade-half-ink: 50%;
 	--tc-foot-fade-deep-ink: 86%;
 	/* Its height beside the calendar, from over the switch; and under two lists, from over their New task. */
-	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-nav-room) + var(--tc-foot-fade));
+	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade));
 	--tc-foot-fade-lists: calc(2 * var(--tc-space-8) + var(--tc-card-h) + var(--tc-foot-room) + var(--tc-foot-fade));
 	--tc-float-w: 190px;
 	/* The dragged card stands a little taller than the one it was lifted from. */
@@ -520,6 +528,9 @@ body.theme-light {
 	--tc-priority-blue-meta: #4682C7;
 }
 
+/* While Obsidian shows its desktop status bar (it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
+body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"])) { --tc-status-room: var(--tc-status-bar); }
+
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
 body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidden; background: var(--tc-bg); color: var(--tc-text); }
@@ -549,10 +560,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
 .task-calendar:is(.is-lists, .is-inbox) > .tc-fade { height: var(--tc-foot-fade-lists); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-nav-room) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: calc(var(--tc-space-16) + var(--tc-status-clear)); bottom: calc(var(--tc-nav-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
 .tc-plus svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-plus); }
@@ -894,7 +905,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
-.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 calc(var(--tc-space-6) + var(--tc-status-clear)) 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); }
+.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-status-room); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); }
 .tc-quick-bar::before { content: ""; position: absolute; inset: 0; z-index: var(--tc-layer-bar-ground); background: var(--tc-bar-bg); box-shadow: inset 0 var(--tc-hairline-half) 0 var(--tc-bar-line); }
 .tc-quick-bar > button { z-index: var(--tc-layer-bar-button); }
 .tc-bar-spacer { flex: 1; }
