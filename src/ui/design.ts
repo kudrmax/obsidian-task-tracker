@@ -49,7 +49,6 @@ export const PROPERTY = {
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",
 	hour: "--tc-hour",
-	statusClear: "--tc-status-clear",
 	allDayExtraRows: "--tc-allday-extra-rows",
 	y: "--tc-y",
 	length: "--tc-len",
@@ -114,6 +113,8 @@ export const LAYOUT = {
 	plusRingReach: 24,
 	/** On a computer a drag starts after the pointer moves this far. */
 	dragStartDistance: 4,
+	/** A second click this soon after the first is a double click: the first waits it out before it counts as a click. */
+	doubleClickMs: 250,
 	/** The divider holds to the middle of the window while dragged this close to it. */
 	dividerSnapDistance: 8,
 	/**
