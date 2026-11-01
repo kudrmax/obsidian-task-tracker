@@ -1335,6 +1335,102 @@
    "h": 280,
    "page": "components",
    "title": "Компонент колёсика (его показывают доски «Колёсико»)"
+  },
+  "QuickFlow1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1928,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "1. Пишешь прямо в списке"
+  },
+  "QuickFlow2.dc.html": {
+   "x": 0,
+   "y": 1276,
+   "w": 1928,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "2. Сдвиг вправо — подзадача"
+  },
+  "QuickFlow3.dc.html": {
+   "x": 0,
+   "y": 2552,
+   "w": 3338,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "3. Плюс, который тянут"
+  },
+  "QuickFlow4.dc.html": {
+   "x": 0,
+   "y": 3828,
+   "w": 1458,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "4. Где New task, а где плюс"
+  },
+  "QuickFlow5.dc.html": {
+   "x": 0,
+   "y": 7656,
+   "w": 1928,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "7. Переименовать на месте и светлая тема"
+  },
+  "QuickAdd.dc.html": {
+   "x": 1410,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов быстрого ввода (его показывают доски «Быстрый ввод»)"
+  },
+  "MenuOrder.dc.html": {
+   "x": 1880,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент меню задачи по группам (его показывают доски «Меню задачи»)"
+  },
+  "QuickFlow6.dc.html": {
+   "x": 0,
+   "y": 5104,
+   "w": 3338,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "5. Полоса над клавиатурой: приоритет и место"
+  },
+  "QuickFlow7.dc.html": {
+   "x": 0,
+   "y": 6380,
+   "w": 1458,
+   "h": 1120,
+   "page": "quickadd",
+   "title": "Не выбран: всё прямо в полосе"
+  },
+  "MenuGroupedShort.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Три уровня в ряд; крестик на выбранном снимает приоритет"
+  },
+  "MenuGroupedLong.dc.html": {
+   "x": 470,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Четыре уровня с длинными именами: два ряда по две, текст гаснет к краю"
+  },
+  "MenuGroupedUnset.dc.html": {
+   "x": 940,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Задача без приоритета: ничего не выбрано, крестика нет"
   }
  },
  "createdOnFiles": {
@@ -1372,7 +1468,8 @@
   "tasksTitle",
   "tasksRulesProd",
   "step14shape",
-  "wheel30Title"
+  "wheel30Title",
+  "menugroupedTitle"
  ],
  "notes": {
   "lightTitle": {
@@ -1629,6 +1726,22 @@
    "text": "Колёсико: окно стоит в центре экрана, иконки крутятся под пальцем, по бокам — только соседи",
    "x": 0,
    "y": -300
+  },
+  "quickaddTitle": {
+   "kind": "title1",
+   "maxW": 3338,
+   "page": "quickadd",
+   "text": "Быстрый ввод: задачи пишут прямо в списке, Enter — следующая, сдвиг — подзадача (на обсуждении)",
+   "x": 0,
+   "y": -300
+  },
+  "menugroupedTitle": {
+   "kind": "title1",
+   "maxW": 1330,
+   "page": "menuorder",
+   "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
+   "x": 0,
+   "y": -300
   }
  },
  "order": [
@@ -1798,7 +1911,19 @@
   "Wheel30DrumCal.dc.html",
   "Wheel30DrumDrag.dc.html",
   "Wheel30DrumLight.dc.html",
-  "Wheel30.dc.html"
+  "Wheel30.dc.html",
+  "QuickAdd.dc.html",
+  "QuickFlow1.dc.html",
+  "QuickFlow2.dc.html",
+  "QuickFlow3.dc.html",
+  "QuickFlow4.dc.html",
+  "QuickFlow5.dc.html",
+  "MenuOrder.dc.html",
+  "QuickFlow6.dc.html",
+  "QuickFlow7.dc.html",
+  "MenuGroupedShort.dc.html",
+  "MenuGroupedLong.dc.html",
+  "MenuGroupedUnset.dc.html"
  ],
  "pages": [
   {
@@ -1836,6 +1961,14 @@
   {
    "id": "wheel30",
    "name": "Колёсико"
+  },
+  {
+   "id": "menuorder",
+   "name": "Меню задачи"
+  },
+  {
+   "id": "quickadd",
+   "name": "Быстрый ввод"
   },
   {
    "id": "components",

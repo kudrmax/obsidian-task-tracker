@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>2. Сдвиг вправо — подзадача</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1928px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">2. Сдвиг вправо — подзадача</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 1800px; font-size: 18px; line-height: 24px; color: #6B6A65;">Как в списках Obsidian: на десктопе Tab и Shift+Tab, на телефоне две кнопки слева в полосе над клавиатурой. Сдвиг подчиняется тем же правилам уровней, что и перетаскивание: не глубже, чем на шаг под соседом сверху, — иначе кнопка гаснет</div>
+<sc-for list="{{phones}}" as="p" hint-placeholder-count="4">
+<div style="position: absolute; left: {{p.left}}px; top: 168px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="QuickAdd" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: 1026px; width: 390px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1928,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { phones: [{"left": 64, "view": "tabBefore", "theme": "dark", "caption": "Написали «Собрать вещи в поездку», Enter, начали следующую и жмут сдвиг вправо"}, {"left": 534, "view": "tabAfter", "theme": "dark", "caption": "Поле стало подзадачей. Своего места у подзадачи нет, она живёт у родителя: в полосе остался только приоритет"}, {"left": 1004, "view": "tabNext", "theme": "dark", "caption": "Enter: следующее поле на том же уровне, у родителя счётчик 0/1"}, {"left": 1474, "view": "tabOut", "theme": "dark", "caption": "Enter на пустой подзадаче — шаг влево, как в Obsidian. Ещё Enter — готово"}] };
+  }
+}
+</script>
+</body>
+</html>

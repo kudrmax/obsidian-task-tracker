@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Быстрый ввод: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<dc-import name="Screen" theme="{{theme}}" right-mode="{{mode}}" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" new-slot="{{newSlot}}" scroll-hours="{{scroll}}" day-title="{{dayTitle}}" hint-size="390px,844px"></dc-import>
+
+<sc-if value="{{hideNewTask}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 669px; width: 187px; height: 51px; background: {{c.bg}}; z-index: 5;"></div>
+</sc-if>
+
+<sc-for list="{{cols}}" as="col" hint-placeholder-count="1">
+<div style="position: absolute; left: {{col.x0}}px; top: 166px; width: 187px; height: {{col.height}}px; overflow: hidden; background: {{c.bg}}; z-index: 5;">
+<svg width="187" height="900" viewBox="0 0 187 900" style="position: absolute; left: 0; top: 0; width: 187px; height: 900px;" aria-hidden="true"><path d="{{col.branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{col.rows}}" as="r" hint-placeholder-count="7">
+
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; box-shadow: {{r.ring}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{r.isField}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; box-shadow: inset 0 0 0 1.5px {{c.accent}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; white-space: nowrap; font-size: 15px;">
+<sc-if value="{{r.selected}}" hint-placeholder-val="{{false}}"><span style="background: {{c.selection}}; border-radius: 2px;">{{r.text}}</span></sc-if>
+<sc-if value="{{r.typed}}" hint-placeholder-val="{{false}}"><span>{{r.text}}</span><span style="width: 2px; height: 20px; flex-shrink: 0; margin-left: 1px; background: {{c.accent}}; border-radius: 1px;"></span></sc-if>
+<sc-if value="{{r.empty}}" hint-placeholder-val="{{false}}"><span style="width: 2px; height: 20px; flex-shrink: 0; margin-right: 1px; background: {{c.accent}}; border-radius: 1px;"></span><span style="color: {{c.muted}};">New task</span></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{r.isGap}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}};"></div>
+</sc-if>
+
+</sc-for>
+</div>
+</sc-for>
+
+<sc-if value="{{calField.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 232px; top: {{calField.top}}px; width: 153px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; box-shadow: inset 0 0 0 1.5px {{c.accent}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 15px; z-index: 4;">
+<span style="width: 2px; height: 20px; flex-shrink: 0; background: {{c.accent}}; border-radius: 1px;"></span>
+<span style="flex: 1; min-width: 0; color: {{c.muted}};">New task</span>
+<span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.accent}}; font-variant-numeric: tabular-nums;">16:30</span>
+</div>
+</sc-if>
+
+<sc-if value="{{fab.rest}}" hint-placeholder-val="{{false}}">
+<button aria-label="New task" style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: {{c.accent}}; box-shadow: {{c.fabShadow}}; display: flex; align-items: center; justify-content: center; z-index: 6;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+</sc-if>
+
+<sc-if value="{{float.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{float.left}}px; top: {{float.top}}px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; padding: 0 14px; display: flex; align-items: center; gap: 8px; box-shadow: {{c.floatShadow}}; font-size: 15px; color: {{c.muted}}; white-space: nowrap; z-index: 8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 5v14 M5 12h14"></path></svg>New task</div>
+</sc-if>
+
+<sc-if value="{{datePanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; right: 8px; top: {{dateTop}}px; width: 300px; box-sizing: border-box; padding: 8px 10px 10px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 4px;">
+<span style="font-size: 16px; font-weight: 600;">November 2026</span>
+<div style="display: flex; gap: 4px;">
+<button aria-label="Previous month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{c.accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Next month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{c.accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 1px;">
+<sc-for list="{{weekdays}}" as="w" hint-placeholder-count="7">
+<span style="height: 18px; text-align: center; font-size: 11px; font-weight: 600; color: {{c.muted}};">{{w}}</span>
+</sc-for>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="42">
+<button style="justify-self: center; width: 36px; height: 36px; border: 0; padding: 0; border-radius: 18px; background: {{d.bg}}; color: {{d.color}}; font: inherit; font-size: 16px; font-weight: {{d.weight}}; font-variant-numeric: tabular-nums;">{{d.n}}</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{priorityPanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; right: 8px; top: {{pp.top}}px; width: 300px; box-sizing: border-box; padding: 8px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; display: flex; flex-direction: column; gap: 6px; z-index: 11;">
+<sc-for list="{{pp.rows}}" as="row" hint-placeholder-count="1">
+<div style="display: flex; gap: 6px;">
+<sc-for list="{{row.tiles}}" as="l" hint-placeholder-count="3">
+<button aria-label="{{l.aria}}" style="position: relative; flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{l.bg}}; box-shadow: {{l.ring}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5"></path></svg>
+<span style="width: 100%; box-sizing: border-box; padding: 0 8px; font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap; overflow: hidden; text-align: {{l.align}}; -webkit-mask-image: {{l.mask}}; mask-image: {{l.mask}};">{{l.name}}</span>
+<sc-if value="{{l.on}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border-radius: 9px; background: {{l.c}}; color: {{c.onDot}}; display: flex; align-items: center; justify-content: center;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12 M18 6L6 18"></path></svg></span>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{placePanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; right: 8px; top: 419px; width: 300px; box-sizing: border-box; padding: 8px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; display: flex; gap: 6px; z-index: 11;">
+<sc-for list="{{tiles}}" as="tl" hint-placeholder-count="4">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{tl.bg}}; box-shadow: {{tl.ring}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{tl.path}}"></path></svg><span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{tl.label}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{kbd.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 509px; width: 390px; height: 44px; box-sizing: border-box; padding: 0 6px; background: {{c.kbd}}; box-shadow: inset 0 0.5px 0 {{c.barLine}}; display: flex; align-items: center; gap: 4px; z-index: 12;">
+<sc-if value="{{bar.indents}}" hint-placeholder-val="{{true}}">
+<button aria-label="Outdent" style="width: 44px; height: 36px; flex-shrink: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: {{bar.outInk}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H11 M21 12H11 M21 18H11 M7 8l-4 4 4 4"></path></svg></button>
+<button aria-label="Indent" style="width: 44px; height: 36px; flex-shrink: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: {{bar.inInk}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4"></path></svg></button>
+</sc-if>
+<span style="flex: 1;"></span>
+<button aria-label="Priority" style="width: 44px; height: 36px; flex-shrink: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: {{bar.flagInk}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="{{bar.flagFill}}" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5z"></path><path d="M5.5 21V4"></path></svg></button>
+<sc-if value="{{bar.segment}}" hint-placeholder-val="{{true}}">
+<div style="height: 32px; flex-shrink: 0; margin-left: 2px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{c.track}}; display: flex;">
+<sc-for list="{{bar.places}}" as="pl" hint-placeholder-count="4">
+<button aria-label="{{pl.label}}" style="width: {{pl.width}}px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 14px; background: {{pl.bg}}; color: {{pl.ink}}; font: inherit; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{pl.path}}"></path></svg><sc-if value="{{pl.hasText}}" hint-placeholder-val="{{false}}"><span style="font-variant-numeric: tabular-nums;">{{pl.text}}</span></sc-if></button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{bar.placeButton}}" hint-placeholder-val="{{false}}">
+<button aria-label="Place" style="width: 100px; height: 32px; flex-shrink: 0; margin-left: 2px; box-sizing: border-box; padding: 0 12px 0 10px; border: 0; border-radius: 16px; background: {{c.track}}; color: {{c.text}}; font: inherit; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{bar.placePath}}"></path></svg>{{bar.placeLabel}}</button>
+</sc-if>
+</div>
+<div style="position: absolute; left: 0; bottom: 0; width: 390px; height: 291px; box-sizing: border-box; padding: 8px 3px 0; background: {{c.kbd}}; display: flex; flex-direction: column; gap: 12px; z-index: 12;">
+<sc-for list="{{kbd.rows}}" as="kr" hint-placeholder-count="4">
+<div style="display: flex; gap: 5px;">
+<sc-for list="{{kr.keys}}" as="k" hint-placeholder-count="10">
+<div style="flex: {{k.flex}}; height: 42px; border-radius: 5px; background: {{k.bg}}; box-shadow: {{c.keyShadow}}; display: flex; align-items: center; justify-content: center; font-size: {{k.size}}px; color: {{k.color}};">{{k.label}}</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"typing","options":["empty","typing","enter","closed","tabBefore","tabAfter","tabNext","tabOut","fabRest","fabCarry","fabCarrySub","fabInto","fabDrop","fabCal","fabCalField","modeCal","modeSoon","modeInbox","v1Now","v1Inbox","v1Date","v2Bar","v2Priority","v2PriorityLong","v2Panel","v2Inbox","v2DatePanel","v2Date","rename"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'typing';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', muted: '#8E8E93', dash: '#C7C7CC', strip: '#8A5CF5', accent: '#8A5CF5', target: '#F1ECFE', selection: 'rgba(138,92,245,0.28)', branch: '#C7C7CC', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', fabShadow: '0 6px 16px rgba(138,92,245,0.35)', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', menu: 'rgba(250,250,252,0.97)', menuTile: 'rgba(0,0,0,0.05)', onDot: '#FFFFFF', placeOnBg: 'rgba(0,0,0,0.1)', placeRing: 'inset 0 0 0 1.5px #1C1C1E', mark: '#FF9500', kbd: '#D1D3D9', barLine: '#B5B8BF', off: '#A1A4AB', track: '#BEC1C9', onBg: '#1C1C1E', onInk: '#FFFFFF', placeInk: '#3A3A3C', tile: '#E5E5EA', pill: '#E5E5EA', pillInk: '#1C1C1E', p1: '#FF3B30', p1Card: '#F4D5D7', p2: '#FF9500', key: '#FFFFFF', fnKey: '#ABB0BC', keyInk: '#000000', keyShadow: '0 1px 0 rgba(0,0,0,0.3)', outside: '#C7C7CC' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', muted: '#8E8E93', dash: '#3A3A3C', strip: '#8A6CEF', accent: '#9580FF', target: '#251F3D', selection: 'rgba(149,128,255,0.38)', branch: '#48484A', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', fabShadow: '0 6px 16px rgba(0,0,0,0.55)', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', menu: 'rgba(44,44,46,0.96)', menuTile: 'rgba(255,255,255,0.08)', onDot: '#000000', placeOnBg: 'rgba(255,255,255,0.16)', placeRing: 'inset 0 0 0 1.5px #E5E5EA', mark: '#FFD60A', kbd: '#1E1E20', barLine: '#2C2C2E', off: '#5A5A5E', track: '#2F2F31', onBg: '#E5E5EA', onInk: '#000000', placeInk: '#E5E5EA', tile: '#2C2C2E', pill: '#2C2C2E', pillInk: '#E5E5EA', p1: '#FF453A', p1Card: '#572725', p2: '#FF9F0A', key: '#48484B', fnKey: '#2F2F31', keyInk: '#FFFFFF', keyShadow: '0 1px 0 rgba(0,0,0,0.5)', outside: '#636366' };
+
+    const CARD = 35, STEP = 37, TOP = 166, INDENT = 20, W = 175;
+    const BAR_TOP = 509, NEW_TASK_TOP = 669, CAL_BOTTOM = 720, SLOT_TOP = 630;
+    const PATHS = {
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      date: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+
+    const card = (title, level, extra) => ({ kind: 'card', title, level: level ?? 0, ...extra });
+    const field = (text, level, extra) => ({ kind: 'field', text, level: level ?? 0, ...extra });
+    const gap = (level) => ({ kind: 'gap', level: level ?? 0 });
+    const base = [
+      card('Созвониться с врачом'),
+      card('Записаться в барбершоп', 0, { progress: true }),
+      card('Позвонить маме', 0, { id: 'mom' }),
+      card('Чай масала'),
+      card('Разобрать почту'),
+      card('Оплатить интернет')
+    ];
+    const head = base.slice(0, 4);
+    const inbox = ['Узнать про курсы итальянского', 'Идея подарка на Новый год', 'Ответить Лёше про поход', 'Посмотреть «Дюну 2»', 'Почитать про налоговое резидентство', 'Сменить тариф мобильной связи'].map((t) => card(t));
+    const nov5 = [card('Забрать костюм из химчистки'), card('Встреча с риелтором')];
+    const trip = (count) => card('Собрать вещи в поездку', 0, { count });
+    const momTarget = base.map((r) => (r.id === 'mom' ? { ...r, target: true } : r));
+    const top = (rows) => ({ side: 'left', rows });
+    const right = (rows) => ({ side: 'right', rows });
+    const bank = 'Позвонить в банк';
+
+    const V = {
+      empty: { cols: [top([...base, field('')])], bar: { out: false, in: true, place: 'now' }, mark: ['field'] },
+      typing: { cols: [top([...base, field('Купить хлеб')])], bar: { out: false, in: true, place: 'now' }, mark: ['field'] },
+      enter: { cols: [top([...base, card('Купить хлеб'), field('')])], bar: { out: false, in: true, place: 'now' }, mark: ['field'] },
+      closed: { cols: [top([...base, card('Купить хлеб', 0, { fresh: true }), card('Забрать посылку', 0, { fresh: true })])], mark: ['fresh'] },
+      tabBefore: { cols: [top([...head, trip(), field('Зарядка для ноутбука')])], bar: { out: false, in: true, place: 'now' }, mark: ['field', 'in'] },
+      tabAfter: { cols: [top([...head, trip(), field('Зарядка для ноутбука', 1)])], bar: { out: true, in: false }, mark: ['field', 'barRight'] },
+      tabNext: { cols: [top([...head, trip('0/1'), card('Зарядка для ноутбука', 1), field('', 1)])], bar: { out: true, in: true }, mark: ['field'] },
+      tabOut: { cols: [top([...head, trip('0/3'), card('Зарядка для ноутбука', 1), card('Паспорт', 1), card('Наушники', 1), field('')])], bar: { out: false, in: true, place: 'now' }, mark: ['field'] },
+      fabRest: { cols: [top(base)], mark: ['fab'] },
+      fabCarry: { cols: [top([base[0], base[1], gap(), ...base.slice(2)])], float: { at: 'gap' }, mark: ['gap'] },
+      fabCarrySub: { cols: [top([base[0], base[1], base[2], gap(1), ...base.slice(3)])], float: { at: 'gap' }, mark: ['gap'] },
+      fabInto: { cols: [top(momTarget)], float: { at: 'target', dx: 30 }, mark: ['target'] },
+      fabDrop: { cols: [top([base[0], base[1], base[2], field('', 1), ...base.slice(3)])], bar: { out: true, in: false }, mark: ['field'] },
+      fabCal: { cols: [top(base)], newSlot: true, float: { at: 'slot' }, mark: ['slot'] },
+      fabCalField: { cols: [top(base)], newSlot: true, scroll: 3.25, calField: true, bar: { indents: false }, mark: ['calField'] },
+      modeCal: { cols: [top(base)], mark: ['fab'] },
+      modeSoon: { mode: 'soon', mark: ['fab', 'newTasks'] },
+      modeInbox: { mode: 'inbox', mark: ['fab', 'newTasks'] },
+      v1Now: { mode: 'soon', cols: [right([...base, field(bank)])], bar: { out: false, in: true, place: 'now', style: 'segment' }, mark: ['field', 'barRight'] },
+      v1Inbox: { mode: 'inbox', cols: [top([...inbox, field(bank)])], bar: { out: false, in: true, place: 'inbox', style: 'segment' }, mark: ['field', 'barRight'] },
+      v1Date: { mode: 'soon', dayTitle: 'Thu, 5 Nov', cols: [right([...nov5, field(bank)])], bar: { out: false, in: true, place: 'date', dateText: '5 Nov', style: 'segment' }, mark: ['field', 'dayHead', 'barRight'] },
+      v2Bar: { mode: 'soon', cols: [right([...base, field(bank)])], bar: { out: false, in: true, place: 'now' }, mark: ['field', 'barRight'] },
+      v2Priority: { mode: 'soon', cols: [right([...base, field(bank, 0, { tint: c.p1Card })])], bar: { out: false, in: true, place: 'now', priority: 'p1' }, priorityPanel: true, mark: ['field', 'panelPriority'] },
+      v2PriorityLong: { mode: 'soon', levels: 'long', cols: [right([...base, field(bank, 0, { tint: '#573E19' })])], bar: { out: false, in: true, place: 'now', priority: 'Важно' }, priorityPanel: true, mark: ['panelPriority'] },
+      v2Panel: { mode: 'soon', cols: [right([...base, field(bank)])], bar: { out: false, in: true, place: 'now' }, placePanel: true, mark: ['panelPlace'] },
+      v2Inbox: { mode: 'inbox', cols: [top([...inbox, field(bank)])], bar: { out: false, in: true, place: 'inbox' }, mark: ['field', 'barRight'] },
+      v2DatePanel: { mode: 'soon', cols: [right([...base, field(bank)])], bar: { out: false, in: true, place: 'now' }, datePanel: true, mark: ['panelDate'] },
+      v2Date: { mode: 'soon', dayTitle: 'Thu, 5 Nov', cols: [right([...nov5, field(bank)])], bar: { out: false, in: true, place: 'date', dateText: '5 Nov' }, mark: ['field', 'dayHead', 'barRight'] },
+      rename: { cols: [top([...base.slice(0, 4), field('Разобрать почту', 0, { selected: true }), base[5]])], bar: { out: false, in: true, place: 'now' }, mark: ['field'] }
+    };
+    const cfg = V[view] ?? V.typing;
+    const mode = cfg.mode ?? 'calendar';
+    const kbdOn = !!cfg.bar;
+    const dragOn = !!cfg.float;
+    const geo = { left: { x0: 0, pad: 10 }, right: { x0: 203, pad: 2 } };
+
+    const marks = [];
+    const box = (left, top, width, height, radius) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius ?? Math.min(height + 8, 44) / 2 });
+    const want = cfg.mark ?? [];
+    let gapAt = null;
+    let targetAt = null;
+
+    const cols = (cfg.cols ?? []).map((col) => {
+      const g = geo[col.side];
+      const bottom = kbdOn ? BAR_TOP : mode === 'calendar' ? CAL_BOTTOM : NEW_TASK_TOP;
+      const height = bottom - TOP;
+      const rows = col.rows.map((r, i) => {
+        const level = r.level ?? 0;
+        return {
+          ...r,
+          isCard: r.kind === 'card',
+          isField: r.kind === 'field',
+          isGap: r.kind === 'gap',
+          left: g.pad + level * INDENT,
+          width: W - level * INDENT,
+          top: i * STEP,
+          progress: !!r.progress,
+          hasCount: !!r.count,
+          count: r.count ?? '',
+          bg: r.target ? c.target : r.tint ?? c.card,
+          ring: r.target ? 'inset 0 0 0 1.5px ' + c.accent : 'none',
+          typed: r.kind === 'field' && !!r.text && !r.selected,
+          empty: r.kind === 'field' && !r.text,
+          selected: !!r.selected,
+          text: r.text ?? ''
+        };
+      });
+      const fieldRow = rows.find((r) => r.isField);
+      const shift = kbdOn && fieldRow ? Math.max(0, fieldRow.top + CARD - (height - 16)) : 0;
+      rows.forEach((r) => { r.top -= shift; });
+
+      const branches = [];
+      rows.forEach((r, i) => {
+        if (r.isGap) return;
+        const kids = [];
+        for (let j = i + 1; j < rows.length && rows[j].level > r.level; j++) {
+          if (rows[j].level === r.level + 1) kids.push(j);
+        }
+        if (!kids.length) return;
+        const x = r.left + INDENT / 2;
+        const mid = (j) => rows[j].top + CARD / 2;
+        const last = mid(kids[kids.length - 1]);
+        branches.push(`M${x} ${mid(i)}V${last - 6}Q${x} ${last} ${x + 6} ${last}H${x + INDENT / 2}`);
+        kids.slice(0, -1).forEach((k) => branches.push(`M${x} ${mid(k)}H${x + INDENT / 2}`));
+      });
+
+      rows.forEach((r) => {
+        const x = g.x0 + r.left, y = TOP + r.top;
+        if (r.isGap) gapAt = { x, y };
+        if (r.target) targetAt = { x, y };
+        if ((want.includes('field') && r.isField) || (want.includes('gap') && r.isGap) || (want.includes('target') && r.target)) marks.push(box(x, y, r.width, CARD));
+      });
+      if (want.includes('fresh')) {
+        const fresh = rows.filter((r) => r.fresh);
+        if (fresh.length) marks.push(box(g.x0 + g.pad, TOP + fresh[0].top, W, fresh[fresh.length - 1].top - fresh[0].top + CARD));
+      }
+      return { x0: g.x0, height, rows, branches: branches.join('') || 'M0 0' };
+    });
+
+    const scroll = cfg.scroll ?? 0;
+    const calTop = SLOT_TOP - scroll * 56;
+    const float = { on: dragOn, left: 0, top: 0 };
+    if (cfg.float && cfg.float.at === 'gap' && gapAt) Object.assign(float, { left: gapAt.x + 4, top: gapAt.y + 6 });
+    if (cfg.float && cfg.float.at === 'target' && targetAt) Object.assign(float, { left: targetAt.x + cfg.float.dx, top: targetAt.y + 14 });
+    if (cfg.float && cfg.float.at === 'slot') Object.assign(float, { left: 186, top: SLOT_TOP + 12 });
+
+    const b = cfg.bar ?? {};
+    const LEVELS = {
+      short: light
+        ? [{ name: 'p1', c: '#FF3B30', tint: '#F4D5D7' }, { name: 'p2', c: '#FF9500', tint: '#F4E3CF' }, { name: 'p3', c: '#FFCC00', tint: '#F4ECCF' }]
+        : [{ name: 'p1', c: '#FF453A', tint: '#572725' }, { name: 'p2', c: '#FF9F0A', tint: '#573E19' }, { name: 'p3', c: '#FFD60A', tint: '#574C19' }],
+      long: [{ name: 'Супер срочно', c: '#FF453A', tint: '#572725' }, { name: 'Важно', c: '#FF9F0A', tint: '#573E19' }, { name: 'На этой неделе', c: '#FFD60A', tint: '#574C19' }, { name: 'Когда-нибудь, если будет время', c: '#40C8E0', tint: '#254950' }]
+    };
+    const levelSet = LEVELS[cfg.levels ?? 'short'];
+    const pr = b.priority ? levelSet.find((l) => l.name === b.priority) : null;
+    const FADE = 'linear-gradient(to right, #000 calc(100% - 20px), transparent calc(100% - 8px))';
+    const levelTiles = levelSet.map((l) => {
+      const on = !!pr && pr.name === l.name;
+      const fits = l.name.length <= 10;
+      return { ...l, on, aria: on ? 'Remove priority ' + l.name : 'Priority ' + l.name, bg: on ? l.tint : c.menuTile, ring: on ? 'inset 0 0 0 1.5px ' + l.c : 'none', align: fits ? 'center' : 'left', mask: fits ? 'none' : FADE };
+    });
+    const rowCount = Math.ceil(levelTiles.length / 3);
+    const perRow = Math.ceil(levelTiles.length / rowCount);
+    const ppRows = [];
+    for (let i = 0; i < levelTiles.length; i += perRow) ppRows.push({ tiles: levelTiles.slice(i, i + perRow) });
+    const ppH = 16 + ppRows.length * 66 + (ppRows.length - 1) * 6;
+    const pp = { rows: ppRows, top: BAR_TOP - 8 - ppH, height: ppH };
+    const placeKeys = ['inbox', 'soon', 'now', 'date'];
+    const placeLabels = { inbox: 'Inbox', soon: 'Soon', now: 'Now', date: b.dateText ?? 'Date' };
+    const segmentOn = kbdOn && !!b.place && b.style === 'segment';
+    const places = placeKeys.map((k) => {
+      const on = b.place === k;
+      const withText = on && k === 'date' && !!b.dateText;
+      return { label: placeLabels[k], path: PATHS[k], width: withText ? 84 : 38, bg: on ? c.onBg : 'transparent', ink: on ? c.onInk : c.placeInk, hasText: withText, text: b.dateText ?? '' };
+    });
+    const priorityW = 44;
+    const placeW = segmentOn ? 4 + places.reduce((s, p) => s + p.width, 0) + 2 : kbdOn && b.place ? 102 : 0;
+    const bar = {
+      indents: b.indents !== false,
+      outInk: b.out ? c.text : c.off,
+      inInk: b.in ? c.text : c.off,
+      flagInk: pr ? pr.c : c.text,
+      flagFill: pr ? pr.c : 'none',
+      segment: segmentOn,
+      places,
+      placeButton: kbdOn && b.style !== 'segment' && !!b.place,
+      placePath: PATHS[b.place ?? 'now'],
+      placeLabel: placeLabels[b.place ?? 'now']
+    };
+    const rightW = priorityW + 4 + placeW;
+    if (want.includes('barRight')) marks.push(box(390 - 6 - rightW, BAR_TOP + 4, rightW, 36, 12));
+    if (want.includes('in')) marks.push(box(54, BAR_TOP + 4, 44, 36, 12));
+    if (want.includes('fab')) marks.push(box(330, 722, 44, 44));
+    if (want.includes('slot')) marks.push(box(232, SLOT_TOP, 153, CARD));
+    if (want.includes('calField')) marks.push(box(232, calTop, 153, CARD));
+    if (want.includes('newTasks')) { marks.push(box(10, 677, 175, CARD)); marks.push(box(205, 677, 175, CARD)); }
+    if (want.includes('dayHead')) marks.push(box(205, 118, 180, 36, 12));
+    if (want.includes('panelDate')) marks.push(box(82, 207, 300, 294, 18));
+    if (want.includes('panelPriority')) marks.push(box(82, pp.top, 300, pp.height, 18));
+    if (want.includes('panelPlace')) marks.push(box(82, 419, 300, 82, 18));
+
+    const tiles = placeKeys.map((k) => ({ label: k === 'date' ? 'Date' : placeLabels[k], path: PATHS[k], bg: b.place === k ? c.placeOnBg : c.menuTile, ring: b.place === k ? c.placeRing : 'none' }));
+
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(2026, 9, 26 + i);
+      const inMonth = d.getMonth() === 10;
+      const isToday = d.getMonth() === 9 && d.getDate() === 30;
+      const isSelected = inMonth && d.getDate() === 5;
+      days.push({ n: d.getDate(), bg: isSelected ? c.accent : 'transparent', color: isSelected ? '#FFFFFF' : isToday ? c.accent : inMonth ? c.text : c.outside, weight: isSelected || isToday ? 700 : 400 });
+    }
+
+    const key = (label, extra) => ({ label, flex: '1', bg: c.key, color: c.keyInk, size: 22, ...extra });
+    const fn = (label, flex) => key(label, { flex, bg: c.fnKey, size: 15 });
+    const kbd = kbdOn
+      ? { on: true, rows: [
+          { keys: ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'].map((k) => key(k)) },
+          { keys: ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э'].map((k) => key(k)) },
+          { keys: [fn('⇧', '1.4'), ...['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю'].map((k) => key(k)), fn('⌫', '1.4')] },
+          { keys: [fn('123', '1.3'), key('пробел', { flex: '6', size: 16 }), fn('Далее', '2.2')] }
+        ] }
+      : { on: false, rows: [] };
+
+    return {
+      c,
+      theme: light ? 'light' : 'dark',
+      mode,
+      newSlot: cfg.newSlot ? 'true' : 'false',
+      scroll: String(scroll),
+      dayTitle: cfg.dayTitle ?? 'Today',
+      hideNewTask: mode === 'calendar',
+      cols,
+      calField: { on: !!cfg.calField, top: calTop },
+      fab: { rest: !kbdOn && !dragOn },
+      float,
+      bar,
+      kbd,
+      datePanel: !!cfg.datePanel,
+      dateTop: 207,
+      priorityPanel: !!cfg.priorityPanel,
+      placePanel: !!cfg.placePanel,
+      pp,
+      tiles,
+      weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+      days,
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>
