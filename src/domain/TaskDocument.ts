@@ -1,3 +1,4 @@
+import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
 import type { GroupName, SectionKey, Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
@@ -263,6 +264,18 @@ export class TaskDocument {
 		const without = this.splice(span.line, span.lineCount, []);
 		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
 		return this.withLines(without);
+	}
+
+	/**
+	 * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
+	 * description has, else its subtasks'. The same text changes nothing; an empty one takes the description away.
+	 */
+	setDescription(entry: TaskEntry, markdown: string): TaskDocument {
+		const lines = markdownLines(markdown);
+		if (lines.join("\n") === (descriptionMarkdown(entry) ?? "")) return this;
+		const indent = descriptionIndent(entry) ?? this.childIndent(entry);
+		const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
+		return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
 	}
 
 	/** A new subtask of `parent`, right before its subtask `before` or last. */

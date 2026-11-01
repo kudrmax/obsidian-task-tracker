@@ -1,6 +1,7 @@
 import type { SubtaskProgress, TaskItem } from "../application/contracts";
 import type { PriorityLevel } from "../settings";
 import { DayBoundary } from "./DayBoundary";
+import { descriptionMarkdown } from "./description";
 import type { LocalDate } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
@@ -59,6 +60,7 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		group: entry.group,
 		subtasks: entry.subtasks.filter(isOpen).map((sub) => toItem(sub, levelOf, entry.task.text)),
 		progress: progressOf(entry),
+		description: descriptionMarkdown(entry),
 		parentText,
 	};
 }

@@ -5,7 +5,7 @@ import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { sameTask } from "./drag/listPlace";
-import { markPriority, renderProgress, showStrip } from "./TaskCard";
+import { markPriority, renderMeta, showStrip } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
@@ -482,7 +482,7 @@ export class Timeline {
 		markPriority(card, item.priority);
 		if (item.status === "inProgress") make(card, "span", "tc-strip");
 		fillTitle(make(card, "div", "tc-card-title"), item.text);
-		renderProgress(card, item);
+		renderMeta(card, item);
 		const meta = make(card, "span", "tc-block-meta is-hidden");
 		make(meta, "span");
 		make(meta, "span");

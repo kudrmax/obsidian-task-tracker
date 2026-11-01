@@ -14,11 +14,27 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	group: null,
 	subtasks: [],
 	progress: null,
-	parentText: null,
+	parentText: null, description: null,
 	...extra,
 });
 
 describe("renderTaskCard", () => {
+	it("puts the subtask counter and the description mark in one column, the mark under the counter", () => {
+		const both = renderTaskCard(document.createElement("div"), item({ progress: { done: 1, total: 4 }, description: "- note" }), { day: null });
+		const meta = both.querySelector(".tc-meta");
+		expect(meta?.classList.contains("is-pair")).toBe(true);
+		expect([...meta!.children].map((c) => c.getAttribute("class"))).toEqual(["tc-count", "tc-desc-mark"]);
+		expect(meta?.querySelector(".tc-count")?.textContent).toBe("1/4");
+	});
+
+	it("shows the mark alone for a task with a description and no subtasks, nothing for a task with neither", () => {
+		const alone = renderTaskCard(document.createElement("div"), item({ description: "- note" }), { day: null }).querySelector(".tc-meta");
+		expect(alone?.classList.contains("is-pair")).toBe(false);
+		expect(alone?.querySelector(".tc-desc-mark")).not.toBeNull();
+		expect(alone?.querySelector(".tc-count")).toBeNull();
+		expect(renderTaskCard(document.createElement("div"), item(), { day: null }).querySelector(".tc-meta")).toBeNull();
+	});
+
 	it("draws the title in a card", () => {
 		const parent = document.createElement("div");
 		const card = renderTaskCard(parent, item(), { day: null });
@@ -74,7 +90,7 @@ describe("a task's priority", () => {
 describe("a task with subtasks", () => {
 	it("shows the counter before the due date, and nothing without subtasks", () => {
 		const card = renderTaskCard(document.createElement("div"), item({ progress: { done: 2, total: 5 }, dueDate: "2026-11-03" }), { day: null });
-		expect([...card.children].map((c) => c.className)).toEqual(["tc-card-title", "tc-count", "tc-due"]);
+		expect([...card.children].map((c) => c.className)).toEqual(["tc-card-title", "tc-meta", "tc-due"]);
 		expect(card.querySelector(".tc-count")?.textContent).toBe("2/5");
 		expect(renderTaskCard(document.createElement("div"), item(), { day: null }).querySelector(".tc-count")).toBeNull();
 	});

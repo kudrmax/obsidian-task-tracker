@@ -54,6 +54,8 @@ export interface TaskItem {
 	readonly progress: SubtaskProgress | null;
 	/** The text of the task a subtask belongs to; null for a task. */
 	readonly parentText: string | null;
+	/** Its nested lines without a checkbox as Markdown, its first level unindented; null without any. */
+	readonly description: string | null;
 }
 
 export interface DayView {
@@ -146,6 +148,11 @@ export interface TaskService {
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
+	/**
+	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes
+	 * nothing, an empty one takes it away. Blank lines go: they would end the task in the file.
+	 */
+	setDescription(key: TaskKey, markdown: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
 
 	/**

@@ -3,6 +3,7 @@ import type { LocalDate } from "./types";
 import type { PriorityLevel } from "../settings";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
+import { icon } from "./icons";
 import { fillTitle } from "./TaskTitle";
 
 export interface TaskCardOptions {
@@ -10,7 +11,7 @@ export interface TaskCardOptions {
 	readonly day: LocalDate | null;
 }
 
-/** A card of the list: the strip of a task in progress, the title fading out on the right, the subtask counter, the due date. */
+/** A card of the list: the strip of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date. */
 export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts: TaskCardOptions): HTMLElement {
 	const card = el(parent, "div", "tc-card");
 	fillCard(card, item, opts);
@@ -28,7 +29,7 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	markPriority(card, item.priority);
 	showStrip(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
-	renderProgress(card, item);
+	renderMeta(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {
 		const due = el(card, "span", "tc-due");
 		el(due, "span", "tc-due-day", dayOfMonth(item.dueDate));
@@ -36,19 +37,29 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	}
 }
 
-/** «2/5»: of the task's own subtasks, the done ones out of those not given up. */
-export function renderProgress(card: HTMLElement, item: TaskItem): void {
-	if (item.progress) el(card, "span", "tc-count", countText(item.progress));
+/**
+ * One column where the subtask counter stood: «2/5», of the task's own subtasks the done ones out of those not given up,
+ * and under it the mark of a description; either alone when the task has only that.
+ */
+export function renderMeta(card: HTMLElement, item: TaskItem): void {
+	const meta = metaOf(item);
+	if (meta) card.appendChild(meta);
 }
 
-const countText = ({ done, total }: NonNullable<TaskItem["progress"]>): string => `${done}/${total}`;
+/** The column of a card already drawn, right after its title, as the task now stands: set, changed, or taken away. */
+export function showMeta(card: HTMLElement, item: TaskItem): void {
+	card.querySelector(":scope > .tc-meta")?.remove();
+	const meta = metaOf(item);
+	if (meta) card.querySelector(":scope > .tc-card-title")?.after(meta);
+}
 
-/** The counter of a card already drawn, right after its title, as the task now stands: set, added, or taken away. */
-export function showProgress(card: HTMLElement, item: TaskItem): void {
-	const count = card.querySelector(":scope > .tc-count");
-	if (!item.progress) count?.remove();
-	else if (count) count.textContent = countText(item.progress);
-	else card.querySelector(":scope > .tc-card-title")?.after(el(null, "span", "tc-count", countText(item.progress)));
+function metaOf(item: TaskItem): HTMLElement | null {
+	if (!item.progress && item.description === null) return null;
+	const meta = el(null, "span", "tc-meta");
+	if (item.progress) el(meta, "span", "tc-count", `${item.progress.done}/${item.progress.total}`);
+	if (item.description !== null) meta.appendChild(icon("description")).classList.add("tc-desc-mark");
+	meta.classList.toggle("is-pair", item.progress !== null && item.description !== null);
+	return meta;
 }
 
 /** Gives a card, or a dot, the colour of a priority level; none takes it away. */

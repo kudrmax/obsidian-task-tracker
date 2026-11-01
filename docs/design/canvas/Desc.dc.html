@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Описание задачи</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<sc-if value="{{onMain}}" hint-placeholder-val="{{true}}">
+<dc-import name="Screen" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 503px; background: {{c.bg}}; z-index: 3;"></div>
+<div style="position: absolute; left: 10px; top: 166px; width: 175px; height: 503px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; z-index: 4;">
+<svg width="175" height="503" viewBox="0 0 175 503" style="position: absolute; left: 0; top: 0; width: 175px; height: 503px;" aria-hidden="true"><path d="{{branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="11">
+<div style="position: relative; flex-shrink: 0; margin-left: {{r.indent}}px; overflow: hidden; height: 35px; box-sizing: border-box; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.strip}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.meta}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}}; outline: {{r.mark}}; outline-offset: 2px; border-radius: 4px;">
+<sc-if value="{{r.hasSubs}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+<sc-if value="{{r.desc}}" hint-placeholder-val="{{false}}"><svg width="{{r.iconSize}}" height="{{r.iconSize}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{descIcon}}"></path></svg></sc-if>
+</span>
+</sc-if>
+<sc-if value="{{r.due}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{menu.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<sc-if value="{{menu.preview}}" hint-placeholder-val="{{false}}">
+<button style="position: absolute; left: {{menu.left}}px; bottom: {{menu.previewBottom}}px; width: 300px; max-height: 214px; box-sizing: border-box; overflow: hidden; padding: 10px 14px 10px 6px; border: 0; border-radius: 14px; background: {{c.panel}}; box-shadow: {{c.shadow}}; color: {{md.text}}; font: inherit; font-family: {{md.font}}; text-align: left; outline: {{menu.previewMark}}; outline-offset: 4px; z-index: 11;">
+<div style="display: flex; flex-direction: column; -webkit-mask-image: linear-gradient(to bottom, #000 150px, transparent 190px); mask-image: linear-gradient(to bottom, #000 150px, transparent 190px);">
+<sc-for list="{{panelItems}}" as="it" hint-placeholder-count="8">
+<div style="position: relative; display: flex; align-items: flex-start; padding-left: {{it.pad}}px;">
+<sc-for list="{{it.guides}}" as="g" hint-placeholder-count="0"><span style="position: absolute; left: {{g.x}}px; top: 0; bottom: 0; width: 1px; background: {{md.guide}};"></span></sc-for>
+<span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{md.faint}};"></span></span>
+<div style="flex: 1; min-width: 0; box-sizing: border-box; border-left: {{it.qBorder}}; padding-left: {{it.qPad}}px; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span><sc-if value="{{p.ext}}" hint-placeholder-val="{{false}}"><svg width="{{it.extSize}}" height="{{it.extSize}}" viewBox="0 0 24 24" fill="none" stroke="{{md.link}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 2px; vertical-align: -1px;"><path d="M15 3h6v6 M10 14L21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></sc-if></sc-for></div>
+</div>
+</sc-for>
+</div>
+</button>
+</sc-if>
+
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.top}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; z-index: 11;">
+<div style="white-space: nowrap; font-size: 15px;">{{menu.title}}</div>
+<sc-if value="{{menu.meta}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}};">
+<sc-if value="{{menu.hasSubs}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{menu.count}}</span></sc-if>
+<sc-if value="{{menu.desc}}" hint-placeholder-val="{{false}}"><svg width="{{menu.iconSize}}" height="{{menu.iconSize}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{descIcon}}"></path></svg></sc-if>
+</span>
+</sc-if>
+<sc-if value="{{menu.due}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{menu.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
+</sc-if>
+</div>
+
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.panelTop}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<div style="padding: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="2">
+<button aria-label="Priority {{l.name}}" style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{flag}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<sc-for list="{{editRows}}" as="r" hint-placeholder-count="3">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{r.label}}</span>
+<sc-if value="{{r.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{r.value}}</span></sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg>
+</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-if value="{{page.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+<button style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{c.button}}; font: inherit; font-size: 17px;">{{page.left}}</button>
+<button style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{c.button}}; font: inherit; font-size: 17px; font-weight: 600;">{{page.right}}</button>
+</div>
+<div style="position: absolute; left: 20px; right: 20px; top: 106px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 22px; line-height: 28px; font-weight: 700; overflow-wrap: anywhere;">{{page.title}}</div>
+<div style="display: flex; flex-direction: column; margin-left: -6px; color: {{md.text}}; font-family: {{md.font}}; outline: {{page.mdMark}}; outline-offset: 6px; border-radius: 6px;">
+<sc-for list="{{pageItems}}" as="it" hint-placeholder-count="8">
+<div style="position: relative; display: flex; align-items: flex-start; padding-left: {{it.pad}}px;">
+<sc-for list="{{it.guides}}" as="g" hint-placeholder-count="0"><span style="position: absolute; left: {{g.x}}px; top: 0; bottom: 0; width: 1px; background: {{md.guide}};"></span></sc-for>
+<span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{md.faint}};"></span></span>
+<div style="flex: 1; min-width: 0; box-sizing: border-box; border-left: {{it.qBorder}}; padding-left: {{it.qPad}}px; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span><sc-if value="{{p.ext}}" hint-placeholder-val="{{false}}"><svg width="{{it.extSize}}" height="{{it.extSize}}" viewBox="0 0 24 24" fill="none" stroke="{{md.link}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: 2px; vertical-align: -1px;"><path d="M15 3h6v6 M10 14L21 3 M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></sc-if></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: 20px; margin-left: 1px; vertical-align: -4px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{page.keyboard}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: 500px; height: 44px; box-sizing: border-box; padding: 0 6px; background: {{c.kbd}}; border-top: 0.5px solid {{c.sep}}; display: flex; align-items: center; gap: 4px;">
+<button aria-label="Outdent" style="width: 44px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H11 M21 12H11 M21 19H11 M7 8l-4 4 4 4"></path></svg></button>
+<button aria-label="Indent" style="width: 44px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H11 M21 12H11 M21 19H11 M3 8l4 4-4 4"></path></svg></button>
+</div>
+<div style="position: absolute; left: 0; right: 0; top: 544px; height: 300px; box-sizing: border-box; padding: 8px 3px 0; background: {{c.kbd}}; display: flex; flex-direction: column; gap: 11px;">
+<sc-for list="{{letterRows}}" as="row" hint-placeholder-count="2">
+<div style="display: flex; gap: 5px;">
+<sc-for list="{{row}}" as="k" hint-placeholder-count="11">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+</div>
+</sc-for>
+<div style="display: flex; gap: 5px;">
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.text}}" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l8 8h-4.5v7h-7v-7H4z"></path></svg></span>
+<sc-for list="{{row3}}" as="k" hint-placeholder-count="9">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="20" viewBox="0 0 26 24" fill="none" stroke="{{c.text}}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M9 5h13a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 22 19H9l-6.5-7z M13 9.5l5 5 M18 9.5l-5 5"></path></svg></span>
+</div>
+<div style="display: flex; gap: 5px;">
+<span style="width: 46px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">123</span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.text}}" stroke-width="1.6" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M3 12h18 M12 3c2.8 3 2.8 15 0 18 M12 3c-2.8 3-2.8 15 0 18"></path></svg></span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Пробел</span>
+<span style="width: 92px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Ввод</span>
+</div>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="k" hint-placeholder-count="0">
+<div style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; width: {{k.width}}px; height: {{k.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{k.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"list","options":["list","menuA","menuAAdd","read","edit","add"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'list';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', strip: '#8A5CF5', button: '#8A5CF5', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', tile: 'rgba(0,0,0,0.05)', danger: '#FF3B30', mark: '#FF9500', branch: '#C7C7CC', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', strip: '#8A6CEF', button: '#8A6CEF', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', tile: 'rgba(255,255,255,0.08)', danger: '#FF453A', mark: '#FFD60A', branch: '#48484A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+    // Obsidian's own markdown look (default theme, Max's settings: Inter 16px, line-height 1.5, list indent 2.25em, bullet 0.3em, guides, accent links and quote border)
+    const md = light
+      ? { font: "Inter, -apple-system, system-ui, sans-serif", text: '#222222', faint: '#ABABAB', guide: 'rgba(0,0,0,0.12)', link: '#8A5CF5', quote: '#8A5CF5', caret: '#8A5CF5' }
+      : { font: "Inter, -apple-system, system-ui, sans-serif", text: '#DADADA', faint: '#666666', guide: 'rgba(255,255,255,0.12)', link: '#A88BFA', quote: '#8A5CF5', caret: '#A88BFA' };
+    const marksOn = this.props.marks !== false;
+    const markLine = marksOn ? '2px dashed ' + c.mark : 'none';
+    const TOP = 166;
+    const STEP = 37;
+    const CARD = 35;
+    const INDENT = 20;
+    const tasks = [
+      { title: 'Созвониться с врачом' },
+      { title: 'Записаться в барбершоп', progress: true, day: '2' },
+      { id: 'bank', title: 'Позвонить в банк', desc: true },
+      { title: 'Посмотреть доклад про local-first приложения', progress: true },
+      { id: 'chai', title: 'Чай масала' },
+      { id: 'belgrade', title: 'Купить билеты в Белград', desc: true, count: '1/4', day: '3' },
+      { title: 'Выбрать места', progress: true, level: 1 },
+      { title: 'Оплатить билеты', level: 1 },
+      { title: 'Добавить посадочные в Wallet', level: 1 },
+      { id: 'internet', title: 'Оплатить интернет', desc: true },
+      { title: 'Забрать посылку' }
+    ];
+    const meta = (t) => ({
+      desc: !!t.desc,
+      hasSubs: !!t.count,
+      meta: !!t.desc || !!t.count,
+      iconSize: t.count ? 11 : 13
+    });
+    const rows = tasks.map((t) => ({
+      ...t,
+      ...meta(t),
+      indent: (t.level ?? 0) * INDENT,
+      progress: !!t.progress,
+      due: !!t.day,
+      mark: view === 'list' && t.desc ? markLine : 'none'
+    }));
+    const mid = (i) => i * STEP + CARD / 2;
+    const parentAt = rows.findIndex((r) => r.id === 'belgrade');
+    const kids = [parentAt + 1, parentAt + 2, parentAt + 3];
+    const last = mid(kids[kids.length - 1]);
+    const x = INDENT / 2;
+    const branches = `M${x} ${mid(parentAt)}V${last - 6}Q${x} ${last} ${x + 6} ${last}H${INDENT}` +
+      kids.slice(0, -1).map((k) => `M${x} ${mid(k)}H${INDENT}`).join('');
+
+    const link = { color: md.link, deco: 'underline' };
+    const ext = { ...link, ext: true };
+    const faint = { color: md.faint, deco: 'none' };
+    const part = (t, style) => ({ t, color: md.text, deco: 'none', ext: false, ...(style ?? {}) });
+    const desc = [
+      { level: 0, parts: [part('Летим 14 ноября, обратно 21-го')] },
+      { level: 0, parts: [part('Сравнить на '), part('Aviasales', ext), part(' и на сайте '), part('Air Serbia', ext)] },
+      { level: 0, parts: [part('Совет Ани:')] },
+      { level: 1, quote: true, parts: [part('бери утренний рейс, вечерний вечно задерживают')] },
+      { level: 0, parts: [part('Багаж')] },
+      { level: 1, parts: [part('один чемодан 23 кг на двоих')] },
+      { level: 1, parts: [part('ручная кладь у каждого')] },
+      { level: 0, parts: [part('Паспорта лежат в '), part('Документы', link)] }
+    ];
+    const editing = view === 'edit';
+    const editDesc = desc.map((it, i) => i === desc.length - 1
+      ? { ...it, parts: [part('Паспорта лежат в '), part('[[', faint), part('Документы', { color: md.link, deco: 'none' }), part(']]', faint)] }
+      : it);
+    const shape = (items, fs, cursorAt) => {
+      const lh = fs * 1.5;
+      const indent = Math.round(fs * 1.5);
+      return items.map((it, i) => ({
+        ...it,
+        fs, lh,
+        marker: indent,
+        dot: Math.round(fs * 0.3 * 10) / 10,
+        extSize: Math.round(fs * 0.75),
+        pad: it.level * indent,
+        guides: Array.from({ length: it.level }, (_, k) => ({ x: k * indent + indent / 2 })),
+        qBorder: it.quote ? '2px solid ' + md.quote : '0',
+        qPad: it.quote ? Math.round(fs * 0.75) : 0,
+        cursor: i === cursorAt
+      }));
+    };
+    const empty = [{ level: 0, parts: [part('Text, links, quotes', faint)] }];
+    const pageSource = view === 'add' ? empty : editing ? editDesc : desc;
+    const cursorAt = view === 'add' ? 0 : editing ? desc.length - 1 : -1;
+
+    const rowTop = (i) => TOP + i * STEP;
+    const menuTask = { menuA: 'belgrade', menuAAdd: 'chai' }[view];
+    const menuAt = rows.findIndex((r) => r.id === menuTask);
+    const mr = menuTask ? rows[menuAt] : null;
+    const cardTop = mr ? rowTop(menuAt) : 0;
+    const menu = mr
+      ? {
+          on: true, left: 10 + mr.indent, top: cardTop, panelTop: cardTop + CARD + 12,
+          title: mr.title, desc: mr.desc, hasSubs: mr.hasSubs, meta: mr.meta, iconSize: mr.iconSize, count: mr.count, due: mr.due, day: mr.day,
+          preview: view === 'menuA', previewBottom: 844 - (cardTop - 10), previewMark: view === 'menuA' ? markLine : 'none'
+        }
+      : { on: false };
+
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      due: 'M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4',
+      subtask: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
+      desc: 'M4 6h16 M4 12h16 M4 18h10'
+    };
+    const editByView = {
+      menuA: [{ label: 'Rename', d: icons.rename }, { label: 'Due date', d: icons.due, value: '3 Nov' }, { label: 'Add subtask', d: icons.subtask }],
+      menuAAdd: [{ label: 'Rename', d: icons.rename }, { label: 'Add description', d: icons.desc }, { label: 'Due date', d: icons.due }, { label: 'Add subtask', d: icons.subtask }]
+    };
+    const editRows = (editByView[view] ?? []).map((r, i, a) => ({ ...r, hasValue: !!r.value, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+
+    const pages = {
+      read: { left: 'Close', right: 'Edit', title: 'Купить билеты в Белград', keyboard: false },
+      edit: { left: 'Cancel', right: 'Save', title: 'Купить билеты в Белград', keyboard: true },
+      add: { left: 'Cancel', right: 'Save', title: 'Чай масала', keyboard: true }
+    };
+    const page = pages[view] ? { on: true, ...pages[view], mdMark: markLine } : { on: false };
+
+    const box = (left, top, width, height, radius) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius ?? Math.min(height + 8, 44) / 2 });
+    const editTop = menu.on ? menu.panelTop + 8 + 66 + 8 + 8 + 8 + 66 + 8 + 8 : 0;
+    const marks = !marksOn ? [] : ({
+      menuAAdd: () => [box(menu.left, editTop + 44, 300, 44, 10)]
+    }[view] ?? (() => []))();
+
+    return {
+      c,
+      md,
+      theme: light ? 'light' : 'dark',
+      onMain: !page.on,
+      rows,
+      branches,
+      descIcon: icons.desc,
+      menu,
+      panelItems: shape(desc, 15, -1),
+      pageItems: shape(pageSource, 16, cursorAt),
+      page,
+      marks,
+      flag: 'M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5',
+      levels: [{ name: 'p1', c: light ? '#FF3B30' : '#FF453A' }, { name: 'p2', c: light ? '#FF9500' : '#FF9F0A' }],
+      statusTiles: [
+        { label: 'Done', d: CIRCLE, fd: CIRCLE },
+        { label: 'In progress', d: CIRCLE, fd: 'M12 3a9 9 0 0 1 0 18z' },
+        { label: 'Won’t do', d: CIRCLE + ' M8 12h8', fd: '' }
+      ],
+      editRows,
+      letterRows: [
+        ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'],
+        ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э']
+      ],
+      row3: ['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю']
+    };
+  }
+}
+</script>
+</body>
+</html>

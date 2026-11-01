@@ -21,6 +21,7 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		subtasks,
 		progress: null,
 		parentText: null,
+		description: null,
 	} as TaskItem;
 }
 

@@ -109,6 +109,25 @@ describe("writing", () => {
 		expect(store.text).toBe(FULL);
 	});
 
+	it("shows a task's description and writes a new one under it, nothing when it is the same", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n\t- note\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		expect(a.description).toBe("- note");
+		expect(b.description).toBeNull();
+		const before = store.text;
+		await svc.setDescription(a.key, "- note");
+		expect(store.text).toBe(before);
+		await svc.setDescription(b.key, "- first\n\t- deeper");
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A\n\t- note\n- [ ] B\n\t- first\n\t\t- deeper\n\n## Soon\n\n## Backlog\n\n## Done\n");
+	});
+
+	it("rejects a description for a task that changed in the file", async () => {
+		const { store, svc } = setup("## Now\n- [ ] A\n");
+		const view = await svc.dayView(T);
+		store.text = "## Now\n- [ ] Changed\n";
+		await expect(svc.setDescription(view.list[0].key, "- x")).rejects.toBeInstanceOf(StaleTaskError);
+	});
+
 	it("createAtTime puts the task at the time, without a duration", async () => {
 		const { store, svc } = setup(FULL);
 		await svc.createAtTime(T, 600, "Call");

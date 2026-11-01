@@ -85,6 +85,11 @@ export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskD
 	return patch(doc, entry, { text: text.trim() });
 }
 
+/** The description from Markdown: see `TaskDocument.setDescription`. */
+export function setDescription(doc: TaskDocument, entry: TaskEntry, markdown: string): TaskDocument {
+	return doc.setDescription(entry, markdown);
+}
+
 export function remove(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 	return doc.removeEntry(entry);
 }

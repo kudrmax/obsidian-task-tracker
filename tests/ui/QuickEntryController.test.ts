@@ -27,6 +27,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	subtasks,
 	progress: null,
 	parentText: null,
+	description: null,
 });
 
 interface SetUp {
@@ -509,7 +510,7 @@ describe("QuickEntryController", () => {
 				stackEl.className = "tc-menu-subtasks";
 				const source = stackEl.appendChild(document.createElement("div"));
 				source.className = "tc-card";
-				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, addSubtask: () => {}, remove: async () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openLink: () => {} } });
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
@@ -563,7 +564,7 @@ describe("QuickEntryController", () => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
 				source.getBoundingClientRect = () => at;
-				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, addSubtask: () => {}, remove: async () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openLink: () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 

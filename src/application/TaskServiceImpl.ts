@@ -118,6 +118,10 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.rename(doc, this.entryOf(doc, key), text));
 	}
 
+	async setDescription(key: TaskKey, markdown: string): Promise<void> {
+		await this.mutate((doc) => ops.setDescription(doc, this.entryOf(doc, key), markdown));
+	}
+
 	async remove(key: TaskKey): Promise<void> {
 		await this.mutate((doc) => ops.remove(doc, this.entryOf(doc, key)));
 	}
