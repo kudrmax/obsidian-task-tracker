@@ -154,6 +154,8 @@ export interface TaskService {
 	 */
 	setDescription(key: TaskKey, markdown: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
+	/** The task's line in the file, from 0, once the file is normalized: where Open in Obsidian puts the cursor. */
+	lineOf(key: TaskKey): Promise<number>;
 
 	/**
 	 * Puts `key` right before the task `before` in the file, in `before`'s section. `before` null: end of the list's section

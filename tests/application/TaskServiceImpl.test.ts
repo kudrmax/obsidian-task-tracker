@@ -534,3 +534,21 @@ describe("sections of a later day", () => {
 		expect(evening.store.text).toBe("## Inbox\n\n## Now\n### Morning\n- [ ] A 📅 2026-10-31\n\n## Soon\n\n## Done\n");
 	});
 });
+
+describe("lineOf", () => {
+	it("gives the line of a task and of a subtask, from 0", async () => {
+		const { svc } = setup("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n\t- [ ] B1\n\n## Soon\n- [ ] C\n\n## Backlog\n\n## Done\n");
+		const now = (await svc.dayView(T)).list;
+		const b = now.find((i) => i.text === "B")!;
+		expect(await svc.lineOf(b.key)).toBe(4);
+		expect(await svc.lineOf(b.subtasks[0].key)).toBe(5);
+		const c = (await svc.soonWithoutDateView())[0];
+		expect(await svc.lineOf(c.key)).toBe(8);
+	});
+
+	it("rejects with StaleTaskError when the line changed", async () => {
+		const { svc } = setup(FULL);
+		const a = (await svc.dayView(T)).list[0];
+		await expect(svc.lineOf({ ...a.key, raw: "- [ ] Other" })).rejects.toBeInstanceOf(StaleTaskError);
+	});
+});

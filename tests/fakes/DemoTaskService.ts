@@ -241,6 +241,11 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
+	async lineOf(key: TaskKey): Promise<number> {
+		this.find(key);
+		return key.index;
+	}
+
 	async moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
 		if (before) this.find(before);
 		const t = this.take(key);

@@ -654,7 +654,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-list::-webkit-scrollbar { display: none; }
 
 /* A card: the strip of a task in progress, the title fading out on the right, the due date. */
-.tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-group-head { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; margin-top: var(--tc-section-gap); margin-bottom: calc(-1 * var(--tc-card-gap)); padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden; touch-action: pan-y; transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-group-head:first-child { margin-top: 0; }
 .tc-group-head.is-folded { height: 0; margin-top: 0; opacity: 0; }
@@ -774,7 +774,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* The now line: the time in a pill, the line to the right edge. */
 /* A task on the timeline is the card of the list: 40 px at a time, its duration's length when it has one; selected, it is ringed and gets the two dots that stretch it. */
-.tc-block { position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-block); touch-action: pan-y; }
+.tc-block { position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-block); touch-action: pan-y; cursor: pointer; }
 .tc-block.is-lifted { visibility: hidden; }
 .tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
