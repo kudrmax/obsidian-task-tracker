@@ -383,6 +383,8 @@ body {
 	--tc-layer-bar-button: 2;
 	--tc-layer-overlay: 1000;
 	--tc-layer-panel: 1001;
+	/* What Obsidian's editor shows for a field in a menu, its note search and its toolbar over the keyboard, over the menu. */
+	--tc-layer-editor: 1002;
 
 	/* Opacity */
 	/* A row or a text button while the finger is on it. */
@@ -643,7 +645,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* Obsidian's editor in the field: its margins, sizes, fonts and colours give way to the field's; links in the accent, as in the cards. */
 .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 { --link-color: var(--tc-accent); --link-color-hover: var(--tc-accent); --link-external-color: var(--tc-accent); --link-external-color-hover: var(--tc-accent); --link-unresolved-color: var(--tc-accent); }
 .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-editor, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-scroller, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-sizer, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-contentContainer, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-content, .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-line { font-family: var(--tc-font-inherit); font-size: inherit; font-weight: var(--tc-weight-normal); line-height: inherit; color: inherit; caret-color: inherit; background: transparent; padding: 0; margin: 0; min-height: 0; max-width: none; overflow: visible; }
+/* On the phone Obsidian sets the top spacing of the view's note editors on the scroller, more specifically than the rule above. */
+body.is-phone .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 > .cm-editor > .cm-scroller { padding: 0; }
 .tc-quick-field.tc-title-field .cm-gutters { display: none; }
+body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdrop.is-shown) .mobile-toolbar { z-index: var(--tc-layer-editor); }
 .tc-quick-field.tc-title-field .cm-placeholder { color: var(--tc-muted); }
 .tc-quick-field.tc-title-field .cm-cursor { border-left-color: var(--tc-accent); }
 .tc-quick-field.tc-title-field ::selection, .tc-quick-field.tc-title-field .cm-selectionLayer .cm-selectionBackground { background: var(--tc-selection); }
