@@ -62,6 +62,9 @@ export interface DropTarget {
 	preview(x: number, y: number, drag: DragPayload): void;
 	/** Where the card will come to rest, in client pixels, while a preview shows. */
 	landing(): DOMRect | null;
+	/** The finger has gone elsewhere, the drag goes on. */
+	leave(): void;
+	/** The drag is over. */
 	clear(): void;
 	drop(x: number, y: number, drag: DragPayload): DropResult | null;
 }

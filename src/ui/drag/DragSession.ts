@@ -26,7 +26,7 @@ export class DragSession {
 		this.opts.float.moveTo(x, y);
 		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
 		if (target !== this.current) {
-			this.current?.clear();
+			this.current?.leave();
 			this.current = target;
 		}
 		target?.preview(x, y, this.opts.payload);
@@ -45,7 +45,7 @@ export class DragSession {
 	}
 
 	/**
-	 * Every target lets the drag go, not only the one under the finger: a list a card was lifted from keeps its room closed
+	 * Every target lets the drag go, not only the one under the finger: a list a card was lifted from keeps its place open
 	 * while the finger is elsewhere, and stands as it was again only now.
 	 */
 	private clearAll(): void {

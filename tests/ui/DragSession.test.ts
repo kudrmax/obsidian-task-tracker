@@ -19,6 +19,9 @@ class FakeTarget implements DropTarget {
 	landing(): DOMRect {
 		return rect(this.from, 0);
 	}
+	leave(): void {
+		this.log.push("leave");
+	}
 	clear(): void {
 		this.log.push("clear");
 	}
@@ -57,7 +60,7 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carr
 }
 
 describe("DragSession", () => {
-	it("moves the float and previews on the target under the pointer, clearing the one left", () => {
+	it("moves the float and previews on the target under the pointer, letting the one left go on", () => {
 		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
 		const b = new FakeTarget("b", 100, 200, { kind: "clearSlot" });
 		const float = new FakeFloat();
@@ -66,8 +69,8 @@ describe("DragSession", () => {
 		s.move(150, 20);
 		s.move(250, 30);
 		expect(float.log).toEqual(["move 50,10", "move 150,20", "move 250,30"]);
-		expect(a.log).toEqual(["preview 50,10", "clear"]);
-		expect(b.log).toEqual(["preview 150,20", "clear"]);
+		expect(a.log).toEqual(["preview 50,10", "leave"]);
+		expect(b.log).toEqual(["preview 150,20", "leave"]);
 	});
 
 	it("drops on the target, flies the float there and reports the result", async () => {
@@ -121,7 +124,7 @@ describe("DragSession", () => {
 		s.move(50, 10);
 		s.move(150, 10);
 		await s.release(150, 10);
-		expect(a.log).toEqual(["preview 50,10", "clear", "clear"]);
+		expect(a.log).toEqual(["preview 50,10", "leave", "clear"]);
 		expect(b.log).toEqual(["preview 150,10", "drop", "clear"]);
 	});
 

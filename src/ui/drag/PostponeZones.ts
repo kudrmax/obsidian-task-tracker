@@ -30,6 +30,10 @@ class PostponeDrop implements DropTarget {
 		return this.offset === null ? null : this.zone.getBoundingClientRect();
 	}
 
+	leave(): void {
+		this.clear();
+	}
+
 	clear(): void {
 		this.zone.classList.remove("is-hot");
 	}

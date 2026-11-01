@@ -39,6 +39,10 @@ export class PlusRing implements DropTarget {
 		return this.ring?.getBoundingClientRect() ?? null;
 	}
 
+	leave(): void {
+		this.clear();
+	}
+
 	clear(): void {
 		this.ring?.classList.remove("is-hot");
 	}

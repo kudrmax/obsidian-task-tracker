@@ -192,7 +192,39 @@ describe("ListDrop", () => {
 			expect(list.elements[2].classList.contains("is-target")).toBe(true);
 		});
 
-		it("closes over the lifted card when the finger leaves the list, and stands as drawn once the card is back", () => {
+		it("keeps the lifted card's place open, dashed, while the finger is outside the list (the owner's decision of 02.11)", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			drop.leave();
+			expect(room(list)).toEqual(["0px", "0px", "0px", "0px"]);
+			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
+			expect(gapEl()?.style.transform).toBe(`translate3d(0px, ${STEP}px, 0)`);
+			drop.preview(27, 100 + STEP + 17, from);
+			expect(drop.landing()?.top).toBe(100 + STEP);
+		});
+
+		it("let go at the place it was lifted from, the card only goes back: nothing to write", () => {
+			const { drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			drop.leave();
+			drop.preview(27, 100 + STEP + 17, from);
+			expect(drop.drop(27, 100 + STEP + 17, from)).toBeNull();
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			expect(drop.drop(27, 100 + 3 * STEP + 2, from)).not.toBeNull();
+		});
+
+		it("a list nothing was lifted from closes when the finger leaves it", () => {
+			vi.useFakeTimers();
+			const { list, drop, from } = lifted(1);
+			list.elements[1].classList.remove("is-lifted");
+			drop.preview(27, 100 + 2 * STEP + 2, from);
+			drop.leave();
+			expect(room(list)).toEqual(["", "", "", ""]);
+			vi.runAllTimers();
+			expect(gapEl()).toBeNull();
+		});
+
+		it("closes over the lifted card when the drag is over, and stands as drawn once the card is back", () => {
 			vi.useFakeTimers();
 			const { list, drop, from } = lifted(1);
 			drop.preview(27, 100 + STEP + 17, from);
