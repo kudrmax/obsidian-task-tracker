@@ -87,6 +87,10 @@ body{margin:0}
 <button aria-label="New task" style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: {{c.accent}}; box-shadow: {{c.fabShadow}}; display: flex; align-items: center; justify-content: center; z-index: 6;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
 </sc-if>
 
+<sc-if value="{{home.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; box-sizing: border-box; border-radius: 22px; border: {{home.border}}; background: {{home.bg}}; display: flex; align-items: center; justify-content: center; z-index: 6;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></div>
+</sc-if>
+
 <sc-if value="{{float.on}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; left: {{float.left}}px; top: {{float.top}}px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; padding: 0 14px; display: flex; align-items: center; gap: 8px; box-shadow: {{c.floatShadow}}; font-size: 15px; color: {{c.muted}}; white-space: nowrap; z-index: 8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 5v14 M5 12h14"></path></svg>New task</div>
 </sc-if>
@@ -173,7 +177,7 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"typing","options":["empty","typing","enter","closed","tabBefore","tabAfter","tabNext","tabOut","fabRest","fabCarry","fabCarrySub","fabInto","fabDrop","fabCal","fabCalField","modeCal","modeSoon","modeInbox","v1Now","v1Inbox","v1Date","v2Bar","v2Priority","v2PriorityLong","v2Panel","v2Inbox","v2DatePanel","v2Date","renameBlock","stackSub","rename"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"typing","options":["empty","typing","enter","closed","tabBefore","tabAfter","tabNext","tabOut","fabRest","fabCarry","fabCarrySub","fabInto","fabDrop","fabCal","fabHome","fabCalField","modeCal","modeSoon","modeInbox","v1Now","v1Inbox","v1Date","v2Bar","v2Priority","v2PriorityLong","v2Panel","v2Inbox","v2DatePanel","v2Date","renameBlock","stackSub","rename"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'typing';
@@ -226,6 +230,7 @@ class Component extends DCLogic {
       fabInto: { cols: [top(momTarget)], float: { at: 'target', dx: 30 }, mark: ['target'] },
       fabDrop: { cols: [top([base[0], base[1], base[2], field('', 1), ...base.slice(3)])], bar: { out: true, in: false }, mark: ['field'] },
       fabCal: { cols: [top(base)], newSlot: true, float: { at: 'slot' }, mark: ['slot'] },
+      fabHome: { cols: [top(base)], float: { at: 'home' }, mark: ['fab'] },
       fabCalField: { cols: [top(base)], newSlot: true, scroll: 3.25, calField: true, bar: { indents: false }, mark: ['calField'] },
       modeCal: { cols: [top(base)], mark: ['fab'] },
       modeSoon: { mode: 'soon', mark: ['fab', 'newTasks'] },
@@ -319,6 +324,7 @@ class Component extends DCLogic {
     if (cfg.float && cfg.float.at === 'gap' && gapAt) Object.assign(float, { left: gapAt.x + 4, top: gapAt.y + 6 });
     if (cfg.float && cfg.float.at === 'target' && targetAt) Object.assign(float, { left: targetAt.x + cfg.float.dx, top: targetAt.y + 14 });
     if (cfg.float && cfg.float.at === 'slot') Object.assign(float, { left: 186, top: SLOT_TOP + 12 });
+    if (cfg.float && cfg.float.at === 'home') Object.assign(float, { left: 196, top: 726 });
 
     const b = cfg.bar ?? {};
     const LEVELS = {
@@ -411,6 +417,7 @@ class Component extends DCLogic {
       calField: { on: !!cfg.calField, top: calTop },
       blk: { rename: cfg.blk === 'rename', backdrop: cfg.blk === 'stack', subs: [{ title: 'Собрать цифры за квартал' }, { title: 'Написать выводы' }, { title: 'Отправить Косте' }] },
       fab: { rest: !kbdOn && !dragOn },
+      home: { on: dragOn, border: cfg.float && cfg.float.at === 'home' ? '1px solid ' + c.accent : '1px dashed ' + c.dash, bg: cfg.float && cfg.float.at === 'home' ? c.target : 'transparent' },
       float,
       bar,
       kbd,

@@ -1355,7 +1355,7 @@
   "QuickFlow3.dc.html": {
    "x": 0,
    "y": 2552,
-   "w": 3338,
+   "w": 3808,
    "h": 1120,
    "page": "quickadd",
    "title": "3. Плюс, который тянут"
@@ -1444,17 +1444,33 @@
    "x": 0,
    "y": 0,
    "w": 1458,
-   "h": 1076,
+   "h": 1100,
    "page": "backlog23",
-   "title": "Вариант 1. Зона Backlog при перетаскивании"
+   "title": "1. Где живёт Backlog"
   },
   "Back23Flow2.dc.html": {
    "x": 0,
-   "y": 1276,
-   "w": 988,
-   "h": 1076,
+   "y": 1220,
+   "w": 2398,
+   "h": 1100,
    "page": "backlog23",
-   "title": "Вариант 2. Move to Backlog в меню задачи"
+   "title": "2. Одно правило переноса"
+  },
+  "Back23Flow3.dc.html": {
+   "x": 0,
+   "y": 2440,
+   "w": 518,
+   "h": 1100,
+   "page": "backlog23",
+   "title": "3. Без перетаскивания"
+  },
+  "Back23Wheel.dc.html": {
+   "x": 2820,
+   "y": 0,
+   "w": 390,
+   "h": 96,
+   "page": "components",
+   "title": "Компонент колёсика с Backlog (его показывают доски «Backlog #23»)"
   },
   "Desc.dc.html": {
    "x": 3290,
@@ -1488,6 +1504,54 @@
    "page": "description",
    "title": "3. Правка и новое описание"
   },
+  "ProgressMark.dc.html": {
+   "x": 3760,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "components",
+   "title": "Задача в процессе: список для вариантов"
+  },
+  "ProgressMarkNow.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "Сейчас: фиолетовая полоса срезана скруглением"
+  },
+  "ProgressMarkCrescent.dc.html": {
+   "x": 754,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "1. Серп по краю капсулы, цветом подписей карточки"
+  },
+  "ProgressMarkBold.dc.html": {
+   "x": 1508,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "2. Название полужирным"
+  },
+  "ProgressMarkHatch.dc.html": {
+   "x": 2262,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3. Штриховка у левого края, гаснет вправо"
+  },
+  "ProgressMarkDot.dc.html": {
+   "x": 3016,
+   "y": 0,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "4. Точка в левом поле"
+  },
   "DescFlowLight.dc.html": {
    "x": 0,
    "y": 3796,
@@ -1495,6 +1559,46 @@
    "h": 1076,
    "page": "description",
    "title": "Светлая тема"
+  },
+  "ProgressHatchStrong.dc.html": {
+   "x": 0,
+   "y": 1160,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3.1 Сильнее и длиннее"
+  },
+  "ProgressHatchMeta.dc.html": {
+   "x": 754,
+   "y": 1160,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3.2 В цвет подписей карточки"
+  },
+  "ProgressHatchWide.dc.html": {
+   "x": 1508,
+   "y": 1160,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3.3 Широкие полосы по всей карточке"
+  },
+  "ProgressHatchWideFade.dc.html": {
+   "x": 2262,
+   "y": 1160,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3.4 Широкие полосы, гаснут вправо"
+  },
+  "ProgressHatchMove.dc.html": {
+   "x": 3016,
+   "y": 1160,
+   "w": 674,
+   "h": 740,
+   "page": "progress",
+   "title": "3.5 Полосы медленно бегут"
   }
  },
  "createdOnFiles": {
@@ -1535,7 +1639,9 @@
   "wheel30Title",
   "menugroupedTitle",
   "backlog23Title",
-  "descriptionTitle"
+  "descriptionTitle",
+  "progressTitle",
+  "progressHatchTitle"
  ],
  "notes": {
   "lightTitle": {
@@ -1795,7 +1901,7 @@
   },
   "quickaddTitle": {
    "kind": "title1",
-   "maxW": 3338,
+   "maxW": 3808,
    "page": "quickadd",
    "text": "Быстрый ввод: задачи пишут прямо в списке, Enter — следующая, сдвиг — подзадача (на обсуждении)",
    "x": 0,
@@ -1811,9 +1917,9 @@
   },
   "backlog23Title": {
    "kind": "title1",
-   "maxW": 1458,
+   "maxW": 2398,
    "page": "backlog23",
-   "text": "Backlog #23: как задача попадает в бэклог из Inbox и Soon (на обсуждении)",
+   "text": "Backlog #23: пятая колонка; перенос — всегда бросок в список, половина напротив делится надвое (на обсуждении)",
    "x": 0,
    "y": -300
   },
@@ -1824,6 +1930,24 @@
    "text": "Описание задачи: строки под задачей без чекбокса (принято 01.11)",
    "x": 0,
    "y": -300
+  },
+  "progressTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Задача в процессе: пометка без цвета и без места",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "progressHatchTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Штриховка: заметнее",
+   "w": 240,
+   "x": 0,
+   "y": 860
   }
  },
  "order": [
@@ -2009,11 +2133,24 @@
   "Back23Screen.dc.html",
   "Back23Flow1.dc.html",
   "Back23Flow2.dc.html",
+  "Back23Flow3.dc.html",
+  "Back23Wheel.dc.html",
   "Desc.dc.html",
   "DescFlow1.dc.html",
   "DescFlow2.dc.html",
   "DescFlow3.dc.html",
-  "DescFlowLight.dc.html"
+  "ProgressMark.dc.html",
+  "ProgressMarkNow.dc.html",
+  "ProgressMarkCrescent.dc.html",
+  "ProgressMarkBold.dc.html",
+  "ProgressMarkHatch.dc.html",
+  "ProgressMarkDot.dc.html",
+  "DescFlowLight.dc.html",
+  "ProgressHatchStrong.dc.html",
+  "ProgressHatchMeta.dc.html",
+  "ProgressHatchWide.dc.html",
+  "ProgressHatchWideFade.dc.html",
+  "ProgressHatchMove.dc.html"
  ],
  "pages": [
   {
@@ -2071,6 +2208,10 @@
   {
    "id": "description",
    "name": "Описание задачи"
+  },
+  {
+   "id": "progress",
+   "name": "В процессе"
   }
  ],
  "title": "Task Calendar"

@@ -12,19 +12,19 @@
 body{margin:0}
 </style>
 </helmet>
-<div style="position: relative; width: 3338px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: relative; width: 3808px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
 <div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">3. Плюс, который тянут</div>
-<div style="position: absolute; left: 64px; top: 100px; width: 3210px; font-size: 18px; line-height: 24px; color: #6B6A65;">Плюс стоит справа внизу на любом виде. Потянул — он становится карточкой «New task» под пальцем и дальше ведёт себя ровно как перетаскиваемая задача: тот же расчёт места, уровня по левому краю карточки и «внутрь» над серединой задачи. Тот же код, а не копия: поменяется чувствительность перетаскивания — поменяется и у плюса. Отпустил — на этом месте поле</div>
-<sc-for list="{{phones}}" as="p" hint-placeholder-count="7">
+<div style="position: absolute; left: 64px; top: 100px; width: 3680px; font-size: 18px; line-height: 24px; color: #6B6A65;">Плюс стоит справа внизу на любом виде. Потянул — он становится карточкой «New task» под пальцем и дальше ведёт себя ровно как перетаскиваемая задача: тот же расчёт места, уровня по левому краю карточки и «внутрь» над серединой задачи. Тот же код, а не копия: поменяется чувствительность перетаскивания — поменяется и у плюса. Отпустил — на этом месте поле. Пока плюс в руке, на его месте пунктирный кружок с плюсом: вернул карточку к нему — отмена</div>
+<sc-for list="{{phones}}" as="p" hint-placeholder-count="8">
 <div style="position: absolute; left: {{p.left}}px; top: 168px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="QuickAdd" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
 <div style="position: absolute; left: {{p.left}}px; top: 1026px; width: 390px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
 </sc-for>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3338,"height":1120}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3808,"height":1120}}'>
 class Component extends DCLogic {
   renderVals() {
-    return { phones: [{"left": 64, "view": "fabRest", "theme": "dark", "caption": "Плюс в покое: справа от колёсика"}, {"left": 534, "view": "fabCarry", "theme": "dark", "caption": "Плюс превратился в карточку: между задачами раскрылось место на верхнем уровне"}, {"left": 1004, "view": "fabCarrySub", "theme": "dark", "caption": "Карточку повели правее — место сдвинулось на уровень, станет подзадачей «Позвонить маме»"}, {"left": 1474, "view": "fabInto", "theme": "dark", "caption": "Над серединой задачи: она горит, новая станет её последней подзадачей"}, {"left": 1944, "view": "fabDrop", "theme": "dark", "caption": "Отпустили: на этом месте поле, клавиатура открыта"}, {"left": 2414, "view": "fabCal", "theme": "dark", "caption": "Над календарём: место на 16:30, прилипает к шагу, как у задачи"}, {"left": 2884, "view": "fabCalField", "theme": "dark", "caption": "Отпустили: поле прямо в календаре, время уже стоит"}] };
+    return { phones: [{"left": 64, "view": "fabRest", "theme": "dark", "caption": "Плюс в покое: справа от колёсика"}, {"left": 534, "view": "fabCarry", "theme": "dark", "caption": "Плюс превратился в карточку: между задачами раскрылось место на верхнем уровне"}, {"left": 1004, "view": "fabCarrySub", "theme": "dark", "caption": "Карточку повели правее — место сдвинулось на уровень, станет подзадачей «Позвонить маме»"}, {"left": 1474, "view": "fabInto", "theme": "dark", "caption": "Над серединой задачи: она горит, новая станет её последней подзадачей"}, {"left": 1944, "view": "fabDrop", "theme": "dark", "caption": "Отпустили: на этом месте поле, клавиатура открыта"}, {"left": 2414, "view": "fabCal", "theme": "dark", "caption": "Над календарём: место на 16:30, прилипает к шагу, как у задачи"}, {"left": 2884, "view": "fabHome", "theme": "dark", "caption": "Карточку вернули к пунктирному кружку, где стоял плюс: он горит; отпустил — ничего не создаётся, плюс на месте"}, {"left": 3354, "view": "fabCalField", "theme": "dark", "caption": "Отпустили: поле прямо в календаре, время уже стоит"}] };
   }
 }
 </script>
