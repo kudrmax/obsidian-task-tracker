@@ -8,6 +8,7 @@ import { fillTitle } from "../TaskTitle";
 import type { LocalDate, Slot } from "../types";
 import { PlacementTiles, sheetIcon } from "./PlacementTiles";
 import { PriorityPills } from "./PriorityPills";
+import type { TitleField, TitleFieldFactory } from "./TitleField";
 import { draftOf, initialState, pickDate, pickPriority, type SheetState, togglePlacement } from "./sheetState";
 
 export interface TaskSheetOptions {
@@ -19,6 +20,8 @@ export interface TaskSheetOptions {
 	readonly levels: readonly PriorityLevel[];
 	/** A subtask's: the title of the task it belongs to, over its own. */
 	readonly parent?: string | null;
+	/** The field the title is typed in. */
+	readonly titleField: TitleFieldFactory;
 	onSubmit(draft: TaskDraft): Promise<void>;
 	onClose?(): void;
 }
@@ -30,7 +33,7 @@ let rememberedKeyboard = 0;
 export class TaskSheet {
 	readonly el: HTMLElement;
 	private state: SheetState;
-	private readonly title: HTMLElement;
+	private readonly title: TitleField;
 	private readonly submit: HTMLButtonElement;
 	private readonly tiles: PlacementTiles;
 	private readonly pills: PriorityPills;
@@ -65,11 +68,11 @@ export class TaskSheet {
 			parent.appendChild(sheetIcon("subtask"));
 			fillTitle(el(parent, "span", "tc-sheet-parent-title"), opts.parent);
 		}
-		this.title = el(body, "div", "tc-sheet-title", opts.initial.text);
-		this.title.contentEditable = "true";
-		this.title.setAttribute("enterkeyhint", "done");
-		this.title.addEventListener("keydown", (e) => this.key(e));
-		this.title.addEventListener("input", () => this.renderSubmit());
+		this.title = opts.titleField(body, opts.initial.text, {
+			onInput: () => this.renderSubmit(),
+			onEnter: () => void this.save(),
+			onEscape: () => this.close(),
+		});
 		this.tiles = new PlacementTiles(body, (tile) => this.setState(togglePlacement(this.state, tile)));
 		if (opts.slot) {
 			const time = el(body, "div", "tc-sheet-time");
@@ -129,28 +132,12 @@ export class TaskSheet {
 	}
 
 	private focusEnd(): void {
-		this.title.focus({ preventScroll: true });
+		this.title.focusEnd();
 		this.el.parentElement?.scrollTo(0, 0);
-		const range = document.createRange();
-		range.selectNodeContents(this.title);
-		range.collapse(false);
-		const selection = window.getSelection();
-		selection?.removeAllRanges();
-		selection?.addRange(range);
 	}
 
 	private get text(): string {
-		return (this.title.textContent ?? "").trim();
-	}
-
-	private key(e: KeyboardEvent): void {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			void this.save();
-		} else if (e.key === "Escape") {
-			e.preventDefault();
-			this.close();
-		}
+		return this.title.text;
 	}
 
 	private setState(state: SheetState): void {
@@ -191,7 +178,10 @@ export class TaskSheet {
 		if (this.closed) return;
 		this.closed = true;
 		this.el.classList.remove("is-shown");
-		window.setTimeout(() => this.el.remove(), tokenMs(this.el, DURATION.fade));
+		window.setTimeout(() => {
+			this.title.destroy();
+			this.el.remove();
+		}, tokenMs(this.el, DURATION.fade));
 		this.opts.onClose?.();
 	}
 }
