@@ -94,6 +94,8 @@ export class QuickEntryController {
 	private dragging = false;
 	private carrying = false;
 	private droppedOn: ListColumn | null = null;
+	/** The bar's place is turning the wheel to the column the field has just moved to. */
+	private turning = false;
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || (e.target instanceof Element && e.target.closest(KEEPS_FIELD))) return;
 		this.entry.blur();
@@ -133,11 +135,10 @@ export class QuickEntryController {
 
 	/** The plus taken: carried as a task is, and let go on a list, the field opens where the drop showed. */
 	dragFromPlus(e: PointerEvent, source: HTMLElement): void {
-		if (this.deps.arbiter.busy) return;
 		const { lists, timeline } = this.deps.dropTargets();
 		this.droppedOn = null;
 		const targets = [...lists.map((target) => this.noted(target)), ...(timeline ? [timeline] : [])];
-		this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result));
+		if (!this.deps.drag.beginNew(source, e, targets, (result) => this.dropped(result))) return;
 		this.carrying = true;
 		this.showPlus();
 	}
@@ -154,6 +155,16 @@ export class QuickEntryController {
 		if (!found) return;
 		const card = this.cards(found.column)[found.index];
 		this.open({ kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } }, item);
+	}
+
+	/**
+	 * Before the screen shows another day or another pair of columns: the open field is finished as by a tap elsewhere,
+	 * and this resolves once every text typed is written for the day and the place it was typed at, which the switch
+	 * would otherwise change under the writes. The wheel the bar's place turns keeps the field it has just moved.
+	 */
+	async settle(): Promise<void> {
+		if (!this.turning) this.entry.blur();
+		await this.entry.idle();
 	}
 
 	/** What `column`'s list draws for the entry: none when the field stands elsewhere. */
@@ -352,7 +363,12 @@ export class QuickEntryController {
 		const date = placement.kind === "now" ? this.deps.today() : placement.kind === "date" ? placement.date : null;
 		this.moved = true;
 		this.entry.moveTo(this.endOf(column));
-		this.deps.turnTo(modeShowing(SWITCH_COLUMN[column], this.deps.mode()));
+		this.turning = true;
+		try {
+			this.deps.turnTo(modeShowing(SWITCH_COLUMN[column], this.deps.mode()));
+		} finally {
+			this.turning = false;
+		}
 		if (date === null || date === this.deps.day()) return;
 		await this.entry.idle();
 		await this.deps.showDay(date);

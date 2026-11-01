@@ -40,7 +40,10 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const buttons = [{ shown: true }, { shown: true }, { shown: true }];
 	const created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
-	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void) => void>();
+	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void) => boolean>(() => true);
+	/** Each write waits for the lists to catch up; held, the test says when they have. */
+	let holdFresh = false;
+	const freshWaiting: (() => void)[] = [];
 	const drops: ColumnDrop[] = [];
 	const lists = {} as Record<ListColumn, TaskList>;
 	let controller: QuickEntryController | null = null;
@@ -80,12 +83,13 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		turnTo: (to) => {
 			turned.push(to);
 			mode = to;
+			void controller?.settle();
 		},
 		showDay: async (date) => {
 			day = date;
 			render();
 		},
-		fresh: async () => {},
+		fresh: () => (holdFresh ? new Promise<void>((resolve) => freshWaiting.push(resolve)) : Promise.resolve()),
 		render,
 		onError: vi.fn(),
 	});
@@ -102,7 +106,15 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		mode = to;
 		render();
 	};
-	return { controller, root, plus, field, lists, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, day: () => day };
+	/** What the view does on a day arrow, Today, a swipe or the wheel: the entry settles first, then the day changes. */
+	const switchDay = async (date: string) => {
+		await controller!.settle();
+		day = date;
+		render();
+	};
+	const holdWrites = () => (holdFresh = true);
+	const releaseWrites = () => freshWaiting.splice(0).forEach((resolve) => resolve());
+	return { controller, root, plus, field, lists, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
 }
 
 afterEach(() => {
@@ -183,6 +195,13 @@ describe("QuickEntryController", () => {
 			expect(plus.classList.contains("is-hidden")).toBe(false);
 		});
 
+		it("stays put when the drag cannot start", () => {
+			const { controller, plus, beginNew } = setUp({ items });
+			beginNew.mockReturnValueOnce(false);
+			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
+			expect(plus.classList.contains("is-hidden")).toBe(false);
+		});
+
 		it("let go on a list, opens the field where the drop showed", () => {
 			const { controller, plus, beginNew, drops, rowsOf } = setUp({ items: { left: [item("A", key("now", 0)), item("B", key("now", 1))] } });
 			const result: DropResult = { kind: "listBefore", before: key("now", 1), column: "left" };
@@ -244,6 +263,50 @@ describe("QuickEntryController", () => {
 		document.body.click();
 		expect(field()).toBeNull();
 		await vi.waitFor(() => expect(created.map((c) => c.text)).toEqual(["Call"]));
+	});
+
+	describe("settling before the screen shows another day or column", () => {
+		const later = "2026-11-03";
+		const items = { left: [item("A", key("soon", 0)), item("B", key("soon", 1))] };
+
+		it("writes the text typed, Enter not pressed, for the day and place it was typed at, then lets the day change", async () => {
+			const { controller, type, created, field, switchDay, holdWrites, releaseWrites, day } = setUp({ day: later, items });
+			controller.openAtEnd("left");
+			type("Call");
+			holdWrites();
+			const switched = switchDay("2026-11-04");
+			expect(field()).toBeNull();
+			await Promise.resolve();
+			expect(day()).toBe(later);
+			releaseWrites();
+			await switched;
+			expect(created).toEqual([{ text: "Call", priority: null, place: { kind: "list", list: "soon", group: null, before: null, date: later } }]);
+			expect(day()).toBe("2026-11-04");
+		});
+
+		it("writes a line sent by Enter as a subtask of the old day's task, not of whatever stands there on the new day", async () => {
+			const { controller, type, press, created, switchDay, holdWrites, releaseWrites, day } = setUp({ day: later, items });
+			holdWrites();
+			controller.openAtEnd("left");
+			press("Tab");
+			type("c");
+			press("Enter");
+			const switched = switchDay(TODAY);
+			await Promise.resolve();
+			expect(day()).toBe(later);
+			releaseWrites();
+			await switched;
+			expect(created).toEqual([{ text: "c", priority: null, place: { kind: "subtask", parent: key("soon", 1), before: null } }]);
+			expect(day()).toBe(TODAY);
+		});
+
+		it("keeps the field the bar's place moved when the wheel turns for it", () => {
+			const { controller, root, field } = setUp();
+			controller.openAtEnd("left");
+			root.querySelector<HTMLElement>(".tc-bar-place")!.click();
+			tile(root, "Inbox").click();
+			expect(field()).not.toBeNull();
+		});
 	});
 
 	it("adds a subtask as the last one of its task, in the list that shows it", () => {

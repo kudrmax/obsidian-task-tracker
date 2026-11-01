@@ -65,9 +65,9 @@ describe("DragController.beginNew", () => {
 
 	it("holds the screen, so a second card cannot start, and frees it after", async () => {
 		const { controller, source, arbiter } = setup();
-		controller.beginNew(source, down(20, 610), [], vi.fn());
+		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(true);
 		expect(arbiter.busy).toBe(true);
-		controller.beginNew(source, down(20, 610), [], vi.fn());
+		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(false);
 		expect(document.querySelectorAll(".tc-float").length).toBe(1);
 		pointer("pointerup", 20, 610);
 		await vi.waitFor(() => expect(arbiter.busy).toBe(false));

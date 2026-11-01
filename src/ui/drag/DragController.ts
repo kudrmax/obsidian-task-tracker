@@ -245,10 +245,10 @@ export class DragController {
 	/**
 	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted and no
 	 * zone appears. Let go off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let
-	 * go on one, `onDrop` hears where once the card has landed.
+	 * go on one, `onDrop` hears where once the card has landed. False when another gesture holds the screen: nothing starts.
 	 */
-	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void): void {
-		if (!this.deps.arbiter.claim(DRAG)) return;
+	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void): boolean {
+		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new FloatingCard(null, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
@@ -276,6 +276,7 @@ export class DragController {
 				onDrop(placed);
 			},
 		);
+		return true;
 	}
 
 	/** Routes the pointer of `e` to the session until it ends; `settled` runs once the card has come to rest. */

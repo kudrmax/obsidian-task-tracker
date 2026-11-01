@@ -178,8 +178,8 @@ export class TaskCalendarView extends ItemView {
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
-			onStep: (days) => this.select(addDays(this.selectedDate, days)),
-			onToday: () => this.select(this.today()),
+			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
+			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
 			soonName: () => this.settings.sections.soon,
 		});
@@ -281,7 +281,7 @@ export class TaskCalendarView extends ItemView {
 		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.settings.rightMode,
-			onChange: (mode) => void this.setMode(mode),
+			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
@@ -315,7 +315,7 @@ export class TaskCalendarView extends ItemView {
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet, .tc-quick-row, .tc-quick-bar")),
-			onSwipe: (shift) => this.step(shift),
+			onSwipe: (shift) => void this.afterEntry(() => this.step(shift)),
 		});
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
@@ -400,6 +400,15 @@ export class TaskCalendarView extends ItemView {
 		const root = this.contentEl.getBoundingClientRect();
 		const clear = nav ? Math.max(0, root.bottom - nav.getBoundingClientRect().top) : 0;
 		this.contentEl.style.setProperty(PROPERTY.navClear, px(nav && nav.getBoundingClientRect().height > 0 ? clear : 0));
+	}
+
+	/**
+	 * Every switch of what the screen shows, another day or another pair of columns, waits for the entry to settle: the
+	 * text typed is written for the day and the place it was typed at, before the lists change under it.
+	 */
+	private async afterEntry(change: () => void | Promise<void>): Promise<void> {
+		await this.quick?.settle();
+		await change();
 	}
 
 	private select(date: LocalDate): void {
