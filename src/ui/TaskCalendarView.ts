@@ -1,5 +1,5 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, DayBoundary, type GroupedList, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
+import { type CalendarService, DayBoundary, type GroupedList, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -11,6 +11,7 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController, type NameGroup } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
+import { sameTask } from "./drag/listPlace";
 import type { ColumnSections, DropTarget, ListColumn, PlacedResult, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupZones } from "./drag/GroupZones";
@@ -22,7 +23,6 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
-import { TaskSheet } from "./sheet/TaskSheet";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -38,13 +38,23 @@ import { type Shift, stepScreen } from "./screens";
 import { Swipe } from "./Swipe";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
-import type { LocalDate, Slot } from "./types";
+import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
+
+/** The task with `key` among `items` and their subtasks. */
+function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
+	for (const item of items) {
+		if (sameTask(item.key, key)) return item;
+		const inner = findTask(item.subtasks, key);
+		if (inner) return inner;
+	}
+	return null;
+}
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -150,7 +160,7 @@ export class TaskCalendarView extends ItemView {
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
-			onNewSlot: (slot) => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, slot),
+			onNewSlot: (slot) => this.quick?.openSlot(slot),
 		});
 	}
 
@@ -294,6 +304,8 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			drag: this.drag,
 			list: (column) => this.listOf(column),
+			timeline: () => this.timeline,
+			task: (key) => findTask(this.data.day?.slotted ?? [], key),
 			newTasks: () => [this.newTask, this.newSoon, this.newInbox].filter((button) => button !== null),
 			dropTargets: () => {
 				const shown = this.shownDrops();
@@ -380,7 +392,7 @@ export class TaskCalendarView extends ItemView {
 		if (this.settings.dayStartHour === this.dayStartHour) return;
 		this.dayStartHour = this.settings.dayStartHour;
 		this.scrolledFor = null;
-		this.select(this.today());
+		void this.afterEntry(() => this.select(this.today()));
 	}
 
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
@@ -643,50 +655,10 @@ export class TaskCalendarView extends ItemView {
 		return this.polling.refresh();
 	}
 
-	/** The task screen for a new task; with a slot, from a long tap on the timeline. */
-	newTaskSheet(placement: Placement, slot: Slot | null): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "new",
-			initial: { text: "", placement, priority: null },
-			slot,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
-			onClose: () => this.timelineDrop?.clear(),
-		});
-	}
-
-	/** The task screen for a new subtask of `parent`: the parent's placement chosen, its title over the new one. */
-	private subtaskSheet(parent: TaskItem): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "new",
-			initial: { text: "", placement: this.deps.tasks.placementOf(parent), priority: null },
-			slot: null,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			parent: parent.text,
-			onSubmit: (draft) => this.act(() => this.deps.tasks.createSubtask(parent.key, draft)),
-		});
-	}
-
-	private editSheet(item: TaskItem): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "edit",
-			initial: { text: item.text, placement: this.deps.tasks.placementOf(item), priority: item.priority?.prefix ?? null },
-			slot: item.slot,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			parent: item.parentText,
-			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
-		});
-	}
-
 	/** The task menu; opened on its picker, a chosen day puts the task off as Tomorrow does. */
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, opening?: "picker"): TaskMenu {
 		const tasks = this.deps.tasks;
 		const setDueDate = (date: LocalDate | null) => (opening === "picker" && date !== null ? tasks.postpone(item.key, date) : tasks.setDueDate(item.key, date));
-		/** A list's card is renamed and given subtasks in place; a timeline card, on the task screen for now. */
-		const inList = source.closest(".tc-list") !== null;
 		return TaskMenu.open({
 			item,
 			source,
@@ -700,8 +672,8 @@ export class TaskCalendarView extends ItemView {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				rename: () => (inList ? this.quick?.rename(item) : this.editSheet(item)),
-				addSubtask: () => (inList ? this.quick?.addSubtask(item) : this.subtaskSheet(item)),
+				rename: () => this.quick?.rename(item),
+				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},
 		});

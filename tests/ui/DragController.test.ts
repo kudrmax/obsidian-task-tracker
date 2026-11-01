@@ -126,3 +126,31 @@ describe("DragController.beginNew", () => {
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
 	});
 });
+
+describe("DragController: a long tap on the timeline's free room", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("opens the field in the slot the target showed, the target let go as the field takes its place", () => {
+		vi.useFakeTimers();
+		const slot = { date: "2026-11-01", start: 600, end: null };
+		const target = { previewNew: vi.fn(), clear: vi.fn(), slot };
+		const opened: unknown[] = [];
+		const deps = {
+			longPressMs: () => 300,
+			haptics: { tap: () => {} },
+			arbiter: new GestureArbiter(),
+			timeline: () => null,
+			newSlot: () => target,
+			onNewSlot: (s: unknown) => opened.push({ slot: s, cleared: target.clear.mock.calls.length }),
+		} as unknown as DragControllerDeps;
+		const canvas = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).attachCanvas(canvas);
+		canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerId: 1, clientX: 50, clientY: 300, isPrimary: true, button: 0, pointerType: "touch" }));
+		vi.advanceTimersByTime(300);
+		expect(target.previewNew).toHaveBeenCalledWith(300);
+		pointer("pointerup", 50, 300);
+		expect(opened).toEqual([{ slot, cleared: 1 }]);
+	});
+});

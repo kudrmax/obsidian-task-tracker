@@ -5,7 +5,10 @@ import type { RightMode } from "../../src/settings";
 import type { DragPayload, DropResult, DropTarget, ListColumn, PlacedResult } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
+import { TaskMenu } from "../../src/ui/menu/TaskMenu";
 import { TaskList } from "../../src/ui/TaskList";
+import { Timeline } from "../../src/ui/Timeline";
+import { DayBoundary } from "../../src/application/contracts";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
@@ -29,9 +32,11 @@ interface SetUp {
 	mode?: RightMode;
 	day?: string;
 	items?: Partial<Record<ListColumn, TaskItem[]>>;
+	/** The tasks on the timeline. */
+	slotted?: TaskItem[];
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {} }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [] }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	let mode = startMode;
@@ -56,8 +61,19 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			onCard: (card, it) => controller?.dress(card, it),
 		});
 	}
+	const timeline = new Timeline(root.appendChild(document.createElement("div")), {
+		theme: () => "dark",
+		date: () => day,
+		today: () => TODAY,
+		boundary: () => DayBoundary.MIDNIGHT,
+		hourPx: () => 56,
+		tasks: () => slotted,
+		events: () => [],
+		now: () => new Date(2026, 10, 1, 8, 0),
+	});
 	const render = () => {
 		for (const column of COLUMNS) lists[column].render();
+		timeline.render();
 		controller?.rendered();
 	};
 	controller = new QuickEntryController({
@@ -74,6 +90,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		arbiter: new GestureArbiter(),
 		drag: { beginNew },
 		list: (column) => lists[column],
+		timeline: () => timeline,
+		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
 		newTasks: () => buttons,
 		dropTargets: () => ({ lists: drops, timeline: null }),
 		levels: () => [{ prefix: "p1", color: "red" }],
@@ -114,7 +132,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	};
 	const holdWrites = () => (holdFresh = true);
 	const releaseWrites = () => freshWaiting.splice(0).forEach((resolve) => resolve());
-	return { controller, root, plus, field, lists, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
+	return { controller, root, plus, field, lists, timeline, slotted, render, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
 }
 
 afterEach(() => {
@@ -352,6 +370,164 @@ describe("QuickEntryController", () => {
 		expect(turned).toEqual(["soon"]);
 		await vi.waitFor(() => expect(day()).toBe("2026-11-05"));
 		expect(rowsOf("left")).toEqual(["field"]);
+	});
+
+	describe("on the timeline", () => {
+		const slot = { date: TODAY, start: 1035, end: null } as const;
+		const onTimeline = (text: string, index: number, subtasks: TaskItem[] = []): TaskItem => ({ ...item(text, key("now", index), null, subtasks), slot: { date: TODAY, start: 600, end: 660 } });
+		const timelineField = (root: HTMLElement) => root.querySelector<HTMLElement>(".tc-items > .tc-quick-row");
+		const bar = (root: HTMLElement) => root.querySelector<HTMLElement>(".tc-quick-bar")!;
+		const shown = (root: HTMLElement, selector: string) => !root.querySelector<HTMLElement>(selector)!.hidden;
+
+		it("opens the field in the slot a long tap showed, with the slot's time, and the bar with the flag only", () => {
+			const { controller, root, field } = setUp();
+			controller.openSlot(slot);
+			expect(timelineField(root)!.contains(field())).toBe(true);
+			expect(timelineField(root)!.querySelector(".tc-field-time")!.textContent).toBe("17:15");
+			expect(document.activeElement).toBe(field());
+			expect(shown(root, ".tc-bar-flag")).toBe(true);
+			expect([".tc-bar-outdent", ".tc-bar-indent", ".tc-bar-place"].map((s) => shown(root, s))).toEqual([false, false, false]);
+			expect(bar(root).hidden).toBe(false);
+		});
+
+		it("writes the task in the slot on Enter and closes: no next line on the calendar", async () => {
+			const { controller, root, type, press, created, field } = setUp();
+			controller.openSlot(slot);
+			type("Call");
+			press("Enter");
+			expect(field()).toBeNull();
+			expect(timelineField(root)).toBeNull();
+			await vi.waitFor(() => expect(created).toEqual([{ text: "Call", priority: null, place: { kind: "slot", slot } }]));
+		});
+
+		it("creates nothing on a blank Enter, Escape, or a tap elsewhere with no text", async () => {
+			const { controller, root, press, created, field } = setUp();
+			controller.openSlot(slot);
+			press("Enter");
+			expect(timelineField(root)).toBeNull();
+			controller.openSlot(slot);
+			press("Escape");
+			expect(field()).toBeNull();
+			controller.openSlot(slot);
+			document.dispatchEvent(new PointerEvent("pointerdown"));
+			document.body.click();
+			expect(field()).toBeNull();
+			await Promise.resolve();
+			expect(created).toEqual([]);
+		});
+
+		it("is not closed by the click that ends the long tap which opened it", () => {
+			const { controller, field } = setUp();
+			controller.openSlot(slot);
+			document.body.click();
+			expect(field()).not.toBeNull();
+		});
+
+		it("opens the field in the slot where the plus was let go on the timeline", () => {
+			const { controller, root, plus, beginNew, field } = setUp();
+			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
+			beginNew.mock.calls[0][3]({ kind: "slot", slot });
+			expect(timelineField(root)!.contains(field())).toBe(true);
+			expect(plus.classList.contains("is-hidden")).toBe(true);
+		});
+
+		it("renames a task only on the calendar in its own card, and Enter saves text and priority only, then closes", async () => {
+			const task = onTimeline("Report", 0);
+			const { controller, root, field, type, press, edits } = setUp({ slotted: [task] });
+			controller.rename(task);
+			const block = [...root.querySelectorAll<HTMLElement>(".tc-items > .tc-block:not(.tc-quick-row)")][0];
+			expect(block.classList.contains("is-renaming")).toBe(true);
+			expect(timelineField(root)!.contains(field())).toBe(true);
+			expect(timelineField(root)!.querySelector(".tc-field-time")).toBeNull();
+			expect(field()!.value).toBe("Report");
+			expect([".tc-bar-indent", ".tc-bar-place"].map((s) => shown(root, s))).toEqual([false, false]);
+			type("Report v2");
+			press("Enter");
+			expect(field()).toBeNull();
+			await vi.waitFor(() => expect(edits).toEqual([{ key: task.key, draft: { text: "Report v2", placement: { kind: "now" }, priority: null } }]));
+		});
+
+		it("renames a task that is also in a list in the list", () => {
+			const task = onTimeline("Report", 0);
+			const { controller, root, rowsOf } = setUp({ items: { left: [task] }, slotted: [task] });
+			controller.rename(task);
+			expect(rowsOf("left")).toEqual(["field", "Report"]);
+			expect(timelineField(root)).toBeNull();
+		});
+
+		describe("Add subtask from the calendar menu", () => {
+			const openMenu = (task: TaskItem) => {
+				const source = document.body.appendChild(document.createElement("div"));
+				source.className = "tc-block";
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, addSubtask: () => {}, remove: async () => {} } });
+			};
+			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
+
+			it("opens the field last in the stack, the panel hidden, the bar over the blur with the flag only", () => {
+				const task = onTimeline("Report", 0, [item("A1", key("now", 0, [0]))]);
+				const { controller } = setUp({ slotted: [task] });
+				controller.addSubtask(task, openMenu(task));
+				expect(document.querySelector<HTMLElement>(".tc-panel.is-task")!.hidden).toBe(true);
+				expect(stack()).toEqual(["A1", "field"]);
+				expect(document.activeElement).toBe(document.querySelector(".tc-menu-subtasks textarea.tc-quick-field"));
+				const quickBar = document.querySelector<HTMLElement>(".tc-quick-bar")!;
+				expect(quickBar.parentElement).toBe(document.body);
+				expect([".tc-bar-indent", ".tc-bar-place"].map((s) => quickBar.querySelector<HTMLElement>(s)!.hidden)).toEqual([true, true]);
+			});
+
+			it("writes each line as the last subtask of the task and opens the next field in the stack", async () => {
+				const task = onTimeline("Report", 0);
+				const { controller, created } = setUp({ slotted: [task] });
+				controller.addSubtask(task, openMenu(task));
+				const field = () => document.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field")!;
+				field().value = "Gather numbers";
+				field().dispatchEvent(new Event("input", { bubbles: true }));
+				field().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+				expect(field().value).toBe("");
+				await vi.waitFor(() => expect(created).toEqual([{ text: "Gather numbers", priority: null, place: { kind: "subtask", parent: task.key, before: null } }]));
+				expect(stack()[stack().length - 1]).toBe("field");
+			});
+
+			it("draws the stack from the task as the screen shows it once the subtask is written", async () => {
+				const task = onTimeline("Report", 0);
+				const { controller, slotted, render } = setUp({ slotted: [task] });
+				controller.addSubtask(task, openMenu(task));
+				slotted[0] = { ...task, subtasks: [item("Gather numbers", key("now", 0, [0]))] };
+				render();
+				expect(stack()).toEqual(["Gather numbers", "field"]);
+			});
+
+			it("closes the menu on a blank Enter, and the bar goes back into the view", () => {
+				const task = onTimeline("Report", 0);
+				const { controller, root } = setUp({ slotted: [task] });
+				const menu = openMenu(task);
+				controller.addSubtask(task, menu);
+				document.querySelector("textarea.tc-quick-field")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+				expect(document.querySelector(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
+				expect(root.lastElementChild!.classList.contains("tc-quick-bar")).toBe(true);
+			});
+
+			it("keeps the text typed when the menu is closed by a tap on the blur", async () => {
+				const task = onTimeline("Report", 0);
+				const { controller, created } = setUp({ slotted: [task] });
+				const menu = openMenu(task);
+				controller.addSubtask(task, menu);
+				const field = document.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field")!;
+				field.value = "Send";
+				field.dispatchEvent(new Event("input", { bubbles: true }));
+				menu.close();
+				await vi.waitFor(() => expect(created.map((c) => c.text)).toEqual(["Send"]));
+			});
+
+			it("a task also in a list gets its field in the list, and the menu closes", () => {
+				const task = onTimeline("Report", 0);
+				const { controller, rowsOf } = setUp({ items: { left: [task] }, slotted: [task] });
+				const menu = openMenu(task);
+				controller.addSubtask(task, menu);
+				expect(rowsOf("left")).toEqual(["Report", "field"]);
+				expect(document.querySelector(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
+			});
+		});
 	});
 });
 

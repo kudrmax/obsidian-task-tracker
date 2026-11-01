@@ -76,7 +76,8 @@ export interface MenuActions {
 	setDueDate(date: LocalDate | null): Promise<void>;
 	setPriority(prefix: string | null): Promise<void>;
 	rename(): void;
-	addSubtask(): void;
+	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
+	addSubtask(menu: TaskMenu): void;
 	remove(): Promise<void>;
 }
 
@@ -107,6 +108,12 @@ export class TaskMenu {
 	private readonly lifted: HTMLElement;
 	private readonly panel: HTMLElement;
 	private readonly anchor: DOMRect;
+	private readonly copy: DOMRect;
+	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
+	private stack: HTMLElement | null = null;
+	private stackRow: HTMLElement | null = null;
+	/** Whoever typed in the stack hears when the menu closes, however it closes. */
+	private stackClosed: (() => void) | null = null;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
@@ -119,8 +126,8 @@ export class TaskMenu {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		const copy = this.liftWhole(context.source.getBoundingClientRect());
-		this.anchor = context.source.classList.contains("tc-block") && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
+		const copy = (this.copy = this.liftWhole(context.source.getBoundingClientRect()));
+		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
 		if (context.opening === "picker") this.showPicker();
@@ -139,21 +146,57 @@ export class TaskMenu {
 		return new DOMRect(left, top, size.width, size.height);
 	}
 
+	/** The menu of a timeline card: its subtasks stand in a stack under its copy. */
+	get stacks(): boolean {
+		return this.context.source.classList.contains("tc-block");
+	}
+
+	/**
+	 * Add subtask on a timeline card: the panel goes, and the stack under the copy, opened when the task has no subtasks
+	 * yet, ends in a row for the field of a new one, which this returns. `onClose` hears when the menu closes.
+	 */
+	openStack(onClose: () => void): HTMLElement {
+		this.panel.hidden = true;
+		this.stackClosed = onClose;
+		const stack = (this.stack ??= this.stackUnder(this.copy));
+		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
+	}
+
+	/** The stack shows `subtasks`, then the texts typed and not yet written, over the field's row, which stays where it is. */
+	showStack(subtasks: readonly TaskItem[], pending: readonly string[]): void {
+		const stack = this.stack;
+		if (!stack) return;
+		for (const child of [...stack.children]) if (child !== this.stackRow) child.remove();
+		this.fillStack(stack, subtasks);
+		for (const text of pending) stack.insertBefore(el(null, "div", "tc-card"), this.stackRow).appendChild(el(null, "div", "tc-card-title", text));
+	}
+
 	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */
 	private showSubtasks(copy: DOMRect): DOMRect {
-		const { item, day, onSubtask } = this.context;
-		const list = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
-		list.style.left = px(copy.left);
-		list.style.top = px(copy.bottom);
-		list.style.width = px(copy.width);
-		for (const subtask of item.subtasks) {
-			const card = renderTaskCard(list, subtask, { day });
+		const stack = (this.stack = this.stackUnder(copy));
+		this.fillStack(stack, this.context.item.subtasks);
+		return new DOMRect(copy.left, copy.top, copy.width, stack.getBoundingClientRect().bottom - copy.top);
+	}
+
+	private stackUnder(copy: DOMRect): HTMLElement {
+		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
+		stack.style.left = px(copy.left);
+		stack.style.top = px(copy.bottom);
+		stack.style.width = px(copy.width);
+		return stack;
+	}
+
+	/** A tap on a subtask's card opens its own menu instead. */
+	private fillStack(stack: HTMLElement, subtasks: readonly TaskItem[]): void {
+		const { day, onSubtask } = this.context;
+		for (const subtask of subtasks) {
+			const card = renderTaskCard(null, subtask, { day });
+			stack.insertBefore(card, this.stackRow);
 			card.addEventListener("click", () => {
 				this.close();
 				onSubtask?.(subtask, card);
 			});
 		}
-		return new DOMRect(copy.left, copy.top, copy.width, list.getBoundingClientRect().bottom - copy.top);
 	}
 
 	private place(): void {
@@ -180,7 +223,7 @@ export class TaskMenu {
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.pick(() => actions.rename()),
 			due: () => this.showDue(),
-			subtask: this.pick(() => actions.addSubtask()),
+			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
 		tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
@@ -225,6 +268,6 @@ export class TaskMenu {
 	}
 
 	close(): void {
-		this.overlay.close();
+		if (this.overlay.close()) this.stackClosed?.();
 	}
 }

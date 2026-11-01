@@ -6,8 +6,10 @@ import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, PlacedResult } from "../drag/DropTarget";
 import { gapOf, type PlaceResult, type PlacedCard, sameTask } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
+import type { TaskMenu } from "../menu/TaskMenu";
 import type { ListEntryInput, TaskList } from "../TaskList";
-import type { LocalDate } from "../types";
+import type { Timeline } from "../Timeline";
+import type { LocalDate, Slot } from "../types";
 import { PlusButton } from "./PlusButton";
 import { QuickBar, type QuickBarState } from "./QuickBar";
 import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
@@ -23,6 +25,9 @@ export interface QuickEntryControllerDeps {
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	list(column: ListColumn): TaskList | null;
+	timeline(): Timeline | null;
+	/** A task of the timeline as the screen shows it now; null once it is not there. */
+	task(key: TaskKey): TaskItem | null;
 	/** The New task buttons under the lists. */
 	newTasks(): readonly { shown: boolean }[];
 	/** Where the plus may be carried: the lists the window shows, and the timeline while it shows. */
@@ -42,6 +47,13 @@ export interface QuickEntryControllerDeps {
 	render(): void;
 	/** A write that failed. */
 	onError(error: unknown): void;
+}
+
+/** A field in a calendar menu's stack of subtasks: the menu, the field's row, the task the subtasks are of. */
+interface MenuStack {
+	readonly menu: TaskMenu;
+	readonly row: HTMLElement;
+	readonly parent: TaskItem;
 }
 
 /** What closes the field when tapped: anything but the field, the bar with its panels, and the plus. */
@@ -77,8 +89,9 @@ function movesRows(before: EntryState | null, after: EntryState): boolean {
 }
 
 /**
- * Typing tasks in the lists (quick-add spec §4.2–4.7): opens the entry from New task, the plus, the task menu; draws the
- * field in its list and keeps it focused across redraws, 16 px over the bar; shows the bar and hides the plus while the
+ * Typing tasks in place (quick-add spec §4.2–4.9): opens the entry from New task, the plus, a long tap on the timeline,
+ * the task menu; draws the field in its list, in its slot or over its card on the timeline, or last in a calendar menu's
+ * stack of subtasks, and keeps it focused across redraws, 16 px over the bar; shows the bar and hides the plus while the
  * entry is open. What the entry means for the file is QuickEntry's.
  */
 export class QuickEntryController {
@@ -96,8 +109,12 @@ export class QuickEntryController {
 	private droppedOn: ListColumn | null = null;
 	/** The bar's place is turning the wheel to the column the field has just moved to. */
 	private turning = false;
+	private stack: MenuStack | null = null;
+	/** The field opened as a press ended: the click that press still sends is not a tap elsewhere. */
+	private pressEnding = false;
+	private readonly pressed = () => (this.pressEnding = false);
 	private readonly tapAway = (e: Event) => {
-		if (!this.state || (e.target instanceof Element && e.target.closest(KEEPS_FIELD))) return;
+		if (!this.state || this.pressEnding || (e.target instanceof Element && e.target.closest(KEEPS_FIELD))) return;
 		this.entry.blur();
 	};
 
@@ -121,6 +138,7 @@ export class QuickEntryController {
 			onPlace: (placement) => void this.moveTo(placement),
 		});
 		document.addEventListener("click", this.tapAway, true);
+		document.addEventListener("pointerdown", this.pressed, true);
 	}
 
 	/** New task, or a double click on a list's free room: the field at the end of the column. */
@@ -143,16 +161,33 @@ export class QuickEntryController {
 		this.showPlus();
 	}
 
-	/** The field as the last subtask of `parent`, in the list that shows it. */
-	addSubtask(parent: TaskItem): void {
-		const found = this.find(parent.key);
-		if (found) this.open({ kind: "list", column: found.column, place: gapOf(this.cards(found.column), { kind: "subtask", parent: parent.key, before: null }) });
+	/** A long tap on the timeline's free room let go: the field of a new task in the slot it showed. */
+	openSlot(slot: Slot): void {
+		this.pressEnding = true;
+		this.open({ kind: "slot", slot });
 	}
 
-	/** The card becomes the field, with its text: the field stands right before it, and the card hides. */
+	/**
+	 * The field as the last subtask of `parent`: in the list that shows it; for a task only on the calendar, last in the
+	 * stack of its calendar menu, which stays open for it. Any other menu closes.
+	 */
+	addSubtask(parent: TaskItem, menu?: TaskMenu): void {
+		const found = this.find(parent.key);
+		if (found || !menu?.stacks) menu?.close();
+		if (found) this.open({ kind: "list", column: found.column, place: gapOf(this.cards(found.column), { kind: "subtask", parent: parent.key, before: null }) });
+		else if (menu?.stacks) this.openStack(parent, menu);
+	}
+
+	/**
+	 * The card becomes the field, with its text: in a list the field stands right before the card, which hides; a task only
+	 * on the calendar is renamed in its card on the timeline, where it keeps its place.
+	 */
 	rename(item: TaskItem): void {
 		const found = this.find(item.key);
-		if (!found) return;
+		if (!found) {
+			if (item.slot) this.open({ kind: "slot", slot: item.slot }, item);
+			return;
+		}
 		const card = this.cards(found.column)[found.index];
 		this.open({ kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } }, item);
 	}
@@ -192,6 +227,7 @@ export class QuickEntryController {
 		for (const button of this.deps.newTasks()) button.shown = shown;
 		this.deps.root.classList.toggle("is-entering", this.state !== null);
 		this.showPlus();
+		this.placeOffLists(this.state);
 		if (!this.state) {
 			this.bar.hide();
 			return;
@@ -206,22 +242,27 @@ export class QuickEntryController {
 		this.reveal();
 	}
 
-	/** The list scrolls the field into sight, at least 16 px over the bar: after a redraw, and as the keyboard shrinks the view. */
+	/**
+	 * The list or the timeline scrolls the field into sight, at least 16 px over the bar: after a redraw, and as the
+	 * keyboard shrinks the view, which the bar over a menu follows.
+	 */
 	reveal(): void {
 		const field = this.field?.el;
-		const spot = this.state?.spot;
-		const list = spot?.kind === "list" ? this.deps.list(spot.column) : null;
-		if (!field?.isConnected || !list) return;
+		const state = this.state;
+		const scroller = state && this.scrollerOf(state.spot);
+		if (state) this.liftBar(state);
+		if (!field?.isConnected || !scroller) return;
 		const rect = field.getBoundingClientRect();
 		const limit = this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
-		const top = list.el.getBoundingClientRect().top;
-		if (rect.bottom > limit) list.el.scrollTop += rect.bottom - limit;
-		else if (rect.top < top) list.el.scrollTop -= top - rect.top;
+		const top = scroller.getBoundingClientRect().top;
+		if (rect.bottom > limit) scroller.scrollTop += rect.bottom - limit;
+		else if (rect.top < top) scroller.scrollTop -= top - rect.top;
 	}
 
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
 	close(): void {
 		document.removeEventListener("click", this.tapAway, true);
+		document.removeEventListener("pointerdown", this.pressed, true);
 		this.entry.blur();
 		this.bar.hide();
 	}
@@ -279,13 +320,68 @@ export class QuickEntryController {
 		};
 	}
 
-	/** The plus came to rest: on a list the field opens where it landed; on the timeline nothing yet. */
+	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
 	private dropped(result: PlacedResult | null): void {
 		this.carrying = false;
 		const column = this.droppedOn;
 		const place = result && column ? placeResultOf(result) : null;
 		if (column && place) this.open({ kind: "list", column, place: gapOf(this.cards(column), place) });
+		else if (result?.kind === "slot") this.open({ kind: "slot", slot: result.slot });
 		else this.showPlus();
+	}
+
+	/** The menu stays over the screen, its panel gone, and the field stands last in its stack of subtasks. */
+	private openStack(parent: TaskItem, menu: TaskMenu): void {
+		const row = menu.openStack(() => this.menuClosed(menu));
+		this.stack = { menu, row, parent };
+		this.open({ kind: "stack", parent: parent.key });
+	}
+
+	/** The menu closed by itself, by a tap on its blur or Escape: the field closes as by a tap elsewhere. */
+	private menuClosed(menu: TaskMenu): void {
+		if (this.stack?.menu !== menu) return;
+		this.stack = null;
+		this.entry.blur();
+	}
+
+	/**
+	 * The field off the lists: the timeline holds it in its slot or over the renamed card, the menu last in its stack under
+	 * the subtasks as the screen shows them now and the texts not yet written. Each lets it go once it stands elsewhere.
+	 */
+	private placeOffLists(state: EntryState | null): void {
+		const spot = state?.spot;
+		const timeline = this.deps.timeline();
+		if (spot?.kind === "slot" && state) {
+			const field = this.offListField();
+			if (state.renaming) timeline?.showRename(state.renaming, field);
+			else timeline?.showField(spot.slot, field);
+		} else timeline?.clearField();
+		const stack = this.stack;
+		if (spot?.kind === "stack" && state && stack) {
+			stack.menu.showStack((this.deps.task(spot.parent) ?? stack.parent).subtasks, state.pending.map((line) => line.text));
+			const field = this.offListField();
+			if (field.parentElement !== stack.row) stack.row.appendChild(field);
+		} else if (stack) {
+			this.stack = null;
+			stack.menu.close();
+		}
+	}
+
+	/** The field for a holder off the lists, made the first time it is asked for. */
+	private offListField(): HTMLTextAreaElement {
+		return (this.field ??= this.openField(document.createElement("div"))).el;
+	}
+
+	/** What scrolls the field into sight: its list, or the timeline; a menu's stack does not scroll. */
+	private scrollerOf(spot: EntrySpot): HTMLElement | null {
+		if (spot.kind === "list") return this.deps.list(spot.column)?.el ?? null;
+		if (spot.kind === "slot") return this.deps.timeline()?.el ?? null;
+		return null;
+	}
+
+	/** Over a menu's blur the bar stands above it, at the bottom of the view. */
+	private liftBar(state: EntryState): void {
+		this.bar.lift(state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null);
 	}
 
 	private showPlus(): void {
@@ -300,6 +396,7 @@ export class QuickEntryController {
 			this.field = null;
 			this.focused = false;
 			this.bar.hide();
+			this.placeOffLists(null);
 		}
 		if (!state || movesRows(before, state)) this.deps.render();
 		else this.sync(state);
@@ -311,6 +408,7 @@ export class QuickEntryController {
 		if (this.field && this.field.el.value !== state.text) this.field.setValue(state.text);
 		this.field?.setPriority(level);
 		this.bar.show(this.barState(state, level));
+		this.liftBar(state);
 	}
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {

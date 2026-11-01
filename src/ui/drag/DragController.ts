@@ -36,7 +36,7 @@ export interface DragControllerDeps {
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
-	/** A long tap on an empty place of the timeline, let go: a new task in the slot the target showed. */
+	/** A long tap on an empty place of the timeline, let go: the field of a new task in the slot the target showed. */
 	newSlot(): TimelineDrop | null;
 	onNewSlot(slot: Slot): void;
 }
@@ -145,7 +145,7 @@ export class DragController {
 		}
 	}
 
-	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the task screen. */
+	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the field there. */
 	attachCanvas(canvas: HTMLElement): void {
 		const onEmpty = (e: PointerEvent) => this.beginNewSlot(canvas, e);
 		new LongPress(canvas, {
@@ -174,8 +174,9 @@ export class DragController {
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(canvas, e.pointerId);
 			this.deps.arbiter.release(NEW_SLOT);
-			if (open) this.deps.onNewSlot(drop.slot);
-			else drop.clear();
+			const slot = drop.slot;
+			drop.clear();
+			if (open) this.deps.onNewSlot(slot);
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);

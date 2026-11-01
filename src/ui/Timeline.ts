@@ -4,6 +4,7 @@ import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
+import { sameTask } from "./drag/listPlace";
 import { markPriority, renderProgress } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
@@ -49,6 +50,15 @@ interface PlacedTask {
 	readonly pill: HTMLElement;
 }
 
+/** A field over the day: a new task's in a slot, joining the stack there; or a renamed task's, over its card. */
+type FieldAt = { readonly kind: "slot"; readonly span: TaskSpan } | { readonly kind: "rename"; readonly key: TaskKey };
+
+interface ShownField {
+	readonly at: FieldAt;
+	/** The card-like box that holds the field, kept across redraws so the field keeps the focus. */
+	readonly box: HTMLElement;
+}
+
 /** A minute held at a share of the visible height. */
 interface Anchor {
 	readonly minutes: number;
@@ -87,6 +97,7 @@ export class Timeline {
 	private drop: TaskSpan | null = null;
 	private stretch: Stretch | null = null;
 	private selected: TaskKey | null = null;
+	private field: ShownField | null = null;
 	private anchor: Anchor | null = null;
 	private readonly grips: HTMLElement;
 
@@ -190,7 +201,7 @@ export class Timeline {
 	}
 
 	render(): void {
-		clear(this.itemsEl);
+		for (const child of [...this.itemsEl.children]) if (child !== this.field?.box) child.remove();
 		this.stretch = null;
 		const boundary = this.deps.boundary();
 		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
@@ -279,6 +290,59 @@ export class Timeline {
 		this.dropEl = null;
 	}
 
+	/**
+	 * The field of a new task in `slot`: a card where a task dropped there comes to rest, the stack making room for it as
+	 * for that task, the slot's time on its right. It stays, the same element, across redraws until `clearField`.
+	 */
+	showField(slot: Slot, field: HTMLElement): void {
+		const box = this.holdField({ kind: "slot", span: { start: this.spanOf(slot).start, end: null } }, field);
+		const time = box.querySelector(".tc-field-time") ?? make(box, "span", "tc-field-time");
+		time.textContent = formatTime(slot.start);
+		this.layoutTasks();
+	}
+
+	/** The field of a renamed task over its card, at the card's place and size; the card hides while it stands there. */
+	showRename(item: TaskItem, field: HTMLElement): void {
+		this.holdField({ kind: "rename", key: item.key }, field);
+		for (const task of this.tasks) task.el.classList.toggle("is-renaming", this.isRenamed(task.item));
+		this.layoutTasks();
+	}
+
+	clearField(): void {
+		if (!this.field) return;
+		this.field.box.remove();
+		this.field = null;
+		for (const task of this.tasks) task.el.classList.remove("is-renaming");
+		this.layoutTasks();
+	}
+
+	/** The box for a field at `at`: the one already shown when it holds this field the same way, else a new one. */
+	private holdField(at: FieldAt, field: HTMLElement): HTMLElement {
+		const shown = this.field;
+		if (shown && shown.at.kind === at.kind && field.parentElement === shown.box) {
+			this.field = { at, box: shown.box };
+			return shown.box;
+		}
+		shown?.box.remove();
+		const box = make(this.itemsEl, "div", `tc-block tc-quick-row is-${at.kind}`);
+		box.appendChild(field);
+		this.field = { at, box };
+		return box;
+	}
+
+	/** The renamed task's field takes its card's box; none while the card is not shown. */
+	private coverRenamed(present: readonly PlacedTask[]): void {
+		const field = this.field;
+		if (field?.at.kind !== "rename") return;
+		const card = present.find((task) => this.isRenamed(task.item));
+		field.box.hidden = !card;
+		if (card) for (const property of [PROPERTY.y, PROPERTY.length, PROPERTY.x]) field.box.style.setProperty(property, card.el.style.getPropertyValue(property));
+	}
+
+	private isRenamed(item: TaskItem): boolean {
+		return this.field?.at.kind === "rename" && sameTask(this.field.at.key, item.key);
+	}
+
 	/** Where the dropped task will come to rest once the stack takes it in, in client pixels. */
 	landing(): DOMRect | null {
 		if (!this.drop) return null;
@@ -302,11 +366,14 @@ export class Timeline {
 	 */
 	layoutTasks(): void {
 		const present = this.present();
-		const placed = Array.from(this.itemsEl.querySelectorAll(":scope > .tc-block:not(.is-lifted)"));
+		const placed = Array.from(this.itemsEl.querySelectorAll(":scope > .tc-block:not(.is-lifted):not(.tc-quick-row)"));
 		if (present.some((task, i) => placed[i] !== task.el)) for (const task of present) this.itemsEl.insertBefore(task.el, this.grips);
 		const spans: TaskSpan[] = present.map((t) => this.taskSpan(t));
-		const boxes = stackTasks(spans, this.eventSpans(), this.hourPx, shownCardSize());
-		let bottom = 0;
+		const slot = this.field?.at.kind === "slot" ? this.field.at.span : null;
+		const boxes = stackTasks(slot ? [slot, ...spans] : spans, this.eventSpans(), this.hourPx, shownCardSize());
+		const own = slot ? boxes.shift() : undefined;
+		let bottom = own ? own.top + own.height : 0;
+		if (own && this.field) this.placeBox(this.field.box, own.top, own.height, own.left);
 		present.forEach((task, i) => {
 			const box = boxes[i];
 			this.placeBox(task.el, box.top, box.height, box.left);
@@ -315,6 +382,7 @@ export class Timeline {
 			bottom = Math.max(bottom, box.top + box.height);
 		});
 		this.canvas.style.setProperty(PROPERTY.stackEnd, px(bottom));
+		this.coverRenamed(present);
 		const selected = present.find((t) => t.el.classList.contains("is-selected"));
 		this.grips.classList.toggle("is-shown", !!selected);
 		if (selected) for (const property of [PROPERTY.y, PROPERTY.length, PROPERTY.x]) this.grips.style.setProperty(property, selected.el.style.getPropertyValue(property));
@@ -419,6 +487,7 @@ export class Timeline {
 		make(meta, "span");
 		const pill = make(card, "span", "tc-block-pill");
 		block.classList.toggle("is-selected", this.isSelected(item));
+		block.classList.toggle("is-renaming", this.isRenamed(item));
 		this.deps.onBlock?.(block, item);
 		return { el: block, item, meta, pill };
 	}

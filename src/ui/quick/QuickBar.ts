@@ -1,6 +1,6 @@
 import type { Placement } from "../../application/contracts";
 import { type PriorityLevel, usableLevels } from "../../settings";
-import { clear, el } from "../dom";
+import { clear, el, px } from "../dom";
 import { icon } from "../icons";
 import { type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
 import { menuIcon } from "../menu/menuIcons";
@@ -70,7 +70,7 @@ export class QuickBar {
 		if (!(e.target instanceof Node) || !this.bar.contains(e.target)) this.closePanel();
 	};
 
-	constructor(parent: HTMLElement, private readonly deps: QuickBarDeps) {
+	constructor(private readonly parent: HTMLElement, private readonly deps: QuickBarDeps) {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
@@ -113,6 +113,25 @@ export class QuickBar {
 	hide(): void {
 		this.closePanel();
 		this.bar.hidden = true;
+		this.lift(null);
+	}
+
+	/**
+	 * Over a menu's blur, which lies over the whole page, the bar leaves the view for the page and stands at the bottom of
+	 * `view`, the view's box, above the blur; null puts it back last in the view.
+	 */
+	lift(view: DOMRect | null): void {
+		this.bar.classList.toggle("is-over", view !== null);
+		if (view) {
+			const page = this.bar.ownerDocument.body;
+			if (this.bar.parentElement !== page) page.appendChild(this.bar);
+			this.bar.style.left = px(view.left);
+			this.bar.style.width = px(view.width);
+			this.bar.style.bottom = px(window.innerHeight - view.bottom);
+			return;
+		}
+		if (this.bar.parentElement !== this.parent) this.parent.appendChild(this.bar);
+		for (const property of ["left", "width", "bottom"]) this.bar.style.removeProperty(property);
 	}
 
 	private levels(): readonly PriorityLevel[] {

@@ -297,3 +297,19 @@ describe("the panels' opening and closing", () => {
 		expect(parent.querySelector(".tc-picker")).not.toBeNull();
 	});
 });
+
+describe("QuickBar over a menu", () => {
+	it("leaves the view for the page at the view's bottom, above the blur, and comes back last in the view", () => {
+		const { parent, bar } = setup();
+		parent.appendChild(document.createElement("span"));
+		const el = q<HTMLElement>(document, ".tc-quick-bar");
+		bar.lift(new DOMRect(10, 0, 300, window.innerHeight - 50));
+		expect(el.parentElement).toBe(document.body);
+		expect(el.classList.contains("is-over")).toBe(true);
+		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["10px", "300px", "50px"]);
+		bar.lift(null);
+		expect(parent.lastElementChild).toBe(el);
+		expect(el.classList.contains("is-over")).toBe(false);
+		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["", "", ""]);
+	});
+});
