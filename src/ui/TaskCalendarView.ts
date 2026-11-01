@@ -672,7 +672,7 @@ export class TaskCalendarView extends ItemView {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				rename: () => this.quick?.rename(item),
+				rename: (menu) => this.quick?.rename(item, menu),
 				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},

@@ -447,6 +447,54 @@ describe("QuickEntryController", () => {
 			await vi.waitFor(() => expect(edits).toEqual([{ key: task.key, draft: { text: "Report v2", placement: { kind: "now" }, priority: null } }]));
 		});
 
+		describe("Rename from the menu of a subtask in the calendar menu's stack", () => {
+			const sub = { ...item("Gather", key("now", 0, [0])), status: "inProgress" as const };
+			const openSubMenu = () => {
+				const stackEl = document.body.appendChild(document.createElement("div"));
+				stackEl.className = "tc-menu-subtasks";
+				const source = stackEl.appendChild(document.createElement("div"));
+				source.className = "tc-card";
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, addSubtask: () => {}, remove: async () => {} } });
+			};
+			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
+
+			it("turns the card into the field in its place, the text selected, the bar with the flag only", () => {
+				const { controller } = setUp({ slotted: [onTimeline("Report", 0, [sub])] });
+				controller.rename(sub, openSubMenu());
+				expect(menuField()!.value).toBe("Gather");
+				expect(document.activeElement).toBe(menuField());
+				expect([menuField()!.selectionStart, menuField()!.selectionEnd]).toEqual([0, 6]);
+				const quickBar = document.querySelector<HTMLElement>(".tc-quick-bar")!;
+				expect(quickBar.parentElement).toBe(document.body);
+				expect([".tc-bar-indent", ".tc-bar-place"].map((s) => quickBar.querySelector<HTMLElement>(s)!.hidden)).toEqual([true, true]);
+				expect(quickBar.querySelector<HTMLElement>(".tc-bar-flag")!.hidden).toBe(false);
+			});
+
+			it("saves the text on Enter and closes the menu", async () => {
+				const { controller, edits } = setUp({ slotted: [onTimeline("Report", 0, [sub])] });
+				controller.rename(sub, openSubMenu());
+				menuField()!.value = "Gather all";
+				menuField()!.dispatchEvent(new Event("input", { bubbles: true }));
+				menuField()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+				expect(document.querySelector(".tc-menu-field")!.classList.contains("is-closing")).toBe(true);
+				expect(document.querySelector<HTMLElement>(".tc-quick-bar")!.hidden).toBe(true);
+				expect(document.querySelector(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
+				await vi.waitFor(() => expect(edits).toEqual([{ key: sub.key, draft: { text: "Gather all", placement: { kind: "now" }, priority: null } }]));
+			});
+
+			it("cancels on Escape", async () => {
+				const { controller, edits } = setUp({ slotted: [onTimeline("Report", 0, [sub])] });
+				controller.rename(sub, openSubMenu());
+				menuField()!.value = "Gather all";
+				menuField()!.dispatchEvent(new Event("input", { bubbles: true }));
+				document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+				expect(document.querySelector(".tc-menu-field")!.classList.contains("is-closing")).toBe(true);
+				expect(document.querySelector<HTMLElement>(".tc-quick-bar")!.hidden).toBe(true);
+				await Promise.resolve();
+				expect(edits).toEqual([]);
+			});
+		});
+
 		it("renames a task that is also in a list in the list", () => {
 			const task = onTimeline("Report", 0);
 			const { controller, root, rowsOf } = setUp({ items: { left: [task] }, slotted: [task] });
@@ -456,9 +504,10 @@ describe("QuickEntryController", () => {
 		});
 
 		describe("Add subtask from the calendar menu", () => {
-			const openMenu = (task: TaskItem) => {
+			const openMenu = (task: TaskItem, at = new DOMRect(0, 0, 0, 0)) => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
+				source.getBoundingClientRect = () => at;
 				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, addSubtask: () => {}, remove: async () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
@@ -517,6 +566,40 @@ describe("QuickEntryController", () => {
 				field.dispatchEvent(new Event("input", { bubbles: true }));
 				menu.close();
 				await vi.waitFor(() => expect(created.map((c) => c.text)).toEqual(["Send"]));
+			});
+
+			it("closes on Escape without writing the text typed", async () => {
+				const task = onTimeline("Report", 0);
+				const { controller, created } = setUp({ slotted: [task] });
+				controller.addSubtask(task, openMenu(task));
+				const field = document.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field")!;
+				field.value = "Send";
+				field.dispatchEvent(new Event("input", { bubbles: true }));
+				document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+				expect(document.querySelector(".tc-menu-subtasks")!.classList.contains("is-closing")).toBe(true);
+				expect(document.querySelector<HTMLElement>(".tc-quick-bar")!.hidden).toBe(true);
+				await Promise.resolve();
+				await Promise.resolve();
+				expect(created).toEqual([]);
+			});
+
+			it("keeps the field 16 px over the bar, raising the parts over the blur", () => {
+				const task = onTimeline("Report", 0);
+				const { controller, root } = setUp({ slotted: [task] });
+				const menu = openMenu(task, new DOMRect(200, 430, 150, 35));
+				root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
+				const rowTop = () => parseFloat(document.querySelector<HTMLElement>(".tc-menu-subtasks")!.style.top) + 2;
+				HTMLTextAreaElement.prototype.getBoundingClientRect = function () {
+					return new DOMRect(0, rowTop(), 150, 35);
+				};
+				try {
+					controller.addSubtask(task, menu);
+					const limit = 500 - 44 - 16;
+					expect(rowTop() + 35).toBe(limit);
+					expect(menu.raised).toBeGreaterThan(0);
+				} finally {
+					delete (HTMLTextAreaElement.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+				}
 			});
 
 			it("a task also in a list gets its field in the list, and the menu closes", () => {

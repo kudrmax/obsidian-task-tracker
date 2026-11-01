@@ -36,4 +36,12 @@ describe("Overlay", () => {
 		expect(sheet.classList.contains("is-closing")).toBe(true);
 		expect(overlay.close()).toBe(false);
 	});
+
+	it("says how it was closed: by Escape, or by a tap on the sheet", () => {
+		const heard: string[] = [];
+		new Overlay((how) => heard.push(how));
+		document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		document.querySelector<HTMLElement>(".tc-backdrop")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+		expect(heard).toEqual(["escape", "away"]);
+	});
 });

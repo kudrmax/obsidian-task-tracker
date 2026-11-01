@@ -5,7 +5,7 @@ import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { sameTask } from "./drag/listPlace";
-import { markPriority, renderProgress } from "./TaskCard";
+import { markPriority, renderProgress, showStrip } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
@@ -301,9 +301,9 @@ export class Timeline {
 		this.layoutTasks();
 	}
 
-	/** The field of a renamed task over its card, at the card's place and size; the card hides while it stands there. */
+	/** The field of a renamed task over its card, at the card's place and size, the strip of a task in progress kept; the card hides while it stands there. */
 	showRename(item: TaskItem, field: HTMLElement): void {
-		this.holdField({ kind: "rename", key: item.key }, field);
+		showStrip(this.holdField({ kind: "rename", key: item.key }, field), item);
 		for (const task of this.tasks) task.el.classList.toggle("is-renaming", this.isRenamed(task.item));
 		this.layoutTasks();
 	}

@@ -172,3 +172,79 @@ describe("the calendar menu's stack for a new subtask", () => {
 		expect(panel().classList.contains("is-closing")).toBe(true);
 	});
 });
+
+describe("the menu of a subtask from the calendar menu's stack", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress" });
+	const openOnStackCard = () => {
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		const stack = document.body.appendChild(document.createElement("div"));
+		stack.className = "tc-menu-subtasks";
+		const source = stack.appendChild(document.createElement("div"));
+		source.className = "tc-card";
+		source.getBoundingClientRect = () => new DOMRect(200, 300, 150, 35);
+		const menu = TaskMenu.open({ item: subtask, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		return { menu, actions };
+	};
+	const panel = () => document.querySelector<HTMLElement>(".tc-panel.is-task")!;
+
+	it("offers no Add subtask", () => {
+		const { menu } = openOnStackCard();
+		expect(menu.inStack).toBe(true);
+		expect([...panel().querySelectorAll(".tc-menu-label")].map((l) => l.textContent)).toEqual(["Rename", "Due date", "Delete"]);
+	});
+
+	it("stays open on Rename and hands itself to the action", () => {
+		const { menu, actions } = openOnStackCard();
+		[...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Rename"))!.click();
+		expect(actions.rename).toHaveBeenCalledWith(menu);
+		expect(panel().classList.contains("is-closing")).toBe(false);
+	});
+
+	it("turns the card into a row for the field in its place: the panel and the copy go, the strip stays", () => {
+		const { menu } = openOnStackCard();
+		const row = menu.openRename(() => {});
+		expect(panel().hidden).toBe(true);
+		expect(document.querySelector<HTMLElement>(".tc-lifted")!.style.visibility).toBe("hidden");
+		expect(row.classList.contains("tc-menu-field")).toBe(true);
+		expect(row.classList.contains("tc-quick-row")).toBe(true);
+		expect([row.style.left, row.style.top, row.style.width]).toEqual(["200px", "300px", "150px"]);
+		expect(row.querySelector(".tc-strip")).not.toBeNull();
+	});
+
+	it("tells the field's holder how it closed", () => {
+		const { menu } = openOnStackCard();
+		const heard: string[] = [];
+		menu.openRename((how) => heard.push(how));
+		document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		expect(heard).toEqual(["escape"]);
+	});
+});
+
+describe("the parts over the blur, raised over the keyboard", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	it("stand higher by the amount asked, never lower than the card, and the field's row with them", () => {
+		const actions = { setStatus: vi.fn(async () => {}), setDueDate: vi.fn(async () => {}), setPriority: vi.fn(async () => {}), rename: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}) };
+		const source = document.body.appendChild(document.createElement("div"));
+		source.className = "tc-block";
+		source.getBoundingClientRect = () => new DOMRect(200, 500, 150, 35);
+		const menu = TaskMenu.open({ item: item(), source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		menu.openStack(() => {});
+		const copy = document.querySelector<HTMLElement>(".tc-lifted")!;
+		const stack = document.querySelector<HTMLElement>(".tc-menu-subtasks")!;
+		const [copyTop, stackTop] = [parseFloat(copy.style.top), parseFloat(stack.style.top)];
+		menu.raise(120);
+		expect(menu.raised).toBe(120);
+		expect([parseFloat(copy.style.top), parseFloat(stack.style.top)]).toEqual([copyTop - 120, stackTop - 120]);
+		menu.raise(-40);
+		expect(menu.raised).toBe(0);
+		expect([parseFloat(copy.style.top), parseFloat(stack.style.top)]).toEqual([copyTop, stackTop]);
+	});
+});
+

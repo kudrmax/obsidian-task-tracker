@@ -3,10 +3,10 @@ import type { PriorityLevel } from "../../settings";
 import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard, renderTaskCard } from "../TaskCard";
+import { fillCard, renderTaskCard, showStrip } from "../TaskCard";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { Overlay } from "./Overlay";
+import { type CloseHow, Overlay } from "./Overlay";
 import { dueOptions } from "./dueOptions";
 import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, placePanel, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
@@ -75,7 +75,8 @@ export interface MenuActions {
 	setStatus(status: TaskStatus): Promise<void>;
 	setDueDate(date: LocalDate | null): Promise<void>;
 	setPriority(prefix: string | null): Promise<void>;
-	rename(): void;
+	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
+	rename(menu: TaskMenu): void;
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
 	addSubtask(menu: TaskMenu): void;
 	remove(): Promise<void>;
@@ -112,15 +113,19 @@ export class TaskMenu {
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
 	private stack: HTMLElement | null = null;
 	private stackRow: HTMLElement | null = null;
-	/** Whoever typed in the stack hears when the menu closes, however it closes. */
-	private stackClosed: (() => void) | null = null;
+	/** The card turned into the field's row, in place of the copy. */
+	private fieldRow: HTMLElement | null = null;
+	/** How far the parts over the blur stand above the card, to keep a field over the keyboard. */
+	private raisedBy = 0;
+	/** Whoever types in the menu hears when it closes, and how. */
+	private fieldClosed: ((how: CloseHow) => void) | null = null;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
 	}
 
 	private constructor(private readonly context: TaskMenuContext) {
-		this.overlay = new Overlay(() => this.close());
+		this.overlay = new Overlay((how) => this.close(how));
 		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
@@ -151,13 +156,47 @@ export class TaskMenu {
 		return this.context.source.classList.contains("tc-block");
 	}
 
+	/** The menu of a subtask tapped in a calendar menu's stack. */
+	get inStack(): boolean {
+		return this.context.source.closest(".tc-menu-subtasks") !== null;
+	}
+
+	get raised(): number {
+		return this.raisedBy;
+	}
+
+	/** The copy, the stack and the field's row stand `by` px above the card, never below it: a field kept over the keyboard. */
+	raise(by: number): void {
+		this.raisedBy = Math.max(0, by);
+		const top = this.copy.top - this.raisedBy;
+		this.lifted.style.top = px(top);
+		if (this.fieldRow) this.fieldRow.style.top = px(top);
+		if (this.stack) this.stack.style.top = px(this.copy.bottom - this.raisedBy);
+	}
+
+	/**
+	 * Rename on a card of a calendar menu's stack: the panel and the copy go, and the card becomes a row for the field in
+	 * its place, the strip of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
+	 */
+	openRename(onClose: (how: CloseHow) => void): HTMLElement {
+		this.panel.hidden = true;
+		this.fieldClosed = onClose;
+		this.lifted.style.visibility = "hidden";
+		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row")));
+		row.style.left = px(this.copy.left);
+		row.style.width = px(this.copy.width);
+		showStrip(row, this.context.item);
+		this.raise(this.raisedBy);
+		return row;
+	}
+
 	/**
 	 * Add subtask on a timeline card: the panel goes, and the stack under the copy, opened when the task has no subtasks
-	 * yet, ends in a row for the field of a new one, which this returns. `onClose` hears when the menu closes.
+	 * yet, ends in a row for the field of a new one, which this returns. `onClose` hears when the menu closes, and how.
 	 */
-	openStack(onClose: () => void): HTMLElement {
+	openStack(onClose: (how: CloseHow) => void): HTMLElement {
 		this.panel.hidden = true;
-		this.stackClosed = onClose;
+		this.fieldClosed = onClose;
 		const stack = (this.stack ??= this.stackUnder(this.copy));
 		return (this.stackRow ??= el(stack, "div", "tc-quick-row"));
 	}
@@ -221,14 +260,15 @@ export class TaskMenu {
 			wontdo: this.pick(() => actions.setStatus("cancelled")),
 		};
 		const edits: Record<EditRowId, () => void> = {
-			rename: this.pick(() => actions.rename()),
+			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
 			due: () => this.showDue(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
 		tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		menuGroup(this.panel, editRows(item).map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
+		const rows = editRows(item).filter((row) => !(this.inStack && row.id === "subtask"));
+		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
 		menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: this.pick(() => actions.remove()) }, "tc-menu-row is-tall is-apart");
 		this.place();
 	}
@@ -267,7 +307,8 @@ export class TaskMenu {
 		this.place();
 	}
 
-	close(): void {
-		if (this.overlay.close()) this.stackClosed?.();
+	/** `how`: Escape, or anything else that closed it. */
+	close(how: CloseHow = "away"): void {
+		if (this.overlay.close()) this.fieldClosed?.(how);
 	}
 }

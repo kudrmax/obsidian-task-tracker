@@ -203,6 +203,23 @@ describe("a field on the timeline", () => {
 	});
 });
 
+describe("a renamed task in progress on the timeline", () => {
+	const task = (status: TaskItem["status"]): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "T0" }, text: "T0", status, dueDate: null, slot: { date: "2026-10-30", start: 900, end: 960 }, priority: null, subtasks: [], progress: null, parentText: null, group: null });
+
+	it("keeps its strip at the field's left, and a task not in progress has none", () => {
+		const doing = task("inProgress");
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [doing]);
+		const field = document.createElement("textarea");
+		view.showRename(doing, field);
+		const box = view.itemsEl.querySelector<HTMLElement>(".tc-quick-row")!;
+		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		view.showRename(doing, field);
+		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		view.showRename(task("todo"), field);
+		expect(box.querySelector(".tc-strip")).toBeNull();
+	});
+});
+
 describe("tasks the now line has passed", () => {
 	const hourPx = 56;
 	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, priority: null, subtasks: [], progress: null, parentText: null, group: null });

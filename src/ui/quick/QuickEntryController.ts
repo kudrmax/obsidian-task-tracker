@@ -6,6 +6,7 @@ import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, PlacedResult } from "../drag/DropTarget";
 import { gapOf, type PlaceResult, type PlacedCard, sameTask } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
+import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
 import type { ListEntryInput, TaskList } from "../TaskList";
 import type { Timeline } from "../Timeline";
@@ -49,11 +50,14 @@ export interface QuickEntryControllerDeps {
 	onError(error: unknown): void;
 }
 
-/** A field in a calendar menu's stack of subtasks: the menu, the field's row, the task the subtasks are of. */
-interface MenuStack {
+/**
+ * A field in a calendar menu: last in its stack, a new subtask of `parent`; or in place of a card of the stack, which it
+ * renames (no parent).
+ */
+interface MenuField {
 	readonly menu: TaskMenu;
 	readonly row: HTMLElement;
-	readonly parent: TaskItem;
+	readonly parent: TaskItem | null;
 }
 
 /** What closes the field when tapped: anything but the field, the bar with its panels, and the plus. */
@@ -109,7 +113,7 @@ export class QuickEntryController {
 	private droppedOn: ListColumn | null = null;
 	/** The bar's place is turning the wheel to the column the field has just moved to. */
 	private turning = false;
-	private stack: MenuStack | null = null;
+	private stack: MenuField | null = null;
 	/** The field opened as a press ended: the click that press still sends is not a tap elsewhere. */
 	private pressEnding = false;
 	private readonly pressed = () => (this.pressEnding = false);
@@ -179,15 +183,17 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The card becomes the field, with its text: in a list the field stands right before the card, which hides; a task only
-	 * on the calendar is renamed in its card on the timeline, where it keeps its place.
+	 * The card becomes the field, with its text: in a list the field stands right before the card, which hides; a subtask
+	 * tapped in a calendar menu's stack is renamed in its card there, the menu kept open for it; a task only on the
+	 * calendar is renamed in its card on the timeline, where it keeps its place. Any other menu closes.
 	 */
-	rename(item: TaskItem): void {
+	rename(item: TaskItem, menu?: TaskMenu): void {
 		const found = this.find(item.key);
-		if (!found) {
-			if (item.slot) this.open({ kind: "slot", slot: item.slot }, item);
-			return;
-		}
+		const inMenu = !found && !!menu?.inStack;
+		if (!inMenu) menu?.close();
+		if (menu && inMenu) this.renameInMenu(item, menu);
+		else if (!found && item.slot) this.open({ kind: "slot", slot: item.slot }, item);
+		if (!found) return;
 		const card = this.cards(found.column)[found.index];
 		this.open({ kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } }, item);
 	}
@@ -243,17 +249,23 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The list or the timeline scrolls the field into sight, at least 16 px over the bar: after a redraw, and as the
-	 * keyboard shrinks the view, which the bar over a menu follows.
+	 * The list or the timeline scrolls the field into sight, at least 16 px over the bar, and a menu raises the parts over
+	 * its blur as far as that needs: after a redraw, and as the keyboard shrinks the view, which the bar over a menu follows.
 	 */
 	reveal(): void {
 		const field = this.field?.el;
 		const state = this.state;
-		const scroller = state && this.scrollerOf(state.spot);
 		if (state) this.liftBar(state);
-		if (!field?.isConnected || !scroller) return;
+		if (!field?.isConnected || !state) return;
 		const rect = field.getBoundingClientRect();
 		const limit = this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
+		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
+		if (menu) {
+			menu.raise(menu.raised + rect.bottom - limit);
+			return;
+		}
+		const scroller = this.scrollerOf(state.spot);
+		if (!scroller) return;
 		const top = scroller.getBoundingClientRect().top;
 		if (rect.bottom > limit) scroller.scrollTop += rect.bottom - limit;
 		else if (rect.top < top) scroller.scrollTop -= top - rect.top;
@@ -332,21 +344,28 @@ export class QuickEntryController {
 
 	/** The menu stays over the screen, its panel gone, and the field stands last in its stack of subtasks. */
 	private openStack(parent: TaskItem, menu: TaskMenu): void {
-		const row = menu.openStack(() => this.menuClosed(menu));
-		this.stack = { menu, row, parent };
+		this.stack = { menu, row: menu.openStack((how) => this.menuClosed(menu, how)), parent };
 		this.open({ kind: "stack", parent: parent.key });
 	}
 
-	/** The menu closed by itself, by a tap on its blur or Escape: the field closes as by a tap elsewhere. */
-	private menuClosed(menu: TaskMenu): void {
+	/** The card of the stack becomes the field, in a calendar menu kept open; the spot is the menu's, of the task itself, where nothing new is written. */
+	private renameInMenu(item: TaskItem, menu: TaskMenu): void {
+		this.stack = { menu, row: menu.openRename((how) => this.menuClosed(menu, how)), parent: null };
+		this.open({ kind: "stack", parent: item.key }, item);
+	}
+
+	/** The menu closed by itself: Escape drops the field's text, a tap on the blur keeps it as a tap elsewhere does. */
+	private menuClosed(menu: TaskMenu, how: CloseHow): void {
 		if (this.stack?.menu !== menu) return;
 		this.stack = null;
-		this.entry.blur();
+		if (how === "escape") this.entry.escape();
+		else this.entry.blur();
 	}
 
 	/**
-	 * The field off the lists: the timeline holds it in its slot or over the renamed card, the menu last in its stack under
-	 * the subtasks as the screen shows them now and the texts not yet written. Each lets it go once it stands elsewhere.
+	 * The field off the lists: the timeline holds it in its slot or over the renamed card; a menu last in its stack under
+	 * the subtasks as the screen shows them now and the texts not yet written, or in place of the card it renames. Each
+	 * lets it go once it stands elsewhere.
 	 */
 	private placeOffLists(state: EntryState | null): void {
 		const spot = state?.spot;
@@ -358,7 +377,7 @@ export class QuickEntryController {
 		} else timeline?.clearField();
 		const stack = this.stack;
 		if (spot?.kind === "stack" && state && stack) {
-			stack.menu.showStack((this.deps.task(spot.parent) ?? stack.parent).subtasks, state.pending.map((line) => line.text));
+			if (stack.parent) stack.menu.showStack((this.deps.task(spot.parent) ?? stack.parent).subtasks, state.pending.map((line) => line.text));
 			const field = this.offListField();
 			if (field.parentElement !== stack.row) stack.row.appendChild(field);
 		} else if (stack) {

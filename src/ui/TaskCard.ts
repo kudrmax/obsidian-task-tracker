@@ -16,9 +16,16 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 	return card;
 }
 
+/** The strip of a task in progress at `parent`'s left, once; none for a task not in progress. */
+export function showStrip(parent: HTMLElement, item: TaskItem): void {
+	const strip = parent.querySelector(":scope > .tc-strip");
+	if (item.status !== "inProgress") strip?.remove();
+	else if (!strip) el(parent, "span", "tc-strip");
+}
+
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
 	markPriority(card, item.priority);
-	if (item.status === "inProgress") el(card, "span", "tc-strip");
+	showStrip(card, item);
 	el(card, "div", "tc-card-title", item.text);
 	renderProgress(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {
