@@ -204,6 +204,30 @@ describe("QuickEntryController", () => {
 			expect(plus.classList.contains("is-hidden")).toBe(false);
 		});
 
+		it("tapped by a finger, stays open through the mouse events and the click the touch still sends to what was under the plus", async () => {
+			const { root, plus, field, timeline, created, type } = setUp({ items });
+			const touch = (type: string) => new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: "touch", isPrimary: true, button: 0 });
+			plus.dispatchEvent(touch("pointerdown"));
+			plus.dispatchEvent(touch("pointerup"));
+			expect(field()).not.toBeNull();
+			const under = timeline.el;
+			const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true, detail: 1 });
+			under.dispatchEvent(mousedown);
+			expect(mousedown.defaultPrevented).toBe(true);
+			under.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, detail: 1 }));
+			under.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+			expect(field()).not.toBeNull();
+			expect(root.classList.contains("is-entering")).toBe(true);
+			type("Call");
+			under.dispatchEvent(touch("pointerdown"));
+			const next = new MouseEvent("mousedown", { bubbles: true, cancelable: true, detail: 1 });
+			under.dispatchEvent(next);
+			expect(next.defaultPrevented).toBe(false);
+			under.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+			expect(field()).toBeNull();
+			await vi.waitFor(() => expect(created.map((c) => c.text)).toEqual(["Call"]));
+		});
+
 		it("hides while a card is carried", () => {
 			const { controller, plus } = setUp();
 			controller.onDragging(true);
@@ -390,6 +414,56 @@ describe("QuickEntryController", () => {
 		height = 71;
 		type("A text long enough to wrap onto three lines");
 		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
+	});
+
+	describe("a list the finger scrolled away from the field", () => {
+		/** The field at the end of Inbox, its top `fieldTop` px down the list's content, the view 500 px tall. */
+		function scrolledAway(fieldTop = 600) {
+			const set = setUp();
+			set.controller.openAtEnd("inbox");
+			set.root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
+			const list = set.lists.inbox.el;
+			list.getBoundingClientRect = () => new DOMRect(0, 0, 175, 500);
+			list.scrollTop = 0;
+			set.field()!.getBoundingClientRect = () => new DOMRect(10, fieldTop - list.scrollTop, 175, 35);
+			set.render();
+			const followed = list.scrollTop;
+			list.scrollTop = 20;
+			list.dispatchEvent(new Event("scroll"));
+			return { ...set, list, followed };
+		}
+
+		it("is followed to the field when it opens", () => {
+			expect(scrolledAway().followed).toBe(600 + 35 - (500 - 44 - 16));
+		});
+
+		it("stays where the finger left it on a redraw", () => {
+			const { render, list } = scrolledAway();
+			render();
+			expect(list.scrollTop).toBe(20);
+		});
+
+		it("stays where the finger left it as the view resizes, the keyboard coming or going", () => {
+			const { controller, list } = scrolledAway();
+			controller.reveal();
+			expect(list.scrollTop).toBe(20);
+		});
+
+		it("goes back to the field once the text changes", () => {
+			const { type, list, followed } = scrolledAway();
+			type("Call");
+			expect(list.scrollTop).toBe(followed);
+		});
+
+		it("goes back to the field once Enter moves it", async () => {
+			const { press, type, list, field } = scrolledAway();
+			type("Call");
+			list.scrollTop = 20;
+			list.dispatchEvent(new Event("scroll"));
+			field()!.getBoundingClientRect = () => new DOMRect(10, 640 - list.scrollTop, 175, 35);
+			press("Enter");
+			await vi.waitFor(() => expect(list.scrollTop).toBe(640 + 35 - (500 - 44 - 16)));
+		});
 	});
 
 	describe("settling before the screen shows another day or column", () => {

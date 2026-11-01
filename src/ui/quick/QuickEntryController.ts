@@ -120,9 +120,25 @@ export class QuickEntryController {
 	/** The bar's place is turning the wheel to the column the field has just moved to. */
 	private turning = false;
 	private stack: MenuField | null = null;
-	/** The field opened as a press ended: the click that press still sends is not a tap elsewhere. */
+	/**
+	 * The field opened as a press ended: the click that press still sends is not a tap elsewhere, nor are the mouse events
+	 * a finger's tap sends after it, which land on what stood under the plus and would take the focus from the field.
+	 */
 	private pressEnding = false;
 	private readonly pressed = () => (this.pressEnding = false);
+	private readonly mousePressed = (e: MouseEvent) => {
+		if (this.pressEnding && this.state) e.preventDefault();
+	};
+	/** The field opened, moved or changed: its list follows it into sight until the finger scrolls the list away. */
+	private follow = false;
+	/** Where the last reveal left each scroller: a scroll to anywhere else is the finger's. */
+	private readonly revealedAt = new WeakMap<Element, number>();
+	private readonly scrolled = (e: Event) => {
+		const scroller = this.state ? this.scrollerOf(this.state.spot) : null;
+		if (!scroller || e.target !== scroller) return;
+		const at = this.revealedAt.get(scroller);
+		if (at === undefined || Math.abs(scroller.scrollTop - at) >= 1) this.follow = false;
+	};
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
 		this.entry.blur();
@@ -140,7 +156,7 @@ export class QuickEntryController {
 			onChange: (state) => this.changed(state),
 			onError: (error) => deps.onError(error),
 		});
-		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPlus(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
+		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
 			levels: () => deps.levels(),
@@ -151,6 +167,8 @@ export class QuickEntryController {
 		});
 		document.addEventListener("click", this.tapAway, true);
 		document.addEventListener("pointerdown", this.pressed, true);
+		document.addEventListener("mousedown", this.mousePressed, true);
+		deps.root.addEventListener("scroll", this.scrolled, true);
 	}
 
 	/** New task, or a double click on a list's free room: the field at the end of the column. */
@@ -161,6 +179,12 @@ export class QuickEntryController {
 	/** The end of the day column while it shows, of Inbox when the window shows Inbox and Soon. */
 	openFromPlus(): void {
 		this.openAtEnd(this.deps.mode() === "inbox" ? "inbox" : "left");
+	}
+
+	/** The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere. */
+	private openFromPress(): void {
+		this.pressEnding = true;
+		this.openFromPlus();
 	}
 
 	/** The plus taken: carried as a task is, and let go on a list, the field opens where the drop showed. */
@@ -261,32 +285,22 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The list or the timeline scrolls the field into sight, at least 16 px over the bar, and a menu raises the parts over
-	 * its blur as far as that needs: after a redraw, and as the keyboard shrinks the view, which the bar over a menu follows.
+	 * After a redraw, and as the keyboard shrinks the view, which the bar over a menu follows: while the field is followed,
+	 * the list or the timeline scrolls it into sight, at least 16 px over the bar, and a menu raises the parts over its blur
+	 * as far as that needs. A list the finger scrolled away stays where it was left.
 	 */
 	reveal(): void {
-		const field = this.field?.el;
 		const state = this.state;
 		if (state) this.liftBar(state);
-		if (!field?.isConnected || !state) return;
-		const rect = field.getBoundingClientRect();
-		const limit = this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
-		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
-		if (menu) {
-			menu.raise(menu.raised + rect.bottom - limit);
-			return;
-		}
-		const scroller = this.scrollerOf(state.spot);
-		if (!scroller) return;
-		const top = scroller.getBoundingClientRect().top;
-		if (rect.bottom > limit) scroller.scrollTop += rect.bottom - limit;
-		else if (rect.top < top) scroller.scrollTop -= top - rect.top;
+		if (state && this.follow) this.bringIntoSight(state);
 	}
 
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
 	close(): void {
 		document.removeEventListener("click", this.tapAway, true);
 		document.removeEventListener("pointerdown", this.pressed, true);
+		document.removeEventListener("mousedown", this.mousePressed, true);
+		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.entry.blur();
 		this.bar.hide();
 	}
@@ -410,6 +424,26 @@ export class QuickEntryController {
 		return null;
 	}
 
+	/** The list or the timeline scrolls the field into sight, at least 16 px over the bar; a menu raises the parts over its blur. */
+	private bringIntoSight(state: EntryState): void {
+		const field = this.field?.el;
+		if (!field?.isConnected) return;
+		const rect = field.getBoundingClientRect();
+		const limit = this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
+		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
+		if (menu) {
+			menu.raise(menu.raised + rect.bottom - limit);
+			return;
+		}
+		const scroller = this.scrollerOf(state.spot);
+		if (!scroller) return;
+		const top = scroller.getBoundingClientRect().top;
+		const by = rect.bottom > limit ? rect.bottom - limit : rect.top < top ? rect.top - top : 0;
+		this.revealedAt.set(scroller, scroller.scrollTop + by);
+		if (by !== 0) scroller.scrollTop += by;
+		this.revealedAt.set(scroller, scroller.scrollTop);
+	}
+
 	/** Over a menu's blur the bar stands above it, at the bottom of the view. */
 	private liftBar(state: EntryState): void {
 		this.bar.lift(state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null);
@@ -428,7 +462,9 @@ export class QuickEntryController {
 			this.bar.hide();
 			this.placeOffLists(null);
 		}
-		if (!state || movesRows(before, state)) this.deps.render();
+		const moves = !state || movesRows(before, state);
+		if (state && moves) this.follow = true;
+		if (moves) this.deps.render();
 		else this.sync(state);
 	}
 
@@ -521,6 +557,7 @@ export class QuickEntryController {
 			titleField: this.deps.titleField,
 			onInput: (text) => {
 				this.entry.type(text);
+				this.follow = true;
 				this.reveal();
 			},
 			onPriority: () => this.state && this.sync(this.state),
