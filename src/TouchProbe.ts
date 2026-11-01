@@ -91,8 +91,5 @@ function metrics(list: HTMLElement): string {
 		const s = getComputedStyle(el);
 		chain.push(`${el.className.toString().split(" ")[0] || el.tagName} h=${el.clientHeight}/${el.scrollHeight} oy=${s.overflowY} ta=${s.touchAction} pe=${s.pointerEvents} pos=${s.position}`);
 	}
-	const view = list.closest(".tc-view") as HTMLElement | null;
-	const nav = document.querySelector(".mobile-navbar")?.getBoundingClientRect();
-	chain.push(`nav-clear=${view ? getComputedStyle(view).getPropertyValue("--tc-nav-clear") : "?"} navbar top=${nav ? Math.round(nav.top) : "none"} h=${nav ? Math.round(nav.height) : 0} window=${window.innerHeight}`);
 	return chain.join("\n    ");
 }
