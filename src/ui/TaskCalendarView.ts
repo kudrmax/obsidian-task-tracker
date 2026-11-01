@@ -22,7 +22,10 @@ import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
-import { type EditorOwner, MarkdownTitleField } from "./sheet/MarkdownTitleField";
+import type { EditorOwner } from "./markdown/EmbeddedEditor";
+import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
+import { DescriptionSheet } from "./sheet/DescriptionSheet";
+import { MarkdownTitleField } from "./sheet/MarkdownTitleField";
 import type { TitleFieldFactory } from "./sheet/TitleField";
 import type { TaskLink } from "./TaskTitle";
 import { TaskSheet } from "./sheet/TaskSheet";
@@ -607,6 +610,20 @@ export class TaskCalendarView extends ItemView {
 	/** The task's title is typed in Obsidian's own editor; its links are made from the tasks file. */
 	private readonly titleField: TitleFieldFactory = (parent, text, events) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, text, events);
 
+	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
+	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
+
+	/** A task's description on its own screen: to read, or straight in the editor. */
+	private descriptionSheet(item: TaskItem, editing: boolean): void {
+		DescriptionSheet.open(this.contentEl, {
+			title: item.text,
+			markdown: item.description,
+			editing,
+			surface: this.markdown,
+			onSave: (markdown) => this.act(() => this.deps.tasks.setDescription(item.key, markdown)),
+		});
+	}
+
 	/** The task screen for a new subtask of `parent`: the parent's placement chosen, its title over the new one. */
 	private subtaskSheet(parent: TaskItem): void {
 		TaskSheet.open(this.contentEl, {
@@ -644,6 +661,7 @@ export class TaskCalendarView extends ItemView {
 			lifted,
 			opening,
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
+			markdown: this.markdown,
 			today: this.today(),
 			day: this.selectedDate,
 			levels: usableLevels(this.settings.priorities),
@@ -652,6 +670,7 @@ export class TaskCalendarView extends ItemView {
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: () => this.editSheet(item),
+				openDescription: (editing) => this.descriptionSheet(item, editing),
 				addSubtask: () => this.subtaskSheet(item),
 				remove: () => this.act(() => tasks.remove(item.key)),
 				openLink: (link) => this.openLink(link),

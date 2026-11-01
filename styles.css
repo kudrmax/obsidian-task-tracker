@@ -262,6 +262,15 @@ body {
 	/* Sizes: the task screen */
 	--tc-sheet-bar: 44px;
 	--tc-sheet-side: 20px;
+	/* A description's own screen: the title over the text; the text is Obsidian's, in its font, size, spacing and ink. */
+	--tc-font-desc-title: 22px;
+	--tc-leading-desc-title: 28px;
+	--tc-desc-title-gap: 12px;
+	--tc-desc-top: 8px;
+	--tc-font-desc: var(--font-text);
+	--tc-desc-size: var(--font-text-size);
+	--tc-desc-leading: var(--line-height-normal);
+	--tc-desc-ink: var(--text-normal);
 	--tc-sheet-gap: 20px;
 	--tc-tile-h: 78px;
 	--tc-radius-tile: 18px;
@@ -808,6 +817,11 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The task screen over the whole view: the bar with Cancel and Add, the title to type, the tiles, the calendar. */
+.tc-desc-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: 0; padding-top: var(--tc-desc-top); overflow-y: auto; display: flex; flex-direction: column; gap: var(--tc-desc-title-gap); }
+.tc-desc-title { flex-shrink: 0; font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+.tc-desc-text { font-family: var(--tc-font-desc); font-size: var(--tc-desc-size); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.tc-desc-sheet .tc-desc-text { flex: 1; min-height: 0; }
+.tc-desc-text.is-editing .markdown-source-view.mod-cm6, .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-scroller, .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-sizer, .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-contentContainer { padding: 0; margin: 0; max-width: none; height: 100%; }
 .tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
 .tc-sheet.is-shown { opacity: 1; transform: none; }
 .tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }

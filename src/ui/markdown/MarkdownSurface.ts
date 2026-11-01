@@ -12,6 +12,6 @@ export interface MarkdownEditing {
 export interface MarkdownSurface {
 	/** Draws the Markdown into `el`; links in it open as in a note. */
 	render(el: HTMLElement, markdown: string): Promise<void>;
-	/** Puts an editor holding `markdown` into `el`, its caret at the end. */
-	edit(el: HTMLElement, markdown: string): MarkdownEditing;
+	/** Puts an editor holding `markdown` into `el`; Escape in it, unless a note search is open there, calls `onEscape`. */
+	edit(el: HTMLElement, markdown: string, onEscape: () => void): MarkdownEditing;
 }
