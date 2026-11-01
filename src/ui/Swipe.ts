@@ -19,15 +19,26 @@ interface Press {
 	swiping: boolean;
 }
 
+/** A trackpad's stroke, its glide after the fingers lift included: it steps once. */
+interface Stroke {
+	travel: number;
+	stepped: boolean;
+	timer: number;
+}
+
 const SWIPE = "swipe";
+/** A stroke ends once the trackpad has sent nothing for this long. */
+const STROKE_SETTLE_MS = 150;
 
 /**
  * A finger drawn sideways across the screen steps to the next screen, to the left, or back, to the right; up or down it is
  * a scroll and stays one. It holds the screen once it goes sideways, so a press that set off as a swipe is not also
- * lifted, scrolled or pulled, and it steps when let go far enough along, or quickly.
+ * lifted, scrolled or pulled, and it steps when let go far enough along, or quickly. Two fingers drawn sideways on a
+ * trackpad step the same way, once a stroke; a pinch (ctrl or cmd with the wheel) is the zoom's.
  */
 export class Swipe {
 	private press: Press | null = null;
+	private stroke: Stroke | null = null;
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -37,6 +48,21 @@ export class Swipe {
 		el.addEventListener("pointermove", (e) => this.move(e));
 		el.addEventListener("pointerup", (e) => this.up(e, true));
 		el.addEventListener("pointercancel", (e) => this.up(e, false));
+		el.addEventListener("wheel", (e) => this.wheel(e), { passive: false });
+	}
+
+	private wheel(e: WheelEvent): void {
+		if (e.ctrlKey || e.metaKey || this.opts.arbiter.busy || !this.opts.accepts(e.target)) return;
+		const stroke = (this.stroke ??= { travel: 0, stepped: false, timer: 0 });
+		window.clearTimeout(stroke.timer);
+		stroke.timer = window.setTimeout(() => (this.stroke = null), STROKE_SETTLE_MS);
+		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+		e.preventDefault();
+		if (stroke.stepped) return;
+		stroke.travel += e.deltaX;
+		if (Math.abs(stroke.travel) < LAYOUT.swipeWheelDistance) return;
+		stroke.stepped = true;
+		this.opts.onSwipe(stroke.travel > 0 ? 1 : -1);
 	}
 
 	private down(e: PointerEvent): void {

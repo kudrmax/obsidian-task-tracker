@@ -136,6 +136,8 @@ export const LAYOUT = {
 	swipeDistance: 48,
 	/** So does a shorter flick still this fast when let go, px per ms. */
 	swipeFlickSpeed: 0.3,
+	/** Two fingers drawn sideways this far on a trackpad step to the next screen. */
+	swipeWheelDistance: 60,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */
