@@ -191,6 +191,17 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
 	});
+
+	it("ends a list where its column's foot begins: the list takes the room left, its rows never shrink, and it pads nothing", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(of(".tc-left, .tc-soon, .tc-inbox")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
+		const list = of(".tc-list");
+		expect([list.get("flex"), list.get("min-height")]).toEqual(["1 1 0", "0"]);
+		expect([...list.keys()].filter((property) => property.startsWith("padding"))).toEqual([]);
+		expect(of(".tc-list > *").get("flex-shrink")).toBe("0");
+		expect(of(".tc-new").get("flex-shrink")).toBe("0");
+		expect(sheet.tokens.get("--tc-nav-room")).toBe("max(0px, var(--view-bottom-spacing, 0px))");
+	});
 });
 
 describe("the code keeps to the design system", () => {

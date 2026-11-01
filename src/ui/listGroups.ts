@@ -1,4 +1,5 @@
 import type { GroupName, TaskItem, TaskKey } from "../application/contracts";
+import { sameTask } from "./drag/listPlace";
 
 /** The cards of one section of a list, in file order. */
 export interface ListGroup {
@@ -45,7 +46,7 @@ export function listGaps(groups: readonly ListGroup[], headers: boolean, dragged
 	for (const group of groups) {
 		if (headers) at++;
 		for (const item of group.items) {
-			if (!sameKey(item.key, dragged)) gaps.push({ place: { group: group.name, before: item.key }, at });
+			if (!dragged || !sameTask(item.key, dragged)) gaps.push({ place: { group: group.name, before: item.key }, at });
 			at++;
 		}
 		gaps.push({ place: { group: group.name, before: null }, at });
@@ -55,8 +56,4 @@ export function listGaps(groups: readonly ListGroup[], headers: boolean, dragged
 
 export function gapPlace(groups: readonly ListGroup[], headers: boolean, gap: number): GapPlace {
 	return listGaps(groups, headers)[gap].place;
-}
-
-function sameKey(a: TaskKey, b: TaskKey | undefined): boolean {
-	return b !== undefined && a.section === b.section && a.index === b.index;
 }

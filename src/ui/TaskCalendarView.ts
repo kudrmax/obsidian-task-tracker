@@ -1,5 +1,5 @@
 import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, DayBoundary, type GroupedList, type Placement, StaleTaskError, type TaskItem, type TaskService } from "../application/contracts";
+import { type CalendarService, DayBoundary, type GroupedList, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -11,7 +11,8 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController, type NameGroup } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import type { ColumnSections, DragPayload, DropTarget, ListColumn, PlacedResult } from "./drag/DropTarget";
+import { sameTask } from "./drag/listPlace";
+import type { ColumnSections, DropTarget, ListColumn, PlacedResult, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupZones } from "./drag/GroupZones";
 import { GroupMenu } from "./menu/GroupMenu";
@@ -24,14 +25,14 @@ import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
+import { MarkdownTitleField } from "./quick/MarkdownTitleField";
+import { QuickEntryController } from "./quick/QuickEntryController";
 import { DescriptionSheet } from "./sheet/DescriptionSheet";
-import { MarkdownTitleField } from "./sheet/MarkdownTitleField";
-import type { TitleFieldFactory } from "./sheet/TitleField";
 import type { TaskLink } from "./TaskTitle";
-import { TaskSheet } from "./sheet/TaskSheet";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
+import { dayColumn } from "./dayColumn";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -40,16 +41,27 @@ import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
-import { Swipe } from "./Swipe";
+import { Swipe, swipeStartsAt } from "./Swipe";
+import { ChromeClearance } from "./chrome";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
-import type { LocalDate, Slot } from "./types";
+import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
+
+/** The task with `key` among `items` and their subtasks. */
+function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
+	for (const item of items) {
+		if (sameTask(item.key, key)) return item;
+		const inner = findTask(item.subtasks, key);
+		if (inner) return inner;
+	}
+	return null;
+}
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -82,9 +94,11 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private readonly data: DayData;
+	/** Obsidian's desktop status bar over the view's bottom right corner. */
+	private readonly clearance = new ChromeClearance(this.contentEl);
 	private readonly polling: CalendarPolling;
 	private renderPending = false;
-	/** The task screen's title while it has the focus: Obsidian's commands and hotkeys go to it. */
+	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	private dayStartHour: number;
@@ -108,6 +122,8 @@ export class TaskCalendarView extends ItemView {
 	/** A card dropped on New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
 	private switching = 0;
+	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
+	private quick: QuickEntryController | null = null;
 	private readonly unsubscribe: (() => void)[] = [];
 
 	constructor(
@@ -142,6 +158,7 @@ export class TaskCalendarView extends ItemView {
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
+				this.quick?.onDragging(active);
 				if (active) {
 					this.postponeZones?.show();
 					for (const zones of this.groupZones) zones.show();
@@ -154,7 +171,7 @@ export class TaskCalendarView extends ItemView {
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			newSlot: () => this.timelineDrop,
-			onNewSlot: (slot) => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, slot),
+			onNewSlot: (slot) => this.quick?.openSlot(slot),
 		});
 	}
 
@@ -182,8 +199,8 @@ export class TaskCalendarView extends ItemView {
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
 			title: () => dayTitle(this.selectedDate, this.today()),
-			onStep: (days) => this.select(addDays(this.selectedDate, days)),
-			onToday: () => this.select(this.today()),
+			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
+			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
 			soonName: () => this.settings.sections.soon,
 		});
@@ -193,9 +210,11 @@ export class TaskCalendarView extends ItemView {
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("left") !== null,
 			pending: () => this.namingIn("left"),
+			entry: () => this.quick?.entryIn("left") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "left", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
 		this.inboxEl = el(root, "div", "tc-inbox");
@@ -204,20 +223,24 @@ export class TaskCalendarView extends ItemView {
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
 			pending: () => this.namingIn("inbox"),
+			entry: () => this.quick?.entryIn("inbox") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "inbox", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => this.sectionsOf("inbox"));
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon" || drag.from === "new", () => this.sectionsOf("inbox"));
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
 			pending: () => this.namingIn("soon"),
+			entry: () => this.quick?.entryIn("soon") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "soon", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -267,9 +290,9 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
 		});
-		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
-		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
-		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
+		this.newTask = new NewTaskButton(this.leftEl, "now", () => this.quick?.openAtEnd("left"));
+		this.newSoon = new NewTaskButton(this.soonEl, "soon", () => this.quick?.openAtEnd("soon"));
+		this.newInbox = new NewTaskButton(this.inboxEl, "inbox", () => this.quick?.openAtEnd("inbox"));
 		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
 		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
 		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
@@ -282,17 +305,44 @@ export class TaskCalendarView extends ItemView {
 		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.settings.rightMode,
-			onChange: (mode) => void this.setMode(mode),
+			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
 		});
 		this.switcher = switcher;
+		this.quick = new QuickEntryController({
+			root,
+			tasks: this.deps.tasks,
+			arbiter: this.arbiter,
+			drag: this.drag,
+			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
+			list: (column) => this.listOf(column),
+			timeline: () => this.timeline,
+			task: (key) => findTask(this.data.day?.slotted ?? [], key),
+			newTasks: () => [this.newTask, this.newSoon, this.newInbox].filter((button) => button !== null),
+			dropTargets: () => {
+				const shown = this.shownDrops();
+				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
+			},
+			levels: () => this.settings.priorities,
+			today: () => this.today(),
+			day: () => this.selectedDate,
+			mode: () => this.settings.rightMode,
+			turnTo: (mode) => this.switcher?.show(mode),
+			showDay: (date) => {
+				this.select(date);
+				return this.data.tasks();
+			},
+			fresh: () => this.data.tasks(),
+			render: () => this.render(),
+			onError: (error) => this.reportFailure(error),
+		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
-			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet")),
-			onSwipe: (shift) => this.step(shift),
+			accepts: swipeStartsAt,
+			onSwipe: (shift) => void this.afterEntry(() => this.step(shift)),
 		});
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
@@ -312,7 +362,7 @@ export class TaskCalendarView extends ItemView {
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
-		requestAnimationFrame(() => this.measureNavigation());
+		requestAnimationFrame(() => this.clearance.measure());
 		this.polling.start();
 		await this.data.load();
 	}
@@ -324,13 +374,15 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onClose(): Promise<void> {
+		this.quick?.close();
 		this.polling.stop();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
 
 	override onResize(): void {
-		this.measureNavigation();
+		this.clearance.measure();
 		this.fitListWidth();
+		this.quick?.reveal();
 	}
 
 	private get settings() {
@@ -355,7 +407,7 @@ export class TaskCalendarView extends ItemView {
 		if (this.settings.dayStartHour === this.dayStartHour) return;
 		this.dayStartHour = this.settings.dayStartHour;
 		this.scrolledFor = null;
-		this.select(this.today());
+		void this.afterEntry(() => this.select(this.today()));
 	}
 
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
@@ -369,12 +421,13 @@ export class TaskCalendarView extends ItemView {
 		if (width > 0) this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listShare, width)));
 	}
 
-	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
-	private measureNavigation(): void {
-		const nav = document.querySelector(".mobile-navbar");
-		const root = this.contentEl.getBoundingClientRect();
-		const clear = nav ? Math.max(0, root.bottom - nav.getBoundingClientRect().top) : 0;
-		this.contentEl.style.setProperty(PROPERTY.navClear, px(nav && nav.getBoundingClientRect().height > 0 ? clear : 0));
+	/**
+	 * Every switch of what the screen shows, another day or another pair of columns, waits for the entry to settle: the
+	 * text typed is written for the day and the place it was typed at, before the lists change under it.
+	 */
+	private async afterEntry(change: () => void | Promise<void>): Promise<void> {
+		await this.quick?.settle();
+		await change();
 	}
 
 	private select(date: LocalDate): void {
@@ -425,6 +478,12 @@ export class TaskCalendarView extends ItemView {
 			new Notice(error.message);
 		}
 		await this.data.tasks();
+	}
+
+	/** A write the screen did not wait for failed: said as any failed change is, and the lists show the file as it is. */
+	private reportFailure(error: unknown): void {
+		new Notice(error instanceof Error ? error.message : String(error));
+		void this.data.tasks();
 	}
 
 	/** The settings' levels at this screen's height, the whole day first; the settings' own before the timeline is laid out. */
@@ -479,17 +538,26 @@ export class TaskCalendarView extends ItemView {
 
 	/** The zones that put a task off, under the Today column, then the two columns the window shows. */
 	private dropTargets(): DropTarget[] {
-		const shown: Record<RightMode, (DropTarget | null)[]> = {
+		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...this.shownDrops()];
+	}
+
+	/** The two columns the window shows, as places to drop. */
+	private shownDrops(): (ListDrop | TimelineDrop)[] {
+		const shown: Record<RightMode, (ListDrop | TimelineDrop | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.soonDrop],
 		};
-		const columns = shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
-		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...columns];
+		return shown[this.settings.rightMode].filter((target) => target !== null);
+	}
+
+	/** A list's card: its gestures. */
+	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+		this.drag.attachCard(card, item, column, subtree);
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
-	private applyDrop(drag: DragPayload, result: PlacedResult): Promise<void> {
+	private applyDrop(drag: TaskDragPayload, result: PlacedResult): Promise<void> {
 		const key = drag.item.key;
 		const tasks = this.deps.tasks;
 		return this.act(() => {
@@ -564,9 +632,8 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
 		if (column !== "left") return { list: column, date: null };
-		const today = this.today();
-		if (this.selectedDate === today) return { list: "now", date: null };
-		return this.selectedDate > today ? { list: "soon", date: this.selectedDate } : null;
+		const { list, date, sections } = dayColumn(this.selectedDate, this.today());
+		return sections ? { list, date } : null;
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
@@ -593,23 +660,6 @@ export class TaskCalendarView extends ItemView {
 		return this.polling.refresh();
 	}
 
-	/** The task screen for a new task; with a slot, from a long tap on the timeline. */
-	newTaskSheet(placement: Placement, slot: Slot | null): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "new",
-			initial: { text: "", placement, priority: null },
-			slot,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			titleField: this.titleField,
-			onSubmit: (draft) => this.act(() => this.deps.tasks.create(draft, slot ?? undefined)),
-			onClose: () => this.timelineDrop?.clear(),
-		});
-	}
-
-	/** The task's title is typed in Obsidian's own editor; its links are made from the tasks file. */
-	private readonly titleField: TitleFieldFactory = (parent, text, events) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, text, events);
-
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
 	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
 
@@ -621,33 +671,6 @@ export class TaskCalendarView extends ItemView {
 			editing,
 			surface: this.markdown,
 			onSave: (markdown) => this.act(() => this.deps.tasks.setDescription(item.key, markdown)),
-		});
-	}
-
-	/** The task screen for a new subtask of `parent`: the parent's placement chosen, its title over the new one. */
-	private subtaskSheet(parent: TaskItem): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "new",
-			initial: { text: "", placement: this.deps.tasks.placementOf(parent), priority: null },
-			slot: null,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			titleField: this.titleField,
-			parent: parent.text,
-			onSubmit: (draft) => this.act(() => this.deps.tasks.createSubtask(parent.key, draft)),
-		});
-	}
-
-	private editSheet(item: TaskItem): void {
-		TaskSheet.open(this.contentEl, {
-			mode: "edit",
-			initial: { text: item.text, placement: this.deps.tasks.placementOf(item), priority: item.priority?.prefix ?? null },
-			slot: item.slot,
-			today: this.today(),
-			levels: usableLevels(this.settings.priorities),
-			titleField: this.titleField,
-			parent: item.parentText,
-			onSubmit: (draft) => this.act(() => this.deps.tasks.edit(item.key, draft)),
 		});
 	}
 
@@ -669,9 +692,9 @@ export class TaskCalendarView extends ItemView {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				rename: () => this.editSheet(item),
+				rename: (menu) => this.quick?.rename(item, menu),
 				openDescription: (editing) => this.descriptionSheet(item, editing),
-				addSubtask: () => this.subtaskSheet(item),
+				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
 				remove: () => this.act(() => tasks.remove(item.key)),
 				openLink: (link) => this.openLink(link),
 			},
@@ -714,6 +737,7 @@ export class TaskCalendarView extends ItemView {
 			if (this.selectedDate === this.today()) this.timeline.scrollTo(boundary.offsetOf(this.selectedDate, this.deps.clock.now()), LAYOUT.nowFraction);
 			else this.timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
 		}
+		this.quick?.rendered();
 	}
 
 	private renderMissing(root: HTMLElement): void {

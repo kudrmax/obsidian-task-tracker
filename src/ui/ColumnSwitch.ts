@@ -17,9 +17,10 @@ export interface ColumnSwitchOptions {
 	readonly arbiter: GestureArbiter;
 }
 
-type Column = "inbox" | "soon" | "now" | "calendar";
+/** The wheel's icons: the columns of the strip, the day column as Now. */
+export type SwitchColumn = "inbox" | "soon" | "now" | "calendar";
 
-const COLUMNS: readonly Column[] = ["inbox", "soon", "now", "calendar"];
+const COLUMNS: readonly SwitchColumn[] = ["inbox", "soon", "now", "calendar"];
 
 const DRAG = "switch";
 
@@ -29,6 +30,12 @@ const placeOf = (mode: RightMode): number => PLACES.indexOf(mode);
 function placeShowing(column: number, from: number): number | null {
 	if (column === from || column === from + 1) return null;
 	return column < from ? column : column - 1;
+}
+
+/** The place showing `column`: `mode` itself when it does, else the nearest that does, as a tap on its icon turns to. */
+export function modeShowing(column: SwitchColumn, mode: RightMode): RightMode {
+	const place = placeShowing(COLUMNS.indexOf(column), placeOf(mode));
+	return place === null ? mode : PLACES[place];
 }
 
 interface Press {
@@ -168,7 +175,7 @@ export class ColumnSwitch {
 			return;
 		}
 		const cell = target instanceof Element ? target.closest<HTMLElement>(".tc-seg-icon") : null;
-		const column = cell ? COLUMNS.indexOf(cell.dataset.column as Column) : -1;
+		const column = cell ? COLUMNS.indexOf(cell.dataset.column as SwitchColumn) : -1;
 		if (column < 0) return;
 		const place = placeShowing(column, placeOf(this.opts.value()));
 		if (place !== null) this.show(PLACES[place]);

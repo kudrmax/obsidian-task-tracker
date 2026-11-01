@@ -5,6 +5,7 @@ import {
 	createGroup,
 	createInList,
 	groupIndex,
+	createInPlace,
 	createInSoon,
 	moveBefore,
 	moveGroupTo,
@@ -69,6 +70,92 @@ describe("create", () => {
 
 	it("createAtTime on another day lands in Soon", () => {
 		expect(createAtTime(parse("## Now\n\n## Soon\n"), D, T, 1410, "New").serialize()).toBe("## Now\n\n## Soon\n- [ ] New ⏰ 2026-11-03 23:30\n");
+	});
+});
+
+describe("createInPlace", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const YESTERDAY = "2026-10-29";
+	const BASE = "## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n\n## Soon\n- [ ] S\n\n## Done\n";
+
+	it("list now, before a task, puts it right above that task, due today", () => {
+		const d = parseG(BASE);
+		const place = { kind: "list", list: "now", group: "Evening", before: d.tasks("now")[2], date: null } as const;
+		expect(createInPlace(d, "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] X 📅 2026-10-30\n- [ ] C\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("list now, before null, goes last in the group", () => {
+		const d = parseG(BASE);
+		const place = { kind: "list", list: "now", group: "Evening", before: null, date: null } as const;
+		expect(createInPlace(d, "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n- [ ] X 📅 2026-10-30\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("list now, no group, before null, goes to the end of the list", () => {
+		const d = parseG("## Now\n- [ ] A\n### Evening\n- [ ] B\n\n## Soon\n");
+		const place = { kind: "list", list: "now", group: null, before: null, date: null } as const;
+		expect(createInPlace(d, "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe("## Now\n- [ ] A\n- [ ] X 📅 2026-10-30\n### Evening\n- [ ] B\n\n## Soon\n");
+	});
+
+	it("list now with a task of another list as before goes to the end of the group", () => {
+		const d = parseG(BASE);
+		const place = { kind: "list", list: "now", group: "Evening", before: d.tasks("soon")[0], date: null } as const;
+		expect(createInPlace(d, "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n- [ ] X 📅 2026-10-30\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("list now on a past day's column is due that day", () => {
+		const place = { kind: "list", list: "now", group: null, before: null, date: YESTERDAY } as const;
+		expect(createInPlace(parseG(BASE), "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n- [ ] X 📅 2026-10-29\n### Evening\n- [ ] B\n- [ ] C\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("list soon on a later day's column is due that day; without a date it has none", () => {
+		const dated = { kind: "list", list: "soon", group: null, before: null, date: "2026-11-02" } as const;
+		expect(createInPlace(parseG(BASE), "X", null, dated, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n\n## Soon\n- [ ] S\n- [ ] X 📅 2026-11-02\n\n## Done\n",
+		);
+		const undated = { kind: "list", list: "soon", group: null, before: null, date: null } as const;
+		expect(createInPlace(parseG(BASE), "X", null, undated, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n\n## Soon\n- [ ] S\n- [ ] X\n\n## Done\n",
+		);
+	});
+
+	it("list inbox goes to the end of Inbox, without a due date or a slot", () => {
+		const place = { kind: "list", list: "inbox", group: null, before: null, date: D } as const;
+		expect(createInPlace(parseG(BASE), "X", null, place, T, DayBoundary.MIDNIGHT).serialize()).toBe(
+			"## Inbox\n- [ ] I\n- [ ] X\n\n## Now\n- [ ] A\n### Evening\n- [ ] B\n- [ ] C\n\n## Soon\n- [ ] S\n\n## Done\n",
+		);
+	});
+
+	it("a subtask goes before the given subtask or after the last one, without a due date", () => {
+		const d = parseG("## Now\n- [ ] P\n  - [ ] S1\n  - [ ] S2\n- [ ] Q\n");
+		const parent = d.tasks("now")[0];
+		const before = { kind: "subtask", parent, before: parent.subtasks[1] } as const;
+		expect(createInPlace(d, "X", null, before, T, DayBoundary.MIDNIGHT).serialize()).toBe("## Now\n- [ ] P\n  - [ ] S1\n  - [ ] X\n  - [ ] S2\n- [ ] Q\n");
+		const last = { kind: "subtask", parent, before: null } as const;
+		expect(createInPlace(d, "X", null, last, T, DayBoundary.MIDNIGHT).serialize()).toBe("## Now\n- [ ] P\n  - [ ] S1\n  - [ ] S2\n  - [ ] X\n- [ ] Q\n");
+	});
+
+	it("a slot gives the same result as createAtTime", () => {
+		const slot = { date: T, start: 990, end: null };
+		const place = { kind: "slot", slot } as const;
+		for (const boundary of [DayBoundary.MIDNIGHT, new DayBoundary(4)]) {
+			expect(createInPlace(parseG(BASE), "X", null, place, T, boundary).serialize()).toBe(createAtTime(parseG(BASE), T, T, 990, "X", boundary).serialize());
+		}
+	});
+
+	it("writes the priority before the text", () => {
+		const place = { kind: "list", list: "inbox", group: null, before: null, date: null } as const;
+		expect(createInPlace(parseG(BASE), "X", "p1", place, T, DayBoundary.MIDNIGHT).serialize()).toContain("- [ ] I\n- [ ] p1 X\n");
+		const slot = { kind: "slot", slot: { date: T, start: 600, end: null } } as const;
+		expect(createInPlace(parseG("## Now\n"), "X", "p2", slot, T, DayBoundary.MIDNIGHT).serialize()).toBe("## Now\n- [ ] p2 X ⏰ 2026-10-30 10:00\n");
 	});
 });
 

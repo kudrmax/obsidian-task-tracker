@@ -76,9 +76,10 @@ export class ListDrop implements DropTarget {
 		const prev = cards[this.place.index - 1];
 		const group = this.place.group;
 		const head = heads.find((h) => h.group === group);
+		const inGroup = (measured: Measured) => this.list.listCard(measured.entry).group === group;
 		const top =
-			at && at.entry.item.group === group ? at.rect.top
-			: prev && prev.entry.item.group === group ? prev.rect.bottom + card.gap
+			at && inGroup(at) ? at.rect.top
+			: prev && inGroup(prev) ? prev.rect.bottom + card.gap
 			: head ? head.top + head.height
 			: heads[0]?.top ?? prev?.rect.bottom ?? r.top;
 		return new DOMRect(left, top, right - left, card.height);
@@ -103,9 +104,9 @@ export class ListDrop implements DropTarget {
 		return { kind: "listBefore", before: result.before, column: this.column };
 	}
 
-	/** A list with sections places a card from anywhere; another only one from itself. */
+	/** A list with sections places a card from anywhere, and any list a new task; another only a card from itself. */
 	private placesAnywhere(drag: DragPayload): boolean {
-		return drag.from === this.column || this.sections() !== null;
+		return drag.from === "new" || drag.from === this.column || this.sections() !== null;
 	}
 
 	/**
@@ -139,7 +140,7 @@ export class ListDrop implements DropTarget {
 	}
 
 	private placed(): PlacedCard[] {
-		return (this.layout ?? this.measure()).cards.map(({ entry, rect }) => ({ key: entry.item.key, level: entry.level, top: rect.top, height: rect.height, group: entry.item.group }));
+		return (this.layout ?? this.measure()).cards.map(({ entry, rect }) => ({ ...this.list.listCard(entry), top: rect.top, height: rect.height }));
 	}
 
 	/** A header stands after the gap when its first card does, or the gap ends a section above it. */
@@ -153,9 +154,10 @@ export class ListDrop implements DropTarget {
 		const all = this.list.cards;
 		const at = all.findIndex((entry) => entry.card.classList.contains("is-lifted"));
 		const cards = (this.layout ?? this.measure()).cards;
-		if (at < 0) return { kind: "gap", index: cards.length, level: 0, group: cards[cards.length - 1]?.entry.item.group ?? null };
+		const last = cards[cards.length - 1];
+		if (at < 0) return { kind: "gap", index: cards.length, level: 0, group: last ? this.list.listCard(last.entry).group : null };
 		const before = all.slice(0, at).filter((entry) => !entry.card.classList.contains("is-lifted")).length;
-		return { kind: "gap", index: before, level: all[at].level, group: all[at].item.group };
+		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
 	}
 
 	private indent(): number {

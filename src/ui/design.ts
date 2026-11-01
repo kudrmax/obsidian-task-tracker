@@ -21,6 +21,8 @@ export const DESIGN = {
 	/** A block starts one pixel under its hour line and ends two pixels short of its length. */
 	itemInset: 1,
 	itemGap: 2,
+	/** The bar over the keyboard while a task is typed: the field stands above it. */
+	barHeight: 44,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -37,6 +39,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	nowPillHeight: "--tc-now-h",
 	itemInset: "--tc-item-inset",
 	itemGap: "--tc-item-gap",
+	barHeight: "--tc-bar-h",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -46,7 +49,7 @@ export const PROPERTY = {
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",
 	hour: "--tc-hour",
-	navClear: "--tc-nav-clear",
+	statusClear: "--tc-status-clear",
 	allDayExtraRows: "--tc-allday-extra-rows",
 	y: "--tc-y",
 	length: "--tc-len",
@@ -66,8 +69,6 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How far the timeline is pulled down from its top. */
 	pull: "--tc-pull",
-	/** The keyboard's height reserved under the task screen's content before the host shrinks the view for it. */
-	keyboard: "--tc-keyboard",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
@@ -107,6 +108,8 @@ export const LAYOUT = {
 	nowFraction: 0.5,
 	/** A finger may wander this far during a long press; farther is a scroll. */
 	pressTolerance: 8,
+	/** How far past its edge the plus's ring reaches for a card brought back to it. */
+	plusRingReach: 24,
 	/** On a computer a drag starts after the pointer moves this far. */
 	dragStartDistance: 4,
 	/** The divider holds to the middle of the window while dragged this close to it. */
@@ -141,6 +144,8 @@ export const LAYOUT = {
 	swipeFlickSpeed: 0.3,
 	/** Two fingers drawn sideways this far on a trackpad step to the next screen. */
 	swipeWheelDistance: 60,
+	/** The list scrolls a field typed in at least this far above the bar. */
+	fieldOverBar: 16,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */

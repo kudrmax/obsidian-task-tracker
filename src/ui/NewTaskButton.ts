@@ -1,9 +1,13 @@
 import { el } from "./dom";
 import { icon } from "./icons";
 
-/** The dashed button under a list; pressed, it opens the task screen. */
+/**
+ * The dashed button under a list; pressed, it runs the handler the view gives it. The container stays when the button is
+ * hidden: it hosts the drag zones that take the button's place while a card is carried.
+ */
 export class NewTaskButton {
 	readonly el: HTMLElement;
+	private readonly button: HTMLElement;
 
 	constructor(
 		parent: HTMLElement,
@@ -11,10 +15,14 @@ export class NewTaskButton {
 		private readonly onPress: () => void,
 	) {
 		this.el = el(parent, "div", column === "now" ? "tc-new" : `tc-new is-${column}`);
-		const button = el(this.el, "button", "tc-new-btn");
-		button.appendChild(icon("plus"));
-		button.appendChild(document.createTextNode("New task"));
-		button.addEventListener("click", onPress);
+		this.button = el(this.el, "button", "tc-new-btn");
+		this.button.appendChild(icon("plus"));
+		this.button.appendChild(document.createTextNode("New task"));
+		this.button.addEventListener("click", onPress);
+	}
+
+	set shown(value: boolean) {
+		this.button.classList.toggle("is-hidden", !value);
 	}
 
 	/**

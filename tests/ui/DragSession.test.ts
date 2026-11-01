@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float } from "../../src/ui/drag/DragSession";
+import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../src/ui/drag/DragSession";
 
 const item: TaskItem = { key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null };
 const payload: DragPayload = { item, from: "left", durationMin: null, grabPx: 20, grabX: 20 };
@@ -44,9 +44,9 @@ class FakeFloat implements Float {
 	}
 }
 
-function session(targets: DropTarget[], float: FakeFloat, ended: unknown[]) {
+function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload) {
 	return new DragSession({
-		payload,
+		payload: carried,
 		targets,
 		float,
 		origin: rect(5, 500),
@@ -112,5 +112,32 @@ describe("DragSession", () => {
 		await s.release(50, 10);
 		expect(float.log).toEqual(["move 50,10", "fly 5,500", "remove"]);
 		expect(ended).toEqual([null]);
+	});
+
+	describe("carrying a new task", () => {
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20, grabX: 20 };
+
+		it("hands the new task to the target under the pointer and reports where it landed", async () => {
+			const slot: DropResult = { kind: "slot", slot: { date: "2026-10-30", start: 990, end: null } };
+			const a = new FakeTarget("a", 0, 100, slot);
+			const float = new FakeFloat();
+			const ended: unknown[] = [];
+			const s = session([a], float, ended, fresh);
+			s.move(50, 10);
+			await s.release(50, 10);
+			expect(float.log).toEqual(["move 50,10", "fly 0,0", "remove"]);
+			expect(ended).toEqual([slot]);
+		});
+
+		it("cancelled new drag returns null", async () => {
+			const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
+			const float = new FakeFloat();
+			const ended: unknown[] = [];
+			const s = session([a], float, ended, fresh);
+			s.move(50, 10);
+			await s.cancel();
+			expect(float.log).toEqual(["move 50,10", "fly 5,500", "remove"]);
+			expect(ended).toEqual([null]);
+		});
 	});
 });

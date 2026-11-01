@@ -68,6 +68,11 @@ describe("gaps", () => {
 		expect(listGaps(listGroups([a]), false).map((g) => g.at)).toEqual([0, 1]);
 	});
 
+	it("a dragged subtask takes no gap from its task", () => {
+		const gaps = listGaps(listGroups([a, b]), true, { ...b.key, path: [0] });
+		expect(gaps.map((g) => g.place.before?.raw ?? null)).toContain(b.key.raw);
+	});
+
 	it("the dragged card is no gap, its section stays", () => {
 		const gaps = listGaps(listGroups([a, b]), true, b.key);
 		expect(gaps.map((g) => [g.place.group, g.place.before?.raw ?? null])).toEqual([

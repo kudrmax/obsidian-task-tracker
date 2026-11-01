@@ -1,9 +1,19 @@
-import type { TaskItem } from "../application/contracts";
+import type { GroupName, TaskItem, TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
-import { clear, el } from "./dom";
+import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
-import { renderTaskCard } from "./TaskCard";
+import { type GapPlace, type ListCard, sameTask } from "./drag/listPlace";
+import type { PendingText } from "./quick/QuickEntry";
+import { renderTaskCard, renderUnwrittenCard } from "./TaskCard";
+
+/** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
+export interface ListEntryInput {
+	readonly place: GapPlace;
+	readonly pending: readonly PendingText[];
+	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
+	field(parent: HTMLElement): HTMLElement;
+}
 
 export interface TaskListDeps {
 	items(): readonly TaskItem[];
@@ -15,6 +25,13 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
+	/** The task being typed, which takes its place among the cards without being one of them; null when none is. */
+	entry?(): ListEntryInput | null;
+	/**
+	 * The task whose text the field edits, wherever the field stands: its card keeps its place among the cards, hidden, and
+	 * the branches pass it by.
+	 */
+	renaming?(): TaskKey | null;
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
@@ -26,6 +43,8 @@ export interface ListEntry {
 	/** 0 for a task, one more for each task above a subtask. */
 	readonly level: number;
 }
+
+const QUICK_ROW = "tc-quick-row";
 
 /**
  * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
@@ -46,32 +65,87 @@ export class TaskList {
 	}
 
 	render(): void {
-		clear(this.el);
+		const entry = this.deps.entry?.() ?? null;
+		const renaming = this.deps.renaming?.() ?? null;
+		const kept = entry ? this.keptRow() : null;
+		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
 		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
 		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 		this.withHeaders = showsHeaders(this.rendered);
-		/** `through`: for each task above the subtask's own, whether its line goes on past the card to a later subtask. */
-		const add = (item: TaskItem, level: number, through: readonly boolean[], last: boolean): void => {
+		const rows: { node: HTMLElement; level: number }[] = [];
+		let entered = entry === null;
+		let groupStart = 0;
+		/** At a card's place, or at the end of its section for a place outside that section's cards: where `resultOf` writes it. */
+		const enter = (group: GroupName, groupEnd = false): void => {
+			if (entered || !entry || (this.withHeaders && entry.place.group !== group)) return;
+			const { index } = entry.place;
+			const outside = this.withHeaders && groupEnd && (index < groupStart || index > this.entries.length);
+			if (index !== this.entries.length && !outside) return;
+			entered = true;
+			this.enterRows(entry, rows, kept);
+		};
+		const add = (item: TaskItem, level: number, group: GroupName): void => {
+			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
-			if (level > 0) branch(card, through, last);
+			const renamed = renaming !== null && sameTask(renaming, item.key);
+			card.classList.toggle("is-renaming", renamed);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
+			if (!renamed) rows.push({ node: card, level });
 			const from = this.entries.length;
-			const below = level > 0 ? [...through, !last] : [];
-			item.subtasks.forEach((sub, i) => add(sub, level + 1, below, i === item.subtasks.length - 1));
+			item.subtasks.forEach((sub) => add(sub, level + 1, group));
 			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));
 		};
+		const aboveHeaders = this.withHeaders && entry?.place.group === null && !this.rendered.some((g) => g.name === null);
+		if (aboveHeaders) enter(null, true);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			for (const item of group.items) add(item, 0, [], false);
+			groupStart = this.entries.length;
+			for (const item of group.items) add(item, 0, group.name);
+			enter(group.name, true);
 		}
+		if (!entered && entry) this.enterRows(entry, rows, kept);
+		rows.forEach((row, i) => {
+			if (row.level === 0) return;
+			const { through, last } = linesOf(rows.map((r) => r.level), i);
+			branch(row.node, through, last);
+		});
 		const pending = this.deps.pending?.() ?? null;
 		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
 		if (pending) renderTaskCard(this.el, pending, { day });
+	}
+
+	/** The field's row from the last drawing: it stays in the list, so the field in it keeps the focus and the keyboard. */
+	private keptRow(): HTMLElement | null {
+		const row = [...this.el.children].find((child) => child.classList.contains(QUICK_ROW));
+		return row instanceof HTMLElement ? row : null;
+	}
+
+	/**
+	 * The typed texts and the field's row after the rows drawn so far. A kept row stays where it is: what was drawn after
+	 * it moves before it, and its old branches go.
+	 */
+	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[], kept: HTMLElement | null): void {
+		const put = (row: HTMLElement, level: number): void => {
+			row.style.setProperty(PROPERTY.level, String(level));
+			rows.push({ node: row, level });
+		};
+		const before: HTMLElement[] = [];
+		for (let node = kept?.nextElementSibling ?? null; node; node = node.nextElementSibling) if (node instanceof HTMLElement) before.push(node);
+		for (const { text, level } of entry.pending) {
+			const card = renderUnwrittenCard(this.el, text);
+			before.push(card);
+			put(card, level);
+		}
+		if (kept) kept.before(...before);
+		const row = kept ?? el(this.el, "div", QUICK_ROW);
+		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
+		entry.field(row);
+		put(row, entry.place.level);
 	}
 
 	/** Where the name of the section a pending card starts is typed; null without one. */
@@ -81,6 +155,16 @@ export class TaskList {
 
 	get cards(): readonly ListEntry[] {
 		return this.entries;
+	}
+
+	/** The cards as places in the list see them, with no measuring: each in the section it is drawn in. */
+	get listCards(): readonly ListCard[] {
+		return this.entries.map((entry) => this.listCard(entry));
+	}
+
+	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */
+	listCard(entry: ListEntry): ListCard {
+		return { key: entry.item.key, level: entry.level, group: this.withHeaders ? entry.item.group : null };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */
@@ -103,6 +187,16 @@ export class TaskList {
 		this.deps.onHeader?.(head, group);
 		return head;
 	}
+}
+
+/**
+ * The branch lines of the row at `i` among rows of these `levels`: whether it is the last of its task's subtasks, and for each
+ * task above its own whether that one has a later sibling, so its line goes on past the row.
+ */
+function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {
+	const goesOn = (level: number): boolean => levels.slice(i + 1).find((l) => l <= level) === level;
+	const through = Array.from({ length: levels[i] - 1 }, (_, k) => goesOn(k + 1));
+	return { through, last: !goesOn(levels[i]) };
 }
 
 /** A subtask's branch from its task, bending in if it is the last; and the lines of the tasks further up that go on past it. */

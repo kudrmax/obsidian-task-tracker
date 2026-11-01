@@ -19,7 +19,7 @@ function setUp() {
 }
 
 describe("NewTaskButton", () => {
-	it("opens the task screen when pressed", () => {
+	it("presses the handler it was given", () => {
 		const { button, pressed } = setUp();
 		button.el.querySelector("button")!.click();
 		expect(pressed()).toBe(1);
@@ -45,5 +45,16 @@ describe("NewTaskButton", () => {
 		const { list, doubleClick, pressed } = setUp();
 		doubleClick(list, "touch");
 		expect(pressed()).toBe(0);
+	});
+
+	it("hidden, it keeps its container for the drag zones and hides only the button", () => {
+		const { button } = setUp();
+		const inner = button.el.querySelector<HTMLElement>(".tc-new-btn")!;
+		button.shown = false;
+		expect(button.el.parentElement).not.toBeNull();
+		expect(button.el.classList.contains("tc-new")).toBe(true);
+		expect(inner.classList.contains("is-hidden")).toBe(true);
+		button.shown = true;
+		expect(inner.classList.contains("is-hidden")).toBe(false);
 	});
 });

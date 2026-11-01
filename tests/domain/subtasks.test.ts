@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalize } from "../../src/domain/normalize";
-import { createSubtask, moveBefore, moveToList, moveToSoon, nest, placeTask, postpone, remove, setSlot, setStatus } from "../../src/domain/operations";
+import { createSubtask, moveBefore, newTask, moveToList, moveToSoon, nest, placeTask, postpone, remove, setSlot, setStatus } from "../../src/domain/operations";
 import { toItem } from "../../src/domain/queries";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -143,5 +143,20 @@ describe("moving under a task and out", () => {
 		const slotted = setSlot(doc, pay(), { date: T, start: 600, end: 660 }, T);
 		expect(slotted.tasks("now")[2]).toMatchObject({ path: [], raw: "- [ ] Pay ⏰ 2026-10-30 10:00-11:00" });
 		expect(slotted.tasks("now")[0].subtasks.map((s) => s.task.text)).toEqual(["Compare", "Seats"]);
+	});
+});
+
+describe("insertUnder with before", () => {
+	it("puts the new subtask right above `before`, whose own subtree stays after it", () => {
+		const doc = parse(TRIP);
+		const trip = doc.tasks("now")[0];
+		const out = doc.insertUnder(trip, newTask("New"), trip.subtasks[1]).serialize();
+		expect(out).toBe("## Now\n- [ ] Trip 📅 2026-11-03\n\t- [x] Compare\n\t- [ ] New\n\t- [/] Seats\n\t\t- [ ] Window\n\t\tnote\n\t- [ ] Pay\n- [ ] Call\n\n## Soon\n- [ ] Later\n\n## Done\n");
+	});
+
+	it("without `before` still adds the last subtask", () => {
+		const doc = parse(TRIP);
+		const trip = doc.tasks("now")[0];
+		expect(doc.insertUnder(trip, newTask("New"), null).serialize()).toBe(doc.insertUnder(trip, newTask("New")).serialize());
 	});
 });

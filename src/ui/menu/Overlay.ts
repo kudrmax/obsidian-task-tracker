@@ -1,6 +1,9 @@
 import { DURATION, tokenMs } from "../design";
 import { el } from "../dom";
 
+/** How an overlay was closed by the user: Escape, or a tap on the sheet. */
+export type CloseHow = "escape" | "away";
+
 /**
  * What a press opens over the view: the blurred dark sheet and the parts laid over it, a copy of what was pressed and its
  * panel. They show together and go together, in one fade, and leave the page at once. A tap on the sheet closes it.
@@ -14,13 +17,13 @@ export class Overlay {
 		if (e.key !== "Escape") return;
 		e.preventDefault();
 		e.stopPropagation();
-		this.onClose();
+		this.onClose("escape");
 	};
 
-	constructor(private readonly onClose: () => void) {
+	constructor(private readonly onClose: (how: CloseHow) => void) {
 		this.backdrop = el(document.body, "div", "tc-backdrop");
 		this.backdrop.addEventListener("pointerdown", (e) => {
-			if (e.target === this.backdrop) onClose();
+			if (e.target === this.backdrop) onClose("away");
 		});
 		document.addEventListener("keydown", this.onKey, true);
 	}

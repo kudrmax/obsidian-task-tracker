@@ -1,4 +1,4 @@
-import { type DayView, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type NewTaskPlace, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
@@ -149,6 +149,22 @@ export class DemoTaskService implements TaskService {
 	async createInSoon(text: string): Promise<void> {
 		if (!text.trim()) return;
 		this.sections.soon.push(task(text.trim()));
+		this.changed();
+	}
+
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void> {
+		if (!text.trim()) return;
+		const added = task(text.trim(), { priority });
+		if (place.kind === "slot") {
+			added.slot = place.slot;
+			this.sections[place.slot.date === this.today() ? "now" : "soon"].push(added);
+		} else if (place.kind === "list") {
+			if (place.list === "now") added.dueDate = place.date ?? this.today();
+			else if (place.list === "soon" && place.date && place.date > this.today()) added.dueDate = place.date;
+			const list = this.sections[place.list];
+			const at = place.before && place.before.section === place.list ? place.before.index : list.length;
+			list.splice(at, 0, added);
+		}
 		this.changed();
 	}
 

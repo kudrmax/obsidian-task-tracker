@@ -44,6 +44,11 @@ export class DescriptionPeek {
 		this.markCut();
 	}
 
+	/** Gone while the menu is typed in: the field and the keyboard need its room. */
+	hide(): void {
+		this.el.hidden = true;
+	}
+
 	private standOver(bottom: number, room: number): number {
 		this.el.classList.remove("is-under");
 		this.el.style.top = "";

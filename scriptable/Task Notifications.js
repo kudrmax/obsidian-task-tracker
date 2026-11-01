@@ -532,9 +532,10 @@ var TaskDocument = class _TaskDocument {
     const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
     return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
   }
-  /** A new last subtask of `parent`. */
-  insertUnder(parent, task) {
-    return this.withLines(this.splice(this.endOf(parent), 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
+  /** A new subtask of `parent`, right before its subtask `before` or last. */
+  insertUnder(parent, task, before = null) {
+    const line = before ? this.spanOf(before).line : this.endOf(parent);
+    return this.withLines(this.splice(line, 0, this.linesOf(this.childIndent(parent), parent.bullet, task)));
   }
   ensureSections(all) {
     const present = new Set(this.headingNames());

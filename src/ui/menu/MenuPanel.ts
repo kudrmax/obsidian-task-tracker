@@ -2,7 +2,7 @@ import type { PriorityColor } from "../../settings";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { icon } from "../icons";
-import { type MenuIconName, menuIcon } from "./menuIcons";
+import { MENU_ICONS, type MenuIconName, menuIcon } from "./menuIcons";
 
 export interface MenuRowSpec {
 	readonly label: string;
@@ -30,11 +30,20 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 	return dot;
 }
 
+/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear. */
+export type PlaceIconName = "inbox" | "soon" | "now" | "calendar";
+export type TileIconName = MenuIconName | PlaceIconName;
+
+function tileIcon(name: TileIconName): SVGSVGElement {
+	return name in MENU_ICONS ? menuIcon(name as MenuIconName) : icon(name as PlaceIconName);
+}
+
 export interface MenuTileSpec {
 	readonly label: string;
-	readonly icon: MenuIconName;
+	readonly icon: TileIconName;
 	/** A priority level's tile: its flag takes the level's colour, and the task's own level is `on`. */
 	readonly color?: PriorityColor;
+	/** The tile that stands for what is set now; a level's tile also carries the cross that takes it off. */
 	readonly on?: boolean;
 	readonly onPick: () => void;
 }
@@ -44,9 +53,9 @@ function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	const tile = el(parent, "button", "tc-menu-tile");
 	if (spec.color) tile.dataset.priority = spec.color;
 	tile.classList.toggle("is-on", spec.on === true);
-	tile.appendChild(menuIcon(spec.icon));
+	tile.appendChild(tileIcon(spec.icon));
 	el(tile, "span", "tc-menu-tile-label", spec.label);
-	if (spec.on) el(tile, "span", "tc-menu-badge").appendChild(menuIcon("cross"));
+	if (spec.on && spec.color) el(tile, "span", "tc-menu-badge").appendChild(menuIcon("cross"));
 	tile.addEventListener("click", spec.onPick);
 	return tile;
 }

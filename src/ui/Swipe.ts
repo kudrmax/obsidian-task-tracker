@@ -33,6 +33,14 @@ interface Stream {
 	timer: number;
 }
 
+/** A field being typed in and the bar beside it, and the field of a section's name: a finger there edits, it does not swipe. */
+const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-group-field";
+
+/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed. */
+export function swipeStartsAt(target: EventTarget | null): boolean {
+	return !(target instanceof Element && target.closest(TYPING));
+}
+
 const SWIPE = "swipe";
 /** The stream ends once the trackpad has sent nothing for this long. */
 const STREAM_SETTLE_MS = 150;

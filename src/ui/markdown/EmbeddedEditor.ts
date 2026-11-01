@@ -31,14 +31,18 @@ export interface EditorHost {
 	activeEditor: EditorOwner | null;
 }
 
-/** A key the editor takes over; it stays the note search's while that is open. */
+/** A key the editor takes over; it stays the note search's while that is open. `false` from a run leaves it to the editor. */
 export interface EditorKey {
 	readonly key: string;
-	run(): void;
+	run(): boolean | void;
+	/** The key with Shift; without it, Shift leaves the key to the editor. */
+	shift?(): boolean | void;
 }
 
 export interface EditorHooks {
 	readonly keys?: readonly EditorKey[];
+	/** More of CodeMirror's extensions, after Obsidian's own and before the keys. */
+	readonly extensions?: readonly Extension[];
 	onChange?(): void;
 }
 
@@ -76,9 +80,33 @@ export class EmbeddedEditor {
 		return this.editor.cm.contentDOM;
 	}
 
+	/** The page's active element. */
+	get focused(): boolean {
+		const { cm } = this.editor;
+		return cm.root.activeElement === cm.contentDOM;
+	}
+
+	/** The whole text replaced, the caret at its end. */
+	setValue(text: string): void {
+		const { cm } = this.editor;
+		if (cm.state.doc.toString() === text) return;
+		cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: text }, selection: { anchor: text.length } });
+	}
+
 	focusEnd(): void {
 		const end = this.editor.cm.state.doc.length;
 		this.editor.cm.dispatch({ selection: { anchor: end } });
+		this.editor.cm.focus();
+	}
+
+	selectAll(): void {
+		const { cm } = this.editor;
+		cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
+		cm.focus();
+	}
+
+	/** The focus given back, the selection as it was. */
+	focus(): void {
 		this.editor.cm.focus();
 	}
 
@@ -93,13 +121,10 @@ export class EmbeddedEditor {
 		return class extends Base {
 			override buildLocalExtensions(): Extension[] {
 				const searching = () => this.editorSuggest?.currentSuggest?.isOpen === true;
-				const take = (run: () => void) => () => {
-					if (searching()) return false;
-					run();
-					return true;
-				};
-				const keys = (hooks.keys ?? []).map(({ key, run }) => ({ key, run: take(run), shift: key === "Enter" ? take(run) : undefined, preventDefault: true }));
-				return keys.length === 0 ? super.buildLocalExtensions() : [...super.buildLocalExtensions(), Prec.highest(keymap.of(keys))];
+				const take = (run: () => boolean | void) => () => !searching() && run() !== false;
+				const keys = (hooks.keys ?? []).map(({ key, run, shift }) => ({ key, run: take(run), shift: shift && take(shift), stopPropagation: true }));
+				const local = [...super.buildLocalExtensions(), ...(hooks.extensions ?? [])];
+				return keys.length === 0 ? local : [...local, Prec.highest(keymap.of(keys))];
 			}
 
 			override onUpdate(update: ViewUpdate, changed: boolean): void {

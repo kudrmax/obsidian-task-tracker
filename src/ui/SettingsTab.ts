@@ -86,7 +86,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void redrawn.remove(index));
 		});
 		new Setting(el)
-			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the menu and on the task screen.")
+			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the task menu and in the bar shown while a task is typed.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void redrawn.add()));
 	}
 

@@ -12,6 +12,7 @@ import {
 	type GroupedList,
 	type GroupName,
 	type GroupPlace,
+	type NewTaskPlace,
 	type Placement,
 	type TaskDraft,
 	type TaskItem,
@@ -71,6 +72,11 @@ export class TaskServiceImpl implements TaskService {
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
 		if (this.blank(text)) return;
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
+	}
+
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void> {
+		if (this.blank(text)) return;
+		await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary));
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
@@ -269,6 +275,19 @@ export class TaskServiceImpl implements TaskService {
 		const index = ops.groupIndex(doc, list, group);
 		if (index < 0) throw new StaleTaskError();
 		return index;
+	}
+
+	private resolve(doc: TaskDocument, place: NewTaskPlace): ops.CreatePlace {
+		const before = (key: TaskKey | null) => (key ? this.entryOf(doc, key) : null);
+		switch (place.kind) {
+			case "list":
+				this.groupOf(doc, place.list, place.group);
+				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null };
+			case "subtask":
+				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
+			case "slot":
+				return place;
+		}
 	}
 
 	private entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {

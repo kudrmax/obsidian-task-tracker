@@ -6,7 +6,7 @@ describe("MonthPicker", () => {
 	it("draws six weeks from the Monday before the month, marking today and the chosen day", () => {
 		const el = document.createElement("div");
 		const picked: string[] = [];
-		new MonthPicker(el, { month: "2026-11-01", today: "2026-10-30", selected: "2026-11-03", onPick: (d) => picked.push(d), variant: "menu" });
+		new MonthPicker(el, { month: "2026-11-01", today: "2026-10-30", selected: "2026-11-03", onPick: (d) => picked.push(d) });
 		const days = [...el.querySelectorAll<HTMLButtonElement>(".tc-day")];
 		expect(days).toHaveLength(42);
 		expect(days[0].textContent).toBe("26");
@@ -22,7 +22,7 @@ describe("MonthPicker", () => {
 
 	it("walks months with its arrows", () => {
 		const el = document.createElement("div");
-		const picker = new MonthPicker(el, { month: "2026-11-01", today: "2026-10-30", selected: null, onPick: () => {}, variant: "sheet" });
+		const picker = new MonthPicker(el, { month: "2026-11-01", today: "2026-10-30", selected: null, onPick: () => {} });
 		el.querySelector<HTMLButtonElement>(".tc-picker-next")!.click();
 		expect(el.querySelector(".tc-picker-title")?.textContent).toBe("December 2026");
 		expect(picker.month).toBe("2026-12-01");

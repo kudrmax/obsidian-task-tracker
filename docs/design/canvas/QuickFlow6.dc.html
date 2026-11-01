@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>5. Полоса над клавиатурой: приоритет и место</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 3338px; height: 1120px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">5. Полоса над клавиатурой: приоритет и место</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 3210px; font-size: 18px; line-height: 24px; color: #6B6A65;">Выбран вариант с двумя кнопками. Справа в полосе флажок приоритета и кнопка места с подписью; обе открывают над полосой плитки в стиле меню задачи, клавиатура не закрывается. Поле всегда стоит там, где окажется задача: выбрал Inbox — экран сам переехал к Inbox, выбрал день — колонка дня открыла этот день. На десктопе та же полоса стоит внизу вида, пока идёт ввод</div>
+<sc-for list="{{phones}}" as="p" hint-placeholder-count="7">
+<div style="position: absolute; left: {{p.left}}px; top: 168px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="QuickAdd" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: 1026px; width: 390px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3338,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { phones: [{"left": 64, "view": "v2Bar", "theme": "dark", "caption": "Пишут задачу в Now: в полосе флажок и кнопка места «Now»"}, {"left": 534, "view": "v2Priority", "theme": "dark", "caption": "Флажок: те же плитки приоритета, что в меню. Выбран p1 — поле окрашено, флажок его цвета; крестик снимает"}, {"left": 1004, "view": "v2PriorityLong", "theme": "dark", "caption": "Длинные имена уровней: ряды поровну, текст гаснет к краю, как в меню"}, {"left": 1474, "view": "v2Panel", "theme": "dark", "caption": "Кнопка места: плитки Inbox, Soon, Now, Date"}, {"left": 1944, "view": "v2Inbox", "theme": "dark", "caption": "Выбрали Inbox: колёсико повернулось, поле с текстом — в конце Inbox"}, {"left": 2414, "view": "v2DatePanel", "theme": "dark", "caption": "Выбрали Date: месяц над полосой"}, {"left": 2884, "view": "v2Date", "theme": "dark", "caption": "Выбрали 5 ноября: колонка дня открыла этот день, поле в его конце"}] };
+  }
+}
+</script>
+</body>
+</html>

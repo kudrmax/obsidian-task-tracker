@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GestureArbiter } from "../../src/ui/gestures";
 import type { Shift } from "../../src/ui/screens";
-import { Swipe } from "../../src/ui/Swipe";
+import { Swipe, swipeStartsAt } from "../../src/ui/Swipe";
 
 const SLOW_STEP_MS = 1000;
 let now = 0;
@@ -204,5 +204,19 @@ describe("Swipe", () => {
 			for (const delta of [30, 30, 30]) wheel(inner, delta);
 			expect(shifts).toEqual([]);
 		});
+	});
+});
+
+describe("where a swipe may start on the screen", () => {
+	it("not in a field being typed in, the quick bar, or a section's name field; anywhere else", () => {
+		const root = document.body.appendChild(document.createElement("div"));
+		const marked = (cls: string) => {
+			const holder = root.appendChild(document.createElement("div"));
+			holder.className = cls;
+			return holder.appendChild(document.createElement("i"));
+		};
+		expect([".tc-quick-row", ".tc-quick-bar", ".tc-group-field"].map((s) => swipeStartsAt(marked(s.slice(1))))).toEqual([false, false, false]);
+		expect(swipeStartsAt(marked("tc-card"))).toBe(true);
+		expect(swipeStartsAt(null)).toBe(true);
 	});
 });

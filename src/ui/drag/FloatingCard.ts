@@ -1,7 +1,8 @@
 import type { TaskItem } from "../../application/contracts";
 import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
-import { px } from "../dom";
+import { el, px } from "../dom";
+import { icon } from "../icons";
 import { fillCard } from "../TaskCard";
 import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
@@ -18,15 +19,27 @@ const STACK_DEPTH = 2;
 
 /**
  * The copy of the card that follows the finger: fixed over everything, moved by transform alone, stretched to the right
- * to show its whole title. A task with subtasks carries them as a stack of layers under it.
+ * to show its whole title. A task with subtasks carries them as a stack of layers under it. A new task, not written yet,
+ * is a plus and "New task" in its place.
  */
 export class FloatingCard implements Float {
 	readonly el: HTMLElement;
 	private readonly stack: HTMLElement[] = [];
 
-	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate) {
+	constructor(item: TaskItem | null, private readonly grab: Grab, day: LocalDate) {
 		this.el = document.createElement("div");
-		this.el.className = "tc-float";
+		this.el.className = item ? "tc-float" : "tc-float is-new";
+		if (item) this.showTask(item, day);
+		else this.showNew();
+	}
+
+	private showNew(): void {
+		this.el.appendChild(icon("plus"));
+		el(this.el, "span", "", "New task");
+		document.body.appendChild(this.el);
+	}
+
+	private showTask(item: TaskItem, day: LocalDate): void {
 		fillCard(this.el, item, { day });
 		if (item.subtasks.length > 0) {
 			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(document.body.appendChild(Object.assign(document.createElement("div"), { className: `tc-float-under is-${depth}` })));

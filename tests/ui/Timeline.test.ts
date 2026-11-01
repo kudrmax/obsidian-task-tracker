@@ -144,6 +144,94 @@ describe("task cards", () => {
 	});
 });
 
+describe("a field on the timeline", () => {
+	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: `T${index}` }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null });
+	const box = (node: HTMLElement) => ["--tc-y", "--tc-len", "--tc-x"].map((p) => node.style.getPropertyValue(p));
+	const fieldBox = (view: Timeline) => view.itemsEl.querySelector<HTMLElement>(".tc-quick-row")!;
+
+	it("stands a new task's field where the drop target lands a task, the slot's time on its right", () => {
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 1020, null)]);
+		view.showDrop({ start: 1035, end: null });
+		const landing = view.landing()!;
+		view.clearDrop();
+		const field = document.createElement("textarea");
+		view.showField({ date: "2026-10-30", start: 1035, end: null }, field);
+		const holder = fieldBox(view);
+		expect(holder.contains(field)).toBe(true);
+		expect(holder.classList.contains("tc-block")).toBe(true);
+		expect(holder.style.getPropertyValue("--tc-y")).toBe(`${landing.y}px`);
+		expect(holder.style.getPropertyValue("--tc-x")).toBe(`${landing.x}px`);
+		expect(holder.style.getPropertyValue("--tc-len")).toBe(`${landing.height}px`);
+		expect(holder.querySelector(".tc-field-time")!.textContent).toBe("17:15");
+	});
+
+	it("has the stack make room for the field, as for a task dropped there", () => {
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 1020, null)]);
+		view.showField({ date: "2026-10-30", start: 1020, end: null }, document.createElement("textarea"));
+		expect(fieldBox(view).style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1}px`);
+		expect(view.itemsEl.querySelector<HTMLElement>(".tc-block:not(.tc-quick-row)")!.style.getPropertyValue("--tc-y")).toBe(`${17 * 56 + 1 + STACK_STEP}px`);
+	});
+
+	it("keeps the field, the same element, across a redraw, and takes it away on clearField", () => {
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 1020, null)]);
+		const field = document.createElement("textarea");
+		view.showField({ date: "2026-10-30", start: 600, end: null }, field);
+		const holder = fieldBox(view);
+		view.render();
+		view.showField({ date: "2026-10-30", start: 600, end: null }, field);
+		expect(fieldBox(view)).toBe(holder);
+		expect(holder.contains(field)).toBe(true);
+		view.clearField();
+		expect(view.itemsEl.querySelector(".tc-quick-row")).toBeNull();
+		expect(view.itemsEl.contains(field)).toBe(false);
+	});
+
+	it("turns a renamed task's card into the field: the card hides, the field takes its place and size", () => {
+		const tasks = [task(0, 900, 960), task(1, 1020, null)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const field = document.createElement("textarea");
+		view.showRename(tasks[0], field);
+		const block = [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-block:not(.tc-quick-row)")].find((b) => b.textContent === "T0")!;
+		expect(block.classList.contains("is-renaming")).toBe(true);
+		expect(box(fieldBox(view))).toEqual(box(block));
+		expect(fieldBox(view).querySelector(".tc-field-time")).toBeNull();
+		view.render();
+		const redrawn = [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-block:not(.tc-quick-row)")].find((b) => b.textContent === "T0")!;
+		expect(redrawn.classList.contains("is-renaming")).toBe(true);
+		view.clearField();
+		expect(view.itemsEl.querySelector(".is-renaming")).toBeNull();
+	});
+
+	it("hides the dots of the selected task while the field renames it, and shows them again after", () => {
+		const tasks = [task(0, 900, 960)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		view.select(tasks[0]);
+		const grips = view.itemsEl.querySelector(".tc-grips")!;
+		expect(grips.classList.contains("is-shown")).toBe(true);
+		view.showRename(tasks[0], document.createElement("textarea"));
+		expect(grips.classList.contains("is-shown")).toBe(false);
+		view.clearField();
+		expect(grips.classList.contains("is-shown")).toBe(true);
+	});
+});
+
+describe("a renamed task in progress on the timeline", () => {
+	const task = (status: TaskItem["status"]): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "T0" }, text: "T0", status, dueDate: null, slot: { date: "2026-10-30", start: 900, end: 960 }, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null });
+
+	it("keeps its strip at the field's left, and a task not in progress has none", () => {
+		const doing = task("inProgress");
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [doing]);
+		const field = document.createElement("textarea");
+		view.showRename(doing, field);
+		const box = view.itemsEl.querySelector<HTMLElement>(".tc-quick-row")!;
+		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		view.showRename(doing, field);
+		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		view.showRename(task("todo"), field);
+		expect(box.querySelector(".tc-strip")).toBeNull();
+	});
+});
+
 describe("tasks the now line has passed", () => {
 	const hourPx = 56;
 	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
