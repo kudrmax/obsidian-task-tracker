@@ -182,6 +182,11 @@ export class TaskDocument {
 		return entry;
 	}
 
+	/** The line the entry's task stands on, from 0. */
+	lineOf(entry: TaskEntry): number {
+		return this.spanOf(entry).line;
+	}
+
 	allTasks(): readonly TaskEntry[] {
 		return SECTION_KEYS.flatMap((key) => this.tasks(key));
 	}

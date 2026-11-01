@@ -1,4 +1,4 @@
-import { ItemView, Notice, type WorkspaceLeaf } from "obsidian";
+import { ItemView, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type GroupedList, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
@@ -696,9 +696,31 @@ export class TaskCalendarView extends ItemView {
 				openDescription: (editing) => this.descriptionSheet(item, editing),
 				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
 				remove: () => this.act(() => tasks.remove(item.key)),
+				openInObsidian: () => void this.openInObsidian(item),
 				openLink: (link) => this.openLink(link),
 			},
 		});
+	}
+
+	/** The tasks file opens in a new tab, as a link does, the cursor at the start of the task's line and the line in the middle. */
+	private async openInObsidian(item: TaskItem): Promise<void> {
+		let line = 0;
+		try {
+			line = await this.deps.tasks.lineOf(item.key);
+		} catch (error) {
+			this.reportFailure(error);
+			return;
+		}
+		const file = this.app.vault.getFileByPath(this.settings.tasksFile);
+		if (!file) return;
+		const leaf = this.app.workspace.getLeaf("tab");
+		await leaf.openFile(file, { active: true, state: { mode: "source" }, eState: { line } });
+		const view = leaf.view;
+		if (!(view instanceof MarkdownView)) return;
+		const at = { line, ch: 0 };
+		view.editor.setCursor(at);
+		view.editor.scrollIntoView({ from: at, to: at }, true);
+		view.editor.focus();
 	}
 
 	/** A note opens in a new tab, so the calendar stays where it is; an address goes to the browser. */
