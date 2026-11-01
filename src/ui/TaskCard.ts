@@ -4,6 +4,7 @@ import type { PriorityLevel } from "../settings";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
 import { icon } from "./icons";
+import { fillTitle } from "./TaskTitle";
 
 export interface TaskCardOptions {
 	/** The day the card is shown on: a due date on that day goes without saying. */
@@ -20,7 +21,7 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
 	markPriority(card, item.priority);
 	if (item.status === "inProgress") el(card, "span", "tc-strip");
-	el(card, "div", "tc-card-title", item.text);
+	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {
 		const due = el(card, "span", "tc-due");

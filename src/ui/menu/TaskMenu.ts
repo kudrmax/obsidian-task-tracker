@@ -4,6 +4,7 @@ import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard, renderTaskCard } from "../TaskCard";
+import { linkAt, type TaskLink } from "../TaskTitle";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { Overlay } from "./Overlay";
@@ -83,6 +84,7 @@ export interface MenuActions {
 	openDescription(editing: boolean): void;
 	addSubtask(): void;
 	remove(): Promise<void>;
+	openLink(link: TaskLink): void;
 }
 
 export interface TaskMenuContext {
@@ -130,11 +132,21 @@ export class TaskMenu {
 		const copy = this.liftWhole(context.source.getBoundingClientRect());
 		this.anchor = context.source.classList.contains("tc-block") && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
+		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
 		this.peek = this.peekOf(context);
 		if (context.opening === "picker") this.showPicker();
 		else this.showMenu();
 		this.overlay.show();
+	}
+
+	/** A link is followed from the copy only, never from the card itself: a tap on the card can't open it by chance. */
+	private followLink(e: MouseEvent): void {
+		const link = linkAt(e.target);
+		if (!link) return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.pick(() => this.context.actions.openLink(link))();
 	}
 
 	/** The copy stands where the card does; a title the card cuts grows it past the column, kept inside the window, and the panel goes by the copy. */

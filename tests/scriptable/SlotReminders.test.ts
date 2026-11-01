@@ -18,6 +18,10 @@ describe("SlotReminders", () => {
 		expect(reminders.of(file("- [/] Write the report 📅 2026-11-02 ⏰ 2026-10-31 09:00"), NOW).map((r) => [r.title, r.body])).toEqual([["Write the report", "09:00"]]);
 	});
 
+	it("a link in the title shows its word", () => {
+		expect(reminders.of(file("- [ ] Call [[People/Peter|Peter]] about [the deal](https://x.ru) ⏰ 2026-10-30 14:30"), NOW)[0].title).toBe("Call Peter about the deal");
+	});
+
 	it("a slot running past midnight shows its end as written", () => {
 		expect(reminders.of(file("- [ ] Deploy ⏰ 2026-10-30 23:00-01:00"), NOW)[0].body).toBe("23:00–01:00");
 	});
