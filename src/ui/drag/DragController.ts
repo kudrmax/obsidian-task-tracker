@@ -280,9 +280,13 @@ export class DragController {
 		return true;
 	}
 
-	/** Routes the pointer of `e` to the session until it ends; `settled` runs once the card has come to rest. */
+	/**
+	 * Routes the pointer of `e` to the session until it ends; `settled` runs once the card has come to rest. The session
+	 * sees the finger where it lifted the card at once: a card lifted from a list keeps its place there open from the start.
+	 */
 	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
 		const session = makeSession(() => detach());
+		session.move(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};

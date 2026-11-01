@@ -1,4 +1,5 @@
 import { LAYOUT } from "../design";
+import { AutoScroll } from "./AutoScroll";
 import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
 import type { DragPayload, DropResult, DropTarget } from "./DropTarget";
@@ -13,12 +14,17 @@ export class TimelineDrop implements DropTarget {
 	private start: number | null = null;
 	private duration: number | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
-	private frame = 0;
+	private readonly scroll: AutoScroll;
 
 	constructor(
 		private readonly timeline: Timeline,
 		private readonly opts: TimelineDropOptions,
-	) {}
+	) {
+		this.scroll = new AutoScroll(
+			() => this.timeline.el,
+			() => this.last && this.preview(this.last.x, this.last.y, this.last.drag),
+		);
+	}
 
 	hitTest(x: number, y: number): boolean {
 		const r = this.timeline.el.getBoundingClientRect();
@@ -29,7 +35,7 @@ export class TimelineDrop implements DropTarget {
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
 		this.show(this.timeline.minutesAt(y - drag.grabPx), drag.durationMin);
-		this.autoScroll(y);
+		this.scroll.follow(y);
 	}
 
 	/** The target for a new task under a long tap: its start where the finger is. */
@@ -51,29 +57,12 @@ export class TimelineDrop implements DropTarget {
 		this.timeline.showDrop({ start, end: duration === null ? null : start + duration });
 	}
 
-	/** Near the top or bottom edge the day scrolls under the finger, faster the closer to the edge. */
-	private autoScroll(y: number): void {
-		const r = this.timeline.el.getBoundingClientRect();
-		const edge = LAYOUT.autoScrollEdge;
-		let velocity = 0;
-		if (y < r.top + edge) velocity = -(1 - Math.max(0, y - r.top) / edge) * LAYOUT.autoScrollSpeed;
-		else if (y > r.bottom - edge) velocity = (1 - Math.max(0, r.bottom - y) / edge) * LAYOUT.autoScrollSpeed;
-		if (velocity === 0 || this.frame) return;
-		this.frame = requestAnimationFrame(() => {
-			this.frame = 0;
-			const before = this.timeline.el.scrollTop;
-			this.timeline.el.scrollTop = before + velocity;
-			if (this.last && this.timeline.el.scrollTop !== before) this.preview(this.last.x, this.last.y, this.last.drag);
-		});
-	}
-
 	landing(): DOMRect | null {
 		return this.timeline.landing();
 	}
 
 	clear(): void {
-		if (this.frame) cancelAnimationFrame(this.frame);
-		this.frame = 0;
+		this.scroll.stop();
 		this.start = null;
 		this.timeline.clearDrop();
 		this.last = null;

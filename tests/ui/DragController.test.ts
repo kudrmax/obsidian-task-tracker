@@ -107,6 +107,14 @@ describe("DragController.beginNew", () => {
 		expect(arbiter.busy).toBe(false);
 	});
 
+	it("shows the target under the finger from the lift, before any move", () => {
+		const { controller, source } = setup();
+		const seen: number[][] = [];
+		const target: DropTarget = { ...new StubTarget({ kind: "clearSlot" }), hitTest: () => true, landing: () => landing, clear: () => {}, drop: () => null, preview: (x, y) => void seen.push([x, y]) };
+		controller.beginNew(source, down(120, 610), [target], vi.fn());
+		expect(seen).toEqual([[120, 610]]);
+	});
+
 	it("holds the card where the finger holds the source, so the drop's place matches the card drawn", () => {
 		const { controller, source } = setup();
 		const target = new StubTarget({ kind: "clearSlot" });

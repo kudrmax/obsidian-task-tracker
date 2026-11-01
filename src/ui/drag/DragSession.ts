@@ -40,8 +40,17 @@ export class DragSession {
 		if (!target || !result) return this.settleBack();
 		const landing = target.landing() ?? this.opts.origin;
 		await Promise.all([this.opts.float.flyTo(landing), this.opts.onEnd(result)]);
-		target.clear();
+		this.clearAll();
 		this.opts.float.remove();
+	}
+
+	/**
+	 * Every target lets the drag go, not only the one under the finger: a list a card was lifted from keeps its room closed
+	 * while the finger is elsewhere, and stands as it was again only now.
+	 */
+	private clearAll(): void {
+		this.current = null;
+		for (const target of this.opts.targets) target.clear();
 	}
 
 	async cancel(): Promise<void> {
@@ -51,9 +60,8 @@ export class DragSession {
 	}
 
 	private async settleBack(): Promise<void> {
-		this.current?.clear();
-		this.current = null;
 		this.opts.onReturn?.();
+		this.clearAll();
 		await this.opts.float.flyTo(this.opts.origin);
 		this.opts.float.remove();
 		await this.opts.onEnd(null);

@@ -114,6 +114,27 @@ describe("DragSession", () => {
 		expect(ended).toEqual([null]);
 	});
 
+	it("lets every target go once the card has landed: a list it was lifted from stands as it was again", async () => {
+		const a = new FakeTarget("a", 0, 100, { kind: "clearSlot" });
+		const b = new FakeTarget("b", 100, 200, { kind: "clearSlot" });
+		const s = session([a, b], new FakeFloat(), []);
+		s.move(50, 10);
+		s.move(150, 10);
+		await s.release(150, 10);
+		expect(a.log).toEqual(["preview 50,10", "clear", "clear"]);
+		expect(b.log).toEqual(["preview 150,10", "drop", "clear"]);
+	});
+
+	it("opens the lifted card's place again before the targets let go, as the card flies back", async () => {
+		const order: string[] = [];
+		const a = new FakeTarget("a", 0, 100, null);
+		a.clear = () => void order.push("clear");
+		const s = new DragSession({ payload, targets: [a], float: new FakeFloat(), origin: rect(5, 500), onReturn: () => order.push("return"), onEnd: async () => {} });
+		s.move(50, 10);
+		await s.cancel();
+		expect(order).toEqual(["return", "clear"]);
+	});
+
 	describe("carrying a new task", () => {
 		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20, grabX: 20 };
 
