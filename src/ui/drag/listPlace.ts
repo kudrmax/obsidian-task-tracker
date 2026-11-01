@@ -22,6 +22,9 @@ export type ListPlace =
 	| { readonly kind: "into"; readonly index: number }
 	| { readonly kind: "gap"; readonly index: number; readonly level: number; readonly group: GroupName };
 
+/** A place between cards. */
+export type GapPlace = Extract<ListPlace, { kind: "gap" }>;
+
 /** What a place means for the file: a task in `group` before another one (null: its end), or a subtask of `parent` before `before` (null: last). */
 export type PlaceResult =
 	| { readonly kind: "task"; readonly group: GroupName; readonly before: TaskKey | null }
@@ -56,11 +59,25 @@ export function placeAt(cards: readonly PlacedCard[], y: number, level: number, 
 	heads.forEach((head, i) => {
 		if (head.firstCard === index && y > headEdge(head, i)) group = head.group;
 	});
+	const { min, max } = levelRange(cards, index, group);
+	return { kind: "gap", index, level: Math.max(min, Math.min(max, Math.round(level))), group };
+}
+
+/**
+ * The levels a card may take in the gap before card `index`, in section `group`: no shallower than the card below, no deeper
+ * than one under the card above. Neighbours of another section do not count, so a header breaks nesting.
+ */
+export function levelRange(cards: readonly PlacedCard[], index: number, group: GroupName): { readonly min: number; readonly max: number } {
 	const prev = cards[index - 1]?.group === group ? cards[index - 1] : undefined;
 	const next = cards[index]?.group === group ? cards[index] : undefined;
-	const deepest = prev ? prev.level + 1 : 0;
-	const shallowest = next?.level ?? 0;
-	return { kind: "gap", index, level: Math.max(shallowest, Math.min(deepest, Math.round(level))), group };
+	return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
+}
+
+/** The place one level deeper (`delta` 1) or shallower (-1), or null when the neighbours do not allow it. */
+export function shiftLevel(cards: readonly PlacedCard[], place: GapPlace, delta: 1 | -1): GapPlace | null {
+	const level = place.level + delta;
+	const { min, max } = levelRange(cards, place.index, place.group);
+	return level >= min && level <= max ? { ...place, level } : null;
 }
 
 export function resultOf(cards: readonly PlacedCard[], place: ListPlace): PlaceResult {
