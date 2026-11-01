@@ -138,6 +138,11 @@ body {
 	--tc-seg-dim: 0.28;
 	/* The switch's row at the bottom, between New task and Obsidian's phone navigation. */
 	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
+	/* The plus: a round button at the right edge, on the switch's row. */
+	--tc-plus-size: 44px;
+	--tc-plus-icon: 22px;
+	--tc-stroke-plus: 2.6px;
+	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 
 	/* Sizes: the columns */
 	--tc-columns-top: 64px;
@@ -391,6 +396,7 @@ body {
 	--tc-layer-drop-gap: 999;
 	--tc-layer-pull: 5;
 	--tc-layer-switch: 5;
+	--tc-layer-plus: 5;
 	--tc-layer-sheet: 20;
 	--tc-layer-bar: 6;
 	--tc-layer-overlay: 1000;
@@ -441,6 +447,7 @@ body.theme-light {
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+	--tc-plus-shadow: 0 6px 16px rgba(138, 92, 245, 0.35);
 	--tc-float-under-1: #F7F7F9;
 	--tc-float-under-2: #EFEFF2;
 	--tc-branch: #C7C7CC;
@@ -509,6 +516,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+/* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
+.task-calendar > button.tc-plus { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus.is-hidden { display: none; }
+.tc-plus svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-plus); }
 .tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
 .tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }
@@ -632,7 +643,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
 .tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
 .tc-postpone { display: none; flex-direction: column; gap: var(--tc-space-8); }
-.task-calendar.is-dragging .tc-new-btn { display: none; }
+.task-calendar.is-dragging .tc-new-btn, .task-calendar .tc-new-btn.is-hidden { display: none; }
 .task-calendar.is-dragging .tc-postpone { display: flex; }
 /* The zones that start a section, over the dates under the day column; under Inbox and Soon they stand alone. */
 .tc-section-zones { display: none; flex-direction: column; gap: var(--tc-space-8); }
