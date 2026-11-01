@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { descriptionMarkdown } from "../../src/domain/description";
-import { setDescription } from "../../src/domain/operations";
+import { DayBoundary } from "../../src/domain/DayBoundary";
+import { createInPlace, placeTask, setDescription } from "../../src/domain/operations";
 import { toItem } from "../../src/domain/queries";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -97,5 +98,46 @@ describe("a task's description", () => {
 		const a = odd.tasks("now")[0];
 		expect(descriptionMarkdown(a)).toBe("- note");
 		expect(nowLines(setDescription(odd, a, "- other"))).toEqual(["- [ ] A", "\t- other", "\t\t- [ ] deep", "\t\t\tits line"]);
+	});
+});
+
+describe("a description and the tasks typed in place", () => {
+	const TODAY = "2026-11-01";
+	const doc = parse(MIXED);
+	const [first, other] = doc.tasks("now");
+	const inNow = (before: typeof first | null) => ({ kind: "list", list: "now", group: null, before, date: null }) as const;
+
+	it("a new task right before a task with a description goes above its line, the description staying under it", () => {
+		const lines = nowLines(createInPlace(doc, "X", null, inNow(first), TODAY, DayBoundary.MIDNIGHT));
+		expect(lines).toEqual(["- [ ] X 📅 2026-11-01", ...MIXED.split("\n").slice(1, 8)]);
+	});
+
+	it("a new task right after a task with a description goes under the whole description", () => {
+		const lines = nowLines(createInPlace(doc, "X", null, inNow(other), TODAY, DayBoundary.MIDNIGHT));
+		expect(lines).toEqual([...MIXED.split("\n").slice(1, 7), "- [ ] X 📅 2026-11-01", "- [ ] Другая"]);
+	});
+
+	it("a new subtask right before a subtask with a description leaves both descriptions where they were", () => {
+		const place = { kind: "subtask", parent: first, before: first.subtasks[0] } as const;
+		const created = createInPlace(doc, "X", null, place, TODAY, DayBoundary.MIDNIGHT);
+		expect(nowLines(created)).toEqual(["- [ ] Задача 1", "\t- Описание её", "\t- Ещё её описание", "\t- [ ] X", "\t- [ ] Задача 2 (подзадача)", "\t\t- Описание подзадачи", "\t- Снова описание задачи 1", "- [ ] Другая"]);
+		expect(descriptionMarkdown(created.tasks("now")[0])).toBe(descriptionMarkdown(first));
+		expect(descriptionMarkdown(created.tasks("now")[0].subtasks[1])).toBe("- Описание подзадачи");
+	});
+
+	it("a new last subtask leaves the description with its task", () => {
+		const created = createInPlace(doc, "X", null, { kind: "subtask", parent: first, before: null }, TODAY, DayBoundary.MIDNIGHT);
+		expect(descriptionMarkdown(created.tasks("now")[0])).toBe(descriptionMarkdown(first));
+		expect(created.tasks("now")[0].subtasks.map((s) => s.task.text)).toEqual(["Задача 2 (подзадача)", "X"]);
+	});
+
+	it("a rename in place keeps the task's description and subtasks", () => {
+		const renamed = placeTask(doc, first, { text: "Новое имя", placement: { kind: "soon" }, priority: null }, TODAY);
+		const moved = renamed.tasks("soon")[0];
+		expect(moved.task.text).toBe("Новое имя");
+		expect(descriptionMarkdown(moved)).toBe(descriptionMarkdown(first));
+		expect(moved.subtasks.map((s) => s.task.text)).toEqual(["Задача 2 (подзадача)"]);
+		const same = placeTask(doc, first, { text: "Новое имя", placement: { kind: "now" }, priority: null }, TODAY);
+		expect(descriptionMarkdown(same.tasks("now")[0])).toBe(descriptionMarkdown(first));
 	});
 });
