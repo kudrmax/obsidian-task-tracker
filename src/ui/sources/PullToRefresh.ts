@@ -18,10 +18,10 @@ const PULL = "pull";
 /** How much of the finger's travel the timeline follows. */
 const PULL_FOLLOW = 0.6;
 
-/** Pulling the timeline down from its top opens the sources' lines; letting go past the threshold refreshes them. */
+/** Pulling the timeline down from its top opens the sources' lines; letting go past the threshold refreshes them. A finger going more sideways than down is a swipe, not a pull. */
 export class PullToRefresh {
 	readonly area: HTMLElement;
-	private press: { readonly pointerId: number; readonly y: number } | null = null;
+	private press: { readonly pointerId: number; readonly x: number; readonly y: number } | null = null;
 	private offset = 0;
 	private refreshing = false;
 
@@ -52,14 +52,15 @@ export class PullToRefresh {
 
 	private down(e: PointerEvent): void {
 		if (e.pointerType === "mouse" || !e.isPrimary || this.refreshing || this.timeline.scrollTop > 0 || this.opts.arbiter.busy) return;
-		this.press = { pointerId: e.pointerId, y: e.clientY };
+		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
 	}
 
 	private move(e: PointerEvent): void {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
 		const travel = e.clientY - this.press.y;
 		if (this.offset === 0) {
-			if (travel <= LAYOUT.pressTolerance || this.timeline.scrollTop > 0) return;
+			const sideways = Math.abs(e.clientX - this.press.x) >= travel;
+			if (travel <= LAYOUT.pressTolerance || sideways || this.timeline.scrollTop > 0) return;
 			if (!this.opts.arbiter.claim(PULL)) return;
 			capturePointer(this.timeline, e.pointerId);
 			this.renderArea();

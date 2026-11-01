@@ -1,5 +1,6 @@
 import { LAYOUT } from "./design";
 import { capturePointer, el as make, releasePointer } from "./dom";
+import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
 
 export interface DividerOptions {
@@ -11,7 +12,10 @@ export interface DividerOptions {
 	/** The width that puts the line in the middle of the window. */
 	center(): number;
 	onSnap(): void;
+	readonly arbiter: GestureArbiter;
 }
+
+const RESIZE = "divider";
 
 interface Press {
 	readonly x: number;
@@ -21,7 +25,7 @@ interface Press {
 	snapped: boolean;
 }
 
-/** The strip between the columns: dragging it, or its handle, sets the list's width; brought slowly near the middle, it holds to it. */
+/** The strip between the columns: dragging it, or its handle, sets the list's width; brought slowly near the middle, it holds to it. The drag holds the screen. */
 export class Divider {
 	private press: Press | null = null;
 
@@ -40,7 +44,7 @@ export class Divider {
 	}
 
 	private down(e: PointerEvent): void {
-		if (!e.isPrimary || e.button !== 0) return;
+		if (!e.isPrimary || e.button !== 0 || !this.opts.arbiter.claim(RESIZE)) return;
 		const width = this.opts.width();
 		const speed = new PointerSpeed(e.clientX, e.timeStamp);
 		this.press = { x: e.clientX, width, pointerId: e.pointerId, speed, snapped: width === this.opts.center() };
@@ -78,6 +82,7 @@ export class Divider {
 		const { width } = this.place(e);
 		releasePointer(this.el, e.pointerId);
 		this.press = null;
+		this.opts.arbiter.release(RESIZE);
 		this.opts.onWidth(width);
 		this.opts.onRelease(width);
 	}

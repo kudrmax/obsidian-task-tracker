@@ -9,6 +9,8 @@ export const DESIGN = {
 	dayHours: 24,
 	/** How far an hour's label rises over its line, and hangs under it: the timeline keeps this much room over its first hour and under its closing one. */
 	labelLift: 7,
+	/** The same for a label between the hours. */
+	minorLift: 4,
 	/** Where the columns start under their headers. */
 	columnsTop: 64,
 	/** Where the timeline starts inside the right column, under one all-day row. */
@@ -27,6 +29,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	hourPx: "--tc-hour",
 	dayHours: "--tc-day-hours",
 	labelLift: "--tc-label-lift",
+	minorLift: "--tc-minor-lift",
 	columnsTop: "--tc-columns-top",
 	timelineOffset: "--tc-timeline-top",
 	dividerWidth: "--tc-divider",
@@ -89,8 +92,6 @@ export const DURATION = {
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
 export const LAYOUT = {
-	/** An hour's label hides when its line comes this close to the now line. */
-	labelHideDistance: 20,
 	/** The grid labels a division of the hour, finest first allowed, once its lines stand at least `gridLabelGap` apart. */
 	gridDivisions: [5, 15, 30],
 	gridLabelGap: 40,
@@ -131,6 +132,10 @@ export const LAYOUT = {
 	pullThreshold: 60,
 	/** A released pinch settles on the nearest zoom level over this long. */
 	zoomSnapMs: 200,
+	/** A finger drawn sideways this far steps to the next screen when let go. */
+	swipeDistance: 48,
+	/** So does a shorter flick still this fast when let go, px per ms. */
+	swipeFlickSpeed: 0.3,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */

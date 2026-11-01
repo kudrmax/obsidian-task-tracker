@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { Divider, type DividerOptions } from "../../src/ui/Divider";
+import { GestureArbiter } from "../../src/ui/gestures";
 
 const SLOW_STEP_MS = 1000;
 let now = 0;
@@ -16,7 +17,7 @@ function pointer(type: string, clientX: number, after = SLOW_STEP_MS): PointerEv
 const FRAME_MS = 8;
 
 function divider(el: HTMLElement, opts: Partial<DividerOptions>): Divider {
-	return new Divider(el, { width: () => 187, onWidth: () => {}, onRelease: () => {}, min: 110, max: () => 280, center: () => 160, onSnap: () => {}, ...opts });
+	return new Divider(el, { arbiter: new GestureArbiter(), width: () => 187, onWidth: () => {}, onRelease: () => {}, min: 110, max: () => 280, center: () => 160, onSnap: () => {}, ...opts });
 }
 
 describe("Divider", () => {
@@ -33,6 +34,22 @@ describe("Divider", () => {
 		expect(released).toEqual([]);
 		el.dispatchEvent(pointer("pointerup", 100));
 		expect(released).toEqual([110]);
+	});
+
+	it("holds the screen while dragged, and waits while another gesture holds it", () => {
+		const el = document.createElement("div");
+		const arbiter = new GestureArbiter();
+		const widths: number[] = [];
+		divider(el, { arbiter, onWidth: (w) => widths.push(w) });
+		el.dispatchEvent(pointer("pointerdown", 200));
+		expect(arbiter.busy).toBe(true);
+		el.dispatchEvent(pointer("pointerup", 210));
+		expect(arbiter.busy).toBe(false);
+		arbiter.claim("swipe");
+		el.dispatchEvent(pointer("pointerdown", 200));
+		el.dispatchEvent(pointer("pointermove", 230));
+		el.dispatchEvent(pointer("pointerup", 230));
+		expect(widths).toEqual([197]);
 	});
 
 	it("ignores moves while nothing is pressed", () => {
