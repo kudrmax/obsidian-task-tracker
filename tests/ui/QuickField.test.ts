@@ -73,6 +73,21 @@ describe("QuickField", () => {
 		expect([tab.defaultPrevented, enter.defaultPrevented]).toEqual([false, false]);
 	});
 
+	it("ignores the key that commits an input method's candidate on iOS", () => {
+		const { field, keys } = open();
+		const enter = press(field, { key: "Enter", keyCode: 229 });
+		expect(keys).toEqual([]);
+		expect(enter.defaultPrevented).toBe(false);
+	});
+
+	it("takes a text set from outside, fitted, its prefix reported again only when typed over", () => {
+		const { handle, field, priorities, type } = open("p1 buy", URGENT);
+		handle.setValue("");
+		expect(field.value).toBe("");
+		type("p1 milk");
+		expect(priorities).toEqual([URGENT]);
+	});
+
 	it("reports the text as typed, and a blur", () => {
 		const { field, texts, type, blurs } = open();
 		type("p1 buy milk");
@@ -214,6 +229,43 @@ describe("TaskList with a task being typed", () => {
 	it("stands at the end of the list for a place past the last card", () => {
 		const l = list([item("A")], 1, 0);
 		expect([...l.el.children].map((r) => r.className)).toEqual(["tc-card", "tc-card", "tc-quick-row"]);
+	});
+
+	it("stands at the end of its own section for a place past that section's cards", () => {
+		const grouped = [{ ...item("A"), group: "Home" }, { ...item("B"), group: "Work" }];
+		const l = new TaskList(document.createElement("div"), {
+			items: () => grouped,
+			day: () => null,
+			grouped: () => true,
+			entry: () => ({ place: { kind: "gap", index: 2, level: 0, group: "Home" }, pending: [], field: (parent) => parent }),
+		});
+		l.render();
+		expect([...l.el.children].map((r) => r.className)).toEqual(["tc-group-head", "tc-card", "tc-quick-row", "tc-group-head", "tc-card"]);
+	});
+
+	it("keeps the field's row, and the field in it, across a redraw", () => {
+		let field: HTMLTextAreaElement | null = null;
+		const items = [item("A")];
+		const l = new TaskList(document.createElement("div"), {
+			items: () => items,
+			day: () => null,
+			entry: () => ({
+				place: { kind: "gap", index: items.length, level: 0, group: null },
+				pending: [],
+				field: (parent) => {
+					field ??= document.createElement("textarea");
+					if (field.parentElement !== parent) parent.appendChild(field);
+					return field;
+				},
+			}),
+		});
+		l.render();
+		const row = l.el.querySelector(".tc-quick-row");
+		items.unshift(item("Z"));
+		l.render();
+		expect(l.el.querySelector(".tc-quick-row")).toBe(row);
+		expect(row!.querySelectorAll("textarea").length).toBe(1);
+		expect([...l.el.children].map((r) => r.textContent || r.className)).toEqual(["Z", "A", "tc-quick-row"]);
 	});
 
 	it("stands in its section when the list has headers", () => {

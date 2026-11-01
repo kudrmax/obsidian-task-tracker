@@ -24,9 +24,14 @@ export interface QuickFieldHandle {
 	focus(): void;
 	/** A level chosen elsewhere; the field takes its colour. */
 	setPriority(level: PriorityLevel | null): void;
+	/** A text set by the owner: the field fits it, and a prefix in it counts as already reported. */
+	setValue(text: string): void;
 }
 
 const KEYS: Readonly<Record<string, QuickKey>> = { Enter: "enter", Escape: "escape", Tab: "tab" };
+
+/** The key iOS sends while an input method commits a candidate, with `isComposing` already false. */
+const COMPOSING_KEY_CODE = 229;
 
 /** The level whose prefix, then a space, starts the text. */
 export function levelOfText(text: string, levels: readonly PriorityLevel[]): PriorityLevel | null {
@@ -51,7 +56,7 @@ export const QuickField = {
 			if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight}px`;
 		};
 		field.addEventListener("keydown", (e) => {
-			if (e.isComposing) return;
+			if (e.isComposing || e.keyCode === COMPOSING_KEY_CODE) return;
 			const key = e.key === "Tab" && e.shiftKey ? "shiftTab" : KEYS[e.key];
 			if (!key) return;
 			e.preventDefault();
@@ -81,6 +86,11 @@ export const QuickField = {
 			},
 			setPriority(level) {
 				markPriority(field, level);
+			},
+			setValue(text) {
+				field.value = text;
+				fromText = levelOfText(text, opts.levels);
+				fit();
 			},
 		};
 	},

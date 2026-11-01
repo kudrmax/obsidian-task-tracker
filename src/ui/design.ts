@@ -21,6 +21,8 @@ export const DESIGN = {
 	/** A block starts one pixel under its hour line and ends two pixels short of its length. */
 	itemInset: 1,
 	itemGap: 2,
+	/** The bar over the keyboard while a task is typed: the field stands above it. */
+	barHeight: 44,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -37,6 +39,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	nowPillHeight: "--tc-now-h",
 	itemInset: "--tc-item-inset",
 	itemGap: "--tc-item-gap",
+	barHeight: "--tc-bar-h",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -138,6 +141,8 @@ export const LAYOUT = {
 	swipeFlickSpeed: 0.3,
 	/** Two fingers drawn sideways this far on a trackpad step to the next screen. */
 	swipeWheelDistance: 60,
+	/** The list scrolls a field typed in at least this far above the bar. */
+	fieldOverBar: 16,
 } as const;
 
 /** A token's number, read from the stylesheet so it stays the one source: `150ms` → 150, `12px` → 12. */

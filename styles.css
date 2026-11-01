@@ -657,6 +657,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar input[type="text"].tc-group-input::placeholder { color: var(--tc-muted); font-weight: var(--tc-weight-normal); }
 .task-calendar input[type="text"].tc-group-input::selection { background: var(--tc-selection); }
 .tc-quick-row { position: relative; flex-shrink: 0; }
+.tc-list > .tc-card.is-renaming { display: none; }
+.task-calendar.is-entering > .tc-seg, .task-calendar.is-entering > .tc-new { display: none; }
 .tc-quick-row > .tc-branch.is-last { height: calc(var(--tc-branch-rise) + var(--tc-card-h) / 2 + var(--tc-branch-w) / 2); }
 .task-calendar textarea.tc-quick-field { display: block; width: 100%; min-height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: var(--tc-block-pad-top) var(--tc-card-pad-end) var(--tc-block-pad-top) var(--tc-card-pad-start); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); outline: none; resize: none; overflow: hidden; overflow-wrap: anywhere; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); -webkit-user-select: text; user-select: text; }
 .task-calendar textarea.tc-quick-field[data-priority] { background: var(--tc-priority-fill); }

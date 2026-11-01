@@ -107,6 +107,16 @@ describe("DragController.beginNew", () => {
 		expect(arbiter.busy).toBe(false);
 	});
 
+	it("holds the card where the finger holds the source, so the drop's place matches the card drawn", () => {
+		const { controller, source } = setup();
+		const target = new StubTarget({ kind: "clearSlot" });
+		const preview = vi.spyOn(target, "preview");
+		controller.beginNew(source, down(20, 610), [target], vi.fn());
+		pointer("pointermove", 150, 300);
+		expect(preview).toHaveBeenCalledWith(150, 300, expect.objectContaining({ grabPx: 10, grabX: 10 }));
+		pointer("pointercancel", 150, 300);
+	});
+
 	it("never reports a drop that asks first as a place", async () => {
 		const { controller, source } = setup();
 		const onDrop = vi.fn();

@@ -1,7 +1,7 @@
 import type { GroupName, TaskItem } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
-import { clear, el } from "./dom";
+import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
 import type { GapPlace } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
@@ -39,6 +39,8 @@ export interface ListEntry {
 	readonly level: number;
 }
 
+const QUICK_ROW = "tc-quick-row";
+
 /**
  * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
  * from the task to each; with sections, a header over each.
@@ -58,20 +60,26 @@ export class TaskList {
 	}
 
 	render(): void {
-		clear(this.el);
+		const entry = this.deps.entry?.() ?? null;
+		const kept = entry ? this.keptRow() : null;
+		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
 		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
 		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 		this.withHeaders = showsHeaders(this.rendered);
-		const entry = this.deps.entry?.() ?? null;
 		const rows: { node: HTMLElement; level: number }[] = [];
 		let entered = entry === null;
-		const enter = (group: GroupName): void => {
-			if (entered || !entry || entry.place.index !== this.entries.length || (this.withHeaders && entry.place.group !== group)) return;
+		let groupStart = 0;
+		/** At a card's place, or at the end of its section for a place outside that section's cards: where `resultOf` writes it. */
+		const enter = (group: GroupName, groupEnd = false): void => {
+			if (entered || !entry || (this.withHeaders && entry.place.group !== group)) return;
+			const { index } = entry.place;
+			const outside = this.withHeaders && groupEnd && (index < groupStart || index > this.entries.length);
+			if (index !== this.entries.length && !outside) return;
 			entered = true;
-			this.enterRows(entry, rows);
+			this.enterRows(entry, rows, kept);
 		};
 		const add = (item: TaskItem, level: number, group: GroupName): void => {
 			enter(group);
@@ -85,13 +93,14 @@ export class TaskList {
 			this.deps.onCard?.(card, item, this.entries.slice(from).map((e) => e.card));
 		};
 		const aboveHeaders = this.withHeaders && entry?.place.group === null && !this.rendered.some((g) => g.name === null);
-		if (aboveHeaders) enter(null);
+		if (aboveHeaders) enter(null, true);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
+			groupStart = this.entries.length;
 			for (const item of group.items) add(item, 0, group.name);
-			enter(group.name);
+			enter(group.name, true);
 		}
-		if (!entered && entry) this.enterRows(entry, rows);
+		if (!entered && entry) this.enterRows(entry, rows, kept);
 		rows.forEach((row, i) => {
 			if (row.level === 0) return;
 			const { through, last } = linesOf(rows.map((r) => r.level), i);
@@ -102,17 +111,32 @@ export class TaskList {
 		if (pending) renderTaskCard(this.el, pending, { day });
 	}
 
-	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[]): void {
+	/** The field's row from the last drawing: it stays in the list, so the field in it keeps the focus and the keyboard. */
+	private keptRow(): HTMLElement | null {
+		const row = [...this.el.children].find((child) => child.classList.contains(QUICK_ROW));
+		return row instanceof HTMLElement ? row : null;
+	}
+
+	/**
+	 * The typed texts and the field's row after the rows drawn so far. A kept row stays where it is: what was drawn after
+	 * it moves before it, and its old branches go.
+	 */
+	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[], kept: HTMLElement | null): void {
 		const put = (row: HTMLElement, level: number): void => {
 			row.style.setProperty(PROPERTY.level, String(level));
 			rows.push({ node: row, level });
 		};
+		const before: HTMLElement[] = [];
+		for (let node = kept?.nextElementSibling ?? null; node; node = node.nextElementSibling) if (node instanceof HTMLElement) before.push(node);
 		for (const { text, level } of entry.pending) {
 			const card = el(this.el, "div", "tc-card");
 			el(card, "div", "tc-card-title", text);
+			before.push(card);
 			put(card, level);
 		}
-		const row = el(this.el, "div", "tc-quick-row");
+		if (kept) kept.before(...before);
+		const row = kept ?? el(this.el, "div", QUICK_ROW);
+		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		put(row, entry.place.level);
 	}

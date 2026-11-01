@@ -94,3 +94,29 @@ export function resultOf(cards: readonly PlacedCard[], place: ListPlace): PlaceR
 	while (cards[parent].level !== place.level - 1) parent--;
 	return { kind: "subtask", parent: cards[parent].key, before };
 }
+
+/** The same line of the file: the same place, whatever its text. */
+export function sameTask(a: TaskKey, b: TaskKey): boolean {
+	return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+}
+
+/**
+ * The gap a result means, read back as `resultOf` writes it: right before `before` at its level; else after the whole of
+ * the parent's subtree a level under it, or at the end of the section (above every header for the tasks outside any,
+ * when none of them shows).
+ */
+export function gapOf(cards: readonly PlacedCard[], result: PlaceResult): GapPlace {
+	const at = (key: TaskKey) => cards.findIndex((card) => sameTask(card.key, key));
+	const before = result.before ? at(result.before) : -1;
+	if (before >= 0) return { kind: "gap", index: before, level: cards[before].level, group: cards[before].group };
+	const parent = result.kind === "subtask" ? at(result.parent) : -1;
+	if (parent >= 0) {
+		let end = parent + 1;
+		while (end < cards.length && cards[end].level > cards[parent].level) end++;
+		return { kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group };
+	}
+	const group = result.kind === "task" ? result.group : null;
+	let last = cards.length - 1;
+	while (last >= 0 && cards[last].group !== group) last--;
+	return { kind: "gap", index: last >= 0 ? last + 1 : group === null ? 0 : cards.length, level: 0, group };
+}

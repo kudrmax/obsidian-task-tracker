@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, type PlacedCard, fitLevel, levelRange, placeAt, resultOf, shiftLevel } from "../../src/ui/drag/listPlace";
+import { type GapPlace, type PlacedCard, fitLevel, gapOf, levelRange, placeAt, resultOf, shiftLevel } from "../../src/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;
@@ -145,5 +145,43 @@ describe("the level a place may take", () => {
 		expect(fitLevel(CARDS, gapAt(2, 0))).toEqual(gapAt(2, 1));
 		expect(fitLevel(SECTIONED, gapAt(2, 1, "X"))).toEqual(gapAt(2, 0, "X"));
 		expect(fitLevel(SECTIONED, gapAt(2, 1))).toEqual(gapAt(2, 1));
+	});
+});
+
+describe("the gap a result means", () => {
+	const sectioned: PlacedCard[] = [
+		{ key: key(0), level: 0, top: 0, height: H, group: null },
+		{ key: key(1), level: 0, top: STEP, height: H, group: "X" },
+		{ key: key(1, [0]), level: 1, top: 2 * STEP, height: H, group: "X" },
+		{ key: key(2), level: 0, top: 3 * STEP, height: H, group: "Y" },
+	];
+
+	it("reads back every gap resultOf writes from, as the same result", () => {
+		const gaps: GapPlace[] = [];
+		for (let index = 0; index <= CARDS.length; index++) {
+			const { min, max } = levelRange(CARDS, index, null);
+			for (let level = min; level <= max; level++) gaps.push({ kind: "gap", index, level, group: null });
+		}
+		for (const gap of gaps) expect(resultOf(CARDS, gapOf(CARDS, resultOf(CARDS, gap)))).toEqual(resultOf(CARDS, gap));
+	});
+
+	it("puts a task with nothing after it at the end of its section", () => {
+		expect(gapOf(sectioned, { kind: "task", group: "X", before: null })).toEqual({ kind: "gap", index: 3, level: 0, group: "X" });
+		expect(gapOf(sectioned, { kind: "task", group: null, before: null })).toEqual({ kind: "gap", index: 1, level: 0, group: null });
+	});
+
+	it("puts a task in a section with no card at the top for the tasks outside any, at the end for another", () => {
+		expect(gapOf(sectioned.slice(1), { kind: "task", group: null, before: null })).toEqual({ kind: "gap", index: 0, level: 0, group: null });
+		expect(gapOf(sectioned, { kind: "task", group: "Z", before: null })).toEqual({ kind: "gap", index: 4, level: 0, group: "Z" });
+	});
+
+	it("puts a last subtask after the whole of its task's subtree, a level under it", () => {
+		expect(gapOf(CARDS, { kind: "subtask", parent: key(0), before: null })).toEqual({ kind: "gap", index: 4, level: 1, group: null });
+		expect(gapOf(sectioned, { kind: "subtask", parent: key(1), before: null })).toEqual({ kind: "gap", index: 3, level: 1, group: "X" });
+	});
+
+	it("puts a place before a card right before it, at its level", () => {
+		expect(gapOf(CARDS, { kind: "subtask", parent: key(0), before: key(0, [1]) })).toEqual({ kind: "gap", index: 2, level: 1, group: null });
+		expect(gapOf(sectioned, { kind: "task", group: "Y", before: key(2) })).toEqual({ kind: "gap", index: 3, level: 0, group: "Y" });
 	});
 });

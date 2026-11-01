@@ -254,7 +254,7 @@ export class DragController {
 		const float = new FloatingCard(null, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
-		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: shownCardSize().height / 2, grabX: e.clientX - origin.left };
+		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };
 		let placed: PlacedResult | null = null;
 		this.follow(
 			source,

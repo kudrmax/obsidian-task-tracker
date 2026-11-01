@@ -23,6 +23,7 @@ import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { TaskMenu } from "./menu/TaskMenu";
 import { TaskSheet } from "./sheet/TaskSheet";
+import { QuickEntryController } from "./quick/QuickEntryController";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
@@ -100,6 +101,8 @@ export class TaskCalendarView extends ItemView {
 	/** A card dropped on New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
 	private switching = 0;
+	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
+	private quick: QuickEntryController | null = null;
 	private readonly unsubscribe: (() => void)[] = [];
 
 	constructor(
@@ -134,6 +137,7 @@ export class TaskCalendarView extends ItemView {
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
+				this.quick?.onDragging(active);
 				if (active) {
 					this.postponeZones?.show();
 					for (const zones of this.groupZones) zones.show();
@@ -185,9 +189,10 @@ export class TaskCalendarView extends ItemView {
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("left") !== null,
 			pending: () => this.namingIn("left"),
+			entry: () => this.quick?.entryIn("left") ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "left", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
 		this.inboxEl = el(root, "div", "tc-inbox");
@@ -196,20 +201,22 @@ export class TaskCalendarView extends ItemView {
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
 			pending: () => this.namingIn("inbox"),
+			entry: () => this.quick?.entryIn("inbox") ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "inbox", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon", () => this.sectionsOf("inbox"));
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon" || drag.from === "new", () => this.sectionsOf("inbox"));
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
 			pending: () => this.namingIn("soon"),
+			entry: () => this.quick?.entryIn("soon") ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.groups.ungrouped,
-			onCard: (card, item, subtree) => this.drag.attachCard(card, item, "soon", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -259,9 +266,9 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
 		});
-		this.newTask = new NewTaskButton(root, "now", () => this.newTaskSheet(this.selectedDate === this.today() ? { kind: "now" } : { kind: "date", date: this.selectedDate }, null));
-		this.newSoon = new NewTaskButton(root, "soon", () => this.newTaskSheet({ kind: "soon" }, null));
-		this.newInbox = new NewTaskButton(root, "inbox", () => this.newTaskSheet({ kind: "inbox" }, null));
+		this.newTask = new NewTaskButton(root, "now", () => this.quick?.openAtEnd("left"));
+		this.newSoon = new NewTaskButton(root, "soon", () => this.quick?.openAtEnd("soon"));
+		this.newInbox = new NewTaskButton(root, "inbox", () => this.quick?.openAtEnd("inbox"));
 		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
 		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
 		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
@@ -281,9 +288,33 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 		});
 		this.switcher = switcher;
+		this.quick = new QuickEntryController({
+			root,
+			tasks: this.deps.tasks,
+			arbiter: this.arbiter,
+			drag: this.drag,
+			list: (column) => this.listOf(column),
+			newTasks: () => [this.newTask, this.newSoon, this.newInbox].filter((button) => button !== null),
+			dropTargets: () => {
+				const shown = this.shownDrops();
+				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
+			},
+			levels: () => this.settings.priorities,
+			today: () => this.today(),
+			day: () => this.selectedDate,
+			mode: () => this.settings.rightMode,
+			turnTo: (mode) => this.switcher?.show(mode),
+			showDay: (date) => {
+				this.select(date);
+				return this.data.tasks();
+			},
+			fresh: () => this.data.tasks(),
+			render: () => this.render(),
+			onError: (error) => this.reportFailure(error),
+		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
-			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet")),
+			accepts: (target) => !(target instanceof Element && target.closest(".tc-sheet, .tc-quick-row, .tc-quick-bar")),
 			onSwipe: (shift) => this.step(shift),
 		});
 		this.unsubscribe.push(
@@ -316,6 +347,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onClose(): Promise<void> {
+		this.quick?.close();
 		this.polling.stop();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
@@ -323,6 +355,7 @@ export class TaskCalendarView extends ItemView {
 	override onResize(): void {
 		this.measureNavigation();
 		this.fitListWidth();
+		this.quick?.reveal();
 	}
 
 	private get settings() {
@@ -419,6 +452,12 @@ export class TaskCalendarView extends ItemView {
 		await this.data.tasks();
 	}
 
+	/** A write the screen did not wait for failed: said as any failed change is, and the lists show the file as it is. */
+	private reportFailure(error: unknown): void {
+		new Notice(error instanceof Error ? error.message : String(error));
+		void this.data.tasks();
+	}
+
 	/** The settings' levels at this screen's height, the whole day first; the settings' own before the timeline is laid out. */
 	private zoomLevels(): ZoomLevel[] {
 		const configured = this.settings.zoomLevels;
@@ -471,13 +510,23 @@ export class TaskCalendarView extends ItemView {
 
 	/** The zones that put a task off, under the Today column, then the two columns the window shows. */
 	private dropTargets(): DropTarget[] {
-		const shown: Record<RightMode, (DropTarget | null)[]> = {
+		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...this.shownDrops()];
+	}
+
+	/** The two columns the window shows, as places to drop. */
+	private shownDrops(): (ListDrop | TimelineDrop)[] {
+		const shown: Record<RightMode, (ListDrop | TimelineDrop | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.soonDrop],
 		};
-		const columns = shown[this.settings.rightMode].filter((target): target is DropTarget => target !== null);
-		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...columns];
+		return shown[this.settings.rightMode].filter((target) => target !== null);
+	}
+
+	/** A list's card: its gestures, and hidden while the field renames it. */
+	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+		this.drag.attachCard(card, item, column, subtree);
+		this.quick?.dress(card, item);
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
@@ -627,6 +676,8 @@ export class TaskCalendarView extends ItemView {
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, opening?: "picker"): TaskMenu {
 		const tasks = this.deps.tasks;
 		const setDueDate = (date: LocalDate | null) => (opening === "picker" && date !== null ? tasks.postpone(item.key, date) : tasks.setDueDate(item.key, date));
+		/** A list's card is renamed and given subtasks in place; a timeline card, on the task screen for now. */
+		const inList = source.closest(".tc-list") !== null;
 		return TaskMenu.open({
 			item,
 			source,
@@ -640,8 +691,8 @@ export class TaskCalendarView extends ItemView {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				setDueDate: (date) => this.act(() => setDueDate(date)),
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				rename: () => this.editSheet(item),
-				addSubtask: () => this.subtaskSheet(item),
+				rename: () => (inList ? this.quick?.rename(item) : this.editSheet(item)),
+				addSubtask: () => (inList ? this.quick?.addSubtask(item) : this.subtaskSheet(item)),
 				remove: () => this.act(() => tasks.remove(item.key)),
 			},
 		});
@@ -677,6 +728,7 @@ export class TaskCalendarView extends ItemView {
 			if (this.selectedDate === this.today()) this.timeline.scrollTo(boundary.offsetOf(this.selectedDate, this.deps.clock.now()), LAYOUT.nowFraction);
 			else this.timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
 		}
+		this.quick?.rendered();
 	}
 
 	private renderMissing(root: HTMLElement): void {
