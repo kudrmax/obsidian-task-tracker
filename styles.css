@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-allday-extra-rows, --tc-y,
+ * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-nav-clear, --tc-status-clear, --tc-allday-extra-rows, --tc-y,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-col, --tc-cols, --tc-event-bg, --tc-event-bar, --tc-event-text) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -155,6 +155,8 @@ body {
 	--tc-handle-left: 3px;
 	/* How far Obsidian's phone navigation reaches up into the content; the code measures it. */
 	--tc-nav-clear: 0px;
+	/* How far Obsidian's desktop status bar reaches in from the right over the view's bottom; the code measures it. */
+	--tc-status-clear: 0px;
 
 	/* Sizes: cards */
 	/* The card's height and the gap between cards, in the list and in a stack on the timeline: the settings set them on the body. */
@@ -493,7 +495,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus { position: absolute; right: calc(var(--tc-space-16) + var(--tc-status-clear)); bottom: calc(var(--tc-nav-clear) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
 .tc-plus svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-plus); }
 .tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
@@ -806,7 +808,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
-.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); }
+.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 calc(var(--tc-space-6) + var(--tc-status-clear)) 0 var(--tc-space-6); display: flex; align-items: center; gap: var(--tc-space-4); }
 .tc-quick-bar::before { content: ""; position: absolute; inset: 0; z-index: var(--tc-layer-bar-ground); background: var(--tc-bar-bg); box-shadow: inset 0 var(--tc-hairline-half) 0 var(--tc-bar-line); }
 .tc-quick-bar > button { z-index: var(--tc-layer-bar-button); }
 .tc-bar-spacer { flex: 1; }

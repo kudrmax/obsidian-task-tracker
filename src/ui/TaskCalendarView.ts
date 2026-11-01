@@ -36,6 +36,7 @@ import { NewTaskButton } from "./NewTaskButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
+import { navigationClear, statusClear } from "./chrome";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -406,12 +407,15 @@ export class TaskCalendarView extends ItemView {
 		if (width > 0) this.contentEl.style.setProperty(PROPERTY.listWidth, px(shownListWidth(this.settings.listShare, width)));
 	}
 
-	/** Obsidian's phone navigation floats over the content; what is pinned to the bottom stays above it. */
+	/**
+	 * Obsidian's phone navigation floats over the content, and on the desktop its status bar over the bottom right corner;
+	 * what is pinned to the bottom stays clear of them.
+	 */
 	private measureNavigation(): void {
-		const nav = document.querySelector(".mobile-navbar");
 		const root = this.contentEl.getBoundingClientRect();
-		const clear = nav ? Math.max(0, root.bottom - nav.getBoundingClientRect().top) : 0;
-		this.contentEl.style.setProperty(PROPERTY.navClear, px(nav && nav.getBoundingClientRect().height > 0 ? clear : 0));
+		const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+		this.contentEl.style.setProperty(PROPERTY.navClear, px(navigationClear(root, box(".mobile-navbar"))));
+		this.contentEl.style.setProperty(PROPERTY.statusClear, px(statusClear(root, box(".status-bar"))));
 	}
 
 	/**
