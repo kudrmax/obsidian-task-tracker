@@ -94,17 +94,5 @@ function metrics(list: HTMLElement): string {
 	const view = list.closest(".tc-view") as HTMLElement | null;
 	const nav = document.querySelector(".mobile-navbar")?.getBoundingClientRect();
 	chain.push(`nav-clear=${view ? getComputedStyle(view).getPropertyValue("--tc-nav-clear") : "?"} navbar top=${nav ? Math.round(nav.top) : "none"} h=${nav ? Math.round(nav.height) : 0} window=${window.innerHeight}`);
-	const r = list.getBoundingClientRect();
-	const kids = Array.from(list.children) as HTMLElement[];
-	const last = kids[kids.length - 1]?.getBoundingClientRect();
-	const sum = kids.reduce((t, k) => t + k.getBoundingClientRect().height, 0);
-	const ps = getComputedStyle(list);
-	chain.push(`list rect ${Math.round(r.top)}..${Math.round(r.bottom)} kids=${kids.length} sumH=${Math.round(sum)} last.bottom=${last ? Math.round(last.bottom) : "-"} padB=${ps.paddingBottom} gap=${ps.rowGap} display=${ps.display}`);
-	chain.push(`kids: ${kids.map((k) => `${k.className.split(" ")[0]}:${Math.round(k.getBoundingClientRect().height)}`).join(" ")}`);
-	const x = Math.round(r.left + r.width / 2);
-	for (const y of [r.bottom - 200, r.bottom - 150, r.bottom - 100, r.bottom - 50, r.bottom - 10]) {
-		const hit = document.elementFromPoint(x, y);
-		chain.push(`at y=${Math.round(y)}: ${describe(hit)}`);
-	}
 	return chain.join("\n    ");
 }
