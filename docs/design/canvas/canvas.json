@@ -1335,6 +1335,38 @@
    "h": 280,
    "page": "components",
    "title": "Компонент колёсика (его показывают доски «Колёсико»)"
+  },
+  "MenuOrder.dc.html": {
+   "x": 1880,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент меню задачи по группам (его показывают доски «Меню задачи»)"
+  },
+  "MenuGroupedShort.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Три уровня в ряд; крестик на выбранном снимает приоритет"
+  },
+  "MenuGroupedLong.dc.html": {
+   "x": 470,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Четыре уровня с длинными именами: два ряда по две, текст гаснет к краю"
+  },
+  "MenuGroupedUnset.dc.html": {
+   "x": 940,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "menuorder",
+   "title": "Задача без приоритета: ничего не выбрано, крестика нет"
   }
  },
  "createdOnFiles": {
@@ -1372,7 +1404,8 @@
   "tasksTitle",
   "tasksRulesProd",
   "step14shape",
-  "wheel30Title"
+  "wheel30Title",
+  "menugroupedTitle"
  ],
  "notes": {
   "lightTitle": {
@@ -1629,6 +1662,14 @@
    "text": "Колёсико: окно стоит в центре экрана, иконки крутятся под пальцем, по бокам — только соседи",
    "x": 0,
    "y": -300
+  },
+  "menugroupedTitle": {
+   "kind": "title1",
+   "maxW": 1330,
+   "page": "menuorder",
+   "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
+   "x": 0,
+   "y": -300
   }
  },
  "order": [
@@ -1798,7 +1839,11 @@
   "Wheel30DrumCal.dc.html",
   "Wheel30DrumDrag.dc.html",
   "Wheel30DrumLight.dc.html",
-  "Wheel30.dc.html"
+  "Wheel30.dc.html",
+  "MenuOrder.dc.html",
+  "MenuGroupedShort.dc.html",
+  "MenuGroupedLong.dc.html",
+  "MenuGroupedUnset.dc.html"
  ],
  "pages": [
   {
@@ -1836,6 +1881,10 @@
   {
    "id": "wheel30",
    "name": "Колёсико"
+  },
+  {
+   "id": "menuorder",
+   "name": "Меню задачи"
   },
   {
    "id": "components",
