@@ -1,5 +1,5 @@
 import type { PriorityColor } from "../../settings";
-import { PROPERTY } from "../design";
+import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { icon } from "../icons";
 import { MENU_ICONS, type MenuIconName, menuIcon } from "./menuIcons";
@@ -87,13 +87,50 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 	return row;
 }
 
+/** The part of the window a menu may take: inside the margin, clear of the phone's status bar and home indicator. */
+export interface MenuRoom {
+	readonly top: number;
+	readonly bottom: number;
+	readonly right: number;
+	readonly windowHeight: number;
+}
+
+export function menuRoom(): MenuRoom {
+	const probe = el(document.body, "div", "tc-safe-probe");
+	const style = getComputedStyle(probe);
+	const margin = tokenPx(probe, "--tc-whole-margin");
+	const room: MenuRoom = {
+		top: (parseFloat(style.paddingTop) || 0) + margin,
+		bottom: window.innerHeight - (parseFloat(style.paddingBottom) || 0) - margin,
+		right: window.innerWidth,
+		windowHeight: window.innerHeight,
+	};
+	probe.remove();
+	return room;
+}
+
 /**
  * Puts a fixed panel under `anchor`, aligned to its left edge, or over it when it would not fit below; the sheet adds the
- * gap. The panel is measured by its layout, not its box on screen: it is placed while it is still shrunk to grow in.
+ * gap. When it fits on neither side, it goes under the anchor raised as far as it takes, never past the room's top, and
+ * scrolls what still doesn't fit. Returns how far the anchor is to be raised. The panel is measured by its layout, not
+ * its box on screen: it is placed while it is still shrunk to grow in.
  */
-export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, viewportBottom: number, viewportRight = window.innerWidth): void {
-	panel.style.left = px(Math.max(0, Math.min(anchor.left, viewportRight - gap - panel.offsetWidth)));
-	const fitsBelow = anchor.bottom + gap + panel.offsetHeight <= viewportBottom;
-	panel.classList.toggle("is-above", !fitsBelow);
-	panel.style.setProperty(PROPERTY.panelY, px(fitsBelow ? anchor.bottom : viewportBottom - anchor.top));
+export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom): number {
+	panel.style.maxHeight = "";
+	panel.classList.remove("is-scrolled");
+	panel.style.left = px(Math.max(0, Math.min(anchor.left, room.right - gap - panel.offsetWidth)));
+	const height = panel.offsetHeight;
+	const fitsBelow = anchor.bottom + gap + height <= room.bottom;
+	const fitsAbove = anchor.top - gap - height >= room.top;
+	const above = !fitsBelow && fitsAbove;
+	const raise = fitsBelow || above ? 0 : Math.max(0, Math.min(anchor.bottom + gap + height - room.bottom, anchor.top - room.top));
+	const top = anchor.bottom - raise;
+	const space = room.bottom - top - gap;
+	if (!above && height > space) {
+		panel.style.maxHeight = px(space);
+		panel.classList.add("is-scrolled");
+	}
+	panel.classList.toggle("is-above", above);
+	panel.style.setProperty(PROPERTY.panelY, px(above ? room.windowHeight - anchor.top : top));
+	return raise;
 }

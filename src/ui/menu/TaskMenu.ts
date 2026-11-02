@@ -9,7 +9,7 @@ import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { type CloseHow, Overlay } from "./Overlay";
 import { dueOptions } from "./dueOptions";
-import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, placePanel, tileGroup } from "./MenuPanel";
+import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
@@ -282,9 +282,11 @@ export class TaskMenu {
 		});
 	}
 
+	/** A menu too tall for either side of the card raises the card with it, as far as the panel needs. */
 	private place(): void {
-		placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), window.innerHeight);
-		this.peek?.place(this.anchor, this.panel);
+		this.raise(placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom()));
+		const anchor = this.anchor;
+		this.peek?.place(new DOMRect(anchor.x, anchor.y - this.raisedBy, anchor.width, anchor.height), this.panel);
 	}
 
 	private pick(action: () => void | Promise<void>): () => void {

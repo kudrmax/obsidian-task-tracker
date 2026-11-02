@@ -1,6 +1,6 @@
 import { tokenPx } from "../design";
 import { el, px } from "../dom";
-import { menuGroup, placePanel } from "./MenuPanel";
+import { menuGroup, menuRoom, placePanel } from "./MenuPanel";
 import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
@@ -29,7 +29,8 @@ export const GroupMenu = {
 			{ label: "Rename", icon: "rename", onPick: pick(opts.onRename) },
 			{ label: "Remove section", icon: "removeSection", onPick: pick(opts.onRemove) },
 		]);
-		placePanel(panel, rect, tokenPx(panel, "--tc-menu-gap"), window.innerHeight);
+		const raise = placePanel(panel, rect, tokenPx(panel, "--tc-menu-gap"), menuRoom());
+		copy.style.top = px(rect.top - raise);
 		overlay.show();
 		return { close: () => overlay.close() };
 	},
