@@ -37,9 +37,11 @@ interface SetUp {
 	items?: Partial<Record<ListColumn, TaskItem[]>>;
 	/** The tasks on the timeline. */
 	slotted?: TaskItem[];
+	/** Obsidian on the desktop, its status bar's top this far down; the phone without. */
+	desktop?: { readonly chromeTop: number };
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [] }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	let mode = startMode;
@@ -106,6 +108,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		dropTargets: () => ({ lists: drops, timeline: null }),
 		levels: () => [{ prefix: "p1", color: "red" }],
 		today: () => TODAY,
+		desktop: () => desktop !== undefined,
+		chromeTop: () => desktop?.chromeTop ?? Infinity,
 		day: () => day,
 		mode: () => mode,
 		turnTo: (to) => {
@@ -414,6 +418,56 @@ describe("QuickEntryController", () => {
 		height = 71;
 		type("A text long enough to wrap onto three lines");
 		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
+	});
+
+	describe("on the desktop", () => {
+		/** The field at the end of Inbox, `fieldTop` px down the list's content; the view 500 px tall, the status bar from 476. */
+		function onDesk(fieldTop = 300) {
+			const set = setUp({ desktop: { chromeTop: 476 } });
+			set.controller.openAtEnd("inbox");
+			set.root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
+			const list = set.lists.inbox.el;
+			list.getBoundingClientRect = () => new DOMRect(0, 0, 175, 500);
+			list.scrollTop = 0;
+			set.field()!.getBoundingClientRect = () => new DOMRect(10, fieldTop - list.scrollTop, 175, 35);
+			const bar = set.root.querySelector<HTMLElement>(".tc-quick-bar")!;
+			bar.getBoundingClientRect = () => new DOMRect(parseFloat(bar.style.left) || 0, parseFloat(bar.style.top) || 0, 105, 32);
+			set.render();
+			return { ...set, list, bar };
+		}
+
+		it("stands the capsule right under the field, right edges together", () => {
+			const { bar } = onDesk();
+			expect(bar.classList.contains("is-desk")).toBe(true);
+			expect([bar.style.left, bar.style.top]).toEqual([`${185 - 105}px`, `${335 + 8}px`]);
+		});
+
+		it("scrolls a field near the bottom up until the capsule fits under it, over the status bar", () => {
+			const { bar, list } = onDesk(600);
+			expect(list.scrollTop).toBe(600 + 35 - (476 - 32 - 2 * 8));
+			expect(bar.style.top).toBe(`${476 - 8 - 32}px`);
+		});
+
+		it("follows the field as its list scrolls, and goes over it at the bottom of the column", () => {
+			const { bar, list, field } = onDesk();
+			const scrollTo = (top: number) => {
+				field()!.getBoundingClientRect = () => new DOMRect(10, top, 175, 35);
+				list.dispatchEvent(new Event("scroll"));
+			};
+			scrollTo(380);
+			expect(bar.style.top).toBe(`${380 + 35 + 8}px`);
+			scrollTo(450);
+			expect(bar.style.top).toBe(`${450 - 8 - 32}px`);
+		});
+
+		it("follows the field once the columns have slid under it", () => {
+			const { bar, field, root } = onDesk();
+			field()!.getBoundingClientRect = () => new DOMRect(-400, 300, 175, 35);
+			root.dispatchEvent(new Event("scroll"));
+			field()!.getBoundingClientRect = () => new DOMRect(10, 250, 175, 35);
+			root.firstElementChild!.dispatchEvent(new Event("transitionend", { bubbles: true }));
+			expect([bar.style.left, bar.style.top]).toEqual([`${185 - 105}px`, `${285 + 8}px`]);
+		});
 	});
 
 	describe("a list the finger scrolled away from the field", () => {

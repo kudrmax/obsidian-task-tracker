@@ -40,6 +40,10 @@ export interface QuickEntryControllerDeps {
 	dropTargets(): { readonly lists: readonly ColumnDrop[]; readonly timeline: DropTarget | null };
 	levels(): readonly PriorityLevel[];
 	today(): LocalDate;
+	/** Obsidian runs on the desktop: the bar is a capsule by the field, not a bar over the keyboard. */
+	desktop(): boolean;
+	/** Where Obsidian's own chrome starts under the view: the top of its desktop status bar while it shows, else Infinity. */
+	chromeTop(): number;
 	/** The day the day column shows. */
 	day(): LocalDate;
 	mode(): RightMode;
@@ -134,10 +138,17 @@ export class QuickEntryController {
 	/** Where the last reveal left each scroller: a scroll to anywhere else is the finger's. */
 	private readonly revealedAt = new WeakMap<Element, number>();
 	private readonly scrolled = (e: Event) => {
-		const scroller = this.state ? this.scrollerOf(this.state.spot) : null;
+		const state = this.state;
+		if (!state) return;
+		this.followBar(state);
+		const scroller = this.scrollerOf(state.spot);
 		if (!scroller || e.target !== scroller) return;
 		const at = this.revealedAt.get(scroller);
 		if (at === undefined || Math.abs(scroller.scrollTop - at) >= 1) this.follow = false;
+	};
+	/** The columns slid or a card settled: the field may stand elsewhere now, and the bar goes with it. */
+	private readonly settled = () => {
+		if (this.state) this.followBar(this.state);
 	};
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
@@ -159,6 +170,7 @@ export class QuickEntryController {
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
+			desktop: () => deps.desktop(),
 			levels: () => deps.levels(),
 			today: () => deps.today(),
 			onIndent: (delta) => this.entry.indent(delta),
@@ -169,6 +181,7 @@ export class QuickEntryController {
 		document.addEventListener("pointerdown", this.pressed, true);
 		document.addEventListener("mousedown", this.mousePressed, true);
 		deps.root.addEventListener("scroll", this.scrolled, true);
+		deps.root.addEventListener("transitionend", this.settled, true);
 	}
 
 	/** New task, or a double click on a list's free room: the field at the end of the column. */
@@ -294,8 +307,8 @@ export class QuickEntryController {
 	 */
 	reveal(): void {
 		const state = this.state;
-		if (state) this.liftBar(state);
 		if (state && this.follow) this.bringIntoSight(state);
+		if (state) this.followBar(state);
 	}
 
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
@@ -304,6 +317,7 @@ export class QuickEntryController {
 		document.removeEventListener("pointerdown", this.pressed, true);
 		document.removeEventListener("mousedown", this.mousePressed, true);
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
+		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.entry.blur();
 		this.bar.hide();
 	}
@@ -428,12 +442,15 @@ export class QuickEntryController {
 		return null;
 	}
 
-	/** The list or the timeline scrolls the field into sight, at least 16 px over the bar; a menu raises the parts over its blur. */
+	/**
+	 * The list or the timeline scrolls the field into sight: on the phone at least 16 px over the bar, on the desktop with
+	 * room under it for the capsule; a menu raises the parts over its blur.
+	 */
 	private bringIntoSight(state: EntryState): void {
 		const field = this.field?.el;
 		if (!field?.isConnected) return;
 		const rect = field.getBoundingClientRect();
-		const limit = this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
+		const limit = this.deps.desktop() ? this.roomOf(state).bottom - this.bar.room : this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
 		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
@@ -448,9 +465,23 @@ export class QuickEntryController {
 		this.revealedAt.set(scroller, scroller.scrollTop);
 	}
 
-	/** Over a menu's blur the bar stands above it, at the bottom of the view. */
-	private liftBar(state: EntryState): void {
-		this.bar.lift(state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null);
+	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */
+	private followBar(state: EntryState): void {
+		const field = this.field?.el;
+		this.bar.follow({
+			field: field?.isConnected ? field.getBoundingClientRect() : null,
+			room: this.roomOf(state),
+			overMenu: state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null,
+		});
+	}
+
+	/** What shows of the field's list or timeline (the view for a menu's stack), down to the top of Obsidian's status bar. */
+	private roomOf(state: EntryState): DOMRect {
+		const view = this.deps.root.getBoundingClientRect();
+		const box = this.scrollerOf(state.spot)?.getBoundingClientRect() ?? view;
+		const top = Math.max(box.top, view.top);
+		const bottom = Math.min(box.bottom, view.bottom, this.deps.chromeTop());
+		return new DOMRect(box.left, top, box.width, Math.max(0, bottom - top));
 	}
 
 	private showPlus(): void {
@@ -478,7 +509,7 @@ export class QuickEntryController {
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setPriority(level);
 		this.bar.show(this.barState(state, level));
-		this.liftBar(state);
+		this.followBar(state);
 	}
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {

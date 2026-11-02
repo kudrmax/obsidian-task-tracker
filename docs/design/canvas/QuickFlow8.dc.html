@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>8. Десктоп: панель у поля</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 6448px; height: 2040px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">8. Десктоп: панель у поля</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 6320px; font-size: 18px; line-height: 24px; color: #6B6A65;">На десктопе клавиатуры нет, поэтому полосы во всю ширину нет: те же кнопки в том же порядке собраны в капсулу в стиле дорожки колёсика (высота 32, отступ 2, скругление 16) и стоят прямо под полем, правый край по правому краю поля, зазор 8. Капсула идёт за полем (Enter, сдвиг, прокрутка); нет места внизу — встаёт над полем. Панели открываются от капсулы, по её правому краю. Подсказки клавиш — системные. Телефон не меняется (решение Макса от 02.11, отдано мне)</div>
+<sc-for list="{wins}" as="p" hint-placeholder-count="10">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 1200px; height: 800px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="QuickDesk" view="{{p.view}}" theme="{{p.theme}}" hint-size="1200px,800px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.ctop}}px; width: 1200px; font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":6448,"height":2040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { wins: [{"left": 64, "top": 168, "ctop": 982, "view": "typing", "theme": "dark", "caption": "Тёмная. Пишут задачу в Now: капсула под полем, правый край по полю, зазор 8. Подсказка клавиши — системная (Tab)"}, {"left": 1344, "top": 168, "ctop": 982, "view": "priority", "theme": "dark", "caption": "Тёмная. Флажок: панель приоритета под капсулой, правый край по капсуле. Поле окрасилось уровнем"}, {"left": 2624, "top": 168, "ctop": 982, "view": "subtask", "theme": "dark", "caption": "Тёмная. Подзадача: кнопки места нет, капсула короче и всё так же у правого края поля. Shift+Tab — назад"}, {"left": 3904, "top": 168, "ctop": 982, "view": "place", "theme": "dark", "caption": "Тёмная. Место: четыре плитки под капсулой; текущая — с кольцом"}, {"left": 5184, "top": 168, "ctop": 982, "view": "above", "theme": "dark", "caption": "Тёмная. Поле у низа окна, над строкой состояния: места под ним нет — капсула и панель (месяц) встают над полем"}, {"left": 64, "top": 1090, "ctop": 1904, "view": "typing", "theme": "light", "caption": "Светлая. Пишут задачу в Now: капсула под полем, правый край по полю, зазор 8. Подсказка клавиши — системная (Tab)"}, {"left": 1344, "top": 1090, "ctop": 1904, "view": "priority", "theme": "light", "caption": "Светлая. Флажок: панель приоритета под капсулой, правый край по капсуле. Поле окрасилось уровнем"}, {"left": 2624, "top": 1090, "ctop": 1904, "view": "subtask", "theme": "light", "caption": "Светлая. Подзадача: кнопки места нет, капсула короче и всё так же у правого края поля. Shift+Tab — назад"}, {"left": 3904, "top": 1090, "ctop": 1904, "view": "place", "theme": "light", "caption": "Светлая. Место: четыре плитки под капсулой; текущая — с кольцом"}, {"left": 5184, "top": 1090, "ctop": 1904, "view": "above", "theme": "light", "caption": "Светлая. Поле у низа окна, над строкой состояния: места под ним нет — капсула и панель (месяц) встают над полем"}] };
+  }
+}
+</script>
+</body>
+</html>

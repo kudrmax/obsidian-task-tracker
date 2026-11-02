@@ -1599,6 +1599,22 @@
    "h": 740,
    "page": "progress",
    "title": "3.5 Полосы медленно бегут"
+  },
+  "QuickFlow8.dc.html": {
+   "h": 2040,
+   "page": "quickadd",
+   "title": "8. Десктоп: панель у поля",
+   "w": 6448,
+   "x": 0,
+   "y": 8932
+  },
+  "QuickDesk.dc.html": {
+   "x": 4514,
+   "y": 0,
+   "w": 1200,
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экранов быстрого ввода на десктопе (его показывает доска «8. Десктоп: панель у поля»)"
   }
  },
  "createdOnFiles": {
@@ -2150,7 +2166,9 @@
   "ProgressHatchMeta.dc.html",
   "ProgressHatchWide.dc.html",
   "ProgressHatchWideFade.dc.html",
-  "ProgressHatchMove.dc.html"
+  "ProgressHatchMove.dc.html",
+  "QuickFlow8.dc.html",
+  "QuickDesk.dc.html"
  ],
  "pages": [
   {
