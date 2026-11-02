@@ -327,6 +327,8 @@ export class TaskCalendarView extends ItemView {
 			},
 			levels: () => this.settings.priorities,
 			today: () => this.today(),
+			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
+			chromeTop: () => statusBarTop(root.ownerDocument),
 			day: () => this.selectedDate,
 			mode: () => this.settings.rightMode,
 			turnTo: (mode) => this.switcher?.show(mode),
@@ -766,4 +768,11 @@ export class TaskCalendarView extends ItemView {
 		button.addEventListener("click", () => void this.act(() => this.deps.tasks.createFile()));
 	}
 
+}
+
+/** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */
+function statusBarTop(doc: Document): number {
+	const bar = doc.body.querySelector<HTMLElement>(":scope > .app-container > .status-bar");
+	const box = bar?.getBoundingClientRect();
+	return box && box.height > 0 ? box.top : Infinity;
 }

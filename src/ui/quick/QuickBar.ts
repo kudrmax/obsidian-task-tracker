@@ -1,6 +1,7 @@
 import type { Placement } from "../../application/contracts";
 import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
+import { DESIGN } from "../design";
 import { clear, el, px } from "../dom";
 import { icon } from "../icons";
 import { type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
@@ -9,6 +10,7 @@ import { MonthPicker } from "../menu/MonthPicker";
 import { tileRows } from "../menu/TaskMenu";
 import { placeLabel } from "../placeLabel";
 import type { LocalDate } from "../types";
+import { barBesideField, panelSide, type Side } from "./barPlacement";
 
 export interface QuickBarState {
 	/** The field can move one level in or out; a button that cannot is greyed. */
@@ -21,7 +23,19 @@ export interface QuickBarState {
 	readonly place: Placement | null;
 }
 
+/** Where the field stands, for the bar to stand by it. */
+export interface BarAnchor {
+	/** Null while the field is not drawn. */
+	readonly field: DOMRect | null;
+	/** What shows of the field's column, under Obsidian's status bar: the desktop bar and its panels stay inside it. */
+	readonly room: DOMRect;
+	/** The view's box while the field is over a menu's blur, which lies over the whole page; null otherwise. */
+	readonly overMenu: DOMRect | null;
+}
+
 export interface QuickBarDeps {
+	/** Obsidian runs on the desktop: no keyboard rises, the bar is a capsule by the field. */
+	desktop(): boolean;
 	levels(): readonly PriorityLevel[];
 	today(): LocalDate;
 	onIndent(delta: 1 | -1): void;
@@ -50,9 +64,11 @@ const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
 
 /**
- * The bar over the keyboard while a task is typed: shift buttons on the left, the priority flag and the place on the right.
- * The flag and the place open a panel above the bar, one at a time. The bar knows nothing of the entry: it shows the state
- * it is given and reports taps. A press on the bar or its panels never takes the focus from the field.
+ * The bar of a task being typed: the shift buttons, the priority flag and the place. On the phone it lies over the keyboard,
+ * the shift buttons on the left, the rest on the right, and its panels open above it. On the desktop the same buttons are a
+ * capsule right under the field, right edges together, or over the field where there is no room under it; its panels open
+ * from it, away from the field. One panel at a time. The bar knows nothing of the entry: it shows the state it is given and
+ * reports taps. A press on the bar or its panels never takes the focus from the field.
  */
 export class QuickBar {
 	private readonly bar: HTMLElement;
@@ -63,6 +79,10 @@ export class QuickBar {
 	private readonly placeText: HTMLElement;
 	private state: QuickBarState | null = null;
 	private panel: OpenPanel | null = null;
+	/** Where the desktop capsule stands: the room it was placed in and the side of the field it took. */
+	private desk: { readonly room: DOMRect; readonly side: Side } | null = null;
+	/** The field the bar last stood by: a panel opening or closing moves the desktop capsule to make room for it. */
+	private anchor: BarAnchor | null = null;
 	private readonly pressOutside = (e: Event) => {
 		if (!(e.target instanceof Node) || !this.bar.contains(e.target)) this.closePanel();
 	};
@@ -71,22 +91,25 @@ export class QuickBar {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
-		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", -1);
-		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", 1);
+		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
+		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		el(this.bar, "span", "tc-bar-spacer");
 		this.flag = el(this.bar, "button", "tc-bar-flag");
 		this.flag.setAttribute("aria-label", "Priority");
+		this.flag.title = "Priority";
 		this.flag.appendChild(menuIcon("priority"));
 		this.flag.addEventListener("click", () => this.toggle("priority"));
 		this.place = el(this.bar, "button", "tc-bar-place");
 		this.place.setAttribute("aria-label", "Place");
+		this.place.title = "Place";
 		this.placeText = el(this.place, "span", "tc-bar-place-label");
 		this.place.addEventListener("click", () => this.toggle("place"));
 	}
 
-	private shiftButton(cls: string, name: "outdent" | "indent", label: string, delta: 1 | -1): HTMLButtonElement {
+	private shiftButton(cls: string, name: "outdent" | "indent", label: string, key: string, delta: 1 | -1): HTMLButtonElement {
 		const button = el(this.bar, "button", `tc-bar-shift ${cls}`);
 		button.setAttribute("aria-label", label);
+		button.title = `${label} (${key})`;
 		button.appendChild(icon(name));
 		button.addEventListener("click", () => this.deps.onIndent(delta));
 		return button;
@@ -95,6 +118,7 @@ export class QuickBar {
 	show(state: QuickBarState): void {
 		this.state = state;
 		this.bar.hidden = false;
+		this.bar.classList.toggle("is-desk", this.deps.desktop());
 		this.outdent.hidden = this.indent.hidden = !state.indents;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
@@ -110,25 +134,59 @@ export class QuickBar {
 	hide(): void {
 		this.closePanel();
 		this.bar.hidden = true;
-		this.lift(null);
+		this.follow(null);
 	}
 
 	/**
-	 * Over a menu's blur, which lies over the whole page, the bar leaves the view for the page and stands at the bottom of
-	 * `view`, the view's box, above the blur; null puts it back last in the view.
+	 * The bar stands by the field `anchor` gives, after the field moved, grew or scrolled or the view changed. Over a menu's
+	 * blur it leaves the view for the page, above the blur; null puts it back last in the view.
 	 */
-	lift(view: DOMRect | null): void {
-		this.bar.classList.toggle("is-over", view !== null);
-		if (view) {
-			const page = this.bar.ownerDocument.body;
-			if (this.bar.parentElement !== page) page.appendChild(this.bar);
-			this.bar.style.left = px(view.left);
-			this.bar.style.width = px(view.width);
-			this.bar.style.bottom = px(window.innerHeight - view.bottom);
-			return;
-		}
-		if (this.bar.parentElement !== this.parent) this.parent.appendChild(this.bar);
-		for (const property of ["left", "width", "bottom"]) this.bar.style.removeProperty(property);
+	follow(anchor: BarAnchor | null): void {
+		this.anchor = anchor;
+		for (const property of ["left", "top", "width", "bottom"]) this.bar.style.removeProperty(property);
+		const over = anchor?.overMenu ?? null;
+		this.bar.classList.toggle("is-over", over !== null);
+		const holder = over ? this.bar.ownerDocument.body : this.parent;
+		if (this.bar.parentElement !== holder) holder.appendChild(this.bar);
+		this.desk = null;
+		this.bar.classList.remove("is-away");
+		if (anchor && this.deps.desktop()) this.standBy(anchor);
+		else if (over) this.dock(over);
+	}
+
+	/** Over a menu's blur on the phone: at the bottom of the view's box, above the blur. */
+	private dock(view: DOMRect): void {
+		this.bar.style.left = px(view.left);
+		this.bar.style.width = px(view.width);
+		this.bar.style.bottom = px(window.innerHeight - view.bottom);
+	}
+
+	/** On the desktop: the capsule by the field, inside the room; out of sight while no part of the field shows. */
+	private standBy(anchor: BarAnchor): void {
+		const size = this.bar.getBoundingClientRect();
+		const panel = this.panel?.el.offsetHeight ?? 0;
+		const spot = anchor.field ? barBesideField(anchor.field, anchor.room, size, DESIGN.deskBarGap, panel) : null;
+		this.bar.classList.toggle("is-away", spot === null);
+		if (!spot) return;
+		const origin = anchor.overMenu ? { left: 0, top: 0 } : this.parent.getBoundingClientRect();
+		this.bar.style.left = px(spot.left - origin.left);
+		this.bar.style.top = px(spot.top - origin.top);
+		this.desk = { room: anchor.room, side: spot.side };
+		this.sidePanel();
+	}
+
+	/** On the desktop the open panel takes the side of the capsule away from the field, unless it fits only on the other. */
+	private sidePanel(): void {
+		const panel = this.panel?.el;
+		if (!panel) return;
+		const side: Side = this.desk ? panelSide(this.bar.getBoundingClientRect(), this.desk.side, panel.offsetHeight, this.desk.room, DESIGN.deskBarGap) : "above";
+		panel.classList.toggle("is-above", side === "above");
+		panel.classList.toggle("is-below", side === "below");
+	}
+
+	/** How much room the bar takes from what shows the field: on the phone at the bottom, on the desktop under the field. */
+	get room(): number {
+		return this.deps.desktop() ? this.bar.getBoundingClientRect().height + 2 * DESIGN.deskBarGap : DESIGN.barHeight;
 	}
 
 	private levels(): readonly PriorityLevel[] {
@@ -150,6 +208,7 @@ export class QuickBar {
 	private openPanel(kind: PanelKind): void {
 		const panel = el(this.bar, "div", "tc-panel tc-quick-panel is-above");
 		this.panel = { kind, el: panel, picking: false };
+		this.bar.dataset.panel = kind;
 		this.renderPanel();
 		panel.getBoundingClientRect(); // lays the panel out shrunk, so adding is-shown grows it in
 		panel.classList.add("is-shown");
@@ -160,6 +219,8 @@ export class QuickBar {
 		if (!this.panel) return;
 		this.panel.el.remove();
 		this.panel = null;
+		delete this.bar.dataset.panel;
+		this.restand();
 		this.bar.ownerDocument.removeEventListener("pointerdown", this.pressOutside, true);
 	}
 
@@ -179,6 +240,13 @@ export class QuickBar {
 		if (panel.kind === "priority") this.renderLevels(panel.el);
 		else if (panel.picking) this.renderPicker(panel.el);
 		else this.renderPlaces(panel.el);
+		this.restand();
+	}
+
+	/** A panel opened, closed or changed its height: the desktop capsule takes the side of the field with room for both. */
+	private restand(): void {
+		if (this.desk && this.anchor) this.follow(this.anchor);
+		else this.sidePanel();
 	}
 
 	private picked(action: () => void): () => void {

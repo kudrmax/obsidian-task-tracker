@@ -12,13 +12,14 @@ const LEVELS: readonly PriorityLevel[] = [
 
 const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" } };
 
-function setup(state: Partial<QuickBarState> = {}) {
+function setup(state: Partial<QuickBarState> = {}, desktop = false) {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const indents: (1 | -1)[] = [];
 	const priorities: (string | null)[] = [];
 	const places: Placement[] = [];
 	const bar = new QuickBar(parent, {
+		desktop: () => desktop,
 		levels: () => LEVELS,
 		today: () => "2026-11-01",
 		onIndent: (delta) => indents.push(delta),
@@ -41,7 +42,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { levels: () => LEVELS, today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -144,7 +145,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { levels: () => [], today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -303,13 +304,85 @@ describe("QuickBar over a menu", () => {
 		const { parent, bar } = setup();
 		parent.appendChild(document.createElement("span"));
 		const el = q<HTMLElement>(document, ".tc-quick-bar");
-		bar.lift(new DOMRect(10, 0, 300, window.innerHeight - 50));
+		bar.follow({ field: null, room: new DOMRect(0, 0, 300, 400), overMenu: new DOMRect(10, 0, 300, window.innerHeight - 50) });
 		expect(el.parentElement).toBe(document.body);
 		expect(el.classList.contains("is-over")).toBe(true);
 		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["10px", "300px", "50px"]);
-		bar.lift(null);
+		bar.follow(null);
 		expect(parent.lastElementChild).toBe(el);
 		expect(el.classList.contains("is-over")).toBe(false);
 		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["", "", ""]);
+	});
+});
+
+describe("QuickBar on the desktop", () => {
+	const VIEW = new DOMRect(100, 50, 800, 600);
+	const ROOM_BOX = new DOMRect(110, 90, 360, 540);
+	const SIZE = new DOMRect(0, 0, 183, 32);
+
+	function desk(state: Partial<QuickBarState> = {}) {
+		const set = setup(state, true);
+		set.parent.getBoundingClientRect = () => VIEW;
+		const el = q<HTMLElement>(document, ".tc-quick-bar");
+		el.getBoundingClientRect = () => new DOMRect(VIEW.left + (parseFloat(el.style.left) || 0), VIEW.top + (parseFloat(el.style.top) || 0), SIZE.width, SIZE.height);
+		return { ...set, el };
+	}
+
+	it("is a capsule right under the field, its right edge on the field's, in the view's own coordinates", () => {
+		const { bar, el } = desk();
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.classList.contains("is-desk")).toBe(true);
+		expect([el.style.left, el.style.top]).toEqual([`${120 + 350 - 183 - 100}px`, `${300 + 35 + 8 - 50}px`]);
+		expect(el.style.bottom).toBe("");
+	});
+
+	it("follows the field and goes over it where the column shows no room under it", () => {
+		const { bar, el } = desk();
+		bar.follow({ field: new DOMRect(120, 400, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.style.top).toBe(`${443 - 50}px`);
+		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.style.top).toBe(`${590 - 8 - 32 - 50}px`);
+	});
+
+	it("is out of sight while the field does not show, and back once it does", () => {
+		const { bar, el } = desk();
+		bar.follow({ field: new DOMRect(120, 20, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.classList.contains("is-away")).toBe(true);
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.classList.contains("is-away")).toBe(false);
+	});
+
+	it("over a menu's blur stands by the field on the page, in the screen's coordinates", () => {
+		const { bar, el } = desk({ place: null });
+		bar.follow({ field: new DOMRect(500, 300, 155, 35), room: VIEW, overMenu: VIEW });
+		expect(el.parentElement).toBe(document.body);
+		expect([el.style.left, el.style.top, el.style.width]).toEqual([`${655 - 183}px`, "343px", ""]);
+	});
+
+	it("opens its panel away from the field: under a capsule under the field, over a capsule over it", () => {
+		const { bar, el } = desk();
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		q(el, ".tc-bar-flag").click();
+		const panel = q<HTMLElement>(el, ".tc-quick-panel");
+		expect(panel.classList.contains("is-below")).toBe(true);
+		expect(el.dataset.panel).toBe("priority");
+		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(panel.classList.contains("is-above")).toBe(true);
+		expect(panel.classList.contains("is-below")).toBe(false);
+	});
+
+	it("names its keys in the buttons' tooltips", () => {
+		const { el } = desk();
+		expect(q(el, ".tc-bar-indent").title).toBe("Move in (Tab)");
+		expect(q(el, ".tc-bar-outdent").title).toBe("Move out (Shift+Tab)");
+	});
+
+	it("is the bar over the keyboard on the phone, whatever the field", () => {
+		const { parent, bar } = setup();
+		const el = q<HTMLElement>(parent, ".tc-quick-bar");
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(el.classList.contains("is-desk")).toBe(false);
+		expect([el.style.left, el.style.top]).toEqual(["", ""]);
+		expect(parent.lastElementChild).toBe(el);
 	});
 });

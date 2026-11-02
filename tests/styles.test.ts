@@ -208,6 +208,12 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-nav-room")).toBe("max(0px, var(--view-bottom-spacing, 0px))");
 	});
 
+	it("lets the foot fade give way while a task is typed, so a field at the end of a column shows whole: down to the status bar on the desktop, behind the bar on the phone", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(of("body:not(.is-mobile) .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-chrome-room)");
+		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-bar-h)");
+	});
+
 	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");

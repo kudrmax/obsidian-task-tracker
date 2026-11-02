@@ -286,6 +286,21 @@ body {
 	--tc-place-on-bg: rgba(255, 255, 255, 0.16);
 	--tc-place-icon: 18px;
 	--tc-radius-place: 16px;
+	/*
+	 * The quick bar on the desktop (board «8. Десктоп: панель у поля», QuickDesk.dc.html): no keyboard, so the same
+	 * buttons are a capsule in the wheel's track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
+	 */
+	--tc-desk-bar-gap: 8px;
+	--tc-desk-bar-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+	--tc-desk-bar-hover: rgba(255, 255, 255, 0.08);
+	--tc-desk-bar-btn-w: 32px;
+	--tc-desk-bar-icon: 18px;
+	--tc-desk-bar-flag: 16px;
+	--tc-desk-bar-rule: 16px;
+	--tc-desk-place-w: 80px;
+	--tc-desk-place-bg: rgba(255, 255, 255, 0.1);
+	--tc-desk-place-icon: 16px;
+	--tc-font-desk-place: 13px;
 	/* A field in a slot of the timeline: the slot's time on its right, as wide as the time "16:30". */
 	--tc-field-time-w: 32px;
 
@@ -508,6 +523,9 @@ body.theme-light {
 	--tc-bar-off: #A1A4AB;
 	--tc-place-bg: #BEC1C9;
 	--tc-place-on-bg: rgba(0, 0, 0, 0.1);
+	--tc-desk-bar-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+	--tc-desk-bar-hover: rgba(0, 0, 0, 0.06);
+	--tc-desk-place-bg: rgba(0, 0, 0, 0.07);
 	--tc-priority-red: #FF3B30;
 	--tc-priority-red-card: #F4D5D7;
 	--tc-priority-red-meta: #C36261;
@@ -559,6 +577,10 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* One fade over the bottom of every column, under the foot's controls, the switch and the plus. */
 .task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
 .task-calendar:is(.is-lists, .is-inbox) > .tc-fade { height: var(--tc-foot-fade-lists); }
+/* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
+body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
+/* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
+body.is-mobile .task-calendar.is-entering > .tc-fade { height: var(--tc-bar-h); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
@@ -925,6 +947,25 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-quick-bar.is-over { position: fixed; right: auto; z-index: var(--tc-layer-panel); font-family: var(--tc-font-ui); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-quick-bar.is-over button { padding: 0; }
 .tc-quick-bar .tc-quick-panel { position: absolute; z-index: var(--tc-layer-bar-panel); top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
+/* On the desktop: a capsule next to the field, placed by the code; its panels hang from its right end, away from the field. */
+.tc-quick-bar.is-desk { right: auto; bottom: auto; height: var(--tc-seg); padding: var(--tc-seg-pad); gap: 0; }
+.tc-quick-bar.is-desk.is-away { visibility: hidden; }
+.tc-quick-bar.is-desk::before { border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); }
+.tc-quick-bar.is-desk .tc-bar-shift, .tc-quick-bar.is-desk .tc-bar-flag { width: var(--tc-desk-bar-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); }
+.tc-quick-bar.is-desk .tc-bar-shift:not(:disabled):hover, .tc-quick-bar.is-desk .tc-bar-flag:hover { background: var(--tc-desk-bar-hover); }
+.tc-quick-bar.is-desk .tc-bar-shift svg { width: var(--tc-desk-bar-icon); height: var(--tc-desk-bar-icon); }
+.tc-quick-bar.is-desk .tc-bar-flag svg { width: var(--tc-desk-bar-flag); height: var(--tc-desk-bar-flag); }
+.tc-quick-bar.is-desk .tc-bar-spacer { flex: none; z-index: var(--tc-layer-bar-button); width: var(--tc-hairline); height: var(--tc-desk-bar-rule); margin: 0 var(--tc-space-2); background: var(--tc-separator); }
+.tc-quick-bar.is-desk .tc-bar-shift[hidden] ~ .tc-bar-spacer, .tc-quick-bar.is-desk .tc-bar-spacer:not(:has(~ button:not([hidden]))) { display: none; }
+.tc-quick-bar.is-desk .tc-bar-place { width: var(--tc-desk-place-w); height: var(--tc-seg-btn-h); padding: 0 var(--tc-space-10) 0 var(--tc-space-8); border-radius: var(--tc-radius-seg-btn); gap: var(--tc-space-5); font-size: var(--tc-font-desk-place); }
+.task-calendar .tc-quick-bar.is-desk .tc-bar-place, .task-calendar .tc-quick-bar.is-desk .tc-bar-place:active, .tc-quick-bar.is-desk.is-over .tc-bar-place { background: var(--tc-desk-place-bg); }
+.task-calendar .tc-quick-bar.is-desk .tc-bar-place:hover, .tc-quick-bar.is-desk.is-over .tc-bar-place:hover, .task-calendar .tc-quick-bar.is-desk[data-panel="place"] .tc-bar-place, .tc-quick-bar.is-desk.is-over[data-panel="place"] .tc-bar-place { background: var(--tc-place-on-bg); }
+.tc-quick-bar.is-desk[data-panel="priority"] .tc-bar-flag { background: var(--tc-desk-bar-hover); }
+.tc-quick-bar.is-desk .tc-bar-place svg { width: var(--tc-desk-place-icon); height: var(--tc-desk-place-icon); }
+.tc-quick-bar.is-desk .tc-quick-panel { right: 0; }
+.tc-quick-bar.is-desk .tc-quick-panel.is-below { top: calc(100% + var(--tc-desk-bar-gap)); bottom: auto; transform-origin: 100% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
+.tc-quick-bar.is-desk .tc-quick-panel.is-above { bottom: calc(100% + var(--tc-desk-bar-gap)); }
+.tc-quick-bar.is-desk .tc-quick-panel.is-shown { transform: none; }
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-ink-strong); }
 
 

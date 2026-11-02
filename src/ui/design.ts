@@ -23,6 +23,8 @@ export const DESIGN = {
 	itemGap: 2,
 	/** The bar over the keyboard while a task is typed: the field stands above it. */
 	barHeight: 44,
+	/** On the desktop the bar is a capsule next to the field, this far from it; its panels stand as far from it. */
+	deskBarGap: 8,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -40,6 +42,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	itemInset: "--tc-item-inset",
 	itemGap: "--tc-item-gap",
 	barHeight: "--tc-bar-h",
+	deskBarGap: "--tc-desk-bar-gap",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */

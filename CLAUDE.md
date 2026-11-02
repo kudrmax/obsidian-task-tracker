@@ -4,6 +4,10 @@
 
 `docs/design/README.md` and the boards in `docs/design/canvas/` are the approved design; `docs/superpowers/specs/2026-10-30-task-calendar-design.md` is the spec behind them. Where they disagree, the design wins. The main screen is transferred **pixel for pixel** (every size, colour, radius, font, mask and shadow from `canvas/Screen.dc.html`), except Obsidian's own chrome. A screen the design doesn't show is built only as `docs/design/README.md`'s last section says, and gets designed before it is polished.
 
+## Both platforms
+
+The plugin is used every day on the phone (iOS) and on the desktop (macOS). Every screen, gesture and control must work and look designed on both: a board for each platform where they differ, and a visual check of both in the test Obsidian (phone view and a desktop window, light and dark) before a release. A feature checked on one platform only is not done.
+
 ## Layers
 
 `src/domain` (pure: the file, the tasks, the rules), `src/application` (`contracts.ts` is the API the UI talks to; services), `src/infrastructure` (vault, Google, the work file), `src/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `src/settings.ts` and `src/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.
