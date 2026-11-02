@@ -13,6 +13,8 @@ export interface GroupZonesDeps {
 
 /** One zone as a place to drop: a preset names the section; New section asks for the name. */
 class GroupDrop implements DropTarget {
+	readonly waitsForEntry = true;
+
 	constructor(
 		readonly zone: HTMLElement,
 		private readonly column: ListColumn,

@@ -290,7 +290,7 @@ export class DragController {
 	 */
 	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
 		const session = makeSession(() => detach());
-		session.move(e.clientX, e.clientY);
+		session.start(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};

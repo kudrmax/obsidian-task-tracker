@@ -63,6 +63,7 @@ describe("AutoScroll", () => {
 			previews++;
 			scroll.follow(600);
 		}, frames);
+		scroll.follow(590);
 		scroll.follow(600);
 		frames.tick();
 		frames.tick();
@@ -74,8 +75,9 @@ describe("AutoScroll", () => {
 	it("plans one step per frame however often the finger moves", () => {
 		const frames = new ManualFrames();
 		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
-		scroll.follow(599);
+		scroll.follow(597);
 		scroll.follow(598);
+		scroll.follow(599);
 		expect(frames.pending).toBe(1);
 	});
 
@@ -84,6 +86,7 @@ describe("AutoScroll", () => {
 		const el = scroller(100, 600, SPEED);
 		let previews = 0;
 		const scroll = new AutoScroll(() => el, () => previews++, frames);
+		scroll.follow(590);
 		scroll.follow(600);
 		scroll.follow(300);
 		expect(frames.pending).toBe(0);
@@ -93,5 +96,29 @@ describe("AutoScroll", () => {
 		frames.tick();
 		expect(el.scrollTop).toBe(SPEED);
 		expect(previews).toBe(1);
+	});
+
+	it("leaves the list where it is under a finger that lifts a card near the edge and stays", () => {
+		const frames = new ManualFrames();
+		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
+		scroll.follow(590);
+		scroll.follow(590);
+		expect(frames.pending).toBe(0);
+		scroll.follow(592);
+		expect(frames.pending).toBe(1);
+	});
+
+	it("leaves the list where it is under a finger carried in across an edge, away from it", () => {
+		const frames = new ManualFrames();
+		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
+		scroll.follow(620);
+		scroll.follow(595);
+		scroll.follow(580);
+		expect(frames.pending).toBe(0);
+		scroll.stop();
+		scroll.follow(110);
+		expect(frames.pending).toBe(0);
+		scroll.follow(105);
+		expect(frames.pending).toBe(1);
 	});
 });
