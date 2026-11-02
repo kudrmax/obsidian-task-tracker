@@ -58,6 +58,10 @@ export type PlacedResult = Exclude<DropResult, { readonly kind: "pickDate" } | {
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 export interface DropTarget {
+	/** A zone that appears over the place a card was lifted from: under the finger at the lift, it takes the card only once the finger has left it. */
+	readonly waitsForEntry?: boolean;
+	/** The card has just been lifted and the zones stand: a list shows where the card came from, scrolled clear of them. */
+	lift?(): void;
 	hitTest(x: number, y: number, drag: DragPayload): boolean;
 	preview(x: number, y: number, drag: DragPayload): void;
 	/** Where the card will come to rest, in client pixels, while a preview shows. */

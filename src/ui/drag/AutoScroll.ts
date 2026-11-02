@@ -22,10 +22,15 @@ const WINDOW_FRAMES: Frames = {
 
 /**
  * A scroller that scrolls itself under a dragged card held near its top or bottom edge, a frame at a time, faster the
- * closer to the edge, for as long as the finger stays there; after each step `onScrolled` previews the drop again.
+ * closer to the edge, for as long as the finger stays there; after each step `onScrolled` previews the drop again. Only a
+ * finger heading for the edge, then held there, scrolls: one lifting a card near the edge, or carried in across it back
+ * from the zones under the list, leaves it where it is.
  */
 export class AutoScroll {
 	private frame = 0;
+	private lastY: number | null = null;
+	/** Steps are being taken: a finger held still goes on scrolling, one that has not set off does not start. */
+	private scrolling = false;
 
 	constructor(
 		private readonly scroller: () => HTMLElement,
@@ -33,12 +38,16 @@ export class AutoScroll {
 		private readonly frames: Frames = WINDOW_FRAMES,
 	) {}
 
-	/** The finger is at `y`: a step is planned near an edge, and none away from them. */
+	/** The finger is at `y`: a step is planned near an edge it heads for, and none elsewhere. */
 	follow(y: number): void {
 		const el = this.scroller();
 		const r = el.getBoundingClientRect();
 		const velocity = edgeVelocity(y, r.top, r.bottom);
-		if (velocity === 0) return this.stop();
+		const from = this.lastY;
+		this.lastY = y;
+		const towards = from !== null && (y === from ? this.scrolling : velocity > 0 === y > from);
+		if (velocity === 0 || !towards) return this.halt();
+		this.scrolling = true;
 		if (this.frame) return;
 		this.frame = this.frames.request(() => {
 			this.frame = 0;
@@ -48,8 +57,15 @@ export class AutoScroll {
 		});
 	}
 
+	/** The finger has gone: the next one to come is not yet heading anywhere. */
 	stop(): void {
+		this.halt();
+		this.lastY = null;
+	}
+
+	private halt(): void {
 		if (this.frame) this.frames.cancel(this.frame);
 		this.frame = 0;
+		this.scrolling = false;
 	}
 }

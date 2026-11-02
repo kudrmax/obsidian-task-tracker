@@ -9,6 +9,8 @@ type Offset = 0 | 1 | null;
 
 /** One zone as a place to drop: lit while the card is over it, out of reach while it is not offered. */
 class PostponeDrop implements DropTarget {
+	readonly waitsForEntry = true;
+
 	constructor(
 		readonly zone: HTMLElement,
 		readonly offset: Offset,

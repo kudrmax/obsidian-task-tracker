@@ -30,6 +30,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	area.appendChild(list.el);
 	list.render();
 	area.getBoundingClientRect = () => new DOMRect(0, 100, 187, 554);
+	list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
 	list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * 40, 175, 35)));
 	const drop = new ListDrop(list, area, column, () => true, () => (grouped ? { list: grouped, date } : null));
 	return { list, drop };
@@ -73,6 +74,15 @@ describe("ListDrop", () => {
 		expect(drop.hitTest(50, 60, from)).toBe(true);
 		expect(drop.drop(50, 60, from)).toEqual({ kind: "group", list: "now", date: null, group: null, before: null });
 		expect(drop.hitTest(50, 20, from)).toBe(false);
+	});
+
+	it("under the list, where the zones and the switch stand while a card is carried, the column takes nothing", () => {
+		const only = item("now", 0, "A", null);
+		const { drop, list } = setup([only], "left", "now");
+		list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 300);
+		const from = drag("soon", item("soon", 0, "S", null));
+		expect(drop.hitTest(50, 399, from)).toBe(true);
+		expect(drop.hitTest(50, 401, from)).toBe(false);
 	});
 
 	it("the left column of a past day keeps listBefore", () => {
@@ -238,12 +248,31 @@ describe("ListDrop", () => {
 			expect(list.el.classList.contains("is-making-room")).toBe(false);
 		});
 
+		it("at the lift, scrolls a place the zones now cover back right above them, and shows it dashed", () => {
+			const { list, drop } = lifted(3);
+			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 3 * STEP);
+			let scrollTop = 0;
+			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+			drop.lift();
+			expect(scrollTop).toBe(35);
+			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
+		});
+
+		it("at the lift, leaves a list alone whose lifted place is in sight", () => {
+			const { list, drop } = lifted(0);
+			let scrollTop = 0;
+			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+			drop.lift();
+			expect(scrollTop).toBe(0);
+		});
+
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {
 			const frames: (() => void)[] = [];
 			vi.stubGlobal("requestAnimationFrame", (fn: () => void) => frames.push(fn));
 			const { list, drop, from } = lifted(1);
 			let scrollTop = 0;
 			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+			drop.preview(27, 100 + 554 - 60, from);
 			drop.preview(27, 100 + 554 - 2, from);
 			expect(frames.length).toBe(1);
 			frames.shift()!();

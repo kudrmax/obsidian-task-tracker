@@ -18,13 +18,23 @@ export interface DragSessionOptions {
 export class DragSession {
 	private current: DropTarget | null = null;
 	private done = false;
+	/** Zones the finger stood on as the card was lifted, which it has not left yet: nothing under them takes the card either. */
+	private waiting: readonly DropTarget[] = [];
 
 	constructor(private readonly opts: DragSessionOptions) {}
+
+	/** The finger at the lift: the lists show where the card came from, and the zones under it wait until it leaves them. */
+	start(x: number, y: number): void {
+		for (const target of this.opts.targets) target.lift?.();
+		this.waiting = this.opts.targets.filter((t) => t.waitsForEntry && t.hitTest(x, y, this.opts.payload));
+		this.move(x, y);
+	}
 
 	move(x: number, y: number): void {
 		if (this.done) return;
 		this.opts.float.moveTo(x, y);
-		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
+		this.waiting = this.waiting.filter((t) => t.hitTest(x, y, this.opts.payload));
+		const target = this.waiting.length > 0 ? null : (this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null);
 		if (target !== this.current) {
 			this.current?.leave();
 			this.current = target;
