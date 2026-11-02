@@ -12,7 +12,8 @@ export interface PeekActions {
 
 /**
  * The start of a task's description over the copy of its card in the menu, drawn by Obsidian. It takes the side of the
- * copy the menu leaves free, or, with too little room there, the far side of the menu; what does not fit fades out.
+ * copy the menu leaves free, or, with too little room there, the far side of the menu; what does not fit fades out, and
+ * with no room on either side it stays away.
  */
 export class DescriptionPeek {
 	private readonly el: HTMLElement;
@@ -39,6 +40,7 @@ export class DescriptionPeek {
 		else if (menuAbove && freeBelow >= least) room = this.standUnder(copy.bottom + gap, freeBelow);
 		else if (menuAbove) room = this.standOver(copy.top - menuSpan - gap, copy.top - menuSpan - gap - margin);
 		else room = this.standUnder(copy.bottom + menuSpan + gap, height - copy.bottom - menuSpan - gap - margin);
+		this.el.hidden = room < least;
 		this.el.style.left = px(Math.max(margin, Math.min(copy.left, window.innerWidth - margin - this.el.offsetWidth)));
 		this.el.style.maxHeight = px(Math.max(0, Math.min(tokenPx(this.el, "--tc-desc-peek-max"), room)));
 		this.markCut();
