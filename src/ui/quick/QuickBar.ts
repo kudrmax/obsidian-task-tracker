@@ -2,8 +2,9 @@ import type { Placement } from "../../application/contracts";
 import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
-import { clear, el, px, restingTop } from "../dom";
+import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
+import { Panel, Picks } from "../kit/Panel";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
 import { placeLabel } from "../placeLabel";
@@ -48,6 +49,7 @@ type PanelKind = "priority" | "place";
 
 interface OpenPanel {
 	readonly kind: PanelKind;
+	readonly window: Panel;
 	readonly el: HTMLElement;
 	/** The place panel shows its month picker in place of the tiles. */
 	picking: boolean;
@@ -245,12 +247,11 @@ export class QuickBar {
 	}
 
 	private openPanel(kind: PanelKind): void {
-		const panel = el(this.bar, "div", "tc-panel tc-quick-panel is-above");
-		this.panel = { kind, el: panel, picking: false, drawn: "" };
+		const panel = Panel.inside(this.bar, { root: "tc-panel", cls: "tc-quick-panel is-above", picks: new Picks(() => this.closePanel()), place: () => this.restand() });
+		this.panel = { kind, window: panel, el: panel.el, picking: false, drawn: "" };
 		this.bar.dataset.panel = kind;
 		this.renderPanel();
-		panel.getBoundingClientRect(); // lays the panel out shrunk, so adding is-shown grows it in
-		panel.classList.add("is-shown");
+		panel.show();
 		this.bar.ownerDocument.addEventListener("pointerdown", this.pressOutside, true);
 	}
 
@@ -281,12 +282,12 @@ export class QuickBar {
 		const panel = this.panel;
 		if (!panel) return;
 		panel.drawn = this.drawnKey(panel.kind);
-		clear(panel.el);
 		panel.el.classList.toggle("is-picker", panel.picking);
-		if (panel.kind === "priority") this.renderLevels(panel.el);
-		else if (panel.picking) this.renderPicker(panel.el);
-		else this.renderPlaces(panel.el);
-		this.restand();
+		panel.window.replace((parent) => {
+			if (panel.kind === "priority") this.renderLevels(parent);
+			else if (panel.picking) this.renderPicker(parent);
+			else this.renderPlaces(parent);
+		});
 	}
 
 	/** A panel opened, closed or changed its height: the desktop capsule takes the side of the field with room for both. */
@@ -295,11 +296,9 @@ export class QuickBar {
 		else this.sidePanel();
 	}
 
+	/** A pick in the open panel: it closes, then `action` runs. */
 	private picked(action: () => void): () => void {
-		return () => {
-			this.closePanel();
-			action();
-		};
+		return this.panel?.window.pick(action) ?? action;
 	}
 
 	private renderLevels(parent: HTMLElement): void {

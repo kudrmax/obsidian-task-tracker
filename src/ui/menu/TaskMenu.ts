@@ -164,8 +164,8 @@ export class TaskMenu extends LiftedMenu {
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
-		this.panel = this.addPanel("is-task");
-		this.upper = this.addPanel("is-task");
+		this.panel = this.addPanel("is-task").el;
+		this.upper = this.addPanel("is-task").el;
 		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
@@ -264,10 +264,7 @@ export class TaskMenu extends LiftedMenu {
 		for (const subtask of subtasks) {
 			const card = renderTaskCard(null, subtask, { day });
 			stack.insertBefore(card, this.stackRow);
-			card.addEventListener("click", () => {
-				this.close();
-				onSubtask?.(subtask, card);
-			});
+			card.addEventListener("click", this.pick(() => onSubtask?.(subtask, card)));
 		}
 	}
 
@@ -275,8 +272,8 @@ export class TaskMenu extends LiftedMenu {
 	private peekOf(context: TaskMenuContext): DescriptionPeek | null {
 		const { item, markdown, actions } = context;
 		if (item.description === null || !markdown) return null;
-		return new DescriptionPeek(this.overlay, markdown, item.description, {
-			onRead: this.pick(() => actions.openDescription(false)),
+		return new DescriptionPeek(this.overlay, this.picks, markdown, item.description, {
+			onRead: () => actions.openDescription(false),
 			onLink: () => this.close(),
 		});
 	}
