@@ -35,8 +35,10 @@
 
 | Где | Состояния |
 |---|---|
-| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `sheet`, `quick`, `drag`, `undo`, `settings` |
-| Только Mac | `hover-row`, `hover-plus`, `active-tile`, `focus-arrow` |
+| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `sheet`, `quick`, `drag`, `undo`, `settings`, `active-handle` |
+| Только Mac | `hover-row`, `hover-plus`, `active-tile`, `focus-arrow`, `hover-tile-on`, `hover-day`, `focus-row`, `focus-seg`, `hover-sheet` |
 | Только телефон | `active-row` |
+
+`hover-tile-on` ставит карточке первый уровень приоритета через меню и снимает его на выходе.
 
 Новое состояние добавляется туда же: как в него попасть и как из него выйти.

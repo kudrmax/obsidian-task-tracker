@@ -85,6 +85,27 @@ const states = {
 	"active-tile": { on: "mac", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-tile", ["active"]] },
 	"active-row": { on: "phone", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-row", ["active"]] },
 	"focus-arrow": { on: "mac", setup: `await sleep(300);`, force: [".tc-arrow", ["focus", "focus-visible"]] },
+	"active-handle": { setup: `top(); await sleep(300);`, force: [".tc-divider-handle", ["active"]] },
+	"hover-tile-on": {
+		on: "mac",
+		setup: `top(); await tap(card(1)); await tap(document.querySelector(".tc-panel .tc-menu-tile[data-priority]")); await sleep(700); await esc(); top(); await tap(card(1)); await sleep(500);`,
+		teardown: `await esc(); top(); await tap(card(1)); const on=document.querySelector(".tc-panel .tc-menu-tile.is-on[data-priority]"); if (on) await tap(on); await sleep(700);`,
+		force: [".tc-panel .tc-menu-tile.is-on", ["hover"]],
+	},
+	// The reference tasks carry no date the picker can show as chosen: the 12th is marked chosen as MonthPicker marks one.
+	"hover-day": {
+		on: "mac",
+		setup: `top(); await tap(card(1)); await tap(byText("Pick a date")); await sleep(400); [...document.querySelectorAll(".tc-picker .tc-day:not(.is-other)")].find((d)=>d.textContent==="12").classList.add("is-selected");`,
+		force: [".tc-picker .tc-day.is-selected", ["hover"]],
+	},
+	"focus-row": { on: "mac", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-row", ["focus", "focus-visible"]] },
+	"focus-seg": { on: "mac", setup: `await sleep(300);`, force: [".tc-seg", ["focus", "focus-visible"]] },
+	"hover-sheet": {
+		on: "mac",
+		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
+		teardown: `document.querySelector(".tc-sheet-cancel")?.click(); await sleep(700);`,
+		force: [".tc-sheet-cancel", ["hover"]],
+	},
 };
 
 async function force(selector, pseudo) {
