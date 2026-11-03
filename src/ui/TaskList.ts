@@ -56,6 +56,8 @@ export class TaskList {
 	private nodes: HTMLElement[] = [];
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
+	/** `listCards` as of the last drawing, made the first time it is asked for. */
+	private drawnCards: readonly ListCard[] | null = null;
 
 	constructor(
 		readonly el: HTMLElement,
@@ -65,6 +67,12 @@ export class TaskList {
 	}
 
 	render(): void {
+		this.drawnCards = null;
+		this.draw();
+		this.drawnCards = null;
+	}
+
+	private draw(): void {
 		const entry = this.deps.entry?.() ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
 		const kept = entry ? this.keptRow() : null;
@@ -167,9 +175,9 @@ export class TaskList {
 		return this.entries;
 	}
 
-	/** The cards as places in the list see them, with no measuring: each in the section it is drawn in. */
+	/** The cards as places in the list see them, with no measuring: each in the section it is drawn in. The same array until the list draws again. */
 	get listCards(): readonly ListCard[] {
-		return this.entries.map((entry) => this.listCard(entry));
+		return (this.drawnCards ??= this.entries.map((entry) => this.listCard(entry)));
 	}
 
 	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */

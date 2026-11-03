@@ -291,6 +291,35 @@ describe("the panels' opening and closing", () => {
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
+	it("the same place keeps its icon", () => {
+		const { parent, bar } = setup({ place: { kind: "inbox" } });
+		const first = q<SVGElement>(parent, ".tc-bar-place svg");
+		bar.show({ ...STATE, place: { kind: "inbox" } });
+		expect(q<SVGElement>(parent, ".tc-bar-place svg")).toBe(first);
+		bar.show({ ...STATE, place: { kind: "soon" } });
+		expect(q<SVGElement>(parent, ".tc-bar-place svg")).not.toBe(first);
+		expect(parent.querySelectorAll(".tc-bar-place svg")).toHaveLength(1);
+		expect(q<HTMLElement>(parent, ".tc-bar-place-label").textContent).toBe("Soon");
+	});
+
+	it("an open panel is not drawn again for the same state", () => {
+		const { parent, bar } = setup();
+		q(parent, ".tc-bar-place").click();
+		const place = tiles(parent)[0];
+		bar.show(STATE);
+		expect(tiles(parent)[0]).toBe(place);
+		bar.show({ ...STATE, place: { kind: "inbox" } });
+		expect(tiles(parent)[0]).not.toBe(place);
+		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([true, false, false, false, false]);
+		q(parent, ".tc-bar-flag").click();
+		const level = tiles(parent)[0];
+		bar.show({ ...STATE, place: { kind: "inbox" } });
+		expect(tiles(parent)[0]).toBe(level);
+		bar.show({ ...STATE, place: { kind: "inbox" }, priority: LEVELS[0] });
+		expect(tiles(parent)[0]).not.toBe(level);
+		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([true, false, false]);
+	});
+
 	it("leaves the month picker alone when the field's state is shown again", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-place").click();
@@ -312,6 +341,16 @@ describe("QuickBar over a menu", () => {
 		bar.follow(null);
 		expect(parent.lastElementChild).toBe(el);
 		expect(el.classList.contains("is-over")).toBe(false);
+		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["", "", ""]);
+	});
+});
+
+describe("QuickBar over a menu on the desktop", () => {
+	it("stands away without docking at the view's bottom when the field has no spot", () => {
+		const { bar } = setup({}, true);
+		const el = q<HTMLElement>(document, ".tc-quick-bar");
+		bar.follow({ field: null, room: new DOMRect(0, 0, 300, 400), overMenu: new DOMRect(10, 0, 300, window.innerHeight - 50), toolbarTop: null });
+		expect(el.classList.contains("is-away")).toBe(true);
 		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["", "", ""]);
 	});
 });
@@ -372,6 +411,38 @@ describe("QuickBar on the desktop", () => {
 		expect(panel.classList.contains("is-below")).toBe(false);
 	});
 
+	it("follows the same anchor without writing anything", () => {
+		const { bar, parent } = desk();
+		const anchor = { field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null, toolbarTop: null };
+		bar.follow(anchor);
+		const observer = new MutationObserver(() => {});
+		observer.observe(document.body, { attributes: true, subtree: true });
+		observer.observe(parent, { attributes: true, subtree: true });
+		bar.follow(anchor);
+		expect(observer.takeRecords()).toEqual([]);
+		observer.disconnect();
+	});
+
+	it("reads the layout before it writes", () => {
+		const { bar, el, parent } = desk();
+		const observer = new MutationObserver(() => {});
+		observer.observe(document.body, { attributes: true, subtree: true });
+		let readsAfterWrite = 0;
+		for (const box of [el, parent]) {
+			const read = box.getBoundingClientRect.bind(box);
+			box.getBoundingClientRect = () => {
+				readsAfterWrite += observer.takeRecords().length;
+				return read();
+			};
+		}
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null, toolbarTop: null });
+		observer.takeRecords();
+		bar.follow({ field: new DOMRect(120, 400, 350, 35), room: ROOM_BOX, overMenu: null, toolbarTop: null });
+		expect(el.style.top).toBe(`${443 - 50}px`);
+		expect(readsAfterWrite).toBe(0);
+		observer.disconnect();
+	});
+
 	it("names its keys in the buttons' tooltips", () => {
 		const { el } = desk();
 		expect(q(el, ".tc-bar-indent").title).toBe("Move in (Tab)");
@@ -399,5 +470,34 @@ describe("QuickBar over Obsidian's toolbar", () => {
 		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: null });
 		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("");
 		expect(el.style.getPropertyValue("--tc-toolbar-room")).toBe("");
+	});
+
+	it("follows the same anchor without writing anything", () => {
+		const { parent, bar } = setup();
+		parent.getBoundingClientRect = () => new DOMRect(0, 0, 390, 700);
+		const anchor = { field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 640 };
+		bar.follow(anchor);
+		const observer = new MutationObserver(() => {});
+		observer.observe(document.body, { attributes: true, subtree: true });
+		bar.follow(anchor);
+		expect(observer.takeRecords()).toEqual([]);
+		observer.disconnect();
+	});
+
+	it("reads the layout before it writes", () => {
+		const { parent, bar } = setup();
+		const observer = new MutationObserver(() => {});
+		observer.observe(document.body, { attributes: true, subtree: true });
+		let readsAfterWrite = 0;
+		parent.getBoundingClientRect = () => {
+			readsAfterWrite += observer.takeRecords().length;
+			return new DOMRect(0, 0, 390, 700);
+		};
+		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 640 });
+		observer.takeRecords();
+		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 600 });
+		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("100px");
+		expect(readsAfterWrite).toBe(0);
+		observer.disconnect();
 	});
 });
