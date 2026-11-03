@@ -2,7 +2,7 @@ import { tokenPx } from "../design";
 import { el, px } from "../dom";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
-import { bringIntoView, topInside } from "./inView";
+import { scrollIntoColumn, shownPart, topInside } from "./inView";
 import { menuRoom, placePanel } from "./MenuPanel";
 
 /** How the copy over the blur shows what the pressed thing cuts: it grows from `size`, never past `widest`, and answers its new size. */
@@ -20,6 +20,9 @@ export abstract class LiftedMenu {
 	protected copy = new DOMRect();
 	/** How far the parts over the blur stand above the pressed thing, to keep a field over the keyboard. */
 	protected raisedBy = 0;
+	/** Closed before it opened: the column's scroll brought the pressed thing into view for nothing. */
+	private gone = false;
+	private stopScroll: () => void = () => undefined;
 
 	protected constructor() {
 		this.overlay = new Overlay((how) => this.close(how));
@@ -27,11 +30,24 @@ export abstract class LiftedMenu {
 	}
 
 	/**
-	 * `source` comes into view in its column first; the copy stands over what the column shows of it, and what it cuts
-	 * grows it, kept inside the column's shown height and the window's width. The panel goes by the copy.
+	 * The menu opens over `source` once it stands in view: its column scrolls to it first, with its own smooth scroll, and
+	 * `build` lays out the copy and the panel when the column stands still. A pressed thing that went meanwhile closes it.
+	 */
+	protected openOver(source: HTMLElement, build: () => void): void {
+		this.stopScroll = scrollIntoColumn(source, () => {
+			if (this.gone) return;
+			if (!source.isConnected) return this.close();
+			build();
+			this.overlay.show();
+		});
+	}
+
+	/**
+	 * The copy stands over what the column shows of `source`, and what it cuts grows it, kept inside the column's shown
+	 * height and the window's width. The panel goes by the copy.
 	 */
 	protected liftWhole(source: HTMLElement, showWhole: ShowWhole): DOMRect {
-		const { rect, box } = bringIntoView(source);
+		const { rect, box } = shownPart(source);
 		const room = windowRoom(this.lifted);
 		const size = showWhole(this.lifted, rect, roomWidth(room));
 		const left = grownStart(rect.left, rect.width, size.width, room.width, room.margin);
@@ -71,6 +87,8 @@ export abstract class LiftedMenu {
 
 	/** `how`: Escape, or anything else that closed it. */
 	close(how: CloseHow = "away"): void {
+		this.gone = true;
+		this.stopScroll();
 		if (this.overlay.close()) this.closed(how);
 	}
 

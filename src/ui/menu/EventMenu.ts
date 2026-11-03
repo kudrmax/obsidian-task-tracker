@@ -17,12 +17,15 @@ export class EventMenu extends LiftedMenu {
 
 	private constructor(context: EventMenuContext) {
 		super();
+		this.openOver(context.source, () => this.build(context));
+	}
+
+	private build(context: EventMenuContext): void {
 		this.lifted.classList.add("is-block");
 		this.lifted.appendChild(context.source.cloneNode(true));
 		const copy = this.liftWhole(context.source, showWholeEvent);
 		const panel = this.addPanel("is-event");
 		menuRow(panel, { label: "Open in Calendar", icon: "calendar", onPick: this.pick(() => context.openInCalendar()) }, "tc-menu-row is-tall");
 		this.placeBy(panel, copy);
-		this.overlay.show();
 	}
 }

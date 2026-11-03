@@ -131,10 +131,10 @@ export interface TaskMenuContext {
  * under it, and the panel grows out under them; the sections and the month picker take its place.
  */
 export class TaskMenu extends LiftedMenu {
-	private readonly panel: HTMLElement;
+	private panel!: HTMLElement;
 	/** The first groups of a panel too tall for either side of the card, over the card; hidden while the panel is whole. */
-	private readonly upper: HTMLElement;
-	private readonly anchor: DOMRect;
+	private upper!: HTMLElement;
+	private anchor!: DOMRect;
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
 	private stack: HTMLElement | null = null;
 	private stackRow: HTMLElement | null = null;
@@ -142,7 +142,7 @@ export class TaskMenu extends LiftedMenu {
 	private fieldRow: HTMLElement | null = null;
 	/** Whoever types in the menu hears when it closes, and how. */
 	private fieldClosed: ((how: CloseHow) => void) | null = null;
-	private readonly peek: DescriptionPeek | null;
+	private peek: DescriptionPeek | null = null;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
@@ -150,6 +150,12 @@ export class TaskMenu extends LiftedMenu {
 
 	private constructor(private readonly context: TaskMenuContext) {
 		super();
+		this.openOver(context.source, () => this.build());
+	}
+
+	/** The copy over the blur, a timeline card's subtasks under it, and the panel. */
+	private build(): void {
+		const context = this.context;
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
@@ -163,7 +169,6 @@ export class TaskMenu extends LiftedMenu {
 		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
-		this.overlay.show();
 	}
 
 	/** A link is followed from the copy only, never from the card itself: a tap on the card can't open it by chance. */
