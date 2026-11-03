@@ -18,9 +18,9 @@ body {
 	--tc-card-lift: 11%;
 	--tc-card-lift-light: 5%;
 	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift));
-	/* Chevrons, the due day, the chosen segment's ground. */
+	/* The day's arrows and the sources' icons. */
 	--tc-ink-soft: #E5E5EA;
-	/* The due day, a tile's label, the chosen segment's and tile's ground. */
+	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
 	--tc-on-strong: #000000;
@@ -97,29 +97,43 @@ body {
 	--tc-priority-blue-meta: #83AEDA;
 
 	/* Shape */
+	/* The icon scale: every icon and flag takes one of these sizes. */
+	--tc-icon-xs: 10px;
+	--tc-icon-s: 16px;
+	--tc-icon-m: 18px;
+	--tc-icon-l: 20px;
+	--tc-icon-xl: 22px;
+	/* The stroke scale: every line an icon draws takes one of these widths. */
+	--tc-stroke-1-8: 1.8px;
+	--tc-stroke-1-9: 1.9px;
+	--tc-stroke-2: 2px;
+	--tc-stroke-2-2: 2.2px;
+	--tc-stroke-2-4: 2.4px;
+	--tc-stroke-2-6: 2.6px;
+	--tc-stroke-2-8: 2.8px;
+	--tc-stroke-3-6: 3.6px;
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
 	--tc-radius-branch: 6px;
 	--tc-radius-float: calc(var(--tc-float-h) / 2);
 	--tc-radius-event: 6px;
 	--tc-radius-time-pill: 6px;
-	--tc-radius-seg: 16px;
-	--tc-radius-seg-btn: 14px;
+	--tc-radius-seg: calc(var(--tc-seg) / 2);
+	--tc-radius-seg-btn: calc(var(--tc-seg-btn-h) / 2);
 	--tc-radius-handle: 5px;
 	--tc-radius-pill: 8px;
 	--tc-radius-circle: 50%;
 	--tc-radius-float-count: calc(var(--tc-float-count-size) / 2);
 	--tc-radius-panel: 14px;
-	--tc-radius-day: 18px;
-	--tc-radius-dot: 4px;
-	--tc-stroke-source: 1.8px;
-	--tc-stroke-refresh: 1.9px;
+	--tc-radius-day: calc(var(--tc-day) / 2);
+	--tc-stroke-source: var(--tc-stroke-1-8);
+	--tc-stroke-refresh: var(--tc-stroke-1-9);
 	--tc-hairline-half: 0.5px;
-	--tc-stroke-menu: 1.8px;
+	--tc-stroke-menu: var(--tc-stroke-1-8);
 	/* The check on the section a task is in, and the plus of New section, in the menu. */
-	--tc-stroke-check: 2.4px;
-	--tc-stroke-add: 2px;
-	--tc-stroke-month: 2.4px;
+	--tc-stroke-check: var(--tc-stroke-2-4);
+	--tc-stroke-add: var(--tc-stroke-2);
+	--tc-stroke-month: var(--tc-stroke-2-4);
 	/* Obsidian 1.14 draws its buttons as squircles; ours keep the board's round corners. */
 	--tc-corner: round;
 	--tc-hairline: 1px;
@@ -127,8 +141,8 @@ body {
 	/* A task in progress: a dot in the middle of the card's left padding, between its edge and the title. */
 	--tc-progress-dot: 4px;
 	--tc-branch-w: 1.5px;
-	--tc-stroke-chevron: 2.2px;
-	--tc-stroke-seg: 2px;
+	--tc-stroke-chevron: var(--tc-stroke-2-2);
+	--tc-stroke-seg: var(--tc-stroke-2);
 
 	/* Sizes: the column headers */
 	--tc-day-row-top: 0px;
@@ -141,7 +155,7 @@ body {
 	--tc-seg-pad: 2px;
 	--tc-seg-btn-w: 38px;
 	--tc-seg-btn-h: 28px;
-	--tc-seg-icon: 18px;
+	--tc-seg-icon: var(--tc-icon-m);
 	/* The switch is a wheel: a window two icons wide stands still in the middle of the screen, and the four icons roll under it; the track holds one neighbour on either side. */
 	--tc-seg-window: calc(2 * var(--tc-seg-btn-w));
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
@@ -152,10 +166,10 @@ body {
 	--tc-switch-row: calc(var(--tc-seg) + var(--tc-foot-gap));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
-	--tc-plus-icon: 22px;
-	--tc-stroke-plus: 2.6px;
+	--tc-plus-icon: var(--tc-icon-xl);
+	--tc-stroke-plus: var(--tc-stroke-2-6);
 	/* The ring that holds the plus's place while it is carried: its plus is thinner. */
-	--tc-stroke-ring: 2.2px;
+	--tc-stroke-ring: var(--tc-stroke-2-2);
 	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 
 	/* Sizes: the columns */
@@ -210,7 +224,7 @@ body {
 	--tc-fade-card: 24px;
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
-	--tc-section-gap: 10px;
+	--tc-section-gap: var(--tc-space-10);
 	/* A lifted section: two layers of its cards under its header, each a step further down and in. */
 	--tc-stack-step-x: 7px;
 	--tc-stack-step-y: 6px;
@@ -246,20 +260,20 @@ body {
 	/* A branch runs up through the gap and a little under the card above, to the curve of its bottom. */
 	--tc-branch-rise: calc(var(--tc-card-gap) + 2px);
 	/* Pressed, a card shows its whole title: it stretches to the right past its column, up to this far from the window's edges. */
-	--tc-whole-margin: 10px;
+	--tc-whole-margin: var(--tc-space-10);
 
 	/* Sizes: the task menu, its due submenu and the month picker */
 	--tc-backdrop-blur: 8px;
 	/* The menu panel grows out from the card it belongs to. */
 	--tc-menu-scale: 0.94;
 	--tc-menu-rise: 8px;
-	--tc-menu-gap: 12px;
+	--tc-menu-gap: var(--tc-space-12);
 	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
 	--tc-desc-peek-w: 300px;
 	--tc-desc-peek-max: 214px;
 	--tc-desc-peek-pad: 10px 14px 10px 6px;
 	--tc-desc-fade: 40px;
-	--tc-font-desc-peek: 15px;
+	--tc-font-desc-peek: var(--tc-font-body);
 	--tc-panel-w: 250px;
 	--tc-picker-w: 300px;
 	--tc-menu-w: 300px;
@@ -267,14 +281,14 @@ body {
 	/* The bulk menu's first line: how many tasks it acts on. */
 	--tc-menu-title-h: 40px;
 	--tc-row-tall: 52px;
-	--tc-group-gap: 8px;
-	--tc-menu-icon: 20px;
-	--tc-back-icon: 18px;
+	--tc-group-gap: var(--tc-space-8);
+	--tc-menu-icon: var(--tc-icon-l);
+	--tc-back-icon: var(--tc-icon-m);
 	/* The task menu's tiles: the statuses and the priority levels, the icon over the label. */
 	--tc-menu-tile-h: 66px;
 	--tc-radius-menu-tile: 10px;
-	--tc-menu-tile-icon: 22px;
-	--tc-font-menu-tile: 13px;
+	--tc-menu-tile-icon: var(--tc-icon-xl);
+	--tc-font-menu-tile: var(--tc-font-caption);
 	--tc-weight-menu-tile: 500;
 	--tc-menu-tile-ring: 1.5px;
 	/* A label too long for its tile fades out from here to the tile's edge padding. */
@@ -282,19 +296,19 @@ body {
 	/* The cross on the task's own level: a tap there takes the priority off. */
 	--tc-menu-badge: 18px;
 	--tc-menu-badge-inset: 5px;
-	--tc-menu-badge-icon: 10px;
-	--tc-stroke-badge: 3.6px;
+	--tc-menu-badge-icon: var(--tc-icon-xs);
+	--tc-stroke-badge: var(--tc-stroke-3-6);
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
 	--tc-level-prefix-w: 56px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
 	--tc-swatch-halo: var(--setting-items-background);
 	--tc-month-btn: 32px;
-	--tc-month-icon: 18px;
+	--tc-month-icon: var(--tc-icon-m);
 	--tc-day: 36px;
 	--tc-weekday-h: 20px;
 	--tc-grid-gap: 2px;
-	--tc-picker-remove-gap: 6px;
+	--tc-picker-remove-gap: var(--tc-space-6);
 	/*
 	 * The quick bar over the keyboard, on the view's own ground: the shift buttons in one pill, the priority flag and the
 	 * place button in pills of the wheel's track; its panels use the menu's.
@@ -302,18 +316,18 @@ body {
 	--tc-bar-h: 44px;
 	--tc-bar-btn-w: 44px;
 	--tc-bar-btn-h: 36px;
-	--tc-radius-bar-btn: 18px;
+	--tc-radius-bar-btn: calc(var(--tc-bar-btn-h) / 2);
 	/* How far the top of Obsidian's toolbar over the phone keyboard is over the view's bottom: the code measures it. */
 	--tc-toolbar-room: 0px;
 	/* The bar's buttons stand the cards' gap over that toolbar (over the view's bottom where it does not show). */
 	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-toolbar-room) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
-	--tc-bar-icon: 22px;
-	--tc-bar-flag: 20px;
-	--tc-stroke-bar: 1.9px;
+	--tc-bar-icon: var(--tc-icon-xl);
+	--tc-bar-flag: var(--tc-icon-l);
+	--tc-stroke-bar: var(--tc-stroke-1-9);
 	--tc-place-w: 108px;
 	--tc-place-h: 36px;
 	--tc-place-on-bg: rgba(255, 255, 255, 0.16);
-	--tc-place-icon: 18px;
+	--tc-place-icon: var(--tc-icon-m);
 	/*
 	 * The quick bar on the desktop (board «8. Десктоп: панель у поля», QuickDesk.dc.html): no keyboard, so the same
 	 * buttons are a capsule in the wheel's track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
@@ -322,13 +336,13 @@ body {
 	--tc-desk-bar-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
 	--tc-desk-bar-hover: rgba(255, 255, 255, 0.08);
 	--tc-desk-bar-btn-w: 32px;
-	--tc-desk-bar-icon: 18px;
-	--tc-desk-bar-flag: 16px;
+	--tc-desk-bar-icon: var(--tc-icon-m);
+	--tc-desk-bar-flag: var(--tc-icon-s);
 	--tc-desk-bar-rule: 16px;
 	--tc-desk-place-w: 80px;
 	--tc-desk-place-bg: rgba(255, 255, 255, 0.1);
-	--tc-desk-place-icon: 16px;
-	--tc-font-desk-place: 13px;
+	--tc-desk-place-icon: var(--tc-icon-s);
+	--tc-font-desk-place: var(--tc-font-caption);
 	/* A field in a slot of the timeline: the slot's time on its right, as wide as the time "16:30". */
 	--tc-field-time-w: 32px;
 
@@ -337,18 +351,18 @@ body {
 	--tc-dot-top: 2px;
 	--tc-dot-right: 6px;
 	--tc-popover-w: 268px;
-	--tc-popover-gap: 10px;
+	--tc-popover-gap: var(--tc-space-10);
 	--tc-source-row: 56px;
-	--tc-source-icon: 20px;
+	--tc-source-icon: var(--tc-icon-l);
 
 	/* Sizes: a description's own screen over the view */
 	--tc-sheet-bar: 44px;
-	--tc-sheet-side: 20px;
+	--tc-sheet-side: var(--tc-space-20);
 	/* A description's own screen: the title over the text; the text is Obsidian's, in its font, size, spacing and ink. */
-	--tc-font-desc-title: 22px;
+	--tc-font-desc-title: var(--tc-text-22);
 	--tc-leading-desc-title: 28px;
-	--tc-desc-title-gap: 12px;
-	--tc-desc-top: 8px;
+	--tc-desc-title-gap: var(--tc-space-12);
+	--tc-desc-top: var(--tc-space-8);
 	--tc-font-desc: var(--font-text);
 	--tc-desc-size: var(--font-text-size);
 	--tc-desc-leading: var(--line-height-normal);
@@ -395,44 +409,58 @@ body {
 	--tc-drop-dot: 8px;
 
 	/* Type */
+	/* The type scale: every font size takes one of these. */
+	--tc-text-7: 7px;
+	--tc-text-9: 9px;
+	--tc-text-10: 10px;
+	--tc-text-11: 11px;
+	--tc-text-12: 12px;
+	--tc-text-13: 13px;
+	--tc-text-15: 15px;
+	--tc-text-16: 16px;
+	--tc-text-17: 17px;
+	--tc-text-20: 20px;
+	--tc-text-22: 22px;
 	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
 	--tc-font-inherit: inherit;
-	--tc-font-title: 20px;
-	--tc-font-body: 15px;
-	--tc-font-due-day: 13px;
+	--tc-font-title: var(--tc-text-20);
+	--tc-font-body: var(--tc-text-15);
+	/* Small secondary text: a source's state, a section's name, a tile's label, the desktop bar's place. */
+	--tc-font-caption: var(--tc-text-13);
+	--tc-font-due-day: var(--tc-text-13);
 	--tc-leading-due-day: 13px;
-	--tc-font-due-mon: 9px;
+	--tc-font-due-mon: var(--tc-text-9);
 	--tc-leading-due-mon: 9px;
 	--tc-tracking-mon: 0.3px;
-	--tc-font-block: 12px;
-	--tc-font-count: 12px;
+	--tc-font-block: var(--tc-text-12);
+	--tc-font-count: var(--tc-text-12);
 	/* The column of the subtask counter and the description mark under it; the mark alone is larger. */
 	--tc-leading-count-pair: 13px;
 	--tc-meta-gap: 2px;
 	--tc-meta-min: 22px;
 	--tc-desc-mark: 13px;
 	--tc-desc-mark-pair: 11px;
-	--tc-stroke-desc-mark: 2.8;
+	--tc-stroke-desc-mark: var(--tc-stroke-2-8);
 	--tc-leading-block: 15px;
 	--tc-leading-card: 18px;
-	--tc-font-meta: 9px;
+	--tc-font-meta: var(--tc-text-9);
 	--tc-leading-meta: 10px;
-	--tc-font-tiny: 10px;
-	--tc-font-hour: 11px;
+	--tc-font-tiny: var(--tc-text-10);
+	--tc-font-hour: var(--tc-text-11);
 	--tc-leading-hour: 14px;
 	/* A label between the hours: half an hour's, centred on its line like the hour's. */
-	--tc-font-minor: 7px;
+	--tc-font-minor: var(--tc-text-7);
 	--tc-leading-minor: 8px;
 	--tc-minor-lift: 4px;
-	--tc-font-now: 10px;
-	--tc-font-menu: 16px;
-	--tc-font-value: 15px;
-	--tc-font-ask: 15px;
-	--tc-font-weekday: 11px;
-	--tc-font-day: 16px;
-	--tc-font-sheet-btn: 17px;
-	--tc-font-sub: 13px;
-	--tc-font-group: 13px;
+	--tc-font-now: var(--tc-text-10);
+	--tc-font-menu: var(--tc-text-16);
+	--tc-font-value: var(--tc-font-body);
+	--tc-font-ask: var(--tc-font-body);
+	--tc-font-weekday: var(--tc-text-11);
+	--tc-font-day: var(--tc-text-16);
+	--tc-font-sheet-btn: var(--tc-text-17);
+	--tc-font-sub: var(--tc-font-caption);
+	--tc-font-group: var(--tc-font-caption);
 	--tc-leading-group: 20px;
 	--tc-leading-normal: normal;
 	--tc-weight-normal: 400;
@@ -440,6 +468,7 @@ body {
 	--tc-weight-bold: 700;
 
 	/* Spacing */
+	/* The spacing scale: gaps and paddings take one of these steps. */
 	--tc-space-2: 2px;
 	--tc-space-4: 4px;
 	--tc-space-5: 5px;
@@ -449,6 +478,7 @@ body {
 	--tc-space-12: 12px;
 	--tc-space-14: 14px;
 	--tc-space-16: 16px;
+	--tc-space-20: 20px;
 	--tc-grid-columns: 7;
 
 	/* Layers */
@@ -629,7 +659,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > .tc-seg.is-settling, .tc-seg.is-settling .tc-seg-pill { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
 .tc-seg.is-settling .tc-seg-reel { transition: left var(--tc-duration-slide) var(--tc-ease-in-out); }
 .tc-seg.is-settling .tc-seg-icon { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
-.tc-dot { display: none; position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-dot); background: var(--tc-stale); }
+.tc-dot { display: none; position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-circle); background: var(--tc-stale); }
 .tc-dot.is-shown { display: block; }
 
 /* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */

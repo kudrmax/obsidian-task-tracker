@@ -188,6 +188,16 @@ describe("styles.css keeps to its design system", () => {
 		expect(differences).toEqual([]);
 	});
 
+	it("takes icon sizes, type sizes and stroke widths from their scales", () => {
+		const tokens = sheet.tokens;
+		const ref = (name: string, scale: RegExp) => expect(tokens.get(name), name).toMatch(scale);
+		for (const name of tokens.keys()) {
+			if (/^--tc-[\w-]*-(icon|flag)$/.test(name) && !/^--tc-icon-/.test(name)) ref(name, /^var\(--tc-icon-(xs|s|m|l|xl)\)$/);
+			if (/^--tc-font-/.test(name) && !["--tc-font-ui", "--tc-font-inherit"].includes(name) && !/var\(--font-/.test(tokens.get(name)!)) ref(name, /^var\(--tc-(text-\d+|font-[\w-]+)\)$/);
+			if (/^--tc-stroke-/.test(name) && !/^--tc-stroke-\d/.test(name)) ref(name, /^var\(--tc-stroke-\d[\d-]*\)$/);
+		}
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
