@@ -3,6 +3,7 @@ import { PROPERTY } from "../design";
 import { el, pinTo, px } from "../dom";
 import { Overlay } from "../menu/Overlay";
 import { icon } from "../kit/icons";
+import { menuRow } from "../menu/MenuPanel";
 import { sourceText } from "./sourceText";
 
 export interface SourcesPopoverOptions {
@@ -40,12 +41,15 @@ export class SourcesPopover {
 			const time = el(row, "span", "tc-source-time", text.time);
 			time.classList.toggle("is-stale", text.stale);
 		}
-		const refresh = el(panel, "button", "tc-btn tc-source-refresh");
-		refresh.appendChild(icon("refresh"));
-		refresh.appendChild(document.createTextNode("Refresh now"));
-		refresh.addEventListener("click", () => {
-			this.close();
-			void opts.onRefresh();
+		menuRow(panel, {
+			label: "Refresh now",
+			icon: "refresh",
+			root: "tc-source-refresh",
+			iconSide: "start",
+			onPick: () => {
+				this.close();
+				void opts.onRefresh();
+			},
 		});
 		this.overlay.show();
 	}

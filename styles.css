@@ -1029,7 +1029,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-picker .tc-day.is-other { color: var(--tc-ink-dim); }
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
 .tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
-.tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
+.tc-panel button.tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
 .tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); }

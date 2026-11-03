@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { groupsAbove, type MenuRoom, placePanel } from "../../src/ui/menu/MenuPanel";
+import { backRow, groupsAbove, menuRow, type MenuRoom, placePanel } from "../../src/ui/menu/MenuPanel";
 
 /** A panel 250 wide of groups this tall in layout, drawn smaller on screen while it grows in from scale(0.94). */
 function growingPanel(heights: readonly number[] = [300]): HTMLElement {
@@ -111,5 +111,44 @@ describe("placePanel", () => {
 		placePanel(small, new DOMRect(10, 400, 300, 40), 12, PHONE);
 		expect(small.classList.contains("is-scrolled")).toBe(false);
 		expect(small.style.maxHeight).toBe("");
+	});
+});
+
+describe("menuRow", () => {
+	const shape = (row: HTMLElement) => [...row.childNodes].map((node) => (node instanceof Element ? `${node.tagName.toLowerCase()}${node.className && typeof node.className === "string" ? `.${node.className}` : ""}` : "#text"));
+
+	it("a tall row apart that adds: its kinds as classes, the label then the icon", () => {
+		const row = menuRow(document.body, { label: "New section", icon: "plus", size: "tall", apart: true, add: true, onPick: () => undefined });
+		expect(row.className).toBe("tc-btn tc-menu-row is-tall is-apart is-add");
+		expect(shape(row)).toEqual(["span.tc-menu-label", "svg"]);
+	});
+
+	it("a quiet choice", () => {
+		const row = menuRow(document.body, { label: "No section", choice: true, quiet: true, onPick: () => undefined });
+		expect(row.className).toBe("tc-btn tc-menu-row is-choice is-quiet");
+	});
+
+	it("a purpose class after the kinds, danger last", () => {
+		expect(menuRow(document.body, { label: "Remove due date", icon: "removeDue", cls: "tc-picker-remove", onPick: () => undefined }).className).toBe("tc-btn tc-menu-row tc-picker-remove");
+		expect(menuRow(document.body, { label: "Delete", danger: true, size: "tall", apart: true, onPick: () => undefined }).className).toBe("tc-btn tc-menu-row is-tall is-apart is-danger");
+	});
+
+	it("the back row: its own root, the icon first, the title as text", () => {
+		const row = backRow(document.body, "Section", () => undefined);
+		expect(row.className).toBe("tc-btn tc-menu-back");
+		expect(shape(row)).toEqual(["svg", "#text"]);
+		expect(row.textContent).toBe("Section");
+	});
+
+	it("Refresh now: the icon at the start, on its own root", () => {
+		const row = menuRow(document.body, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: () => undefined });
+		expect(row.className).toBe("tc-btn tc-source-refresh");
+		expect(shape(row)).toEqual(["svg", "#text"]);
+	});
+
+	it("a pick calls back", () => {
+		let picked = 0;
+		menuRow(document.body, { label: "Rename", onPick: () => picked++ }).click();
+		expect(picked).toBe(1);
 	});
 });

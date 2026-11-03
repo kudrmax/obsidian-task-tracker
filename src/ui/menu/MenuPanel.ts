@@ -7,21 +7,46 @@ import { icon, type IconName } from "../kit/icons";
 /** The wheel's places, which the quick bar's place tiles wear. */
 export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar";
 
+/** What a row is drawn as: a panel's row, the way back of a submenu, Refresh now of the sources window. */
+export type MenuRowRoot = "tc-menu-row" | "tc-menu-back" | "tc-source-refresh";
+
 export interface MenuRowSpec {
 	readonly label: string;
 	readonly value?: string;
 	readonly icon?: IconName;
 	readonly danger?: boolean;
 	readonly onPick: () => void;
+	readonly root?: MenuRowRoot;
+	readonly size?: "row" | "tall";
+	/** Stands apart from what is over it by a thick line. */
+	readonly apart?: boolean;
+	/** One of a list to choose from: its label fades out, its check is the accent. */
+	readonly choice?: boolean;
+	readonly quiet?: boolean;
+	/** Adds something: its plus is the accent. */
+	readonly add?: boolean;
+	/** The icon after the label, or before it as the row's lead, the label then plain text. */
+	readonly iconSide?: "end" | "start";
+	/** The purpose: where the row stands. */
+	readonly cls?: string;
 }
 
-/** A row of a panel: the label, a value beside it, the icon on the right. */
-export function menuRow(parent: HTMLElement, spec: MenuRowSpec, cls = "tc-menu-row"): HTMLButtonElement {
-	const row = el(parent, "button", `tc-btn ${cls}`);
-	row.classList.toggle("is-danger", spec.danger === true);
-	el(row, "span", "tc-menu-label", spec.label);
-	if (spec.value) el(row, "span", "tc-menu-value", spec.value);
-	if (spec.icon) row.appendChild(icon(spec.icon));
+function rowClass(spec: MenuRowSpec): string {
+	const kinds = [spec.size === "tall" && "is-tall", spec.apart && "is-apart", spec.choice && "is-choice", spec.quiet && "is-quiet", spec.add && "is-add"];
+	return ["tc-btn", spec.root ?? "tc-menu-row", ...kinds, spec.cls, spec.danger && "is-danger"].filter(Boolean).join(" ");
+}
+
+/** A row of a panel: the label, a value beside it, the icon on the right; or the icon leading the label. */
+export function menuRow(parent: HTMLElement, spec: MenuRowSpec): HTMLButtonElement {
+	const row = el(parent, "button", rowClass(spec));
+	if (spec.iconSide === "start") {
+		if (spec.icon) row.appendChild(icon(spec.icon));
+		row.appendChild(document.createTextNode(spec.label));
+	} else {
+		el(row, "span", "tc-menu-label", spec.label);
+		if (spec.value) el(row, "span", "tc-menu-value", spec.value);
+		if (spec.icon) row.appendChild(icon(spec.icon));
+	}
 	row.addEventListener("click", spec.onPick);
 	return row;
 }
@@ -53,6 +78,17 @@ function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	if (spec.on && spec.color) el(tile, "span", "tc-menu-badge").appendChild(icon("cross"));
 	tile.addEventListener("click", spec.onPick);
 	return tile;
+}
+
+const TILES_PER_ROW = 3;
+
+/** Tiles in rows of at most three, as even as they go: four make two and two, five three and two. */
+export function tileRows<T>(tiles: readonly T[]): readonly (readonly T[])[] {
+	if (tiles.length === 0) return [];
+	const perRow = Math.ceil(tiles.length / Math.ceil(tiles.length / TILES_PER_ROW));
+	const rows: T[][] = [];
+	for (let i = 0; i < tiles.length; i += perRow) rows.push(tiles.slice(i, i + perRow));
+	return rows;
 }
 
 /** A group of tiles, row by row; a label too long for its tile starts at its left and fades out at the right. */
@@ -99,11 +135,7 @@ export function menuGroup(parent: HTMLElement, rows: readonly MenuRowSpec[]): HT
 
 /** The submenu's first row: the way back and the title. */
 export function backRow(parent: HTMLElement, title: string, onBack: () => void): HTMLButtonElement {
-	const row = el(parent, "button", "tc-btn tc-menu-back");
-	row.appendChild(icon("chevronLeft"));
-	row.appendChild(document.createTextNode(title));
-	row.addEventListener("click", onBack);
-	return row;
+	return menuRow(parent, { label: title, icon: "chevronLeft", root: "tc-menu-back", iconSide: "start", onPick: onBack });
 }
 
 /** A tile's label too long for its tile, and a question's task name too long for its line, is marked, all in one layout once the panel is built: tiles mark no label as they are made. */

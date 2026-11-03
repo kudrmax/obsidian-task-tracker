@@ -25,7 +25,7 @@ export class EventMenu extends LiftedMenu {
 		this.lifted.appendChild(context.source.cloneNode(true));
 		const copy = this.liftWhole(context.source, showWholeEvent);
 		const panel = this.addPanel("is-event");
-		menuRow(panel, { label: "Open in Calendar", icon: "calendar", onPick: this.pick(() => context.openInCalendar()) }, "tc-menu-row is-tall");
+		menuRow(panel, { label: "Open in Calendar", icon: "calendar", size: "tall", onPick: this.pick(() => context.openInCalendar()) });
 		this.placeBy(panel, copy);
 	}
 }

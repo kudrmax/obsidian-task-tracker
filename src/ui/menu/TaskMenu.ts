@@ -9,7 +9,7 @@ import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
+import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import { plainText } from "../../application/taskText";
 import type { IconName } from "../kit/icons";
 import { MonthPicker } from "./MonthPicker";
@@ -73,17 +73,6 @@ export function priorityTiles(item: TaskItem, levels: readonly PriorityLevel[]):
 /** A tap on a level sets it; on the task's own level it takes the priority off. */
 export function nextPriority(item: TaskItem, prefix: string): string | null {
 	return item.priority?.prefix === prefix ? null : prefix;
-}
-
-const TILES_PER_ROW = 3;
-
-/** Tiles in rows of at most three, as even as they go: four make two and two, five three and two. */
-export function tileRows<T>(tiles: readonly T[]): readonly (readonly T[])[] {
-	if (tiles.length === 0) return [];
-	const perRow = Math.ceil(tiles.length / Math.ceil(tiles.length / TILES_PER_ROW));
-	const rows: T[][] = [];
-	for (let i = 0; i < tiles.length; i += perRow) rows.push(tiles.slice(i, i + perRow));
-	return rows;
 }
 
 export interface MenuActions {
@@ -328,9 +317,9 @@ export class TaskMenu extends LiftedMenu {
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
 		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
-		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) }, "tc-menu-row is-tall is-apart");
+		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", size: "tall", apart: true, onPick: this.pick(() => actions.openInObsidian()) });
 		if (this.asking === "delete") this.askGroup("delete");
-		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: () => this.askFor("delete") }, "tc-menu-row is-tall is-apart");
+		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, size: "tall", apart: true, onPick: () => this.askFor("delete") });
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}
@@ -377,9 +366,9 @@ export class TaskMenu extends LiftedMenu {
 		backRow(this.panel, "Section", () => this.showMenu());
 		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
 		const group = menuGroup(this.panel, []);
-		for (const name of sections.names) menuRow(group, { label: name, icon: name === sections.current ? "check" : undefined, onPick: choose(name) }, "tc-menu-row is-choice");
-		menuRow(group, { label: sections.ungrouped, icon: sections.current === null ? "check" : undefined, onPick: choose(null) }, "tc-menu-row is-choice is-quiet");
-		menuRow(this.panel, { label: "New section", icon: "plus", onPick: this.pick(() => actions.newSection()) }, "tc-menu-row is-tall is-apart is-add");
+		for (const name of sections.names) menuRow(group, { label: name, icon: name === sections.current ? "check" : undefined, choice: true, onPick: choose(name) });
+		menuRow(group, { label: sections.ungrouped, icon: sections.current === null ? "check" : undefined, choice: true, quiet: true, onPick: choose(null) });
+		menuRow(this.panel, { label: "New section", icon: "plus", size: "tall", apart: true, add: true, onPick: this.pick(() => actions.newSection()) });
 		this.place();
 	}
 
@@ -396,7 +385,7 @@ export class TaskMenu extends LiftedMenu {
 			onPick: (date) => this.pick(() => actions.postpone(date))(),
 		});
 		if (canRemoveDue(today, item.dueDate)) {
-			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.removeDue()) }, "tc-menu-row tc-picker-remove");
+			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", cls: "tc-picker-remove", onPick: this.pick(() => actions.removeDue()) });
 		}
 		this.place();
 	}
