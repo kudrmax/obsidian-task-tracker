@@ -209,6 +209,23 @@ describe("styles.css keeps to its design system", () => {
 		for (const d of quiet) expect(selectors(d.selector).every((s) => s.startsWith(":where(")), d.selector).toBe(true);
 	});
 
+	it("casts every shadow from a shadow token, or rings an element with token measures", () => {
+		const parts = (value: string) => value.split(/,(?![^(]*\))/).map((part) => part.trim());
+		const allowed = [/^none$/, /^var\(--tc-(shadow|level|ring)-[\w-]+\)$/, /^(inset )?0 0 0 (var\(--tc-[\w-]+\)|calc\([^)]*var\(--tc-[\w-]+\)\)) var\(--tc-[\w-]+\)$/];
+		const offenders = sheet.rules
+			.filter((d) => d.property === "box-shadow" || d.property === "filter")
+			.filter((d) => !parts(d.value).every((part) => allowed.some((pattern) => pattern.test(part))))
+			.map(where);
+		expect(offenders).toEqual([]);
+	});
+
+	it("gives the bottom row one shadow: the wheel, the plus, the plus under the finger, Undo and the desktop capsule", () => {
+		const shadowOf = (element: string) =>
+			sheet.rules.filter((d) => d.property === "box-shadow" && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-seg", ".task-calendar > button.tc-plus", ".tc-float-plus", ".task-calendar > button.tc-undo", ".tc-quick-bar.is-desk::before"])
+			expect(shadowOf(element), element).toEqual(["var(--tc-shadow-control)"]);
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);

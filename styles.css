@@ -49,7 +49,7 @@ body {
 	--tc-stack-2: #1C1C1E;
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
-	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
+	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
 	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
@@ -62,14 +62,14 @@ body {
 	--tc-panel-bg: rgba(44, 44, 46, 0.96);
 	--tc-menu-tile-bg: rgba(255, 255, 255, 0.08);
 	--tc-menu-badge-ink: #000000;
-	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+	--tc-shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.6);
 	/* The task menu's card and its panels stand at one depth: one shadow falls from them all, none on another. */
 	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.6));
 	--tc-level-ring: none;
 	/* A source gone stale, and its dot. */
 	--tc-stale: #FF9F0A;
 	--tc-popover-bg: rgba(44, 44, 46, 0.97);
-	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+	--tc-shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.7);
 	--tc-pull-ink: #AEAEB2;
 	/* The segmented control's ground, and the bands between a menu's groups. */
 	--tc-track-bg: var(--tc-card-bg);
@@ -169,7 +169,8 @@ body {
 	--tc-stroke-plus: var(--tc-stroke-2-6);
 	/* The ring that holds the plus's place while it is carried: its plus is thinner. */
 	--tc-stroke-ring: var(--tc-stroke-2-2);
-	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+	/* Everything that floats over the content in the bottom row (the wheel, the plus, Undo, the desktop capsule) casts this one shadow; its ring parts it from a ground of its own tone. */
+	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
 
 	/* Sizes: the columns */
 	/* The title row, then the head gap: the titles' type stands as far over the first card as Obsidian's header over it. */
@@ -332,7 +333,6 @@ body {
 	 * buttons are a capsule in the wheel's track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
 	 */
 	--tc-desk-bar-gap: 8px;
-	--tc-desk-bar-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
 	--tc-desk-bar-hover: rgba(255, 255, 255, 0.08);
 	--tc-desk-bar-btn-w: 32px;
 	--tc-desk-bar-icon: var(--tc-icon-m);
@@ -549,8 +549,8 @@ body.theme-light {
 	--tc-stack-2: #EFEFF2;
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
-	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
-	--tc-plus-shadow: 0 6px 16px rgba(138, 92, 245, 0.35);
+	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
 	--tc-ink-dim: #C7C7CC;
@@ -558,16 +558,15 @@ body.theme-light {
 	--tc-backdrop: rgba(0, 0, 0, 0.22);
 	--tc-panel-bg: rgba(250, 250, 252, 0.97);
 	--tc-menu-tile-bg: rgba(0, 0, 0, 0.05);
-	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+	--tc-shadow-panel: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
 	--tc-level-ring: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-stale: #FF9500;
 	--tc-popover-bg: rgba(250, 250, 252, 0.97);
-	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+	--tc-shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-pull-ink: #6C6C70;
 	--tc-gap-ink: #E5E5EA;
 	--tc-place-on-bg: rgba(0, 0, 0, 0.1);
-	--tc-desk-bar-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-desk-bar-hover: rgba(0, 0, 0, 0.06);
 	--tc-desk-place-bg: rgba(0, 0, 0, 0.07);
 	--tc-priority-red: #FF3B30;
@@ -626,14 +625,14 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
-.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo, .tc-float-plus { width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
-.task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
+.task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-shadow-control); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { left: var(--tc-space-16); padding: 0; background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); }
+.task-calendar > button.tc-undo { left: var(--tc-space-16); padding: 0; background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); color: var(--tc-text); }
 .task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
 .task-calendar > button.tc-undo:active { opacity: var(--tc-pressed); }
 .task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
@@ -664,8 +663,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
 .tc-popover, .tc-panel, .tc-float, .tc-section-float, .tc-lifted, .tc-menu-subtasks, .tc-quick-bar.is-over, .tc-drop, .tc-menu-field { font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-panel, .tc-popover, .tc-desc-peek { border-radius: var(--tc-radius-panel); overflow: hidden; }
-.tc-panel, .tc-desc-peek { box-sizing: border-box; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); }
-.tc-popover { position: fixed; bottom: calc(var(--tc-panel-y) + var(--tc-popover-gap)); margin-left: calc(-1 * var(--tc-popover-w) / 2); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); background: var(--tc-popover-bg); box-shadow: var(--tc-popover-shadow); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-panel, .tc-desc-peek { box-sizing: border-box; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); }
+.tc-popover { position: fixed; bottom: calc(var(--tc-panel-y) + var(--tc-popover-gap)); margin-left: calc(-1 * var(--tc-popover-w) / 2); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); background: var(--tc-popover-bg); box-shadow: var(--tc-shadow-popover); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-popover.is-shown { opacity: 1; }
 .tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-14); display: flex; align-items: center; gap: var(--tc-space-10); }
 .tc-source-row:not(:last-of-type) { border-bottom: var(--tc-rule); }
@@ -863,15 +862,15 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
 .tc-float, .tc-float-plus, .tc-float-under, .tc-section-float, .tc-float-count { position: fixed; left: 0; top: 0; z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; }
-.tc-float { width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow); transform-origin: 0 0; font-size: var(--tc-font-body); }
-.tc-float-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
+.tc-float { width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-shadow-lift); transform-origin: 0 0; font-size: var(--tc-font-body); }
+.tc-float-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-shadow-control); }
 .tc-float-plus svg { stroke-width: var(--tc-stroke-plus); }
 .tc-float-plus.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
-.tc-float-under { height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-float-shadow); transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
+.tc-float-under { height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-under.is-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }
 .tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step-y)) 0 0 calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
 .tc-float-under.is-gone { opacity: 0; }
@@ -896,10 +895,10 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted.is-head { background: none; border-radius: 0; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); align-items: flex-end; }
 /* A lifted section under the finger: its header as a lifted card, its count on the right, two layers of its cards beneath. */
 .tc-section-float { width: var(--tc-float-w); height: var(--tc-float-h); }
-.tc-stack-layer { position: absolute; left: 0; top: 0; height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-float-shadow); }
+.tc-stack-layer { position: absolute; left: 0; top: 0; height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); }
 .tc-stack-layer.is-1 { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x)); transform: translate(var(--tc-stack-step-x), var(--tc-stack-step-y)); background: var(--tc-stack-1); }
 .tc-stack-layer.is-2 { width: calc(var(--tc-float-w) - 2 * var(--tc-stack-step-x) - 2 * var(--tc-stack-step-x)); transform: translate(calc(2 * var(--tc-stack-step-x)), calc(2 * var(--tc-stack-step-y))); background: var(--tc-stack-2); }
-.tc-section-card { position: absolute; inset: 0; box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); box-shadow: var(--tc-float-shadow); padding: 0 var(--tc-space-12) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); }
+.tc-section-card { position: absolute; inset: 0; box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); padding: 0 var(--tc-space-12) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-section-card-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-section-card-count { flex-shrink: 0; font-size: var(--tc-font-count); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-lifted.is-block { background: none; padding: 0; border-radius: 0; overflow: visible; }
@@ -1028,7 +1027,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-bar.is-desk { right: auto; bottom: auto; height: var(--tc-seg); padding: var(--tc-seg-pad); gap: 0; }
 .tc-quick-bar.is-desk.is-away { visibility: hidden; }
 .tc-quick-bar.is-desk .tc-bar-shifts { display: contents; }
-.tc-quick-bar.is-desk::before { border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); }
+.tc-quick-bar.is-desk::before { border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); }
 .tc-quick-bar.is-desk .tc-bar-shift, .tc-quick-bar.is-desk .tc-bar-flag { width: var(--tc-desk-bar-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); }
 .tc-quick-bar.is-desk .tc-bar-shift:not(:disabled):hover, .tc-quick-bar.is-desk .tc-bar-flag:hover { background: var(--tc-desk-bar-hover); }
 .tc-quick-bar.is-desk .tc-bar-shift svg { width: var(--tc-desk-bar-icon); height: var(--tc-desk-bar-icon); }
