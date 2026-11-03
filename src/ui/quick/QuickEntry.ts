@@ -265,16 +265,20 @@ export class QuickEntry {
 		});
 	}
 
+	/** The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a moment. */
 	private async write(spot: EntrySpot, line: Line): Promise<void> {
 		switch (spot.kind) {
 			case "slot":
-				return this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
+				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
+				return this.deps.fresh();
 			case "stack":
-				return this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
+				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
+				return this.deps.fresh();
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
 				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)));
+				await this.deps.fresh();
 				this.runs.landed(spot.column, place.index);
 			}
 		}

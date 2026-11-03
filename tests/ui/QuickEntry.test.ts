@@ -43,6 +43,11 @@ class FakeTasks {
 	readonly errors: unknown[] = [];
 	gate: Promise<void> = Promise.resolve();
 	failing = new Set<string>();
+	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
+	lagging = false;
+	private written: PlacedCard[] | null = null;
+	/** At each change: the card names the lists show, then the texts waiting under them. */
+	readonly seen: string[][] = [];
 
 	constructor(names: readonly (string | [string, number])[]) {
 		this.cards = names.map((n) => (typeof n === "string" ? card(n) : card(...n)));
@@ -55,7 +60,11 @@ class FakeTasks {
 				result.kind === "task"
 					? { kind: "list", list: "now", group: result.group, before: result.before }
 					: { kind: "subtask", parent: result.parent, before: result.before },
-			fresh: () => this.gate,
+			fresh: async () => {
+				await this.gate;
+				if (this.written) this.cards = this.written;
+				this.written = null;
+			},
 			createInPlace: async (text, priority, place) => {
 				if (this.failing.has(text)) throw new Error(`no ${text}`);
 				this.created.push({ text, priority, place });
@@ -70,7 +79,10 @@ class FakeTasks {
 				{ prefix: "!!", color: "red" },
 				{ prefix: "p1", color: "orange" },
 			],
-			onChange: (state) => this.changes.push(state),
+			onChange: (state) => {
+				this.changes.push(state);
+				this.seen.push([...this.cards.map((c) => c.key.raw), ...(state?.pending.map((line) => line.text) ?? [])]);
+			},
 			onError: (e) => this.errors.push(e),
 		});
 	}
@@ -92,7 +104,9 @@ class FakeTasks {
 		}
 		if (place.before) index = indexOf(place.before);
 		// A write makes every key read before it stale: the lists hand out new ones.
-		this.cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)].map((c) => ({ ...c, key: { ...c.key } }));
+		const cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)].map((c) => ({ ...c, key: { ...c.key } }));
+		if (this.lagging) this.written = cards;
+		else this.cards = cards;
 	}
 }
 
@@ -110,6 +124,23 @@ describe("QuickEntry", () => {
 		expect(tasks.names).toEqual(["A:0", "New:0", "B:0"]);
 		expect(entry.state).toMatchObject({ text: "", pending: [], spot: at(2) });
 		expect(tasks.changes[tasks.changes.length - 1]).toEqual(entry.state);
+	});
+
+	it("a text entered waits under the cards until the lists show it written: it never leaves the screen for a moment", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.lagging = true;
+		const entry = tasks.entry();
+		entry.open(at(2));
+		for (const text of ["1", "2"]) {
+			entry.type(text);
+			entry.enter();
+		}
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "B:0", "1:0", "2:0"]);
+		expect(entry.state).toMatchObject({ pending: [], spot: at(4) });
+		const both = (seen: string[]) => seen.filter((name) => name === "1" || name === "2");
+		const entered = tasks.seen.findIndex((seen) => both(seen).length === 2);
+		for (const seen of tasks.seen.slice(entered)) expect(both(seen)).toEqual(["1", "2"]);
 	});
 
 	it("queues rapid enters in order", async () => {
