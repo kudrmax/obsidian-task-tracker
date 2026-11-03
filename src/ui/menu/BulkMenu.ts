@@ -88,7 +88,7 @@ export class BulkMenu {
 		this.overlay = new Overlay(() => this.close());
 		for (const card of context.cards) this.lift(card);
 		this.anchor = this.besideList(context.source);
-		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task is-bulk"));
+		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task is-bulk"), true);
 		this.showMenu();
 		this.overlay.show();
 	}
@@ -98,7 +98,7 @@ export class BulkMenu {
 		const rect = card.getBoundingClientRect();
 		if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
 		const item = this.context.items[this.context.cards.indexOf(card)];
-		const copy = this.overlay.add(el(null, "div", "tc-lifted is-selected"));
+		const copy = this.overlay.add(el(null, "div", "tc-lifted is-selected"), true);
 		fillCard(copy, item, { day: this.context.day });
 		copy.style.left = px(rect.left);
 		copy.style.top = px(rect.top);

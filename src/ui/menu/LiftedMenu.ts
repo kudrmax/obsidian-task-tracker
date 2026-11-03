@@ -10,7 +10,7 @@ export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
 /**
  * What a press on a card or an event opens: a copy of it over the blurred screen, where it stood, grown only as far as
  * its title needs and kept inside the window, and the panel that grows out by it. The task menu and the event menu are
- * made of it; they go together, in the overlay's one fade.
+ * made of it; they go together, in the overlay's one fade, and stand at one depth under one shadow.
  */
 export abstract class LiftedMenu {
 	protected readonly overlay: Overlay;
@@ -22,7 +22,7 @@ export abstract class LiftedMenu {
 
 	protected constructor() {
 		this.overlay = new Overlay((how) => this.close(how));
-		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
+		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"), true);
 	}
 
 	/** The copy stands where `source` does; what it cuts grows it, kept inside the window, and the panel goes by the copy. */
@@ -38,7 +38,7 @@ export abstract class LiftedMenu {
 
 	/** The panel of either menu: the same width and rows. */
 	protected addPanel(cls: string): HTMLElement {
-		return this.overlay.add(el(null, "div", `tc-panel is-menu ${cls}`));
+		return this.overlay.add(el(null, "div", `tc-panel is-menu ${cls}`), true);
 	}
 
 	get raised(): number {

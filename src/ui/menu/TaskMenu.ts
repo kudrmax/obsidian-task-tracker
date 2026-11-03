@@ -201,7 +201,7 @@ export class TaskMenu extends LiftedMenu {
 		this.giveToField();
 		this.fieldClosed = onClose;
 		this.lifted.style.visibility = "hidden";
-		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row")));
+		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		row.style.left = px(this.copy.left);
 		row.style.width = px(this.copy.width);
 		showStrip(row, this.context.item);
@@ -249,7 +249,7 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	private stackUnder(copy: DOMRect): HTMLElement {
-		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
+		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"), true);
 		stack.style.left = px(copy.left);
 		stack.style.top = px(copy.bottom);
 		stack.style.width = px(copy.width);

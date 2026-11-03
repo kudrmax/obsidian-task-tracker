@@ -65,6 +65,9 @@ body {
 	--tc-menu-tile-bg: rgba(255, 255, 255, 0.08);
 	--tc-menu-badge-ink: #000000;
 	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+	/* The task menu's card and its panels stand at one depth: one shadow falls from them all, none on another. */
+	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.6));
+	--tc-level-ring: none;
 	/* A source gone stale, and its dot. */
 	--tc-stale: #FF9F0A;
 	--tc-popover-bg: rgba(44, 44, 46, 0.97);
@@ -528,6 +531,8 @@ body.theme-light {
 	--tc-panel-bg: rgba(250, 250, 252, 0.97);
 	--tc-menu-tile-bg: rgba(0, 0, 0, 0.05);
 	--tc-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
+	--tc-level-ring: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-stale: #FF9500;
 	--tc-popover-bg: rgba(250, 250, 252, 0.97);
 	--tc-popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
@@ -851,6 +856,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-backdrop.is-shown { opacity: 1; }
+.tc-level { position: fixed; inset: 0; z-index: var(--tc-layer-panel); pointer-events: none; filter: var(--tc-level-shadow); }
+.tc-level > :not(.tc-lifted) { pointer-events: auto; }
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); overflow: hidden; pointer-events: none; }
 .tc-link { color: var(--tc-accent); }
 .tc-lifted .tc-link { pointer-events: auto; cursor: pointer; }
@@ -896,6 +903,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-desc-text > :last-child { margin-bottom: 0; }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); box-sizing: border-box; border-radius: var(--tc-radius-panel); overflow: hidden; background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-panel { top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); }
+.tc-level > .tc-panel, .tc-level > .tc-desc-peek { box-shadow: var(--tc-level-ring); }
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }
 .tc-panel.is-shown { opacity: 1; transform: none; }
 .tc-panel.is-scrolled { overflow-y: auto; overscroll-behavior: contain; }
