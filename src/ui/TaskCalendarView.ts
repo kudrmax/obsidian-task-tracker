@@ -45,7 +45,6 @@ import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
-import { named, swipeTrace } from "./swipeTrace";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
 import { type DayLane, DayTrack, EdgeTrack, restore, StripTrack, stripParts } from "./ScreenTracks";
@@ -384,7 +383,6 @@ export class TaskCalendarView extends ItemView {
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
-		this.traceSwipes(root);
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
@@ -529,40 +527,6 @@ export class TaskCalendarView extends ItemView {
 	 * the finger, to another day each column turns to that day's within itself, and past the row's end it only gives.
 	 */
 	private trackTo(shift: Shift): ScreenTrack {
-		swipeTrace.log(`track ${shift} from ${this.mode()} ${this.selectedDate} today=${this.today()} landing=${this.landing !== null} shownMode=${this.shownMode}`);
-		try {
-			const track = this.builtTrackTo(shift);
-			swipeTrace.log(`track ${shift}: ${track instanceof StripTrack ? "strip" : track instanceof DayTrack ? "day" : track instanceof EdgeTrack ? "edge" : "other"} distance=${track.distance}`);
-			return track;
-		} catch (error) {
-			swipeTrace.log(`track ${shift} failed: ${error instanceof Error ? `${error.name}: ${error.message} | ${error.stack ?? ""}` : String(error)}`);
-			throw error;
-		}
-	}
-
-	private traceSwipes(root: HTMLElement): void {
-		const path = "Task Calendar swipe log.md";
-		const adapter = this.app.vault.adapter;
-		swipeTrace.attach({
-			write: (text) =>
-				void adapter
-					.exists(path)
-					.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
-					.catch((error) => console.error(error)),
-		});
-		swipeTrace.log(`open ${Platform.isIosApp ? "ios" : Platform.isMobile ? "mobile" : "desktop"} ${this.app.vault.getName()} width=${root.clientWidth} ua=${navigator.userAgent}`);
-		for (const type of ["touchstart", "touchend", "touchcancel"] as const)
-			this.registerDomEvent(root, type, (e) => swipeTrace.log(`${type} touches=${e.touches.length} on=${named(e.target)} cancelable=${e.cancelable}`), { capture: true, passive: true });
-		this.registerDomEvent(root, "pointercancel", (e) => swipeTrace.log(`pointercancel id=${e.pointerId} on=${named(e.target)}`), { capture: true });
-		this.registerDomEvent(window, "error", (e) => swipeTrace.log(`window error: ${e.message} at ${e.filename}:${e.lineno}`));
-		this.registerDomEvent(window, "unhandledrejection", (e) => swipeTrace.log(`unhandled rejection: ${e.reason instanceof Error ? e.reason.stack : String(e.reason)}`));
-		this.register(() => {
-			swipeTrace.flush();
-			swipeTrace.attach(null);
-		});
-	}
-
-	private builtTrackTo(shift: Shift): ScreenTrack {
 		this.landed();
 		const root = this.contentEl;
 		const parts = stripParts(root);

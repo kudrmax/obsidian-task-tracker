@@ -2,7 +2,6 @@ import type { RightMode } from "../settings";
 import { LAYOUT } from "./design";
 import type { DayPeek } from "./DayPeek";
 import { PLACES, type Shift } from "./screens";
-import { swipeTrace } from "./swipeTrace";
 import type { ScreenTrack } from "./ScreenPager";
 
 /** What stands on the strip and slides with it: the columns, the dividers between them and the headers over them. */
@@ -147,20 +146,15 @@ export class StripTrack implements ScreenTrack {
 			animation.currentTime = 0;
 			this.animations.push(animation);
 		});
-		const soonAt = soon < 0 ? "none" : `${before[soon].left}->${after[soon].left}`;
-		swipeTrace.log(`strip ${deps.from}->${deps.to} distance=${Math.round(this.distance)} soon=${soonAt} parts=${parts.length} animations=${this.animations.length} classes=${root.className}`);
 	}
 
 	at(dx: number): void {
 		const share = this.distance > 0 ? Math.min(1, Math.max(0, (-this.way * dx) / this.distance)) : 0;
 		for (const animation of this.animations) animation.currentTime = share * SCRUB_MS;
-		const soon = this.deps.root.querySelector<HTMLElement>(":scope > .tc-soon");
-		swipeTrace.log(`strip at dx=${Math.round(dx)} share=${share.toFixed(2)} soonLeft=${soon ? Math.round(soon.getBoundingClientRect().left) : "none"} playState=${this.animations[0]?.playState} time=${this.animations[0]?.currentTime}`);
 		this.deps.turnWheel(this.fromPlace + this.way * share);
 	}
 
 	land(arrived: boolean): void {
-		swipeTrace.log(`strip land arrived=${arrived}`);
 		if (arrived) this.deps.onArrive(this.deps.to);
 		else this.deps.turnWheel(this.fromPlace);
 		for (const animation of this.animations) animation.cancel();
