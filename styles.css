@@ -601,6 +601,8 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar button, .tc-panel button, .tc-picker button, .tc-popover button, .tc-quick-bar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. At zero weight: it quiets Obsidian's light, never a button's own ground. */
 :where(.task-calendar, .tc-panel, .tc-picker, .tc-popover, .tc-quick-bar) :where(button:hover, button:active) { background: transparent; box-shadow: none; }
+/* On the phone Obsidian marks a tapped button .mobile-tap and greys it, at (0,2,1); this answers at the same weight, later, and a button's own ground answers above it. */
+:is(.task-calendar, .tc-panel, .tc-picker, .tc-popover, .tc-quick-bar) button.mobile-tap { background-color: transparent; box-shadow: none; }
 /* Pressed, every button of the plugin dims; the divider's handle is held for the whole drag, and stays. */
 :is(.task-calendar, .tc-panel, .tc-picker, .tc-popover, .tc-quick-bar) button:not(.tc-divider-handle):not(:disabled):active, .tc-swatch:active { opacity: var(--tc-pressed); }
 /* Under the pointer (desktop only), a layer over the button's own ground, never instead of it. */
@@ -720,7 +722,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar.is-lists .tc-divider.is-fixed.is-inbox { left: calc(-1 * var(--tc-divider)); }
 .task-calendar.is-inbox .tc-divider.is-fixed.is-inbox { left: var(--tc-half-column); }
 .tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
-.task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
+.task-calendar button.tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
 .tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }

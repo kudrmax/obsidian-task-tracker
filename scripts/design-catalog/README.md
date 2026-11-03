@@ -42,3 +42,7 @@
 `hover-tile-on` ставит карточке первый уровень приоритета через меню и снимает его на выходе.
 
 Новое состояние добавляется туда же: как в него попасть и как из него выйти.
+
+## Tap and iPad probe
+
+`node scripts/design-catalog/tapcheck.mjs` switches the test Obsidian to the phone view and, in the main screen, the task menu, the date picker, the delete question, the sources window, the description and the quick bar, gives every visible plugin button Obsidian's tap mark `.mobile-tap` and prints each button whose ground, shadow or padding changes. `TAB=1` does the same with the body marked `.is-tablet` (Obsidian's iPad button padding). An empty state means no button changed.

@@ -209,6 +209,12 @@ describe("styles.css keeps to its design system", () => {
 		for (const d of quiet) expect(selectors(d.selector).every((s) => s.startsWith(":where(")), d.selector).toBe(true);
 	});
 
+	it("answers Obsidian's phone tap (button:not(.clickable-icon).mobile-tap, weight 0,2,1) at its weight, and the divider's handle keeps its ground above it", () => {
+		const tap = sheet.rules.filter((d) => d.selector === ":is(.task-calendar, .tc-panel, .tc-picker, .tc-popover, .tc-quick-bar) button.mobile-tap");
+		expect(tap.map((d) => `${d.property}: ${d.value}`)).toEqual(["background-color: transparent", "box-shadow: none"]);
+		expect(sheet.rules.some((d) => d.selector === ".task-calendar button.tc-divider-handle" && d.property === "background")).toBe(true);
+	});
+
 	it("casts every shadow from a shadow token, or rings an element with token measures", () => {
 		const parts = (value: string) => value.split(/,(?![^(]*\))/).map((part) => part.trim());
 		const allowed = [/^none$/, /^var\(--tc-(shadow|level|ring)-[\w-]+\)$/, /^(inset )?0 0 0 (var\(--tc-[\w-]+\)|calc\([^)]*var\(--tc-[\w-]+\)\)) var\(--tc-[\w-]+\)$/];
