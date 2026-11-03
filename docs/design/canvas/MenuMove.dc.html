@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Меню задачи: перенос и секция</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="Screen" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<div style="position: absolute; left: 10px; top: {{cardTop}}px; width: 175px; height: 35px; box-sizing: border-box; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; z-index: 11;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">Купить билеты в Белград</div>
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span>
+</div>
+
+<div style="position: absolute; left: 10px; top: {{panelTop}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-if value="{{onMenu}}" hint-placeholder-val="{{true}}">
+<div style="padding: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{flag}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px; outline: {{markMove}}; outline-offset: -4px; border-radius: 0;">
+<sc-for list="{{moveTiles}}" as="m" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.accent}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.d}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap;">{{m.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<sc-for list="{{editRows}}" as="r" hint-placeholder-count="4">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left; outline: {{r.mark}}; outline-offset: -3px;">
+<span style="flex: 1; min-width: 0;">{{r.label}}</span>
+<sc-if value="{{r.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{r.value}}</span></sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg>
+</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Open in Obsidian</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.open}}"></path></svg></button>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.del}}"></path></svg></button>
+</sc-if>
+
+<sc-if value="{{onSections}}" hint-placeholder-val="{{false}}">
+<div style="height: 52px; box-sizing: border-box; padding: 0 16px 0 10px; display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Section
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<sc-for list="{{sectionRows}}" as="s" hint-placeholder-count="5">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{s.sep}}; background: transparent; color: {{s.ink}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;">{{s.name}}</span>
+<sc-if value="{{s.on}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></sc-if>
+</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">New section</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"today","options":["today","later","sections"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'today';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', accent: '#8A5CF5', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', tile: 'rgba(0,0,0,0.05)', danger: '#FF3B30', mark: '#FF9500' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', accent: '#8A6CEF', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', tile: 'rgba(255,255,255,0.08)', danger: '#FF453A', mark: '#FFD60A' };
+    const markLine = this.props.marks !== false ? '2px dashed ' + c.mark : 'none';
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      progressFill: 'M12 3a9 9 0 0 1 0 18z',
+      wontdo: CIRCLE + ' M8 12h8',
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      desc: 'M4 6h16 M4 12h16 M4 18h10',
+      section: 'M4 6h9 M4 12h16 M4 18h16',
+      subtask: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
+      open: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13',
+      today: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      pick: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const day = view === 'later' ? '5' : '3';
+    const moveTiles = [
+      ...(view === 'later' ? [{ label: 'Today', d: icons.today }] : []),
+      { label: 'Tomorrow', d: icons.tomorrow },
+      { label: 'Pick a date', d: icons.pick }
+    ];
+    const editRows = [
+      { label: 'Rename', d: icons.rename },
+      { label: 'Add description', d: icons.desc },
+      { label: 'Section', d: icons.section, value: 'Morning', mark: true },
+      { label: 'Add subtask', d: icons.subtask }
+    ].map((r, i, a) => ({ ...r, hasValue: !!r.value, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0', mark: r.mark && view !== 'sections' ? markLine : 'none' }));
+    const sections = [
+      { name: 'Morning', on: true },
+      { name: 'Afternoon' },
+      { name: 'Evening' },
+      { name: 'Работа' },
+      { name: 'No section', muted: true }
+    ];
+    const sectionRows = sections.map((s, i, a) => ({ ...s, on: !!s.on, ink: s.muted ? c.muted : c.text, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const cardTop = 166;
+    return {
+      c,
+      theme: light ? 'light' : 'dark',
+      icons,
+      day,
+      cardTop,
+      panelTop: cardTop + 35 + 12,
+      onMenu: view !== 'sections',
+      onSections: view === 'sections',
+      markMove: view === 'sections' ? 'none' : markLine,
+      flag: 'M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5',
+      levels: [{ name: 'p1', c: light ? '#FF3B30' : '#FF453A' }, { name: 'p2', c: light ? '#FF9500' : '#FF9F0A' }, { name: 'p3', c: light ? '#FFCC00' : '#FFD60A' }],
+      statusTiles: [
+        { label: 'Done', d: CIRCLE, fd: CIRCLE },
+        { label: 'In progress', d: CIRCLE, fd: icons.progressFill },
+        { label: 'Won’t do', d: icons.wontdo, fd: '' }
+      ],
+      moveTiles,
+      editRows,
+      sectionRows
+    };
+  }
+}
+</script>
+</body>
+</html>

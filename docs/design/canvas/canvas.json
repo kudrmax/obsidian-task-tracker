@@ -1600,13 +1600,21 @@
    "page": "progress",
    "title": "3.5 Полосы медленно бегут"
   },
-  "QuickFlow8.dc.html": {
-   "h": 2040,
-   "page": "quickadd",
-   "title": "8. Десктоп: панель у поля",
-   "w": 6448,
+  "FootBoard.dc.html": {
    "x": 0,
-   "y": 8932
+   "y": 0,
+   "w": 1928,
+   "h": 2260,
+   "page": "foot",
+   "title": "Низ списков: варианты"
+  },
+  "Foot.dc.html": {
+   "x": 2048,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "foot",
+   "title": "Служебное: экран для вариантов низа"
   },
   "QuickDesk.dc.html": {
    "x": 4514,
@@ -1615,6 +1623,110 @@
    "h": 800,
    "page": "components",
    "title": "Компонент экранов быстрого ввода на десктопе (его показывает доска «8. Десктоп: панель у поля»)"
+  },
+  "QuickFlow8.dc.html": {
+   "h": 2040,
+   "page": "quickadd",
+   "title": "8. Десктоп: панель у поля",
+   "w": 6448,
+   "x": 0,
+   "y": 8932
+  },
+  "Ev1Now.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "Сейчас: колонки"
+  },
+  "Ev1A.dc.html": {
+   "x": 470,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "A — внахлёст, сдвиг 18 px, как у задач"
+  },
+  "Ev1B.dc.html": {
+   "x": 940,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "B — как A, плюс кромка цвета фона"
+  },
+  "Ev1C.dc.html": {
+   "x": 1410,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "C — внахлёст, сдвиг 40 px"
+  },
+  "Ev2Now.dc.html": {
+   "x": 0,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "Сейчас: колонки"
+  },
+  "Ev2A.dc.html": {
+   "x": 470,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "A — внахлёст, сдвиг 18 px, как у задач"
+  },
+  "Ev2B.dc.html": {
+   "x": 940,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "B — как A, плюс кромка цвета фона"
+  },
+  "Ev2C.dc.html": {
+   "x": 1410,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "page": "events",
+   "title": "C — внахлёст, сдвиг 40 px"
+  },
+  "DragCoverBoard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1928,
+   "h": 2380,
+   "page": "dragcover",
+   "title": "Зоны при переносе: варианты"
+  },
+  "DragCover.dc.html": {
+   "x": 5794,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов «Зоны при переносе»"
+  },
+  "MenuMoveBoard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1928,
+   "h": 1290,
+   "page": "menumove",
+   "title": "Перенос и секция в меню задачи"
+  },
+  "MenuMove.dc.html": {
+   "x": 6264,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Меню задачи: перенос и секция"
   }
  },
  "createdOnFiles": {
@@ -1964,6 +2076,22 @@
    "w": 240,
    "x": 0,
    "y": 860
+  },
+  "events1Title": {
+   "kind": "title1",
+   "maxW": 1800,
+   "page": "events",
+   "text": "Пересекающиеся события: твой вечер",
+   "x": 0,
+   "y": -300
+  },
+  "events2Title": {
+   "kind": "title1",
+   "maxW": 1800,
+   "page": "events",
+   "text": "Трудные случаи: одно начало, один календарь, задача поверх",
+   "x": 0,
+   "y": 964
   }
  },
  "order": [
@@ -2167,8 +2295,22 @@
   "ProgressHatchWide.dc.html",
   "ProgressHatchWideFade.dc.html",
   "ProgressHatchMove.dc.html",
+  "Foot.dc.html",
+  "FootBoard.dc.html",
+  "QuickDesk.dc.html",
   "QuickFlow8.dc.html",
-  "QuickDesk.dc.html"
+  "Ev1Now.dc.html",
+  "Ev1A.dc.html",
+  "Ev1B.dc.html",
+  "Ev1C.dc.html",
+  "Ev2Now.dc.html",
+  "Ev2A.dc.html",
+  "Ev2B.dc.html",
+  "Ev2C.dc.html",
+  "DragCover.dc.html",
+  "DragCoverBoard.dc.html",
+  "MenuMove.dc.html",
+  "MenuMoveBoard.dc.html"
  ],
  "pages": [
   {
@@ -2230,6 +2372,22 @@
   {
    "id": "progress",
    "name": "В процессе"
+  },
+  {
+   "id": "foot",
+   "name": "Низ списков"
+  },
+  {
+   "id": "events",
+   "name": "События внахлёст"
+  },
+  {
+   "id": "dragcover",
+   "name": "Зоны при переносе"
+  },
+  {
+   "id": "menumove",
+   "name": "Перенос в меню"
   }
  ],
  "title": "Task Calendar"
