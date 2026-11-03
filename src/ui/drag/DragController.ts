@@ -35,7 +35,7 @@ export interface DragControllerDeps {
 	carried?(item: TaskItem): readonly PickedCard[];
 	readonly haptics: Haptics;
 	readonly arbiter: GestureArbiter;
-	/** A card is lifted or settled: the lists hide New task while it is carried. */
+	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
 	onResult(drag: TaskDragPayload, result: DropResult): Promise<void>;
 	onResize(item: TaskItem, slot: Slot): Promise<void>;

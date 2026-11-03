@@ -12,6 +12,8 @@ export interface SwipeTarget {
 	follow(dx: number): void;
 	/** Let go: on to the next screen `shift`'s way, or back where it stood (null); resolves once it stands. */
 	settle(shift: Shift | null): Promise<void>;
+	/** It stands at once where it was going. */
+	stand(): void;
 }
 
 export interface SwipeOptions {
@@ -28,9 +30,6 @@ interface Press {
 	readonly speed: PointerSpeed;
 	/** Where the finger stood when the screen took it: the screen follows it from there. */
 	from: number;
-	lastX: number;
-	/** The way the finger last went: on (left) or back (right). */
-	way: Shift | 0;
 	swiping: boolean;
 }
 
@@ -55,12 +54,15 @@ interface Stream {
 	timer: number;
 }
 
-/** A field being typed in and the bar beside it, and the field of a section's name: a finger there edits, it does not swipe. */
-const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-group-field";
+/**
+ * A field being typed in and the bar beside it, and the field of a section's name: a finger there edits, it does not
+ * swipe. Nor on the divider that sets the columns' widths: a finger there resizes.
+ */
+const NOT_SWIPED = ".tc-quick-row, .tc-quick-bar, .tc-group-field, .tc-divider:not(.is-fixed)";
 
-/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed. */
+/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed or the columns resized. */
 export function swipeStartsAt(target: EventTarget | null): boolean {
-	return !(target instanceof Element && target.closest(TYPING));
+	return !(target instanceof Element && target.closest(NOT_SWIPED));
 }
 
 const SWIPE = "swipe";
@@ -87,11 +89,14 @@ export class Swipe {
 	private stream: Stream | null = null;
 	/** The swipes and settlings now holding the screen. */
 	private holds = 0;
+	/** Counts the times the screen was made to stand at once: a settling begun before that no longer holds it. */
+	private round = 0;
 
 	constructor(
 		private readonly el: HTMLElement,
 		private readonly opts: SwipeOptions,
 	) {
+		el.addEventListener("pointerdown", () => this.interrupt(), { capture: true });
 		el.addEventListener("pointerdown", (e) => this.down(e));
 		el.addEventListener("pointermove", (e) => this.move(e));
 		el.addEventListener("pointerup", (e) => this.up(e, true));
@@ -153,7 +158,7 @@ export class Swipe {
 	private letStreamGo(stream: Stream, shift: Shift | null): void {
 		stream.following = false;
 		stream.dx = 0;
-		void this.opts.target.settle(shift).then(() => this.letGo());
+		this.settle(shift);
 	}
 
 	private down(e: PointerEvent): void {
@@ -163,15 +168,13 @@ export class Swipe {
 			return;
 		}
 		if (!this.free() || !this.opts.accepts(e.target)) return;
-		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, speed: new PointerSpeed(e.clientX, e.timeStamp), from: e.clientX, lastX: e.clientX, way: 0, swiping: false };
+		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, speed: new PointerSpeed(e.clientX, e.timeStamp), from: e.clientX, swiping: false };
 	}
 
 	private move(e: PointerEvent): void {
 		const press = this.press;
 		if (!press || e.pointerId !== press.pointerId) return;
 		press.speed.update(e.clientX, e.timeStamp);
-		if (e.clientX !== press.lastX) press.way = e.clientX < press.lastX ? 1 : -1;
-		press.lastX = e.clientX;
 		if (press.swiping) {
 			this.opts.target.follow(this.within(e.clientX - press.from));
 			return;
@@ -197,8 +200,9 @@ export class Swipe {
 		releasePointer(this.el, press.pointerId);
 		const dx = this.within(e.clientX - press.from);
 		this.opts.target.follow(dx);
-		const fling = press.speed.value >= LAYOUT.swipeFlickSpeed ? press.way : 0;
-		void this.opts.target.settle(released ? this.landing(dx, fling) : null).then(() => this.letGo());
+		const velocity = press.speed.velocity;
+		const fling: Shift | 0 = Math.abs(velocity) < LAYOUT.swipeFlickSpeed ? 0 : velocity < 0 ? 1 : -1;
+		this.settle(released ? this.landing(dx, fling) : null);
 	}
 
 	/** Where the screen stands once let go: the next screen when it is the nearer one, or when a flick sends it there. */
@@ -226,6 +230,25 @@ export class Swipe {
 		if (this.holds === 0 && !this.opts.arbiter.claim(SWIPE)) return false;
 		this.holds++;
 		return true;
+	}
+
+	private settle(shift: Shift | null): void {
+		const round = this.round;
+		void this.opts.target.settle(shift).then(() => {
+			if (round === this.round) this.letGo();
+		});
+	}
+
+	/**
+	 * A finger that comes down while the screen still runs to its place stands it there at once and frees the screen
+	 * before anything under the finger asks for it: the divider, a card.
+	 */
+	private interrupt(): void {
+		if (this.holds === 0 || this.press?.swiping || this.stream?.following) return;
+		this.opts.target.stand();
+		this.round++;
+		this.holds = 0;
+		this.opts.arbiter.release(SWIPE);
 	}
 
 	private letGo(): void {
