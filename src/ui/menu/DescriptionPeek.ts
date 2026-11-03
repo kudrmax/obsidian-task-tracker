@@ -1,10 +1,11 @@
 import { LAYOUT, tokenPx } from "../design";
 import { el, px } from "../dom";
+import { Panel, type Picks } from "../kit/Panel";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import type { Overlay } from "./Overlay";
 
 export interface PeekActions {
-	/** A tap on the text: the whole description. */
+	/** A tap on the text: the menu goes, then the whole description. */
 	onRead(): void;
 	/** A tap on a link: it opens as in a note, the menu goes. */
 	onLink(): void;
@@ -18,10 +19,13 @@ export interface PeekActions {
 export class DescriptionPeek {
 	private readonly el: HTMLElement;
 
-	constructor(overlay: Overlay, surface: MarkdownSurface, markdown: string, actions: PeekActions) {
-		this.el = overlay.add(el(null, "div", "tc-desc-peek"), true);
+	/** `picks`: the menu's, which a tap on the text closes. */
+	constructor(overlay: Overlay, picks: Picks, surface: MarkdownSurface, markdown: string, actions: PeekActions) {
+		const panel = Panel.over(overlay, { root: "tc-desc-peek", picks });
+		this.el = panel.el;
 		const text = el(this.el, "div", "tc-desc-text");
-		this.el.addEventListener("click", (e) => ((e.target as Element).closest("a") ? actions.onLink() : actions.onRead()));
+		const read = panel.pick(() => actions.onRead());
+		this.el.addEventListener("click", (e) => ((e.target as Element).closest("a") ? actions.onLink() : read()));
 		void surface.render(text, markdown).then(() => this.markCut());
 	}
 

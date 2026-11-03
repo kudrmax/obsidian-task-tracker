@@ -2,7 +2,8 @@ import type { TaskItem } from "../../application/contracts";
 import { shownCardSize } from "../cardSize";
 import { LAYOUT } from "../design";
 import { stretchedSpan } from "../timelineLayout";
-import { capturePointer, el, releasePointer } from "../dom";
+import { capturePointer, releasePointer } from "../dom";
+import { Grips } from "../kit/Grips";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ResizeEdge, Timeline } from "../Timeline";
@@ -173,15 +174,13 @@ export class DragController {
 
 	/** The dots on the copy of the card over the menu's blur stretch the card itself; a dot taken closes the menu. */
 	private gripsOn(copy: HTMLElement, block: HTMLElement, item: TaskItem, closeMenu: () => void): void {
-		for (const edge of ["start", "end"] as const) {
-			el(copy, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
-				if (!e.isPrimary || e.button !== 0 || this.deps.arbiter.busy) return;
-				e.stopPropagation();
-				e.preventDefault();
+		Grips.attach(copy, {
+			takes: () => !this.deps.arbiter.busy,
+			onGrip: (edge, e) => {
 				closeMenu();
 				this.beginResize(block, item, edge, e);
-			});
-		}
+			},
+		});
 	}
 
 	/** The timeline's empty places: a long tap shows the target for a new task, moving slides it, lifting opens the field there. */

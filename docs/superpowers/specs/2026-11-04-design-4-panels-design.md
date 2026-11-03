@@ -146,4 +146,47 @@ class LiftedCopy {
 
 ## Итог
 
-(заполняется после реализации)
+Реализовано 04.11 в ветке `design-4-panels` по плану `plans/2026-11-04-design-4-panels.md`: коммит состояний каталога, коммит плана и по коммиту на задачу.
+
+- `dom.pinTo(el, rect, { width?, height? })`. На нём копии `GroupMenu`, `BulkMenu`, `SourcesPopover`, копия `LiftedMenu`, стопка подзадач и строка поля в `TaskMenu`.
+- `kit/Panel`: `Panel.over(overlay, spec, onLevel)` и `Panel.inside(holder, spec)`, `show`, `place`, `pick`, `replace`. На нём панели `LiftedMenu` (меню задачи и события), `BulkMenu`, `GroupMenu`, окно источников, начало описания и панели полосы быстрого ввода.
+- `kit/Picks`: «закрыть, потом выполнить» одним объектом на меню. Первое нажатие закрывает и выполняет, любое следующее, пока меню гаснет, ничего не делает. Раньше второе нажатие во время затухания выполняло действие ещё раз.
+- `kit/LiftedCopy`: `LiftedCopy.over(overlay, copy, onLevel).pin(rect, size)`. На нём `tc-lifted`, `is-head`, `is-selected`, `tc-seg-copy`.
+- `menu/SectionChooser` (`sectionChooser`) и `menu/DatePage` (`datePage`): подменю «Раздел» и «Дата» для `TaskMenu` и `BulkMenu`. `SectionChoice` переехал в `SectionChooser`, `TaskMenu` его реэкспортирует. `QuickBar` строит только `MonthPicker`, как раньше.
+- `menuRow(parent, spec)` с полями `root`, `size`, `apart`, `choice`, `quiet`, `add`, `iconSide`, `cls`. `backRow` и «Refresh now» — та же строка. `tileRows` переехал в `MenuPanel`.
+- `kit/Grips.attach(parent, { takes, onGrip })`: ручки `Timeline` и копии в `DragController`.
+- Тесты: 1353 зелёных, сборка зелёная. Новые: `dom.test.ts` (`pinTo`), `kit/Panel.test.ts` (в том числе «второе нажатие ничего не делает»), `kit/LiftedCopy.test.ts`, `kit/Grips.test.ts`, `SectionChooser.test.ts`, `DatePage.test.ts`, строки меню в `MenuPanel.test.ts` и `menuCopies.test.ts`: `"Remove due date"` в коде `src/ui` один раз, `backRow(…"Section")` только в `SectionChooser`, `new MonthPicker(` только в `DatePage` и `QuickBar`.
+
+Каталог. Добавлены состояния (до рефакторинга, поэтому они есть в эталоне): `bulk`, `bulk-section`, `bulk-picker` (только Mac: выбор ⌘-нажатием есть только на десктопе), `quick-priority`, `quick-place`, `quick-picker`, `block-menu` (меню карточки таймлайна со стопкой подзадач и ручками). Эталон — сборка master в `cat/s4base`, ветка — `cat/s4final`. Совпали все 102 снимка, в том числе в первом прогоне: `diff.py` — `0 differ`.
+
+Пробы касания и iPad, после работы, как и до:
+
+```
+$ node scripts/design-catalog/tapcheck.mjs
+== main
+== menu
+== picker
+== confirm
+== sources
+== sheet
+== quick
+$ TAB=1 node scripts/design-catalog/tapcheck.mjs
+== main
+== menu
+== picker
+== confirm
+== sources
+== sheet
+== quick
+```
+
+Руками в тестовом Obsidian (Mac): меню задачи закрывается Escape и тапом мимо; меню выбранных задач открывается, подменю «Раздел» показывает галочку у общего раздела, «назад» возвращает к меню, Escape закрывает.
+
+Отступления и решения:
+- **Найден и исправлен баг этапа 3.** У «Remove due date» с 0.4.97 отступ 16 вместо 4: правило `.tc-panel .tc-picker-remove` (вес 0,2,0) проигрывало `.tc-panel button.tc-menu-row` (0,2,1). Каталог его не видел: ни в одном состоянии не было задачи с датой. Нашёл тест `styles.test.ts`, когда класс строки стал виден ему через `cls`. Правило теперь `.tc-panel button.tc-picker-remove`, отступ снова 4, как в 0.4.96: подпись встаёт по краю сетки дней. Проверено снимком в тестовом Obsidian, до и после. Это единственное видимое изменение ветки.
+- **`FloatingCard` не на `pinTo`.** Он двигается через `transform`, а не `left/top`; ставить его в прямоугольник — другое действие.
+- **У `Panel` нет `close(how)`.** Закрывает владелец: оверлей или полоса. `Panel` получает от него `Picks`, а у меню из нескольких окон (`TaskMenu`: панель и верхняя часть, начало описания) `Picks` общий, поэтому одно нажатие закрывает всё меню.
+- **Корень строки — поле `root`.** Строка «назад» и «Refresh now» сохраняют свои классы `tc-menu-back` и `tc-source-refresh`, поэтому `size` и `tone` им не ставятся: классы те же, CSS не менялся. `iconSide: "start"` рисует иконку и текст без `span`, как раньше.
+- **`Grips.attach` берёт `{ takes, onGrip }`, а не один `onGrip`.** Так нажатие останавливается до действия, в прежнем порядке.
+- **У `datePage` нет параметра месяца.** Оба вызывающих открывали месяц выбранного дня или сегодняшний.
+- **Каталог:** `quick-*` пишут по одной задаче «Новая задача», как и старое `quick`. Прогоны от этого не расходятся.
