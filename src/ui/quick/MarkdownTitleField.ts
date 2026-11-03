@@ -77,10 +77,6 @@ export class MarkdownTitleField implements TitleField {
 		this.editor.focusEnd();
 	}
 
-	selectAll(): void {
-		this.editor.selectAll();
-	}
-
 	focus(): void {
 		this.editor.focus();
 	}

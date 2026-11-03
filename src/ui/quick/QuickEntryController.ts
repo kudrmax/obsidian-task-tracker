@@ -586,7 +586,6 @@ export class QuickEntryController {
 		const levels = usableLevels(this.deps.levels());
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
-			select: state?.renaming != null,
 			levels,
 			priority: state ? this.levelOf(state) : null,
 			titleField: this.deps.titleField,

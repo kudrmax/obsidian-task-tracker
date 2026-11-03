@@ -2,8 +2,6 @@ import { el } from "./dom";
 
 export interface GroupNameFieldOptions {
 	readonly value: string;
-	/** The whole value selected, to be typed over: a rename. */
-	readonly select: boolean;
 	/** The trimmed name on Enter; null for an empty one, Escape, or a tap elsewhere. Called once. */
 	onDone(name: string | null): void;
 }
@@ -32,7 +30,7 @@ export const GroupNameField = {
 		});
 		input.addEventListener("blur", () => finish(null));
 		input.focus();
-		if (opts.select) input.setSelectionRange(0, input.value.length);
+		input.setSelectionRange(input.value.length, input.value.length);
 		return field;
 	},
 };

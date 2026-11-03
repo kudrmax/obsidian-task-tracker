@@ -2,11 +2,11 @@
 import { describe, expect, it } from "vitest";
 import { GroupNameField } from "../../src/ui/GroupNameField";
 
-function open(value = "", select = false) {
+function open(value = "") {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const got: (string | null)[] = [];
-	const field = GroupNameField.open(parent, { value, select, onDone: (name) => got.push(name) });
+	const field = GroupNameField.open(parent, { value, onDone: (name) => got.push(name) });
 	const input = parent.querySelector("input")!;
 	return { field, input, got };
 }
@@ -42,10 +42,10 @@ describe("GroupNameField", () => {
 		expect(seen).toEqual([]);
 	});
 
-	it("select puts the whole value in the selection", () => {
-		const { input } = open("Экскурсия", true);
+	it("puts the caret at the end of the value", () => {
+		const { input } = open("Экскурсия");
 		expect(input.value).toBe("Экскурсия");
-		expect([input.selectionStart, input.selectionEnd]).toEqual([0, "Экскурсия".length]);
+		expect([input.selectionStart, input.selectionEnd]).toEqual(["Экскурсия".length, "Экскурсия".length]);
 		expect(input.placeholder).toBe("Section name");
 	});
 });

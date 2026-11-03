@@ -99,12 +99,6 @@ export class EmbeddedEditor {
 		this.editor.cm.focus();
 	}
 
-	selectAll(): void {
-		const { cm } = this.editor;
-		cm.dispatch({ selection: { anchor: 0, head: cm.state.doc.length } });
-		cm.focus();
-	}
-
 	/** The focus given back, the selection as it was. */
 	focus(): void {
 		this.editor.cm.focus();

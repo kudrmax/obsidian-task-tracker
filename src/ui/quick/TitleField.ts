@@ -26,8 +26,6 @@ export interface TitleField {
 	setText(text: string): void;
 	/** Puts the caret at the end, the keyboard up. */
 	focusEnd(): void;
-	/** The whole title selected, to be typed over, the keyboard up. */
-	selectAll(): void;
 	/** The focus given back, the selection as it was, without scrolling. */
 	focus(): void;
 	/** Part of the typing: the field, or what its editor shows for it elsewhere on the page; a tap there is not a tap elsewhere. */

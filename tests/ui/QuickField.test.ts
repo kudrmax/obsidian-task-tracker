@@ -10,7 +10,7 @@ import { fakeTitleField } from "../fakes/FakeTitleField";
 const URGENT: PriorityLevel = { prefix: "p1", color: "red" };
 const LATER: PriorityLevel = { prefix: "p2", color: "blue" };
 
-function open(value = "", priority: PriorityLevel | null = null, select = false) {
+function open(value = "", priority: PriorityLevel | null = null) {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const keys: QuickKey[] = [];
@@ -19,7 +19,6 @@ function open(value = "", priority: PriorityLevel | null = null, select = false)
 	let blurs = 0;
 	const handle = QuickField.open(parent, {
 		value,
-		select,
 		priority,
 		levels: [URGENT, LATER],
 		titleField: fakeTitleField,
@@ -143,10 +142,7 @@ describe("QuickField", () => {
 		});
 	});
 
-	it("selects the whole value on focus for a rename, and puts the caret at the end otherwise", () => {
-		const rename = open("Buy milk", null, true);
-		rename.handle.focus();
-		expect([rename.field.selectionStart, rename.field.selectionEnd]).toEqual([0, 8]);
+	it("puts the caret at the end on focus, a rename too", () => {
 		const fresh = open("Buy milk");
 		fresh.handle.focus();
 		expect([fresh.field.selectionStart, fresh.field.selectionEnd]).toEqual([8, 8]);
@@ -192,7 +188,7 @@ describe("TaskList with a task being typed", () => {
 			entry: () => ({
 				place: { kind: "gap", index, level, group: null },
 				pending,
-				field: (parent) => QuickField.open(parent, { value: "", select: false, levels: [], priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
+				field: (parent) => QuickField.open(parent, { value: "", levels: [], priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
 			}),
 		});
 		l.render();
