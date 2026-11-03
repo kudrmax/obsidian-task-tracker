@@ -109,10 +109,7 @@ function changedBlocks(before: readonly string[], after: readonly string[]): (re
 	while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
 	const b = before.slice(head, before.length - tail);
 	const a = after.slice(head, after.length - tail);
-	const common: number[][] = Array.from({ length: b.length + 1 }, () => new Array<number>(a.length + 1).fill(0));
-	for (let i = b.length - 1; i >= 0; i--) {
-		for (let j = a.length - 1; j >= 0; j--) common[i][j] = b[i] === a[j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1]);
-	}
+	const same = sharedLines(b, a);
 	const blocks: [number, number, number, number][] = [];
 	let i = 0;
 	let j = 0;
@@ -121,17 +118,89 @@ function changedBlocks(before: readonly string[], after: readonly string[]): (re
 		if (open) blocks.push([head + open[0], head + i, head + open[1], head + j]);
 		open = null;
 	};
-	while (i < b.length || j < a.length) {
-		if (i < b.length && j < a.length && b[i] === a[j]) {
-			close();
-			i++;
-			j++;
-			continue;
+	for (const [x, y] of [...same, [b.length, a.length] as const]) {
+		if (i < x || j < y) {
+			open ??= [i, j];
+			i = x;
+			j = y;
 		}
-		open ??= [i, j];
-		if (j < a.length && (i === b.length || common[i][j + 1] >= common[i + 1][j])) j++;
-		else i++;
+		if (x === b.length && y === a.length) break;
+		close();
+		i++;
+		j++;
 	}
 	close();
 	return blocks;
+}
+
+/** Up to this many cells (about 2 MB) the table of common runs is kept: the blocks found are the ones it always found. */
+const TABLE_CELLS = 1_000_000;
+
+/** The pairs of lines `b` and `a` share, as [index in b, index in a] in order. */
+function sharedLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+	return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
+}
+
+/** The longest run of shared lines by a table, taking a line added before a line removed where both keep it as long. */
+function tableLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+	const width = a.length + 1;
+	const common = new Uint16Array((b.length + 1) * width);
+	for (let i = b.length - 1; i >= 0; i--) {
+		for (let j = a.length - 1; j >= 0; j--) {
+			common[i * width + j] = b[i] === a[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+		}
+	}
+	const pairs: (readonly [number, number])[] = [];
+	let i = 0;
+	let j = 0;
+	while (i < b.length || j < a.length) {
+		if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
+		else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+		else i++;
+	}
+	return pairs;
+}
+
+/** Myers' shortest edit script, for a change too wide for the table: time and memory by the lines changed, not the file. */
+function myersLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+	const n = b.length;
+	const m = a.length;
+	const offset = n + m + 1;
+	const v = new Int32Array(2 * offset + 1);
+	const trace: Int32Array[] = [];
+	const down = (k: number, d: number, at: (k: number) => number) => k === -d || (k !== d && at(k - 1) < at(k + 1));
+	let found = n === 0 && m === 0 ? 0 : -1;
+	for (let d = 0; found < 0; d++) {
+		trace.push(v.slice(offset - d, offset + d + 1));
+		for (let k = -d; k <= d; k += 2) {
+			let x = down(k, d, (i) => v[offset + i]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
+			let y = x - k;
+			while (x < n && y < m && b[x] === a[y]) {
+				x++;
+				y++;
+			}
+			v[offset + k] = x;
+			if (x >= n && y >= m) {
+				found = d;
+				break;
+			}
+		}
+	}
+	const pairs: (readonly [number, number])[] = [];
+	let x = n;
+	let y = m;
+	for (let d = found; d > 0; d--) {
+		const before = trace[d];
+		const at = (k: number) => before[k + d];
+		const k = x - y;
+		const prevK = down(k, d, at) ? k + 1 : k - 1;
+		const prevX = at(prevK);
+		const prevY = prevX - prevK;
+		const startX = prevK === k + 1 ? prevX : prevX + 1;
+		while (x > startX) pairs.push([--x, --y]);
+		x = prevX;
+		y = prevY;
+	}
+	while (x > 0) pairs.push([--x, --y]);
+	return pairs.reverse();
 }

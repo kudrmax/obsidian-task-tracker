@@ -206,6 +206,7 @@ export class DragController {
 		};
 		const finish = (ev: PointerEvent, open: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
+			lost();
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
@@ -217,6 +218,7 @@ export class DragController {
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);
+		const lost = onLostLift(e.pointerId, () => finish(e, false));
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);
@@ -328,7 +330,9 @@ export class DragController {
 			ev.stopPropagation();
 			end(() => session.cancel());
 		};
+		const lost = onLostLift(e.pointerId, () => end(() => session.cancel()));
 		const detach = () => {
+			lost();
 			document.removeEventListener("keydown", escape, true);
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
@@ -384,4 +388,16 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
+}
+
+/**
+ * iOS sends a finger's lift to the element it touched, and a redraw (a pinch's new hour lines) may have taken that element
+ * away: a finger that comes down alone proves the held one gone, and `lost` ends what it held. Returns the unsubscribe.
+ */
+function onLostLift(pointerId: number, lost: () => void): () => void {
+	const down = (ev: PointerEvent) => {
+		if (ev.isPrimary && ev.pointerId !== pointerId) lost();
+	};
+	document.addEventListener("pointerdown", down, true);
+	return () => document.removeEventListener("pointerdown", down, true);
 }
