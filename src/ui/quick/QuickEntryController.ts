@@ -3,6 +3,7 @@ import { type PriorityLevel, type RightMode, usableLevels } from "../../settings
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { type DayColumn, dayColumn } from "../dayColumn";
 import { LAYOUT } from "../design";
+import { FramePass } from "../FramePass";
 import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
 import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
@@ -139,10 +140,14 @@ export class QuickEntryController {
 	private follow = false;
 	/** Where the last reveal left each scroller: a scroll to anywhere else is the finger's. */
 	private readonly revealedAt = new WeakMap<Element, number>();
+	/** The field followed into sight and the bar by it: once a frame however often the field moves, grows or scrolls. */
+	private readonly pass = new FramePass(() => this.followField());
+	/** The pass also brings the field into sight: it was drawn, typed in, or the view resized; a scroll or a slide only moves the bar. */
+	private revealing = false;
 	private readonly scrolled = (e: Event) => {
 		const state = this.state;
 		if (!state) return;
-		this.followBar(state);
+		this.pass.ask();
 		const scroller = this.scrollerOf(state.spot);
 		if (!scroller || e.target !== scroller) return;
 		const at = this.revealedAt.get(scroller);
@@ -150,7 +155,7 @@ export class QuickEntryController {
 	};
 	/** The columns slid or a card settled: the field may stand elsewhere now, and the bar goes with it. */
 	private readonly settled = () => {
-		if (this.state) this.followBar(this.state);
+		if (this.state) this.pass.ask();
 	};
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
@@ -293,11 +298,12 @@ export class QuickEntryController {
 		}
 		this.sync(this.state);
 		const field = this.field;
-		if (!field?.el.isConnected) return;
-		if (!this.focused) {
-			this.focused = true;
-			field.focus();
-		} else if (!field.focused) field.refocus();
+		if (field?.el.isConnected) {
+			if (!this.focused) {
+				this.focused = true;
+				field.focus();
+			} else if (!field.focused) field.refocus();
+		}
 		this.reveal();
 	}
 
@@ -307,9 +313,8 @@ export class QuickEntryController {
 	 * as far as that needs. A list the finger scrolled away stays where it was left.
 	 */
 	reveal(): void {
-		const state = this.state;
-		if (state && this.follow) this.bringIntoSight(state);
-		if (state) this.followBar(state);
+		this.revealing = true;
+		this.pass.now();
 	}
 
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
@@ -319,6 +324,8 @@ export class QuickEntryController {
 		document.removeEventListener("mousedown", this.mousePressed, true);
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
+		this.revealing = false;
+		this.pass.cancel();
 		this.entry.blur();
 		this.bar.hide();
 	}
@@ -444,43 +451,56 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The list or the timeline scrolls the field into sight: on the phone at least 16 px over the bar, on the desktop with
-	 * room under it for the capsule; a menu raises the parts over its blur.
+	 * One pass over the layout: while the field is followed, the list or the timeline scrolls it into sight, at least 16 px
+	 * over the bar, and a menu raises the parts over its blur as far as that needs; then the bar stands by it. The view and
+	 * the scroller are measured once; the field again only once it moved.
 	 */
-	private bringIntoSight(state: EntryState): void {
-		const field = this.field?.el;
-		if (!field?.isConnected) return;
-		const rect = field.getBoundingClientRect();
-		const limit = this.deps.desktop() ? this.roomOf(state).bottom - this.bar.room : this.deps.root.getBoundingClientRect().bottom - this.bar.room - LAYOUT.fieldOverBar;
+	private followField(): void {
+		const state = this.state;
+		const revealing = this.revealing;
+		this.revealing = false;
+		if (!state) return;
+		const view = this.deps.root.getBoundingClientRect();
+		const box = this.scrollerOf(state.spot)?.getBoundingClientRect() ?? view;
+		const field = this.field?.el.isConnected ? this.field.el : null;
+		let rect = field?.getBoundingClientRect() ?? null;
+		if (field && rect && revealing && this.follow && this.bringIntoSight(state, rect, view, box)) rect = field.getBoundingClientRect();
+		this.followBar(state, rect, view, box);
+	}
+
+	/**
+	 * The list or the timeline scrolls the field at `rect` into sight: on the phone at least 16 px over the bar, on the
+	 * desktop with room under it for the capsule; a menu raises the parts over its blur. Whether the field moved.
+	 */
+	private bringIntoSight(state: EntryState, rect: DOMRect, view: DOMRect, box: DOMRect): boolean {
+		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : view.bottom - this.bar.room - LAYOUT.fieldOverBar;
 		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
-			return;
+			return true;
 		}
 		const scroller = this.scrollerOf(state.spot);
-		if (!scroller) return;
-		const top = scroller.getBoundingClientRect().top;
+		if (!scroller) return false;
+		const top = box.top;
 		const by = rect.bottom > limit ? rect.bottom - limit : rect.top < top ? rect.top - top : 0;
 		this.revealedAt.set(scroller, scroller.scrollTop + by);
 		if (by !== 0) scroller.scrollTop += by;
 		this.revealedAt.set(scroller, scroller.scrollTop);
+		return by !== 0;
 	}
 
 	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */
-	private followBar(state: EntryState): void {
-		const field = this.field?.el;
+	private followBar(state: EntryState, field: DOMRect | null, view: DOMRect, box: DOMRect): void {
 		this.bar.follow({
-			field: field?.isConnected ? field.getBoundingClientRect() : null,
-			room: this.roomOf(state),
-			overMenu: state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null,
+			field,
+			room: this.roomOf(view, box),
+			overMenu: state.spot.kind === "stack" ? view : null,
 			toolbarTop: this.deps.toolbarTop(),
 		});
 	}
 
-	/** What shows of the field's list or timeline (the view for a menu's stack), down to the top of Obsidian's status bar. */
-	private roomOf(state: EntryState): DOMRect {
-		const view = this.deps.root.getBoundingClientRect();
-		const box = this.scrollerOf(state.spot)?.getBoundingClientRect() ?? view;
+	/** What shows of `box`, the field's list or timeline (the view for a menu's stack), down to the top of Obsidian's status bar. */
+	private roomOf(view: DOMRect, box: DOMRect): DOMRect {
 		const top = Math.max(box.top, view.top);
 		const bottom = Math.min(box.bottom, view.bottom, this.deps.chromeTop());
 		return new DOMRect(box.left, top, box.width, Math.max(0, bottom - top));
@@ -509,6 +529,8 @@ export class QuickEntryController {
 		this.state = state;
 		if (state?.renaming !== before?.renaming) this.moved = false;
 		if (!state) {
+			this.revealing = false;
+			this.pass.cancel();
 			this.dropField();
 			this.bar.hide();
 			this.placeOffLists(null);
@@ -517,7 +539,10 @@ export class QuickEntryController {
 		if (state && moves) this.follow = true;
 		if (drawnNext && state) return;
 		if (moves) this.deps.render();
-		else this.sync(state);
+		else {
+			this.sync(state);
+			this.pass.ask();
+		}
 	}
 
 	/** The field and the bar show the state: its text, its level, what the field may do. */
@@ -526,7 +551,6 @@ export class QuickEntryController {
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setPriority(level);
 		this.bar.show(this.barState(state, level));
-		this.followBar(state);
 	}
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {
@@ -609,9 +633,14 @@ export class QuickEntryController {
 			onInput: (text) => {
 				this.entry.type(text);
 				this.follow = true;
-				this.reveal();
+				this.revealing = true;
+				this.pass.ask();
 			},
-			onPriority: () => this.state && this.sync(this.state),
+			onPriority: () => {
+				if (!this.state) return;
+				this.sync(this.state);
+				this.pass.ask();
+			},
 			onKey: (key) => this.key(key),
 			onBlur: () => this.blurred(handle),
 		});
