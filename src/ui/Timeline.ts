@@ -237,6 +237,21 @@ export class Timeline {
 		this.holdAnchor();
 	}
 
+	/** A gesture took the screen: the timeline stays where it stands, no longer holding a minute in its place. */
+	stopHolding(): void {
+		this.anchor = null;
+	}
+
+	/**
+	 * Stands as `other` stands: the same room around the hours and the same scroll, so every minute shows at the same
+	 * height in both, as the next day must beside the day it replaces.
+	 */
+	alignWith(other: Timeline): void {
+		this.anchor = null;
+		this.setRoom(other.room?.top ?? 0, other.room?.bottom ?? 0);
+		this.el.scrollTop = other.el.scrollTop;
+	}
+
 	private holdAnchor(): void {
 		if (!this.anchor) return;
 		this.setRoom(0, 0);

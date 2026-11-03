@@ -466,3 +466,16 @@ describe("a stretched block while its new time is written (block 3)", () => {
 		expect(length(block(view))).toBe(unstretched);
 	});
 });
+
+describe("a timeline beside another day's", () => {
+	it("stands as the other stands: the same room around the hours and the same scroll", () => {
+		const shown = timeline({ hourPx: 60 });
+		const next = timeline({ hourPx: 60 });
+		(shown as unknown as { setRoom(top: number, bottom: number): void }).setRoom(120, 40);
+		Object.defineProperty(shown.el, "scrollTop", { value: 300, writable: true });
+		next.alignWith(shown);
+		expect(next.canvas.style.getPropertyValue("--tc-room-top")).toBe("120px");
+		expect(next.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("40px");
+		expect(next.el.scrollTop).toBe(300);
+	});
+});

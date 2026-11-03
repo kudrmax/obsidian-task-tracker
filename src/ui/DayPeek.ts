@@ -18,9 +18,10 @@ export interface DayPeekDeps {
 	/** Whether the day's list shows its sections. */
 	grouped(date: LocalDate): boolean;
 	ungroupedName(): string;
-	/** How far the shown day's list and timeline are scrolled: the next day's open there too, the hours standing still. */
+	/** How far the shown day's list is scrolled: the next day's opens there too. */
 	listScroll(): number;
-	timelineScroll(): number;
+	/** Stands the next day's timeline as the shown day's stands, every minute at the same height: the hours stand still. */
+	alignTimeline(timeline: Timeline): void;
 	/** The shown day's rows of all-day events past the first: the next day's timeline starts where the shown one does. */
 	allDayExtraRows(): string;
 }
@@ -80,10 +81,10 @@ export class DayPeek {
 			this.day = day;
 			this.render();
 			this.list.el.scrollTop = deps.listScroll();
-			this.timeline.el.scrollTop = deps.timelineScroll();
+			deps.alignTimeline(this.timeline);
 		});
 		this.render();
-		this.timeline.el.scrollTop = deps.timelineScroll();
+		deps.alignTimeline(this.timeline);
 		this.list.el.scrollTop = deps.listScroll();
 	}
 
