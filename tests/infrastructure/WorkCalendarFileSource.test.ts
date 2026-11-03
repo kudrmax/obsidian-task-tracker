@@ -15,11 +15,15 @@ const FILE = JSON.stringify({
 });
 
 class FakeAdapter {
-	constructor(private readonly files: Record<string, string>) {}
-	async exists(path: string): Promise<boolean> {
-		return path in this.files;
+	reads = 0;
+	readonly mtimes: Record<string, number> = {};
+	constructor(readonly files: Record<string, string>) {}
+	async stat(path: string): Promise<{ mtime: number; size: number } | null> {
+		if (!(path in this.files)) return null;
+		return { mtime: this.mtimes[path] ?? 1, size: this.files[path].length };
 	}
 	async read(path: string): Promise<string> {
+		this.reads++;
 		return this.files[path];
 	}
 }
@@ -35,8 +39,13 @@ class FakeWatcher implements PathWatcher {
 }
 
 function source(titles: string[] = [], path = "calendar/work.json", watcher = new FakeWatcher()) {
+	return counted(titles, path, watcher).work;
+}
+
+function counted(titles: string[] = [], path = "calendar/work.json", watcher = new FakeWatcher()) {
 	const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, workCalendarFile: path, workCalendarTitles: titles });
-	return new WorkCalendarFileSource(new FakeAdapter({ "calendar/work.json": FILE }), settings, watcher);
+	const adapter = new FakeAdapter({ "calendar/work.json": FILE });
+	return { work: new WorkCalendarFileSource(adapter, settings, watcher), adapter, settings };
 }
 
 describe("WorkCalendarFileSource", () => {
@@ -86,5 +95,53 @@ describe("WorkCalendarFileSource", () => {
 
 	it("throws 'file missing' when the file is not there", async () => {
 		await expect(source([], "calendar/other.json").eventsBetween()).rejects.toThrow("file missing");
+	});
+
+	it("reads and parses the file once while it stays the same", async () => {
+		const { work, adapter } = counted();
+		await work.eventsBetween();
+		await work.eventsBetween();
+		const { events } = await work.eventsBetween();
+		expect(adapter.reads).toBe(1);
+		expect(events).toHaveLength(3);
+	});
+
+	it("reads it again when its time or size changed", async () => {
+		const { work, adapter } = counted();
+		await work.eventsBetween();
+		adapter.mtimes["calendar/work.json"] = 2;
+		await work.eventsBetween();
+		expect(adapter.reads).toBe(2);
+		adapter.files["calendar/work.json"] = JSON.stringify({ exportedAt: "2026-10-30T09:00:00.000Z", events: [] });
+		const { events } = await work.eventsBetween();
+		expect(adapter.reads).toBe(3);
+		expect(events).toEqual([]);
+	});
+
+	it("reads the new file when the path in the settings changed", async () => {
+		const { work, adapter, settings } = counted();
+		await work.eventsBetween();
+		adapter.files["calendar/other.json"] = JSON.stringify({ exportedAt: "2026-10-30T09:00:00.000Z", events: [] });
+		await settings.update({ workCalendarFile: "calendar/other.json" });
+		const { events } = await work.eventsBetween();
+		expect(adapter.reads).toBe(2);
+		expect(events).toEqual([]);
+	});
+
+	it("applies changed titles to the file kept, without reading it", async () => {
+		const { work, adapter, settings } = counted();
+		await work.eventsBetween();
+		await settings.update({ workCalendarTitles: ["personal"] });
+		const { events } = await work.eventsBetween();
+		expect(adapter.reads).toBe(1);
+		expect(events.map((e) => e.title)).toEqual(["Dentist"]);
+	});
+
+	it("a file that does not parse is read again next time", async () => {
+		const { work, adapter } = counted();
+		adapter.files["calendar/work.json"] = "{";
+		await expect(work.eventsBetween()).rejects.toThrow();
+		await expect(work.eventsBetween()).rejects.toThrow();
+		expect(adapter.reads).toBe(2);
 	});
 });
