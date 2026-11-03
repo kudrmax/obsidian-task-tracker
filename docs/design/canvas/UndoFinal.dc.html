@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Отмена: итог</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2608px; height: 4060px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">Отмена: плашка снизу и кнопка в углу</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 2480px; font-size: 18px; line-height: 24px; color: #6B6A65;">Фон каждого кадра — снимок плагина 0.4.55 из тестового Obsidian. Плашка повторяет панель меню, кнопка отмены — плюс нижнего ряда, только на подложке переключателя</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="14">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: {{p.w}}px; height: {{p.h}}px; overflow: hidden; border-radius: {{p.r}}px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="UndoFrame" platform="{{p.p}}" state="{{p.s}}" theme="{{p.t}}" hint-size="{{p.w}}px,{{p.h}}px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: {{p.capW}}px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2608,"height":4060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { frames: [{"p": "phone", "s": "idle", "t": "dark", "left": 64, "top": 176, "w": 390, "h": 844, "r": 34, "name": "Нечего отменять, тёмная", "cap": "Кнопка отмены в левом углу нижнего ряда, напротив плюса, погашена. Плашки нет", "capTop": 1038, "capW": 390}, {"p": "phone", "s": "done", "t": "dark", "left": 494, "top": 176, "w": 390, "h": 844, "r": 34, "name": "Сразу после Done, тёмная", "cap": "Плашка над нижним рядом: иконка Done, что сделано, название задачи и Undo. Полоса внизу показывает, сколько плашка ещё простоит", "capTop": 1038, "capW": 390}, {"p": "phone", "s": "delete", "t": "dark", "left": 924, "top": 176, "w": 390, "h": 844, "r": 34, "name": "После Delete, тёмная", "cap": "Та же плашка, иконка корзины красная. Undo возвращает задачу на её место", "capTop": 1038, "capW": 390}, {"p": "phone", "s": "undone", "t": "dark", "left": 1354, "top": 176, "w": 390, "h": 844, "r": 34, "name": "После отмены, тёмная", "cap": "Задача вернулась. Плашка говорит куда, кнопка в ней теперь Redo", "capTop": 1038, "capW": 390}, {"p": "phone", "s": "conflict", "t": "dark", "left": 1784, "top": 176, "w": 390, "h": 844, "r": 34, "name": "Отмена невозможна, тёмная", "cap": "Файл задач правили с тех пор. Оранжевый знак и причина, кнопки нет. Шаг убран из стека", "capTop": 1038, "capW": 390}, {"p": "phone", "s": "idle", "t": "light", "left": 64, "top": 1180, "w": 390, "h": 844, "r": 34, "name": "Нечего отменять, светлая", "cap": "То же в светлой теме", "capTop": 2042, "capW": 390}, {"p": "phone", "s": "done", "t": "light", "left": 494, "top": 1180, "w": 390, "h": 844, "r": 34, "name": "Сразу после Done, светлая", "cap": "То же в светлой теме", "capTop": 2042, "capW": 390}, {"p": "phone", "s": "delete", "t": "light", "left": 924, "top": 1180, "w": 390, "h": 844, "r": 34, "name": "После Delete, светлая", "cap": "То же в светлой теме", "capTop": 2042, "capW": 390}, {"p": "phone", "s": "undone", "t": "light", "left": 1354, "top": 1180, "w": 390, "h": 844, "r": 34, "name": "После отмены, светлая", "cap": "То же в светлой теме", "capTop": 2042, "capW": 390}, {"p": "phone", "s": "conflict", "t": "light", "left": 1784, "top": 1180, "w": 390, "h": 844, "r": 34, "name": "Отмена невозможна, светлая", "cap": "То же в светлой теме", "capTop": 2042, "capW": 390}, {"p": "desk", "s": "done", "t": "dark", "left": 64, "top": 2190, "w": 1200, "h": 800, "r": 10, "name": "Mac: сразу после Done, тёмная", "cap": "Плашка и кнопка отмены стоят в нижнем ряду плагина, как на телефоне: от левого края кнопки до правого края плюса, над строкой состояния Obsidian. Рядом с Undo его клавиши", "capTop": 3008, "capW": 760}, {"p": "desk", "s": "delete", "t": "dark", "left": 1344, "top": 2190, "w": 1200, "h": 800, "r": 10, "name": "Mac: после Delete, тёмная", "cap": "Та же плашка после удаления. Клик по кнопке в углу или Cmd+Z отменяют одинаково", "capTop": 3008, "capW": 760}, {"p": "desk", "s": "undone", "t": "light", "left": 64, "top": 3120, "w": 1200, "h": 800, "r": 10, "name": "Mac: после Cmd+Z, светлая", "cap": "После отмены — Redo и его клавиши Shift+Cmd+Z", "capTop": 3938, "capW": 760}, {"p": "desk", "s": "conflict", "t": "light", "left": 1344, "top": 3120, "w": 1200, "h": 800, "r": 10, "name": "Mac: отмена невозможна, светлая", "cap": "Отказ: оранжевый знак и причина, кнопки в плашке нет", "capTop": 3938, "capW": 760}] };
+  }
+}
+</script>
+</body>
+</html>
