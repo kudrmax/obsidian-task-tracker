@@ -1,16 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { levelsFor, nearestLevel, stepFor } from "../../src/ui/zoomLevels";
+import { levelsFor, stepFor } from "../../src/ui/zoomLevels";
 
 const levels = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
-
-describe("zoom levels", () => {
-	it("finds the nearest level", () => {
-		expect(nearestLevel(60, levels)).toEqual({ hourPx: 56 });
-		expect(nearestLevel(90, levels)).toEqual({ hourPx: 112 });
-		expect(nearestLevel(10, levels)).toEqual({ hourPx: 28 });
-		expect(nearestLevel(999, levels)).toEqual({ hourPx: 224 });
-	});
-});
 
 describe("levelsFor", () => {
 	it("puts the whole day in the smallest level's place", () => {

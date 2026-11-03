@@ -36,7 +36,7 @@ describe("PinchZoom", () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());
 
-	it("scales the hour with the distance between two fingers and settles on release", () => {
+	it("scales the hour with the distance between two fingers and stays where they lift", () => {
 		const el = document.createElement("div");
 		const arbiter = new GestureArbiter();
 		const scales: number[] = [];
@@ -65,6 +65,17 @@ describe("PinchZoom", () => {
 		el.dispatchEvent(pointer("pointerup", 2, 100, 300));
 		expect(released).toEqual([84]);
 		expect(arbiter.busy).toBe(false);
+	});
+
+	it("releases at the scale the fingers left, though the view lays it out a frame later", () => {
+		const el = document.createElement("div");
+		const released: number[] = [];
+		new PinchZoom(el, { hourPx: () => 56, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: () => {}, onRelease: (h) => released.push(h) });
+		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
+		el.dispatchEvent(pointer("pointerdown", 2, 100, 200));
+		el.dispatchEvent(pointer("pointermove", 2, 100, 270));
+		el.dispatchEvent(pointer("pointerup", 2, 100, 270));
+		expect(released[0]).toBeCloseTo(95.2);
 	});
 
 	it("keeps within its bounds", () => {

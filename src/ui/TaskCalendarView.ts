@@ -32,7 +32,7 @@ import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
 import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
-import { levelsFor, nearestLevel, stepFor } from "./zoomLevels";
+import { levelsFor, stepFor } from "./zoomLevels";
 import { dayColumn } from "./dayColumn";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
@@ -310,7 +310,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 			minutesAt: (y) => timeline.minutesAt(y),
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
-			onRelease: (hourPx, anchor) => this.settleZoom(hourPx, anchor),
+			onRelease: (hourPx) => this.settleZoom(hourPx),
 		});
 		this.newTask = new NewTaskButton(this.leftEl, "now", () => this.quick?.openAtEnd("left"));
 		this.newSoon = new NewTaskButton(this.soonEl, "soon", () => this.quick?.openAtEnd("soon"));
@@ -557,21 +557,10 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** Released, the scale glides to the nearest level, and the timeline opens at it next time. */
-	private settleZoom(from: number, anchor: ZoomAnchor): void {
-		const levels = this.zoomLevels();
-		const to = nearestLevel(from, levels).hourPx;
-		this.wholeDay = to === levels[0].hourPx;
-		const started = performance.now();
-		const frame = (now: number) => {
-			const t = Math.min(1, (now - started) / LAYOUT.zoomSnapMs);
-			const eased = 1 - (1 - t) * (1 - t);
-			this.hourPx = from + (to - from) * eased;
-			this.timeline?.zoomTo(anchor.minutes, anchor.clientY);
-			this.zoomFrame = t < 1 ? requestAnimationFrame(frame) : 0;
-			if (t === 1) void this.deps.settings.update({ zoom: this.wholeDay ? "wholeDay" : to });
-		};
-		this.zoomFrame = requestAnimationFrame(frame);
+	/** Released, the scale stays where the fingers left it, and the timeline opens at it next time; out all the way it is the whole day. */
+	private settleZoom(hourPx: number): void {
+		this.wholeDay = hourPx <= this.zoomLevels()[0].hourPx;
+		void this.deps.settings.update({ zoom: this.wholeDay ? "wholeDay" : hourPx });
 	}
 
 	/** The two columns the window shows, as places to drop. */
