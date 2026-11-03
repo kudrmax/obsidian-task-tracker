@@ -1,7 +1,7 @@
 import type { TaskItem } from "../../application/contracts";
 import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
-import { px } from "../dom";
+import { el, px } from "../dom";
 import { fillCard } from "../TaskCard";
 import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
@@ -28,15 +28,14 @@ export class FloatingCard implements Float {
 
 	/** `count`: how many tasks are carried, this one among them. */
 	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate, count = 1) {
-		this.el = document.createElement("div");
-		this.el.className = "tc-float";
+		this.el = el(null, "div", "tc-float");
 		this.showTask(item, day, count);
 	}
 
 	private showTask(item: TaskItem, day: LocalDate, count: number): void {
 		fillCard(this.el, item, { day });
 		if (item.subtasks.length > 0 || count > 1) {
-			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(document.body.appendChild(Object.assign(document.createElement("div"), { className: `tc-float-under is-${depth}` })));
+			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(document.body, "div", `tc-float-under is-${depth}`));
 		}
 		document.body.appendChild(this.el);
 		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
@@ -46,7 +45,7 @@ export class FloatingCard implements Float {
 
 	/** The number of tasks carried, on the top card's upper right corner, moved along with it. */
 	private showCount(count: number): void {
-		const badge = (this.count = document.body.appendChild(Object.assign(document.createElement("div"), { className: "tc-float-count", textContent: String(count) })));
+		const badge = (this.count = el(document.body, "div", "tc-float-count", String(count)));
 		badge.style.left = px(this.el.offsetWidth);
 	}
 

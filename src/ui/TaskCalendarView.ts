@@ -39,6 +39,7 @@ import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
+import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
@@ -992,7 +993,7 @@ export class TaskCalendarView extends ItemView {
 			this.list.render();
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl]) part.style.display = missing ? "none" : "";
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
@@ -1031,8 +1032,7 @@ export class TaskCalendarView extends ItemView {
 	private renderMissing(root: HTMLElement): void {
 		const box = el(root, "div", "tc-missing");
 		el(box, "div", "", `No tasks file at ${this.settings.tasksFile}`);
-		const button = el(box, "button", "tc-missing-btn", "Create file");
-		button.addEventListener("click", () => void this.act(() => this.deps.tasks.createFile()));
+		Button.create(box, { kind: "pill", label: "Create file", cls: "tc-missing-btn", onPress: () => void this.act(() => this.deps.tasks.createFile()) });
 	}
 
 }

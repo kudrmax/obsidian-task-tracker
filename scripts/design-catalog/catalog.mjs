@@ -65,7 +65,7 @@ const states = {
 	sources: { setup: `V().showSources(V().contentEl.querySelector(".tc-seg")); await sleep(700);` },
 	sheet: {
 		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
-		teardown: `document.querySelector(".tc-sheet-cancel")?.click(); await sleep(700);`,
+		teardown: `document.querySelector(".tc-sheet-bar > .tc-btn")?.click(); await sleep(700);`,
 	},
 	quick: {
 		setup: `top(); V().quick.openAtEnd("left"); await sleep(600); const e=V().contentEl.querySelector(".tc-quick-field [contenteditable=true]")??V().contentEl.querySelector(".tc-quick-field"); e.focus(); for (const ch of "Новая задача") { document.execCommand("insertText", false, ch); await sleep(15);} await sleep(900);`,
@@ -103,8 +103,8 @@ const states = {
 	"hover-sheet": {
 		on: "mac",
 		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
-		teardown: `document.querySelector(".tc-sheet-cancel")?.click(); await sleep(700);`,
-		force: [".tc-sheet-cancel", ["hover"]],
+		teardown: `document.querySelector(".tc-sheet-bar > .tc-btn")?.click(); await sleep(700);`,
+		force: [".tc-sheet-bar > .tc-btn", ["hover"]],
 	},
 };
 

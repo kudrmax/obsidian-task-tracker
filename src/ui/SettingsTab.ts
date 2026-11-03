@@ -5,6 +5,7 @@ import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, DEFAULT_SETTINGS, type 
 import { LevelEdits } from "./priorityLevels";
 import { PresetEdits } from "./presetEdits";
 import { formatTime } from "./dates";
+import { Button } from "./kit/Button";
 
 export interface GoogleCalendarOption {
 	readonly id: string;
@@ -79,9 +80,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			prefix.inputEl.addClass("tc-level-prefix");
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of PRIORITY_COLORS) {
-				const swatch = swatches.createDiv({ cls: "tc-swatch", attr: { role: "button", tabindex: "0", "aria-label": color, "data-priority": color } });
-				swatch.toggleClass("is-on", color === level.color);
-				swatch.addEventListener("click", () => void redrawn.recolour(index, color));
+				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void redrawn.recolour(index, color) });
+				swatch.el.dataset.priority = color;
+				swatch.setOn(color === level.color);
 			}
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void redrawn.remove(index));
 		});

@@ -91,7 +91,7 @@ describe("QuickBar", () => {
 
 	it("labels the place button Inbox, Soon, Now or the day", () => {
 		const { parent, bar } = setup();
-		const label = () => q(parent, ".tc-bar-place-label").textContent;
+		const label = () => q(parent, ".tc-bar-place .tc-btn-label").textContent;
 		expect(label()).toBe("Soon");
 		bar.show({ ...STATE, place: { kind: "inbox" } });
 		expect(label()).toBe("Inbox");
@@ -299,7 +299,7 @@ describe("the panels' opening and closing", () => {
 		bar.show({ ...STATE, place: { kind: "soon" } });
 		expect(q<SVGElement>(parent, ".tc-bar-place svg")).not.toBe(first);
 		expect(parent.querySelectorAll(".tc-bar-place svg")).toHaveLength(1);
-		expect(q<HTMLElement>(parent, ".tc-bar-place-label").textContent).toBe("Soon");
+		expect(q<HTMLElement>(parent, ".tc-bar-place .tc-btn-label").textContent).toBe("Soon");
 	});
 
 	it("an open panel is not drawn again for the same state", () => {

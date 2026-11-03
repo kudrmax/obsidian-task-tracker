@@ -272,6 +272,14 @@ describe("tasks the now line has passed", () => {
 		expect(y(doing)).toBe(`${12 * hourPx + 1}px`);
 	});
 
+	it("marks a task in progress with one dot before its title, and no other card", () => {
+		const [plain, doing] = onToday([task(0, 540, null), task(1, 600, null, "inProgress")]);
+		expect(plain.querySelector(".tc-progress-dot")).toBeNull();
+		const card = doing.querySelector(".tc-block-card")!;
+		expect(card.querySelectorAll(":scope > .tc-progress-dot")).toHaveLength(1);
+		expect(card.querySelector(":scope > .tc-progress-dot")!.nextElementSibling!.classList.contains("tc-card-title")).toBe(true);
+	});
+
 	it("writes a task in progress pushed down the stack at its own time, not the line's", () => {
 		const [, doing] = onToday([task(0, 540, null), task(1, 600, null, "inProgress")]);
 		expect(y(doing)).toBe(`${12 * hourPx + 1 + STACK_STEP}px`);

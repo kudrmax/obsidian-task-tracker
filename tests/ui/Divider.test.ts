@@ -21,6 +21,15 @@ function divider(el: HTMLElement, opts: Partial<DividerOptions>): Divider {
 }
 
 describe("Divider", () => {
+	it("marks its handle a separator, not a button: it is dragged, never pressed", () => {
+		const el = document.createElement("div");
+		divider(el, {});
+		const handle = el.querySelector(".tc-divider-handle")!;
+		expect(handle.tagName).toBe("SPAN");
+		expect([handle.getAttribute("role"), handle.getAttribute("aria-orientation"), handle.getAttribute("aria-label")]).toEqual(["separator", "vertical", "Resize columns"]);
+		expect(el.querySelector("button")).toBeNull();
+	});
+
 	it("moves the list's edge with the pointer, within its bounds, and reports the width on release", () => {
 		const el = document.createElement("div");
 		const widths: number[] = [];
