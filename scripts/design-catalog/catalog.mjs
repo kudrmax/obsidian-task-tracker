@@ -125,9 +125,10 @@ await waitForView();
 await ev(`${remote} app.changeTheme("${theme === "light" ? "moonstone" : "obsidian"}"); await new Promise(r=>setTimeout(r,3000)); return 1`);
 // The reference tasks, and the clock stopped at noon on the day they are written for: a run is the same pixels every time.
 const tasks = fs.readFileSync(process.env.TASKS ?? path.join(here, "tasks.md"), "utf8");
+// The clock stops before the tasks are written: on a fresh page the plugin would otherwise carry them over to the real today.
+await ev(`const T=new Date(2026,10,3,12,0,0,0).getTime(); if (window.__tcFrozen !== T) { const O=Date; class F extends O { constructor(...a){ if (a.length) super(...a); else super(T); } static now(){ return T; } } window.Date=F; window.__tcFrozen=T; } return 1`);
 await ev(`await app.vault.adapter.write("tasks.md", ${JSON.stringify(tasks)}); return 1`);
-await ev(`const T=new Date(2026,10,3,12,0,0,0).getTime(); if (window.__tcFrozen !== T) { const O=Date; class F extends O { constructor(...a){ if (a.length) super(...a); else super(T); } static now(){ return T; } } window.Date=F; window.__tcFrozen=T; }
-	app.workspace.getLeavesOfType("task-calendar").forEach((l)=>l.detach()); await app.commands.executeCommandById("task-calendar:open"); await new Promise(r=>setTimeout(r,1500)); return 1`);
+await ev(`app.workspace.getLeavesOfType("task-calendar").forEach((l)=>l.detach()); await app.commands.executeCommandById("task-calendar:open"); await new Promise(r=>setTimeout(r,1500)); return 1`);
 await waitForView();
 await sleep(1000);
 
