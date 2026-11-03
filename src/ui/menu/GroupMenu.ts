@@ -29,8 +29,7 @@ export const GroupMenu = {
 			{ label: "Rename", icon: "rename", onPick: pick(opts.onRename) },
 			{ label: "Remove section", icon: "removeSection", onPick: pick(opts.onRemove) },
 		]);
-		const raise = placePanel(panel, rect, tokenPx(panel, "--tc-menu-gap"), menuRoom());
-		copy.style.top = px(rect.top - raise);
+		placePanel(panel, rect, tokenPx(panel, "--tc-menu-gap"), menuRoom());
 		overlay.show();
 		return { close: () => overlay.close() };
 	},

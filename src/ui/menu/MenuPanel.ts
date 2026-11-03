@@ -67,7 +67,6 @@ export function tileGroup(parent: HTMLElement, kind: string, rows: readonly (rea
 		const row = el(group, "div", "tc-menu-tile-row");
 		for (const spec of specs) menuTile(row, spec);
 	}
-	for (const label of group.querySelectorAll<HTMLElement>(".tc-menu-tile-label")) label.classList.toggle("is-long", label.scrollWidth > label.clientWidth);
 	return group;
 }
 
@@ -85,6 +84,13 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 	row.appendChild(document.createTextNode(title));
 	row.addEventListener("click", onBack);
 	return row;
+}
+
+/** A tile's label too long for its tile is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
+export function markLongLabels(panel: HTMLElement): void {
+	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label")];
+	const long = labels.map((label) => label.scrollWidth > label.clientWidth);
+	labels.forEach((label, i) => label.classList.toggle("is-long", long[i]));
 }
 
 /** The part of the window a menu may take: inside the margin, clear of the phone's status bar and home indicator. */
@@ -110,27 +116,63 @@ export function menuRoom(): MenuRoom {
 }
 
 /**
- * Puts a fixed panel under `anchor`, aligned to its left edge, or over it when it would not fit below; the sheet adds the
- * gap. When it fits on neither side, it goes under the anchor raised as far as it takes, never past the room's top, and
- * scrolls what still doesn't fit. Returns how far the anchor is to be raised. The panel is measured by its layout, not
- * its box on screen: it is placed while it is still shrunk to grow in.
+ * How many of a panel's groups stand over the anchor: none (the panel under it), all (over it), or the first few, the
+ * rest under it, when the whole fits on neither side. `cuts` are the heights of the panel down to each inner border
+ * between groups, `total` its whole height. The first way that fits wins, in that order and with the fewest groups over
+ * the anchor; when none fits, the one that leaves the least to scroll. A panel that can't split goes whole to one side.
  */
-export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom): number {
-	panel.style.maxHeight = "";
-	panel.classList.remove("is-scrolled");
-	panel.style.left = px(Math.max(0, Math.min(anchor.left, room.right - gap - panel.offsetWidth)));
-	const height = panel.offsetHeight;
-	const fitsBelow = anchor.bottom + gap + height <= room.bottom;
-	const fitsAbove = anchor.top - gap - height >= room.top;
-	const above = !fitsBelow && fitsAbove;
-	const raise = fitsBelow || above ? 0 : Math.max(0, Math.min(anchor.bottom + gap + height - room.bottom, anchor.top - room.top));
-	const top = anchor.bottom - raise;
-	const space = room.bottom - top - gap;
-	if (!above && height > space) {
-		panel.style.maxHeight = px(space);
-		panel.classList.add("is-scrolled");
+export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean): number {
+	const groups = cuts.length + 1;
+	const over = (height: number, space: number) => Math.max(0, height - space);
+	const ways = [
+		{ count: 0, overflow: over(total, below) },
+		{ count: groups, overflow: over(total, above) },
+		...(canSplit ? cuts.map((cut, i) => ({ count: i + 1, overflow: over(cut, above) + over(total - cut, below) })) : []),
+	];
+	return (ways.find((way) => way.overflow === 0) ?? ways.reduce((best, way) => (way.overflow < best.overflow ? way : best))).count;
+}
+
+/** A part of a panel taller than its space keeps to it and scrolls. */
+function keepWithin(part: HTMLElement, space: number): void {
+	const scrolls = part.offsetHeight > space;
+	part.style.maxHeight = scrolls ? px(Math.max(0, space)) : "";
+	part.classList.toggle("is-scrolled", scrolls);
+}
+
+/**
+ * Puts a fixed panel under `anchor`, aligned to its left edge, or over it when it would not fit below; the sheet adds the
+ * gap. When it fits on neither side and there is an `upper` part to take them, its first groups stand over the anchor
+ * and the rest under it (see groupsAbove); a part that still doesn't fit scrolls. The anchor never moves. The panel is
+ * measured by its layout, not its box on screen: it is placed while it is still shrunk to grow in.
+ */
+export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom, upper?: HTMLElement): void {
+	if (upper) {
+		panel.prepend(...upper.children);
+		upper.hidden = true;
 	}
-	panel.classList.toggle("is-above", above);
-	panel.style.setProperty(PROPERTY.panelY, px(above ? room.windowHeight - anchor.top : top));
-	return raise;
+	markLongLabels(panel);
+	for (const part of upper ? [panel, upper] : [panel]) {
+		part.style.maxHeight = "";
+		part.classList.remove("is-scrolled");
+	}
+	const left = px(Math.max(0, Math.min(anchor.left, room.right - gap - panel.offsetWidth)));
+	const above = anchor.top - gap - room.top;
+	const below = room.bottom - anchor.bottom - gap;
+	const groups = [...panel.children] as HTMLElement[];
+	const count = groupsAbove(groups.slice(1).map((group) => group.offsetTop), panel.offsetHeight, above, below, upper !== undefined && groups.length > 1);
+	const overY = px(room.windowHeight - anchor.top);
+	panel.style.left = left;
+	if (count > 0 && count < groups.length && upper) {
+		upper.className = panel.className;
+		upper.classList.add("is-above");
+		upper.style.left = left;
+		upper.style.setProperty(PROPERTY.panelY, overY);
+		upper.append(...groups.slice(0, count));
+		upper.hidden = false;
+		keepWithin(upper, above);
+	}
+	const whole = count === groups.length && groups.length > 0;
+	panel.classList.toggle("is-above", whole);
+	panel.style.setProperty(PROPERTY.panelY, whole ? overY : px(anchor.bottom));
+	keepWithin(panel, whole ? above : below);
 }

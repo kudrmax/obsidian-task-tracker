@@ -49,6 +49,8 @@ export interface DragControllerDeps {
 
 export interface OpenMenu {
 	close(): void;
+	/** A second click on the copy right after the click that opened the menu: the menu goes and `then` runs. */
+	onClickedAgain(then: () => void): void;
 }
 
 const DRAG = "drag";
@@ -79,10 +81,8 @@ export class DragController {
 				this.begin(card, payload, e, subtree, carried);
 			},
 			onTap: (e) => {
-				if (!this.deps.pick?.(item, card, e, "tap")) this.deps.onMenu(item, card);
+				if (!this.deps.pick?.(item, card, e, "tap")) this.tapped(e, item, this.deps.onMenu(item, card));
 			},
-			immediate: (e) => e.metaKey || e.ctrlKey || e.shiftKey,
-			onDoubleTap: () => this.deps.onRename(item),
 		});
 	}
 
@@ -95,8 +95,7 @@ export class DragController {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
-			onTap: () => this.deps.onMenu(item, block),
-			onDoubleTap: () => this.deps.onRename(item),
+			onTap: (e) => this.tapped(e, item, this.deps.onMenu(item, block)),
 			onLongTap: () => this.selectWithMenu(block, item),
 		});
 	}
@@ -107,6 +106,11 @@ export class DragController {
 		const rect = card.getBoundingClientRect();
 		const grabPx = onTimeline ? e.clientY - rect.top : shownCardSize().height / 2;
 		return { item, from, durationMin, grabPx, grabX: e.clientX - rect.left };
+	}
+
+	/** A click opens the menu at once; a second one, on the copy now over the card, makes it a double click that renames. */
+	private tapped(e: PointerEvent, item: TaskItem, menu: OpenMenu): void {
+		if (e.pointerType === "mouse") menu.onClickedAgain(() => this.deps.onRename(item));
 	}
 
 	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
