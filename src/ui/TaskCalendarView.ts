@@ -14,7 +14,7 @@ import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
 import { sameTask } from "./drag/listPlace";
-import type { ColumnSections, DropResult, ListColumn, TaskDragPayload } from "./drag/DropTarget";
+import type { ColumnSections, DragPayload, DropResult, ListColumn, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
 import type { ListGroup } from "./listGroups";
@@ -50,6 +50,9 @@ import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
+
+/** Inbox and Backlog take what waits to be sorted or put off: a card from either of them or from Soon, or the plus. */
+const undatedTakes = (drag: DragPayload): boolean => drag.from === "inbox" || drag.from === "backlog" || drag.from === "soon" || drag.from === "new";
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
@@ -84,8 +87,8 @@ export interface ViewDeps {
 }
 
 /**
- * The screen: a window two columns wide on a strip of four, Inbox, Soon, the list of the day (Now) and the day's timeline,
- * each list under its header. The window shows Inbox and Soon or Soon and Now, halved by a fixed divider, or Now and the
+ * The screen: a window two columns wide on a strip of four, Inbox over Backlog, Soon, the list of the day (Now) and the
+ * day's timeline, each list under its header. The window shows Inbox and Soon or Soon and Now, halved by a fixed divider, or Now and the
  * timeline, parted by the divider that sets the list's width; the switch at the bottom slides the strip, headers and all.
  */
 export class TaskCalendarView extends ItemView {
@@ -104,6 +107,9 @@ export class TaskCalendarView extends ItemView {
 	private inboxEl: HTMLElement | null = null;
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
+	private backlogList: TaskList | null = null;
+	private backlogDrop: ListDrop | null = null;
+	private backlogTitle: HTMLElement | null = null;
 	private rightEl: HTMLElement | null = null;
 	private allDayEl: HTMLElement | null = null;
 	private timeline: Timeline | null = null;
@@ -131,6 +137,7 @@ export class TaskCalendarView extends ItemView {
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
+	private newBacklog: NewTaskButton | null = null;
 	private readonly groupDrag: GroupDrag;
 	/** A card sent to New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
@@ -241,9 +248,11 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"), true, () => this.haptics.tap());
 		this.inboxEl = el(root, "div", "tc-inbox");
-		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
+		const inboxPane = el(this.inboxEl, "div", "tc-pane is-inbox");
+		const backlogPane = el(this.inboxEl, "div", "tc-pane is-backlog");
+		this.inboxList = new TaskList(el(inboxPane, "div"), {
 			items: () => this.unnamed(this.data.inbox),
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
@@ -254,7 +263,20 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon" || drag.from === "new", () => this.sectionsOf("inbox"));
+		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", undatedTakes, () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
+		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
+		this.backlogList = new TaskList(el(backlogPane, "div"), {
+			items: () => this.unnamed(this.data.backlog),
+			day: () => null,
+			grouped: () => this.sectionsOf("backlog") !== null,
+			pending: () => this.namingIn("backlog"),
+			entry: () => this.quick?.entryIn("backlog") ?? null,
+			renaming: () => this.quick?.renaming() ?? null,
+			onHeader: (head, group) => this.groupDrag.attach(head, "backlog", this.backlogList!, group),
+			ungroupedName: () => this.settings.groups.ungrouped,
+			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
+		});
+		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", undatedTakes, () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
@@ -267,7 +289,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"), true, () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -311,10 +333,12 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.newTask = new NewTaskButton(this.leftEl, "now", () => this.quick?.openAtEnd("left"));
 		this.newSoon = new NewTaskButton(this.soonEl, "soon", () => this.quick?.openAtEnd("soon"));
-		this.newInbox = new NewTaskButton(this.inboxEl, "inbox", () => this.quick?.openAtEnd("inbox"));
+		this.newInbox = new NewTaskButton(inboxPane, "inbox", () => this.quick?.openAtEnd("inbox"));
+		this.newBacklog = new NewTaskButton(backlogPane, "backlog", () => this.quick?.openAtEnd("backlog"));
 		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
 		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
-		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
+		this.newInbox.pressOnDoubleClick(inboxPane, this.inboxList.el);
+		this.newBacklog.pressOnDoubleClick(backlogPane, this.backlogList.el);
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.settings.rightMode,
 			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
@@ -333,7 +357,7 @@ export class TaskCalendarView extends ItemView {
 			list: (column) => this.listOf(column),
 			timeline: () => this.timeline,
 			task: (key) => findTask(this.data.day?.slotted ?? [], key),
-			newTasks: () => [this.newTask, this.newSoon, this.newInbox].filter((button) => button !== null),
+			newTasks: () => [this.newTask, this.newSoon, this.newInbox, this.newBacklog].filter((button) => button !== null),
 			dropTargets: () => {
 				const shown = this.shownDrops();
 				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
@@ -601,7 +625,7 @@ export class TaskCalendarView extends ItemView {
 		const shown: Record<RightMode, (ListDrop | TimelineDrop | null)[]> = {
 			calendar: [this.timelineDrop, this.leftDrop],
 			soon: [this.soonDrop, this.leftDrop],
-			inbox: [this.inboxDrop, this.soonDrop],
+			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
 		};
 		return shown[this.settings.rightMode].filter((target) => target !== null);
 	}
@@ -698,7 +722,7 @@ export class TaskCalendarView extends ItemView {
 	private sectionsHome(item: TaskItem, card: HTMLElement): NameGroup | null {
 		const list = item.key.section;
 		if (item.parentText !== null || list === "done") return null;
-		const columns: ListColumn[] = ["left", "soon", "inbox"];
+		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
 		if (!column || !this.sectionsOf(column)) return null;
 		return { column, list, date: list === "soon" ? item.dueDate : null };
@@ -723,13 +747,13 @@ export class TaskCalendarView extends ItemView {
 	/** The sections the list has, in its order, then the presets it lacks, in the settings' order; the No section name is none of them. */
 	private sectionChoice(list: GroupedList, item: TaskItem): SectionChoice {
 		const { presets, ungrouped } = this.settings.groups;
-		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox].filter((task) => task.key.section === list);
+		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox, ...this.data.backlog].filter((task) => task.key.section === list);
 		const names = [...tasks.flatMap((task) => (task.group === null ? [] : [task.group])), ...presets.map((preset) => preset.trim())];
 		return { names: [...new Set(names)].filter((name) => name !== "" && name !== ungrouped), current: item.group, ungrouped };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
-		return { left: this.list, soon: this.soonList, inbox: this.inboxList }[column];
+		return { left: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
 	}
 
 	/** The lists leave out the card waiting for its section's name; its own list draws it last. */
@@ -842,7 +866,7 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
-		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.list || !this.soonList || !this.inboxList) return;
+		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.newBacklog || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
 		if (parts.has("frame")) {
 			this.fitListWidth();
 			this.headers.render();
@@ -854,11 +878,13 @@ export class TaskCalendarView extends ItemView {
 			this.list.render();
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el]) part.style.display = missing ? "none" : "";
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el, this.newBacklog.el]) part.style.display = missing ? "none" : "";
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
 			this.inboxList.render();
+			this.backlogTitle.textContent = this.settings.sections.backlog;
+			this.backlogList.render();
 		}
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();

@@ -61,6 +61,13 @@ const titles = (data: DayData) => data.events.map((e) => e.title);
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("DayData", () => {
+	it("reads Backlog with the other lists", async () => {
+		const { data } = setup();
+		await data.tasks();
+		expect(data.backlog.map((t) => t.text)).toEqual(["Выучить японский", "Сделать сайт-портфолио", "Съездить в Грузию", "Пройти курс по Rust"]);
+		expect(data.backlog[0].key.section).toBe("backlog");
+	});
+
 	it("shows a change to the tasks without asking the calendars", async () => {
 		const { data, tasks, calendars, updates } = setup();
 		await data.tasks();

@@ -56,11 +56,11 @@ afterEach(() => {
 });
 
 describe("DragController.beginNew", () => {
-	it("shows a New task card, lifts nothing and offers no zones", () => {
+	it("carries the plus itself, lifts nothing and offers no zones", () => {
 		const { controller, source, calls } = setup();
 		controller.beginNew(source, down(20, 610), [], vi.fn());
-		expect(document.querySelector(".tc-float.is-new")?.textContent).toBe("New task");
-		expect(document.querySelector(".tc-float.is-new svg")).not.toBeNull();
+		expect(document.querySelector(".tc-float-plus svg")).not.toBeNull();
+		expect(document.querySelector(".tc-float")).toBeNull();
 		expect(calls).not.toContain("dragging");
 	});
 
@@ -69,7 +69,7 @@ describe("DragController.beginNew", () => {
 		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(true);
 		expect(arbiter.busy).toBe(true);
 		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(false);
-		expect(document.querySelectorAll(".tc-float").length).toBe(1);
+		expect(document.querySelectorAll(".tc-float-plus").length).toBe(1);
 		pointer("pointerup", 20, 610);
 		await vi.waitFor(() => expect(arbiter.busy).toBe(false));
 	});
@@ -81,7 +81,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointermove", 30, 620);
 		pointer("pointerup", 30, 620);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 	});
 
 	it("flies back and says null when cancelled", async () => {
@@ -91,7 +91,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointermove", 150, 300);
 		pointer("pointercancel", 150, 300);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 	});
 
 	it("says where the card landed once it has landed on a target", async () => {
@@ -104,7 +104,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointerup", 150, 300);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(result));
 		expect(target.cleared).toBeGreaterThan(0);
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 		expect(arbiter.busy).toBe(false);
 	});
 

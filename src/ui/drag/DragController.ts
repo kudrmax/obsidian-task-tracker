@@ -11,6 +11,7 @@ import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
+import { PlusFloat } from "./PlusFloat";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
 import type { PickedCard } from "../TaskSelection";
@@ -264,14 +265,14 @@ export class DragController {
 	}
 
 	/**
-	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted. Let go
-	 * off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once the card has landed. False when another gesture holds the screen: nothing starts.
+	 * The plus taken: the plus itself follows the finger over the same targets as a task, but no card is lifted. Let go
+	 * off every target, or cancelled, the plus flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once it has landed. False when another gesture holds the screen: nothing starts.
 	 */
 	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(null, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
+		const float = new PlusFloat({ dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
 		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };

@@ -16,10 +16,11 @@ interface TasksState {
 	readonly day: DayView | null;
 	readonly soon: readonly TaskItem[];
 	readonly inbox: readonly TaskItem[];
+	readonly backlog: readonly TaskItem[];
 	readonly missing: boolean;
 }
 
-const MISSING: TasksState = { day: null, soon: [], inbox: [], missing: true };
+const MISSING: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: true };
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -27,7 +28,7 @@ const MISSING: TasksState = { day: null, soon: [], inbox: [], missing: true };
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { day: null, soon: [], inbox: [], missing: false };
+	private state: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -49,6 +50,10 @@ export class DayData {
 
 	get inbox(): readonly TaskItem[] {
 		return this.state.inbox;
+	}
+
+	get backlog(): readonly TaskItem[] {
+		return this.state.backlog;
 	}
 
 	get missing(): boolean {
@@ -101,8 +106,8 @@ export class DayData {
 		const tasks = this.deps.tasks;
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonWithoutDateView(), tasks.inboxView()]);
-			return { day, soon, inbox, missing: false };
+			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
+			return { day, soon, inbox, backlog, missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return MISSING;
 			throw error;
