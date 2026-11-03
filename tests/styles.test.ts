@@ -236,6 +236,13 @@ describe("styles.css keeps to its design system", () => {
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
+
+	it("moves only the cards a drag draws off their place, flat", () => {
+		const moving = sheet.rules.filter((d) => d.value.includes("var(--tc-room)"));
+		expect(moving.length).toBe(1);
+		expect(moving[0].selector).toContain(".is-moved");
+		expect(moving[0].value).toBe("translateY(var(--tc-room))");
+	});
 });
 
 describe("the code keeps to the design system", () => {

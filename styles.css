@@ -701,10 +701,10 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-group-drop:first-child { margin-top: 0; }
 .tc-group-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
-/* A section lifted: its tasks fold away with its header. A task lifted keeps its place in the layout, hidden: the cards are drawn where the drag wants them (--tc-room), so nothing reflows under the finger. */
+/* A section lifted: its tasks fold away with its header. A task lifted keeps its place in the layout, hidden: the cards are drawn where the drag wants them (--tc-room), so nothing reflows under the finger. Only the ones drawn off their place take a transform. */
 .tc-card.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
 .tc-card.is-lifted { visibility: hidden; }
-.tc-list.is-making-room > .tc-card, .tc-list.is-making-room > .tc-group-head { transform: translate3d(0, var(--tc-room), 0); }
+.tc-list.is-making-room > .tc-card.is-moved, .tc-list.is-making-room > .tc-group-head.is-moved { transform: translateY(var(--tc-room)); }
 .tc-list > .tc-card, .tc-list > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* A subtask's branch from its task: on down past it to the next subtask, bending in at the last; the lines of the tasks further up that go on past it. */
 .tc-branch, .tc-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }

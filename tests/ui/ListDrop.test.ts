@@ -326,6 +326,38 @@ describe("ListDrop", () => {
 			expect(list.el.classList.contains("is-making-room")).toBe(false);
 		});
 
+		it("writes the room only into the cards whose room changed", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			const sets = list.elements.map((node) => vi.spyOn(node.style, "setProperty"));
+			const roomed = () => sets.filter((set) => set.mock.calls.some(([name]) => name === "--tc-room")).length;
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			expect(roomed()).toBe(1);
+			for (const set of sets) set.mockClear();
+			drop.preview(27, 100 + 3 * STEP + 3, from);
+			expect(roomed()).toBe(0);
+			for (const set of sets) set.mockRestore();
+		});
+
+		it("marks as moved only the cards drawn off their place", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			const rooms = room(list);
+			expect(list.elements.map((n) => n.classList.contains("is-moved"))).toEqual(rooms.map((value) => value !== "0px"));
+			expect(list.elements[0].classList.contains("is-moved")).toBe(false);
+			expect(list.elements[1].classList.contains("is-moved")).toBe(false);
+			expect(list.elements[2].classList.contains("is-moved")).toBe(true);
+		});
+
+		it("stands as drawn after the drag: no room and no mark left", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			list.elements[1].classList.remove("is-lifted");
+			drop.clear();
+			expect(list.elements.some((n) => n.classList.contains("is-moved"))).toBe(false);
+			expect(room(list)).toEqual(["", "", "", ""]);
+		});
+
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {
 			const frames: (() => void)[] = [];
 			vi.stubGlobal("requestAnimationFrame", (fn: () => void) => frames.push(fn));

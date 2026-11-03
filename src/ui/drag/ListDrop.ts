@@ -17,6 +17,8 @@ const SHIFTED = "is-shifted";
 const TARGET = "is-target";
 /** The list draws its cards where the drag puts them, each at its own `--tc-room`. */
 const MAKING_ROOM = "is-making-room";
+/** A card or header drawn off its place: only these take a transform. */
+const MOVED = "is-moved";
 
 /** A card where it stands in the list's content, with the lifted cards gone and no room open. */
 interface Measured {
@@ -65,6 +67,9 @@ export class ListDrop implements DropTarget {
 	private many = false;
 	/** The cards carried along wait, dashed, since the finger left the list. */
 	private waiting = false;
+	/** The `--tc-room` last written into each node of `roomed`, so a move writes only the ones that change. */
+	private readonly rooms = new Map<HTMLElement, number>();
+	private roomed: readonly HTMLElement[] | null = null;
 
 	constructor(
 		private readonly list: TaskList,
@@ -216,6 +221,10 @@ export class ListDrop implements DropTarget {
 	 */
 	private arrange(frame?: ListFrame): void {
 		const nodes = this.list.elements;
+		if (this.roomed !== nodes) {
+			this.rooms.clear();
+			this.roomed = nodes;
+		}
 		const card = shownCardSize();
 		const step = card.height + card.gap;
 		const room = this.room;
@@ -223,10 +232,11 @@ export class ListDrop implements DropTarget {
 		const lifted = nodes.some(gone);
 		if (!room && !lifted) {
 			this.list.el.classList.remove(MAKING_ROOM);
-			for (const node of nodes) {
-				node.classList.remove(SHIFTED);
+			for (const node of this.rooms.keys()) {
+				node.classList.remove(SHIFTED, MOVED);
 				node.style.removeProperty(PROPERTY.room);
 			}
+			this.rooms.clear();
 			return;
 		}
 		const heads = room ? this.layoutFor(frame ?? readFrame(this.list.el)).heads : [];
@@ -235,7 +245,7 @@ export class ListDrop implements DropTarget {
 		for (const node of nodes) {
 			if (gone(node)) {
 				removed += step;
-				node.style.setProperty(PROPERTY.room, px(0));
+				this.setRoom(node, 0);
 				continue;
 			}
 			const head = heads.find((h) => h.el === node);
@@ -243,9 +253,16 @@ export class ListDrop implements DropTarget {
 			const after = room !== null && (isCard ? index >= room.index : head !== undefined && this.headAfter(head, room, heads));
 			if (isCard) index++;
 			node.classList.toggle(SHIFTED, after);
-			node.style.setProperty(PROPERTY.room, px((after ? step : 0) - removed));
+			this.setRoom(node, (after ? step : 0) - removed);
 		}
 		this.list.el.classList.add(MAKING_ROOM);
+	}
+
+	private setRoom(node: HTMLElement, value: number): void {
+		if (this.rooms.get(node) === value) return;
+		node.style.setProperty(PROPERTY.room, px(value));
+		node.classList.toggle(MOVED, value !== 0);
+		this.rooms.set(node, value);
 	}
 
 	/** The layout measured for this drag, measured again only once the list is drawn anew or changes its card size or width. */
