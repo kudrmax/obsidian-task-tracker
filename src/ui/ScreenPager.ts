@@ -87,6 +87,10 @@ export class ScreenPager implements SwipeTarget {
 		});
 	}
 
+	stand(): void {
+		this.finish();
+	}
+
 	private frame(settling: Settling, time: number): void {
 		if (this.settling !== settling) return;
 		settling.start ??= time;

@@ -47,7 +47,7 @@ import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
-import { DayTrack, EdgeTrack, StripTrack, stripParts } from "./ScreenTracks";
+import { type DayLane, DayTrack, EdgeTrack, restore, StripTrack, stripParts } from "./ScreenTracks";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -522,7 +522,7 @@ export class TaskCalendarView extends ItemView {
 
 	/**
 	 * A swipe walks the row of screens as the switch and the arrows do: to the next pair of columns the strip slides under
-	 * the finger, to another day the screen moves aside for that day drawn beside it, and past the row's end it only gives.
+	 * the finger, to another day each column turns to that day's within itself, and past the row's end it only gives.
 	 */
 	private trackTo(shift: Shift): ScreenTrack {
 		this.landed();
@@ -556,8 +556,13 @@ export class TaskCalendarView extends ItemView {
 			scrollTimeline: (timeline, date) => this.scrollToOpen(timeline, date),
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 		});
-		return new DayTrack(parts, peek, shift, root.clientWidth, (arrived) => {
-			this.landing = { peek: arrived, parts };
+		const inside = (column: Element | null): HTMLElement[] => (column ? [...column.children].filter((part) => part instanceof HTMLElement) : []);
+		const nav = root.querySelector<HTMLElement>(":scope > .tc-day-nav");
+		const list: DayLane = { shown: inside(this.leftEl), next: inside(peek.left), width: this.leftEl?.offsetWidth ?? 0 };
+		const timeline: DayLane = { shown: inside(this.rightEl), next: inside(peek.right), width: this.rightEl?.offsetWidth ?? root.clientWidth };
+		const header: DayLane = { shown: nav ? [nav] : [], next: peek.nav ? [peek.nav] : [], width: list.width, fades: true };
+		return new DayTrack([list, timeline, header], timeline, peek, shift, (arrived, shown) => {
+			this.landing = { peek: arrived, parts: shown };
 			void this.afterEntry(() => this.select(arrived.date));
 		});
 	}
@@ -575,7 +580,7 @@ export class TaskCalendarView extends ItemView {
 		const landing = this.landing;
 		if (!landing) return;
 		this.landing = null;
-		for (const part of landing.parts) part.style.transform = "";
+		restore(landing.parts);
 		landing.peek.remove();
 	}
 
