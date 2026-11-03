@@ -132,6 +132,8 @@ export interface TaskMenuContext {
  */
 export class TaskMenu extends LiftedMenu {
 	private readonly panel: HTMLElement;
+	/** The first groups of a panel too tall for either side of the card, over the card; hidden while the panel is whole. */
+	private readonly upper: HTMLElement;
 	private readonly anchor: DOMRect;
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
 	private stack: HTMLElement | null = null;
@@ -157,6 +159,8 @@ export class TaskMenu extends LiftedMenu {
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.addPanel("is-task");
+		this.upper = this.addPanel("is-task");
+		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
 		this.overlay.show();
@@ -219,6 +223,7 @@ export class TaskMenu extends LiftedMenu {
 	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */
 	private giveToField(): void {
 		this.panel.hidden = true;
+		this.upper.hidden = true;
 		this.peek?.hide();
 	}
 
@@ -274,14 +279,16 @@ export class TaskMenu extends LiftedMenu {
 		});
 	}
 
+	/** A menu split over and under the card leaves no side to the description, which then stays away. */
 	private place(): void {
-		this.placeBy(this.panel, this.anchor);
-		const anchor = this.anchor;
-		this.peek?.place(new DOMRect(anchor.x, anchor.y - this.raisedBy, anchor.width, anchor.height), this.panel);
+		this.placeBy(this.panel, this.anchor, this.upper);
+		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
+		else this.peek?.hide();
 	}
 
 	private showMenu(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.remove("is-picker");
 		const { item, actions, levels } = this.context;
 		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
@@ -317,6 +324,7 @@ export class TaskMenu extends LiftedMenu {
 		const sections = this.context.sections;
 		if (!sections) return;
 		clear(this.panel);
+		clear(this.upper);
 		const { item, actions } = this.context;
 		backRow(this.panel, "Section", () => this.showMenu());
 		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
@@ -329,6 +337,7 @@ export class TaskMenu extends LiftedMenu {
 
 	private showPicker(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.add("is-picker");
 		const { item, actions, today } = this.context;
 		new MonthPicker(el(this.panel, "div"), {

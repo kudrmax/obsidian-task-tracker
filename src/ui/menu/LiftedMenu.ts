@@ -17,7 +17,7 @@ export abstract class LiftedMenu {
 	protected readonly lifted: HTMLElement;
 	/** Where the copy stands before it is raised. */
 	protected copy = new DOMRect();
-	/** How far the parts over the blur stand above the pressed thing, to keep a field over the keyboard or the panel in the window. */
+	/** How far the parts over the blur stand above the pressed thing, to keep a field over the keyboard. */
 	protected raisedBy = 0;
 
 	protected constructor() {
@@ -51,9 +51,9 @@ export abstract class LiftedMenu {
 		this.lifted.style.top = px(this.copy.top - this.raisedBy);
 	}
 
-	/** A panel too tall for either side of `anchor` raises the parts over the blur with it, as far as it needs. */
-	protected placeBy(panel: HTMLElement, anchor: DOMRect): void {
-		this.raise(placePanel(panel, anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom()));
+	/** The panel by `anchor`, which never moves; one too tall for either side splits its first groups into `upper`, over it. */
+	protected placeBy(panel: HTMLElement, anchor: DOMRect, upper?: HTMLElement): void {
+		placePanel(panel, anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom(), upper);
 	}
 
 	/** A row's action: the menu closes, then the action runs. */
