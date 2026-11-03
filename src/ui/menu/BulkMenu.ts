@@ -1,7 +1,7 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { tokenPx } from "../design";
-import { clear, el, px } from "../dom";
+import { clear, el, pinTo } from "../dom";
 import { fillCard } from "../TaskCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { backRow, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
@@ -100,10 +100,7 @@ export class BulkMenu {
 		const item = this.context.items[this.context.cards.indexOf(card)];
 		const copy = this.overlay.add(el(null, "div", "tc-lifted is-selected"), true);
 		fillCard(copy, item, { day: this.context.day });
-		copy.style.left = px(rect.left);
-		copy.style.top = px(rect.top);
-		copy.style.width = px(rect.width);
-		copy.style.height = px(rect.height);
+		pinTo(copy, rect, { width: true, height: true });
 	}
 
 	/** Right of the clicked card's list, its top level with the card. */

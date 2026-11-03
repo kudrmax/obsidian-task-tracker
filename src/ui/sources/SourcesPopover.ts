@@ -1,6 +1,6 @@
 import type { SourceStatus } from "../../application/contracts";
 import { PROPERTY } from "../design";
-import { el, px } from "../dom";
+import { el, pinTo, px } from "../dom";
 import { Overlay } from "../menu/Overlay";
 import { icon } from "../kit/icons";
 import { sourceText } from "./sourceText";
@@ -26,8 +26,7 @@ export class SourcesPopover {
 		const rect = opts.anchor.getBoundingClientRect();
 		const copy = this.overlay.add(opts.anchor.cloneNode(true) as HTMLElement);
 		copy.classList.add("tc-seg-copy");
-		copy.style.left = px(rect.left);
-		copy.style.top = px(rect.top);
+		pinTo(copy, rect);
 		const panel = this.overlay.add(el(null, "div", "tc-popover"));
 		panel.style.left = px(rect.left + rect.width / 2);
 		panel.style.setProperty(PROPERTY.panelY, px(window.innerHeight - rect.top));

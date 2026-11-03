@@ -1,7 +1,7 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
-import { clear, el, px } from "../dom";
+import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
@@ -218,8 +218,7 @@ export class TaskMenu extends LiftedMenu {
 		this.fieldClosed = onClose;
 		this.lifted.classList.add("tc-invisible");
 		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
-		row.style.left = px(this.copy.left);
-		row.style.width = px(this.copy.width);
+		pinTo(row, this.copy, { width: true });
 		showProgressDot(row, this.context.item);
 		this.raise(this.raisedBy);
 		return row;
@@ -266,9 +265,7 @@ export class TaskMenu extends LiftedMenu {
 
 	private stackUnder(copy: DOMRect): HTMLElement {
 		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"), true);
-		stack.style.left = px(copy.left);
-		stack.style.top = px(copy.bottom);
-		stack.style.width = px(copy.width);
+		pinTo(stack, new DOMRect(copy.left, copy.bottom, copy.width), { width: true });
 		return stack;
 	}
 

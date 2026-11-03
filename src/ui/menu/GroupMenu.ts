@@ -1,5 +1,5 @@
 import { tokenPx } from "../design";
-import { el, px } from "../dom";
+import { el, pinTo } from "../dom";
 import { menuGroup, menuRoom, placePanel } from "./MenuPanel";
 import { Overlay } from "./Overlay";
 
@@ -16,10 +16,7 @@ export const GroupMenu = {
 		const rect = head.getBoundingClientRect();
 		const copy = overlay.add(el(null, "div", "tc-lifted is-head"));
 		el(copy, "span", "tc-group-name", opts.name);
-		copy.style.left = px(rect.left);
-		copy.style.top = px(rect.top);
-		copy.style.width = px(rect.width);
-		copy.style.height = px(rect.height);
+		pinTo(copy, rect, { width: true, height: true });
 		const panel = overlay.add(el(null, "div", "tc-panel"));
 		const pick = (action: () => void) => () => {
 			overlay.close();

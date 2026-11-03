@@ -1,5 +1,5 @@
 import { tokenPx } from "../design";
-import { el, px } from "../dom";
+import { el, pinTo, px } from "../dom";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
 import { scrollIntoColumn, shownPart, topInside } from "./inView";
@@ -52,9 +52,9 @@ export abstract class LiftedMenu {
 		const size = showWhole(this.lifted, rect, roomWidth(room));
 		const left = grownStart(rect.left, rect.width, size.width, room.width, room.margin);
 		const top = box ? topInside(rect.top, size.height, box) : grownStart(rect.top, rect.height, size.height, room.height, room.margin);
-		this.lifted.style.left = px(left);
-		this.lifted.style.top = px(top);
-		return (this.copy = new DOMRect(left, top, size.width, size.height));
+		this.copy = new DOMRect(left, top, size.width, size.height);
+		pinTo(this.lifted, this.copy);
+		return this.copy;
 	}
 
 	/** The panel of either menu: the same width and rows. */
