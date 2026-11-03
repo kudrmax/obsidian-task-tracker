@@ -282,7 +282,7 @@ export class DragController {
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
 		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };
-		let placed: DropResult | null = null;
+		let placed = false;
 		this.follow(
 			source,
 			e,
@@ -292,15 +292,21 @@ export class DragController {
 					targets,
 					float,
 					origin,
+					// Placed, the task opens as the finger lifts, its line giving way to the field; the plus shrinks meanwhile.
 					onEnd: async (result) => {
 						detach();
-						placed = result;
+						if (!result) return;
+						placed = true;
+						this.deps.arbiter.release(DRAG);
+						for (const target of targets) target.clear();
+						this.deps.haptics.tap();
+						onDrop(result);
 					},
 				}),
 			() => {
+				if (placed) return;
 				this.deps.arbiter.release(DRAG);
-				if (placed) this.deps.haptics.tap();
-				onDrop(placed);
+				onDrop(null);
 			},
 		);
 		return true;

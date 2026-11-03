@@ -359,6 +359,49 @@ describe("the timeline's size", () => {
 			globalThis.ResizeObserver = real;
 		}
 	});
+
+	/** A timeline put on noon at 40 % of its height, its height as the test says, and the resizes it hears. */
+	function anchored() {
+		const real = globalThis.ResizeObserver;
+		let resized = () => {};
+		globalThis.ResizeObserver = class {
+			constructor(run: () => void) {
+				resized = run;
+			}
+			observe(): void {}
+			unobserve(): void {}
+			disconnect(): void {}
+		} as unknown as typeof ResizeObserver;
+		const view = timeline({ hourPx: 56 });
+		globalThis.ResizeObserver = real;
+		document.body.appendChild(view.el);
+		view.el.style.paddingBottom = "0px";
+		let height = 600;
+		Object.defineProperty(view.el, "clientHeight", { configurable: true, get: () => height });
+		Object.defineProperty(view.canvas, "offsetHeight", { configurable: true, get: () => 24 * 56 });
+		view.scrollTo(12 * 60, 0.4);
+		expect(view.el.scrollTop).toBeGreaterThan(0);
+		return { view, resize: (to: number) => ((height = to), resized()) };
+	}
+
+	it("keeps the minute it was put on in place while it settles its height", () => {
+		const { view, resize } = anchored();
+		const before = view.el.scrollTop;
+		resize(300);
+		expect(view.el.scrollTop).toBe(before + 0.4 * 300);
+		view.destroy();
+		view.el.remove();
+	});
+
+	it("stands still as the keyboard shrinks the view once a finger touched the screen anywhere", () => {
+		const { view, resize } = anchored();
+		const before = view.el.scrollTop;
+		document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+		resize(300);
+		expect(view.el.scrollTop).toBe(before);
+		view.destroy();
+		view.el.remove();
+	});
 });
 
 describe("measuring once (block 3)", () => {
