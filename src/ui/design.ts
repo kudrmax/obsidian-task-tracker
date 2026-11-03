@@ -69,8 +69,6 @@ export const PROPERTY = {
 	panelY: "--tc-panel-y",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
-	/** How far a card of a list stands from its place while a drag makes room in the list, px. */
-	room: "--tc-room",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
 	/** Where the switch's wheel stands: 0 with Inbox and Soon in its window, 2 with Now and the calendar, in between under a finger. */
