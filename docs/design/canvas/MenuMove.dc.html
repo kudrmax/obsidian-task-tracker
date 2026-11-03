@@ -48,7 +48,7 @@ body{margin:0}
 </sc-for>
 </div>
 <div style="border-top: 8px solid {{c.gap}};">
-<sc-for list="{{editRows}}" as="r" hint-placeholder-count="5">
+<sc-for list="{{editRows}}" as="r" hint-placeholder-count="4">
 <button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left; outline: {{r.mark}}; outline-offset: -3px;">
 <span style="flex: 1; min-width: 0;">{{r.label}}</span>
 <sc-if value="{{r.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{r.value}}</span></sc-if>
@@ -92,7 +92,6 @@ class Component extends DCLogic {
       wontdo: CIRCLE + ' M8 12h8',
       rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
       desc: 'M4 6h16 M4 12h16 M4 18h10',
-      due: 'M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4',
       section: 'M4 6h9 M4 12h16 M4 18h16',
       subtask: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
       open: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
@@ -110,7 +109,6 @@ class Component extends DCLogic {
     const editRows = [
       { label: 'Rename', d: icons.rename },
       { label: 'Add description', d: icons.desc },
-      { label: 'Due date', d: icons.due, value: day + ' Nov' },
       { label: 'Section', d: icons.section, value: 'Morning', mark: true },
       { label: 'Add subtask', d: icons.subtask }
     ].map((r, i, a) => ({ ...r, hasValue: !!r.value, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0', mark: r.mark && view !== 'sections' ? markLine : 'none' }));
