@@ -9,10 +9,11 @@ import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
+import { askGroup, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import { plainText } from "../../application/taskText";
 import type { IconName } from "../kit/icons";
-import { MonthPicker } from "./MonthPicker";
+import { datePage } from "./DatePage";
+import { type SectionChoice, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 
@@ -42,14 +43,7 @@ export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	];
 }
 
-/** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */
-export interface SectionChoice {
-	/** The sections the list has, in its order, then the presets it lacks, in the settings' order. */
-	readonly names: readonly string[];
-	readonly current: GroupName;
-	/** The name of the tasks outside any section. */
-	readonly ungrouped: string;
-}
+export type { SectionChoice } from "./SectionChooser";
 
 /** The edit group: Rename, Add description for a task without one, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
@@ -360,12 +354,13 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		const { item, actions } = this.context;
-		backRow(this.panel, "Section", () => this.showMenu());
-		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
-		const group = menuGroup(this.panel, []);
-		for (const name of sections.names) menuRow(group, { label: name, icon: name === sections.current ? "check" : undefined, choice: true, onPick: choose(name) });
-		menuRow(group, { label: sections.ungrouped, icon: sections.current === null ? "check" : undefined, choice: true, quiet: true, onPick: choose(null) });
-		menuRow(this.panel, { label: "New section", icon: "plus", size: "tall", apart: true, add: true, onPick: this.pick(() => actions.newSection()) });
+		sectionChooser(this.panel, {
+			choice: sections,
+			checked: (name) => name === sections.current,
+			onBack: () => this.showMenu(),
+			onPick: (name) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)))(),
+			onNew: this.pick(() => actions.newSection()),
+		});
 		this.place();
 	}
 
@@ -373,17 +368,13 @@ export class TaskMenu extends LiftedMenu {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		this.panel.classList.add("is-picker");
 		const { item, actions, today } = this.context;
-		new MonthPicker(el(this.panel, "div"), {
-			month: item.dueDate ?? today,
+		datePage(this.panel, {
 			today,
 			selected: item.dueDate,
 			onPick: (date) => this.pick(() => actions.postpone(date))(),
+			onRemove: canRemoveDue(today, item.dueDate) ? this.pick(() => actions.removeDue()) : undefined,
 		});
-		if (canRemoveDue(today, item.dueDate)) {
-			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", cls: "tc-picker-remove", onPick: this.pick(() => actions.removeDue()) });
-		}
 		this.place();
 	}
 

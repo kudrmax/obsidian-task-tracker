@@ -6,8 +6,9 @@ import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { backRow, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
-import { MonthPicker } from "./MonthPicker";
+import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
+import { datePage } from "./DatePage";
+import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { canRemoveDue, type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
 import type { LevelTile, SectionChoice } from "./TaskMenu";
@@ -149,23 +150,27 @@ export class BulkMenu {
 		if (!this.context.sections) return;
 		const { choice, shared } = this.context.sections;
 		const { actions } = this.context;
-		this.panel.replace((panel) => {
-			backRow(panel, "Section", () => this.showMenu());
-			const group = menuGroup(panel, []);
-			const checked = (name: GroupName) => (shared && name === choice.current ? "check" : undefined);
-			for (const name of choice.names) menuRow(group, { label: name, icon: checked(name), choice: true, onPick: this.pick(() => actions.toSection(name)) });
-			menuRow(group, { label: choice.ungrouped, icon: checked(null), choice: true, quiet: true, onPick: this.pick(() => actions.toSection(null)) });
-		});
+		this.panel.replace((panel) =>
+			sectionChooser(panel, {
+				choice,
+				checked: (name) => shared && name === choice.current,
+				onBack: () => this.showMenu(),
+				onPick: (name) => this.pick(() => actions.toSection(name))(),
+			}),
+		);
 	}
 
 	private showPicker(): void {
-		this.panel.el.classList.add("is-picker");
 		const { items, actions, today } = this.context;
 		const shared = items.every((item) => item.dueDate === items[0].dueDate) ? items[0].dueDate : null;
-		this.panel.replace((panel) => {
-			new MonthPicker(el(panel, "div"), { month: shared ?? today, today, selected: shared, onPick: (date) => this.pick(() => actions.postpone(date))() });
-			if (bulkCanRemoveDue(items, today)) menuRow(panel, { label: "Remove due date", icon: "removeDue", cls: "tc-picker-remove", onPick: this.pick(() => actions.removeDue()) });
-		});
+		this.panel.replace((panel) =>
+			datePage(panel, {
+				today,
+				selected: shared,
+				onPick: (date) => this.pick(() => actions.postpone(date))(),
+				onRemove: bulkCanRemoveDue(items, today) ? this.pick(() => actions.removeDue()) : undefined,
+			}),
+		);
 	}
 
 	close(): void {
