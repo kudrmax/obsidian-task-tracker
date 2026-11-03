@@ -55,10 +55,11 @@ interface OpenPanel {
 	picking: boolean;
 }
 
-type FixedPlace = "inbox" | "soon" | "now";
+type FixedPlace = "inbox" | "backlog" | "soon" | "now";
 
 const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string }[] = [
 	{ kind: "inbox", label: "Inbox" },
+	{ kind: "backlog", label: "Backlog" },
 	{ kind: "soon", label: "Soon" },
 	{ kind: "now", label: "Now" },
 ];

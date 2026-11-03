@@ -76,6 +76,17 @@ describe("ListDrop", () => {
 		expect(drop.hitTest(50, 20, from)).toBe(false);
 	});
 
+	it("Backlog, whose title stands in its own area under Inbox, takes nothing above its area", () => {
+		const only = item("backlog", 0, "L", null);
+		const { list } = setup([only], "backlog", "backlog");
+		const area = list.el.parentElement!;
+		const drop = new ListDrop(list, area, "backlog", () => true, () => ({ list: "backlog", date: null }), false);
+		const from = drag("inbox", item("inbox", 0, "I", null));
+		expect(drop.hitTest(50, 99, from)).toBe(false);
+		expect(drop.hitTest(50, 101, from)).toBe(true);
+		expect(drop.drop(50, 101, from)).toEqual({ kind: "group", list: "backlog", date: null, group: null, before: only.key });
+	});
+
 	it("under the list the column takes nothing", () => {
 		const only = item("now", 0, "A", null);
 		const { drop, list } = setup([only], "left", "now");

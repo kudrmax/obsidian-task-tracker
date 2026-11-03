@@ -5,6 +5,8 @@ import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 export interface SectionNamesOf {
 	/** Left out by a reader Inbox means nothing to: the phone's reminders, Inbox tasks having no slot. */
 	readonly inbox?: string;
+	/** Left out by a reader Backlog means nothing to, as Inbox. */
+	readonly backlog?: string;
 	readonly now: string;
 	readonly soon: string;
 	readonly done: string;
@@ -76,7 +78,7 @@ interface Block {
 	readonly end: number;
 }
 
-const SECTION_KEYS: readonly SectionKey[] = ["inbox", "now", "soon", "done"];
+const SECTION_KEYS: readonly SectionKey[] = ["inbox", "backlog", "now", "soon", "done"];
 const LIST_END_RE = /^#{1,2}(\s|$)/;
 const GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 const SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;

@@ -11,7 +11,7 @@ export class NewTaskButton {
 
 	constructor(
 		parent: HTMLElement,
-		column: "now" | "soon" | "inbox",
+		column: "now" | "soon" | "inbox" | "backlog",
 		private readonly onPress: () => void,
 	) {
 		this.el = el(parent, "div", column === "now" ? "tc-new" : `tc-new is-${column}`);

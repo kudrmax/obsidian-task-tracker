@@ -38,6 +38,10 @@ export function inboxList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("inbox");
 }
 
+export function backlogList(doc: TaskDocument): readonly TaskEntry[] {
+	return doc.tasks("backlog");
+}
+
 function isOpen(entry: TaskEntry): boolean {
 	return entry.task.status === "todo" || entry.task.status === "inProgress";
 }
