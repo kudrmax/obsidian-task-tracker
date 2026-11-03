@@ -65,8 +65,6 @@ export class ListDrop implements DropTarget {
 	private readonly scroll: AutoScroll;
 	/** Several cards are carried: away from the list each waits as a dashed place where it stood. */
 	private many = false;
-	/** The cards carried along wait, dashed, since the finger left the list. */
-	private waiting = false;
 	/** The `--tc-room` last written into each node of `roomed`, so a move writes only the ones that change. */
 	private readonly rooms = new Map<HTMLElement, number>();
 	private roomed: readonly HTMLElement[] | null = null;
@@ -102,10 +100,7 @@ export class ListDrop implements DropTarget {
 	preview(x: number, y: number, drag: DragPayload): void {
 		const frame = readFrame(this.list.el);
 		this.many = carriesMany(drag);
-		if (this.waiting) {
-			for (const node of this.list.elements) node.classList.remove(WAITING);
-			this.waiting = false;
-		}
+		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.last = { x, y, drag };
 		const layout = this.layoutFor(frame);
 		if (!this.placesAnywhere(drag)) {
@@ -153,7 +148,6 @@ export class ListDrop implements DropTarget {
 		const frame = readFrame(this.list.el);
 		if (this.many) {
 			for (const node of this.list.elements) node.classList.toggle(WAITING, node.classList.contains(LIFTED));
-			this.waiting = true;
 			this.reset(null);
 			this.gap.hide();
 			return;
@@ -167,7 +161,6 @@ export class ListDrop implements DropTarget {
 	/** The drag is over: the room closes, and with no card lifted from it the list stands as it was. */
 	clear(): void {
 		this.many = false;
-		this.waiting = false;
 		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.reset(null);
 		this.gap.hide();

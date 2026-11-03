@@ -230,15 +230,16 @@ describe("DragController: stretching a block (block 3)", () => {
 		pointer("pointercancel", 50, 676);
 	});
 
-	it("frees the screen before the change is written", async () => {
+	it("holds the screen until the change is written: no second grab starts from the old time", async () => {
 		let written = () => {};
 		const { arbiter, timeline } = stretching(() => new Promise<void>((resolve) => (written = resolve)));
 		pointer("pointermove", 50, 720);
 		pointer("pointerup", 50, 720);
-		expect(arbiter.busy).toBe(false);
+		expect(arbiter.busy).toBe(true);
 		expect(timeline.endStretch).not.toHaveBeenCalled();
 		written();
-		await vi.waitFor(() => expect(timeline.endStretch).toHaveBeenCalledWith(item.key));
+		await vi.waitFor(() => expect(arbiter.busy).toBe(false));
+		expect(timeline.endStretch).toHaveBeenCalledWith(item.key);
 	});
 
 	it("puts the block back when the write fails", async () => {

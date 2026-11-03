@@ -436,3 +436,15 @@ describe("ListDrop", () => {
 		});
 	});
 });
+
+describe("ListDrop with picked cards carried along", () => {
+	it("closes the list up over the carried cards from the first move, not only after the finger came back", () => {
+		const items = ["A", "B", "C", "D"].map((t, i) => item("soon", i, t, null));
+		const { drop, list } = setup(items, "soon", null);
+		for (const at of [0, 2]) list.elements[at].classList.add("is-lifted", "is-waiting");
+		const carried = { ...drag("soon", items[0]), carried: [{ item: items[2], from: "soon" }] } as unknown as DragPayload;
+		drop.preview(20, 220, carried);
+		expect(list.elements.map((n) => n.classList.contains("is-waiting"))).toEqual([false, false, false, false]);
+		expect(list.elements[1].style.getPropertyValue("--tc-room")).not.toBe(list.elements[3].style.getPropertyValue("--tc-room"));
+	});
+});

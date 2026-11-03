@@ -371,22 +371,26 @@ export class DragController {
 			shown = { start, end };
 			timeline.stretchTo(block, { start, end }, edge);
 		};
-		/** The screen is free at once; the block stays stretched until the tasks come back with its new time, or the write fails. */
+		/** The screen stays held until the write is done: a second grab of the card, or another gesture, would start from its old time. */
 		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
-			this.deps.arbiter.release(RESIZE);
 			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx, shownCardSize().height);
 			const changed = next.start !== slot.start || next.end !== slot.end;
-			if (!apply || !changed) return timeline.stretchTo(block, null, edge);
+			if (!apply || !changed) {
+				timeline.stretchTo(block, null, edge);
+				this.deps.arbiter.release(RESIZE);
+				return;
+			}
 			this.deps.haptics.tap();
 			try {
 				await this.deps.onResize(item, timeline.slotAt(next.start, next.end));
 			} finally {
 				timeline.endStretch(item.key);
+				this.deps.arbiter.release(RESIZE);
 			}
 		};
 		const report = (error: unknown) => console.error("Task Calendar: resize", error);
