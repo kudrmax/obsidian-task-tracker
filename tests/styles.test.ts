@@ -202,6 +202,13 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector)).toHaveLength(1);
 	});
 
+	it("quiets Obsidian's hover on our buttons without touching their own ground", () => {
+		const quiet = sheet.rules.filter((d) => d.property === "background" && /:hover|:active/.test(d.selector) && d.value === "transparent");
+		expect(quiet.length).toBeGreaterThan(0);
+		const selectors = (list: string) => list.split(/,(?![^(]*\))/).map((s) => s.trim());
+		for (const d of quiet) expect(selectors(d.selector).every((s) => s.startsWith(":where(")), d.selector).toBe(true);
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
