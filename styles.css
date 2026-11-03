@@ -562,8 +562,8 @@ body.theme-light {
 	--tc-priority-blue-meta: #4682C7;
 }
 
-/* While Obsidian shows its desktop status bar (it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
-body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"])) { --tc-status-room: var(--tc-status-bar); }
+/* While Obsidian shows its desktop status bar (the view marks the body; it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
+body:not(.is-mobile).tc-status-bar-shown { --tc-status-room: var(--tc-status-bar); }
 
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
