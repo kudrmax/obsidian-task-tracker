@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { TaskItem } from "../../src/application/contracts";
 import type { DropResult, DropTarget } from "../../src/ui/drag/DropTarget";
 import { DragController, type DragControllerDeps } from "../../src/ui/drag/DragController";
 import { GestureArbiter } from "../../src/ui/gestures";
@@ -198,5 +199,54 @@ describe("DragController: a drop that changes nothing", () => {
 		at("pointermove", 150, 300, document);
 		at("pointerup", 150, 300, document);
 		await vi.waitFor(() => expect(block.classList.contains("is-lifted")).toBe(false));
+	});
+});
+
+describe("DragController: stretching a block (block 3)", () => {
+	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null } as unknown as TaskItem;
+
+	function stretching(onResize: () => Promise<void> = async () => undefined) {
+		const arbiter = new GestureArbiter();
+		const timeline = {
+			minutesAt: (y: number) => y,
+			shownSpan: () => ({ start: 600, end: 660 }),
+			stretchTo: vi.fn(),
+			slotAt: (start: number, end: number | null) => ({ date: "2026-11-01", start, end }),
+			hourPx: 56,
+			endStretch: vi.fn(),
+		};
+		const deps = { step: () => 15, timeline: () => timeline, haptics: { tap: () => {} }, arbiter, onResize: vi.fn(onResize) } as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).grip(block, item, "end", down(50, 660));
+		return { arbiter, timeline, deps };
+	}
+
+	it("stretches the block once per grid step, not per pixel", () => {
+		const { timeline } = stretching();
+		for (let i = 0; i < 30; i++) pointer("pointermove", 50, 653 + (i % 15));
+		expect(timeline.stretchTo).toHaveBeenCalledTimes(1);
+		pointer("pointermove", 50, 676);
+		expect(timeline.stretchTo).toHaveBeenCalledTimes(2);
+		pointer("pointercancel", 50, 676);
+	});
+
+	it("frees the screen before the change is written", async () => {
+		let written = () => {};
+		const { arbiter, timeline } = stretching(() => new Promise<void>((resolve) => (written = resolve)));
+		pointer("pointermove", 50, 720);
+		pointer("pointerup", 50, 720);
+		expect(arbiter.busy).toBe(false);
+		expect(timeline.endStretch).not.toHaveBeenCalled();
+		written();
+		await vi.waitFor(() => expect(timeline.endStretch).toHaveBeenCalledWith(item.key));
+	});
+
+	it("puts the block back when the write fails", async () => {
+		const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		const { timeline } = stretching(() => Promise.reject(new Error("the file changed")));
+		pointer("pointermove", 50, 720);
+		pointer("pointerup", 50, 720);
+		await vi.waitFor(() => expect(timeline.endStretch).toHaveBeenCalledWith(item.key));
+		quiet.mockRestore();
 	});
 });

@@ -65,11 +65,17 @@ interface Anchor {
 	readonly fraction: number;
 }
 
-/** A card being resized: the minutes it shows while the finger moves, and which edge moves. */
+/**
+ * A card being resized: the minutes it shows while the finger moves, and which edge moves. It is the task `key`, put on
+ * `from` when the stretch began; `held` is the card the gesture holds, which a redraw may have replaced by `el`.
+ */
 interface Stretch {
 	readonly el: HTMLElement;
+	readonly held: HTMLElement;
 	readonly span: TaskSpan;
 	readonly edge: ResizeEdge;
+	readonly key: TaskKey | null;
+	readonly from: Slot | null;
 }
 
 /** The timeline as read for a gesture: its box, and where its canvas stands with the day scrolled to the top. */
@@ -252,6 +258,7 @@ export class Timeline {
 
 	render(): void {
 		for (const child of [...this.itemsEl.children]) if (child !== this.field?.box) child.remove();
+		const stretch = this.stretch;
 		this.stretch = null;
 		this.frame = null;
 		const boundary = this.deps.boundary();
@@ -264,6 +271,7 @@ export class Timeline {
 			.sort((a, b) => a.box.layer - b.box.layer)
 			.map(({ event, span, box }) => this.placeEvent(event, span, box.left, box.level));
 		this.tasks = this.deps.tasks().filter((task) => task.slot).map((task) => this.placeTask(task));
+		if (stretch) this.keepStretch(stretch);
 		this.itemsEl.appendChild(this.grips);
 		this.nowEl?.remove();
 		this.nowEl = null;
@@ -437,11 +445,34 @@ export class Timeline {
 	}
 
 	/** Shows a card stretched to `span` while its dot moves, the moving edge's time on the pill; null puts it back. */
-	stretchTo(el: HTMLElement, span: TaskSpan | null, edge: ResizeEdge): void {
-		this.stretch = span ? { el, span, edge } : null;
+	stretchTo(held: HTMLElement, span: TaskSpan | null, edge: ResizeEdge): void {
+		const kept = this.stretch?.held === held ? this.stretch : null;
+		const el = kept?.el ?? held;
+		const task = kept ? null : this.tasks.find((t) => t.el === el);
+		const key = kept ? kept.key : (task?.item.key ?? null);
+		const from = kept ? kept.from : (task?.item.slot ?? null);
+		this.stretch = span ? { el, held, span, edge, key, from } : null;
 		if (!span) this.frame = null;
 		el.classList.toggle("is-resizing", span !== null);
 		this.layoutTasks();
+	}
+
+	/** The change of task `key`'s time is written, or failed: its card stands as its task says. A stretch of another task, begun meanwhile, stays. */
+	endStretch(key: TaskKey): void {
+		const stretch = this.stretch;
+		if (!stretch?.key || !sameTask(stretch.key, key)) return;
+		this.stretch = null;
+		this.frame = null;
+		stretch.el.classList.remove("is-resizing");
+		this.layoutTasks();
+	}
+
+	/** A redraw while the new time is written: the task, still on the time it had, stays stretched on its new card. */
+	private keepStretch(stretch: Stretch): void {
+		const task = stretch.key && stretch.from ? this.tasks.find((t) => sameTask(t.item.key, stretch.key!)) : undefined;
+		if (!task || !sameSlot(task.item.slot, stretch.from)) return;
+		task.el.classList.add("is-resizing");
+		this.stretch = { ...stretch, el: task.el };
 	}
 
 	/**
@@ -575,6 +606,10 @@ export class Timeline {
 		this.deps.onBlock?.(block, item);
 		return { el: block, item, meta, pill };
 	}
+}
+
+function sameSlot(a: Slot | null, b: Slot | null): boolean {
+	return a !== null && b !== null && a.date === b.date && a.start === b.start && a.end === b.end;
 }
 
 function noDropShown(): DropShown {

@@ -430,3 +430,39 @@ describe("measuring once (block 3)", () => {
 		expect(set.mock.calls.filter(([name]) => name === "--tc-room-top").length).toBeLessThanOrEqual(1);
 	});
 });
+
+describe("a stretched block while its new time is written (block 3)", () => {
+	const task = (start: number, end: number): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
+	const block = (view: Timeline) => view.itemsEl.querySelector<HTMLElement>(".tc-block")!;
+	const length = (el: HTMLElement) => el.style.getPropertyValue("--tc-len");
+
+	it("keeps a block stretched across a redraw until its new time comes", () => {
+		const tasks = [task(600, 660)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const unstretched = length(block(view));
+		view.stretchTo(block(view), { start: 600, end: 720 }, "end");
+		const stretched = length(block(view));
+		expect(stretched).not.toBe(unstretched);
+		const before = block(view);
+		view.render();
+		expect(block(view)).not.toBe(before);
+		expect(block(view).classList.contains("is-resizing")).toBe(true);
+		expect(length(block(view))).toBe(stretched);
+		tasks[0] = task(600, 720);
+		view.render();
+		expect(block(view).classList.contains("is-resizing")).toBe(false);
+		expect(length(block(view))).toBe(stretched);
+	});
+
+	it("puts the block back once its change is over, and leaves another task's stretch alone", () => {
+		const tasks = [task(600, 660)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const unstretched = length(block(view));
+		view.stretchTo(block(view), { start: 600, end: 720 }, "end");
+		view.endStretch({ section: "now", index: 1, path: [], raw: "" });
+		expect(block(view).classList.contains("is-resizing")).toBe(true);
+		view.endStretch(tasks[0].key);
+		expect(block(view).classList.contains("is-resizing")).toBe(false);
+		expect(length(block(view))).toBe(unstretched);
+	});
+});
