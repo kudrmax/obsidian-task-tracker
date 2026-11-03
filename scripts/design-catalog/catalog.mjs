@@ -79,7 +79,7 @@ const states = {
 		setup: `top(); await tap(card(1)); await tap(byText("In progress")); await sleep(1200);`,
 		teardown: `const u=V().contentEl.querySelector(".tc-undo"); if(vis(u)) await tap(u); await sleep(900);`,
 	},
-	settings: { setup: `app.setting.open(); app.setting.openTabById("task-calendar"); await sleep(900);`, teardown: `app.setting.close(); await sleep(400);` },
+	settings: { setup: `app.setting.open(); app.setting.openTabById("task-calendar"); await sleep(900); document.activeElement?.blur(); await sleep(200);`, teardown: `app.setting.close(); await sleep(400);` },
 	"hover-row": { on: "mac", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-row", ["hover"]] },
 	"hover-plus": { on: "mac", setup: `await sleep(300);`, force: [".tc-plus", ["hover"]] },
 	"active-tile": { on: "mac", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-tile", ["active"]] },
@@ -114,6 +114,8 @@ for (const name of only ? only.split(",") : Object.keys(states)) {
 	const state = states[name];
 	if (!state) throw new Error(`no state ${name}`);
 	if (state.on && state.on !== platform) continue;
+	// The plugin's tab is the focused one in every shot: Obsidian draws the active tab's title brighter.
+	await ev(`const l=app.workspace.getLeavesOfType("task-calendar")[0]; app.workspace.setActiveLeaf(l,{focus:true}); await new Promise(r=>setTimeout(r,200)); return 1`);
 	const res = await ev(`${H} ${state.setup} return "ok"`);
 	let forced = null;
 	if (state.force) forced = await force(...state.force);
