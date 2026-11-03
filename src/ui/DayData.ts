@@ -36,10 +36,20 @@ export class DayData {
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
 	private readonly taskReload: Reload<TasksState>;
 	private readonly eventReload: Reload<DayEvents>;
+	/** The next fetch is for a day that opens: it asks for the days next to it too. Taken when the fetch starts. */
+	private around = false;
 
 	constructor(private readonly deps: DayDataDeps) {
 		this.taskReload = new Reload(() => this.readTasks(), (state) => this.show(() => (this.state = state)));
-		this.eventReload = new Reload(() => deps.calendars.eventsOn(deps.date()), (events) => this.show(() => (this.dayEvents = events)));
+		this.eventReload = new Reload(
+			() => {
+				const date = deps.date();
+				const around = this.around;
+				this.around = false;
+				return around ? deps.calendars.eventsAround(date) : deps.calendars.eventsOn(date);
+			},
+			(events) => this.show(() => (this.dayEvents = events)),
+		);
 	}
 
 	get day(): DayView | null {
@@ -76,7 +86,7 @@ export class DayData {
 	 */
 	load(): Promise<void> {
 		this.showCached(this.dayEvents);
-		void this.calendars();
+		void this.openDay();
 		return this.tasks();
 	}
 
@@ -85,8 +95,9 @@ export class DayData {
 		return this.taskReload.request(beforeShow);
 	}
 
-	/** The events fetched afresh: Refresh now in the sources popover, the polling. */
+	/** The events fetched afresh for the day alone: Refresh now in the sources popover, the polling, a source that changed. */
 	calendars(): Promise<void> {
+		this.around = false;
 		return this.eventReload.request();
 	}
 
@@ -101,7 +112,13 @@ export class DayData {
 	}
 
 	private fetchBoth(): Promise<void> {
-		return Promise.all([this.tasks(), this.calendars()]).then(() => undefined);
+		return Promise.all([this.tasks(), this.openDay()]).then(() => undefined);
+	}
+
+	/** The day's events with the days next to it, so a swipe finds them ready. */
+	private openDay(): Promise<void> {
+		this.around = true;
+		return this.eventReload.request();
 	}
 
 	private async readTasks(): Promise<TasksState> {

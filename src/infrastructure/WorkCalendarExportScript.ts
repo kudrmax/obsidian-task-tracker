@@ -1,9 +1,10 @@
 import loader from "../../scriptable/Export Work Calendar.js?raw";
 import exportBody from "../../scriptable/work-calendar-export.js?raw";
 import type { SettingsStore } from "../application/ports";
-import type { WorkCalendarAdapter } from "./WorkCalendarFileSource";
 
-export interface ExportScriptAdapter extends WorkCalendarAdapter {
+export interface ExportScriptAdapter {
+	exists(path: string): Promise<boolean>;
+	read(path: string): Promise<string>;
 	write(path: string, data: string): Promise<void>;
 }
 
@@ -16,6 +17,7 @@ const LOADER_PATH = `.obsidian/plugins/task-calendar/${FILE}`;
  */
 export class WorkCalendarExportScript {
 	private writing: Promise<void> = Promise.resolve();
+	private installedFor: string | null = null;
 
 	constructor(
 		private readonly adapter: ExportScriptAdapter,
@@ -28,15 +30,24 @@ export class WorkCalendarExportScript {
 		return loader.replace(LOADER_PATH, this.path);
 	}
 
-	/** Writes the export now and again whenever the settings change. Returns the unsubscribe. */
+	/** Writes the export now and again whenever the work file path changes. Returns the unsubscribe. */
 	keepInstalled(): () => void {
 		void this.install();
-		return this.settings.onChange(() => void this.install());
+		return this.settings.onChange(() => {
+			if (this.settings.get().workCalendarFile !== this.installedFor) void this.install();
+		});
 	}
 
-	/** One write at a time, so the last settings win. Writes only when the file differs: Sync is not woken for nothing. */
+	/** One write at a time, so the last settings win. Writes only when the file differs: Sync is not woken for nothing. A failed write is tried again on the next change of the settings. */
 	install(): Promise<void> {
-		this.writing = this.writing.then(() => this.write()).catch((e: unknown) => console.error("Task Calendar: work calendar export", e));
+		const path = this.settings.get().workCalendarFile;
+		this.installedFor = path;
+		this.writing = this.writing
+			.then(() => this.write())
+			.catch((e: unknown) => {
+				if (this.installedFor === path) this.installedFor = null;
+				console.error("Task Calendar: work calendar export", e);
+			});
 		return this.writing;
 	}
 

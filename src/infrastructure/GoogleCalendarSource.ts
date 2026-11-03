@@ -1,10 +1,13 @@
-import { requestUrl } from "obsidian";
 import type { CalendarEvent } from "../application/contracts";
 import type { EventBatch, EventSource } from "../application/EventSource";
-import type { SettingsStore } from "../application/ports";
+import type { Clock, SettingsStore } from "../application/ports";
 import type { GoogleAuth } from "./GoogleAuth";
+import type { Http } from "./Http";
 
 const API = "https://www.googleapis.com/calendar/v3";
+/** How long the list of calendars is taken as it is: it changes when a calendar is added in Google, rarely. */
+const LIST_KEPT_MS = 30 * 60_000;
+const PAGE_SIZE = "250";
 const DEFAULT_COLOR = "#4285F4";
 const UNTITLED = "(untitled)";
 
@@ -37,38 +40,65 @@ function dateOf(point: { dateTime?: string; date?: string }): Date {
 
 export class GoogleCalendarSource implements EventSource {
 	readonly name = "google" as const;
+	private list: { readonly key: string; readonly at: number; readonly calendars: Promise<CalendarListEntry[]> } | null = null;
 
 	constructor(
-		private readonly auth: GoogleAuth,
+		private readonly auth: Pick<GoogleAuth, "isLoggedIn" | "accessToken">,
 		private readonly settings: SettingsStore,
+		private readonly clock: Clock,
+		private readonly http: Http,
 	) {}
 
 	async eventsBetween(start: Date, end: Date): Promise<EventBatch> {
 		if (!this.auth.isLoggedIn()) throw new Error("not logged in");
 		const wanted = this.settings.get().google.calendarIds;
 		const calendars = (await this.calendarList()).filter((c) => c.selected !== false && (wanted.length === 0 || wanted.includes(c.id)));
-		const perCalendar = await Promise.all(calendars.map((c) => this.eventsOf(c, start, end)));
-		return { events: perCalendar.flat(), updatedAt: new Date() };
+		try {
+			const perCalendar = await Promise.all(calendars.map((c) => this.eventsOf(c, start, end)));
+			return { events: perCalendar.flat(), updatedAt: this.clock.now() };
+		} catch (e) {
+			// A calendar removed in Google answers 404: the list is asked again, not kept failing for half an hour.
+			this.list = null;
+			throw e;
+		}
 	}
 
+	/** The settings page: always asked afresh, and kept for the fetches after it. */
 	async listCalendars(): Promise<GoogleCalendarInfo[]> {
-		return (await this.calendarList()).map((c) => ({ id: c.id, title: c.summary, color: c.backgroundColor ?? DEFAULT_COLOR }));
+		return (await this.calendarList(true)).map((c) => ({ id: c.id, title: c.summary, color: c.backgroundColor ?? DEFAULT_COLOR }));
 	}
 
-	private async calendarList(): Promise<CalendarListEntry[]> {
-		const data = await this.get<{ items?: CalendarListEntry[] }>(`${API}/users/me/calendarList`, {});
-		return data.items ?? [];
+	/** Kept per login for LIST_KEPT_MS; fetches at once share one request. */
+	private calendarList(fresh = false): Promise<CalendarListEntry[]> {
+		const { clientId, refreshToken } = this.settings.get().google;
+		const key = JSON.stringify([clientId, refreshToken]);
+		const now = this.clock.now().getTime();
+		if (!fresh && this.list && this.list.key === key && now - this.list.at < LIST_KEPT_MS) return this.list.calendars;
+		const calendars = this.get<{ items?: CalendarListEntry[] }>(`${API}/users/me/calendarList`, {}).then((data) => data.items ?? []);
+		const list = { key, at: now, calendars };
+		this.list = list;
+		calendars.catch(() => {
+			if (this.list === list) this.list = null;
+		});
+		return calendars;
 	}
 
 	private async eventsOf(calendar: CalendarListEntry, start: Date, end: Date): Promise<CalendarEvent[]> {
-		const data = await this.get<{ items?: GoogleEvent[] }>(`${API}/calendars/${encodeURIComponent(calendar.id)}/events`, {
-			timeMin: start.toISOString(),
-			timeMax: end.toISOString(),
-			singleEvents: "true",
-			orderBy: "startTime",
-			maxResults: "250",
-		});
-		return (data.items ?? [])
+		const items: GoogleEvent[] = [];
+		let pageToken: string | undefined;
+		do {
+			const data = await this.get<{ items?: GoogleEvent[]; nextPageToken?: string }>(`${API}/calendars/${encodeURIComponent(calendar.id)}/events`, {
+				timeMin: start.toISOString(),
+				timeMax: end.toISOString(),
+				singleEvents: "true",
+				orderBy: "startTime",
+				maxResults: PAGE_SIZE,
+				...(pageToken ? { pageToken } : {}),
+			});
+			items.push(...(data.items ?? []));
+			pageToken = data.nextPageToken;
+		} while (pageToken);
+		return items
 			.filter((e) => e.status !== "cancelled")
 			.map((e) => ({
 				id: `google:${calendar.id}:${e.id}`,
@@ -84,10 +114,9 @@ export class GoogleCalendarSource implements EventSource {
 
 	private async get<T>(url: string, params: Record<string, string>): Promise<T> {
 		const query = new URLSearchParams(params).toString();
-		const res = await requestUrl({
+		const res = await this.http({
 			url: query ? `${url}?${query}` : url,
 			headers: { Authorization: `Bearer ${await this.auth.accessToken()}` },
-			throw: false,
 		});
 		if (res.status >= 400) throw new Error(`Google API ${res.status}: ${res.text}`);
 		return res.json as T;

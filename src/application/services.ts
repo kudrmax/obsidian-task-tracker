@@ -4,6 +4,7 @@ import { GoogleAuth } from "../infrastructure/GoogleAuth";
 import { GoogleCalendarSource } from "../infrastructure/GoogleCalendarSource";
 import { browserLoginDeps, GoogleRedirectLogin } from "../infrastructure/GoogleRedirectLogin";
 import { requestToken } from "../infrastructure/GoogleToken";
+import { obsidianHttp } from "../infrastructure/ObsidianHttp";
 import { VaultPathWatcher } from "../infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "../infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "../infrastructure/WorkCalendarExportScript";
@@ -35,9 +36,10 @@ export interface ServicesHost {
 export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock): Services {
 	const store = new VaultTaskFileStore(app, () => settings.get().tasksFile);
 	const history = new UndoHistory(store);
-	const login = new GoogleRedirectLogin(browserLoginDeps((fields) => requestToken(settings.get().google.clientId, settings.get().google.clientSecret, fields)));
-	const google = new GoogleAuth(settings, login);
-	const googleSource = new GoogleCalendarSource(google, settings);
+	const token = (fields: Record<string, string>) => requestToken(obsidianHttp, settings.get().google.clientId, settings.get().google.clientSecret, fields);
+	const login = new GoogleRedirectLogin(browserLoginDeps(token));
+	const google = new GoogleAuth(settings, login, token, clock);
+	const googleSource = new GoogleCalendarSource(google, settings, clock, obsidianHttp);
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
 	return {
 		tasks: new TaskServiceImpl(store, settings, clock, history),

@@ -78,7 +78,7 @@ export class DayPeek {
 		const cached = deps.calendars.cached(date);
 		if (cached) this.events = cached.events;
 		else
-			void deps.calendars.eventsOn(date).then((events) => {
+			void deps.calendars.eventsAround(date).then((events) => {
 				this.events = events.events;
 				this.render();
 			});

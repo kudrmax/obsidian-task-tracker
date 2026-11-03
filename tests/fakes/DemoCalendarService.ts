@@ -52,6 +52,10 @@ export class DemoCalendarService implements CalendarService {
 		return result;
 	}
 
+	eventsAround(date: LocalDate): Promise<DayEvents> {
+		return this.eventsOn(date);
+	}
+
 	cached(date: LocalDate): DayEvents | null {
 		return this.last.get(date) ?? null;
 	}

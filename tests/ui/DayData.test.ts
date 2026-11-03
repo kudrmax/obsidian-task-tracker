@@ -21,11 +21,21 @@ const event = (title: string): CalendarEvent => ({
 /** A network that answers only when the test lets it. */
 class SlowCalendars implements CalendarService {
 	readonly asked: LocalDate[] = [];
+	readonly around: LocalDate[] = [];
 	private readonly waiting: (() => void)[] = [];
 	readonly last = new Map<LocalDate, DayEvents>();
 
 	eventsOn(date: LocalDate): Promise<DayEvents> {
 		this.asked.push(date);
+		return this.fetch(date);
+	}
+
+	eventsAround(date: LocalDate): Promise<DayEvents> {
+		this.around.push(date);
+		return this.fetch(date);
+	}
+
+	private fetch(date: LocalDate): Promise<DayEvents> {
 		return new Promise((resolve) =>
 			this.waiting.push(() => {
 				const day = { events: [event(`on ${date}`)], statuses: [] };
@@ -61,6 +71,56 @@ const titles = (data: DayData) => data.events.map((e) => e.title);
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("DayData", () => {
+	it("the view opens asking for the day with its neighbours", async () => {
+		const { data, calendars } = setup();
+		await data.load();
+		expect(calendars.around).toEqual([TODAY]);
+		expect(calendars.asked).toEqual([]);
+	});
+
+	it("another day asks for it with its neighbours", async () => {
+		const { data, calendars, setDate } = setup();
+		setDate(TOMORROW);
+		void data.selectDay();
+		expect(calendars.around).toEqual([TOMORROW]);
+		expect(calendars.asked).toEqual([]);
+	});
+
+	it("a poll asks for the shown day alone", async () => {
+		const { data, calendars } = setup();
+		void data.calendars();
+		expect(calendars.asked).toEqual([TODAY]);
+		expect(calendars.around).toEqual([]);
+	});
+
+	it("a poll during the opening of a day is served by a fetch of the day alone after it", async () => {
+		const { data, calendars, setDate } = setup();
+		setDate(TOMORROW);
+		const selected = data.selectDay();
+		const polled = data.calendars();
+		calendars.answer();
+		await settled();
+		calendars.answer();
+		await Promise.all([selected, polled]);
+		expect(calendars.around).toEqual([TOMORROW]);
+		expect(calendars.asked).toEqual([TOMORROW]);
+	});
+
+	it("a day changed during the fetch is asked for with its neighbours after it", async () => {
+		const { data, calendars, setDate } = setup();
+		setDate(TODAY);
+		const first = data.selectDay();
+		setDate(TOMORROW);
+		const second = data.selectDay();
+		calendars.answer();
+		await settled();
+		calendars.answer();
+		await Promise.all([first, second]);
+		expect(calendars.around).toEqual([TODAY, TOMORROW]);
+		expect(calendars.asked).toEqual([]);
+		expect(titles(data)).toEqual([`on ${TOMORROW}`]);
+	});
+
 	it("reads Backlog with the other lists", async () => {
 		const { data } = setup();
 		await data.tasks();

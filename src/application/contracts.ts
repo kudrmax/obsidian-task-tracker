@@ -295,8 +295,13 @@ export interface DayEvents {
 
 /** Events of both sources for one day. A failing source keeps its last good events and reports the error. */
 export interface CalendarService {
-	/** Fetches both sources afresh. */
+	/** Fetches both sources afresh for the day alone: polling, Refresh now, a source that changed. */
 	eventsOn(date: LocalDate): Promise<DayEvents>;
+	/**
+	 * Another day opens: the day and the days next to it, one request per source. A source polled over the network that
+	 * answered for the day less than the refresh interval ago is not asked again: its last answer is shown.
+	 */
+	eventsAround(date: LocalDate): Promise<DayEvents>;
 	/** The last result for `date` without a fetch; null when `eventsOn` was never called for it. */
 	cached(date: LocalDate): DayEvents | null;
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */

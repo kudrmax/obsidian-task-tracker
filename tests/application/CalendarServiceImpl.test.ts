@@ -247,3 +247,216 @@ describe("CalendarServiceImpl.onChange", () => {
 		expect(work.changeListeners.size).toBe(0);
 	});
 });
+
+describe("CalendarServiceImpl.eventsAround", () => {
+	const D = "2026-10-30";
+	const at = (day: number, hour: number) => new Date(2026, 9, day, hour);
+
+	class ManualSource extends FakeSource {
+		private readonly waiting: (() => void)[] = [];
+		override async eventsBetween(start: Date, end: Date): Promise<EventBatch> {
+			const batch = super.eventsBetween(start, end);
+			await new Promise<void>((resolve) => this.waiting.push(resolve));
+			return batch;
+		}
+		answer(): void {
+			for (const resolve of this.waiting.splice(0)) resolve();
+		}
+	}
+
+	function around(sources: EventSource[], refreshSeconds = 60, cache = new MemoryEventCache()) {
+		const clock = new FakeClock();
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 5, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
+		const svc = new CalendarServiceImpl(sources, clock, settings, cache);
+		const pass = (ms: number) => (clock.current = new Date(clock.current.getTime() + ms));
+		return { svc, clock, settings, cache, pass };
+	}
+
+	function threeDays() {
+		return new FakeSource("google", [
+			event("google", "g29", at(29, 12), at(29, 13)),
+			event("google", "g30", at(30, 12), at(30, 13)),
+			event("google", "g31", at(31, 12), at(31, 13)),
+		]);
+	}
+
+	it("eventsAround asks every source once for the day before through the day after and keeps the three days", async () => {
+		const google = threeDays();
+		const { svc } = around([google]);
+		const day = await svc.eventsAround(D);
+		expect(google.calls).toEqual([{ start: new Date(2026, 9, 29, 0), end: new Date(2026, 10, 1, 5) }]);
+		expect(day.events.map((e) => e.id)).toEqual(["g30"]);
+		expect(svc.cached("2026-10-29")!.events.map((e) => e.id)).toEqual(["g29"]);
+		expect(svc.cached(D)!.events.map((e) => e.id)).toEqual(["g30"]);
+		expect(svc.cached("2026-10-31")!.events.map((e) => e.id)).toEqual(["g31"]);
+		expect(svc.cached("2026-10-31")!.statuses[0].message).toBe("1 event");
+	});
+
+	it("a neighbour answered less than refreshSeconds ago is shown without asking Google", async () => {
+		const google = threeDays();
+		const { svc, pass } = around([google]);
+		await svc.eventsAround(D);
+		pass(30_000);
+		const next = await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(1);
+		expect(next).toEqual(svc.cached("2026-10-31"));
+		expect(next.events.map((e) => e.id)).toEqual(["g31"]);
+	});
+
+	it("refreshSeconds later it asks again, once", async () => {
+		const google = threeDays();
+		const { svc, pass } = around([google]);
+		await svc.eventsAround(D);
+		pass(60_000);
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(2);
+	});
+
+	it("eventsOn asks for the day alone every time", async () => {
+		const google = threeDays();
+		const { svc } = around([google]);
+		await svc.eventsAround(D);
+		await svc.eventsOn(D);
+		expect(google.calls).toHaveLength(2);
+		expect(google.calls[1]).toEqual({ start: new Date(2026, 9, 30, 0), end: new Date(2026, 9, 31, 5) });
+	});
+
+	it("a source that tells its changes is always asked", async () => {
+		const google = threeDays();
+		const work = new ChangingSource("work", [event("work", "w31", at(31, 9), at(31, 10))]);
+		const { svc, pass } = around([google, work]);
+		await svc.eventsAround(D);
+		pass(30_000);
+		const next = await svc.eventsAround("2026-10-31");
+		expect(work.calls).toHaveLength(2);
+		expect(google.calls).toHaveLength(1);
+		expect(next.events.map((e) => e.id)).toEqual(["w31", "g31"]);
+		expect(next.statuses.map((s) => s.source)).toEqual(["google", "work"]);
+	});
+
+	it("a failure for the day shown makes its neighbours unfresh too: Google is asked again on the swipe", async () => {
+		const google = threeDays();
+		const { svc, pass } = around([google]);
+		await svc.eventsAround(D);
+		pass(20_000);
+		google.failWith = new Error("offline");
+		await svc.eventsOn(D);
+		google.failWith = null;
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(3);
+	});
+
+	it("a failed answer is not fresh", async () => {
+		const google = threeDays();
+		const { svc } = around([google]);
+		google.failWith = new Error("offline");
+		await svc.eventsAround(D);
+		google.failWith = null;
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(2);
+	});
+
+	it("other calendars chosen make every day unfresh, another column shown does not", async () => {
+		const google = threeDays();
+		const { svc, settings } = around([google]);
+		await svc.eventsAround(D);
+		await settings.update({ google: { ...settings.get().google, calendarIds: ["work"] } });
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(2);
+		await settings.update({ rightMode: "soon" });
+		await svc.eventsAround(D);
+		expect(google.calls).toHaveLength(2);
+	});
+
+	it("an answer that comes after the calendars changed is not fresh", async () => {
+		const google = new ManualSource("google");
+		const { svc, settings } = around([google]);
+		const first = svc.eventsAround(D);
+		await settings.update({ google: { ...settings.get().google, calendarIds: ["work"] } });
+		google.answer();
+		await first;
+		const second = svc.eventsAround("2026-10-31");
+		await Promise.resolve();
+		google.answer();
+		await second;
+		expect(google.calls).toHaveLength(2);
+	});
+
+	it("refreshSeconds 0 means nothing is fresh", async () => {
+		const google = threeDays();
+		const { svc } = around([google], 0);
+		await svc.eventsAround(D);
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(2);
+	});
+
+	it("a neighbour is kept only when every source answered for it", async () => {
+		const google = threeDays();
+		const work = new ChangingSource("work");
+		const { svc } = around([google, work]);
+		await svc.eventsOn(D);
+		await svc.eventsAround(D);
+		expect(google.calls).toHaveLength(1);
+		expect(work.calls).toHaveLength(2);
+		expect(svc.cached("2026-10-31")).toBeNull();
+		expect(svc.cached("2026-10-29")).toBeNull();
+	});
+
+	it("a neighbour a source failed for is not kept", async () => {
+		const google = threeDays();
+		const work = new ChangingSource("work");
+		work.failWith = new Error("file missing");
+		const { svc } = around([google, work]);
+		await svc.eventsAround(D);
+		expect(svc.cached(D)).not.toBeNull();
+		expect(svc.cached("2026-10-31")).toBeNull();
+	});
+
+	it("the same events fetched again write the device cache nothing", async () => {
+		const google = threeDays();
+		const { svc, cache, pass } = around([google]);
+		await svc.eventsOn(D);
+		pass(60_000);
+		google.updatedAt = new Date(FETCHED.getTime() + 60_000);
+		await svc.eventsOn(D);
+		expect(cache.writes).toBe(1);
+		expect(svc.cached(D)!.statuses[0].updatedAt).toEqual(google.updatedAt);
+	});
+
+	it("other events are written at once", async () => {
+		const google = threeDays();
+		const { svc, cache } = around([google]);
+		await svc.eventsOn(D);
+		google.events = [event("google", "moved", at(30, 15), at(30, 16))];
+		await svc.eventsOn(D);
+		expect(cache.writes).toBe(2);
+	});
+
+	it("a fetch time 10 minutes newer is written", async () => {
+		const google = threeDays();
+		const { svc, cache } = around([google]);
+		await svc.eventsOn(D);
+		google.updatedAt = new Date(FETCHED.getTime() + 10 * 60_000 + 1000);
+		await svc.eventsOn(D);
+		expect(cache.writes).toBe(2);
+	});
+
+	it("eventsAround writes the three days at most once", async () => {
+		const google = threeDays();
+		const { svc, cache } = around([google]);
+		await svc.eventsAround(D);
+		expect(cache.writes).toBe(1);
+		expect(cache.days.size).toBe(3);
+		expect([...cache.days.keys()].pop()).toBe(D);
+	});
+
+	it("reads the device cache on first use, not when built", () => {
+		const cache = new MemoryEventCache();
+		const { svc } = around([threeDays()], 60, cache);
+		expect(cache.reads).toBe(0);
+		svc.cached(D);
+		expect(cache.reads).toBe(1);
+		svc.cached(D);
+		expect(cache.reads).toBe(1);
+	});
+});
