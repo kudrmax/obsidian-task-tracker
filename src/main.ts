@@ -1,27 +1,35 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
+import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices, type ServicesHost } from "./application/services";
-import { type DeviceState, partition, settingsFrom, sharedOf, type TaskCalendarSettings } from "./settings";
+import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
-const DEVICE_STATE_KEY = "task-calendar:device";
-
-/**
- * The settings: the synced file (data.json) for what is the vault's, and the device's own storage for the divider's
- * place and the column shown. The file is written over its freshest copy, so a token Sync just brought is never lost.
- */
+/** The plugin is the settings store the view sees; PluginSettings keeps them. */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
-	private current: TaskCalendarSettings = settingsFrom(null);
-	private readonly listeners = new Set<() => void>();
+	private pluginSettings!: PluginSettings;
 
 	override async onload(): Promise<void> {
-		await this.reloadSettings();
+		this.pluginSettings = new PluginSettings(
+			{
+				loadData: () => this.loadData(),
+				saveData: (data) => this.saveData(data),
+				loadLocalStorage: (key) => this.app.loadLocalStorage(key),
+				saveLocalStorage: (key, data) => this.app.saveLocalStorage(key, data),
+			},
+			`${this.pluginDir}/data.json`,
+		);
+		this.pluginSettings.onChange(() => showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap }));
+		await this.pluginSettings.load();
 		this.register(clearCardSize);
 		this.registerEvent(this.watchSettingsFile());
+		this.registerDomEvent(document, "visibilitychange", () => {
+			if (!document.hidden) void this.pluginSettings.reload();
+		});
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
@@ -58,57 +66,35 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		};
 	}
 
+	private get pluginDir(): string {
+		return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+	}
+
 	private servicesHost(): ServicesHost {
 		return {
-			pluginDir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
+			pluginDir: this.pluginDir,
 			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => window.open(url) },
 		};
 	}
 
 	/** Sync brings data.json from the other device (the Google token, logged in on the Mac): it counts here at once, with no reload. */
 	private watchSettingsFile(): EventRef {
-		const file = `${this.manifest.dir}/data.json`;
 		const vault = this.app.vault as Vault & { on(name: "raw", callback: (path: string) => void): EventRef };
 		return vault.on("raw", (path) => {
-			if (path === file) void this.reloadSettings();
+			if (this.pluginSettings.owns(path)) void this.pluginSettings.reload();
 		});
 	}
 
-	private deviceState(): Partial<DeviceState> {
-		const saved = this.app.loadLocalStorage(DEVICE_STATE_KEY) as Partial<DeviceState> | null;
-		return saved ?? {};
-	}
-
-	private async reloadSettings(): Promise<void> {
-		this.current = { ...settingsFrom(await this.loadData()), ...this.deviceState() };
-		this.emit();
-	}
-
 	get(): TaskCalendarSettings {
-		return this.current;
+		return this.pluginSettings.get();
 	}
 
-	async update(patch: Partial<TaskCalendarSettings>): Promise<void> {
-		const { device, shared } = partition(patch);
-		const deviceState = { ...this.deviceState(), ...device };
-		if (Object.keys(device).length) this.app.saveLocalStorage(DEVICE_STATE_KEY, deviceState);
-		let fileSettings = settingsFrom(await this.loadData());
-		if (Object.keys(shared).length) {
-			fileSettings = settingsFrom({ ...fileSettings, ...shared });
-			await this.saveData(sharedOf(fileSettings));
-		}
-		this.current = { ...fileSettings, ...deviceState };
-		this.emit();
+	update(patch: Partial<TaskCalendarSettings>): Promise<void> {
+		return this.pluginSettings.update(patch);
 	}
 
 	onChange(listener: () => void): () => void {
-		this.listeners.add(listener);
-		return () => this.listeners.delete(listener);
-	}
-
-	private emit(): void {
-		showCardSize({ height: this.current.cardHeight, gap: this.current.cardGap });
-		for (const listener of this.listeners) listener();
+		return this.pluginSettings.onChange(listener);
 	}
 
 	private async openView(): Promise<void> {
