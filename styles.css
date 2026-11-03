@@ -227,6 +227,8 @@ body {
 	--tc-float-count-size: 22px;
 	--tc-float-count-out: 9px;
 	--tc-float-count-ring: 2px;
+	/* The carried stack over the cancel ring, seen through. */
+	--tc-float-cancel-opacity: 0.35;
 	/* A subtask's card stands this much further in per level. */
 	--tc-subtask-indent: 20px;
 	/* A branch runs up through the gap and a little under the card above, to the curve of its bottom. */
@@ -879,6 +881,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-card.is-waiting > * { visibility: hidden; }
 .tc-float-count { position: fixed; left: 0; top: 0; min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-count.is-gone { opacity: 0; }
+body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancelling .tc-float-count { opacity: var(--tc-float-cancel-opacity); }
 .tc-block-card[data-priority] .tc-block-meta { color: var(--tc-priority-meta); }
 .tc-priority-dot { flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
 .tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-desc-peek-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; overflow: hidden; padding: var(--tc-desc-peek-pad); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }

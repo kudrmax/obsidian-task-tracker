@@ -24,6 +24,8 @@ export class TaskSelection {
 	private readonly picked = new Map<string, PickedCard>();
 	/** Every list card drawn, picked or not, by its element. */
 	private readonly drawn = new WeakMap<HTMLElement, PickedCard>();
+	/** The card drawn last for each task: a click on a card a redraw just replaced picks the new one. */
+	private readonly latest = new Map<string, PickedCard>();
 	/** The task the last ⌘-click picked: a Shift-click selects from it. */
 	private anchor: PickedCard | null = null;
 
@@ -33,6 +35,7 @@ export class TaskSelection {
 	attach(card: PickedCard): void {
 		this.drawn.set(card.card, card);
 		const id = keyId(card.item.key);
+		this.latest.set(id, card);
 		const picked = this.picked.has(id);
 		if (picked) this.picked.set(id, card);
 		if (this.anchor && keyId(this.anchor.item.key) === id) this.anchor = card;
@@ -59,8 +62,9 @@ export class TaskSelection {
 	}
 
 	/** ⌘-click: in or out. */
-	toggle(card: PickedCard): void {
-		const id = keyId(card.item.key);
+	toggle(clicked: PickedCard): void {
+		const id = keyId(clicked.item.key);
+		const card = this.current(clicked);
 		if (this.picked.has(id)) {
 			this.picked.delete(id);
 			this.anchor = null;
@@ -72,13 +76,19 @@ export class TaskSelection {
 	}
 
 	/** Shift-click: every card of `column` from the last picked one to this one joins; without one in that list, only this one. */
-	extend(card: PickedCard, column: readonly PickedCard[]): void {
+	extend(clicked: PickedCard, column: readonly PickedCard[]): void {
+		const card = this.current(clicked);
 		const from = this.anchor && this.anchor.card.isConnected ? column.findIndex((c) => c.card === this.anchor!.card) : -1;
 		const to = column.findIndex((c) => c.card === card.card);
 		if (from < 0 || to < 0) return this.toggle(card);
 		for (const c of column.slice(Math.min(from, to), Math.max(from, to) + 1)) this.picked.set(keyId(c.item.key), c);
 		this.anchor = card;
 		this.show();
+	}
+
+	private current(card: PickedCard): PickedCard {
+		const latest = this.latest.get(keyId(card.item.key));
+		return latest && latest.card.isConnected ? latest : card;
 	}
 
 	clear(): void {

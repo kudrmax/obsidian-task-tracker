@@ -3,6 +3,8 @@ import type { DropTarget } from "../drag/DropTarget";
 import { el } from "../dom";
 import { icon, type IconName } from "../icons";
 
+const CANCELLING = "tc-cancelling";
+
 /**
  * The plus's own place while the plus is carried: a dashed ring that lights up when the card comes back to it. Let go
  * there, the drop is a cancel: nothing is created and the card flies back to where the plus was. While several picked
@@ -35,8 +37,10 @@ export class PlusRing implements DropTarget {
 		return distance < rect.width / 2 + LAYOUT.plusRingReach;
 	}
 
+	/** Over the cross the carried stack turns see-through: the ring it would cover shows lit under it. */
 	preview(): void {
 		this.ring?.classList.add("is-hot");
+		if (this.mark === "cancel") this.parent.ownerDocument.body.classList.add(CANCELLING);
 	}
 
 	landing(): DOMRect | null {
@@ -49,6 +53,7 @@ export class PlusRing implements DropTarget {
 
 	clear(): void {
 		this.ring?.classList.remove("is-hot");
+		this.parent.ownerDocument.body.classList.remove(CANCELLING);
 	}
 
 	drop(): null {
