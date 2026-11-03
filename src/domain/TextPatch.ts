@@ -133,8 +133,8 @@ function changedBlocks(before: readonly string[], after: readonly string[]): (re
 	return blocks;
 }
 
-/** Up to this many cells the table of common runs is kept: about 8 MB, and the blocks found are the ones it always found. */
-const TABLE_CELLS = 4_000_000;
+/** Up to this many cells (about 2 MB) the table of common runs is kept: the blocks found are the ones it always found. */
+const TABLE_CELLS = 1_000_000;
 
 /** The pairs of lines `b` and `a` share, as [index in b, index in a] in order. */
 function sharedLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
