@@ -95,7 +95,7 @@ describe("DragController.beginNew", () => {
 		expect(document.querySelector(".tc-float-plus")).toBeNull();
 	});
 
-	it("says where the card landed once it has landed on a target", async () => {
+	it("says where the task goes on a target, and the plus is gone once it has shrunk", async () => {
 		const { controller, source, arbiter } = setup();
 		const onDrop = vi.fn();
 		const result: DropResult = { kind: "listBefore", before: null, column: "soon" };
@@ -105,8 +105,22 @@ describe("DragController.beginNew", () => {
 		pointer("pointerup", 150, 300);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(result));
 		expect(target.cleared).toBeGreaterThan(0);
-		expect(document.querySelector(".tc-float-plus")).toBeNull();
+		await vi.waitFor(() => expect(document.querySelector(".tc-float-plus")).toBeNull());
 		expect(arbiter.busy).toBe(false);
+	});
+
+	it("says where the task goes as the finger lifts, the screen free and the line gone, while the plus still shrinks", () => {
+		const { controller, source, arbiter } = setup();
+		const onDrop = vi.fn();
+		const result: DropResult = { kind: "listBefore", before: null, column: "soon" };
+		const target = new StubTarget(result);
+		controller.beginNew(source, down(20, 610), [target], onDrop);
+		pointer("pointermove", 150, 300);
+		pointer("pointerup", 150, 300);
+		expect(onDrop).toHaveBeenCalledWith(result);
+		expect(arbiter.busy).toBe(false);
+		expect(target.cleared).toBeGreaterThan(0);
+		expect(document.querySelector(".tc-float-plus")).not.toBeNull();
 	});
 
 	it("shows the target under the finger from the lift, before any move", () => {

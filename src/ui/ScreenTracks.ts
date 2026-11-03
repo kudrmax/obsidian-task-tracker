@@ -41,30 +41,43 @@ export class EdgeTrack implements ScreenTrack {
 }
 
 /**
- * One part of the screen a day slides through: what it shows goes out one side as the next day's comes in from the
- * other, within its own column. A header that no column holds fades as it goes.
+ * One column a day slides through: what shows the day goes out one side as the next day's comes in from the other, each
+ * seen only in its own place in the column. What the column draws for every day, its hours and lines, stands still.
  */
 export interface DayLane {
-	readonly shown: readonly HTMLElement[];
-	readonly next: readonly HTMLElement[];
+	/** Read again on every frame: a part drawn anew while the finger moves moves too. */
+	readonly shown: () => readonly HTMLElement[];
+	readonly next: () => readonly HTMLElement[];
 	readonly width: number;
-	readonly fades?: boolean;
+}
+
+/** A part `dx` px from its place, seen only within its place: it slides in and out of it as through a window. */
+function slide(part: HTMLElement, dx: number): void {
+	if (dx === 0) return still(part);
+	part.style.transform = `translate3d(${dx}px, 0, 0)`;
+	part.style.clipPath = `inset(0 ${Math.max(0, dx)}px 0 ${Math.max(0, -dx)}px)`;
+}
+
+function still(part: HTMLElement): void {
+	part.style.transform = "";
+	part.style.clipPath = "";
 }
 
 /**
- * Another day: the list stays the list and the timeline the timeline, the divider standing still between them; in each
- * column the day slides out and the next comes in, the `lead` column under the finger. Arrived, what the screen showed
- * stays out of sight until the screen has drawn the day itself.
+ * Another day: the header, the hours and the divider stand still; in each column the day slides out and the next comes
+ * in, the `lead` column under the finger. The header names whichever day stands nearer. Arrived, what the screen
+ * showed stays out of sight until the screen has drawn the day itself.
  */
 export class DayTrack implements ScreenTrack {
 	readonly distance: number;
+	private nearer = false;
 
 	constructor(
 		private readonly lanes: readonly DayLane[],
 		lead: DayLane,
 		private readonly peek: DayPeek,
 		private readonly shift: Shift,
-		private readonly onArrive: (peek: DayPeek, shown: readonly HTMLElement[]) => void,
+		private readonly events: { onNearer(nearer: boolean): void; onArrive(peek: DayPeek, shown: readonly HTMLElement[]): void },
 	) {
 		this.distance = lead.width;
 		this.at(0);
@@ -74,28 +87,27 @@ export class DayTrack implements ScreenTrack {
 		const share = this.distance > 0 ? dx / this.distance : 0;
 		for (const lane of this.lanes) {
 			const offset = share * lane.width;
-			shiftParts(lane.shown, offset);
-			shiftParts(lane.next, this.shift * lane.width + offset);
-			if (!lane.fades) continue;
-			for (const part of lane.shown) part.style.opacity = share === 0 ? "" : String(1 - Math.abs(share));
-			for (const part of lane.next) part.style.opacity = String(Math.abs(share));
+			for (const part of lane.shown()) slide(part, offset);
+			for (const part of lane.next()) slide(part, this.shift * lane.width + offset);
 		}
+		const nearer = Math.abs(share) * 2 >= 1;
+		if (nearer === this.nearer) return;
+		this.nearer = nearer;
+		this.events.onNearer(nearer);
 	}
 
 	land(arrived: boolean): void {
-		const shown = this.lanes.flatMap((lane) => lane.shown);
-		if (arrived) return this.onArrive(this.peek, shown);
+		const shown = this.lanes.flatMap((lane) => lane.shown());
+		if (arrived) return this.events.onArrive(this.peek, shown);
 		restore(shown);
 		this.peek.remove();
+		if (this.nearer) this.events.onNearer(false);
 	}
 }
 
 /** What a swipe moved stands where it stood, as drawn. */
 export function restore(parts: readonly HTMLElement[]): void {
-	for (const part of parts) {
-		part.style.transform = "";
-		part.style.opacity = "";
-	}
+	for (const part of parts) still(part);
 }
 
 export interface StripTrackDeps {

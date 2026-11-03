@@ -40,6 +40,7 @@ import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
+import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -148,6 +149,8 @@ export class TaskCalendarView extends ItemView {
 	private shownMode: RightMode | null = null;
 	/** The day a swipe brought in, drawn over the screen until the screen has drawn it itself. */
 	private landing: { readonly peek: DayPeek; readonly parts: readonly HTMLElement[] } | null = null;
+	/** The day a swipe has drawn nearer than the selected one: the header names it. */
+	private titleDay: LocalDate | null = null;
 	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
 	private quick: QuickEntryController | null = null;
 	private readonly unsubscribe: (() => void)[] = [];
@@ -238,7 +241,7 @@ export class TaskCalendarView extends ItemView {
 		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
-			title: () => dayTitle(this.selectedDate, this.today()),
+			title: () => dayTitle(this.titleDay ?? this.selectedDate, this.today()),
 			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
@@ -385,6 +388,7 @@ export class TaskCalendarView extends ItemView {
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
+		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
 		this.unsubscribe.push(() => undo.destroy());
@@ -460,6 +464,21 @@ export class TaskCalendarView extends ItemView {
 		this.polling.stop();
 		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
+	}
+
+	/** Temporary: how quick entry opens and closes on the phone, frame by frame, in «Task Calendar entry log.md». */
+	private traceEntry(root: HTMLElement): void {
+		const path = "Task Calendar entry log.md";
+		const adapter = this.app.vault.adapter;
+		const trace = new EntryTrace(root.ownerDocument, {
+			write: (text) =>
+				void adapter
+					.exists(path)
+					.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
+					.catch((error) => console.error(error)),
+		});
+		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
+		this.unsubscribe.push(() => trace.destroy());
 	}
 
 	override onResize(): void {
@@ -555,6 +574,7 @@ export class TaskCalendarView extends ItemView {
 				onArrive: (mode) => this.arriveAt(mode),
 			});
 		}
+		this.timeline?.stopHolding();
 		const peek = new DayPeek(root, to.date, {
 			tasks: this.deps.tasks,
 			calendars: this.deps.calendars,
@@ -565,17 +585,33 @@ export class TaskCalendarView extends ItemView {
 			now: () => this.deps.clock.now(),
 			grouped: (date) => dayColumn(date, this.today()).sections,
 			ungroupedName: () => this.settings.groups.ungrouped,
-			scrollTimeline: (timeline, date) => this.scrollToOpen(timeline, date),
 			listScroll: () => this.list?.el.scrollTop ?? 0,
+			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
+			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 		});
-		const inside = (column: Element | null): HTMLElement[] => (column ? [...column.children].filter((part) => part instanceof HTMLElement) : []);
-		const nav = root.querySelector<HTMLElement>(":scope > .tc-day-nav");
-		const list: DayLane = { shown: inside(this.leftEl), next: inside(peek.left), width: this.leftEl?.offsetWidth ?? 0 };
-		const timeline: DayLane = { shown: inside(this.rightEl), next: inside(peek.right), width: this.rightEl?.offsetWidth ?? root.clientWidth };
-		const header: DayLane = { shown: nav ? [nav] : [], next: peek.nav ? [peek.nav] : [], width: list.width, fades: true };
-		return new DayTrack([list, timeline, header], timeline, peek, shift, (arrived, shown) => {
-			this.landing = { peek: arrived, parts: shown };
-			void this.afterEntry(() => this.select(arrived.date));
+		const list: DayLane = {
+			shown: () => (this.leftEl ? [...this.leftEl.children].filter((part) => part instanceof HTMLElement) : []),
+			next: () => peek.listParts(),
+			width: this.leftEl?.offsetWidth ?? 0,
+		};
+		const timeline: DayLane = {
+			shown: () => [...(this.timeline?.dayLayers() ?? []), ...(this.allDayEl?.querySelectorAll<HTMLElement>(".tc-allday") ?? [])],
+			next: () => peek.timelineParts(),
+			width: this.rightEl?.offsetWidth ?? root.clientWidth,
+		};
+		return new DayTrack([list, timeline], timeline, peek, shift, {
+			onNearer: (nearer) => {
+				this.titleDay = nearer ? to.date : null;
+				this.headers?.render();
+			},
+			onArrive: (arrived, shown) => {
+				this.landing = { peek: arrived, parts: shown };
+				this.scrolledFor = arrived.date;
+				void this.afterEntry(() => {
+					this.titleDay = null;
+					this.select(arrived.date);
+				});
+			},
 		});
 	}
 
@@ -964,14 +1000,25 @@ export class TaskCalendarView extends ItemView {
 			this.backlogTitle.textContent = this.settings.sections.backlog;
 			this.backlogList.render();
 		}
+		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
+		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
 			this.scrollToOpen(this.timeline, this.selectedDate);
 		}
 		if (this.landing?.peek.date === this.selectedDate && (this.data.missing || this.data.day?.date === this.selectedDate)) this.landed();
 		this.quick?.rendered();
+	}
+
+	/**
+	 * The day a swipe brought in may end sooner, or have more or fewer rows of all-day events, than the one it replaced:
+	 * the timeline keeps its scroll, moved by as much as the rows push it, so the hours stay where they stood.
+	 */
+	private keepHoursAt(at: { readonly top: number; readonly scroll: number }): void {
+		if (!this.timeline) return;
+		this.timeline.holdScroll(at.scroll + this.timeline.el.getBoundingClientRect().top - at.top);
 	}
 
 	/** Today opens on the now line, another day at the hour the settings name. */

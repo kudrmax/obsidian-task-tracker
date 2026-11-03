@@ -94,6 +94,8 @@ interface DropShown {
 }
 
 const MINUTES_PER_HOUR = 60;
+/** What ends the hold on the minute a timeline was put on: a finger anywhere on the page. */
+const TOUCHES = ["pointerdown", "touchstart"] as const;
 
 function isOpen(item: TaskItem): boolean {
 	return item.status === "todo" || item.status === "inProgress";
@@ -127,6 +129,8 @@ export class Timeline {
 	private anchor: Anchor | null = null;
 	private readonly grips: HTMLElement;
 	private readonly sizeWatch: ResizeObserver;
+	/** A finger on the screen, anywhere: the anchor goes, and the keyboard it may bring shrinks the view under a still timeline. */
+	private readonly touched = () => (this.anchor = null);
 
 	constructor(
 		readonly el: HTMLElement,
@@ -144,7 +148,8 @@ export class Timeline {
 			this.holdAnchor();
 		});
 		this.sizeWatch.observe(el);
-		for (const type of ["pointerdown", "wheel", "touchstart"] as const) el.addEventListener(type, () => (this.anchor = null), { passive: true });
+		el.addEventListener("wheel", this.touched, { passive: true });
+		for (const type of TOUCHES) el.ownerDocument.addEventListener(type, this.touched, { capture: true, passive: true });
 		for (const edge of ["start", "end"] as const) {
 			make(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
 				const task = this.tasks.find((t) => t.el.classList.contains("is-selected"));
@@ -159,6 +164,7 @@ export class Timeline {
 	/** The view closes: the timeline stops watching its size. */
 	destroy(): void {
 		this.sizeWatch.disconnect();
+		for (const type of TOUCHES) this.el.ownerDocument.removeEventListener(type, this.touched, { capture: true });
 	}
 
 	get hourPx(): number {
@@ -230,11 +236,35 @@ export class Timeline {
 
 	/**
 	 * Puts the minute at `fraction` of the visible height and keeps it there while the timeline settles its height (a view
-	 * opened before Obsidian has laid it out, the all-day rows coming in), until the user scrolls it.
+	 * opened before Obsidian has laid it out, the all-day rows coming in), until the user touches the screen or scrolls it.
 	 */
 	scrollTo(minutes: number, fraction: number): void {
 		this.anchor = { minutes, fraction };
 		this.holdAnchor();
+	}
+
+	/** A gesture took the screen: the timeline stays where it stands, no longer holding a minute in its place. */
+	stopHolding(): void {
+		this.anchor = null;
+	}
+
+	/**
+	 * Stands as `other` stands: the same room around the hours and the same scroll, so every minute shows at the same
+	 * height in both, as the next day must beside the day it replaces.
+	 */
+	alignWith(other: Timeline): void {
+		this.anchor = null;
+		this.setRoom(other.room?.top ?? 0, other.room?.bottom ?? 0);
+		this.holdScroll(other.el.scrollTop);
+	}
+
+	/** Scrolled to `top` even when its day ends sooner than the one before: it takes the room under the hours it lacks. */
+	holdScroll(top: number): void {
+		this.el.scrollTop = top;
+		const lack = top - this.el.scrollTop;
+		if (lack <= 0) return;
+		this.setRoom(this.room?.top ?? 0, (this.room?.bottom ?? 0) + lack);
+		this.el.scrollTop = top;
 	}
 
 	private holdAnchor(): void {
@@ -281,6 +311,11 @@ export class Timeline {
 			make(this.nowEl, "div", "tc-now-line");
 		}
 		this.layout();
+	}
+
+	/** What shows the day itself rather than its hours: the cards and events, and the now line on today. */
+	dayLayers(): HTMLElement[] {
+		return this.nowEl ? [this.itemsEl, this.nowEl] : [this.itemsEl];
 	}
 
 	/** A minute passed: the now line, its time, and the tasks it carries move; nothing is drawn anew. */

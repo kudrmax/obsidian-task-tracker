@@ -359,6 +359,49 @@ describe("the timeline's size", () => {
 			globalThis.ResizeObserver = real;
 		}
 	});
+
+	/** A timeline put on noon at 40 % of its height, its height as the test says, and the resizes it hears. */
+	function anchored() {
+		const real = globalThis.ResizeObserver;
+		let resized = () => {};
+		globalThis.ResizeObserver = class {
+			constructor(run: () => void) {
+				resized = run;
+			}
+			observe(): void {}
+			unobserve(): void {}
+			disconnect(): void {}
+		} as unknown as typeof ResizeObserver;
+		const view = timeline({ hourPx: 56 });
+		globalThis.ResizeObserver = real;
+		document.body.appendChild(view.el);
+		view.el.style.paddingBottom = "0px";
+		let height = 600;
+		Object.defineProperty(view.el, "clientHeight", { configurable: true, get: () => height });
+		Object.defineProperty(view.canvas, "offsetHeight", { configurable: true, get: () => 24 * 56 });
+		view.scrollTo(12 * 60, 0.4);
+		expect(view.el.scrollTop).toBeGreaterThan(0);
+		return { view, resize: (to: number) => ((height = to), resized()) };
+	}
+
+	it("keeps the minute it was put on in place while it settles its height", () => {
+		const { view, resize } = anchored();
+		const before = view.el.scrollTop;
+		resize(300);
+		expect(view.el.scrollTop).toBe(before + 0.4 * 300);
+		view.destroy();
+		view.el.remove();
+	});
+
+	it("stands still as the keyboard shrinks the view once a finger touched the screen anywhere", () => {
+		const { view, resize } = anchored();
+		const before = view.el.scrollTop;
+		document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+		resize(300);
+		expect(view.el.scrollTop).toBe(before);
+		view.destroy();
+		view.el.remove();
+	});
 });
 
 describe("measuring once (block 3)", () => {
@@ -464,5 +507,27 @@ describe("a stretched block while its new time is written (block 3)", () => {
 		view.endStretch(tasks[0].key);
 		expect(block(view).classList.contains("is-resizing")).toBe(false);
 		expect(length(block(view))).toBe(unstretched);
+	});
+});
+
+describe("a timeline beside another day's", () => {
+	it("stands as the other stands: the same room around the hours and the same scroll", () => {
+		const shown = timeline({ hourPx: 60 });
+		const next = timeline({ hourPx: 60 });
+		(shown as unknown as { setRoom(top: number, bottom: number): void }).setRoom(120, 40);
+		Object.defineProperty(shown.el, "scrollTop", { value: 300, writable: true });
+		next.alignWith(shown);
+		expect(next.canvas.style.getPropertyValue("--tc-room-top")).toBe("120px");
+		expect(next.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("40px");
+		expect(next.el.scrollTop).toBe(300);
+	});
+
+	it("keeps its scroll when its day ends sooner, taking the room under the hours it lacks", () => {
+		const view = timeline({ hourPx: 60 });
+		let top = 0;
+		Object.defineProperty(view.el, "scrollTop", { get: () => top, set: (value: number) => (top = Math.min(value, view.canvas.style.getPropertyValue("--tc-room-bottom") === "50px" ? 400 : 350)) });
+		view.holdScroll(400);
+		expect(view.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("50px");
+		expect(view.el.scrollTop).toBe(400);
 	});
 });
