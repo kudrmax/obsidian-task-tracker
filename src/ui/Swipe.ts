@@ -2,7 +2,6 @@ import { LAYOUT } from "./design";
 import { capturePointer, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
-import { named, swipeTrace } from "./swipeTrace";
 import type { Shift } from "./screens";
 
 /** What a swipe draws: the screen, beside the next one either way. */
@@ -162,12 +161,7 @@ export class Swipe {
 		this.settle(shift);
 	}
 
-	private holder(): string {
-		return (this.opts.arbiter as unknown as { holder: string | null }).holder ?? "-";
-	}
-
 	private down(e: PointerEvent): void {
-		swipeTrace.log(`down ${e.pointerType} id=${e.pointerId} primary=${e.isPrimary} x=${Math.round(e.clientX)} y=${Math.round(e.clientY)} on=${named(e.target)} holder=${this.holder()} holds=${this.holds} accepts=${this.opts.accepts(e.target)}`);
 		if (e.pointerType === "mouse") return;
 		if (!e.isPrimary) {
 			if (this.press && !this.press.swiping) this.press = null;
@@ -182,32 +176,22 @@ export class Swipe {
 		if (!press || e.pointerId !== press.pointerId) return;
 		press.speed.update(e.clientX, e.timeStamp);
 		if (press.swiping) {
-			const dx = this.within(e.clientX - press.from);
-			swipeTrace.log(`follow x=${Math.round(e.clientX)} dx=${Math.round(dx)}`);
-			this.opts.target.follow(dx);
+			this.opts.target.follow(this.within(e.clientX - press.from));
 			return;
 		}
 		const dx = Math.abs(e.clientX - press.x);
 		const dy = Math.abs(e.clientY - press.y);
 		if (Math.hypot(dx, dy) <= LAYOUT.pressTolerance) return;
-		if (dx <= dy) {
-			swipeTrace.log(`drop: up or down dx=${Math.round(dx)} dy=${Math.round(dy)}`);
+		if (dx <= dy || !this.hold()) {
 			this.press = null;
 			return;
 		}
-		if (!this.hold()) {
-			swipeTrace.log(`drop: screen held by ${this.holder()}`);
-			this.press = null;
-			return;
-		}
-		swipeTrace.log(`claim x=${Math.round(e.clientX)} dx=${Math.round(e.clientX - press.x)} dy=${Math.round(e.clientY - press.y)}`);
 		press.swiping = true;
 		press.from = e.clientX;
 		capturePointer(this.el, press.pointerId);
 	}
 
 	private up(e: PointerEvent, released: boolean): void {
-		swipeTrace.log(`${released ? "up" : "cancel"} id=${e.pointerId} x=${Math.round(e.clientX)} press=${this.press ? (this.press.swiping ? "swiping" : "waiting") : "none"}`);
 		const press = this.press;
 		if (!press || e.pointerId !== press.pointerId) return;
 		this.press = null;
@@ -218,9 +202,7 @@ export class Swipe {
 		this.opts.target.follow(dx);
 		const velocity = press.speed.velocity;
 		const fling: Shift | 0 = Math.abs(velocity) < LAYOUT.swipeFlickSpeed ? 0 : velocity < 0 ? 1 : -1;
-		const landing = released ? this.landing(dx, fling) : null;
-		swipeTrace.log(`let go dx=${Math.round(dx)} velocity=${velocity.toFixed(2)} fling=${fling} lands=${landing}`);
-		this.settle(landing);
+		this.settle(released ? this.landing(dx, fling) : null);
 	}
 
 	/** Where the screen stands once let go: the next screen when it is the nearer one, or when a flick sends it there. */
@@ -233,8 +215,9 @@ export class Swipe {
 		return Math.abs(dx) * 2 >= distance ? shift : null;
 	}
 
-	/** The screen goes no further than the next one. */
+	/** The screen goes no further than the next one; a finger that has gone neither way yet asks for no screen. */
 	private within(dx: number): number {
+		if (dx === 0) return 0;
 		const distance = this.opts.target.distance(dx < 0 ? 1 : -1);
 		return distance === null ? dx : Math.sign(dx) * Math.min(Math.abs(dx), distance);
 	}
@@ -263,7 +246,6 @@ export class Swipe {
 	 */
 	private interrupt(): void {
 		if (this.holds === 0 || this.press?.swiping || this.stream?.following) return;
-		swipeTrace.log(`interrupt: stands the settling screen`);
 		this.opts.target.stand();
 		this.round++;
 		this.holds = 0;
