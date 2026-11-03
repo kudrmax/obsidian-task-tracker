@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
+import { TaskDocument } from "../../src/domain/TaskDocument";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
@@ -627,5 +628,101 @@ describe("applyAll", () => {
 		store.text = "## Now\n- [ ] A\n- [ ] Changed\n";
 		await expect(svc.applyAll([a, b].map((item) => ({ key: item.key, change: { kind: "remove" } as const })))).rejects.toBeInstanceOf(StaleTaskError);
 		expect(store.text).toBe("## Now\n- [ ] A\n- [ ] Changed\n");
+	});
+});
+
+describe("one parse per version of the file", () => {
+	const TEXT = "## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n- [/] B 📅 2026-10-30\n\n## Soon\n- [ ] C\n- [ ] D 📅 2026-11-03\n\n## Backlog\n\n## Done\n- [x] Old\n";
+
+	afterEach(() => vi.restoreAllMocks());
+
+	function views(svc: TaskServiceImpl) {
+		return Promise.all([svc.dayView(T), svc.soonWithoutDateView(), svc.inboxView()]);
+	}
+
+	async function reload(svc: TaskServiceImpl) {
+		await svc.normalize();
+		return views(svc);
+	}
+
+	it("parses the file once for a reload of the tasks and not at all for the next one", async () => {
+		const { store, svc } = setup(TEXT);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		await reload(svc);
+		expect(parse).toHaveBeenCalledTimes(1);
+		await reload(svc);
+		expect(parse).toHaveBeenCalledTimes(1);
+		expect(store.reads).toBe(8);
+	});
+
+	for (const [name, text] of [
+		["\\n", TEXT],
+		["\\r\\n", TEXT.replace(/\n/g, "\r\n")],
+		["no last line end", TEXT.slice(0, -1)],
+		["\\r\\n and no last line end", TEXT.replace(/\n/g, "\r\n").slice(0, -2)],
+	] as const) {
+		it(`reads its own write without parsing it again (${name})`, async () => {
+			const { store, svc } = setup(text);
+			const [day] = await reload(svc);
+			const parse = vi.spyOn(TaskDocument, "parse");
+			await svc.setStatus(day.list.find((i) => i.text === "A")!.key, "done");
+			const after = parse.mock.calls.length;
+			const seen = await reload(svc);
+			expect(parse).toHaveBeenCalledTimes(after);
+			expect(seen).toEqual(await reload(new TaskServiceImpl(new InMemoryTaskFileStore(store.text), new FakeSettingsStore(), clock)));
+		});
+	}
+
+	it("parses again by new settings", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(TEXT.replace("- [ ] C", "- [ ] C @due 2026-11-03"), settings);
+		await reload(svc);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		await settings.update({ dueDateMarker: "@due" });
+		const [, soon] = await reload(svc);
+		expect(parse).toHaveBeenCalledTimes(1);
+		expect(soon.map((i) => i.text)).toEqual(["D 📅 2026-11-03"]);
+		expect((await svc.dayView(D)).list.map((i) => i.text)).toEqual(["C"]);
+	});
+
+	it("keeps the parse over settings the file is not read by", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(TEXT, settings);
+		await reload(svc);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		await settings.update({ zoom: 80, listShare: 0.4, rightMode: "calendar", cardHeight: 40 });
+		await reload(svc);
+		expect(parse).not.toHaveBeenCalled();
+	});
+
+	it("parses again when the day changes", async () => {
+		let now = new Date(2026, 9, 30, 14, 20);
+		const store = new InMemoryTaskFileStore(TEXT.replace("- [ ] C", "- [ ] C 📅 2026-10-31"));
+		const svc = new TaskServiceImpl(store, new FakeSettingsStore(), { now: () => now });
+		expect((await svc.dayView("2026-10-31")).list.map((i) => i.text)).toContain("C");
+		expect((await svc.soonWithoutDateView()).map((i) => i.text)).toEqual([]);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		now = new Date(2026, 10, 1, 14, 20);
+		const today = await svc.dayView("2026-11-01");
+		expect(parse).toHaveBeenCalledTimes(1);
+		expect(today.list.map((i) => i.text)).toEqual(expect.arrayContaining(["B", "C"]));
+		expect(today.list.find((i) => i.text === "C")!.dueDate).toBe("2026-11-01");
+	});
+
+	it("writes nothing on normalize when only the sections are missing, as before", async () => {
+		const { store, svc } = setup("## Now\n- [x] Closed\n- [ ] A\n");
+		await reload(svc);
+		expect(store.writes).toBe(0);
+		expect((await svc.dayView(T)).list.map((i) => i.text)).toEqual(["A"]);
+	});
+
+	it("parses again after an edit made elsewhere", async () => {
+		const { store, svc } = setup(TEXT);
+		await reload(svc);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		store.text = TEXT.replace("- [ ] I\n", "- [ ] I\n- [ ] J\n");
+		const [, , inbox] = await reload(svc);
+		expect(parse).toHaveBeenCalledTimes(1);
+		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
 	});
 });

@@ -77,11 +77,24 @@ class FieldSlicer {
 	}
 }
 
+const slicers = new Map<string, FieldSlicer>();
+
+/** The slicer for these markers, compiled once per pair of markers. */
+export function fieldSlicerFor(markers: Markers): FieldSlicer {
+	const key = `${markers.slot}\u0000${markers.dueDate}`;
+	let slicer = slicers.get(key);
+	if (!slicer) {
+		slicer = new FieldSlicer(markers);
+		slicers.set(key, slicer);
+	}
+	return slicer;
+}
+
 export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
 	const m = LINE_RE.exec(line);
 	if (!m) return null;
 	const statusChar = m[3];
-	const fields = new FieldSlicer(markers).slice(m[4]);
+	const fields = fieldSlicerFor(markers).slice(m[4]);
 	return {
 		indent: m[1],
 		bullet: m[2],
