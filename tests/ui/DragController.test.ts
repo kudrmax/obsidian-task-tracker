@@ -153,4 +153,21 @@ describe("DragController: a long tap on the timeline's free room", () => {
 		pointer("pointerup", 50, 300);
 		expect(opened).toEqual([{ slot, cleared: 1 }]);
 	});
+
+	it("lets the target go when its finger's lift never arrives: the next finger down frees the screen", () => {
+		vi.useFakeTimers();
+		const target = { previewNew: vi.fn(), clear: vi.fn(), slot: { date: "2026-11-01", start: 600, end: null } };
+		const arbiter = new GestureArbiter();
+		const onNewSlot = vi.fn();
+		const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter, timeline: () => null, newSlot: () => target, onNewSlot } as unknown as DragControllerDeps;
+		const canvas = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).attachCanvas(canvas);
+		canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerId: 1, clientX: 50, clientY: 300, isPrimary: true, button: 0, pointerType: "touch" }));
+		vi.advanceTimersByTime(300);
+		expect(arbiter.busy).toBe(true);
+		document.body.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 2, clientX: 80, clientY: 400, isPrimary: true, button: 0, pointerType: "touch" }));
+		expect(arbiter.busy).toBe(false);
+		expect(target.clear).toHaveBeenCalledTimes(1);
+		expect(onNewSlot).not.toHaveBeenCalled();
+	});
 });
