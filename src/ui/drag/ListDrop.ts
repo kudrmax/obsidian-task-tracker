@@ -25,8 +25,8 @@ interface Layout {
 /**
  * A list as a place to drop. No card moves while a drag goes on: a card lifted from the list waits as a dashed place where
  * it stood, and the calendar's drop line between two cards shows the gap and the level, as it does for a new task carried
- * on the plus. A card carried along takes the level its left edge picks, and over the middle of another card goes into
- * it, that card lit; a new task takes its level from the list's middle, goes only between cards, and each new place ticks
+ * on the plus. A card carried along takes the gap its top edge picks and the level its left edge picks, so the line stays in
+ * sight over it; over another card's lower part it goes into that card, lit; a new task takes its level from the list's middle, goes only between cards, and each new place ticks
  * under the finger. A list that shows sections takes a card from anywhere this way, into the section of the gap; another
  * list takes a card from elsewhere at its end.
  */
@@ -72,7 +72,7 @@ export class ListDrop implements DropTarget {
 		const before = this.place;
 		const place = !this.placesAnywhere(drag)
 			? { kind: "gap" as const, index: layout.cards.length, level: 0, group: null }
-			: placeAt(this.placed(), y, fresh ? this.newTaskLevel(x) : this.cardLevel(x, drag), 0, null, this.sections() ? layout.heads : [], this.place, LAYOUT.dropHysteresis, !fresh);
+			: placeAt(this.placed(), fresh ? y : this.cardY(y, drag), fresh ? this.newTaskLevel(x) : this.cardLevel(x, drag), 0, null, this.sections() ? layout.heads : [], this.place ?? this.liftedFrom(), LAYOUT.dropHysteresis, !fresh);
 		this.place = place;
 		if (fresh && (before?.kind !== "gap" || place.kind !== "gap" || !samePlace(before, place) || before.level !== place.level)) this.onNewPlace();
 		layout.cards.forEach(({ entry }, i) => entry.card.classList.toggle(TARGET, place.kind === "into" && i === place.index));
@@ -209,6 +209,15 @@ export class ListDrop implements DropTarget {
 		if (at < 0) return null;
 		const before = all.slice(0, at).filter((entry) => !entry.card.classList.contains(LIFTED)).length;
 		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
+	}
+
+	/**
+	 * A card carried along: the gap is picked by its top edge, so the line stands in the nearest gap above the card, never
+	 * under it. Read as a finger half a card above that edge, the card goes into another one when its top edge is over
+	 * that card's lower part, the lit card in sight above it.
+	 */
+	private cardY(y: number, drag: DragPayload): number {
+		return y - drag.grabPx - shownCardSize().height / 2;
 	}
 
 	/** A card carried along: the level its left edge stands at. */
