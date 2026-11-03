@@ -235,7 +235,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"), () => this.haptics.tap());
 		this.inboxEl = el(root, "div", "tc-inbox");
 		this.inboxList = new TaskList(el(this.inboxEl, "div"), {
 			items: () => this.unnamed(this.data.inbox),
@@ -248,7 +248,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon" || drag.from === "new", () => this.sectionsOf("inbox"));
+		this.inboxDrop = new ListDrop(this.inboxList, this.inboxEl, "inbox", (drag) => drag.from === "inbox" || drag.from === "soon" || drag.from === "new", () => this.sectionsOf("inbox"), () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
@@ -261,7 +261,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"), () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {

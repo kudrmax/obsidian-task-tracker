@@ -5,6 +5,7 @@ import type { ListEntry, TaskList } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropGap } from "./DropGap";
+import { DropLine } from "./DropLine";
 import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
@@ -28,7 +29,8 @@ interface Layout {
 
 /**
  * A list as a place to drop. The cards step aside at the finger, and a dashed place shows the level the card's left edge
- * picks; over the middle of a card the card goes into it. A list that shows sections takes a card from anywhere this way,
+ * picks; over the middle of a card the card goes into it. A new task carried on the plus goes only between cards: the
+ * cards stay, a line shows the gap and the level, and each new place ticks under the finger. A list that shows sections takes a card from anywhere this way,
  * into the section of the gap; another list takes a card from elsewhere at its end.
  *
  * The cards never leave their places in the layout during a drag: the lifted ones only hide, and every card is drawn
@@ -43,6 +45,7 @@ export class ListDrop implements DropTarget {
 	private layout: Layout | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly gap: DropGap;
+	private readonly line: DropLine;
 	private readonly scroll: AutoScroll;
 	/** Several cards are carried: away from the list each waits as a dashed place where it stood. */
 	private many = false;
@@ -54,8 +57,11 @@ export class ListDrop implements DropTarget {
 		private readonly accepts: (drag: DragPayload) => boolean,
 		/** Whose sections the column shows; null for a past day's column. */
 		private readonly sections: () => ColumnSections | null = () => null,
+		/** A new task's place moved to another gap or level. */
+		private readonly onNewPlace: () => void = () => undefined,
 	) {
 		this.gap = new DropGap(() => this.list.el);
+		this.line = new DropLine(() => this.list.el);
 		this.scroll = new AutoScroll(
 			() => this.list.el,
 			() => this.last && this.preview(this.last.x, this.last.y, this.last.drag),
@@ -79,9 +85,10 @@ export class ListDrop implements DropTarget {
 			this.place = { kind: "gap", index: layout.cards.length, level: 0, group: null };
 			return;
 		}
-		const card = shownCardSize();
-		const level = drag.from === "new" ? this.newTaskLevel(x) : this.cardLevel(x, drag);
 		const heads = this.sections() ? layout.heads : [];
+		if (drag.from === "new") return this.previewNew(x, y, heads);
+		const card = shownCardSize();
+		const level = this.cardLevel(x, drag);
 		const room = this.room ?? this.liftedFrom();
 		const held = this.place ?? room;
 		const place = placeAt(this.placed(), y, level, card.height + card.gap, room, heads, held, LAYOUT.dropHysteresis);
@@ -95,9 +102,21 @@ export class ListDrop implements DropTarget {
 		this.scroll.follow(y);
 	}
 
+	/** The new task's line in the gap at the finger, its level counted from the list's middle. */
+	private previewNew(x: number, y: number, heads: readonly PlacedHead[]): void {
+		const place = placeAt(this.placed(), y, this.newTaskLevel(x), 0, null, heads, this.place, LAYOUT.dropHysteresis, false) as GapPlace;
+		const before = this.place;
+		this.place = place;
+		if (before?.kind !== "gap" || !samePlace(before, place) || before.level !== place.level) this.onNewPlace();
+		const line = this.lineRect(place);
+		this.line.show(line.left, line.right, line.top);
+		this.scroll.follow(y);
+	}
+
 	landing(): DOMRect | null {
 		if (!this.layout || !this.place) return null;
 		if (this.place.kind === "into") return this.layout.cards[this.place.index].rect;
+		if (this.last?.drag.from === "new") return this.lineRect(this.place);
 		return this.gapRect(this.place);
 	}
 
@@ -109,6 +128,7 @@ export class ListDrop implements DropTarget {
 			this.gap.hide();
 			return;
 		}
+		this.line.hide();
 		this.reset(this.liftedFrom());
 		if (this.room) this.gap.show(this.gapRect(this.room), true);
 		else this.gap.hide();
@@ -120,6 +140,7 @@ export class ListDrop implements DropTarget {
 		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.reset(null);
 		this.gap.hide();
+		this.line.hide();
 		this.layout = null;
 	}
 
@@ -279,13 +300,20 @@ export class ListDrop implements DropTarget {
 	}
 
 	/**
-	 * A new task: the finger on the list's right half makes it a subtask of the card above, as deep as the neighbours
-	 * allow; on the left half it stays as shallow as they allow. The thumb of either hand reaches its half without
-	 * stretching to the list's left edge.
+	 * A new task: on the list's left half as shallow as the neighbours allow; right of the middle a level deeper for each
+	 * indent, as if the finger held the left edge of a task's card standing in the middle. So the thumb picks a task, a
+	 * subtask or one under that near the middle of the screen, never stretching to the list's left edge.
 	 */
 	private newTaskLevel(x: number): number {
 		const r = this.list.el.getBoundingClientRect();
-		return x >= r.left + r.width / 2 ? Number.POSITIVE_INFINITY : 0;
+		const indent = this.indent();
+		return indent > 0 ? (x - (r.left + r.width / 2)) / indent : 0;
+	}
+
+	/** The new task's line: through the middle of the gap, from the left edge of its level; with no height. */
+	private lineRect(place: GapPlace): DOMRect {
+		const gap = this.gapRect(place);
+		return new DOMRect(gap.left, gap.top - shownCardSize().gap / 2, gap.width, 0);
 	}
 
 	private indent(): number {

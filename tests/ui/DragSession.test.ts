@@ -39,6 +39,9 @@ class FakeFloat implements Float {
 	moveTo(x: number, y: number): void {
 		this.log.push(`move ${x},${y}`);
 	}
+	async land(to: DOMRect): Promise<void> {
+		this.log.push(`land ${to.x},${to.y}`);
+	}
 	async flyTo(to: DOMRect): Promise<void> {
 		this.log.push(`fly ${to.x},${to.y}`);
 	}
@@ -82,7 +85,7 @@ describe("DragSession", () => {
 		s.move(50, 10);
 		await s.release(50, 10);
 		expect(a.log).toEqual(["preview 50,10", "drop", "clear"]);
-		expect(float.log).toEqual(["move 50,10", "fly 0,0", "remove"]);
+		expect(float.log).toEqual(["move 50,10", "land 0,0", "remove"]);
 		expect(ended).toEqual([slot]);
 	});
 
@@ -149,7 +152,7 @@ describe("DragSession", () => {
 			const s = session([a], float, ended, fresh);
 			s.move(50, 10);
 			await s.release(50, 10);
-			expect(float.log).toEqual(["move 50,10", "fly 0,0", "remove"]);
+			expect(float.log).toEqual(["move 50,10", "land 0,0", "remove"]);
 			expect(ended).toEqual([slot]);
 		});
 

@@ -76,6 +76,9 @@ export interface DropTarget {
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
+	/** Settles where the drop puts it. */
+	land(rect: DOMRect): Promise<void>;
+	/** Flies back to where it came from. */
 	flyTo(rect: DOMRect): Promise<void>;
 	remove(): void;
 }

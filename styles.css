@@ -384,6 +384,7 @@ body {
 	--tc-now-h: 16px;
 	--tc-now-pill-w: 34px;
 	--tc-now-line: 2px;
+	--tc-drop-dot: 8px;
 
 	/* Type */
 	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
@@ -712,6 +713,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 /* Where a dragged card will land, at the level its left edge picks: inside the list, so it scrolls with the cards; it eases along as they step aside. */
 .tc-drop-gap { position: absolute; left: 0; top: 0; height: var(--tc-card-h); box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-collapse) var(--tc-ease-out), width var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-drop-gap.is-shown { opacity: 1; }
+.tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); display: flex; align-items: center; z-index: var(--tc-layer-drop-gap); pointer-events: none; transition: transform var(--tc-duration-snap) var(--tc-ease-out), width var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-list-drop-dot { width: var(--tc-drop-dot); height: var(--tc-drop-dot); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-accent); }
 /* The dot of a task in progress, level with the first line of the title; on a card with a priority it takes the level's meta tint, like the date and the time. */
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
 [data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot { background: var(--tc-priority-meta); }
@@ -816,8 +819,9 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* Dragging: the drop target on the timeline, snapped to the grid with its start time; the card under the finger. */
 .tc-float { position: fixed; left: 0; top: 0; width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-float-shadow); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transform-origin: 0 0; font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
-.tc-float.is-new { padding: 0 var(--tc-card-pad-start); gap: var(--tc-space-8); color: var(--tc-muted); white-space: nowrap; }
-.tc-float.is-new svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
+.tc-float-plus { position: fixed; left: 0; top: 0; width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; }
+.tc-float-plus svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-plus); }
+.tc-float-plus.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
