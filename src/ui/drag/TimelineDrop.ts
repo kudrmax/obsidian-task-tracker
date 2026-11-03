@@ -35,8 +35,10 @@ export class TimelineDrop implements DropTarget {
 	/** The start follows the dragged card's top as the finger holds it. */
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
-		this.show(this.timeline.minutesAt(y - drag.grabPx), drag.durationMin);
-		this.scroll.follow(y);
+		const wanted = this.timeline.minutesAt(y - drag.grabPx);
+		const box = this.timeline.el.getBoundingClientRect();
+		this.show(wanted, drag.durationMin);
+		this.scroll.follow(y, box);
 	}
 
 	/** The target for a new task under a long tap: its start where the finger is. */

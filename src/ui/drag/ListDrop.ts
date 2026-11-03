@@ -1,4 +1,4 @@
-import { shownCardSize } from "../cardSize";
+import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, PROPERTY, tokenPx } from "../design";
 import { px } from "../dom";
 import type { ListEntry, TaskList } from "../TaskList";
@@ -6,6 +6,7 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropGap } from "./DropGap";
 import { DropLine } from "./DropLine";
+import { type ListFrame, readFrame, toClient } from "./listFrame";
 import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
@@ -17,13 +18,26 @@ const TARGET = "is-target";
 /** The list draws its cards where the drag puts them, each at its own `--tc-room`. */
 const MAKING_ROOM = "is-making-room";
 
+/** A card where it stands in the list's content, with the lifted cards gone and no room open. */
 interface Measured {
 	readonly entry: ListEntry;
-	readonly rect: DOMRect;
+	readonly top: number;
+	readonly left: number;
+	readonly width: number;
+	readonly height: number;
 }
 
+/**
+ * The list as measured once a drag, in its content pixels, so a scroll moves nothing in it. It holds while the list is
+ * drawn with the same nodes, at the same card size and width.
+ */
 interface Layout {
+	readonly nodes: readonly HTMLElement[];
+	readonly size: CardSize;
+	readonly width: number;
+	readonly indent: number;
 	readonly cards: readonly Measured[];
+	/** Their `top` in content pixels too. */
 	readonly heads: readonly (PlacedHead & { readonly el: HTMLElement })[];
 }
 
@@ -49,6 +63,8 @@ export class ListDrop implements DropTarget {
 	private readonly scroll: AutoScroll;
 	/** Several cards are carried: away from the list each waits as a dashed place where it stood. */
 	private many = false;
+	/** The cards carried along wait, dashed, since the finger left the list. */
+	private waiting = false;
 
 	constructor(
 		private readonly list: TaskList,
@@ -79,66 +95,74 @@ export class ListDrop implements DropTarget {
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
+		const frame = readFrame(this.list.el);
 		this.many = carriesMany(drag);
-		for (const node of this.list.elements) node.classList.remove(WAITING);
+		if (this.waiting) {
+			for (const node of this.list.elements) node.classList.remove(WAITING);
+			this.waiting = false;
+		}
 		this.last = { x, y, drag };
-		const layout = this.measure();
+		const layout = this.layoutFor(frame);
 		if (!this.placesAnywhere(drag)) {
 			this.place = { kind: "gap", index: layout.cards.length, level: 0, group: null };
 			return;
 		}
-		const heads = this.sections() ? layout.heads : [];
-		if (drag.from === "new") return this.previewNew(x, y, heads);
-		const card = shownCardSize();
-		const level = this.cardLevel(x, drag);
+		const heads = this.sections() ? this.placedHeads(frame) : [];
+		if (drag.from === "new") return this.previewNew(x, y, heads, frame);
+		const card = layout.size;
+		const level = this.cardLevel(x, drag, frame);
 		const room = this.room ?? this.liftedFrom();
 		const held = this.place ?? room;
-		const place = placeAt(this.placed(), y, level, card.height + card.gap, room, heads, held, LAYOUT.dropHysteresis);
+		const place = placeAt(this.placed(frame), y, level, card.height + card.gap, room, heads, held, LAYOUT.dropHysteresis);
 		this.place = place;
 		this.room = place.kind === "gap" ? place : room;
-		this.arrange();
+		this.arrange(frame);
 		layout.cards.forEach(({ entry }, i) => entry.card.classList.toggle(TARGET, place.kind === "into" && i === place.index));
-		const open = this.room ? this.gapRect(this.room) : null;
-		if (open) this.gap.show(open, place.kind === "gap");
+		const open = this.room ? this.gapRect(this.room, frame) : null;
+		if (open) this.gap.show(open, place.kind === "gap", frame);
 		else this.gap.hide();
-		this.scroll.follow(y);
+		this.scroll.follow(y, frame.box);
 	}
 
 	/** The new task's line in the gap at the finger, its level counted from the list's middle. */
-	private previewNew(x: number, y: number, heads: readonly PlacedHead[]): void {
-		const place = placeAt(this.placed(), y, this.newTaskLevel(x), 0, null, heads, this.place, LAYOUT.dropHysteresis, false) as GapPlace;
+	private previewNew(x: number, y: number, heads: readonly PlacedHead[], frame: ListFrame): void {
+		const place = placeAt(this.placed(frame), y, this.newTaskLevel(x, frame), 0, null, heads, this.place, LAYOUT.dropHysteresis, false) as GapPlace;
 		const before = this.place;
 		this.place = place;
 		if (before?.kind !== "gap" || !samePlace(before, place) || before.level !== place.level) this.onNewPlace();
-		const line = this.lineRect(place);
-		this.line.show(line.left, line.right, line.top);
-		this.scroll.follow(y);
+		const line = this.lineRect(place, frame);
+		this.line.show(line.left, line.right, line.top, frame);
+		this.scroll.follow(y, frame.box);
 	}
 
 	landing(): DOMRect | null {
 		if (!this.layout || !this.place) return null;
-		if (this.place.kind === "into") return this.layout.cards[this.place.index].rect;
-		if (this.last?.drag.from === "new") return this.lineRect(this.place);
-		return this.gapRect(this.place);
+		const frame = readFrame(this.list.el);
+		if (this.place.kind === "into") return this.cardRect(this.layout.cards[this.place.index], frame);
+		if (this.last?.drag.from === "new") return this.lineRect(this.place, frame);
+		return this.gapRect(this.place, frame);
 	}
 
 	/** The finger has left the list: the room goes back to where the card was lifted from, dashed, so it is plain where to bring it back. */
 	leave(): void {
+		const frame = readFrame(this.list.el);
 		if (this.many) {
 			for (const node of this.list.elements) node.classList.toggle(WAITING, node.classList.contains(LIFTED));
+			this.waiting = true;
 			this.reset(null);
 			this.gap.hide();
 			return;
 		}
 		this.line.hide();
-		this.reset(this.liftedFrom());
-		if (this.room) this.gap.show(this.gapRect(this.room), true);
+		this.reset(this.liftedFrom(), frame);
+		if (this.room) this.gap.show(this.gapRect(this.room, frame), true, frame);
 		else this.gap.hide();
 	}
 
 	/** The drag is over: the room closes, and with no card lifted from it the list stands as it was. */
 	clear(): void {
 		this.many = false;
+		this.waiting = false;
 		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.reset(null);
 		this.gap.hide();
@@ -146,14 +170,14 @@ export class ListDrop implements DropTarget {
 		this.layout = null;
 	}
 
-	private reset(room: GapPlace | null): void {
+	/** `frame` is needed only where a room stays open. */
+	private reset(room: GapPlace | null, frame?: ListFrame): void {
 		this.scroll.stop();
 		for (const node of this.list.elements) node.classList.remove(TARGET);
 		this.place = null;
 		this.room = room;
 		this.last = null;
-		this.layout = null;
-		this.arrange();
+		this.arrange(frame);
 	}
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
@@ -162,7 +186,7 @@ export class ListDrop implements DropTarget {
 		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place || this.isHome(this.place)) return null;
-		const result = resultOf(this.placed(), this.place);
+		const result = resultOf(this.placed(readFrame(this.list.el)), this.place);
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
 		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
 		return { kind: "listBefore", before: result.before, column: this.column };
@@ -190,9 +214,10 @@ export class ListDrop implements DropTarget {
 	 * Draws each card and header where the drag wants it: those after the room a card lower, all of them closed up over
 	 * the lifted cards, which keep their places in the layout but hide. With neither, the list stands as it was drawn.
 	 */
-	private arrange(): void {
+	private arrange(frame?: ListFrame): void {
 		const nodes = this.list.elements;
-		const step = shownCardSize().height + shownCardSize().gap;
+		const card = shownCardSize();
+		const step = card.height + card.gap;
 		const room = this.room;
 		const gone = (node: HTMLElement) => node.classList.contains(LIFTED) && !node.classList.contains(WAITING);
 		const lifted = nodes.some(gone);
@@ -204,7 +229,7 @@ export class ListDrop implements DropTarget {
 			}
 			return;
 		}
-		const heads = room ? (this.layout ?? this.measure()).heads : [];
+		const heads = room ? this.layoutFor(frame ?? readFrame(this.list.el)).heads : [];
 		let removed = 0;
 		let index = 0;
 		for (const node of nodes) {
@@ -223,55 +248,72 @@ export class ListDrop implements DropTarget {
 		this.list.el.classList.add(MAKING_ROOM);
 	}
 
+	/** The layout measured for this drag, measured again only once the list is drawn anew or changes its card size or width. */
+	private layoutFor(frame: ListFrame): Layout {
+		const nodes = this.list.elements;
+		const size = shownCardSize();
+		const width = frame.box.width;
+		const kept = this.layout;
+		if (kept && kept.nodes === nodes && kept.size === size && kept.width === width) return kept;
+		this.layout = this.measure(nodes, size, width);
+		return this.layout;
+	}
+
 	/**
 	 * The cards that stay in the list and the headers, where they stand with the lifted cards gone and no room open: their
-	 * places in the layout, read under whatever transform is easing them now, less the lifted cards above them.
+	 * places in the layout, which no transform moves, less the lifted cards above them. Read once, in content pixels.
 	 */
-	private measure(): Layout {
-		const step = shownCardSize().height + shownCardSize().gap;
+	private measure(nodes: readonly HTMLElement[], size: CardSize, width: number): Layout {
+		const step = size.height + size.gap;
 		let removed = 0;
-		const rest = (node: HTMLElement) => {
-			const r = node.getBoundingClientRect();
-			return new DOMRect(r.left, r.top - translateY(node) - removed, r.width, r.height);
-		};
 		const cards: Measured[] = [];
 		const heads: (PlacedHead & { el: HTMLElement })[] = [];
 		const entries = new Map(this.list.cards.map((entry) => [entry.card, entry]));
 		const groups = this.list.groups;
 		let groupIndex = 0;
-		for (const node of this.list.elements) {
+		for (const node of nodes) {
 			if (node.classList.contains(LIFTED)) {
 				removed += step;
 				continue;
 			}
 			const entry = entries.get(node);
 			if (entry) {
-				cards.push({ entry, rect: rest(node) });
+				cards.push({ entry, top: node.offsetTop - removed, left: node.offsetLeft, width: node.offsetWidth, height: node.offsetHeight });
 				continue;
 			}
 			while (groupIndex < groups.length && !node.classList.contains("tc-group-head")) groupIndex++;
-			const r = rest(node);
-			heads.push({ el: node, group: groups[groupIndex++]?.name ?? null, firstCard: cards.length, top: r.top, height: r.height });
+			heads.push({ el: node, group: groups[groupIndex++]?.name ?? null, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
-		this.layout = { cards, heads };
-		return this.layout;
+		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads };
 	}
 
-	private placed(): PlacedCard[] {
-		return (this.layout ?? this.measure()).cards.map(({ entry, rect }) => ({ ...this.list.listCard(entry), top: rect.top, height: rect.height }));
+	/** A measured card in client pixels. */
+	private cardRect(card: Measured, frame: ListFrame): DOMRect {
+		const at = toClient(frame, card.left, card.top);
+		return new DOMRect(at.x, at.y, card.width, card.height);
+	}
+
+	private placed(frame: ListFrame): PlacedCard[] {
+		return this.layoutFor(frame).cards.map((card) => ({ ...this.list.listCard(card.entry), top: toClient(frame, 0, card.top).y, height: card.height }));
+	}
+
+	private placedHeads(frame: ListFrame): PlacedHead[] {
+		return this.layoutFor(frame).heads.map((head) => ({ ...head, top: toClient(frame, 0, head.top).y }));
 	}
 
 	/** Where a card put in `place` stands, in client pixels, at the level of the place. */
-	private gapRect(place: GapPlace): DOMRect {
-		const { cards, heads } = this.layout ?? this.measure();
-		const card = shownCardSize();
-		const r = this.list.el.getBoundingClientRect();
-		const left = this.baseLeft() + place.level * this.indent();
+	private gapRect(place: GapPlace, frame: ListFrame): DOMRect {
+		const layout = this.layoutFor(frame);
+		const cards = layout.cards.map((card) => ({ entry: card.entry, rect: this.cardRect(card, frame) }));
+		const heads = this.placedHeads(frame);
+		const card = layout.size;
+		const r = frame.box;
+		const left = this.baseLeft(frame) + place.level * layout.indent;
 		const right = cards[0]?.rect.right ?? r.right;
 		const at = cards[place.index];
 		const prev = cards[place.index - 1];
 		const head = heads.find((h) => h.group === place.group);
-		const inGroup = (measured: Measured) => this.list.listCard(measured.entry).group === place.group;
+		const inGroup = (measured: { entry: ListEntry }) => this.list.listCard(measured.entry).group === place.group;
 		const top =
 			at && inGroup(at) ? at.rect.top
 			: prev && inGroup(prev) ? prev.rect.bottom + card.gap
@@ -296,9 +338,9 @@ export class ListDrop implements DropTarget {
 	}
 
 	/** A card carried along: the level its left edge stands at. */
-	private cardLevel(x: number, drag: DragPayload): number {
-		const indent = this.indent();
-		return indent > 0 ? (x - drag.grabX - this.baseLeft()) / indent : 0;
+	private cardLevel(x: number, drag: DragPayload, frame: ListFrame): number {
+		const indent = this.layoutFor(frame).indent;
+		return indent > 0 ? (x - drag.grabX - this.baseLeft(frame)) / indent : 0;
 	}
 
 	/**
@@ -306,34 +348,22 @@ export class ListDrop implements DropTarget {
 	 * indent, as if the finger held the left edge of a task's card standing in the middle. So the thumb picks a task, a
 	 * subtask or one under that near the middle of the screen, never stretching to the list's left edge.
 	 */
-	private newTaskLevel(x: number): number {
-		const r = this.list.el.getBoundingClientRect();
-		const indent = this.indent();
+	private newTaskLevel(x: number, frame: ListFrame): number {
+		const r = frame.box;
+		const indent = this.layoutFor(frame).indent;
 		return indent > 0 ? (x - (r.left + r.width / 2)) / indent : 0;
 	}
 
 	/** The new task's line: through the middle of the gap, from the left edge of its level; with no height. */
-	private lineRect(place: GapPlace): DOMRect {
-		const gap = this.gapRect(place);
-		return new DOMRect(gap.left, gap.top - shownCardSize().gap / 2, gap.width, 0);
-	}
-
-	private indent(): number {
-		return tokenPx(this.list.el, INDENT);
+	private lineRect(place: GapPlace, frame: ListFrame): DOMRect {
+		const gap = this.gapRect(place, frame);
+		return new DOMRect(gap.left, gap.top - this.layoutFor(frame).size.gap / 2, gap.width, 0);
 	}
 
 	/** Where a task's card starts: a subtask's stands its levels further in. */
-	private baseLeft(): number {
-		const first = (this.layout ?? this.measure()).cards[0];
-		return first ? first.rect.left - first.entry.level * this.indent() : this.list.el.getBoundingClientRect().left;
+	private baseLeft(frame: ListFrame): number {
+		const layout = this.layoutFor(frame);
+		const first = layout.cards[0];
+		return first ? toClient(frame, first.left, 0).x - first.entry.level * layout.indent : frame.box.left;
 	}
-}
-
-/** How far a transform moves the element down right now, mid-transition included. */
-function translateY(node: HTMLElement): number {
-	const transform = getComputedStyle(node).transform;
-	const values = /^matrix(3d)?\(([^)]*)\)$/.exec(transform ?? "");
-	if (!values) return 0;
-	const numbers = values[2].split(",").map(Number);
-	return (values[1] ? numbers[13] : numbers[5]) || 0;
 }
