@@ -1,7 +1,7 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
 import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
@@ -41,6 +41,8 @@ import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
+import { type ScreenPart, ScreenParts } from "./ScreenParts";
+import { settingsEffect } from "./settingsEffect";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
@@ -94,6 +96,10 @@ export interface ViewDeps {
  */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
+	/** The day the last minute's tick saw as today: the next day's first tick releases the slots and reads the tasks anew. */
+	private shownToday: LocalDate;
+	/** A minute passed while the view was hidden or a gesture held it: it ticks once as soon as it can. */
+	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
 	private switcher: ColumnSwitch | null = null;
 	private leftEl: HTMLElement | null = null;
@@ -114,13 +120,13 @@ export class TaskCalendarView extends ItemView {
 	private readonly data: DayData;
 	/** Obsidian's desktop status bar over the view's bottom right corner. */
 	private readonly polling: CalendarPolling;
-	private renderPending = false;
+	/** The frame, the tasks and the events, each drawn when it changes; a gesture holds them all. */
+	private readonly parts = new ScreenParts({ busy: () => this.arbiter.busy, draw: (parts) => this.draw(parts) });
 	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
-	private dayStartHour: number;
-	/** The levels the tasks were last read with: other levels colour them anew. */
-	private priorities: readonly PriorityLevel[];
+	/** The settings the screen last followed: a change is weighed against them. */
+	private seen: TaskCalendarSettings;
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -152,10 +158,10 @@ export class TaskCalendarView extends ItemView {
 		private readonly deps: ViewDeps,
 	) {
 		super(leaf);
-		this.dayStartHour = this.settings.dayStartHour;
-		this.priorities = this.settings.priorities;
+		this.seen = this.settings;
 		this.selectedDate = this.today();
-		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: () => this.render() });
+		this.shownToday = this.selectedDate;
+		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
 		this.polling = new CalendarPolling({
 			refresh: () => this.data.calendars(),
 			intervalMs: () => this.settings.google.refreshSeconds * SECOND_MS,
@@ -296,7 +302,7 @@ export class TaskCalendarView extends ItemView {
 		new Divider(el(root, "div"), {
 			width: () => shownListWidth(this.settings.listShare, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
-			onRelease: (width) => void this.deps.settings.update({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.render()),
+			onRelease: (width) => void this.deps.settings.update({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.parts.request("frame")),
 			min: LIST_WIDTH_MIN,
 			max: () => listWidthMax(root.clientWidth),
 			center: () => centeredListWidth(root.clientWidth),
@@ -396,7 +402,9 @@ export class TaskCalendarView extends ItemView {
 		);
 		this.registerDomEvent(window, "focus", () => void this.polling.refresh());
 		this.registerDomEvent(document, "visibilitychange", () => {
-			if (!document.hidden) void this.polling.refresh();
+			if (document.hidden) return;
+			void this.polling.refresh();
+			this.catchUpTick();
 		});
 		this.registerDomEvent(root, "touchmove", (e) => {
 			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
@@ -406,28 +414,56 @@ export class TaskCalendarView extends ItemView {
 		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
 		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
-		this.arbiter.onIdle(() => this.renderPending && this.render());
-		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
+		this.arbiter.onIdle(() => {
+			this.parts.flush();
+			this.catchUpTick();
+		});
+		this.registerEvent(this.app.workspace.on("css-change", () => this.parts.request("events")));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		this.polling.start();
+		this.render();
 		await this.data.load();
 	}
 
-	/** Once a minute: the now line moves, and a day that ended releases its slots (the file is written only when a rule fires). */
+	/**
+	 * Once a minute: the now line moves, nothing else is drawn. A day that ended releases its slots (the file is written
+	 * only when a rule fires) and the lists, which depend on today, are drawn and read anew. A hidden view, or one a gesture holds, waits.
+	 */
 	private async tick(): Promise<void> {
-		this.render();
-		await this.deps.tasks.normalize();
+		if (document.hidden || !this.contentEl.isShown() || this.arbiter.busy) {
+			this.missedTick = true;
+			return;
+		}
+		this.missedTick = false;
+		const today = this.today();
+		if (today === this.shownToday) {
+			this.timeline?.tickNow();
+			return;
+		}
+		this.shownToday = today;
+		try {
+			await this.deps.tasks.normalize();
+		} finally {
+			this.parts.request("frame", "tasks");
+			void this.data.tasks();
+		}
+	}
+
+	private catchUpTick(): void {
+		if (this.missedTick) void this.tick();
 	}
 
 	override async onClose(): Promise<void> {
 		this.quick?.close();
 		this.polling.stop();
+		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
 
 	override onResize(): void {
 		this.fitListWidth();
 		this.quick?.reveal();
+		this.catchUpTick();
 	}
 
 	private get settings() {
@@ -442,16 +478,23 @@ export class TaskCalendarView extends ItemView {
 		return new DayBoundary(this.settings.dayStartHour);
 	}
 
-	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. Another card size restacks the timeline. */
+	/**
+	 * Another card size restacks the timeline. Another file, its names or marks, or other levels: the headers and the lists
+	 * follow the names at once, and the tasks are read anew. Another hour for the day's start moves today and the timeline:
+	 * the screen opens today afresh. Anything else redraws nothing.
+	 */
 	private onSettings(): void {
-		this.timeline?.layoutTasks();
-		if (!sameLevels(this.settings.priorities, this.priorities)) {
-			this.priorities = this.settings.priorities;
+		const effect = settingsEffect(this.seen, this.settings);
+		this.seen = this.settings;
+		if (effect.restack) this.timeline?.layoutTasks();
+		if (effect.reload) {
+			this.parts.request("frame", "tasks");
 			void this.data.tasks();
 		}
-		if (this.settings.dayStartHour === this.dayStartHour) return;
-		this.dayStartHour = this.settings.dayStartHour;
+		if (effect.frame) this.parts.request("frame");
+		if (!effect.newDay) return;
 		this.scrolledFor = null;
+		this.parts.request("frame", "tasks", "events");
 		void this.afterEntry(() => this.select(this.today()));
 	}
 
@@ -475,8 +518,10 @@ export class TaskCalendarView extends ItemView {
 		await change();
 	}
 
+	/** The header shows the day at once; its tasks and events replace the last day's as they come. */
 	private select(date: LocalDate): void {
 		this.selectedDate = date;
+		this.headers?.render();
 		void this.data.selectDay();
 	}
 
@@ -544,8 +589,9 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/**
-	 * The strip slides only while the window moves to the other pair, in step with the switch's pill, before the choice is
-	 * saved; the divider's drag, a resize and a swipe that already brought it there move it at once.
+	 * The strip slides only while the window moves to the other pair, in step with the switch's pill, over the columns
+	 * already drawn; the divider's drag, a resize and a swipe that already brought it there move it at once. Once the
+	 * choice is saved the frame follows it.
 	 */
 	private async setMode(mode: RightMode, slide = true): Promise<void> {
 		const root = this.contentEl;
@@ -558,7 +604,7 @@ export class TaskCalendarView extends ItemView {
 		this.showMode(mode);
 		await this.deps.settings.update({ rightMode: mode });
 		if (this.shownMode === mode) this.shownMode = null;
-		this.render();
+		this.parts.request("frame");
 	}
 
 	private showMode(mode: RightMode): void {
@@ -879,32 +925,40 @@ export class TaskCalendarView extends ItemView {
 		else void this.app.workspace.openLinkText(link.target, this.settings.tasksFile, "tab");
 	}
 
-	/** A gesture keeps the elements it holds: the redraw waits until it ends. */
+	/** The whole screen anew. A gesture keeps the elements it holds: the redraw waits until it ends. */
 	render(): void {
-		if (this.arbiter.busy) {
-			this.renderPending = true;
-			return;
-		}
-		this.renderPending = false;
+		this.parts.request("frame", "tasks", "events");
+	}
+
+	/**
+	 * The frame: the columns' width and which pair shows, the headers. The tasks: the lists, the missing file's box, the
+	 * timeline. The events: the all-day rows, the timeline. The switch's dot follows the sources, which a missing file hides.
+	 */
+	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
 		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.newBacklog || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
-		this.fitListWidth();
-		this.headers.render();
+		if (parts.has("frame")) {
+			this.fitListWidth();
+			this.headers.render();
+			this.showMode(this.mode());
+		}
 		this.switcher.render();
-		this.list.render();
-		const missing = this.data.missing;
-		root.classList.toggle("is-missing", missing);
-		this.showMode(this.mode());
-		for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el, this.newBacklog.el]) part.style.display = missing ? "none" : "";
-		root.querySelector(".tc-missing")?.remove();
-		if (missing) this.renderMissing(root);
-		this.soonList.render();
-		this.inboxList.render();
-		this.backlogTitle.textContent = this.settings.sections.backlog;
-		this.backlogList.render();
-		renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
-		this.timeline.render();
-		if (this.scrolledFor !== this.selectedDate) {
+		if (parts.has("tasks")) {
+			this.bulk.selection.forgetDrawn();
+			this.list.render();
+			const missing = this.data.missing;
+			root.classList.toggle("is-missing", missing);
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el, this.newBacklog.el]) part.style.display = missing ? "none" : "";
+			root.querySelector(".tc-missing")?.remove();
+			if (missing) this.renderMissing(root);
+			this.soonList.render();
+			this.inboxList.render();
+			this.backlogTitle.textContent = this.settings.sections.backlog;
+			this.backlogList.render();
+		}
+		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
+		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
+		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
 			this.scrollToOpen(this.timeline, this.selectedDate);
 		}

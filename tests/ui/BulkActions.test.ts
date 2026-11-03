@@ -143,3 +143,21 @@ describe("bulk actions", () => {
 		bulk.settled();
 	});
 });
+
+describe("the selection across redraws", () => {
+	it("forgets the cards a redraw took away, and keeps the task picked on its new card", () => {
+		const selection = new TaskSelection();
+		const tasks = [item(), item(), item()];
+		const first = cards(tasks);
+		selection.toggle(first[0]);
+		for (let redraw = 0; redraw < 100; redraw++) {
+			selection.forgetDrawn();
+			const drawn = cards(redraw === 99 ? tasks : [item(), item(), item()]);
+			drawn.forEach((card) => selection.attach(card));
+			if (redraw === 99) expect(drawn[0].card.classList.contains("is-selected")).toBe(true);
+			for (const card of first) card.card.remove();
+		}
+		expect(selection.drawnCount).toBeLessThanOrEqual(3);
+		expect(selection.has(tasks[0])).toBe(true);
+	});
+});
