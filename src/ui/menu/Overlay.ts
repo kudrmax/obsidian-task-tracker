@@ -11,6 +11,8 @@ export type CloseHow = "escape" | "away";
 export class Overlay {
 	private readonly backdrop: HTMLElement;
 	private readonly parts: HTMLElement[] = [];
+	/** Holds the parts that stand at one depth, so one shadow falls from all of them and none on another. */
+	private level: HTMLElement | null = null;
 	private closed = false;
 	/** Escape closes this and nothing else: Obsidian would otherwise take it as a step back. */
 	private readonly onKey = (e: KeyboardEvent) => {
@@ -28,9 +30,9 @@ export class Overlay {
 		document.addEventListener("keydown", this.onKey, true);
 	}
 
-	/** Lays a part over the sheet: it shows and goes with it. */
-	add<T extends HTMLElement>(part: T): T {
-		document.body.appendChild(part);
+	/** Lays a part over the sheet: it shows and goes with it. A part `onLevel` stands at the depth of the others there. */
+	add<T extends HTMLElement>(part: T, onLevel = false): T {
+		(onLevel ? (this.level ??= el(document.body, "div", "tc-level")) : document.body).appendChild(part);
 		this.parts.push(part);
 		return part;
 	}
@@ -48,7 +50,7 @@ export class Overlay {
 			part.classList.add("is-closing");
 			part.classList.remove("is-shown");
 		}
-		window.setTimeout(() => this.all().forEach((part) => part.remove()), tokenMs(this.backdrop, DURATION.collapse));
+		window.setTimeout(() => [...this.all(), this.level].forEach((part) => part?.remove()), tokenMs(this.backdrop, DURATION.collapse));
 		return true;
 	}
 

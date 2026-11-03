@@ -154,7 +154,7 @@ export class TaskMenu {
 
 	private constructor(private readonly context: TaskMenuContext) {
 		this.overlay = new Overlay((how) => this.close(how));
-		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
+		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"), true);
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
@@ -163,8 +163,8 @@ export class TaskMenu {
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
-		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
-		this.upper = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"), true);
+		this.upper = this.overlay.add(el(null, "div", "tc-panel is-task"), true);
 		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
@@ -222,7 +222,7 @@ export class TaskMenu {
 		this.giveToField();
 		this.fieldClosed = onClose;
 		this.lifted.style.visibility = "hidden";
-		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row")));
+		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		row.style.left = px(this.copy.left);
 		row.style.width = px(this.copy.width);
 		showStrip(row, this.context.item);
@@ -270,7 +270,7 @@ export class TaskMenu {
 	}
 
 	private stackUnder(copy: DOMRect): HTMLElement {
-		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
+		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"), true);
 		stack.style.left = px(copy.left);
 		stack.style.top = px(copy.bottom);
 		stack.style.width = px(copy.width);

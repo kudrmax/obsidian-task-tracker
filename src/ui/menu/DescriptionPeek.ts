@@ -19,7 +19,7 @@ export class DescriptionPeek {
 	private readonly el: HTMLElement;
 
 	constructor(overlay: Overlay, surface: MarkdownSurface, markdown: string, actions: PeekActions) {
-		this.el = overlay.add(el(null, "div", "tc-desc-peek"));
+		this.el = overlay.add(el(null, "div", "tc-desc-peek"), true);
 		const text = el(this.el, "div", "tc-desc-text");
 		this.el.addEventListener("click", (e) => ((e.target as Element).closest("a") ? actions.onLink() : actions.onRead()));
 		void surface.render(text, markdown).then(() => this.markCut());
