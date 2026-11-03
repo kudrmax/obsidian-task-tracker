@@ -2,6 +2,7 @@ import { tokenPx } from "../design";
 import { el, px } from "../dom";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
+import { bringIntoView, topInside } from "./inView";
 import { menuRoom, placePanel } from "./MenuPanel";
 
 /** How the copy over the blur shows what the pressed thing cuts: it grows from `size`, never past `widest`, and answers its new size. */
@@ -25,12 +26,16 @@ export abstract class LiftedMenu {
 		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"), true);
 	}
 
-	/** The copy stands where `source` does; what it cuts grows it, kept inside the window, and the panel goes by the copy. */
-	protected liftWhole(source: DOMRect, showWhole: ShowWhole): DOMRect {
+	/**
+	 * `source` comes into view in its column first; the copy stands over what the column shows of it, and what it cuts
+	 * grows it, kept inside the column's shown height and the window's width. The panel goes by the copy.
+	 */
+	protected liftWhole(source: HTMLElement, showWhole: ShowWhole): DOMRect {
+		const { rect, box } = bringIntoView(source);
 		const room = windowRoom(this.lifted);
-		const size = showWhole(this.lifted, source, roomWidth(room));
-		const left = grownStart(source.left, source.width, size.width, room.width, room.margin);
-		const top = grownStart(source.top, source.height, size.height, room.height, room.margin);
+		const size = showWhole(this.lifted, rect, roomWidth(room));
+		const left = grownStart(rect.left, rect.width, size.width, room.width, room.margin);
+		const top = box ? topInside(rect.top, size.height, box) : grownStart(rect.top, rect.height, size.height, room.height, room.margin);
 		this.lifted.style.left = px(left);
 		this.lifted.style.top = px(top);
 		return (this.copy = new DOMRect(left, top, size.width, size.height));
