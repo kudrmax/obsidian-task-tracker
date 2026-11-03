@@ -4,7 +4,7 @@ import { settingsEffect } from "../../src/ui/settingsEffect";
 
 const before = DEFAULT_SETTINGS;
 const after = (patch: Partial<TaskCalendarSettings>) => settingsEffect(before, { ...before, ...patch });
-const NOTHING = { restack: false, reload: false, newDay: false };
+const NOTHING = { restack: false, reload: false, newDay: false, frame: false };
 
 describe("settingsEffect", () => {
 	it("restacks the timeline for another card height", () => {
@@ -49,8 +49,13 @@ describe("settingsEffect", () => {
 		expect(after({ dayStartHour: 3 })).toEqual({ ...NOTHING, newDay: true });
 	});
 
-	it("nothing for the divider, the zoom or the column shown", () => {
-		expect(after({ listShare: 0.3, zoom: 112, rightMode: "soon" })).toEqual(NOTHING);
+	it("redraws the frame for the divider or the column shown, set by another view", () => {
+		expect(after({ listShare: 0.3 })).toEqual({ ...NOTHING, frame: true });
+		expect(after({ rightMode: "soon" })).toEqual({ ...NOTHING, frame: true });
+	});
+
+	it("nothing for the zoom", () => {
+		expect(after({ zoom: 112 })).toEqual(NOTHING);
 	});
 
 	it("nothing for the same settings copied", () => {

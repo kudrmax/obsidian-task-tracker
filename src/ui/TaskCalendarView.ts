@@ -484,8 +484,10 @@ export class TaskCalendarView extends ItemView {
 			this.parts.request("frame", "tasks");
 			void this.data.tasks();
 		}
+		if (effect.frame) this.parts.request("frame");
 		if (!effect.newDay) return;
 		this.scrolledFor = null;
+		this.parts.request("frame", "tasks", "events");
 		void this.afterEntry(() => this.select(this.today()));
 	}
 

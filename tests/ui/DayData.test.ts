@@ -141,6 +141,23 @@ describe("DayData", () => {
 		expect(data.statuses).toEqual([]);
 	});
 
+	it("tells the events changed when the file comes back: the all-day rows hid with it", async () => {
+		let gone = true;
+		const demo = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const flaky = new Proxy(demo, {
+			get: (target, name, receiver) => (gone && name === "normalize" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
+		});
+		const { data, calendars, parts } = setup(flaky);
+		const opened = data.load();
+		calendars.answer();
+		await opened;
+		await settled();
+		parts.length = 0;
+		gone = false;
+		await data.tasks();
+		expect(parts).toEqual(["tasks", "events"]);
+	});
+
 	it("tells the tasks changed and not the events", async () => {
 		const { data, tasks, parts } = setup();
 		await data.tasks();

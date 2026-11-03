@@ -124,9 +124,9 @@ export class DayData {
 		}
 	}
 
-	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched. */
+	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; a missing file shows none. */
 	private drawnOf(part: DayPart): string {
 		if (part === "tasks") return JSON.stringify(this.state);
-		return JSON.stringify([this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale)]);
+		return JSON.stringify([this.missing, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale)]);
 	}
 }

@@ -8,6 +8,8 @@ export interface SettingsEffect {
 	readonly reload: boolean;
 	/** Today moved: the day starts at another hour. */
 	readonly newDay: boolean;
+	/** The columns shown or their width changed: another view of the calendar set them. */
+	readonly frame: boolean;
 }
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -24,5 +26,6 @@ export function settingsEffect(before: TaskCalendarSettings, after: TaskCalendar
 			!same(before.groups.presets, after.groups.presets) ||
 			!sameLevels(before.priorities, after.priorities),
 		newDay: before.dayStartHour !== after.dayStartHour,
+		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
 	};
 }

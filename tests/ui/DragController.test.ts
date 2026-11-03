@@ -171,3 +171,32 @@ describe("DragController: a long tap on the timeline's free room", () => {
 		expect(onNewSlot).not.toHaveBeenCalled();
 	});
 });
+
+describe("DragController: a drop that changes nothing", () => {
+	it("shows the lifted block again once the result is applied, though nothing was drawn anew", async () => {
+		const target = new StubTarget({ kind: "clearSlot" });
+		const deps = {
+			longPressMs: () => 300,
+			day: () => "2026-11-01",
+			step: () => 15,
+			timeline: () => null,
+			targets: () => [target],
+			haptics: { tap: () => {} },
+			arbiter: new GestureArbiter(),
+			onDragging: () => {},
+			onResult: async () => {},
+		} as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		block.getBoundingClientRect = () => rect(10, 600);
+		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
+		new DragController(deps).attachBlock(block, item as never);
+		const at = (type: string, x: number, y: number, el: EventTarget) =>
+			el.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { pointerId: 1, clientX: x, clientY: y, isPrimary: true, button: 0, pointerType: "mouse" }));
+		at("pointerdown", 20, 610, block);
+		at("pointermove", 150, 300, block);
+		expect(block.classList.contains("is-lifted")).toBe(true);
+		at("pointermove", 150, 300, document);
+		at("pointerup", 150, 300, document);
+		await vi.waitFor(() => expect(block.classList.contains("is-lifted")).toBe(false));
+	});
+});

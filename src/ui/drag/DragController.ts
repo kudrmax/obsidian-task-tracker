@@ -258,6 +258,7 @@ export class DragController {
 						if (!result) return;
 						this.deps.haptics.tap();
 						await this.deps.onResult(payload, result);
+						reopen();
 					},
 				}),
 			() => this.deps.onDragging(false),
