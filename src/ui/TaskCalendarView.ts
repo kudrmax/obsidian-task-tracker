@@ -28,6 +28,7 @@ import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
+import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -349,6 +350,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 		});
 		this.switcher = switcher;
+		const chrome = new ObsidianChrome(root.ownerDocument);
 		this.quick = new QuickEntryController({
 			root,
 			tasks: this.deps.tasks,
@@ -365,8 +367,8 @@ export class TaskCalendarView extends ItemView {
 			levels: () => this.settings.priorities,
 			today: () => this.today(),
 			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
-			chromeTop: () => statusBarTop(root.ownerDocument),
-			toolbarTop: () => keyboardToolbarTop(root.ownerDocument),
+			chromeTop: () => chrome.statusBarTop(),
+			toolbarTop: () => chrome.toolbarTop(),
 			day: () => this.selectedDate,
 			mode: () => this.mode(),
 			turnTo: (mode) => this.switcher?.show(mode),
@@ -374,8 +376,8 @@ export class TaskCalendarView extends ItemView {
 				this.select(date);
 				return this.data.tasks();
 			},
-			fresh: () => this.data.tasks(),
-			render: () => this.render(),
+			fresh: (beforeShow) => this.data.tasks(beforeShow),
+			render: () => this.parts.request("tasks"),
 			onError: (error) => this.reportFailure(error),
 		});
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
@@ -978,18 +980,4 @@ export class TaskCalendarView extends ItemView {
 		button.addEventListener("click", () => void this.act(() => this.deps.tasks.createFile()));
 	}
 
-}
-
-/** The top of the buttons of Obsidian's toolbar over the phone keyboard while it shows; null otherwise. */
-function keyboardToolbarTop(doc: Document): number | null {
-	const toolbar = doc.body.querySelector<HTMLElement>(".mobile-toolbar .mobile-toolbar-options-container");
-	const box = toolbar?.getBoundingClientRect();
-	return box && box.height > 0 ? box.top : null;
-}
-
-/** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */
-function statusBarTop(doc: Document): number {
-	const bar = doc.body.querySelector<HTMLElement>(":scope > .app-container > .status-bar");
-	const box = bar?.getBoundingClientRect();
-	return box && box.height > 0 ? box.top : Infinity;
 }

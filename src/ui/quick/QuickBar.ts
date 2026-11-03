@@ -53,7 +53,14 @@ interface OpenPanel {
 	readonly el: HTMLElement;
 	/** The place panel shows its month picker in place of the tiles. */
 	picking: boolean;
+	/** What its tiles were drawn for: drawn again only once that changes. */
+	drawn: string;
 }
+
+/** The bar's own position, each property set or, when absent, left to the styles. */
+type BarPosition = Partial<Record<"left" | "top" | "width" | "bottom", string>>;
+
+const POSITION = ["left", "top", "width", "bottom"] as const;
 
 type FixedPlace = "inbox" | "backlog" | "soon" | "now";
 
@@ -84,6 +91,8 @@ export class QuickBar {
 	private readonly place: HTMLButtonElement;
 	private readonly placeText: HTMLElement;
 	private state: QuickBarState | null = null;
+	/** The place the place button shows. */
+	private shownPlace: Placement | null = null;
 	private panel: OpenPanel | null = null;
 	/** Where the desktop capsule stands: the room it was placed in and the side of the field it took. */
 	private desk: { readonly room: DOMRect; readonly side: Side } | null = null;
@@ -134,7 +143,7 @@ export class QuickBar {
 		if (state.priority) this.flag.dataset.priority = state.priority.color;
 		else delete this.flag.dataset.priority;
 		this.place.hidden = state.place === null;
-		if (state.place) this.showPlace(state.place);
+		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		this.refreshPanel();
 	}
 
@@ -150,49 +159,48 @@ export class QuickBar {
 	 */
 	follow(anchor: BarAnchor | null): void {
 		this.anchor = anchor;
-		for (const property of ["left", "top", "width", "bottom"]) this.bar.style.removeProperty(property);
-		this.standOverToolbar(anchor?.toolbarTop ?? null);
 		const over = anchor?.overMenu ?? null;
-		this.bar.classList.toggle("is-over", over !== null);
+		// Leaving the view for the page, or coming back, restyles the bar: that is done before it is measured.
+		reclass(this.bar, "is-over", over !== null);
 		const holder = over ? this.bar.ownerDocument.body : this.parent;
 		if (this.bar.parentElement !== holder) holder.appendChild(this.bar);
-		this.desk = null;
-		this.bar.classList.remove("is-away");
-		if (anchor && this.deps.desktop()) this.standBy(anchor);
-		else if (over) this.dock(over);
+		const desktop = this.deps.desktop();
+		const toolbarTop = desktop ? null : (anchor?.toolbarTop ?? null);
+		const desk = desktop ? anchor : null;
+		const view = toolbarTop !== null || (desk && !desk.overMenu) ? this.parent.getBoundingClientRect() : null;
+		const spot = desk && this.standBy(desk);
+		this.standOverToolbar(toolbarTop === null || !view ? 0 : Math.max(0, view.bottom - toolbarTop));
+		this.desk = spot ? { room: spot.room, side: spot.side } : null;
+		reclass(this.bar, "is-away", desk !== null && spot === null);
+		const origin = desk?.overMenu || !view ? { left: 0, top: 0 } : view;
+		this.position(spot ? { left: px(spot.left - origin.left), top: px(spot.top - origin.top) } : over && !desktop ? this.dock(over) : {});
+		if (spot) this.sidePanel();
 	}
 
 	/**
 	 * On the phone the bar stands over Obsidian's toolbar, wherever the keyboard and the toolbar put it: the view and the bar
 	 * learn how far the toolbar's top is over the view's bottom, and the styles keep the cards' gap above it.
 	 */
-	private standOverToolbar(top: number | null): void {
-		const room = top === null || this.deps.desktop() ? 0 : Math.max(0, this.parent.getBoundingClientRect().bottom - top);
-		for (const holder of [this.parent, this.bar]) {
-			if (room > 0) holder.style.setProperty(TOOLBAR_ROOM, px(room));
-			else holder.style.removeProperty(TOOLBAR_ROOM);
-		}
+	private standOverToolbar(room: number): void {
+		for (const holder of [this.parent, this.bar]) restyle(holder, TOOLBAR_ROOM, room > 0 ? px(room) : null);
+	}
+
+	private position(position: BarPosition): void {
+		for (const property of POSITION) restyle(this.bar, property, position[property] ?? null);
 	}
 
 	/** Over a menu's blur on the phone: at the bottom of the view's box, above the blur. */
-	private dock(view: DOMRect): void {
-		this.bar.style.left = px(view.left);
-		this.bar.style.width = px(view.width);
-		this.bar.style.bottom = `calc(${px(window.innerHeight - view.bottom)} + var(--tc-bar-bottom))`;
+	private dock(view: DOMRect): BarPosition {
+		return { left: px(view.left), width: px(view.width), bottom: `calc(${px(window.innerHeight - view.bottom)} + var(--tc-bar-bottom))` };
 	}
 
-	/** On the desktop: the capsule by the field, inside the room; out of sight while no part of the field shows. */
-	private standBy(anchor: BarAnchor): void {
+	/** On the desktop: where the capsule stands by the field, inside the room; null while no part of the field shows, the capsule out of sight. */
+	private standBy(anchor: BarAnchor): { readonly left: number; readonly top: number; readonly side: Side; readonly room: DOMRect } | null {
+		if (!anchor.field) return null;
 		const size = this.bar.getBoundingClientRect();
 		const panel = this.panel?.el.offsetHeight ?? 0;
-		const spot = anchor.field ? barBesideField(anchor.field, anchor.room, size, DESIGN.deskBarGap, panel) : null;
-		this.bar.classList.toggle("is-away", spot === null);
-		if (!spot) return;
-		const origin = anchor.overMenu ? { left: 0, top: 0 } : this.parent.getBoundingClientRect();
-		this.bar.style.left = px(spot.left - origin.left);
-		this.bar.style.top = px(spot.top - origin.top);
-		this.desk = { room: anchor.room, side: spot.side };
-		this.sidePanel();
+		const spot = barBesideField(anchor.field, anchor.room, size, DESIGN.deskBarGap, panel);
+		return spot && { ...spot, room: anchor.room };
 	}
 
 	/** On the desktop the open panel takes the side of the capsule away from the field, unless it fits only on the other. */
@@ -216,6 +224,7 @@ export class QuickBar {
 	}
 
 	private showPlace(place: Placement): void {
+		this.shownPlace = place;
 		this.place.querySelector("svg")?.remove();
 		this.place.prepend(icon(placeIcon(place)));
 		this.placeText.textContent = placeLabel(place);
@@ -229,7 +238,7 @@ export class QuickBar {
 
 	private openPanel(kind: PanelKind): void {
 		const panel = el(this.bar, "div", "tc-panel tc-quick-panel is-above");
-		this.panel = { kind, el: panel, picking: false };
+		this.panel = { kind, el: panel, picking: false, drawn: "" };
 		this.bar.dataset.panel = kind;
 		this.renderPanel();
 		panel.getBoundingClientRect(); // lays the panel out shrunk, so adding is-shown grows it in
@@ -251,12 +260,19 @@ export class QuickBar {
 		if (!this.panel) return;
 		const gone = this.panel.kind === "priority" ? this.levels().length === 0 : this.state?.place == null;
 		if (gone) this.closePanel();
-		else if (!this.panel.picking) this.renderPanel();
+		else if (!this.panel.picking && this.panel.drawn !== this.drawnKey(this.panel.kind)) this.renderPanel();
+	}
+
+	/** What a panel of `kind` shows: the levels and the field's, the places and the field's, and today for the picker. */
+	private drawnKey(kind: PanelKind): string {
+		const state = this.state;
+		return JSON.stringify([kind, this.levels(), state?.priority?.prefix ?? null, state?.place ?? null, this.deps.today()]);
 	}
 
 	private renderPanel(): void {
 		const panel = this.panel;
 		if (!panel) return;
+		panel.drawn = this.drawnKey(panel.kind);
 		clear(panel.el);
 		panel.el.classList.toggle("is-picker", panel.picking);
 		if (panel.kind === "priority") this.renderLevels(panel.el);
@@ -321,4 +337,16 @@ export class QuickBar {
 			},
 		});
 	}
+}
+
+/** Puts a class on or takes it off only when that changes it: a toggle that changes nothing still writes in some DOMs. */
+function reclass(target: HTMLElement, name: string, on: boolean): void {
+	if (target.classList.contains(name) !== on) target.classList.toggle(name, on);
+}
+
+/** Sets a style property, or takes it off for null, only when that changes it. */
+function restyle(target: HTMLElement, property: string, value: string | null): void {
+	if (target.style.getPropertyValue(property) === (value ?? "")) return;
+	if (value === null) target.style.removeProperty(property);
+	else target.style.setProperty(property, value);
 }
