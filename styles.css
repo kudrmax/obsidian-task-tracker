@@ -800,8 +800,9 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-item-title { font-size: var(--tc-font-block); line-height: var(--tc-leading-block); font-weight: var(--tc-weight-semibold); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
 /* A block shorter than a line of text keeps its title on one line, smaller. */
 .tc-item.is-tiny .tc-item-title { font-size: var(--tc-font-tiny); line-height: max(var(--tc-len) - var(--tc-item-gap) - var(--tc-space-2), var(--tc-font-tiny)); }
-.tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; }
-.tc-event-body { flex: 1; min-width: 0; padding: var(--tc-space-4) var(--tc-space-6); }
+/* An event cut by the timeline's edge keeps its title in view: the title holds to that edge while the event lasts; the event clips without becoming a scroller, so the title sticks to the timeline's. */
+.tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; overflow: clip; }
+.tc-event-body { flex: 1; min-width: 0; align-self: flex-start; position: sticky; top: 0; bottom: 0; padding: var(--tc-space-4) var(--tc-space-6); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
 .tc-item.is-tiny .tc-event-body { padding: 0 var(--tc-space-5); }
 
