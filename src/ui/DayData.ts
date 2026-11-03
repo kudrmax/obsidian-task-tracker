@@ -6,11 +6,15 @@ export interface DayDataDeps {
 	readonly tasks: TaskService;
 	readonly calendars: CalendarService;
 	readonly date: () => LocalDate;
-	/** The data changed: redraw. */
-	readonly onUpdate: () => void;
+	/** A part of the data changed: redraw what shows it. Data read the same as shown says nothing. */
+	readonly onUpdate: (part: DayPart) => void;
 }
 
+export type DayPart = "tasks" | "events";
+
 interface TasksState {
+	/** The day the tasks were read for: a missing file read for another day is news too, the screen lands on that day. */
+	readonly date: LocalDate | null;
 	readonly day: DayView | null;
 	readonly soon: readonly TaskItem[];
 	readonly inbox: readonly TaskItem[];
@@ -18,7 +22,7 @@ interface TasksState {
 	readonly missing: boolean;
 }
 
-const MISSING: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: true };
+const MISSING = { day: null, soon: [], inbox: [], backlog: [], missing: true } as const;
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -26,8 +30,10 @@ const MISSING: TasksState = { day: null, soon: [], inbox: [], backlog: [], missi
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: false };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
+	/** What the screen was last told of each part, to tell only a change. */
+	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
 	private readonly taskReload: Reload<TasksState>;
 	private readonly eventReload: Reload<DayEvents>;
 
@@ -100,18 +106,30 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const tasks = this.deps.tasks;
+		const date = this.deps.date();
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
-			return { day, soon, inbox, backlog, missing: false };
+			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
+			return { date, day, soon, inbox, backlog, missing: false };
 		} catch (error) {
-			if (error instanceof TasksFileMissingError) return MISSING;
+			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;
 		}
 	}
 
 	private show(change: () => void): void {
 		change();
-		this.deps.onUpdate();
+		for (const part of ["tasks", "events"] as const) {
+			const drawn = this.drawnOf(part);
+			if (drawn === this.shown[part]) continue;
+			this.shown[part] = drawn;
+			this.deps.onUpdate(part);
+		}
+	}
+
+	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; a missing file shows none. */
+	private drawnOf(part: DayPart): string {
+		if (part === "tasks") return JSON.stringify(this.state);
+		return JSON.stringify([this.missing, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale)]);
 	}
 }

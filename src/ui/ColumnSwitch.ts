@@ -190,6 +190,13 @@ export class ColumnSwitch {
 		if (mode !== this.opts.value()) this.opts.onChange(mode);
 	}
 
+	/** The wheel turns with the screen while a finger draws the screen: `position` a share of the way from one place to the next. */
+	follow(position: number): void {
+		window.clearTimeout(this.settling);
+		this.el.classList.remove("is-settling");
+		this.turn(position);
+	}
+
 	/**
 	 * Both copies of the wheel to one place: the window keeps its two icons whole, the rest shrink and fade by how far out
 	 * they stand. The track holds one neighbour on each side, and only where the wheel has one: past an end it stops at the window.

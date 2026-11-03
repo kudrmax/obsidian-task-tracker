@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DayBoundary } from "../../src/application/contracts";
-import type { TaskItem } from "../../src/application/contracts";
+import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 
@@ -294,5 +294,69 @@ describe("tasks the now line has passed", () => {
 	it("moves nothing on another day", () => {
 		const [past] = onToday([{ ...task(0, 600, null), slot: { date: "2026-11-02", start: 600, end: null } }], "2026-11-02");
 		expect(y(past)).toBe(`${10 * hourPx + 1}px`);
+	});
+});
+
+describe("the minute's tick", () => {
+	const hourPx = 56;
+	const task = (start: number): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-31", start, end: null }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
+	const meeting: CalendarEvent = { id: "m", title: "Meeting", start: new Date(2026, 9, 31, 9), end: new Date(2026, 9, 31, 10), allDay: false, calendar: "Work", color: "#0A84FF", source: "google" };
+
+	function ticking(tasks: TaskItem[]) {
+		const clock = { now: new Date(2026, 9, 31, 12, 0) };
+		const view = new Timeline(document.createElement("div"), {
+			theme: () => "dark",
+			date: () => "2026-10-31",
+			today: () => "2026-10-31",
+			boundary: () => DayBoundary.MIDNIGHT,
+			hourPx: () => hourPx,
+			tasks: () => tasks,
+			events: () => [meeting],
+			now: () => clock.now,
+		});
+		view.render();
+		return { view, clock };
+	}
+
+	it("moves the now line and the pill's time without drawing the items again", () => {
+		const { view, clock } = ticking([task(840)]);
+		const items = [...view.itemsEl.children];
+		const line = view.canvas.querySelector<HTMLElement>(".tc-now")!;
+		clock.now = new Date(2026, 9, 31, 12, 7);
+		view.tickNow();
+		expect([...view.itemsEl.children]).toEqual(items);
+		expect(view.canvas.querySelector(".tc-now")).toBe(line);
+		expect(line.querySelector(".tc-now-pill")!.textContent).toBe("12:07");
+		expect(line.style.getPropertyValue("--tc-y")).toBe(`${12 * hourPx + (7 * hourPx) / 60}px`);
+	});
+
+	it("a task that passed the now line follows it on the tick", () => {
+		const { view, clock } = ticking([task(600)]);
+		const block = view.itemsEl.querySelector<HTMLElement>(".tc-block")!;
+		const line = view.canvas.querySelector<HTMLElement>(".tc-now")!;
+		clock.now = new Date(2026, 9, 31, 13, 0);
+		view.tickNow();
+		expect(block.style.getPropertyValue("--tc-y")).toBe(`${13 * hourPx + 1}px`);
+		expect(line.style.getPropertyValue("--tc-y")).toBe(`${13 * hourPx}px`);
+	});
+});
+
+describe("the timeline's size", () => {
+	it("stops watching its size once destroyed", () => {
+		const real = globalThis.ResizeObserver;
+		const disconnect = vi.fn();
+		globalThis.ResizeObserver = class {
+			observe(): void {}
+			unobserve(): void {}
+			disconnect = disconnect;
+		} as unknown as typeof ResizeObserver;
+		try {
+			const view = timeline({ hourPx: 56 });
+			expect(disconnect).not.toHaveBeenCalled();
+			view.destroy();
+			expect(disconnect).toHaveBeenCalledOnce();
+		} finally {
+			globalThis.ResizeObserver = real;
+		}
 	});
 });

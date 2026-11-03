@@ -100,6 +100,7 @@ export class Timeline {
 	private field: ShownField | null = null;
 	private anchor: Anchor | null = null;
 	private readonly grips: HTMLElement;
+	private readonly sizeWatch: ResizeObserver;
 
 	constructor(
 		readonly el: HTMLElement,
@@ -111,10 +112,11 @@ export class Timeline {
 		this.minorEl = make(this.canvas, "div");
 		this.itemsEl = make(this.canvas, "div", "tc-items");
 		this.grips = make(null, "div", "tc-grips");
-		new ResizeObserver(() => {
+		this.sizeWatch = new ResizeObserver(() => {
 			this.deps.onResize?.();
 			this.holdAnchor();
-		}).observe(el);
+		});
+		this.sizeWatch.observe(el);
 		for (const type of ["pointerdown", "wheel", "touchstart"] as const) el.addEventListener(type, () => (this.anchor = null), { passive: true });
 		for (const edge of ["start", "end"] as const) {
 			make(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
@@ -125,6 +127,11 @@ export class Timeline {
 				this.deps.onGrip?.(task.el, task.item, edge, e);
 			});
 		}
+	}
+
+	/** The view closes: the timeline stops watching its size. */
+	destroy(): void {
+		this.sizeWatch.disconnect();
 	}
 
 	get hourPx(): number {
@@ -221,6 +228,13 @@ export class Timeline {
 			make(this.nowEl, "span", "tc-now-pill", formatTime(minutesOf(this.deps.now())));
 			make(this.nowEl, "div", "tc-now-line");
 		}
+		this.layout();
+	}
+
+	/** A minute passed: the now line, its time, and the tasks it carries move; nothing is drawn anew. */
+	tickNow(): void {
+		if (!this.nowEl) return;
+		this.nowEl.querySelector(".tc-now-pill")!.textContent = formatTime(minutesOf(this.deps.now()));
 		this.layout();
 	}
 
