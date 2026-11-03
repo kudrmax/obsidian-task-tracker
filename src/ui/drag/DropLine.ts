@@ -6,9 +6,13 @@ import { type ListFrame, toContent } from "./listFrame";
  * Where a dragged task will stand: the calendar's drop line between two cards, from a dot at the left edge of the level it
  * picks to the list's right edge. Drawn inside the list, so it scrolls with the cards, which stay where they are. For a new
  * task it comes out of the plus: a dot at the finger that runs to its place and stretches into the line.
+ *
+ * It hangs from its right edge: a move carries that edge, a new level only stretches the bar leftwards. So a change of level
+ * moves its left end alone, never its right one, which a move and a stretch would shake as the two run on their own clocks.
  */
 export class DropLine {
 	private el: HTMLElement | null = null;
+	private bar: HTMLElement | null = null;
 
 	constructor(private readonly list: () => HTMLElement) {}
 
@@ -18,8 +22,9 @@ export class DropLine {
 		if (!this.el || this.el.parentElement !== list) {
 			this.el?.remove();
 			this.el = el(null, "div", "tc-list-drop");
-			el(this.el, "div", "tc-list-drop-dot");
-			el(this.el, "div", "tc-drop-line");
+			this.bar = el(this.el, "div", "tc-list-drop-bar");
+			el(this.bar, "div", "tc-list-drop-dot");
+			el(this.bar, "div", "tc-drop-line");
 			const dot = finger ? tokenPx(list, "--tc-drop-dot") : 0;
 			if (finger) this.place(frame, finger.x - dot / 2, finger.x + dot / 2, finger.y);
 			else this.place(frame, left, right, y);
@@ -32,13 +37,14 @@ export class DropLine {
 
 	/** Placed before the line joins the list, so a new one first stands at the plus, not at the list's corner. */
 	private place(frame: ListFrame, left: number, right: number, y: number): void {
-		const at = toContent(frame, left, y);
+		const at = toContent(frame, right, y);
 		this.el!.style.transform = `translate3d(${at.x}px, ${at.y}px, 0)`;
-		this.el!.style.width = px(right - left);
+		this.bar!.style.width = px(right - left);
 	}
 
 	hide(): void {
 		this.el?.remove();
 		this.el = null;
+		this.bar = null;
 	}
 }

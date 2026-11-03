@@ -12,7 +12,7 @@ export const DESIGN = {
 	/** The same for a label between the hours. */
 	minorLift: 4,
 	/** Where the columns start under their headers. */
-	columnsTop: 64,
+	columnsTop: 40,
 	/** Where the timeline starts inside the right column, under one all-day row. */
 	timelineOffset: 34,
 	dividerWidth: 16,

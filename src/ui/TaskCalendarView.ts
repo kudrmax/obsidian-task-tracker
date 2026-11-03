@@ -45,6 +45,7 @@ import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
+import { StatusBarRoom } from "./StatusBarRoom";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
@@ -235,6 +236,7 @@ export class TaskCalendarView extends ItemView {
 		const root = this.contentEl;
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
+		this.unsubscribe.push(StatusBarRoom.hold(root.ownerDocument));
 		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {

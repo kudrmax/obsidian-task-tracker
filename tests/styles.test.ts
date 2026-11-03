@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "../src/settings";
 import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../src/ui/design";
+import { STATUS_BAR_SHOWN } from "../src/ui/StatusBarRoom";
 
 interface Declaration {
 	readonly selector: string;
@@ -225,13 +226,32 @@ describe("styles.css keeps to its design system", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
-		expect(of('body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"]))').get("--tc-status-room")).toBe("var(--tc-status-bar)");
+		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
-		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room))");
-		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
+		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
+	});
+
+	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
+		const lifted = sheet.rules
+			.filter((d) => d.property === "z-index" && d.value === "var(--tc-layer-bar-button)")
+			.flatMap((d) => d.selector.split(",").map((part) => part.trim()));
+		expect(sheet.rules.some((d) => d.selector.includes(".tc-quick-bar.is-desk .tc-bar-shifts") && d.property === "display" && d.value === "contents")).toBe(true);
+		expect(lifted).toContain(".tc-bar-shift");
+	});
+
+	it("no rule reads an element's inline style", () => {
+		const offenders = sheet.rules.filter((d) => /\[style\s*[~|^$*]?=/.test(d.selector)).map(where);
+		expect(offenders).toEqual([]);
+	});
+
+	it("the status bar's class is the one the view sets", () => {
+		const room = sheet.rules.filter((d) => d.property === "--tc-status-room").map((d) => d.selector);
+		expect(room).toHaveLength(1);
+		expect(room[0]).toContain(`.${STATUS_BAR_SHOWN}`);
 	});
 
 	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {

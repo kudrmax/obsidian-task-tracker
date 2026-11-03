@@ -60,7 +60,7 @@ describe("changing a subtask", () => {
 		const done = normalize(setStatus(doc, doc.find("now", 0, [2])!, "done"), T);
 		expect(done.tasks("now")[0].subtasks[2].task.status).toBe("done");
 		const all = normalize(setStatus(done, done.tasks("now")[0], "done"), T).serialize();
-		expect(all).toContain("## Done\n- [x] Trip 📅 2026-11-03\n\t- [x] Compare\n\t- [/] Seats\n\t\t- [ ] Window\n\t\tnote\n\t- [x] Pay\n");
+		expect(all).toContain("## Done\n\n- [x] Trip 📅 2026-11-03\n\t- [x] Compare\n\t- [/] Seats\n\t\t- [ ] Window\n\t\tnote\n\t- [x] Pay\n");
 	});
 });
 

@@ -131,7 +131,7 @@ body {
 	--tc-stroke-seg: 2px;
 
 	/* Sizes: the column headers */
-	--tc-day-row-top: 16px;
+	--tc-day-row-top: 0px;
 	--tc-day-row: 36px;
 	--tc-arrow: 36px;
 	/* Over a half-wide column the day's arrows close in, so that the longest day's name fits between them. */
@@ -147,8 +147,9 @@ body {
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
-	/* The switch's row at the bottom, over Obsidian's phone navigation. */
-	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
+	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
+	--tc-foot-gap: 12px;
+	--tc-switch-row: calc(var(--tc-seg) + var(--tc-foot-gap));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
 	--tc-plus-icon: 22px;
@@ -158,7 +159,9 @@ body {
 	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 
 	/* Sizes: the columns */
-	--tc-columns-top: 64px;
+	/* The title row, then the head gap: the titles' type stands as far over the first card as Obsidian's header over it. */
+	--tc-columns-top: 40px;
+	--tc-head-gap: 4px;
 	--tc-list-width: 187px;
 	--tc-divider: 16px;
 	/* Soon and Now share the window evenly on both sides of the fixed divider. */
@@ -562,8 +565,8 @@ body.theme-light {
 	--tc-priority-blue-meta: #4682C7;
 }
 
-/* While Obsidian shows its desktop status bar (it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
-body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"])) { --tc-status-room: var(--tc-status-bar); }
+/* While Obsidian shows its desktop status bar (the view marks the body; it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
+body:not(.is-mobile).tc-status-bar-shown { --tc-status-room: var(--tc-status-bar); }
 
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
@@ -597,13 +600,13 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
 /* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
 .task-calendar > button.tc-undo:active { opacity: var(--tc-pressed); }
 .task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
@@ -662,7 +665,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-pane { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 /* The screen's foot (the switch's row, the fade) lies over Backlog's half: the half is that much taller, so both lists show as much. */
 .tc-pane.is-backlog { flex-basis: calc(var(--tc-foot-room) + var(--tc-foot-fade)); border-top: var(--tc-hairline) solid var(--tc-line); }
-.tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; }
+.tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-head-gap) 0; display: flex; align-items: center; }
 /* Inbox's half ends over the line, out of the screen's foot. */
 .task-calendar .tc-pane.is-inbox .tc-list::after { height: var(--tc-space-8); }
 .tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
@@ -717,15 +720,16 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-branch.is-last::after { content: none; }
 .tc-branch-pass { left: calc(-1 * (var(--tc-pass) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 /* A card another one is dragged over: it will take it as its last subtask. */
-.tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
 .tc-meta { flex-shrink: 0; min-width: var(--tc-meta-min); display: flex; flex-direction: column; align-items: center; gap: var(--tc-meta-gap); color: var(--tc-muted); }
 .tc-meta.is-pair .tc-count { line-height: var(--tc-leading-count-pair); }
 .tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
 .tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* Where a dragged task will land: the calendar's drop line between two cards, at the level it picks, inside the list so it scrolls with the cards. */
-.tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); display: flex; align-items: center; z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), width var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); width: 0; height: var(--tc-drop-dot); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop.is-shown { opacity: 1; }
+/* The line hangs from its right edge, where the box stands: a new level stretches it to the left only. */
+.tc-list-drop-bar { position: absolute; top: 0; right: 0; height: 100%; display: flex; align-items: center; transition: width var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop-dot { width: var(--tc-drop-dot); height: var(--tc-drop-dot); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-accent); }
 /* The dot of a task in progress, level with the first line of the title; on a card with a priority it takes the level's meta tint, like the date and the time. */
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
@@ -966,7 +970,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
 .tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-quick-bar::before { content: ""; position: absolute; inset: 0; z-index: var(--tc-layer-bar-ground); background: var(--tc-bg); }
-.tc-quick-bar > button, .tc-bar-shifts { z-index: var(--tc-layer-bar-button); }
+.tc-quick-bar > button, .tc-bar-shifts, .tc-bar-shift { z-index: var(--tc-layer-bar-button); }
 .tc-bar-shifts { display: flex; flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
 .tc-bar-spacer { flex: 1; }
 .tc-quick-bar .tc-bar-shift, .tc-quick-bar .tc-bar-flag { width: var(--tc-bar-btn-w); height: var(--tc-bar-btn-h); flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); }
