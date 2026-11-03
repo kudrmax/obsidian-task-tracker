@@ -42,6 +42,16 @@ export class TaskSelection {
 		card.card.classList.toggle(SELECTED, picked);
 	}
 
+	/** The lists are drawn anew: the cards drawn before are let go; the picked tasks and the anchor stay. */
+	forgetDrawn(): void {
+		this.latest.clear();
+	}
+
+	/** How many cards are known as their tasks' latest. */
+	get drawnCount(): number {
+		return this.latest.size;
+	}
+
 	/** The picked tasks whose cards are on the page, in the order they stand there. */
 	get cards(): readonly PickedCard[] {
 		return [...this.picked.values()].filter((p) => p.card.isConnected).sort((a, b) => (a.card.compareDocumentPosition(b.card) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
