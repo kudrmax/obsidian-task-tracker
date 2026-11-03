@@ -29,7 +29,8 @@ import type { UndoHistory } from "./UndoHistory";
 interface Normalized {
 	readonly text: string;
 	readonly today: LocalDate;
-	readonly settings: TaskCalendarSettings;
+	/** What of the settings the document is read and normalized by: another divider or zoom keeps it. */
+	readonly reading: string;
 	readonly doc: TaskDocument;
 	readonly changed: boolean;
 }
@@ -345,7 +346,7 @@ export class TaskServiceImpl implements TaskService {
 		});
 		if (failure !== null) throw failure;
 		if (!change) return;
-		this.normalized = { text: change.after, today, settings, doc: change.doc, changed: false };
+		this.normalized = { text: change.after, today, reading: this.readingOf(settings), doc: change.doc, changed: false };
 		if (record) this.history?.record(change.before, change.after);
 	}
 
@@ -361,14 +362,21 @@ export class TaskServiceImpl implements TaskService {
 	/** The text parsed and normalized, kept until the text, the day or the settings change. */
 	private normalizedOf(text: string, settings: TaskCalendarSettings, today: LocalDate, boundary: DayBoundary): Normalized {
 		const last = this.normalized;
-		if (last && last.text === text && last.today === today && last.settings === settings) return last;
+		const reading = this.readingOf(settings);
+		if (last && last.text === text && last.today === today && last.reading === reading) return last;
 		const presets = ops.usablePresets(settings.groups.presets);
 		const parsed = this.parse(text, settings);
 		const whole = parsed.ensureSections(managedSectionNames(settings));
 		const doc = normalize(whole, today, boundary, presets);
 		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
-		this.normalized = { text, today, settings, doc, changed };
+		this.normalized = { text, today, reading, doc, changed };
 		return this.normalized;
+	}
+
+	private readingOf(settings: TaskCalendarSettings): string {
+		const { sections, groups, dueDateMarker, slotMarker, dayStartHour } = settings;
+		const prefixes = this.levels(settings).map((l) => l.prefix);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, prefixes, dayStartHour]);
 	}
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {

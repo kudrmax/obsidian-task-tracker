@@ -685,6 +685,16 @@ describe("one parse per version of the file", () => {
 		expect((await svc.dayView(D)).list.map((i) => i.text)).toEqual(["C"]);
 	});
 
+	it("keeps the parse over settings the file is not read by", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(TEXT, settings);
+		await reload(svc);
+		const parse = vi.spyOn(TaskDocument, "parse");
+		await settings.update({ zoom: 80, listShare: 0.4, rightMode: "calendar", cardHeight: 40 });
+		await reload(svc);
+		expect(parse).not.toHaveBeenCalled();
+	});
+
 	it("parses again when the day changes", async () => {
 		let now = new Date(2026, 9, 30, 14, 20);
 		const store = new InMemoryTaskFileStore(TEXT.replace("- [ ] C", "- [ ] C 📅 2026-10-31"));
