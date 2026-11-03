@@ -11,6 +11,8 @@ export interface LongPressOptions {
 	onTap?(e: PointerEvent): void;
 	/** A mouse clicked twice quickly: the first click then reports no tap. */
 	onDoubleTap?(e: PointerEvent): void;
+	/** A click no double click could follow: reported as a tap at once, without waiting for a second one. */
+	immediate?(e: PointerEvent): boolean;
 	/** A mouse held still for the delay. */
 	onLongTap?(e: PointerEvent): void;
 	/** Whether this press is for this element at all: a press that starts on a child with gestures of its own is not. */
@@ -78,7 +80,7 @@ export class LongPress {
 		const { mouse, second } = this.press;
 		this.end();
 		if (moved) return;
-		if (!mouse || !this.opts.onDoubleTap) this.opts.onTap?.(e);
+		if (!mouse || !this.opts.onDoubleTap || this.opts.immediate?.(e)) this.opts.onTap?.(e);
 		else if (second) this.opts.onDoubleTap(e);
 		else this.pendingTap = window.setTimeout(() => {
 			this.pendingTap = null;

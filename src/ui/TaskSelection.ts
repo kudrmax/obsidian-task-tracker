@@ -1,0 +1,96 @@
+import type { TaskItem, TaskKey } from "../application/contracts";
+import type { ListColumn } from "./drag/DropTarget";
+
+/** A list card as the selection knows it: the task, the card drawn for it, the list it stands in, its subtasks' cards. */
+export interface PickedCard {
+	readonly item: TaskItem;
+	readonly card: HTMLElement;
+	readonly column: ListColumn;
+	readonly subtree: readonly HTMLElement[];
+}
+
+const SELECTED = "is-selected";
+
+/** The same task as read: its place and its line. */
+export function keyId(key: TaskKey): string {
+	return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+}
+
+/**
+ * The tasks picked with ⌘-click for an action on all of them (bulk actions spec, desktop only). A redraw gives each
+ * picked task its new card, which wears the selection; a task no list draws any more drops out of it.
+ */
+export class TaskSelection {
+	private readonly picked = new Map<string, PickedCard>();
+	/** Every list card drawn, picked or not, by its element. */
+	private readonly drawn = new WeakMap<HTMLElement, PickedCard>();
+	/** The task the last ⌘-click picked: a Shift-click selects from it. */
+	private anchor: PickedCard | null = null;
+
+	constructor(private readonly onChange: () => void = () => {}) {}
+
+	/** A card drawn: it wears the selection when its task is picked. */
+	attach(card: PickedCard): void {
+		this.drawn.set(card.card, card);
+		const id = keyId(card.item.key);
+		const picked = this.picked.has(id);
+		if (picked) this.picked.set(id, card);
+		if (this.anchor && keyId(this.anchor.item.key) === id) this.anchor = card;
+		card.card.classList.toggle(SELECTED, picked);
+	}
+
+	/** The picked tasks whose cards are on the page, in the order they stand there. */
+	get cards(): readonly PickedCard[] {
+		return [...this.picked.values()].filter((p) => p.card.isConnected).sort((a, b) => (a.card.compareDocumentPosition(b.card) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+	}
+
+	/** The drawn card `el` as the selection knows it. */
+	cardOf(el: HTMLElement): PickedCard | undefined {
+		return this.drawn.get(el);
+	}
+
+	get size(): number {
+		return this.cards.length;
+	}
+
+	has(item: TaskItem): boolean {
+		const picked = this.picked.get(keyId(item.key));
+		return picked !== undefined && picked.card.isConnected;
+	}
+
+	/** ⌘-click: in or out. */
+	toggle(card: PickedCard): void {
+		const id = keyId(card.item.key);
+		if (this.picked.has(id)) {
+			this.picked.delete(id);
+			this.anchor = null;
+		} else {
+			this.picked.set(id, card);
+			this.anchor = card;
+		}
+		this.show();
+	}
+
+	/** Shift-click: every card of `column` from the last picked one to this one joins; without one in that list, only this one. */
+	extend(card: PickedCard, column: readonly PickedCard[]): void {
+		const from = this.anchor && this.anchor.card.isConnected ? column.findIndex((c) => c.card === this.anchor!.card) : -1;
+		const to = column.findIndex((c) => c.card === card.card);
+		if (from < 0 || to < 0) return this.toggle(card);
+		for (const c of column.slice(Math.min(from, to), Math.max(from, to) + 1)) this.picked.set(keyId(c.item.key), c);
+		this.anchor = card;
+		this.show();
+	}
+
+	clear(): void {
+		if (this.picked.size === 0) return;
+		this.picked.clear();
+		this.anchor = null;
+		this.show();
+	}
+
+	private show(): void {
+		for (const card of document.querySelectorAll<HTMLElement>(`.tc-card.${SELECTED}`)) card.classList.remove(SELECTED);
+		for (const p of this.picked.values()) p.card.classList.add(SELECTED);
+		this.onChange();
+	}
+}

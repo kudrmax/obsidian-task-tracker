@@ -13,6 +13,9 @@ import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigi
 import { FloatingCard } from "./FloatingCard";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
+import type { PickedCard } from "../TaskSelection";
+
+const WAITING = "is-waiting";
 
 export interface DragControllerDeps {
 	longPressMs(): number;
@@ -20,7 +23,15 @@ export interface DragControllerDeps {
 	day(): LocalDate;
 	step(): number;
 	timeline(): Timeline | null;
-	targets(): readonly DropTarget[];
+	/** Where `drag` may land: the lists and the timeline shown, and the place that cancels several cards carried at once. */
+	targets(drag: TaskDragPayload): readonly DropTarget[];
+	/**
+	 * A list card clicked (`tap`) or right-clicked (`menu`): true when the click picked cards or opened the menu for the
+	 * picked ones, so the card's own menu stays shut.
+	 */
+	pick?(item: TaskItem, card: HTMLElement, e: MouseEvent, how: "tap" | "menu"): boolean;
+	/** The other picked cards that go along when `item` is lifted; none when it is not picked or picked alone. */
+	carried?(item: TaskItem): readonly PickedCard[];
 	readonly haptics: Haptics;
 	readonly arbiter: GestureArbiter;
 	/** A card is lifted or settled: the lists hide New task while it is carried. */
@@ -57,13 +68,20 @@ export class DragController {
 	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = []): void {
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
-			this.deps.onMenu(item, card);
+			if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
 		});
 		new LongPress(card, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
-			onStart: (e) => this.begin(card, this.payload(card, item, from, e), e, subtree),
-			onTap: () => this.deps.onMenu(item, card),
+			onStart: (e) => {
+				const carried = this.deps.carried?.(item) ?? [];
+				const payload = { ...this.payload(card, item, from, e), carried: carried.map((c) => ({ item: c.item, from: c.column })) };
+				this.begin(card, payload, e, subtree, carried);
+			},
+			onTap: (e) => {
+				if (!this.deps.pick?.(item, card, e, "tap")) this.deps.onMenu(item, card);
+			},
+			immediate: (e) => e.metaKey || e.ctrlKey || e.shiftKey,
 			onDoubleTap: () => this.deps.onRename(item),
 		});
 	}
@@ -182,20 +200,22 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	private begin(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = []): void {
+	/** `carried`: the other picked cards, lifted with this one; each waits as a dashed place where it stood until the pointer is over its list. */
+	private begin(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
+		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length);
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
-		const lifted = [source, ...subtree];
+		const lifted = [source, ...subtree, ...carried.flatMap((c) => [c.card, ...c.subtree])];
 		for (const card of lifted) card.classList.add("is-lifted");
+		if (carried.length > 0) for (const card of lifted) card.classList.add(WAITING);
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		const reopen = () => {
-			for (const card of lifted) card.classList.remove("is-lifted");
+			for (const card of lifted) card.classList.remove("is-lifted", WAITING);
 			timeline?.layoutTasks();
 		};
 		this.follow(
@@ -204,7 +224,7 @@ export class DragController {
 			(detach) =>
 				new DragSession({
 					payload,
-					targets: this.deps.targets(),
+					targets: this.deps.targets(payload),
 					float,
 					origin,
 					onReturn: reopen,
@@ -266,18 +286,34 @@ export class DragController {
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};
+		let ended = false;
+		const end = (settling: () => Promise<void>) => {
+			if (ended) return;
+			ended = true;
+			document.removeEventListener("keydown", escape, true);
+			void settling().then(settled);
+		};
 		const up = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) void session.release(ev.clientX, ev.clientY).then(settled);
+			if (ev.pointerId === e.pointerId) end(() => session.release(ev.clientX, ev.clientY));
 		};
 		const cancel = (ev: PointerEvent) => {
-			if (ev.pointerId === e.pointerId) void session.cancel().then(settled);
+			if (ev.pointerId === e.pointerId) end(() => session.cancel());
+		};
+		/** Escape puts the cards back where they were, as a cancelled drag does. */
+		const escape = (ev: KeyboardEvent) => {
+			if (ev.key !== "Escape") return;
+			ev.preventDefault();
+			ev.stopPropagation();
+			end(() => session.cancel());
 		};
 		const detach = () => {
+			document.removeEventListener("keydown", escape, true);
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(source, e.pointerId);
 		};
+		document.addEventListener("keydown", escape, true);
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);

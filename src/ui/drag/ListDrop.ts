@@ -3,12 +3,14 @@ import { DESIGN, LAYOUT, PROPERTY, tokenPx } from "../design";
 import { px } from "../dom";
 import type { ListEntry, TaskList } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
-import type { ColumnSections, DragPayload, DropResult, DropTarget, ListColumn } from "./DropTarget";
+import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropGap } from "./DropGap";
 import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
+/** A card carried with others, shown as a dashed place where it stood while the pointer is away from its list. */
+const WAITING = "is-waiting";
 const SHIFTED = "is-shifted";
 const TARGET = "is-target";
 /** The list draws its cards where the drag puts them, each at its own `--tc-room`. */
@@ -42,6 +44,8 @@ export class ListDrop implements DropTarget {
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly gap: DropGap;
 	private readonly scroll: AutoScroll;
+	/** Several cards are carried: away from the list each waits as a dashed place where it stood. */
+	private many = false;
 
 	constructor(
 		private readonly list: TaskList,
@@ -60,13 +64,15 @@ export class ListDrop implements DropTarget {
 
 	/** The list and the column's title over it: a finger carried up past the list puts the card on its top. Under the list nothing is it. */
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
-		if (!this.accepts(drag)) return false;
+		if (!this.takes(drag)) return false;
 		const r = this.area.getBoundingClientRect();
 		const bottom = Math.min(r.bottom, this.list.el.getBoundingClientRect().bottom);
 		return x >= r.left && x < r.right && y >= r.top - DESIGN.columnsTop && y < bottom;
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {
+		this.many = carriesMany(drag);
+		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.last = { x, y, drag };
 		const layout = this.measure();
 		if (!this.placesAnywhere(drag)) {
@@ -98,6 +104,12 @@ export class ListDrop implements DropTarget {
 
 	/** The finger has left the list: the room goes back to where the card was lifted from, dashed, so it is plain where to bring it back. */
 	leave(): void {
+		if (this.many) {
+			for (const node of this.list.elements) node.classList.toggle(WAITING, node.classList.contains(LIFTED));
+			this.reset(null);
+			this.gap.hide();
+			return;
+		}
 		this.reset(this.liftedFrom());
 		if (this.room) this.gap.show(this.gapRect(this.room), true);
 		else this.gap.hide();
@@ -105,6 +117,8 @@ export class ListDrop implements DropTarget {
 
 	/** The drag is over: the room closes, and with no card lifted from it the list stands as it was. */
 	clear(): void {
+		this.many = false;
+		for (const node of this.list.elements) node.classList.remove(WAITING);
 		this.reset(null);
 		this.gap.hide();
 		this.layout = null;
@@ -121,7 +135,7 @@ export class ListDrop implements DropTarget {
 	}
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
-		if (!this.accepts(drag)) return null;
+		if (!this.takes(drag)) return null;
 		const sections = this.sections();
 		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
 		if (!this.place) this.preview(x, y, drag);
@@ -134,8 +148,15 @@ export class ListDrop implements DropTarget {
 
 	/** The place the card was lifted from, at its level: let go there, the card only goes back. */
 	private isHome(place: ListPlace): boolean {
+		if (this.many) return false;
 		const home = this.liftedFrom();
 		return home !== null && place.kind === "gap" && samePlace(place, home) && place.level === home.level;
+	}
+
+	/** The list takes the card under the finger and every card carried along with it. */
+	private takes(drag: DragPayload): boolean {
+		if (!this.accepts(drag)) return false;
+		return drag.from === "new" || (drag.carried ?? []).every((carried) => this.accepts({ ...drag, from: carried.from }));
 	}
 
 	/** A list with sections places a card from anywhere, and any list a new task; another only a card from itself. */
@@ -151,7 +172,8 @@ export class ListDrop implements DropTarget {
 		const nodes = this.list.elements;
 		const step = shownCardSize().height + shownCardSize().gap;
 		const room = this.room;
-		const lifted = nodes.some((node) => node.classList.contains(LIFTED));
+		const gone = (node: HTMLElement) => node.classList.contains(LIFTED) && !node.classList.contains(WAITING);
+		const lifted = nodes.some(gone);
 		if (!room && !lifted) {
 			this.list.el.classList.remove(MAKING_ROOM);
 			for (const node of nodes) {
@@ -164,7 +186,7 @@ export class ListDrop implements DropTarget {
 		let removed = 0;
 		let index = 0;
 		for (const node of nodes) {
-			if (node.classList.contains(LIFTED)) {
+			if (gone(node)) {
 				removed += step;
 				node.style.setProperty(PROPERTY.room, px(0));
 				continue;
