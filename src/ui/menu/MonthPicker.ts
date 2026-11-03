@@ -1,6 +1,6 @@
 import { addDays, addMonths, gridStart, monthTitle, sameMonth, startOfMonth } from "../dates";
 import { clear, el as make } from "../dom";
-import { icon } from "../icons";
+import { icon } from "../kit/icons";
 import type { LocalDate } from "../types";
 
 export interface MonthPickerOptions {

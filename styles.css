@@ -653,8 +653,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }
 .task-calendar > .tc-plus-ring.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); }
-.task-calendar > .tc-plus-ring.is-cancel { color: var(--tc-muted); background: var(--tc-bg); }
-.task-calendar > .tc-plus-ring.is-cancel.is-hot { color: var(--tc-accent); background: var(--tc-drop-bg); }
+.task-calendar > .tc-plus-ring.is-cross { color: var(--tc-muted); background: var(--tc-bg); }
+.task-calendar > .tc-plus-ring.is-cross.is-hot { color: var(--tc-accent); background: var(--tc-drop-bg); }
 .tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
 .tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }

@@ -11,7 +11,7 @@ import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
 import { plainText } from "../../application/taskText";
-import type { MenuIconName } from "./menuIcons";
+import type { IconName } from "../kit/icons";
 import { MonthPicker } from "./MonthPicker";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
@@ -23,14 +23,14 @@ type Asking = "delete" | "wontdo";
 export interface StatusTile {
 	readonly id: StatusTileId;
 	readonly label: string;
-	readonly icon: MenuIconName;
+	readonly icon: IconName;
 }
 
 export interface EditRow {
 	readonly id: EditRowId;
 	readonly label: string;
 	readonly value: string;
-	readonly icon: MenuIconName;
+	readonly icon: IconName;
 }
 
 /** The status group: Done first, the most used. */

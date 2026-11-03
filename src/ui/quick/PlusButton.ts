@@ -1,7 +1,7 @@
 import { LAYOUT } from "../design";
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
-import { icon } from "../icons";
+import { icon } from "../kit/icons";
 
 export interface PlusButtonDeps {
 	onTap(): void;

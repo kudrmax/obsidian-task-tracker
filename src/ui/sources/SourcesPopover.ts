@@ -2,7 +2,7 @@ import type { SourceStatus } from "../../application/contracts";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { Overlay } from "../menu/Overlay";
-import { sourceIcon } from "./sourceIcons";
+import { icon } from "../kit/icons";
 import { sourceText } from "./sourceText";
 
 export interface SourcesPopoverOptions {
@@ -34,7 +34,7 @@ export class SourcesPopover {
 		for (const status of opts.statuses) {
 			const text = sourceText(status, opts.now);
 			const row = el(panel, "div", "tc-source-row");
-			row.appendChild(sourceIcon(status.source));
+			row.appendChild(icon(status.source));
 			const lines = el(row, "div", "tc-source-lines");
 			el(lines, "span", "tc-source-name", text.name);
 			el(lines, "span", "tc-source-sub", text.sub);
@@ -42,7 +42,7 @@ export class SourcesPopover {
 			time.classList.toggle("is-stale", text.stale);
 		}
 		const refresh = el(panel, "button", "tc-source-refresh");
-		refresh.appendChild(sourceIcon("refresh"));
+		refresh.appendChild(icon("refresh"));
 		refresh.appendChild(document.createTextNode("Refresh now"));
 		refresh.addEventListener("click", () => {
 			this.close();

@@ -1,21 +1,15 @@
 import type { PriorityColor } from "../../settings";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
-import { icon } from "../icons";
-import { MENU_ICONS, type MenuIconName, menuIcon } from "./menuIcons";
+import { icon, type IconName } from "../kit/icons";
 
-/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear, and Tomorrow, which a quick move wears. */
-export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar" | "tomorrow";
-export type TileIconName = MenuIconName | PlaceIconName;
-
-function tileIcon(name: TileIconName): SVGSVGElement {
-	return name in MENU_ICONS ? menuIcon(name as MenuIconName) : icon(name as PlaceIconName);
-}
+/** The wheel's places, which the quick bar's place tiles wear. */
+export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar";
 
 export interface MenuRowSpec {
 	readonly label: string;
 	readonly value?: string;
-	readonly icon?: TileIconName;
+	readonly icon?: IconName;
 	readonly danger?: boolean;
 	readonly onPick: () => void;
 }
@@ -26,7 +20,7 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec, cls = "tc-menu-r
 	row.classList.toggle("is-danger", spec.danger === true);
 	el(row, "span", "tc-menu-label", spec.label);
 	if (spec.value) el(row, "span", "tc-menu-value", spec.value);
-	if (spec.icon) row.appendChild(tileIcon(spec.icon));
+	if (spec.icon) row.appendChild(icon(spec.icon));
 	row.addEventListener("click", spec.onPick);
 	return row;
 }
@@ -40,7 +34,7 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 
 export interface MenuTileSpec {
 	readonly label: string;
-	readonly icon: TileIconName;
+	readonly icon: IconName;
 	/** A priority level's tile: its flag takes the level's colour, and the task's own level is `on`. */
 	readonly color?: PriorityColor;
 	/** The tile that stands for what is set now; a level's tile also carries the cross that takes it off. */
@@ -53,9 +47,9 @@ function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	const tile = el(parent, "button", "tc-menu-tile");
 	if (spec.color) tile.dataset.priority = spec.color;
 	tile.classList.toggle("is-on", spec.on === true);
-	tile.appendChild(tileIcon(spec.icon));
+	tile.appendChild(icon(spec.icon));
 	el(tile, "span", "tc-menu-tile-label", spec.label);
-	if (spec.on && spec.color) el(tile, "span", "tc-menu-badge").appendChild(menuIcon("cross"));
+	if (spec.on && spec.color) el(tile, "span", "tc-menu-badge").appendChild(icon("cross"));
 	tile.addEventListener("click", spec.onPick);
 	return tile;
 }
@@ -75,7 +69,7 @@ export interface MenuAskSpec {
 	readonly verb: string;
 	readonly title: string;
 	readonly confirm: string;
-	readonly icon: MenuIconName;
+	readonly icon: IconName;
 	/** The confirming button in the danger colour: what it does can't be taken back. */
 	readonly danger: boolean;
 	readonly onCancel: () => void;
@@ -93,7 +87,7 @@ export function askGroup(parent: HTMLElement, spec: MenuAskSpec): HTMLElement {
 	const buttons = el(group, "div", "tc-menu-ask-buttons");
 	el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-cancel", "Cancel").addEventListener("click", spec.onCancel);
 	const confirm = el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-confirm");
-	confirm.appendChild(menuIcon(spec.icon));
+	confirm.appendChild(icon(spec.icon));
 	confirm.appendChild(document.createTextNode(spec.confirm));
 	confirm.addEventListener("click", spec.onConfirm);
 	return group;

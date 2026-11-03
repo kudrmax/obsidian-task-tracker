@@ -1,6 +1,6 @@
 import { DURATION, tokenMs } from "../design";
 import { el } from "../dom";
-import { icon } from "../icons";
+import { icon } from "../kit/icons";
 import type { Grab } from "./FloatingCard";
 import type { Float } from "./DropTarget";
 

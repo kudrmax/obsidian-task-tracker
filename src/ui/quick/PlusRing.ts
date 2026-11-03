@@ -1,7 +1,7 @@
 import { LAYOUT } from "../design";
 import type { DropTarget } from "../drag/DropTarget";
 import { el } from "../dom";
-import { icon, type IconName } from "../icons";
+import { icon, type IconName } from "../kit/icons";
 
 const CANCELLING = "tc-cancelling";
 
@@ -40,7 +40,7 @@ export class PlusRing implements DropTarget {
 	/** Over the cross the carried stack turns see-through: the ring it would cover shows lit under it. */
 	preview(): void {
 		this.ring?.classList.add("is-hot");
-		if (this.mark === "cancel") this.parent.ownerDocument.body.classList.add(CANCELLING);
+		if (this.mark === "cross") this.parent.ownerDocument.body.classList.add(CANCELLING);
 	}
 
 	landing(): DOMRect | null {

@@ -1,6 +1,6 @@
 import type { UndoService } from "../application/contracts";
 import { el } from "./dom";
-import { icon } from "./icons";
+import { icon } from "./kit/icons";
 
 /** The round button opposite the plus: a press takes the last action back; it stays dim while there is none. */
 export class UndoButton {

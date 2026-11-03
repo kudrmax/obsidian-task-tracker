@@ -1,5 +1,5 @@
 import { el } from "./dom";
-import { icon } from "./icons";
+import { icon } from "./kit/icons";
 
 export interface ColumnHeadersOptions {
 	title(): string;
