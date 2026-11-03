@@ -37,8 +37,9 @@ import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
-import { clear, el, px } from "./dom";
+import { clear, el, px, restingTop } from "./dom";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
+import { Keyboard } from "./Keyboard";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -376,6 +377,8 @@ export class TaskCalendarView extends ItemView {
 			render: () => this.render(),
 			onError: (error) => this.reportFailure(error),
 		});
+		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
+		this.unsubscribe.push(() => keyboard.destroy());
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
 		this.unsubscribe.push(() => undo.destroy());
 		this.scope = new Scope(this.app.scope);
@@ -973,11 +976,11 @@ export class TaskCalendarView extends ItemView {
 
 }
 
-/** The top of the buttons of Obsidian's toolbar over the phone keyboard while it shows; null otherwise. */
+/** Where the buttons of Obsidian's toolbar over the phone keyboard stop while it shows, though still sliding there; null otherwise. */
 function keyboardToolbarTop(doc: Document): number | null {
 	const toolbar = doc.body.querySelector<HTMLElement>(".mobile-toolbar .mobile-toolbar-options-container");
 	const box = toolbar?.getBoundingClientRect();
-	return box && box.height > 0 ? box.top : null;
+	return toolbar && box && box.height > 0 ? restingTop(toolbar) : null;
 }
 
 /** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */

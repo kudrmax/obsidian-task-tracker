@@ -2,7 +2,7 @@ import type { Placement } from "../../application/contracts";
 import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
-import { clear, el, px } from "../dom";
+import { clear, el, px, restingTop } from "../dom";
 import { icon } from "../icons";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
 import { menuIcon } from "../menu/menuIcons";
@@ -65,6 +65,7 @@ const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string
 ];
 
 const TOOLBAR_ROOM = "--tc-toolbar-room";
+const GLIDING = "is-gliding";
 
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
 
@@ -111,6 +112,9 @@ export class QuickBar {
 		this.place.title = "Place";
 		this.placeText = el(this.place, "span", "tc-bar-place-label");
 		this.place.addEventListener("click", () => this.toggle("place"));
+		this.bar.addEventListener("transitionend", (e) => {
+			if (e.target === this.bar && e.propertyName === "transform") this.bar.classList.remove(GLIDING);
+		});
 	}
 
 	private shiftButton(cls: string, name: "outdent" | "indent", label: string, key: string, delta: 1 | -1): HTMLButtonElement {
@@ -140,15 +144,18 @@ export class QuickBar {
 
 	hide(): void {
 		this.closePanel();
+		this.stopGlide();
 		this.bar.hidden = true;
 		this.follow(null);
 	}
 
 	/**
 	 * The bar stands by the field `anchor` gives, after the field moved, grew or scrolled or the view changed. Over a menu's
-	 * blur it leaves the view for the page, above the blur; null puts it back last in the view.
+	 * blur it leaves the view for the page, above the blur; null puts it back last in the view. With `glide`, the phone
+	 * keyboard has started to slide: the bar slides from where it is drawn to its new place with it.
 	 */
-	follow(anchor: BarAnchor | null): void {
+	follow(anchor: BarAnchor | null, glide = false): void {
+		const from = glide && !this.bar.hidden && !this.deps.desktop() ? this.bar.getBoundingClientRect().top : null;
 		this.anchor = anchor;
 		for (const property of ["left", "top", "width", "bottom"]) this.bar.style.removeProperty(property);
 		this.standOverToolbar(anchor?.toolbarTop ?? null);
@@ -160,18 +167,35 @@ export class QuickBar {
 		this.bar.classList.remove("is-away");
 		if (anchor && this.deps.desktop()) this.standBy(anchor);
 		else if (over) this.dock(over);
+		if (from !== null) this.glideFrom(from);
+	}
+
+	/** Drawn at `top` again, the bar slides to where it now stands in the keyboard's time and easing. */
+	private glideFrom(top: number): void {
+		const by = top - restingTop(this.bar);
+		if (Math.abs(by) < 1) return;
+		this.stopGlide();
+		this.bar.style.transform = `translateY(${px(by)})`;
+		this.bar.getBoundingClientRect(); // draws it where it was, so the slide starts there
+		this.bar.classList.add(GLIDING);
+		this.bar.style.removeProperty("transform");
+	}
+
+	private stopGlide(): void {
+		this.bar.classList.remove(GLIDING);
+		this.bar.style.removeProperty("transform");
 	}
 
 	/**
-	 * On the phone the bar stands over Obsidian's toolbar, wherever the keyboard and the toolbar put it: the view and the bar
-	 * learn how far the toolbar's top is over the view's bottom, and the styles keep the cards' gap above it.
+	 * On the phone the bar stands over Obsidian's toolbar, wherever the keyboard and the toolbar put it: the page learns how
+	 * far the toolbar's top is over the view's bottom, and the styles keep the cards' gap above it. The page, since the
+	 * tokens built on it are worked out on its body.
 	 */
 	private standOverToolbar(top: number | null): void {
 		const room = top === null || this.deps.desktop() ? 0 : Math.max(0, this.parent.getBoundingClientRect().bottom - top);
-		for (const holder of [this.parent, this.bar]) {
-			if (room > 0) holder.style.setProperty(TOOLBAR_ROOM, px(room));
-			else holder.style.removeProperty(TOOLBAR_ROOM);
-		}
+		const page = this.parent.ownerDocument.body;
+		if (room > 0) page.style.setProperty(TOOLBAR_ROOM, px(room));
+		else page.style.removeProperty(TOOLBAR_ROOM);
 	}
 
 	/** Over a menu's blur on the phone: at the bottom of the view's box, above the blur. */
@@ -208,7 +232,7 @@ export class QuickBar {
 	get room(): number {
 		if (this.deps.desktop()) return this.bar.getBoundingClientRect().height + 2 * DESIGN.deskBarGap;
 		const bar = this.bar.getBoundingClientRect();
-		return bar.height > 0 ? Math.max(DESIGN.barHeight, this.parent.getBoundingClientRect().bottom - bar.top) : DESIGN.barHeight;
+		return bar.height > 0 ? Math.max(DESIGN.barHeight, this.parent.getBoundingClientRect().bottom - restingTop(this.bar)) : DESIGN.barHeight;
 	}
 
 	private levels(): readonly PriorityLevel[] {

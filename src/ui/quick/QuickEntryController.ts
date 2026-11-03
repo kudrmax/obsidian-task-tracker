@@ -7,6 +7,7 @@ import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
 import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
+import type { Glide } from "../Keyboard";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
 import type { ListEntryInput, TaskList } from "../TaskList";
@@ -17,6 +18,7 @@ import { PlusRing } from "./PlusRing";
 import { QuickBar, type QuickBarState } from "./QuickBar";
 import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
 import { levelOfText, QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
+import { ScrollGlide } from "./ScrollGlide";
 import type { TitleFieldFactory } from "./TitleField";
 
 /** A list as a place to drop, and the column it is. */
@@ -137,6 +139,8 @@ export class QuickEntryController {
 	private follow = false;
 	/** Where the last reveal left each scroller: a scroll to anywhere else is the finger's. */
 	private readonly revealedAt = new WeakMap<Element, number>();
+	/** The list riding the keyboard as it slides. */
+	private readonly glide = new ScrollGlide();
 	private readonly scrolled = (e: Event) => {
 		const state = this.state;
 		if (!state) return;
@@ -144,12 +148,16 @@ export class QuickEntryController {
 		const scroller = this.scrollerOf(state.spot);
 		if (!scroller || e.target !== scroller) return;
 		const at = this.revealedAt.get(scroller);
-		if (at === undefined || Math.abs(scroller.scrollTop - at) >= 1) this.follow = false;
+		if (at !== undefined && Math.abs(scroller.scrollTop - at) < 1) return;
+		this.follow = false;
+		this.glide.stop();
 	};
 	/** The columns slid or a card settled: the field may stand elsewhere now, and the bar goes with it. */
 	private readonly settled = () => {
 		if (this.state) this.followBar(this.state);
 	};
+	/** The view grew or shrank, Obsidian's toolbar coming or going under it: the field keeps over the bar in the same frame. */
+	private readonly sizeWatch = new ResizeObserver(() => this.reveal());
 	private readonly tapAway = (e: Event) => {
 		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
 		this.entry.blur();
@@ -182,6 +190,7 @@ export class QuickEntryController {
 		document.addEventListener("mousedown", this.mousePressed, true);
 		deps.root.addEventListener("scroll", this.scrolled, true);
 		deps.root.addEventListener("transitionend", this.settled, true);
+		this.sizeWatch.observe(deps.root);
 	}
 
 	/** A double click on a list's free room: the field at the end of the column. */
@@ -309,6 +318,17 @@ export class QuickEntryController {
 		if (state) this.followBar(state);
 	}
 
+	/**
+	 * The phone keyboard starts to slide in or out, the view still as tall as before: the bar goes to where the keyboard's
+	 * toolbar will stop, and the field followed into sight scrolls over it, both in the keyboard's time and easing.
+	 */
+	keyboardSlides(glide: Glide): void {
+		const state = this.state;
+		if (!state) return;
+		this.followBar(state, true);
+		if (this.follow) this.bringIntoSight(state, glide);
+	}
+
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
 	close(): void {
 		document.removeEventListener("click", this.tapAway, true);
@@ -316,6 +336,8 @@ export class QuickEntryController {
 		document.removeEventListener("mousedown", this.mousePressed, true);
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
+		this.sizeWatch.disconnect();
+		this.glide.stop();
 		this.entry.blur();
 		this.bar.hide();
 	}
@@ -442,9 +464,10 @@ export class QuickEntryController {
 
 	/**
 	 * The list or the timeline scrolls the field into sight: on the phone at least 16 px over the bar, on the desktop with
-	 * room under it for the capsule; a menu raises the parts over its blur.
+	 * room under it for the capsule; a menu raises the parts over its blur. With `glide` the list scrolls along with the
+	 * keyboard instead of at once.
 	 */
-	private bringIntoSight(state: EntryState): void {
+	private bringIntoSight(state: EntryState, glide?: Glide): void {
 		const field = this.field?.el;
 		if (!field?.isConnected) return;
 		const rect = field.getBoundingClientRect();
@@ -458,20 +481,26 @@ export class QuickEntryController {
 		if (!scroller) return;
 		const top = scroller.getBoundingClientRect().top;
 		const by = rect.bottom > limit ? rect.bottom - limit : rect.top < top ? rect.top - top : 0;
+		if (glide && by !== 0) {
+			this.glide.start(scroller, scroller.scrollTop + by, glide, (at) => this.revealedAt.set(scroller, at));
+			return;
+		}
+		if (by !== 0) this.glide.stop();
 		this.revealedAt.set(scroller, scroller.scrollTop + by);
 		if (by !== 0) scroller.scrollTop += by;
 		this.revealedAt.set(scroller, scroller.scrollTop);
 	}
 
 	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */
-	private followBar(state: EntryState): void {
+	private followBar(state: EntryState, glide = false): void {
 		const field = this.field?.el;
-		this.bar.follow({
+		const anchor = {
 			field: field?.isConnected ? field.getBoundingClientRect() : null,
 			room: this.roomOf(state),
 			overMenu: state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null,
 			toolbarTop: this.deps.toolbarTop(),
-		});
+		};
+		this.bar.follow(anchor, glide);
 	}
 
 	/** What shows of the field's list or timeline (the view for a menu's stack), down to the top of Obsidian's status bar. */
@@ -492,6 +521,7 @@ export class QuickEntryController {
 		this.state = state;
 		if (state?.renaming !== before?.renaming) this.moved = false;
 		if (!state) {
+			this.glide.stop();
 			this.dropField();
 			this.bar.hide();
 			this.placeOffLists(null);

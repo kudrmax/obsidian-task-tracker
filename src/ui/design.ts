@@ -88,6 +88,12 @@ export const DURATION = {
 	fly: "--tc-duration-fly",
 	fade: "--tc-duration-fade",
 	slide: "--tc-duration-slide",
+	keyboard: "--tc-duration-keyboard",
+} as const;
+
+/** The easings the code animates with, read from styles.css as the durations are. */
+export const EASING = {
+	keyboard: "--tc-ease-keyboard",
 } as const;
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */

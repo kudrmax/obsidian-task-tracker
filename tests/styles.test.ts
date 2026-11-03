@@ -228,10 +228,16 @@ describe("styles.css keeps to its design system", () => {
 		expect(of('body:not(.is-mobile):has(> .app-container > .status-bar:not([style*="display: none"]))').get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
-		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8))");
-		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2)");
+		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room))");
+		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
+	});
+
+	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
+		expect(of(".task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 });
 

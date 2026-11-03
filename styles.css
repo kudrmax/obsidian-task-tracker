@@ -183,6 +183,12 @@ body {
 	--tc-status-room: 0px;
 	/* What Obsidian keeps under the view's bottom row (the switch and the plus): the phone's navigation, the desktop's status bar. */
 	--tc-chrome-room: calc(var(--tc-nav-room) + var(--tc-status-room));
+	/*
+	 * How far Obsidian's phone keyboard reaches into the screen while it stands (0 elsewhere). The switch, the plus and Undo stand
+	 * as on the screen without it: while the keyboard is up they wait under it, so when it goes down they are uncovered in
+	 * place, never drawn over it first and then dropped.
+	 */
+	--tc-keyboard-room: var(--keyboard-height, 0px);
 	/* Under a list column: the switch's row, and Obsidian's navigation or status bar under it. */
 	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room));
 	/* While a task is typed, the list's end can rise this far: over the bar at the view's bottom, with the field 16 px above it. */
@@ -484,6 +490,9 @@ body {
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
 	--tc-duration-fade: 160ms;
+	/* The phone keyboard slides in and out as Obsidian moves its toolbar with it: the quick bar and the field typed in ride it. */
+	--tc-duration-keyboard: 300ms;
+	--tc-ease-keyboard: cubic-bezier(0.12, 0, 0.44, 0.99);
 	/* A description's screen rises this far as it fades in. */
 	--tc-rise: 12px;
 }
@@ -588,13 +597,13 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
 /* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
 .task-calendar > button.tc-undo:active { opacity: var(--tc-pressed); }
 .task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
@@ -974,6 +983,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar .tc-quick-bar .tc-bar-place, .task-calendar .tc-quick-bar .tc-bar-place:hover, .task-calendar .tc-quick-bar .tc-bar-place:active { background: var(--tc-track-bg); }
 .tc-quick-bar button:active:not(:disabled) { opacity: var(--tc-pressed); }
 .tc-quick-bar[hidden], .tc-quick-bar button[hidden], .tc-bar-shifts[hidden] { display: none; }
+.tc-quick-bar.is-gliding { transition: transform var(--tc-duration-keyboard) var(--tc-ease-keyboard); }
 /* Over a menu's blur the bar leaves the view for the page, at the view's bottom, which the code gives it. */
 .tc-quick-bar.is-over { position: fixed; right: auto; z-index: var(--tc-layer-panel); font-family: var(--tc-font-ui); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-quick-bar.is-over button { padding: 0; }
