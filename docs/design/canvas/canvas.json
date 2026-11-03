@@ -1728,14 +1728,6 @@
    "page": "components",
    "title": "Меню задачи: перенос и секция"
   },
-  "MassDesk.dc.html": {
-   "x": 6734,
-   "y": 0,
-   "w": 1200,
-   "h": 800,
-   "page": "components",
-   "title": "Компонент экранов массовых действий на десктопе (его показывают доски «Массовые действия»)"
-  },
   "MassLook.dc.html": {
    "x": 0,
    "y": 0,
@@ -1752,6 +1744,14 @@
    "page": "bulk",
    "title": "2. Массовые действия на десктопе"
   },
+  "MassDesk.dc.html": {
+   "x": 6734,
+   "y": 0,
+   "w": 1200,
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экранов массовых действий на десктопе (его показывают доски «Массовые действия»)"
+  },
   "ProgressGlow.dc.html": {
    "x": 12332,
    "y": 0,
@@ -1760,6 +1760,126 @@
    "page": "components",
    "title": "Задача в процессе: список и приоритеты для градиента"
   },
+  "ProgressGlowSoft.dc.html": {
+   "x": 0,
+   "y": 2320,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "5.1 Мягкий градиент цветом текста"
+  },
+  "ProgressGlowMeta.dc.html": {
+   "x": 754,
+   "y": 2320,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "5.2 Градиент цветом своей карточки"
+  },
+  "ProgressGlowFull.dc.html": {
+   "x": 1508,
+   "y": 2320,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "5.3 Цветом карточки, во всю длину"
+  },
+  "ProgressGlowShort.dc.html": {
+   "x": 2262,
+   "y": 2320,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "5.4 Короткий и плотнее"
+  },
+  "ProgressGlowDot.dc.html": {
+   "x": 3016,
+   "y": 2320,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "5.5 Точка, отодвинута от текста насколько можно"
+  },
+  "ProgressAlt.dc.html": {
+   "x": 13086,
+   "y": 0,
+   "w": 674,
+   "h": 1370,
+   "page": "components",
+   "title": "Задача в процессе: значок, форма, тон"
+  },
+  "ProgressAltIcon.dc.html": {
+   "x": 0,
+   "y": 4110,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "6.1 Значок «в процессе» из меню, цветом подписей"
+  },
+  "ProgressAltIconInk.dc.html": {
+   "x": 754,
+   "y": 4110,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "6.2 Тот же значок цветом текста"
+  },
+  "ProgressAltShape.dc.html": {
+   "x": 1508,
+   "y": 4110,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "6.3 Другая форма: левый край прямее"
+  },
+  "ProgressAltDeep.dc.html": {
+   "x": 2262,
+   "y": 4110,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "6.4 Карточка на тон глубже своего цвета"
+  },
+  "ProgressAltCut.dc.html": {
+   "x": 0,
+   "y": 5900,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "7.1 Срез: кончик слева отделён полоской фона"
+  },
+  "ProgressAltTab.dc.html": {
+   "x": 754,
+   "y": 5900,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "7.2 Закладка: левый край прямой и выступает"
+  },
+  "ProgressAltPull.dc.html": {
+   "x": 1508,
+   "y": 5900,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "7.3 Выдвинута влево, форма та же"
+  },
+  "ProgressAltRect.dc.html": {
+   "x": 2262,
+   "y": 5900,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "7.4 Прямоугольник со скруглением среди капсул"
+  },
+  "ProgressDotPriority.dc.html": {
+   "x": 0,
+   "y": 7690,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "8.1 Точка цвета приоритета, посередине поля"
+  },
   "ProgressDotMeta.dc.html": {
    "x": 754,
    "y": 7690,
@@ -1767,6 +1887,54 @@
    "h": 1370,
    "page": "progress",
    "title": "8.2 Точка цвета подписей карточки, посередине поля"
+  },
+  "UndoBoard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 6448,
+   "h": 3330,
+   "page": "undo",
+   "title": "Отмена — итог"
+  },
+  "UndoKit.dc.html": {
+   "x": 10144,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент: кадр отмены (телефон и Mac)"
+  },
+  "Confirm1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 2188,
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 1 — На месте"
+  },
+  "Confirm2.dc.html": {
+   "x": 2268,
+   "y": 0,
+   "w": 2188,
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 2 — Окно у пункта"
+  },
+  "Confirm3.dc.html": {
+   "x": 4536,
+   "y": 0,
+   "w": 2188,
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 3 — Как на платформе"
+  },
+  "ConfirmKit.dc.html": {
+   "x": 8014,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент: кадр подтверждения (телефон и Mac)"
   }
  },
  "createdOnFiles": {
@@ -1809,7 +1977,11 @@
   "backlog23Title",
   "descriptionTitle",
   "progressTitle",
-  "progressHatchTitle"
+  "progressHatchTitle",
+  "progressGlowTitle",
+  "progressAltTitle",
+  "progressShapeTitle",
+  "progressDotTitle"
  ],
  "notes": {
   "lightTitle": {
@@ -2132,6 +2304,42 @@
    "text": "Трудные случаи: одно начало, один календарь, задача поверх",
    "x": 0,
    "y": 964
+  },
+  "progressGlowTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Градиент вместо штриховки, на всех приоритетах",
+   "w": 240,
+   "x": 0,
+   "y": 2020
+  },
+  "progressAltTitle": {
+   "kind": "title1",
+   "maxW": 2940,
+   "page": "progress",
+   "text": "Без градиентов: значок, форма, тон",
+   "w": 240,
+   "x": 0,
+   "y": 3810
+  },
+  "progressShapeTitle": {
+   "kind": "title1",
+   "maxW": 2940,
+   "page": "progress",
+   "text": "Форма карточки вместо пометки",
+   "w": 240,
+   "x": 0,
+   "y": 5600
+  },
+  "progressDotTitle": {
+   "kind": "title1",
+   "maxW": 1430,
+   "page": "progress",
+   "text": "Точка посередине поля",
+   "w": 240,
+   "x": 0,
+   "y": 7390
   }
  },
  "order": [
@@ -2355,7 +2563,28 @@
   "MassLook.dc.html",
   "MassFlow.dc.html",
   "ProgressGlow.dc.html",
-  "ProgressDotMeta.dc.html"
+  "ProgressGlowSoft.dc.html",
+  "ProgressGlowMeta.dc.html",
+  "ProgressGlowFull.dc.html",
+  "ProgressGlowShort.dc.html",
+  "ProgressGlowDot.dc.html",
+  "ProgressAlt.dc.html",
+  "ProgressAltIcon.dc.html",
+  "ProgressAltIconInk.dc.html",
+  "ProgressAltShape.dc.html",
+  "ProgressAltDeep.dc.html",
+  "ProgressAltCut.dc.html",
+  "ProgressAltTab.dc.html",
+  "ProgressAltPull.dc.html",
+  "ProgressAltRect.dc.html",
+  "ProgressDotPriority.dc.html",
+  "ProgressDotMeta.dc.html",
+  "UndoBoard.dc.html",
+  "UndoKit.dc.html",
+  "Confirm1.dc.html",
+  "Confirm2.dc.html",
+  "Confirm3.dc.html",
+  "ConfirmKit.dc.html"
  ],
  "pages": [
   {
@@ -2437,6 +2666,14 @@
   {
    "id": "bulk",
    "name": "Массовые действия"
+  },
+  {
+   "id": "confirmdelete",
+   "name": "Подтверждение удаления"
+  },
+  {
+   "id": "undo",
+   "name": "Отмена"
   }
  ],
  "title": "Task Calendar"
