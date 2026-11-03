@@ -28,8 +28,13 @@ interface Settling {
 	readonly ms: number;
 	start: number | null;
 	frame: number;
+	/** Stands it anyway once its time is up: a page out of sight draws no frames. */
+	timer: number;
 	readonly resolve: () => void;
 }
+
+/** How long past its time a run waits for its last frame before it stands anyway. */
+const FRAME_SLACK_MS = 100;
 
 /** Let go, the screen runs on fast and slows to a stop, as a photo in a gallery does. */
 const easeOut = (t: number): number => 1 - (1 - t) ** 3;
@@ -74,10 +79,11 @@ export class ScreenPager implements SwipeTarget {
 		const span = track.distance ?? this.deps.width();
 		const ms = span > 0 ? this.deps.duration() * Math.min(1, Math.abs(to - this.dx) / span) : 0;
 		return new Promise((resolve) => {
-			const settling: Settling = { track, arrived, from: this.dx, to, ms, start: null, frame: 0, resolve };
+			const settling: Settling = { track, arrived, from: this.dx, to, ms, start: null, frame: 0, timer: 0, resolve };
 			this.settling = settling;
 			if (ms <= 0) return this.finish();
 			settling.frame = requestAnimationFrame((time) => this.frame(settling, time));
+			settling.timer = window.setTimeout(() => this.finish(), ms + FRAME_SLACK_MS);
 		});
 	}
 
@@ -97,6 +103,7 @@ export class ScreenPager implements SwipeTarget {
 		if (!settling) return;
 		this.settling = null;
 		cancelAnimationFrame(settling.frame);
+		window.clearTimeout(settling.timer);
 		settling.track.at(settling.to);
 		for (const track of this.tracks.values()) if (track !== settling.track) track.land(false);
 		settling.track.land(settling.arrived);

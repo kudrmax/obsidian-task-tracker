@@ -111,6 +111,19 @@ describe("ScreenPager", () => {
 		expect(tracks.get(1)?.shown).toEqual([-20]);
 	});
 
+	it("stands once its time is up even when no frame comes, as on a page out of sight", async () => {
+		vi.useRealTimers();
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const frames = vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
+		const { pager, tracks } = setUp();
+		pager.follow(-200);
+		const done = pager.settle(1);
+		vi.advanceTimersByTime(SLIDE_MS);
+		await done;
+		expect(tracks.get(1)?.landed).toEqual([true]);
+		frames.mockRestore();
+	});
+
 	it("stands at once when let go without being drawn", async () => {
 		const { pager, made } = setUp();
 		await pager.settle(null);
