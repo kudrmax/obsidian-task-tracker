@@ -2,7 +2,7 @@ import type { NewTaskPlace, Placement, TaskItem, TaskKey, TaskService } from "..
 import { type PriorityLevel, type RightMode, usableLevels } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { type DayColumn, dayColumn } from "../dayColumn";
-import { DESIGN, LAYOUT } from "../design";
+import { LAYOUT } from "../design";
 import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
 import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
@@ -44,6 +44,8 @@ export interface QuickEntryControllerDeps {
 	desktop(): boolean;
 	/** Where Obsidian's own chrome starts under the view: the top of its desktop status bar while it shows, else Infinity. */
 	chromeTop(): number;
+	/** The top of Obsidian's toolbar over the phone keyboard while it shows, else null. */
+	toolbarTop(): number | null;
 	/** The day the day column shows. */
 	day(): LocalDate;
 	mode(): RightMode;
@@ -450,7 +452,7 @@ export class QuickEntryController {
 		const field = this.field?.el;
 		if (!field?.isConnected) return;
 		const rect = field.getBoundingClientRect();
-		const limit = this.deps.desktop() ? this.roomOf(state).bottom - this.bar.room : this.deps.root.getBoundingClientRect().bottom - DESIGN.barHeight - LAYOUT.fieldOverBar;
+		const limit = this.deps.desktop() ? this.roomOf(state).bottom - this.bar.room : this.deps.root.getBoundingClientRect().bottom - this.bar.room - LAYOUT.fieldOverBar;
 		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
@@ -472,6 +474,7 @@ export class QuickEntryController {
 			field: field?.isConnected ? field.getBoundingClientRect() : null,
 			room: this.roomOf(state),
 			overMenu: state.spot.kind === "stack" ? this.deps.root.getBoundingClientRect() : null,
+			toolbarTop: this.deps.toolbarTop(),
 		});
 	}
 

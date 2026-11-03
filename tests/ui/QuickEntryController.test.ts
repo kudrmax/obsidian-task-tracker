@@ -110,6 +110,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		today: () => TODAY,
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,
+		toolbarTop: () => null,
 		day: () => day,
 		mode: () => mode,
 		turnTo: (to) => {

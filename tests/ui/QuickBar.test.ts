@@ -65,6 +65,7 @@ describe("QuickBar", () => {
 
 	it("has no shift buttons for a field that does not shift", () => {
 		const { parent } = setup({ indents: false });
+		expect(q<HTMLElement>(parent, ".tc-bar-shifts").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-outdent").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-indent").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(false);
@@ -304,10 +305,10 @@ describe("QuickBar over a menu", () => {
 		const { parent, bar } = setup();
 		parent.appendChild(document.createElement("span"));
 		const el = q<HTMLElement>(document, ".tc-quick-bar");
-		bar.follow({ field: null, room: new DOMRect(0, 0, 300, 400), overMenu: new DOMRect(10, 0, 300, window.innerHeight - 50) });
+		bar.follow({ field: null, room: new DOMRect(0, 0, 300, 400), overMenu: new DOMRect(10, 0, 300, window.innerHeight - 50), toolbarTop: null });
 		expect(el.parentElement).toBe(document.body);
 		expect(el.classList.contains("is-over")).toBe(true);
-		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["10px", "300px", "50px"]);
+		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["10px", "300px", "calc(50px + var(--tc-bar-bottom))"]);
 		bar.follow(null);
 		expect(parent.lastElementChild).toBe(el);
 		expect(el.classList.contains("is-over")).toBe(false);
@@ -330,7 +331,7 @@ describe("QuickBar on the desktop", () => {
 
 	it("is a capsule right under the field, its right edge on the field's, in the view's own coordinates", () => {
 		const { bar, el } = desk();
-		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.classList.contains("is-desk")).toBe(true);
 		expect([el.style.left, el.style.top]).toEqual([`${120 + 350 - 183 - 100}px`, `${300 + 35 + 8 - 50}px`]);
 		expect(el.style.bottom).toBe("");
@@ -338,35 +339,35 @@ describe("QuickBar on the desktop", () => {
 
 	it("follows the field and goes over it where the column shows no room under it", () => {
 		const { bar, el } = desk();
-		bar.follow({ field: new DOMRect(120, 400, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 400, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.style.top).toBe(`${443 - 50}px`);
-		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.style.top).toBe(`${590 - 8 - 32 - 50}px`);
 	});
 
 	it("is out of sight while the field does not show, and back once it does", () => {
 		const { bar, el } = desk();
-		bar.follow({ field: new DOMRect(120, 20, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 20, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.classList.contains("is-away")).toBe(true);
-		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.classList.contains("is-away")).toBe(false);
 	});
 
 	it("over a menu's blur stands by the field on the page, in the screen's coordinates", () => {
 		const { bar, el } = desk({ place: null });
-		bar.follow({ field: new DOMRect(500, 300, 155, 35), room: VIEW, overMenu: VIEW });
+		bar.follow({ field: new DOMRect(500, 300, 155, 35), room: VIEW, overMenu: VIEW , toolbarTop: null});
 		expect(el.parentElement).toBe(document.body);
 		expect([el.style.left, el.style.top, el.style.width]).toEqual([`${655 - 183}px`, "343px", ""]);
 	});
 
 	it("opens its panel away from the field: under a capsule under the field, over a capsule over it", () => {
 		const { bar, el } = desk();
-		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		q(el, ".tc-bar-flag").click();
 		const panel = q<HTMLElement>(el, ".tc-quick-panel");
 		expect(panel.classList.contains("is-below")).toBe(true);
 		expect(el.dataset.panel).toBe("priority");
-		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 590, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(panel.classList.contains("is-above")).toBe(true);
 		expect(panel.classList.contains("is-below")).toBe(false);
 	});
@@ -380,9 +381,23 @@ describe("QuickBar on the desktop", () => {
 	it("is the bar over the keyboard on the phone, whatever the field", () => {
 		const { parent, bar } = setup();
 		const el = q<HTMLElement>(parent, ".tc-quick-bar");
-		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null , toolbarTop: null});
 		expect(el.classList.contains("is-desk")).toBe(false);
 		expect([el.style.left, el.style.top]).toEqual(["", ""]);
 		expect(parent.lastElementChild).toBe(el);
+	});
+});
+
+describe("QuickBar over Obsidian's toolbar", () => {
+	it("tells the view and itself how far the toolbar's top is over the view's bottom, and forgets it once the toolbar goes", () => {
+		const { parent, bar } = setup();
+		parent.getBoundingClientRect = () => new DOMRect(0, 0, 390, 700);
+		const el = q<HTMLElement>(parent, ".tc-quick-bar");
+		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 640 });
+		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("60px");
+		expect(el.style.getPropertyValue("--tc-toolbar-room")).toBe("60px");
+		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: null });
+		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("");
+		expect(el.style.getPropertyValue("--tc-toolbar-room")).toBe("");
 	});
 });

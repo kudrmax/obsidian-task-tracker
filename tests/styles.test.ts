@@ -211,7 +211,7 @@ describe("styles.css keeps to its design system", () => {
 	it("lets the foot fade give way while a task is typed, so a field at the end of a column shows whole: down to the status bar on the desktop, behind the bar on the phone", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(of("body:not(.is-mobile) .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-chrome-room)");
-		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-bar-h)");
+		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-bottom))");
 	});
 
 	it("marks a task in progress with a dot in the middle of the card's left padding, level with the title, in the card's meta tint", () => {
@@ -234,7 +234,7 @@ describe("styles.css keeps to its design system", () => {
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8))");
 		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2)");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
-		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-status-room)");
+		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
 });
 

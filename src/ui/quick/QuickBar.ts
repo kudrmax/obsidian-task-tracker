@@ -31,6 +31,8 @@ export interface BarAnchor {
 	readonly room: DOMRect;
 	/** The view's box while the field is over a menu's blur, which lies over the whole page; null otherwise. */
 	readonly overMenu: DOMRect | null;
+	/** The top of Obsidian's toolbar over the phone keyboard, which the bar stands over; null while it does not show. */
+	readonly toolbarTop: number | null;
 }
 
 export interface QuickBarDeps {
@@ -61,6 +63,8 @@ const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string
 	{ kind: "now", label: "Now" },
 ];
 
+const TOOLBAR_ROOM = "--tc-toolbar-room";
+
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
 
 /**
@@ -72,6 +76,7 @@ const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "
  */
 export class QuickBar {
 	private readonly bar: HTMLElement;
+	private readonly shifts: HTMLElement;
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
@@ -91,6 +96,7 @@ export class QuickBar {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
+		this.shifts = el(this.bar, "span", "tc-bar-shifts");
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		el(this.bar, "span", "tc-bar-spacer");
@@ -107,7 +113,7 @@ export class QuickBar {
 	}
 
 	private shiftButton(cls: string, name: "outdent" | "indent", label: string, key: string, delta: 1 | -1): HTMLButtonElement {
-		const button = el(this.bar, "button", `tc-bar-shift ${cls}`);
+		const button = el(this.shifts, "button", `tc-bar-shift ${cls}`);
 		button.setAttribute("aria-label", label);
 		button.title = `${label} (${key})`;
 		button.appendChild(icon(name));
@@ -119,7 +125,7 @@ export class QuickBar {
 		this.state = state;
 		this.bar.hidden = false;
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
-		this.outdent.hidden = this.indent.hidden = !state.indents;
+		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
 		this.flag.hidden = this.levels().length === 0;
@@ -144,6 +150,7 @@ export class QuickBar {
 	follow(anchor: BarAnchor | null): void {
 		this.anchor = anchor;
 		for (const property of ["left", "top", "width", "bottom"]) this.bar.style.removeProperty(property);
+		this.standOverToolbar(anchor?.toolbarTop ?? null);
 		const over = anchor?.overMenu ?? null;
 		this.bar.classList.toggle("is-over", over !== null);
 		const holder = over ? this.bar.ownerDocument.body : this.parent;
@@ -154,11 +161,23 @@ export class QuickBar {
 		else if (over) this.dock(over);
 	}
 
+	/**
+	 * On the phone the bar stands over Obsidian's toolbar, wherever the keyboard and the toolbar put it: the view and the bar
+	 * learn how far the toolbar's top is over the view's bottom, and the styles keep the cards' gap above it.
+	 */
+	private standOverToolbar(top: number | null): void {
+		const room = top === null || this.deps.desktop() ? 0 : Math.max(0, this.parent.getBoundingClientRect().bottom - top);
+		for (const holder of [this.parent, this.bar]) {
+			if (room > 0) holder.style.setProperty(TOOLBAR_ROOM, px(room));
+			else holder.style.removeProperty(TOOLBAR_ROOM);
+		}
+	}
+
 	/** Over a menu's blur on the phone: at the bottom of the view's box, above the blur. */
 	private dock(view: DOMRect): void {
 		this.bar.style.left = px(view.left);
 		this.bar.style.width = px(view.width);
-		this.bar.style.bottom = px(window.innerHeight - view.bottom);
+		this.bar.style.bottom = `calc(${px(window.innerHeight - view.bottom)} + var(--tc-bar-bottom))`;
 	}
 
 	/** On the desktop: the capsule by the field, inside the room; out of sight while no part of the field shows. */
@@ -184,9 +203,11 @@ export class QuickBar {
 		panel.classList.toggle("is-below", side === "below");
 	}
 
-	/** How much room the bar takes from what shows the field: on the phone at the bottom, on the desktop under the field. */
+	/** How much room the bar takes from what shows the field: on the phone from the view's bottom up, on the desktop under the field. */
 	get room(): number {
-		return this.deps.desktop() ? this.bar.getBoundingClientRect().height + 2 * DESIGN.deskBarGap : DESIGN.barHeight;
+		if (this.deps.desktop()) return this.bar.getBoundingClientRect().height + 2 * DESIGN.deskBarGap;
+		const bar = this.bar.getBoundingClientRect();
+		return bar.height > 0 ? Math.max(DESIGN.barHeight, this.parent.getBoundingClientRect().bottom - bar.top) : DESIGN.barHeight;
 	}
 
 	private levels(): readonly PriorityLevel[] {

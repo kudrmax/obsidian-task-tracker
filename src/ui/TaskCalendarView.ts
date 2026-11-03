@@ -342,6 +342,7 @@ export class TaskCalendarView extends ItemView {
 			today: () => this.today(),
 			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
 			chromeTop: () => statusBarTop(root.ownerDocument),
+			toolbarTop: () => keyboardToolbarTop(root.ownerDocument),
 			day: () => this.selectedDate,
 			mode: () => this.settings.rightMode,
 			turnTo: (mode) => this.switcher?.show(mode),
@@ -825,6 +826,13 @@ export class TaskCalendarView extends ItemView {
 		button.addEventListener("click", () => void this.act(() => this.deps.tasks.createFile()));
 	}
 
+}
+
+/** The top of the buttons of Obsidian's toolbar over the phone keyboard while it shows; null otherwise. */
+function keyboardToolbarTop(doc: Document): number | null {
+	const toolbar = doc.body.querySelector<HTMLElement>(".mobile-toolbar .mobile-toolbar-options-container");
+	const box = toolbar?.getBoundingClientRect();
+	return box && box.height > 0 ? box.top : null;
 }
 
 /** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */
