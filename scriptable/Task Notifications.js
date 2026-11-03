@@ -376,7 +376,7 @@ function ungroupedIndex(groups) {
   for (let i = groups.length - 1; i > 0; i--) if (groups[i].name === null) return i;
   return 0;
 }
-var SECTION_KEYS = ["inbox", "now", "soon", "done"];
+var SECTION_KEYS = ["inbox", "backlog", "now", "soon", "done"];
 var LIST_END_RE = /^#{1,2}(\s|$)/;
 var GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 var SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
