@@ -5,7 +5,7 @@ import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
 import { type GapPlace, type ListCard, sameTask } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
-import { renderTaskCard, renderUnwrittenCard } from "./TaskCard";
+import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
@@ -109,6 +109,7 @@ export class TaskList {
 			enter(group.name, true);
 		}
 		if (!entered && entry) this.enterRows(entry, rows, kept);
+		if (entry) this.markRenamed(renaming);
 		rows.forEach((row, i) => {
 			if (row.level === 0) return;
 			const { through, last } = linesOf(rows.map((r) => r.level), i);
@@ -146,6 +147,15 @@ export class TaskList {
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		put(row, entry.place.level);
+	}
+
+	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */
+	private markRenamed(renaming: TaskKey | null): void {
+		const row = this.keptRow();
+		if (!row) return;
+		const renamed = renaming === null ? undefined : this.entries.find((e) => sameTask(renaming, e.item.key));
+		if (renamed) showProgressDot(row, renamed.item);
+		else row.querySelector(":scope > .tc-progress-dot")?.remove();
 	}
 
 	/** Where the name of the section a pending card starts is typed; null without one. */

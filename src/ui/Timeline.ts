@@ -5,7 +5,7 @@ import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { sameTask } from "./drag/listPlace";
-import { markPriority, renderMeta, showStrip } from "./TaskCard";
+import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
 import { durationParts, followNow, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
@@ -304,9 +304,9 @@ export class Timeline {
 		this.layoutTasks();
 	}
 
-	/** The field of a renamed task over its card, at the card's place and size, the strip of a task in progress kept; the card hides while it stands there. */
+	/** The field of a renamed task over its card, at the card's place and size, the dot of a task in progress kept; the card hides while it stands there. */
 	showRename(item: TaskItem, field: HTMLElement): void {
-		showStrip(this.holdField({ kind: "rename", key: item.key }, field), item);
+		showProgressDot(this.holdField({ kind: "rename", key: item.key }, field), item);
 		for (const task of this.tasks) task.el.classList.toggle("is-renaming", this.isRenamed(task.item));
 		this.layoutTasks();
 	}
@@ -477,12 +477,12 @@ export class Timeline {
 		return { el: block, ...span, level };
 	}
 
-	/** The card of the list on the timeline: the strip, the title fading out, the small time or duration on the right. */
+	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */
 	private placeTask(item: TaskItem): PlacedTask {
 		const block = make(this.itemsEl, "div", "tc-block");
 		const card = make(block, "div", "tc-block-card");
 		markPriority(card, item.priority);
-		if (item.status === "inProgress") make(card, "span", "tc-strip");
+		if (item.status === "inProgress") make(card, "span", "tc-progress-dot");
 		fillTitle(make(card, "div", "tc-card-title"), item.text);
 		renderMeta(card, item);
 		const meta = make(card, "span", "tc-block-meta is-hidden");

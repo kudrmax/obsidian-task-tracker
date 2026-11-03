@@ -2,7 +2,7 @@ import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
+import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
@@ -154,7 +154,7 @@ export class TaskMenu extends LiftedMenu {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		const copy = this.liftWhole(context.source.getBoundingClientRect(), showWhole);
+		const copy = this.liftWhole(context.source, showWhole);
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
@@ -195,7 +195,7 @@ export class TaskMenu extends LiftedMenu {
 
 	/**
 	 * Rename on a card of a calendar menu's stack: the panel and the copy go, and the card becomes a row for the field in
-	 * its place, the strip of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
+	 * its place, the dot of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
 	 */
 	openRename(onClose: (how: CloseHow) => void): HTMLElement {
 		this.giveToField();
@@ -204,7 +204,7 @@ export class TaskMenu extends LiftedMenu {
 		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		row.style.left = px(this.copy.left);
 		row.style.width = px(this.copy.width);
-		showStrip(row, this.context.item);
+		showProgressDot(row, this.context.item);
 		this.raise(this.raisedBy);
 		return row;
 	}

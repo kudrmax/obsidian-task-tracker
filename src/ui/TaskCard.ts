@@ -11,7 +11,7 @@ export interface TaskCardOptions {
 	readonly day: LocalDate | null;
 }
 
-/** A card of the list: the strip of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date. */
+/** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date. */
 export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts: TaskCardOptions): HTMLElement {
 	const card = el(parent, "div", "tc-card");
 	fillCard(card, item, opts);
@@ -25,16 +25,16 @@ export function renderUnwrittenCard(parent: HTMLElement | null, text: string): H
 	return card;
 }
 
-/** The strip of a task in progress at `parent`'s left, once; none for a task not in progress. */
-export function showStrip(parent: HTMLElement, item: TaskItem): void {
-	const strip = parent.querySelector(":scope > .tc-strip");
-	if (item.status !== "inProgress") strip?.remove();
-	else if (!strip) el(parent, "span", "tc-strip");
+/** The dot of a task in progress in `parent`'s left padding, once; none for a task not in progress. */
+export function showProgressDot(parent: HTMLElement, item: TaskItem): void {
+	const dot = parent.querySelector(":scope > .tc-progress-dot");
+	if (item.status !== "inProgress") dot?.remove();
+	else if (!dot) el(parent, "span", "tc-progress-dot");
 }
 
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
 	markPriority(card, item.priority);
-	showStrip(card, item);
+	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
 	if (item.dueDate && item.dueDate !== opts.day) {

@@ -1751,6 +1751,22 @@
    "h": 2276,
    "page": "bulk",
    "title": "2. Массовые действия на десктопе"
+  },
+  "ProgressGlow.dc.html": {
+   "x": 12332,
+   "y": 0,
+   "w": 674,
+   "h": 1370,
+   "page": "components",
+   "title": "Задача в процессе: список и приоритеты для градиента"
+  },
+  "ProgressDotMeta.dc.html": {
+   "x": 754,
+   "y": 7690,
+   "w": 674,
+   "h": 1370,
+   "page": "progress",
+   "title": "8.2 Точка цвета подписей карточки, посередине поля"
   }
  },
  "createdOnFiles": {
@@ -2337,7 +2353,9 @@
   "MenuMoveBoard.dc.html",
   "MassDesk.dc.html",
   "MassLook.dc.html",
-  "MassFlow.dc.html"
+  "MassFlow.dc.html",
+  "ProgressGlow.dc.html",
+  "ProgressDotMeta.dc.html"
  ],
  "pages": [
   {
