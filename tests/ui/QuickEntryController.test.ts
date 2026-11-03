@@ -39,6 +39,8 @@ interface SetUp {
 	slotted?: TaskItem[];
 	/** Obsidian on the desktop, its status bar's top this far down; the phone without. */
 	desktop?: { readonly chromeTop: number };
+	/** Where Obsidian's toolbar over the phone keyboard stops: a function, since the keyboard moves it. */
+	toolbarTop?: () => number | null;
 	/**
 	 * The lists read the file after a write and draw it only when it changed, as the view's do: "grows" lands each write
 	 * as a card at the end of the day column, "same" lands nothing.
@@ -46,7 +48,7 @@ interface SetUp {
 	drawsOnFresh?: "grows" | "same";
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, toolbarTop = () => null, drawsOnFresh }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -133,7 +135,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		today: () => TODAY,
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,
-		toolbarTop: () => null,
+		toolbarTop,
 		day: () => day,
 		mode: () => mode,
 		turnTo: (to) => {
@@ -477,6 +479,50 @@ describe("QuickEntryController", () => {
 		type("A text long enough to wrap onto three lines");
 		runFrames();
 		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
+	});
+
+	describe("as the phone keyboard slides in", () => {
+		const GLIDE = { ms: 300, ease: (t: number) => t };
+
+		/** The field at the end of Inbox, 405 px down the list; the view 500 px tall, the keyboard's toolbar stopping 300 px up once it slides. */
+		function withKeyboard() {
+			let toolbar: number | null = null;
+			const set = setUp({ toolbarTop: () => toolbar });
+			vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "performance"] });
+			set.controller.openAtEnd("inbox");
+			set.root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
+			const list = set.lists.inbox.el;
+			list.getBoundingClientRect = () => new DOMRect(0, 0, 175, 500);
+			list.scrollTop = 0;
+			set.field()!.getBoundingClientRect = () => new DOMRect(10, 405 - list.scrollTop, 175, 35);
+			const bar = set.root.querySelector<HTMLElement>(".tc-quick-bar")!;
+			bar.getBoundingClientRect = () => new DOMRect(0, (toolbar ?? 500) - 44, 390, 44);
+			set.render();
+			return { ...set, list, slide: (top: number) => ((toolbar = top), set.controller.keyboardSlides(GLIDE)) };
+		}
+
+		afterEach(() => vi.useRealTimers());
+
+		it("scrolls the field over the bar's new place along with the keyboard, not at once", () => {
+			const { list, field, slide } = withKeyboard();
+			const before = list.scrollTop;
+			slide(200);
+			expect(list.scrollTop).toBe(before);
+			vi.advanceTimersByTime(150);
+			expect(list.scrollTop).toBeGreaterThan(before);
+			vi.advanceTimersByTime(300);
+			expect(field()!.getBoundingClientRect().bottom).toBe(200 - 44 - 16);
+		});
+
+		it("stops riding the keyboard once a finger scrolls the list", () => {
+			const { list, slide } = withKeyboard();
+			slide(200);
+			vi.advanceTimersByTime(100);
+			list.scrollTop = 3;
+			list.dispatchEvent(new Event("scroll"));
+			vi.advanceTimersByTime(500);
+			expect(list.scrollTop).toBe(3);
+		});
 	});
 
 	describe("Enter", () => {

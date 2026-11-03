@@ -460,16 +460,38 @@ describe("QuickBar on the desktop", () => {
 });
 
 describe("QuickBar over Obsidian's toolbar", () => {
-	it("tells the view and itself how far the toolbar's top is over the view's bottom, and forgets it once the toolbar goes", () => {
+	it("tells the page how far the toolbar's top is over the view's bottom, and forgets it once the toolbar goes", () => {
 		const { parent, bar } = setup();
 		parent.getBoundingClientRect = () => new DOMRect(0, 0, 390, 700);
-		const el = q<HTMLElement>(parent, ".tc-quick-bar");
 		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 640 });
-		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("60px");
-		expect(el.style.getPropertyValue("--tc-toolbar-room")).toBe("60px");
+		expect(document.body.style.getPropertyValue("--tc-toolbar-room")).toBe("60px");
 		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: null });
-		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("");
-		expect(el.style.getPropertyValue("--tc-toolbar-room")).toBe("");
+		expect(document.body.style.getPropertyValue("--tc-toolbar-room")).toBe("");
+	});
+
+	it("slides from where it was drawn to its new place when the keyboard slides, and not otherwise", () => {
+		const { parent, bar } = setup();
+		const el = q<HTMLElement>(parent, ".tc-quick-bar");
+		const anchor = { field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: null };
+		const drawn: string[] = [];
+		const drawnAt = (before: number, after: number) => {
+			let calls = 0;
+			el.getBoundingClientRect = () => {
+				drawn.push(el.style.transform);
+				return new DOMRect(0, calls++ === 0 ? before : after, 390, 44);
+			};
+		};
+		drawnAt(750, 414);
+		bar.follow(anchor, true);
+		expect(drawn).toContain("translateY(336px)");
+		expect(el.classList.contains("is-gliding")).toBe(true);
+		expect(el.style.transform).toBe("");
+		el.classList.remove("is-gliding");
+		drawn.length = 0;
+		drawnAt(414, 300);
+		bar.follow(anchor);
+		expect(drawn).toEqual([]);
+		expect(el.classList.contains("is-gliding")).toBe(false);
 	});
 
 	it("follows the same anchor without writing anything", () => {
@@ -496,7 +518,7 @@ describe("QuickBar over Obsidian's toolbar", () => {
 		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 640 });
 		observer.takeRecords();
 		bar.follow({ field: null, room: new DOMRect(0, 0, 390, 700), overMenu: null, toolbarTop: 600 });
-		expect(parent.style.getPropertyValue("--tc-toolbar-room")).toBe("100px");
+		expect(document.body.style.getPropertyValue("--tc-toolbar-room")).toBe("100px");
 		expect(readsAfterWrite).toBe(0);
 		observer.disconnect();
 	});
