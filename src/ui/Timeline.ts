@@ -4,6 +4,7 @@ import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el, px } from "./dom";
+import { Grips } from "./kit/Grips";
 import { sameTask } from "./drag/listPlace";
 import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
@@ -153,15 +154,14 @@ export class Timeline {
 		this.sizeWatch.observe(this.el);
 		this.el.addEventListener("wheel", this.touched, { passive: true });
 		for (const type of TOUCHES) this.el.ownerDocument.addEventListener(type, this.touched, { capture: true, passive: true });
-		for (const edge of ["start", "end"] as const) {
-			el(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
-				const task = this.tasks.find((t) => t.el.classList.contains("is-selected"));
-				if (!task || !e.isPrimary || e.button !== 0) return;
-				e.stopPropagation();
-				e.preventDefault();
-				this.deps.onGrip?.(task.el, task.item, edge, e);
-			});
-		}
+		const selected = () => this.tasks.find((t) => t.el.classList.contains("is-selected"));
+		Grips.attach(this.grips, {
+			takes: () => selected() !== undefined,
+			onGrip: (edge, e) => {
+				const task = selected();
+				if (task) this.deps.onGrip?.(task.el, task.item, edge, e);
+			},
+		});
 	}
 
 	/** The view closes: the timeline stops watching its size. */
