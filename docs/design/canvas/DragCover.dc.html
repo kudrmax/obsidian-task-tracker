@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Зоны при переносе: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<dc-import name="Screen" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<sc-if value="{{top.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 112px; width: 390px; height: 50px; background: {{c.bg}}; z-index: 6;"></div>
+<div style="position: absolute; left: 10px; top: 118px; display: flex; gap: 8px; z-index: 7;">
+<sc-for list="{{top.zones}}" as="z" hint-placeholder-count="2">
+<div style="height: 36px; box-sizing: border-box; border-radius: 18px; border: {{z.border}}; background: {{z.bg}}; padding: 0 14px 0 12px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{z.color}}; white-space: nowrap;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{z.icon}}"></path></svg>{{z.label}}</div>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 554px; overflow: hidden; background: {{c.bg}}; z-index: 6;">
+<sc-for list="{{items}}" as="it" hint-placeholder-count="12">
+
+<sc-if value="{{it.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{it.title}}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isHeader}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden;">
+<span style="font-size: 13px; line-height: 20px; font-weight: 600; color: {{it.color}};">{{it.name}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isGap}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}};"></div>
+</sc-if>
+
+<sc-if value="{{it.isZoneBg}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: {{it.top}}px; width: 187px; height: {{it.height}}px; background: {{c.bg}};"></div>
+</sc-if>
+
+<sc-if value="{{it.isZone}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: {{it.border}}; background: {{it.bg}}; padding: 0 12px 0 14px; display: flex; align-items: center; gap: 8px; font-size: 15px; color: {{it.color}}; white-space: nowrap; overflow: hidden;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{it.icon}}"></path></svg>
+<span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);">{{it.label}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{it.isStrip}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{it.left}}px; top: {{it.top}}px; width: {{it.width}}px; height: 35px; box-sizing: border-box; border-radius: 17.5px; border: 1px dashed {{c.dash}}; display: flex; align-items: center; justify-content: space-evenly;">
+<sc-for list="{{it.icons}}" as="ic" hint-placeholder-count="5">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ic.d}}"></path></svg>
+</sc-for>
+</div>
+</sc-if>
+
+</sc-for>
+</div>
+
+<sc-if value="{{drag.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{drag.left}}px; top: {{drag.top}}px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; padding: 0 12px 0 14px; display: flex; align-items: center; box-shadow: {{c.floatShadow}}; z-index: 8;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{drag.title}}</div>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="k" hint-placeholder-count="0">
+<div style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; width: {{k.width}}px; height: {{k.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{k.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","default":"now","options":["now","top","strip","inline"]},"phase":{"editor":"enum","default":"lift","options":["lift","carry"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const variant = this.props.variant ?? 'now';
+    const carry = this.props.phase === 'carry';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F7', text: '#000000', muted: '#8E8E93', headInk: '#6C6C70', dash: '#C7C7CC', accent: '#8A5CF5', target: '#F1ECFE', float: '#FFFFFF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', mark: '#FF9500' }
+      : { bg: '#000000', card: '#1C1C1E', text: '#FFFFFF', muted: '#8E8E93', headInk: '#AEAEB2', dash: '#3A3A3C', accent: '#9580FF', target: '#251F3D', float: '#2C2C2E', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', mark: '#FFD60A' };
+
+    const CARD = 35, STEP = 37, TOP = 166, HEAD = 26, GROUP = 10, COL_H = 554, L = 10, W = 175;
+    const ICON = {
+      section: 'M4 6h9 M4 12h16 M4 18h16',
+      plus: 'M12 5v14 M5 12h14',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      date: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const LIFTED = 'Скачать офлайн-карту';
+    const groups = [
+      { name: 'No section', none: true, tasks: ['Созвониться с врачом', 'Записаться в барбершоп', 'Позвонить маме'] },
+      { name: 'Morning', tasks: ['Чай масала', 'Разобрать почту', 'Оплатить интернет'] },
+      { name: 'Экскурсия', tasks: ['Купить билеты в музей', 'Зарядить пауэрбанк', LIFTED, 'Взять наличные'] }
+    ];
+    const sectionZones = ['Afternoon', 'Evening'].map((label) => ({ label, icon: ICON.section })).concat([{ label: 'New section', icon: ICON.plus }]);
+    const dateZones = [{ label: 'Tomorrow', icon: ICON.tomorrow }, { label: 'Pick a date', icon: ICON.date }];
+    const HOT = { now: 'Tomorrow', top: 'Tomorrow', strip: 'Tomorrow', inline: 'Evening' }[variant];
+    const look = (label) => {
+      const hot = carry && label === HOT;
+      return { border: hot ? '1px solid ' + c.accent : '1px dashed ' + c.dash, bg: hot ? c.target : 'transparent', color: hot ? c.text : c.muted };
+    };
+
+    const items = [];
+    const marks = [];
+    const box = (left, top, width, height) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: Math.min(height + 8, 44) / 2 });
+    let y = 0;
+    let home = 0;
+    groups.forEach((g, gi) => {
+      if (gi > 0) y += GROUP;
+      items.push({ isHeader: true, left: L, top: y, width: W, name: g.name, color: g.none ? c.muted : c.headInk });
+      y += HEAD;
+      g.tasks.forEach((title) => {
+        if (title === LIFTED) {
+          home = y;
+          items.push({ isGap: true, left: L, top: y, width: W });
+        } else items.push({ isCard: true, left: L, top: y, width: W, title });
+        y += STEP;
+      });
+    });
+    if (variant === 'inline' || variant === 'top') {
+      y += GROUP;
+      sectionZones.forEach((z) => {
+        if (z.label === 'New section') y += 8;
+        items.push({ isZone: true, left: L, top: y, width: W, label: z.label, icon: z.icon, ...look(z.label) });
+        y += STEP;
+      });
+    }
+
+    const bottomZones = variant === 'now' || (variant === 'strip' && carry);
+    let zoneBgTop = COL_H;
+    if (bottomZones) {
+      const z = [...sectionZones.map((s) => ({ ...s, group: 's' })), ...dateZones.map((d) => ({ ...d, group: 'd' }))];
+      let total = 0;
+      z.forEach((zz, i) => { total += CARD + (i === 0 ? 0 : zz.group !== z[i - 1].group ? 16 : 8); });
+      let zy = COL_H - 8 - total;
+      zoneBgTop = zy - 8;
+      items.push({ isZoneBg: true, top: zoneBgTop, height: COL_H - zoneBgTop });
+      z.forEach((zz, i) => {
+        if (i > 0) zy += zz.group !== z[i - 1].group ? 16 : 8;
+        items.push({ isZone: true, left: L, top: zy, width: W, label: zz.label, icon: zz.icon, ...look(zz.label) });
+        zy += CARD;
+      });
+    }
+    if (variant === 'strip' && !carry) {
+      const sy = COL_H - 8 - CARD;
+      zoneBgTop = sy - 8;
+      items.push({ isZoneBg: true, top: zoneBgTop, height: COL_H - zoneBgTop });
+      items.push({ isStrip: true, left: L, top: sy, width: W, icons: [ICON.section, ICON.section, ICON.plus, ICON.tomorrow, ICON.date].map((d) => ({ d })) });
+      marks.push(box(L, TOP + sy, W, CARD));
+    }
+
+    let scroll = 0;
+    if (variant === 'now' && !carry) scroll = Math.max(0, home + CARD - (zoneBgTop - 8));
+    if (variant === 'inline' && carry) scroll = Math.max(0, y - 2 - (COL_H - 8));
+    if (scroll > 0) items.forEach((it) => { if (it.isCard || it.isHeader || it.isGap || (it.isZone && (variant === 'inline' || variant === 'top'))) it.top -= scroll; });
+    const homeTop = home - scroll;
+    if (!carry) marks.push(box(L, TOP + homeTop, W, CARD));
+    const hot = variant === 'top' ? null : items.find((it) => it.isZone && it.label === HOT);
+    if (carry && hot) marks.push(box(L, TOP + hot.top, W, CARD));
+
+    const top = variant === 'top'
+      ? { on: true, zones: dateZones.map((z) => ({ ...z, ...look(z.label) })) }
+      : { on: false };
+    if (variant === 'top' && carry) marks.push({ left: 4, top: 114, width: 125, height: 44, radius: 22 });
+
+    let drag;
+    if (!carry) drag = { left: L + 8, top: TOP + homeTop - 6 };
+    else if (variant === 'top') drag = { left: 44, top: 146 };
+    else drag = { left: L + 34, top: TOP + hot.top + 26 };
+
+    return {
+      c,
+      theme: light ? 'light' : 'dark',
+      items,
+      top,
+      drag: { on: true, title: LIFTED, ...drag },
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

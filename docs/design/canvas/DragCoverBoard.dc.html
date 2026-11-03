@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Зоны при переносе: варианты</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1928px; height: 2380px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">Зоны при переносе</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 1800px; font-size: 18px; line-height: 24px; color: #6B6A65;">Задачу берут снизу списка, а зоны секций и дат встают как раз на её место. Сейчас список отскакивает вверх. Три способа, при которых он стоит на месте</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="2">
+<div style="position: absolute; left: 64px; top: {{row.labelTop}}px; font-size: 22px; line-height: 28px; font-weight: 600; color: #1C1C1E;">{{row.label}}</div>
+<sc-for list="{{row.phones}}" as="p" hint-placeholder-count="4">
+<div style="position: absolute; left: {{p.left}}px; top: {{row.top}}px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="DragCover" variant="{{p.variant}}" phase="{{row.phase}}" theme="dark" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{row.captionTop}}px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</span>
+</div>
+</sc-for>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1928,"height":2380}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const lefts = [64, 534, 1004, 1474];
+    const names = { now: 'Сейчас', top: '1. Даты наверху, секции в конце списка', strip: '2. Свёрнутая полоска внизу', inline: '3. Секции в конце списка, даты из меню' };
+    const captions = {
+      lift: {
+        now: 'Зоны закрыли низ списка, и список отскочил вверх, чтобы показать место задачи над ними',
+        top: 'Шапка дня на время переноса становится зонами Tomorrow и Pick a date. Секции ждут в конце списка, ниже последней задачи. Список не двигается',
+        strip: 'Все зоны свёрнуты в одну полоску на месте New task. Под ней задач нет, список не двигается',
+        inline: 'Секции ждут в конце списка, как в варианте 1. Зон дат нет совсем'
+      },
+      carry: {
+        now: 'Задачу несут вниз, на Tomorrow',
+        top: 'Задачу несут вверх, на Tomorrow. Место задачи ждёт там, откуда её взяли',
+        strip: 'Палец дошёл до полоски, и она раскрылась в полные зоны. Ушёл вверх — снова полоска',
+        inline: 'Задачу несут вниз, список докручивается до секций, Evening загорается. Перенос на завтра — через меню задачи, «Срок»'
+      }
+    };
+    const block = 844 + 300;
+    const rows = [
+      { phase: 'lift', label: 'Только что подняли нижнюю задачу', top: 220 },
+      { phase: 'carry', label: 'Несут на зону', top: 220 + block }
+    ].map((r) => ({
+      ...r,
+      labelTop: r.top - 44,
+      captionTop: r.top + 844 + 18,
+      phones: ['now', 'top', 'strip', 'inline'].map((v, i) => ({ variant: v, left: lefts[i], name: names[v], caption: captions[r.phase][v] }))
+    }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>
