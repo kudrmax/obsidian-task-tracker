@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Отмена: кадр</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: {{f.w}}px; height: {{f.h}}px; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="Screen" foot="prod" platform="{{platform}}" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" without="{{without}}" hint-size="{{f.hint}}"></dc-import>
+
+<button aria-label="Undo" style="position: absolute; left: {{f.left}}px; top: {{f.rowTop}}px; width: 44px; height: 44px; box-sizing: border-box; padding: 0; border: 0; border-radius: 22px; background: {{c.track}}; box-shadow: {{c.floatShadow}}; color: {{btnInk}}; display: flex; align-items: center; justify-content: center; z-index: 5;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg></button>
+
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{true}}">
+<div role="status" style="position: absolute; left: {{f.left}}px; top: {{f.toastTop}}px; width: {{f.toastW}}px; min-height: 56px; box-sizing: border-box; padding: 8px 14px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; display: flex; align-items: center; gap: 10px; z-index: 6;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; color: {{s.ink}};"><path d="{{s.icon}}"></path><path d="{{s.fill}}" fill="currentColor" stroke="none"></path></svg>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 16px; white-space: nowrap;">{{s.label}}</span>
+<span style="font-size: 13px; color: {{c.muted}}; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent calc(100% - 8px)); mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent calc(100% - 8px));">{{s.sub}}</span>
+</span>
+<sc-if value="{{showKeys}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 13px; color: {{c.muted}}; white-space: nowrap; font-variant-numeric: tabular-nums;">{{s.keys}}</span></sc-if>
+<sc-if value="{{s.hasAction}}" hint-placeholder-val="{{true}}">
+<button style="flex-shrink: 0; height: 40px; padding: 0 6px; border: 0; background: transparent; color: {{c.accent}}; font: inherit; font-size: 16px; font-weight: 600;">{{s.action}}</button>
+</sc-if>
+<span style="position: absolute; left: 0; bottom: 0; width: {{s.left}}%; height: 3px; background: {{c.accent}};"></span>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; left: {{m.tagLeft}}px; top: {{m.tagTop}}px; height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"platform":{"editor":"enum","default":"phone","options":["phone","desk"]},"state":{"editor":"enum","default":"done","options":["idle","done","delete","undone","conflict"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const platform = this.props.platform === 'desk' ? 'desk' : 'phone';
+    const desk = platform === 'desk';
+    const state = this.props.state ?? 'done';
+    const light = this.props.theme === 'light';
+    const ground = desk ? (light ? '#FFFFFF' : '#1E1E1E') : (light ? '#FFFFFF' : '#000000');
+    const c = light
+      ? { bg: ground, track: '#F2F2F2', text: '#000000', muted: '#8E8E93', accent: '#8A5CF5', danger: '#FF3B30', stale: '#FF9500', off: '#A1A4AB', panel: 'rgba(250,250,252,0.97)', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', floatShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', mark: '#FF9500' }
+      : { bg: ground, track: desk ? '#373737' : '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', accent: '#9580FF', danger: '#FF453A', stale: '#FF9F0A', off: '#5A5A5E', panel: 'rgba(44,44,46,0.96)', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', floatShadow: '0 6px 16px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.1)', mark: '#FFD60A' };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const TITLE = 'Купить билеты в Белград';
+    const S = {
+      done: { icon: CIRCLE, fill: CIRCLE, ink: c.text, label: 'Marked done', sub: TITLE, action: 'Undo', keys: '⌘Z', left: 62 },
+      delete: { icon: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13', fill: '', ink: c.danger, label: 'Task deleted', sub: TITLE, action: 'Undo', keys: '⌘Z', left: 62 },
+      undone: { icon: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11', fill: '', ink: c.text, label: 'Back in Now', sub: TITLE, action: 'Redo', keys: '⇧⌘Z', left: 62 },
+      conflict: { icon: 'M12 3.5L2.5 20h19z M12 10v4.5 M12 17.5v.01', fill: '', ink: c.stale, label: 'Can’t undo', sub: 'The tasks file changed', action: '', keys: '', left: 62 },
+      idle: { icon: '', fill: '', ink: c.text, label: '', sub: '', action: '', keys: '', left: 0 }
+    };
+    const s = { ...(S[state] ?? S.done) };
+    s.hasAction = !!s.action;
+    const f = desk
+      ? { w: 1200, h: 800, hint: '1200px,800px', left: 60, rowTop: 719, toastW: 300 }
+      : { w: 390, h: 844, hint: '390px,844px', left: 16, rowTop: 722, toastW: 358 };
+    f.toastTop = f.rowTop - 8 - 56;
+    const hasToast = state !== 'idle';
+    const ring = (left, top, width, height, radius, tag, tagLeft, tagTop) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagLeft, tagTop });
+    const marks = [];
+    if (hasToast) marks.push(ring(f.left, f.toastTop, f.toastW, 56, 14, 'Плашка отмены', f.left - 4, f.toastTop - 30));
+    const btnTag = desk ? 'Кнопка отмены' : 'Кнопка';
+    marks.push(hasToast
+      ? ring(f.left, f.rowTop, 44, 44, 22, btnTag, f.left + 50, f.rowTop + 12)
+      : ring(f.left, f.rowTop, 44, 44, 22, 'Кнопка отмены', f.left - 4, f.rowTop - 30));
+    return {
+      c, s, f, platform,
+      theme: light ? 'light' : 'dark',
+      without: state === 'done' || state === 'delete' ? TITLE : '',
+      hasToast,
+      showKeys: desk && s.hasAction,
+      btnInk: state === 'idle' ? c.off : c.text,
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>
