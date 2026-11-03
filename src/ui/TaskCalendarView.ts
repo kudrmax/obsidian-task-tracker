@@ -40,6 +40,7 @@ import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
+import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
@@ -387,6 +388,7 @@ export class TaskCalendarView extends ItemView {
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
+		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
 		this.unsubscribe.push(() => undo.destroy());
@@ -462,6 +464,21 @@ export class TaskCalendarView extends ItemView {
 		this.polling.stop();
 		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
+	}
+
+	/** Temporary: how quick entry opens and closes on the phone, frame by frame, in «Task Calendar entry log.md». */
+	private traceEntry(root: HTMLElement): void {
+		const path = "Task Calendar entry log.md";
+		const adapter = this.app.vault.adapter;
+		const trace = new EntryTrace(root.ownerDocument, {
+			write: (text) =>
+				void adapter
+					.exists(path)
+					.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
+					.catch((error) => console.error(error)),
+		});
+		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
+		this.unsubscribe.push(() => trace.destroy());
 	}
 
 	override onResize(): void {
