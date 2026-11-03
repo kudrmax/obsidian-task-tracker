@@ -65,7 +65,7 @@ body{margin:0;background:#000}
 </sc-if>
 
 <sc-if value="{{showWheel}}" hint-placeholder-val="{{true}}">
-<div role="group" aria-label="Columns" style="position: absolute; left: {{wh.left}}px; bottom: {{wh.bottom}}px; width: {{wh.width}}px; height: 32px; box-sizing: border-box; border-radius: 16px; background: {{c.track}}; overflow: hidden; z-index: 5;">
+<div role="group" aria-label="Columns" style="position: absolute; left: {{wh.left}}px; bottom: {{wh.bottom}}px; width: {{wh.width}}px; height: 32px; box-sizing: border-box; border-radius: 16px; background: {{c.track}}; box-shadow: {{c.plusShadow}}; overflow: hidden; z-index: 5;">
 <div style="position: absolute; left: 2px; right: 2px; top: 2px; height: 28px; overflow: hidden;">
 <sc-for list="{{wh.icons}}" as="o" hint-placeholder-count="3">
 <button aria-label="{{o.label}}" style="position: absolute; left: {{o.left}}px; top: 0; width: 38px; height: 28px; border: 0; padding: 0; background: transparent; color: {{c.muted}}; display: flex; align-items: center; justify-content: center; transform: scale({{o.scale}}); opacity: {{o.opacity}};"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
@@ -319,7 +319,7 @@ class Component extends DCLogic {
         priorityCard: { red: '#572725', orange: '#573E19' },
         priorityDot: { red: '#FF453A', orange: '#FF9F0A' }, lateBase: '#FF453A', toward: '#FFFFFF', lateTarget: null,
         chrome: '#1F1F21', chromeIcon: '#E5E5EA', chromeOff: '#6C6C70', nav: '#2A2A2C', navShadow: 'none',
-        plusShadow: '0 6px 16px rgba(0,0,0,0.55)', deskBg: '#1E1E1E', deskChrome: '#262626', deskChromeLine: '#363636', cardLift: 0.11,
+        plusShadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', deskBg: '#1E1E1E', deskChrome: '#262626', deskChromeLine: '#363636', cardLift: 0.11,
         calendars: { work: '#0A84FF', google: '#FF9F0A', pink: '#FF375F', green: '#30D158', purple: '#7D7AFF', yellow: '#FFE29A' }
       },
       light: {
@@ -331,7 +331,7 @@ class Component extends DCLogic {
         priorityCard: { red: '#F4D5D7', orange: '#F4E3CF' },
         priorityDot: { red: '#FF3B30', orange: '#FF9500' }, lateBase: '#FF3B30', toward: '#000000', lateTarget: 4.5,
         chrome: '#F2F2F7', chromeIcon: '#3A3A3C', chromeOff: '#C7C7CC', nav: '#F7F7F9', navShadow: '0 0 0 0.5px rgba(0,0,0,0.08), 0 6px 20px rgba(0,0,0,0.08)',
-        plusShadow: '0 6px 16px rgba(138,92,245,0.35)', deskBg: '#FFFFFF', deskChrome: '#F6F6F6', deskChromeLine: '#E3E3E3', cardLift: 0.05,
+        plusShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', deskBg: '#FFFFFF', deskChrome: '#F6F6F6', deskChromeLine: '#E3E3E3', cardLift: 0.05,
         calendars: { work: '#007AFF', google: '#FF9500', pink: '#FF2D55', green: '#34C759', purple: '#5E5CE6', yellow: '#FFCC00' }
       }
     };
