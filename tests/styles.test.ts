@@ -214,6 +214,16 @@ describe("styles.css keeps to its design system", () => {
 		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-bar-h)");
 	});
 
+	it("marks a task in progress with a dot in the middle of the card's left padding, level with the title, in the card's meta tint", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		const dot = of(".tc-progress-dot");
+		expect([dot.get("left"), dot.get("top")]).toEqual(["calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2)", "calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2)"]);
+		expect([dot.get("width"), dot.get("height"), dot.get("border-radius")]).toEqual(["var(--tc-progress-dot)", "var(--tc-progress-dot)", "var(--tc-radius-circle)"]);
+		expect(dot.get("background")).toBe("var(--tc-muted)");
+		expect(of("[data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot").get("background")).toBe("var(--tc-priority-meta)");
+		expect(sheet.tokens.get("--tc-progress-dot")).toBe("4px");
+	});
+
 	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
