@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Плашка отмены</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: {{width}}px; height: {{height}}px; box-sizing: border-box; overflow: hidden; border-radius: {{radius}}px; background: {{c.bg}}; box-shadow: {{c.shadow}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; padding: {{pad}}; display: flex; align-items: center; gap: 12px;">
+<span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 16px; background: {{s.iconBg}}; color: {{s.ink}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{s.icon}}"></path><path d="{{s.fill}}" fill="currentColor" stroke="none"></path></svg></span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+<span style="font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{s.label}}</span>
+<span style="font-size: 13px; line-height: 18px; color: {{c.muted}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{s.sub}}</span>
+</div>
+<sc-if value="{{s.hasAction}}" hint-placeholder-val="{{true}}">
+<sc-if value="{{kbd}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; height: 22px; box-sizing: border-box; padding: 0 6px; border-radius: 6px; background: {{c.kbdBg}}; color: {{c.muted}}; font-size: 12px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums;">{{s.keys}}</span>
+</sc-if>
+<button style="flex-shrink: 0; height: {{btnH}}px; box-sizing: border-box; padding: 0 14px; border: 0; border-radius: {{btnR}}px; background: {{btnBg}}; color: {{btnInk}}; font: inherit; font-size: 15px; font-weight: 600;">{{s.action}}</button>
+</sc-if>
+<sc-if value="{{timer}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: 0; bottom: 0; width: {{s.left}}; height: 2px; background: {{c.accent}};"></span>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","default":"done","options":["done","delete","undone","conflict"]},"shape":{"editor":"enum","default":"bar","options":["bar","bubble","pill"]},"width":{"editor":"range","default":358,"min":200,"max":480,"step":1,"unit":"px"},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"kbd":{"editor":"boolean","default":false},"$preview":{"width":358,"height":56}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const state = this.props.state ?? 'done';
+    const shape = this.props.shape ?? 'bar';
+    const light = this.props.theme === 'light';
+    const kbd = this.props.kbd === true || this.props.kbd === 'true';
+    const c = light
+      ? { bg: '#FFFFFF', text: '#000000', muted: '#8E8E93', accent: '#8A5CF5', shadow: '0 8px 24px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(0,0,0,0.1)', tile: 'rgba(0,0,0,0.05)', kbdBg: 'rgba(0,0,0,0.06)', danger: '#FF3B30', dangerSoft: 'rgba(255,59,48,0.12)', warn: '#FF9500', warnSoft: 'rgba(255,149,0,0.14)', accentSoft: 'rgba(138,92,245,0.12)', neutralSoft: 'rgba(0,0,0,0.06)' }
+      : { bg: '#2C2C2E', text: '#FFFFFF', muted: '#8E8E93', accent: '#9580FF', shadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', tile: 'rgba(255,255,255,0.08)', kbdBg: 'rgba(255,255,255,0.1)', danger: '#FF453A', dangerSoft: 'rgba(255,69,58,0.18)', warn: '#FF9F0A', warnSoft: 'rgba(255,159,10,0.18)', accentSoft: 'rgba(149,128,255,0.2)', neutralSoft: 'rgba(255,255,255,0.1)' };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const S = {
+      done: { label: 'Marked done', sub: 'Купить билеты в Белград', icon: CIRCLE, fill: CIRCLE, ink: c.text, iconBg: c.neutralSoft, action: 'Undo', keys: '⌘Z', left: '62%' },
+      delete: { label: 'Task deleted', sub: 'Купить билеты в Белград', icon: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13', fill: '', ink: c.danger, iconBg: c.dangerSoft, action: 'Undo', keys: '⌘Z', left: '62%' },
+      undone: { label: 'Back in Now', sub: 'Купить билеты в Белград', icon: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11', fill: '', ink: c.accent, iconBg: c.accentSoft, action: 'Redo', keys: '⇧⌘Z', left: '62%' },
+      conflict: { label: 'Can’t undo', sub: 'The tasks file changed', icon: 'M12 3.5L2.5 20h19z M12 10v4.5 M12 17.4v0.1', fill: '', ink: c.warn, iconBg: c.warnSoft, action: '', keys: '', left: '0%' }
+    };
+    const s = { ...S[state] };
+    s.hasAction = !!s.action && shape !== 'bubble';
+    const height = shape === 'pill' ? 52 : 56;
+    return {
+      c, s, kbd,
+      width: Number(this.props.width ?? 358),
+      height,
+      radius: shape === 'pill' ? 26 : 14,
+      pad: shape === 'pill' ? '0 8px 0 10px' : '0 6px 0 12px',
+      btnH: shape === 'pill' ? 36 : 44,
+      btnR: shape === 'pill' ? 18 : 10,
+      btnBg: shape === 'pill' ? c.accent : 'transparent',
+      btnInk: shape === 'pill' ? '#FFFFFF' : c.accent,
+      timer: shape === 'bar' && s.hasAction && !kbd
+    };
+  }
+}
+</script>
+</body>
+</html>

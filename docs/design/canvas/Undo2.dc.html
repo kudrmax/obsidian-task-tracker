@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>2. Кнопка отмены в нижнем ряду</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 1824px; height: 3180px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">2. Кнопка отмены в нижнем ряду</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 1700px; font-size: 18px; line-height: 24px; color: #6B6A65;">Слева в ряду переключателя, напротив плюса, стоит круглая кнопка отмены: она видна, пока есть что отменять, и не гаснет по таймеру. Над ней на 3 секунды всплывает, что именно сделано. Долгое нажатие на кнопку — Redo</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="8">
+<sc-if value="{{p.phone}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="UndoPhone" look="button" state="{{p.s}}" theme="{{p.t}}" hint-size="390px,844px"></dc-import></div>
+</sc-if>
+<sc-if value="{{p.desk}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 1200px; height: 800px; overflow: hidden; border-radius: 10px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="UndoDesk" look="button" state="{{p.s}}" theme="{{p.t}}" hint-size="1200px,800px"></dc-import></div>
+</sc-if>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1824,"height":3180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { frames: [{"phone": true, "s": "done", "t": "dark", "left": 64, "top": 176, "name": "Сразу после Done, тёмная", "cap": "Кнопка с кольцом акцента: есть что отменить. Над ней — что сделано и с какой задачей", "desk": false, "capTop": 1038}, {"phone": true, "s": "delete", "t": "dark", "left": 494, "top": 176, "name": "После Delete, тёмная", "cap": "То же после удаления, корзина красная", "desk": false, "capTop": 1038}, {"phone": true, "s": "undone", "t": "dark", "left": 924, "top": 176, "name": "После отмены, тёмная", "cap": "После нажатия всплывает, куда вернулась задача. Кнопка остаётся для следующего шага", "desk": false, "capTop": 1038}, {"phone": true, "s": "conflict", "t": "dark", "left": 1354, "top": 176, "name": "Отмена невозможна, тёмная", "cap": "Отмена не прошла: кнопка гаснет, над ней причина", "desk": false, "capTop": 1038}, {"phone": true, "s": "done", "t": "light", "left": 64, "top": 1200, "name": "Сразу после Done, светлая", "cap": "Та же плашка в светлой теме", "desk": false, "capTop": 2062}, {"phone": false, "s": "undone", "t": "dark", "left": 494, "top": 1200, "name": "Mac: после Cmd+Z, тёмная", "cap": "На Mac кнопки нет, отмена — Cmd+Z. После неё внизу по центру всплывает, что вернулось", "desk": true, "capTop": 2018}, {"phone": true, "s": "conflict", "t": "light", "left": 64, "top": 2200, "name": "Отмена невозможна, светлая", "cap": "Отказ в светлой теме", "desk": false, "capTop": 3062}, {"phone": false, "s": "conflict", "t": "light", "left": 494, "top": 2200, "name": "Mac: отмена невозможна, светлая", "cap": "Отказ отмены на Mac в светлой теме", "desk": true, "capTop": 3018}] };
+  }
+}
+</script>
+</body>
+</html>

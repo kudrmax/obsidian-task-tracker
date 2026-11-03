@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Отмена на десктопе</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; position: relative; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="ConfirmDesk" variant="plain" theme="{{theme}}" hint-size="1200px,800px"></dc-import>
+<sc-if value="{{isBar}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 412px; top: 704px; width: 420px; height: 56px; z-index: 8;"><dc-import name="UndoToast" state="{{state}}" shape="bar" width="420" kbd="true" theme="{{theme}}" hint-size="420px,56px"></dc-import></div>
+</sc-if>
+<sc-if value="{{isButton}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 462px; top: 704px; width: 320px; height: 56px; z-index: 8;"><dc-import name="UndoToast" state="{{state}}" shape="bubble" width="320" theme="{{theme}}" hint-size="320px,56px"></dc-import></div>
+</sc-if>
+<sc-if value="{{isTop}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 432px; top: 52px; width: 380px; height: 52px; z-index: 8;"><dc-import name="UndoToast" state="{{state}}" shape="pill" width="380" kbd="true" theme="{{theme}}" hint-size="380px,52px"></dc-import></div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"look":{"editor":"enum","default":"bar","options":["bar","button","top"]},"state":{"editor":"enum","default":"undone","options":["done","delete","undone","conflict"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const look = this.props.look ?? 'bar';
+    return {
+      state: this.props.state ?? 'undone',
+      theme: this.props.theme === 'light' ? 'light' : 'dark',
+      isBar: look === 'bar',
+      isButton: look === 'button',
+      isTop: look === 'top'
+    };
+  }
+}
+</script>
+</body>
+</html>
