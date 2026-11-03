@@ -488,7 +488,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		const { menu } = openOnStackCard();
 		const row = menu.openRename(() => {});
 		expect(panel().hidden).toBe(true);
-		expect(document.querySelector<HTMLElement>(".tc-lifted")!.style.visibility).toBe("hidden");
+		expect(document.querySelector(".tc-lifted")!.classList.contains("tc-invisible")).toBe(true);
 		expect(row.classList.contains("tc-menu-field")).toBe(true);
 		expect(row.classList.contains("tc-quick-row")).toBe(true);
 		expect([row.style.left, row.style.top, row.style.width]).toEqual(["200px", "300px", "150px"]);

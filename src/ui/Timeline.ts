@@ -3,7 +3,7 @@ import { paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
-import { clear, el as make, px } from "./dom";
+import { clear, el, px } from "./dom";
 import { sameTask } from "./drag/listPlace";
 import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
@@ -132,26 +132,29 @@ export class Timeline {
 	/** A finger on the screen, anywhere: the anchor goes, and the keyboard it may bring shrinks the view under a still timeline. */
 	private readonly touched = () => (this.anchor = null);
 
+	readonly el: HTMLElement;
+
 	constructor(
-		readonly el: HTMLElement,
+		host: HTMLElement,
 		private readonly deps: TimelineDeps,
 	) {
-		el.classList.add("tc-timeline");
-		this.canvas = make(el, "div", "tc-canvas");
+		this.el = host;
+		this.el.classList.add("tc-timeline");
+		this.canvas = el(this.el, "div", "tc-canvas");
 		for (let hour = 0; hour <= DESIGN.dayHours; hour++) this.hours.push(this.mark(this.canvas, hour * MINUTES_PER_HOUR, ""));
-		this.minorEl = make(this.canvas, "div");
-		this.itemsEl = make(this.canvas, "div", "tc-items");
-		this.grips = make(null, "div", "tc-grips");
+		this.minorEl = el(this.canvas, "div");
+		this.itemsEl = el(this.canvas, "div", "tc-items");
+		this.grips = el(null, "div", "tc-grips");
 		this.sizeWatch = new ResizeObserver(() => {
 			this.frame = null;
 			this.deps.onResize?.();
 			this.holdAnchor();
 		});
-		this.sizeWatch.observe(el);
-		el.addEventListener("wheel", this.touched, { passive: true });
-		for (const type of TOUCHES) el.ownerDocument.addEventListener(type, this.touched, { capture: true, passive: true });
+		this.sizeWatch.observe(this.el);
+		this.el.addEventListener("wheel", this.touched, { passive: true });
+		for (const type of TOUCHES) this.el.ownerDocument.addEventListener(type, this.touched, { capture: true, passive: true });
 		for (const edge of ["start", "end"] as const) {
-			make(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
+			el(this.grips, "span", `tc-grip is-${edge}`).addEventListener("pointerdown", (e) => {
 				const task = this.tasks.find((t) => t.el.classList.contains("is-selected"));
 				if (!task || !e.isPrimary || e.button !== 0) return;
 				e.stopPropagation();
@@ -306,9 +309,9 @@ export class Timeline {
 		this.nowEl?.remove();
 		this.nowEl = null;
 		if (this.deps.date() === this.deps.today()) {
-			this.nowEl = make(this.canvas, "div", "tc-now");
-			make(this.nowEl, "span", "tc-now-pill", formatTime(minutesOf(this.deps.now())));
-			make(this.nowEl, "div", "tc-now-line");
+			this.nowEl = el(this.canvas, "div", "tc-now");
+			el(this.nowEl, "span", "tc-now-pill", formatTime(minutesOf(this.deps.now())));
+			el(this.nowEl, "div", "tc-now-line");
 		}
 		this.layout();
 	}
@@ -373,9 +376,9 @@ export class Timeline {
 		this.drop = span;
 		const { view, canvasTop } = this.measured();
 		if (!this.dropEl) {
-			this.dropEl = make(document.body, "div", "tc-drop");
-			make(this.dropEl, "span", "tc-drop-pill");
-			make(this.dropEl, "div", "tc-drop-line");
+			this.dropEl = el(document.body, "div", "tc-drop");
+			el(this.dropEl, "span", "tc-drop-pill");
+			el(this.dropEl, "div", "tc-drop-line");
 			this.dropShown = noDropShown();
 		}
 		if (this.dropShown.start !== span.start) {
@@ -422,7 +425,7 @@ export class Timeline {
 	 */
 	showField(slot: Slot, field: HTMLElement): void {
 		const box = this.holdField({ kind: "slot", span: { start: this.spanOf(slot).start, end: null } }, field);
-		const time = box.querySelector(".tc-field-time") ?? make(box, "span", "tc-field-time");
+		const time = box.querySelector(".tc-field-time") ?? el(box, "span", "tc-field-time");
 		time.textContent = formatTime(slot.start);
 		this.layoutTasks();
 	}
@@ -450,7 +453,7 @@ export class Timeline {
 			return shown.box;
 		}
 		shown?.box.remove();
-		const box = make(this.itemsEl, "div", `tc-block tc-quick-row is-${at.kind}`);
+		const box = el(this.itemsEl, "div", `tc-block tc-quick-row is-${at.kind}`);
 		box.appendChild(field);
 		this.field = { at, box };
 		return box;
@@ -586,7 +589,7 @@ export class Timeline {
 	}
 
 	private mark(parent: HTMLElement, minutes: number, text: string): HourMark {
-		return { minutes, label: make(parent, "div", "tc-hour-label", text), line: make(parent, "div", "tc-hour-line") };
+		return { minutes, label: el(parent, "div", "tc-hour-label", text), line: el(parent, "div", "tc-hour-line") };
 	}
 
 	/** Redraws the marks between the hours when the zoom crosses into another grid: small labels on some, bare lines on the rest. */
@@ -598,8 +601,8 @@ export class Timeline {
 		for (let minutes = grid.lines; minutes < DESIGN.dayHours * MINUTES_PER_HOUR; minutes += grid.lines) {
 			const minute = minutes % MINUTES_PER_HOUR;
 			if (minute === 0) continue;
-			const line = make(this.minorEl, "div", "tc-hour-line is-minor");
-			const label = minute % grid.labels === 0 ? make(this.minorEl, "div", "tc-hour-label is-minor", `:${String(minute).padStart(2, "0")}`) : null;
+			const line = el(this.minorEl, "div", "tc-hour-line is-minor");
+			const label = minute % grid.labels === 0 ? el(this.minorEl, "div", "tc-hour-label is-minor", `:${String(minute).padStart(2, "0")}`) : null;
 			this.minor.push({ minutes, label, line });
 		}
 	}
@@ -615,27 +618,27 @@ export class Timeline {
 	}
 
 	private placeEvent(event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {
-		const block = make(this.itemsEl, "div", "tc-item tc-event");
+		const block = el(this.itemsEl, "div", "tc-item tc-event");
 		block.style.setProperty(PROPERTY.x, px(left));
 		paintEvent(block, event, this.deps.theme());
-		make(block, "div", "tc-event-bar");
-		make(make(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
+		el(block, "div", "tc-event-bar");
+		el(el(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
 		this.deps.onEvent?.(block, event);
 		return { el: block, ...span, level };
 	}
 
 	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */
 	private placeTask(item: TaskItem): PlacedTask {
-		const block = make(this.itemsEl, "div", "tc-block");
-		const card = make(block, "div", "tc-block-card");
+		const block = el(this.itemsEl, "div", "tc-block");
+		const card = el(block, "div", "tc-block-card");
 		markPriority(card, item.priority);
-		if (item.status === "inProgress") make(card, "span", "tc-progress-dot");
-		fillTitle(make(card, "div", "tc-card-title"), item.text);
+		showProgressDot(card, item);
+		fillTitle(el(card, "div", "tc-card-title"), item.text);
 		renderMeta(card, item);
-		const meta = make(card, "span", "tc-block-meta is-hidden");
-		make(meta, "span");
-		make(meta, "span");
-		const pill = make(card, "span", "tc-block-pill");
+		const meta = el(card, "span", "tc-block-meta is-hidden");
+		el(meta, "span");
+		el(meta, "span");
+		const pill = el(card, "span", "tc-block-pill");
 		block.classList.toggle("is-selected", this.isSelected(item));
 		block.classList.toggle("is-renaming", this.isRenamed(item));
 		this.deps.onBlock?.(block, item);

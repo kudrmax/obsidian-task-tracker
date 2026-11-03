@@ -426,6 +426,14 @@ describe("styles.css keeps to its design system", () => {
 });
 
 describe("the code keeps to the design system", () => {
+	it("hides by the plugin's own classes, never by an inline style, and calls the DOM helper by its name", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(of(".task-calendar > .tc-hidden").get("display")).toBe("none");
+		expect(of(".tc-invisible").get("visibility")).toBe("hidden");
+		const offenders = code.files.flatMap(({ path, text }) => (/\.style\.(display|visibility) =|\bel as \w+/.test(text) ? [path] : []));
+		expect(offenders).toEqual([]);
+	});
+
 	it("writes no size, time or share into a style except as a named constant", () => {
 		const offenders: string[] = [];
 		for (const { path, text } of code.files) {

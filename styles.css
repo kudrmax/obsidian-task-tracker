@@ -634,6 +634,9 @@ button.tc-btn.is-pill.is-danger { background: var(--tc-danger); color: var(--tc-
 button.tc-btn.is-swatch { width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
 button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
 .task-calendar svg { display: block; }
+/* Hidden by the plugin's own classes, apart from Obsidian's is-hidden. */
+.task-calendar > .tc-hidden { display: none; }
+.tc-invisible { visibility: hidden; }
 
 /* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
 .tc-head { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; align-items: center; }

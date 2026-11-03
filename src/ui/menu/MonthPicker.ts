@@ -1,5 +1,5 @@
 import { addDays, addMonths, gridStart, monthTitle, sameMonth, startOfMonth } from "../dates";
-import { clear, el as make } from "../dom";
+import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
 import type { LocalDate } from "../types";
 
@@ -19,18 +19,21 @@ export class MonthPicker {
 	private readonly titleEl: HTMLElement;
 	private readonly gridEl: HTMLElement;
 
+	readonly el: HTMLElement;
+
 	constructor(
-		readonly el: HTMLElement,
+		host: HTMLElement,
 		private readonly opts: MonthPickerOptions,
 	) {
+		this.el = host;
 		this.month = startOfMonth(opts.month);
-		el.classList.add("tc-picker");
-		const head = make(el, "div", "tc-picker-head");
-		this.titleEl = make(head, "span", "tc-picker-title");
-		const nav = make(head, "div", "tc-picker-nav");
+		this.el.classList.add("tc-picker");
+		const head = el(this.el, "div", "tc-picker-head");
+		this.titleEl = el(head, "span", "tc-picker-title");
+		const nav = el(head, "div", "tc-picker-nav");
 		this.arrow(nav, "tc-picker-prev", "Previous month", -1);
 		this.arrow(nav, "tc-picker-next", "Next month", 1);
-		this.gridEl = make(el, "div", "tc-picker-grid");
+		this.gridEl = el(this.el, "div", "tc-picker-grid");
 		this.render();
 	}
 
@@ -51,11 +54,11 @@ export class MonthPicker {
 	render(): void {
 		this.titleEl.textContent = monthTitle(this.month);
 		clear(this.gridEl);
-		for (const name of WEEKDAYS) make(this.gridEl, "span", "tc-weekday", name);
+		for (const name of WEEKDAYS) el(this.gridEl, "span", "tc-weekday", name);
 		const start = gridStart(this.month);
 		for (let i = 0; i < CELLS; i++) {
 			const date = addDays(start, i);
-			const day = make(this.gridEl, "button", "tc-btn tc-day", String(Number(date.slice(-2))));
+			const day = el(this.gridEl, "button", "tc-btn tc-day", String(Number(date.slice(-2))));
 			day.classList.toggle("is-other", !sameMonth(date, this.month));
 			day.classList.toggle("is-today", date === this.opts.today);
 			day.classList.toggle("is-selected", date === this.opts.selected);

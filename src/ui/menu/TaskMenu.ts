@@ -216,7 +216,7 @@ export class TaskMenu extends LiftedMenu {
 	openRename(onClose: (how: CloseHow) => void): HTMLElement {
 		this.giveToField();
 		this.fieldClosed = onClose;
-		this.lifted.style.visibility = "hidden";
+		this.lifted.classList.add("tc-invisible");
 		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		row.style.left = px(this.copy.left);
 		row.style.width = px(this.copy.width);
