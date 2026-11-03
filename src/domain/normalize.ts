@@ -43,11 +43,11 @@ function closedToDone(doc: TaskDocument): TaskDocument {
 	return gatherAtStart(doc, "done", (e) => !isOpen(e.task));
 }
 
-/** An Inbox task that got a due date or a slot is sorted: it goes to Soon, and from there `dueToNow` takes today's on. */
-function datedOutOfInbox(doc: TaskDocument): TaskDocument {
+/** An Inbox or Backlog task that got a due date or a slot has its day: it goes to Soon, and from there `dueToNow` takes today's on. */
+function datedOutOfUndated(doc: TaskDocument): TaskDocument {
 	if (!doc.hasSection("soon")) return doc;
 	for (;;) {
-		const entry = doc.tasks("inbox").find((e) => isOpen(e.task) && (e.task.dueDate !== null || e.task.slot !== null));
+		const entry = [...doc.tasks("inbox"), ...doc.tasks("backlog")].find((e) => isOpen(e.task) && (e.task.dueDate !== null || e.task.slot !== null));
 		if (!entry) return doc;
 		doc = doc.moveEntry(entry, "soon", "end");
 	}
@@ -83,7 +83,7 @@ function intoGroup(doc: TaskDocument, entry: TaskEntry, name: string, presets: r
 	return doc.moveEntry(doc.tasks(entry.section)[entry.index], "now", { endOf: index });
 }
 
-const GROUPED: readonly SectionKey[] = ["inbox", "now", "soon"];
+const GROUPED: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
 
 /** What a section of the list may hold: what the list's column shows (sections spec §3.3). */
 function fitsGroup(section: SectionKey, task: Task, today: LocalDate): boolean {
@@ -147,7 +147,7 @@ function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
 
 /** `presets`: the section presets in their order, for a section rule 4 has to make in Now. */
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT, presets: readonly string[] = []): TaskDocument {
-	const listed = dueToNow(datedOutOfInbox(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
+	const listed = dueToNow(datedOutOfUndated(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
 	const result = normalizeGroups(listed, today);
 	return result.serialize() === doc.serialize() ? doc : result;
 }

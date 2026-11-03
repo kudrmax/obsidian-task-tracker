@@ -20,7 +20,10 @@ export interface TaskKey {
 }
 
 /** The lists that hold sections. */
-export type GroupedList = "inbox" | "soon" | "now";
+export type GroupedList = "inbox" | "backlog" | "soon" | "now";
+
+/** The lists a task is put at the end of: a drop on such a column from another one, or at the end of its own. */
+export type EndList = "inbox" | "backlog" | "soon";
 
 /** Where to create a task: a place in a list, a place among subtasks, or a slot on the calendar. */
 export type NewTaskPlace =
@@ -81,11 +84,12 @@ export class TasksFileMissingError extends Error {
 }
 
 /**
- * Where the task sheet puts a task: Inbox = section Inbox without a due date or slot, Soon = section Soon without a due
- * date, Now = section Now with today's due date (Now is today), Date = a due date.
+ * Where the task sheet puts a task: Inbox = section Inbox without a due date or slot, Backlog = section Backlog likewise,
+ * Soon = section Soon without a due date, Now = section Now with today's due date (Now is today), Date = a due date.
  */
 export type Placement =
 	| { readonly kind: "inbox" }
+	| { readonly kind: "backlog" }
 	| { readonly kind: "soon" }
 	| { readonly kind: "now" }
 	| { readonly kind: "date"; readonly date: LocalDate };
@@ -107,7 +111,7 @@ export type TaskChange =
 	| { readonly kind: "moveBefore"; readonly before: TaskKey | null; readonly date: LocalDate }
 	| { readonly kind: "moveToList"; readonly date: LocalDate }
 	| { readonly kind: "moveToSoon"; readonly date: LocalDate }
-	| { readonly kind: "moveToEnd"; readonly section: "inbox" | "soon" }
+	| { readonly kind: "moveToEnd"; readonly section: EndList }
 	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
@@ -127,6 +131,8 @@ export interface TaskService {
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;
 	/** Every Inbox task, in file order: none has a due date or a slot (spec §4.4, rule 3). */
 	inboxView(): Promise<readonly TaskItem[]>;
+	/** Every Backlog task, in file order: none has a due date or a slot, as in Inbox. */
+	backlogView(): Promise<readonly TaskItem[]>;
 
 	/** Today: end of Now, due today. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
 	createInList(date: LocalDate, text: string): Promise<void>;
@@ -144,7 +150,7 @@ export interface TaskService {
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void>;
 
 	/**
-	 * The task sheet. `inbox`: end of Inbox, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
+	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
 	 * when D is today or earlier, else end of Soon. With `slot`: the slot is kept too (long tap on the timeline).
 	 */
 	create(draft: TaskDraft, slot?: Slot): Promise<void>;
@@ -199,8 +205,8 @@ export interface TaskService {
 	moveToSoon(key: TaskKey, date: LocalDate): Promise<void>;
 	/** Put off to `date` (a drop on Tomorrow or Pick a date): due date `date`, no slot; the end of Soon for a later day, of Now for today or earlier. */
 	postpone(key: TaskKey, date: LocalDate): Promise<void>;
-	/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
-	moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void>;
+	/** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */
+	moveToEnd(key: TaskKey, section: EndList): Promise<void>;
 
 	/**
 	 * A drop into a gap of a list that shows sections (sections spec §5.3): right before `before`, in its section, or at

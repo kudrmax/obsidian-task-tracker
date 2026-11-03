@@ -1,8 +1,8 @@
 /** A calendar day as `YYYY-MM-DD`. Compared as strings. */
 export type LocalDate = string;
 
-/** Which of the plugin's sections a task sits in. Backlog is never read. */
-export type SectionKey = "inbox" | "now" | "soon" | "done";
+/** Which of the plugin's sections a task sits in. */
+export type SectionKey = "inbox" | "backlog" | "now" | "soon" | "done";
 
 /** A `###` section of a list by its name, or null for the tasks outside any. */
 export type GroupName = string | null;

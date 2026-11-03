@@ -32,7 +32,7 @@ import { normalize } from "../../src/domain/normalize";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
 const T = "2026-10-30";
 const D = "2026-11-03";
 
@@ -385,6 +385,39 @@ describe("Inbox", () => {
 	it("moveToEnd into Inbox drops the due date and the slot", () => {
 		const d = parse("## Inbox\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n");
 		expect(moveToEnd(d, d.tasks("soon")[0], "inbox").serialize()).toBe("## Inbox\n- [ ] S\n\n## Soon\n");
+	});
+});
+
+describe("Backlog", () => {
+	const text = "## Inbox\n- [ ] I\n\n## Backlog\n- [ ] L\n\n## Now\n- [ ] A 📅 2026-11-03 ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n- [ ] S\n";
+
+	it("the Backlog tile creates at the end of Backlog and drops a slot", () => {
+		const slot = { date: T, start: 600, end: null };
+		expect(placeTask(parse(text), null, { text: "New", placement: { kind: "backlog" }, priority: null }, T, slot).serialize()).toBe(
+			"## Inbox\n- [ ] I\n\n## Backlog\n- [ ] L\n- [ ] New\n\n## Now\n- [ ] A 📅 2026-11-03 ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n- [ ] S\n",
+		);
+	});
+
+	it("an edit to Backlog takes the due date and the slot away", () => {
+		const d = parse(text);
+		expect(placeTask(d, d.tasks("now")[0], { text: "A", placement: { kind: "backlog" }, priority: null }, T).serialize()).toBe("## Inbox\n- [ ] I\n\n## Backlog\n- [ ] L\n- [ ] A\n\n## Now\n\n## Soon\n- [ ] S\n");
+	});
+
+	it("a Backlog task shows the Backlog tile", () => {
+		expect(placementOfEntry(parse(text).tasks("backlog")[0], T)).toEqual({ kind: "backlog" });
+	});
+
+	it("moveToEnd moves between Inbox, Backlog and Soon; into Backlog the due date and the slot go", () => {
+		const d = parse("## Inbox\n- [ ] I\n\n## Backlog\n- [ ] L\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n");
+		expect(moveToEnd(d, d.tasks("inbox")[0], "backlog").serialize()).toBe("## Inbox\n\n## Backlog\n- [ ] L\n- [ ] I\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n");
+		expect(moveToEnd(d, d.tasks("soon")[0], "backlog").serialize()).toBe("## Inbox\n- [ ] I\n\n## Backlog\n- [ ] L\n- [ ] S\n\n## Soon\n");
+		expect(moveToEnd(d, d.tasks("backlog")[0], "soon").serialize()).toBe("## Inbox\n- [ ] I\n\n## Backlog\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n- [ ] L\n");
+		expect(moveToEnd(d, d.tasks("backlog")[0], "inbox").serialize()).toBe("## Inbox\n- [ ] I\n- [ ] L\n\n## Backlog\n\n## Soon\n- [ ] S 📅 2026-11-03 ⏰ 2026-11-02 10:00-11:00\n");
+	});
+
+	it("a drop into a gap of Backlog puts the task there without a due date", () => {
+		const d = parse("## Backlog\n- [ ] L\n- [ ] M\n\n## Now\n- [ ] A 📅 2026-10-30\n");
+		expect(moveToGroup(d, d.tasks("now")[0], "backlog", null, d.tasks("backlog")[1], T).serialize()).toBe("## Backlog\n- [ ] L\n- [ ] A\n- [ ] M\n\n## Now\n");
 	});
 });
 

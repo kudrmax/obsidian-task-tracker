@@ -7,7 +7,7 @@ import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 
 const T = "2026-10-30";
 const clock: Clock = { now: () => new Date(2026, 9, 30, 14, 20) };
-const FILE = "## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n";
+const FILE = "## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Backlog\n\n## Done\n";
 
 function setup(text = FILE) {
 	const store = new InMemoryTaskFileStore(text);
