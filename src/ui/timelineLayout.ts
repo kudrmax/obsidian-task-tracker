@@ -6,10 +6,14 @@ export interface Span {
 	readonly end: number;
 }
 
-export interface ColumnBox {
-	readonly col: number;
-	readonly cols: number;
+/** An event in the items area: its left edge, how deep it lies over others, and its place back to front. */
+export interface EventBox {
+	readonly left: number;
+	readonly level: number;
+	readonly layer: number;
 }
+
+export type PlacedSpan = Span & { readonly level: number };
 
 export interface TaskSpan {
 	readonly start: number;
@@ -62,28 +66,26 @@ const MINUTES_PER_HOUR = 60;
 /** Under half a pixel off its time a card still stands on it. */
 const STACK_SLACK = 0.5;
 
-/** Overlapping events share the width in equal columns, each cluster on its own; answers in the order given. */
-export function layoutColumns(spans: readonly Span[]): ColumnBox[] {
+/**
+ * Events never share the width, like tasks: by start, the longer first on a tie, an event that starts while another goes on lies over
+ * it, one inset further in; the later lies higher. Answers in the order given.
+ */
+export function layoutEvents(spans: readonly Span[]): EventBox[] {
 	const order = spans.map((span, index) => ({ span, index })).sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
-	const boxes: ColumnBox[] = new Array(spans.length);
-	let cluster: { index: number; col: number }[] = [];
-	let columnEnds: number[] = [];
-	let clusterEnd = -Infinity;
-	const close = () => {
-		for (const member of cluster) boxes[member.index] = { col: member.col, cols: columnEnds.length };
-		cluster = [];
-		columnEnds = [];
-	};
+	const boxes: EventBox[] = new Array(spans.length);
+	const placed: (Span & { level: number })[] = [];
 	for (const { span, index } of order) {
-		if (span.start >= clusterEnd) close();
-		let col = columnEnds.findIndex((end) => end <= span.start);
-		if (col < 0) col = columnEnds.length;
-		columnEnds[col] = span.end;
-		cluster.push({ index, col });
-		clusterEnd = Math.max(clusterEnd, span.end);
+		const under = placed.filter((p) => p.start <= span.start && span.start < p.end).pop();
+		const level = under ? under.level + 1 : 0;
+		boxes[index] = { left: overlayLeft(level), level, layer: placed.length };
+		placed.push({ ...span, level });
 	}
-	close();
 	return boxes;
+}
+
+/** The left edge of a block lying `level` deep: on the ground at the inset, over others one overlay inset per level. */
+function overlayLeft(level: number): number {
+	return level === 0 ? DESIGN.itemInset : level * LAYOUT.overlayInset;
 }
 
 /** The grid at this zoom: labels at the finest division that still has room for them, else the hour; lines as often as they stay apart. */
@@ -110,12 +112,12 @@ export function itemBox(startMin: number, endMin: number, hourPx: number): ItemB
 /**
  * Tasks never share the width: by start, ties in the order given, each card sits on its own time or one gap under the head
  * (the top card's height) of the one before. A pushed long card still ends at its end. A card that starts on a long card's body or
- * on an event lies over it, 18 px further in. Answers in the order given.
+ * on an event lies over it, 18 px further in than the topmost. Answers in the order given.
  */
-export function stackTasks(tasks: readonly TaskSpan[], events: readonly Span[], hourPx: number, card: CardSize): StackBox[] {
+export function stackTasks(tasks: readonly TaskSpan[], events: readonly PlacedSpan[], hourPx: number, card: CardSize): StackBox[] {
 	const head = card.height;
 	const y = (minutes: number) => minutesToPx(minutes, hourPx);
-	const overEvent = (top: number, bottom: number) => events.some((e) => top < y(e.end) && bottom > y(e.start));
+	const eventsUnder = (top: number, bottom: number) => events.filter((e) => top < y(e.end) && bottom > y(e.start));
 	const order = tasks.map((task, index) => ({ task, index })).sort((a, b) => a.task.start - b.task.start || a.index - b.index);
 	const boxes: { -readonly [K in keyof StackBox]: StackBox[K] }[] = new Array(tasks.length);
 	const bodies: { top: number; bottom: number; left: number }[] = [];
@@ -127,8 +129,10 @@ export function stackTasks(tasks: readonly TaskSpan[], events: readonly Span[], 
 		const height = task.end === null ? head : Math.max(head, y(task.end) - DESIGN.itemInset - top);
 		headBottom = top + head;
 		const parent = bodies.filter((b) => top < b.bottom && top + head > b.top).pop();
-		const overlay = !!parent || overEvent(top, top + height);
-		const left = parent ? parent.left + LAYOUT.overlayInset : overlay ? LAYOUT.overlayInset : DESIGN.itemInset;
+		const under = eventsUnder(top, top + height);
+		const overlay = !!parent || under.length > 0;
+		const eventLeft = under.length ? overlayLeft(Math.max(...under.map((e) => e.level)) + 1) : DESIGN.itemInset;
+		const left = Math.max(parent ? parent.left + LAYOUT.overlayInset : DESIGN.itemInset, eventLeft);
 		if (height > head) bodies.push({ top: top + head, bottom: top + height, left });
 		const stacked = top - natural > STACK_SLACK;
 		if (stacked && previous) previous.stacked = true;

@@ -62,8 +62,6 @@ export const PROPERTY = {
 	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
 	roomTop: "--tc-room-top",
 	roomBottom: "--tc-room-bottom",
-	column: "--tc-col",
-	columns: "--tc-cols",
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",
 	eventText: "--tc-event-text",
@@ -118,6 +116,8 @@ export const LAYOUT = {
 	dragStartDistance: 4,
 	/** A second click this soon after the first is a double click: the first waits it out before it counts as a click. */
 	doubleClickMs: 250,
+	/** A column that has gone this long without a scroll step has stopped: what its scroll brought into view opens its menu. */
+	scrollIdleMs: 120,
 	/** The divider holds to the middle of the window while dragged this close to it. */
 	dividerSnapDistance: 8,
 	/**

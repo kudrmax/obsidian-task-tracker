@@ -110,6 +110,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		today: () => TODAY,
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,
+		toolbarTop: () => null,
 		day: () => day,
 		mode: () => mode,
 		turnTo: (to) => {
@@ -587,6 +588,16 @@ describe("QuickEntryController", () => {
 		type("A2");
 		press("Enter");
 		await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A2", placement: { kind: "now" }, priority: null } }]));
+	});
+
+	it("keeps the dot of a task in progress on the field that renames it, and none on the field of a new task", () => {
+		const a: TaskItem = { ...item("A", key("now", 0)), status: "inProgress" };
+		const { controller, lists } = setUp({ items: { left: [a, item("B", key("now", 1))] } });
+		controller.rename(a);
+		const row = () => lists.left.el.querySelector(".tc-quick-row")!;
+		expect(row().querySelector(":scope > .tc-progress-dot")).not.toBeNull();
+		lists.left.render();
+		expect(row().querySelectorAll(":scope > .tc-progress-dot")).toHaveLength(1);
 	});
 
 	describe("a rename the bar's place moves to another column", () => {

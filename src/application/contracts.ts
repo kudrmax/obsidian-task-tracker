@@ -97,6 +97,26 @@ export interface TaskDraft {
 	readonly priority: string | null;
 }
 
+/** One change `applyAll` makes to a task: each kind does what the single call of that name does. */
+export type TaskChange =
+	| { readonly kind: "status"; readonly status: TaskStatus }
+	| { readonly kind: "priority"; readonly priority: string | null }
+	| { readonly kind: "dueDate"; readonly date: LocalDate | null }
+	| { readonly kind: "postpone"; readonly date: LocalDate }
+	| { readonly kind: "remove" }
+	| { readonly kind: "moveBefore"; readonly before: TaskKey | null; readonly date: LocalDate }
+	| { readonly kind: "moveToList"; readonly date: LocalDate }
+	| { readonly kind: "moveToSoon"; readonly date: LocalDate }
+	| { readonly kind: "moveToEnd"; readonly section: "inbox" | "soon" }
+	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
+	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
+	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
+
+export interface TaskStep {
+	readonly key: TaskKey;
+	readonly change: TaskChange;
+}
+
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
@@ -201,6 +221,14 @@ export interface TaskService {
 	renameGroup(list: GroupedList, group: string, name: string): Promise<void>;
 	/** The heading goes; its tasks, in order, join the end of No section. */
 	removeGroup(list: GroupedList, group: string): Promise<void>;
+
+	/**
+	 * Several tasks at once (bulk actions spec): every step in one write, in the order the tasks stand in the file, so
+	 * tasks moved to one place keep their order there. A key, `before` or `parent` names the task as read, wherever the
+	 * steps before it moved it. A move skips a task whose own task moves too: it goes along. A task already gone with
+	 * its removed task is skipped. Rejects with StaleTaskError, writing nothing, when any key no longer matches.
+	 */
+	applyAll(steps: readonly TaskStep[]): Promise<void>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

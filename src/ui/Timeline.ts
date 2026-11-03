@@ -5,10 +5,10 @@ import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el as make, px } from "./dom";
 import { sameTask } from "./drag/listPlace";
-import { markPriority, renderMeta, showStrip } from "./TaskCard";
+import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
-import { durationParts, followNow, gridAt, type Grid, itemBox, layoutColumns, minutesToPx, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
+import { durationParts, followNow, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -24,6 +24,7 @@ export interface TimelineDeps {
 	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
 	onResize?(): void;
 	onBlock?(block: HTMLElement, item: TaskItem): void;
+	onEvent?(block: HTMLElement, event: CalendarEvent): void;
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
 }
@@ -38,10 +39,8 @@ interface GridMark {
 
 type HourMark = GridMark & { readonly label: HTMLElement };
 
-interface PlacedEvent {
+interface PlacedEvent extends PlacedSpan {
 	readonly el: HTMLElement;
-	readonly start: number;
-	readonly end: number;
 }
 
 interface PlacedTask {
@@ -208,8 +207,11 @@ export class Timeline {
 		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
 		const events = this.deps.events().filter((e) => !e.allDay);
 		const spans = events.map((e) => this.eventSpan(e));
-		const boxes = layoutColumns(spans);
-		this.events = events.map((event, i) => this.placeEvent(event, spans[i], boxes[i].col, boxes[i].cols));
+		const boxes = layoutEvents(spans);
+		this.events = events
+			.map((event, i) => ({ event, span: spans[i], box: boxes[i] }))
+			.sort((a, b) => a.box.layer - b.box.layer)
+			.map(({ event, span, box }) => this.placeEvent(event, span, box.left, box.level));
 		this.tasks = this.deps.tasks().filter((task) => task.slot).map((task) => this.placeTask(task));
 		this.itemsEl.appendChild(this.grips);
 		this.nowEl?.remove();
@@ -302,9 +304,9 @@ export class Timeline {
 		this.layoutTasks();
 	}
 
-	/** The field of a renamed task over its card, at the card's place and size, the strip of a task in progress kept; the card hides while it stands there. */
+	/** The field of a renamed task over its card, at the card's place and size, the dot of a task in progress kept; the card hides while it stands there. */
 	showRename(item: TaskItem, field: HTMLElement): void {
-		showStrip(this.holdField({ kind: "rename", key: item.key }, field), item);
+		showProgressDot(this.holdField({ kind: "rename", key: item.key }, field), item);
 		for (const task of this.tasks) task.el.classList.toggle("is-renaming", this.isRenamed(task.item));
 		this.layoutTasks();
 	}
@@ -398,8 +400,8 @@ export class Timeline {
 			.map(({ task }) => task);
 	}
 
-	private eventSpans(): Span[] {
-		return this.events.map((e) => ({ start: e.start, end: e.end }));
+	private eventSpans(): PlacedSpan[] {
+		return this.events.map((e) => ({ start: e.start, end: e.end, level: e.level }));
 	}
 
 	private taskSpan(task: PlacedTask): TaskSpan {
@@ -465,22 +467,22 @@ export class Timeline {
 		};
 	}
 
-	private placeEvent(event: CalendarEvent, span: Span, col: number, cols: number): PlacedEvent {
+	private placeEvent(event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {
 		const block = make(this.itemsEl, "div", "tc-item tc-event");
-		block.style.setProperty(PROPERTY.column, String(col));
-		block.style.setProperty(PROPERTY.columns, String(cols));
+		block.style.setProperty(PROPERTY.x, px(left));
 		paintEvent(block, event, this.deps.theme());
 		make(block, "div", "tc-event-bar");
 		make(make(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
-		return { el: block, ...span };
+		this.deps.onEvent?.(block, event);
+		return { el: block, ...span, level };
 	}
 
-	/** The card of the list on the timeline: the strip, the title fading out, the small time or duration on the right. */
+	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */
 	private placeTask(item: TaskItem): PlacedTask {
 		const block = make(this.itemsEl, "div", "tc-block");
 		const card = make(block, "div", "tc-block-card");
 		markPriority(card, item.priority);
-		if (item.status === "inProgress") make(card, "span", "tc-strip");
+		if (item.status === "inProgress") make(card, "span", "tc-progress-dot");
 		fillTitle(make(card, "div", "tc-card-title"), item.text);
 		renderMeta(card, item);
 		const meta = make(card, "span", "tc-block-meta is-hidden");

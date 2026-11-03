@@ -1,28 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, followNow, gridAt, itemBox, layoutColumns, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, followNow, gridAt, itemBox, layoutEvents, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
 
-describe("layoutColumns", () => {
-	it("gives a lone event the whole width", () => {
-		expect(layoutColumns([{ start: 540, end: 600 }])).toEqual([{ col: 0, cols: 1 }]);
+describe("layoutEvents", () => {
+	it("lays a lone event on the ground across the whole width", () => {
+		expect(layoutEvents([{ start: 540, end: 600 }])).toEqual([{ left: 1, level: 0, layer: 0 }]);
 	});
 
-	it("splits two overlapping events into two columns, in order of start", () => {
-		expect(layoutColumns([{ start: 900, end: 990 }, { start: 930, end: 960 }])).toEqual([{ col: 0, cols: 2 }, { col: 1, cols: 2 }]);
+	it("lays an event that starts while another goes on over it, 18 px in", () => {
+		expect(layoutEvents([{ start: 900, end: 990 }, { start: 930, end: 960 }])).toEqual([
+			{ left: 1, level: 0, layer: 0 },
+			{ left: 18, level: 1, layer: 1 },
+		]);
 	});
 
-	it("keeps a chain in one cluster: the third overlaps the second but not the first", () => {
-		const boxes = layoutColumns([{ start: 600, end: 660 }, { start: 630, end: 720 }, { start: 690, end: 750 }]);
-		expect(boxes.map((b) => b.cols)).toEqual([2, 2, 2]);
-		expect(boxes.map((b) => b.col)).toEqual([0, 1, 0]);
+	it("nests deeper over an event that itself lies over another", () => {
+		const boxes = layoutEvents([{ start: 1080, end: 1140 }, { start: 1110, end: 1275 }, { start: 1185, end: 1215 }, { start: 1215, end: 1245 }]);
+		expect(boxes.map((b) => b.left)).toEqual([1, 18, 36, 36]);
 	});
 
-	it("starts a new cluster when nothing overlaps any more, and touching ends do not overlap", () => {
-		const boxes = layoutColumns([{ start: 600, end: 660 }, { start: 660, end: 720 }, { start: 700, end: 760 }]);
-		expect(boxes).toEqual([{ col: 0, cols: 1 }, { col: 0, cols: 2 }, { col: 1, cols: 2 }]);
+	it("keeps the longer one underneath when two start together", () => {
+		const boxes = layoutEvents([{ start: 900, end: 930 }, { start: 900, end: 1020 }]);
+		expect(boxes).toEqual([
+			{ left: 18, level: 1, layer: 1 },
+			{ left: 1, level: 0, layer: 0 },
+		]);
 	});
 
-	it("answers in the order given, whatever the order of starts", () => {
-		expect(layoutColumns([{ start: 930, end: 960 }, { start: 900, end: 990 }])).toEqual([{ col: 1, cols: 2 }, { col: 0, cols: 2 }]);
+	it("treats touching ends as apart", () => {
+		expect(layoutEvents([{ start: 600, end: 660 }, { start: 660, end: 720 }]).map((b) => b.left)).toEqual([1, 1]);
 	});
 });
 
@@ -103,9 +108,18 @@ describe("stackTasks", () => {
 	});
 
 	it("lays a task over an event 18 px in, ringed, without moving the event", () => {
-		const boxes = stackTasks([{ start: at(15, 30), end: null }, { start: at(18), end: null }], [{ start: at(15), end: at(16, 30) }], H, CARD);
+		const boxes = stackTasks([{ start: at(15, 30), end: null }, { start: at(18), end: null }], [{ start: at(15), end: at(16, 30), level: 0 }], H, CARD);
 		expect(boxes[0]).toMatchObject({ left: 18, overlay: true });
 		expect(boxes[1]).toMatchObject({ left: 1, overlay: false });
+	});
+
+	it("lays a task over the topmost event under it, 18 px further in", () => {
+		const events = [
+			{ start: at(15), end: at(17), level: 0 },
+			{ start: at(16), end: at(16, 30), level: 1 },
+		];
+		const boxes = stackTasks([{ start: at(16), end: null }, { start: at(16, 40), end: null }], events, H, CARD);
+		expect(boxes.map((b) => b.left)).toEqual([36, 18]);
 	});
 
 	it("takes the card's height and gap from the settings", () => {

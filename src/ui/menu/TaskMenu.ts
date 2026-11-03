@@ -1,14 +1,15 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
-import { tokenPx } from "../design";
+import { LAYOUT } from "../design";
 import { clear, el, px } from "../dom";
-import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
+import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
-import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
+import { showWhole } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { type CloseHow, Overlay } from "./Overlay";
+import type { CloseHow } from "./Overlay";
+import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
+import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
@@ -129,42 +130,45 @@ export interface TaskMenuContext {
  * The task menu over a blurred screen: the tapped card stays as it is above the blur, a timeline card with its subtasks
  * under it, and the panel grows out under them; the sections and the month picker take its place.
  */
-export class TaskMenu {
-	private readonly overlay: Overlay;
-	private readonly lifted: HTMLElement;
-	private readonly panel: HTMLElement;
-	private readonly anchor: DOMRect;
-	private readonly copy: DOMRect;
+export class TaskMenu extends LiftedMenu {
+	private panel!: HTMLElement;
+	/** The first groups of a panel too tall for either side of the card, over the card; hidden while the panel is whole. */
+	private upper!: HTMLElement;
+	private anchor!: DOMRect;
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
 	private stack: HTMLElement | null = null;
 	private stackRow: HTMLElement | null = null;
 	/** The card turned into the field's row, in place of the copy. */
 	private fieldRow: HTMLElement | null = null;
-	/** How far the parts over the blur stand above the card, to keep a field over the keyboard. */
-	private raisedBy = 0;
 	/** Whoever types in the menu hears when it closes, and how. */
 	private fieldClosed: ((how: CloseHow) => void) | null = null;
-	private readonly peek: DescriptionPeek | null;
+	private peek: DescriptionPeek | null = null;
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
 	}
 
 	private constructor(private readonly context: TaskMenuContext) {
-		this.overlay = new Overlay((how) => this.close(how));
-		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
+		super();
+		this.openOver(context.source, () => this.build());
+	}
+
+	/** The copy over the blur, a timeline card's subtasks under it, and the panel. */
+	private build(): void {
+		const context = this.context;
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		const copy = (this.copy = this.liftWhole(context.source.getBoundingClientRect()));
+		const copy = this.liftWhole(context.source, showWhole);
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
-		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.panel = this.addPanel("is-task");
+		this.upper = this.addPanel("is-task");
+		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
-		this.overlay.show();
 	}
 
 	/** A link is followed from the copy only, never from the card itself: a tap on the card can't open it by chance. */
@@ -174,17 +178,6 @@ export class TaskMenu {
 		e.preventDefault();
 		e.stopPropagation();
 		this.pick(() => this.context.actions.openLink(link))();
-	}
-
-	/** The copy stands where the card does; a title the card cuts grows it past the column, kept inside the window, and the panel goes by the copy. */
-	private liftWhole(card: DOMRect): DOMRect {
-		const room = windowRoom(this.lifted);
-		const size = showWhole(this.lifted, card, roomWidth(room));
-		const left = grownStart(card.left, card.width, size.width, room.width, room.margin);
-		const top = grownStart(card.top, card.height, size.height, room.height, room.margin);
-		this.lifted.style.left = px(left);
-		this.lifted.style.top = px(top);
-		return new DOMRect(left, top, size.width, size.height);
 	}
 
 	/** The menu of a timeline card: its subtasks stand in a stack under its copy. */
@@ -197,31 +190,26 @@ export class TaskMenu {
 		return this.context.source.closest(".tc-menu-subtasks") !== null;
 	}
 
-	get raised(): number {
-		return this.raisedBy;
-	}
-
-	/** The copy, the stack and the field's row stand `by` px above the card, never below it: a field kept over the keyboard. */
-	raise(by: number): void {
-		this.raisedBy = Math.max(0, by);
+	/** The stack and the field's row go up with the copy: a field kept over the keyboard. */
+	override raise(by: number): void {
+		super.raise(by);
 		const top = this.copy.top - this.raisedBy;
-		this.lifted.style.top = px(top);
 		if (this.fieldRow) this.fieldRow.style.top = px(top);
 		if (this.stack) this.stack.style.top = px(this.copy.bottom - this.raisedBy);
 	}
 
 	/**
 	 * Rename on a card of a calendar menu's stack: the panel and the copy go, and the card becomes a row for the field in
-	 * its place, the strip of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
+	 * its place, the dot of a task in progress kept; this returns the row. `onClose` hears when the menu closes, and how.
 	 */
 	openRename(onClose: (how: CloseHow) => void): HTMLElement {
 		this.giveToField();
 		this.fieldClosed = onClose;
 		this.lifted.style.visibility = "hidden";
-		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row")));
+		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		row.style.left = px(this.copy.left);
 		row.style.width = px(this.copy.width);
-		showStrip(row, this.context.item);
+		showProgressDot(row, this.context.item);
 		this.raise(this.raisedBy);
 		return row;
 	}
@@ -240,6 +228,7 @@ export class TaskMenu {
 	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */
 	private giveToField(): void {
 		this.panel.hidden = true;
+		this.upper.hidden = true;
 		this.peek?.hide();
 	}
 
@@ -265,7 +254,7 @@ export class TaskMenu {
 	}
 
 	private stackUnder(copy: DOMRect): HTMLElement {
-		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"));
+		const stack = this.overlay.add(el(null, "div", "tc-menu-subtasks"), true);
 		stack.style.left = px(copy.left);
 		stack.style.top = px(copy.bottom);
 		stack.style.width = px(copy.width);
@@ -295,22 +284,16 @@ export class TaskMenu {
 		});
 	}
 
-	/** A menu too tall for either side of the card raises the card with it, as far as the panel needs. */
+	/** A menu split over and under the card leaves no side to the description, which then stays away. */
 	private place(): void {
-		this.raise(placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom()));
-		const anchor = this.anchor;
-		this.peek?.place(new DOMRect(anchor.x, anchor.y - this.raisedBy, anchor.width, anchor.height), this.panel);
-	}
-
-	private pick(action: () => void | Promise<void>): () => void {
-		return () => {
-			this.close();
-			void action();
-		};
+		this.placeBy(this.panel, this.anchor, this.upper);
+		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
+		else this.peek?.hide();
 	}
 
 	private showMenu(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.remove("is-picker");
 		const { item, actions, levels } = this.context;
 		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
@@ -346,6 +329,7 @@ export class TaskMenu {
 		const sections = this.context.sections;
 		if (!sections) return;
 		clear(this.panel);
+		clear(this.upper);
 		const { item, actions } = this.context;
 		backRow(this.panel, "Section", () => this.showMenu());
 		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
@@ -358,6 +342,7 @@ export class TaskMenu {
 
 	private showPicker(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.add("is-picker");
 		const { item, actions, today } = this.context;
 		new MonthPicker(el(this.panel, "div"), {
@@ -372,8 +357,28 @@ export class TaskMenu {
 		this.place();
 	}
 
-	/** `how`: Escape, or anything else that closed it. */
-	close(how: CloseHow = "away"): void {
-		if (this.overlay.close()) this.fieldClosed?.(how);
+	/**
+	 * A second press anywhere within a double click of now, wherever the copy and the panel now stand: the menu goes and
+	 * `then` runs; the press and its click reach nothing under it, so a tile can't be picked by chance.
+	 */
+	onClickedAgain(then: () => void): void {
+		const until = performance.now() + LAYOUT.doubleClickMs;
+		const stop = (e: Event) => {
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		const press = (e: PointerEvent) => {
+			window.removeEventListener("pointerdown", press, true);
+			if (performance.now() > until) return;
+			stop(e);
+			window.addEventListener("click", stop, { capture: true, once: true });
+			this.close();
+			then();
+		};
+		window.addEventListener("pointerdown", press, true);
+	}
+
+	protected override closed(how: CloseHow): void {
+		this.fieldClosed?.(how);
 	}
 }

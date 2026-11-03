@@ -15,6 +15,19 @@ afterEach(() => {
 });
 
 describe("Overlay", () => {
+	it("stands the parts put on its level in one holder, so they cast one shadow, and takes it away with them", () => {
+		vi.useFakeTimers();
+		const overlay = new Overlay(() => overlay.close());
+		const copy = overlay.add(document.createElement("div"), true);
+		const panel = overlay.add(document.createElement("div"), true);
+		const level = document.querySelector(".tc-level")!;
+		expect([copy.parentElement, panel.parentElement]).toEqual([level, level]);
+		overlay.close();
+		expect(copy.classList.contains("is-closing")).toBe(true);
+		vi.runAllTimers();
+		expect([level.isConnected, copy.isConnected]).toEqual([false, false]);
+	});
+
 	it("starts fading the sheet, the copy and the panel in the same moment", () => {
 		const { overlay, copy, panel, sheet } = open();
 		overlay.close();
