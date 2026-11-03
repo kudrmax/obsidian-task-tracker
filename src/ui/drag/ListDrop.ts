@@ -111,7 +111,7 @@ export class ListDrop implements DropTarget {
 		this.place = place;
 		if (before?.kind !== "gap" || !samePlace(before, place) || before.level !== place.level) this.onNewPlace();
 		const line = this.lineRect(place);
-		this.line.show(line.left, line.right, line.top);
+		this.line.show(line.left, line.right, line.top, { x, y });
 		this.scroll.follow(y);
 	}
 
