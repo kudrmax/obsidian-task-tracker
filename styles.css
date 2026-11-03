@@ -1054,7 +1054,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-editor, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-scroller, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-sizer, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-contentContainer { padding: 0; margin: 0; max-width: none; min-height: 0; }
 .tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-fade) var(--tc-ease-out), transform var(--tc-duration-fade) var(--tc-ease-out); }
 .tc-sheet.is-shown { opacity: 1; transform: none; }
-.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-8); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
+/* The buttons' text, inside their own padding, starts and ends on the title's edges (--tc-sheet-side). */
+.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
 .task-calendar .tc-sheet-cancel, .task-calendar .tc-sheet-submit { height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 .task-calendar .tc-sheet-submit { font-weight: var(--tc-weight-semibold); }
 
