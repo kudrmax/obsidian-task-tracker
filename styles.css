@@ -633,7 +633,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 .task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { left: var(--tc-space-16); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); }
+.task-calendar > button.tc-undo { left: var(--tc-space-16); padding: 0; background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); }
 .task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
 .task-calendar > button.tc-undo:active { opacity: var(--tc-pressed); }
 .task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
@@ -977,7 +977,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-ask-question > .tc-menu-ask-title { flex-shrink: 1; min-width: 0; overflow: hidden; }
 .tc-menu-ask-title.is-long { -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
 .tc-menu-ask-buttons { display: flex; gap: var(--tc-space-6); }
-.tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; height: var(--tc-row); border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); color: var(--tc-text); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-8); }
+.tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; padding: 0; height: var(--tc-row); border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); color: var(--tc-text); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-8); }
 .tc-panel button.tc-menu-ask-confirm { background: var(--tc-ink-strong); color: var(--tc-on-strong); font-weight: var(--tc-weight-semibold); }
 .tc-menu-ask.is-danger button.tc-menu-ask-confirm { background: var(--tc-danger); color: var(--tc-on-danger); }
 .tc-panel button.tc-menu-ask-btn:active { opacity: var(--tc-pressed); }
