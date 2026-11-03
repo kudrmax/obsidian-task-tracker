@@ -3,11 +3,13 @@ import type { TaskFileStore } from "../../src/application/ports";
 
 export class InMemoryTaskFileStore implements TaskFileStore {
 	writes = 0;
+	reads = 0;
 	private readonly listeners = new Set<() => void>();
 
 	constructor(public text: string | null) {}
 
 	async read(): Promise<string | null> {
+		this.reads++;
 		return this.text;
 	}
 
