@@ -51,9 +51,9 @@ export interface QuickEntryControllerDeps {
 	turnTo(mode: RightMode): void;
 	/** The day column opens `date`; resolves once its tasks show. */
 	showDay(date: LocalDate): Promise<void>;
-	/** Resolves once the lists show the file as of the last write. */
-	fresh(): Promise<void>;
-	/** Redraws the screen, which calls `rendered` once drawn. */
+	/** Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it. */
+	fresh(beforeShow?: () => void): Promise<void>;
+	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
 	/** A write that failed. */
 	onError(error: unknown): void;
@@ -124,6 +124,8 @@ export class QuickEntryController {
 	/** The bar's place is turning the wheel to the column the field has just moved to. */
 	private turning = false;
 	private stack: MenuField | null = null;
+	/** The drawings so far: a read that drew nothing leaves it as it was. */
+	private draws = 0;
 	/**
 	 * The field opened as a press ended: the click that press still sends is not a tap elsewhere, nor are the mouse events
 	 * a finger's tap sends after it, which land on what stood under the plus and would take the focus from the field.
@@ -159,15 +161,12 @@ export class QuickEntryController {
 		this.entry = new QuickEntry({
 			cards: (column) => this.cards(column),
 			placeOf: (column, result) => this.placeOf(column, result),
-			fresh: async (beforeShow) => {
-				await deps.fresh();
-				beforeShow?.();
-			},
+			fresh: (beforeShow) => this.fresh(beforeShow),
 			createInPlace: (text, priority, place) => deps.tasks.createInPlace(text, priority, place),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),
 			levels: () => usableLevels(deps.levels()),
-			onChange: (state) => this.changed(state),
+			onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			onError: (error) => deps.onError(error),
 		});
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
@@ -283,6 +282,7 @@ export class QuickEntryController {
 	 * have changed under the field, a written line landing, so what the field may do is read again.
 	 */
 	rendered(): void {
+		this.draws++;
 		if (this.state) this.state = this.entry.state;
 		this.deps.root.classList.toggle("is-entering", this.state !== null);
 		this.showPlus();
@@ -490,7 +490,21 @@ export class QuickEntryController {
 		this.plus.hidden = this.state !== null || this.dragging || this.carrying;
 	}
 
-	private changed(state: EntryState | null): void {
+	/**
+	 * The lists read afresh; with `beforeShow`, the entry changes as they draw what was read. A read the same as shown, or
+	 * one a gesture holds back, draws nothing then: the entry's change is drawn here, or waits with the gesture.
+	 */
+	private async fresh(beforeShow?: () => void): Promise<void> {
+		if (!beforeShow) return this.deps.fresh();
+		let mark = -1;
+		await this.deps.fresh(() => {
+			beforeShow();
+			mark = this.draws;
+		});
+		if (mark === this.draws) this.deps.render();
+	}
+
+	private changed(state: EntryState | null, drawnNext = false): void {
 		const before = this.state;
 		this.state = state;
 		if (state?.renaming !== before?.renaming) this.moved = false;
@@ -501,6 +515,7 @@ export class QuickEntryController {
 		}
 		const moves = !state || movesRows(before, state);
 		if (state && moves) this.follow = true;
+		if (drawnNext && state) return;
 		if (moves) this.deps.render();
 		else this.sync(state);
 	}

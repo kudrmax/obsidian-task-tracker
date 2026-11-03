@@ -374,8 +374,8 @@ export class TaskCalendarView extends ItemView {
 				this.select(date);
 				return this.data.tasks();
 			},
-			fresh: () => this.data.tasks(),
-			render: () => this.render(),
+			fresh: (beforeShow) => this.data.tasks(beforeShow),
+			render: () => this.parts.request("tasks"),
 			onError: (error) => this.reportFailure(error),
 		});
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));

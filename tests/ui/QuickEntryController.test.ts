@@ -39,9 +39,14 @@ interface SetUp {
 	slotted?: TaskItem[];
 	/** Obsidian on the desktop, its status bar's top this far down; the phone without. */
 	desktop?: { readonly chromeTop: number };
+	/**
+	 * The lists read the file after a write and draw it only when it changed, as the view's do: "grows" lands each write
+	 * as a card at the end of the day column, "same" lands nothing.
+	 */
+	drawsOnFresh?: "grows" | "same";
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	let mode = startMode;
@@ -77,16 +82,23 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		events: () => [],
 		now: () => new Date(2026, 10, 1, 8, 0),
 	});
+	let draws = 0;
+	/** The day column's rows as each drawing left them. */
+	const drawnLeft: string[][] = [];
 	const render = () => {
+		draws++;
 		for (const column of COLUMNS) lists[column].render();
 		timeline.render();
 		controller?.rendered();
+		drawnLeft.push(rowsOf("left"));
 	};
+	let shownLeft = (items.left ?? []).length;
 	controller = new QuickEntryController({
 		root,
 		tasks: {
 			createInPlace: async (text, priority, place) => {
 				created.push({ text, priority, place });
+				if (drawsOnFresh === "grows") (items.left ??= []).push(item(text, key("now", (items.left ?? []).length)));
 			},
 			edit: async (k, draft) => {
 				edits.push({ key: k, draft });
@@ -120,14 +132,22 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			day = date;
 			render();
 		},
-		fresh: () => (holdFresh ? new Promise<void>((resolve) => freshWaiting.push(resolve)) : Promise.resolve()),
+		fresh: async (beforeShow) => {
+			if (holdFresh) await new Promise<void>((resolve) => freshWaiting.push(resolve));
+			beforeShow?.();
+			const left = (items.left ?? []).length;
+			if (drawsOnFresh && left !== shownLeft) render();
+			shownLeft = left;
+		},
 		render,
 		onError: vi.fn(),
 	});
 	render();
 	const plus = root.querySelector<HTMLElement>(".tc-plus")!;
 	const field = () => root.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field");
-	const rowsOf = (column: ListColumn) => [...lists[column].el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent || row.className));
+	function rowsOf(column: ListColumn): string[] {
+		return [...lists[column].el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent || row.className));
+	}
 	const type = (text: string) => {
 		field()!.value = text;
 		field()!.dispatchEvent(new Event("input", { bubbles: true }));
@@ -148,7 +168,36 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		holdFresh = false;
 		freshWaiting.splice(0).forEach((resolve) => resolve());
 	};
-	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
+	return {
+		controller,
+		root,
+		plus,
+		field,
+		titleFields,
+		lists,
+		timeline,
+		slotted,
+		render,
+		rowsOf,
+		type,
+		press,
+		created,
+		edits,
+		beginNew,
+		drops,
+		turned,
+		setMode,
+		switchDay,
+		holdWrites,
+		releaseWrites,
+		day: () => day,
+		draws: () => draws,
+		drawnLeft,
+		resetDraws: () => {
+			draws = 0;
+			drawnLeft.length = 0;
+		},
+	};
 }
 
 afterEach(() => {
@@ -411,6 +460,65 @@ describe("QuickEntryController", () => {
 		height = 71;
 		type("A text long enough to wrap onto three lines");
 		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
+	});
+
+	describe("Enter", () => {
+		const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+		const twoCards = () => ({ left: [item("X", key("now", 0)), item("Y", key("now", 1))] });
+
+		it("Enter draws the lists twice: the line moving up at once, and once with its card", async () => {
+			const { controller, type, press, draws, resetDraws, rowsOf } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(draws()).toBe(2);
+			expect(rowsOf("left")).toEqual(["X", "Y", "A", "field"]);
+		});
+
+		it("no drawing shows the line twice or the field over its card", async () => {
+			const { controller, type, press, drawnLeft, resetDraws } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(drawnLeft.length).toBeGreaterThan(0);
+			for (const rows of drawnLeft) {
+				expect(rows.filter((row) => row === "A").length).toBeLessThanOrEqual(1);
+				expect(rows[rows.length - 1]).toBe("field");
+			}
+		});
+
+		it("Enter keeps the field's own element, focused, with no blur", async () => {
+			const { controller, type, press, field } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			const before = field()!;
+			let blurs = 0;
+			let focuses = 0;
+			before.addEventListener("blur", () => blurs++);
+			before.addEventListener("focus", () => focuses++);
+			press("Enter");
+			await settled();
+			expect(field()).toBe(before);
+			expect(document.activeElement).toBe(before);
+			expect(blurs).toBe(0);
+			expect(focuses).toBe(0);
+		});
+
+		it("a write whose read draws nothing redraws the lists itself", async () => {
+			const { controller, type, press, draws, resetDraws, rowsOf, created } = setUp({ items: twoCards(), drawsOnFresh: "same" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(created.map((c) => c.text)).toEqual(["A"]);
+			expect(draws()).toBe(2);
+			expect(rowsOf("left")).toEqual(["X", "Y", "field"]);
+		});
 	});
 
 	describe("on the desktop", () => {
