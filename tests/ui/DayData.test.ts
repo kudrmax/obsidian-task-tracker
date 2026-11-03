@@ -21,11 +21,21 @@ const event = (title: string): CalendarEvent => ({
 /** A network that answers only when the test lets it. */
 class SlowCalendars implements CalendarService {
 	readonly asked: LocalDate[] = [];
+	readonly around: LocalDate[] = [];
 	private readonly waiting: (() => void)[] = [];
 	readonly last = new Map<LocalDate, DayEvents>();
 
 	eventsOn(date: LocalDate): Promise<DayEvents> {
 		this.asked.push(date);
+		return this.fetch(date);
+	}
+
+	eventsAround(date: LocalDate): Promise<DayEvents> {
+		this.around.push(date);
+		return this.fetch(date);
+	}
+
+	private fetch(date: LocalDate): Promise<DayEvents> {
 		return new Promise((resolve) =>
 			this.waiting.push(() => {
 				const day = { events: [event(`on ${date}`)], statuses: [] };

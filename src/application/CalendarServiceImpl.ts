@@ -91,6 +91,10 @@ export class CalendarServiceImpl implements CalendarService {
 		return day;
 	}
 
+	eventsAround(date: LocalDate): Promise<DayEvents> {
+		return this.eventsOn(date);
+	}
+
 	/** Staleness counts from now: a day cached yesterday shows its orange dot today. */
 	cached(date: LocalDate): DayEvents | null {
 		const day = this.lastDay.get(date);
