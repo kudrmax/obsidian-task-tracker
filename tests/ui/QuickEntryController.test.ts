@@ -767,12 +767,12 @@ describe("QuickEntryController", () => {
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
-			it("turns the card into the field in its place, the text selected, the bar with the flag only", () => {
+			it("turns the card into the field in its place, the caret at the end of the text, the bar with the flag only", () => {
 				const { controller } = setUp({ slotted: [onTimeline("Report", 0, [sub])] });
 				controller.rename(sub, openSubMenu());
 				expect(menuField()!.value).toBe("Gather");
 				expect(document.activeElement).toBe(menuField());
-				expect([menuField()!.selectionStart, menuField()!.selectionEnd]).toEqual([0, 6]);
+				expect([menuField()!.selectionStart, menuField()!.selectionEnd]).toEqual([6, 6]);
 				const quickBar = document.querySelector<HTMLElement>(".tc-quick-bar")!;
 				expect(quickBar.parentElement).toBe(document.body);
 				expect([".tc-bar-indent", ".tc-bar-place"].map((s) => quickBar.querySelector<HTMLElement>(s)!.hidden)).toEqual([true, true]);

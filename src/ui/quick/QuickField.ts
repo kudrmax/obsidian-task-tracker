@@ -6,8 +6,6 @@ export type QuickKey = "enter" | "escape" | "tab" | "shiftTab";
 
 export interface QuickFieldOptions {
 	readonly value: string;
-	/** The whole value selected once focused, to be typed over: a rename. */
-	readonly select: boolean;
 	/** The levels a prefix at the start of the text may stand for. */
 	readonly levels: readonly PriorityLevel[];
 	/** The level the field starts with. */
@@ -25,7 +23,7 @@ export interface QuickFieldHandle {
 	readonly el: HTMLElement;
 	readonly text: string;
 	readonly focused: boolean;
-	/** The focus taken the first time: the whole value selected for a rename, else the caret at the end. */
+	/** The focus taken the first time: the caret at the end. */
 	focus(): void;
 	/** The focus given back after a redraw moved the field, the selection as it was. */
 	refocus(): void;
@@ -80,8 +78,7 @@ export const QuickField = {
 				return title.focused;
 			},
 			focus() {
-				if (opts.select) title.selectAll();
-				else title.focusEnd();
+				title.focusEnd();
 			},
 			refocus() {
 				title.focus();

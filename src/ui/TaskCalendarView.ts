@@ -586,7 +586,6 @@ export class TaskCalendarView extends ItemView {
 		}
 		const field = GroupNameField.open(slot, {
 			value: "",
-			select: false,
 			onDone: (name) => {
 				this.naming = null;
 				this.arbiter.release(NAMING);
@@ -608,7 +607,7 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** The name is edited where the header stands, selected to be typed over. */
+	/** The name is edited where the header stands, the caret at its end. */
 	private renameInPlace(head: HTMLElement, list: GroupedList, name: string): void {
 		if (!this.arbiter.claim(NAMING)) return;
 		const slot = el(null, "div", "tc-group-slot");
@@ -616,7 +615,6 @@ export class TaskCalendarView extends ItemView {
 		head.classList.add("is-renamed");
 		GroupNameField.open(slot, {
 			value: name,
-			select: true,
 			onDone: (to) => {
 				this.arbiter.release(NAMING);
 				if (to && to !== name) void this.act(() => this.deps.tasks.renameGroup(list, name, to));

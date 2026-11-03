@@ -45,11 +45,6 @@ export class FakeTitleField implements TitleField {
 		this.el.setSelectionRange(this.el.value.length, this.el.value.length);
 	}
 
-	selectAll(): void {
-		this.el.focus();
-		this.el.setSelectionRange(0, this.el.value.length);
-	}
-
 	focus(): void {
 		this.el.focus({ preventScroll: true });
 	}
