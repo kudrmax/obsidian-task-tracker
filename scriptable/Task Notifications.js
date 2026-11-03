@@ -396,7 +396,10 @@ function indentWidth(line) {
   return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.children.length === b.children.length && a.children.every((c, i) => c === b.children[i]);
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
+}
+function sameLines(a, b) {
+  return a.length === b.length && a.every((line, i) => line === b[i]);
 }
 function contains(entry, other) {
   return entry.section === other.section && entry.index === other.index && entry.path.every((i, k) => other.path[k] === i) && other.path.length >= entry.path.length;
@@ -473,6 +476,31 @@ var TaskDocument = class _TaskDocument {
     const span = this.spanOf(entry);
     if (sameTask(entry.task, task)) return this;
     return this.withLines(this.splice(span.line, span.lineCount, this.linesOf(entry.indent, entry.bullet, task)));
+  }
+  /**
+   * Each entry of this document becomes its task, as `replace` one after another would, in one rewrite. Only the task's
+   * own line changes unless its description and subtasks do; those rewritten lines may not hold another change.
+   */
+  replaceAll(changes) {
+    const edits = [];
+    for (const [entry, task] of changes) {
+      const span = this.spanOf(entry);
+      if (sameTask(entry.task, task)) continue;
+      const own = sameLines(entry.task.children, task.children);
+      edits.push(
+        own ? { line: span.line, count: 1, lines: [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)] } : { line: span.line, count: span.lineCount, lines: this.linesOf(entry.indent, entry.bullet, task) }
+      );
+    }
+    if (edits.length === 0) return this;
+    edits.sort((a, b) => b.line - a.line);
+    const lines = [...this.lines];
+    let below = lines.length;
+    for (const edit of edits) {
+      if (edit.line + edit.count > below) throw new Error(`Changes overlap at line ${edit.line + 1}`);
+      lines.splice(edit.line, edit.count, ...edit.lines);
+      below = edit.line;
+    }
+    return this.withLines(lines);
   }
   removeEntry(entry) {
     const span = this.spanOf(entry);
