@@ -80,11 +80,11 @@ describe("LongPress", () => {
 	});
 });
 
-describe("LongPress double click", () => {
+describe("LongPress tap", () => {
 	beforeEach(() => vi.useFakeTimers());
 	afterEach(() => vi.useRealTimers());
 
-	function clicking(): { el: HTMLElement; log: Log; click(pointerType?: string): void } {
+	function clicking(): { log: Log; click(pointerType?: string): void } {
 		const el = document.createElement("div");
 		const log: Log = [];
 		new LongPress(el, {
@@ -92,48 +92,32 @@ describe("LongPress double click", () => {
 			busy: () => false,
 			onStart: () => log.push("start"),
 			onTap: () => log.push("tap"),
-			onDoubleTap: () => log.push("double"),
 		});
 		const click = (pointerType = "mouse") => {
 			el.dispatchEvent(pointer("pointerdown", 10, 10, pointerType));
 			el.dispatchEvent(pointer("pointerup", 10, 10, pointerType));
 		};
-		return { el, log, click };
+		return { log, click };
 	}
 
-	it("reports a double tap and no tap when a mouse clicks twice quickly", () => {
+	it("reports a mouse click as a tap at once, without waiting for a second one", () => {
+		const { log, click } = clicking();
+		click();
+		expect(log).toEqual(["tap"]);
+	});
+
+	it("takes two quick clicks as two taps: a double click is the menu's to tell", () => {
 		const { log, click } = clicking();
 		click();
 		vi.advanceTimersByTime(100);
 		click();
-		vi.advanceTimersByTime(1000);
-		expect(log).toEqual(["double"]);
-	});
-
-	it("reports a single mouse click as a tap once the double click window passes", () => {
-		const { log, click } = clicking();
-		click();
-		vi.advanceTimersByTime(249);
-		expect(log).toEqual([]);
-		vi.advanceTimersByTime(1);
-		expect(log).toEqual(["tap"]);
-	});
-
-	it("takes two slow clicks as two taps", () => {
-		const { log, click } = clicking();
-		click();
-		vi.advanceTimersByTime(300);
-		click();
-		vi.advanceTimersByTime(300);
 		expect(log).toEqual(["tap", "tap"]);
 	});
 
-	it("reports a finger's tap at once, with no double tap", () => {
+	it("reports a finger's tap at once", () => {
 		const { log, click } = clicking();
 		click("touch");
 		expect(log).toEqual(["tap"]);
-		click("touch");
-		expect(log).toEqual(["tap", "tap"]);
 	});
 });
 

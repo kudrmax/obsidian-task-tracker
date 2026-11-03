@@ -1,5 +1,6 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
+import { LAYOUT } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
@@ -340,6 +341,27 @@ export class TaskMenu extends LiftedMenu {
 			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.removeDue()) }, "tc-menu-row tc-picker-remove");
 		}
 		this.place();
+	}
+
+	/**
+	 * A second press anywhere within a double click of now, wherever the copy and the panel now stand: the menu goes and
+	 * `then` runs; the press and its click reach nothing under it, so a tile can't be picked by chance.
+	 */
+	onClickedAgain(then: () => void): void {
+		const until = performance.now() + LAYOUT.doubleClickMs;
+		const stop = (e: Event) => {
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		const press = (e: PointerEvent) => {
+			window.removeEventListener("pointerdown", press, true);
+			if (performance.now() > until) return;
+			stop(e);
+			window.addEventListener("click", stop, { capture: true, once: true });
+			this.close();
+			then();
+		};
+		window.addEventListener("pointerdown", press, true);
 	}
 
 	protected override closed(how: CloseHow): void {

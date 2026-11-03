@@ -67,7 +67,6 @@ export function tileGroup(parent: HTMLElement, kind: string, rows: readonly (rea
 		const row = el(group, "div", "tc-menu-tile-row");
 		for (const spec of specs) menuTile(row, spec);
 	}
-	for (const label of group.querySelectorAll<HTMLElement>(".tc-menu-tile-label")) label.classList.toggle("is-long", label.scrollWidth > label.clientWidth);
 	return group;
 }
 
@@ -85,6 +84,13 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 	row.appendChild(document.createTextNode(title));
 	row.addEventListener("click", onBack);
 	return row;
+}
+
+/** A tile's label too long for its tile is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
+export function markLongLabels(panel: HTMLElement): void {
+	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label")];
+	const long = labels.map((label) => label.scrollWidth > label.clientWidth);
+	labels.forEach((label, i) => label.classList.toggle("is-long", long[i]));
 }
 
 /** The part of the window a menu may take: inside the margin, clear of the phone's status bar and home indicator. */
@@ -116,6 +122,7 @@ export function menuRoom(): MenuRoom {
  * its box on screen: it is placed while it is still shrunk to grow in.
  */
 export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom): number {
+	markLongLabels(panel);
 	panel.style.maxHeight = "";
 	panel.classList.remove("is-scrolled");
 	panel.style.left = px(Math.max(0, Math.min(anchor.left, room.right - gap - panel.offsetWidth)));
