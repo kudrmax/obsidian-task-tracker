@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Массовые действия на десктопе: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<div style="position: absolute; left: 0; top: 0; width: 44px; height: 800px; background: {{c.chrome}}; box-shadow: inset -1px 0 0 {{c.chromeLine}};"></div>
+<div style="position: absolute; left: 14px; top: 14px; display: flex; gap: 8px; flex-direction: column;">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840;"></span>
+</div>
+<div style="position: absolute; left: 44px; top: 0; width: 1156px; height: 40px; background: {{c.bg}}; box-shadow: inset 0 -1px 0 {{c.chromeLine}}; display: flex; align-items: center; padding-left: 72px; box-sizing: border-box; font-size: 13px; color: {{c.text}};">Task Calendar</div>
+
+<div style="position: absolute; left: 64px; top: 58px; font-size: 28px; line-height: 34px; font-weight: 700;">Now</div>
+<div style="position: absolute; left: 470px; top: 58px; display: flex; align-items: center; gap: 12px; font-size: 28px; line-height: 34px; font-weight: 700;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Today<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg>
+</div>
+
+<div style="position: absolute; left: 431px; top: 104px; width: 2px; height: 672px; border-radius: 1px; background: {{c.line}};"></div>
+
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="12">
+<div style="position: absolute; left: 448px; top: {{h.top}}px; width: 40px; font-size: 12px; line-height: 14px; font-weight: 500; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{h.label}}</div>
+<div style="position: absolute; left: 492px; top: {{h.line}}px; width: 698px; height: 1px; background: {{c.hourLine}};"></div>
+</sc-for>
+<sc-for list="{{events}}" as="ev" hint-placeholder-count="3">
+<div style="position: absolute; left: 496px; top: {{ev.top}}px; width: 690px; height: {{ev.height}}px; box-sizing: border-box; border-radius: 6px; overflow: hidden; background: {{ev.bg}}; color: {{ev.ink}}; display: flex; font-size: 13px; line-height: 16px; font-weight: 600;"><span style="width: 3px; flex-shrink: 0; background: {{ev.bar}};"></span><span style="padding: 4px 8px;">{{ev.title}}</span></div>
+</sc-for>
+<div style="position: absolute; left: 448px; top: {{nowTop}}px; width: 742px; height: 2px; background: {{c.now}};"></div>
+
+<sc-if value="{{menu}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 5;"></div>
+</sc-if>
+
+<div style="position: absolute; left: 54px; top: 104px; width: 360px; height: 672px; overflow: hidden;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 0; top: {{r.top}}px; width: 360px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; box-shadow: {{r.ring}}; border-radius: 17.5px; padding: {{r.pad}}; display: flex; align-items: center; gap: 8px; z-index: {{r.z}};">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{c.accent}};"></span></sc-if>
+<sc-if value="{{r.check}}" hint-placeholder-val="{{false}}"><span style="width: 18px; height: 18px; flex-shrink: 0; border-radius: 9px; background: {{c.accent}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;">{{r.title}}</div>
+<sc-if value="{{r.hasDate}}" hint-placeholder-val="{{false}}"><span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{r.isPlace}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: {{r.top}}px; width: 360px; height: {{r.height}}px; box-sizing: border-box; border: 1px dashed {{c.dash}}; border-radius: 17.5px;"></div>
+</sc-if>
+</sc-for>
+</div>
+
+<sc-if value="{{menu}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{panel.left}}px; top: {{panel.top}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<div style="height: 40px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; font-size: 15px; font-weight: 600;">3 tasks</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{moveTiles}}" as="m" hint-placeholder-count="2">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.accent}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.d}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap;">{{m.label}}</span>
+</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Section</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.section}}"></path></svg></button>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete 3 tasks</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.del}}"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-if value="{{drag}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{stack.left}}px; top: {{stack.top}}px; width: 190px; height: 37px; z-index: 12;">
+<div style="position: absolute; left: 10px; top: 10px; width: 190px; height: 37px; border-radius: 18.5px; background: {{c.floatBack}}; box-shadow: {{c.floatShadow}};"></div>
+<div style="position: absolute; left: 5px; top: 5px; width: 190px; height: 37px; border-radius: 18.5px; background: {{c.floatMid}}; box-shadow: {{c.floatShadow}};"></div>
+<div style="position: absolute; left: 0; top: 0; width: 190px; height: 37px; box-sizing: border-box; border-radius: 18.5px; background: {{c.float}}; box-shadow: {{c.floatShadow}}; padding: 0 14px; display: flex; align-items: center; white-space: nowrap; overflow: hidden;">
+<span style="flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);">Позвонить маме</span>
+</div>
+<div style="position: absolute; right: -9px; top: -9px; min-width: 22px; height: 22px; box-sizing: border-box; padding: 0 6px; border-radius: 11px; background: {{c.accent}}; color: #FFFFFF; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px {{c.bg}}; font-variant-numeric: tabular-nums;">3</div>
+</div>
+<svg width="16" height="22" viewBox="0 0 16 22" style="position: absolute; left: {{cursor.left}}px; top: {{cursor.top}}px; z-index: 14;" aria-hidden="true"><path d="M1 1v16l4.2-4 3 7 2.8-1.2-3-6.8H14z" fill="#000000" stroke="#FFFFFF" stroke-width="1.2" stroke-linejoin="round"></path></svg>
+</sc-if>
+
+
+<sc-if value="{{pointer}}" hint-placeholder-val="{{false}}">
+<svg width="16" height="22" viewBox="0 0 16 22" style="position: absolute; left: {{cursor.left}}px; top: {{cursor.top}}px; z-index: 14;" aria-hidden="true"><path d="M1 1v16l4.2-4 3 7 2.8-1.2-3-6.8H14z" fill="#000000" stroke="#FFFFFF" stroke-width="1.2" stroke-linejoin="round"></path></svg>
+</sc-if>
+
+
+<sc-if value="{{plus}}" hint-placeholder-val="{{true}}">
+<button aria-label="New task" style="position: absolute; left: 1140px; top: 716px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: {{c.accent}}; color: #FFFFFF; box-shadow: {{c.plusShadow}}; display: flex; align-items: center; justify-content: center; z-index: 4;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+</sc-if>
+<sc-if value="{{cancel.on}}" hint-placeholder-val="{{false}}">
+<div aria-label="Cancel move" style="position: absolute; left: 1140px; top: 716px; width: 44px; height: 44px; box-sizing: border-box; border-radius: 22px; border: {{cancel.border}}; background: {{cancel.bg}}; color: {{cancel.ink}}; display: flex; align-items: center; justify-content: center; z-index: 4;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12 M18 6L6 18"></path></svg></div>
+</sc-if>
+<div style="position: absolute; right: 0; bottom: 0; height: 24px; box-sizing: border-box; padding: 0 12px; border-top-left-radius: 6px; background: {{c.chrome}}; box-shadow: inset 1px 1px 0 {{c.chromeLine}}; display: flex; align-items: center; gap: 16px; font-size: 12px; color: {{c.muted}}; z-index: 13;"><span>0 backlinks</span><span>14 words</span><span>112 characters</span></div>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"select","options":["select","menu","drag","calendar","cancel"]},"look":{"editor":"enum","default":"fill","options":["fill","ring","check"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'select';
+    const look = this.props.look ?? 'fill';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', chrome: '#F6F6F6', chromeLine: '#E3E3E3', card: '#F2F2F2', track: '#F2F2F2', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', accent: '#8A5CF5', sel: '#E5DBFC', line: '#E5E5EA', hourLine: '#EFEFF4', now: '#FF3B30', dash: '#C7C7CC', backdrop: 'rgba(0,0,0,0.22)', menu: 'rgba(250,250,252,0.97)', menuTile: 'rgba(0,0,0,0.05)', gap: '#E5E5EA', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', pillShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', danger: '#FF3B30', dropBg: '#F1ECFE', plusShadow: '0 6px 16px rgba(138,92,245,0.35)', float: '#FFFFFF', floatMid: '#F7F7F7', floatBack: '#EFEFEF', floatShadow: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', wheelOn: '#FFFFFF', mark: '#FF9500', p1: '#FF3B30', p2: '#FF9500', p2Card: '#F4E3CF', p3: '#FFCC00', ev: { bg: 'rgba(0,122,255,0.13)', ink: '#0058B8', bar: '#007AFF' }, ev2: { bg: 'rgba(52,199,89,0.16)', ink: '#1F7735', bar: '#34C759' } }
+      : { bg: '#1E1E1E', chrome: '#262626', chromeLine: '#363636', card: '#373737', track: '#373737', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', accent: '#9580FF', sel: '#443D66', line: '#2C2C2E', hourLine: '#2A2A2A', now: '#D92C24', dash: '#5A5A5E', backdrop: 'rgba(0,0,0,0.55)', menu: 'rgba(44,44,46,0.96)', menuTile: 'rgba(255,255,255,0.08)', gap: '#1C1C1E', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', pillShadow: '0 6px 16px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.1)', danger: '#FF453A', dropBg: '#251F3D', plusShadow: '0 6px 16px rgba(0,0,0,0.55)', float: '#474747', floatMid: '#3E3E3E', floatBack: '#353535', floatShadow: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #555555', wheelOn: '#5A5A5A', mark: '#FFD60A', p1: '#FF453A', p2: '#FF9F0A', p2Card: '#573E19', p3: '#FFD60A', ev: { bg: 'rgba(10,132,255,0.24)', ink: '#85C1FF', bar: '#0A84FF' }, ev2: { bg: 'rgba(48,209,88,0.22)', ink: '#97E8AC', bar: '#30D158' } };
+
+    const LIST_X = 54, LIST_TOP = 104, CARD = 35, G = 2, STEP = CARD + G;
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      section: 'M4 6h9 M4 12h16 M4 18h16',
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      pick: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const tasks = [
+      { id: 0, title: 'Созвониться с врачом' },
+      { id: 1, title: 'Записаться в барбершоп', progress: true, sel: true },
+      { id: 2, title: 'Чай масала' },
+      { id: 3, title: 'Позвонить маме', sel: true },
+      { id: 4, title: 'Оплатить интернет', tint: 'p2', sel: true },
+      { id: 5, title: 'Разобрать почту' },
+      { id: 6, title: 'Купить подарок Косте' },
+      { id: 7, title: 'Забрать посылку' }
+    ];
+    const cardRow = (t) => {
+      const on = !!t.sel && view !== 'select-none';
+      const base = t.tint ? c[t.tint + 'Card'] : c.card;
+      const bg = on && look === 'fill' ? c.sel : base;
+      const ring = on && look === 'ring' ? 'inset 0 0 0 2px ' + c.accent : 'none';
+      const check = on && look === 'check';
+      return { kind: 'card', isCard: true, isPlace: false, title: t.title, progress: !!t.progress, bg, ring, check, pad: check ? '0 10px 0 9px' : '0 10px 0 14px', z: on ? 6 : 1, hasDate: !!t.day, day: t.day ?? '' };
+    };
+    const place = (n) => ({ kind: 'place', isCard: false, isPlace: true, height: n * CARD + (n - 1) * G });
+    let list;
+    if (view === 'drag') {
+      const rest = tasks.filter((t) => !t.sel);
+      list = [cardRow(rest[0]), place(1), ...rest.slice(1).map(cardRow)];
+    } else if (view === 'calendar' || view === 'cancel') {
+      list = tasks.map((t) => (t.sel ? place(1) : cardRow(t)));
+    } else {
+      list = tasks.map(cardRow);
+    }
+    let y = 0;
+    const rows = list.map((r) => {
+      const h = r.isPlace ? r.height : CARD;
+      const out = { ...r, top: y, height: h };
+      y += h + G;
+      return out;
+    });
+    const rowTop = (i) => LIST_TOP + rows[i].top;
+
+    const clicked = 3;
+    const panel = { left: LIST_X + 360 + 12, top: rowTop(clicked) };
+    const PANEL_H = 40 + 82 + 8 + 82 + 8 + 82 + 8 + 44 + 8 + 52;
+
+    const stack = view === 'drag' ? { left: LIST_X + 236, top: rowTop(1) + 6 } : view === 'cancel' ? { left: 924, top: 690 } : { left: 700, top: 300 };
+    const cursor = view === 'select' ? { left: LIST_X + 290, top: rowTop(3) + 14 }
+      : view === 'menu' ? { left: LIST_X + 290, top: rowTop(3) + 14 }
+      : view === 'cancel' ? { left: 1128, top: 712 } : { left: stack.left + 40, top: stack.top + 16 };
+
+    const HOUR = 56, FIRST = 9;
+    const hours = [];
+    for (let h = 0; h < 12; h++) hours.push({ label: String(FIRST + h).padStart(2, '0') + ':00', top: 104 + h * HOUR - 7, line: 104 + h * HOUR });
+    const at = (hh) => 104 + (hh - FIRST) * HOUR + 1;
+    const events = [
+      { title: 'Стендап', top: at(10), height: HOUR / 2 - 2, ...c.ev },
+      { title: 'Обед с Сашей', top: at(13), height: HOUR - 2, ...c.ev2 },
+      { title: 'Ревью дизайна', top: at(16), height: HOUR * 1.5 - 2, ...c.ev }
+    ];
+
+    const W = {
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      cal: icons.pick
+    };
+    const wheel = ['inbox', 'soon', 'now', 'cal'].map((k) => ({ d: W[k], bg: k === 'now' ? c.wheelOn : 'transparent' }));
+
+    const box = (left, top, width, height, radius) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius ?? Math.min(height + 8, 44) / 2 });
+    const marks = [];
+        if (view === 'menu') marks.push(box(panel.left, panel.top, 300, PANEL_H, 18));
+    if (view === 'drag') { marks.push(box(LIST_X, rowTop(1), 360, rows[1].height, 21)); }
+    if (view === 'drag' || view === 'calendar' || view === 'cancel') marks.push(box(1140, 716, 44, 44, 26));
+    if (view === 'calendar') rows.forEach((r, i) => { if (r.isPlace) marks.push(box(LIST_X, rowTop(i), 360, CARD)); });
+
+    return {
+      c, rows, icons, panel, stack, cursor, hours, events, nowTop: at(11.5),
+      menu: view === 'menu', drag: view === 'drag' || view === 'calendar' || view === 'cancel',
+      plus: view === 'select' || view === 'menu',
+      cancel: { on: view === 'drag' || view === 'calendar' || view === 'cancel', border: view === 'cancel' ? '1px solid ' + c.accent : '1px dashed ' + c.dash, bg: view === 'cancel' ? c.dropBg : c.bg, ink: view === 'cancel' ? c.accent : c.muted }, pointer: view === 'select' || view === 'menu',
+      levels: [{ name: 'p1', c: c.p1 }, { name: 'p2', c: c.p2 }, { name: 'p3', c: c.p3 }],
+      statusTiles: [
+        { label: 'Done', d: CIRCLE, fd: CIRCLE },
+        { label: 'In progress', d: CIRCLE, fd: 'M12 3a9 9 0 0 1 0 18z' },
+        { label: 'Won’t do', d: CIRCLE + ' M8 12h8', fd: '' }
+      ],
+      moveTiles: [{ label: 'Tomorrow', d: icons.tomorrow }, { label: 'Pick a date', d: icons.pick }],
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

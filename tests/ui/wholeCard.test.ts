@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grownStart, roomWidth, wholeWidth } from "../../src/ui/wholeCard";
+import { grownStart, roomWidth, wholeHeight, wholeWidth } from "../../src/ui/wholeCard";
 
 const phone = roomWidth({ width: 390, height: 844, margin: 10 });
 
@@ -37,5 +37,15 @@ describe("a grown card stays inside the window", () => {
 
 	it("leaves a card that started past the margin where it was", () => {
 		expect(grownStart(4, 100, 120, 390, 10)).toBe(4);
+	});
+});
+
+describe("a pressed event shows its title inside itself first", () => {
+	it("keeps its height when the wrapped lines fit", () => {
+		expect(wholeHeight(150, 45, 8)).toBe(150);
+	});
+
+	it("grows down by what the lines and padding need beyond it", () => {
+		expect(wholeHeight(26, 45, 8)).toBe(53);
 	});
 });

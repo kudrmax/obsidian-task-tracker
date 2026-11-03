@@ -19,17 +19,20 @@ const STACK_DEPTH = 2;
 
 /**
  * The copy of the card that follows the finger: fixed over everything, moved by transform alone, stretched to the right
- * to show its whole title. A task with subtasks carries them as a stack of layers under it. A new task, not written yet,
- * is a plus and "New task" in its place.
+ * to show its whole title. A task with subtasks carries them as a stack of layers under it, and so do several picked
+ * tasks carried at once, with their number on the top card's corner. A new task, not written yet, is a plus and "New
+ * task" in its place.
  */
 export class FloatingCard implements Float {
 	readonly el: HTMLElement;
 	private readonly stack: HTMLElement[] = [];
+	private count: HTMLElement | null = null;
 
-	constructor(item: TaskItem | null, private readonly grab: Grab, day: LocalDate) {
+	/** `count`: how many tasks are carried, this one among them. */
+	constructor(item: TaskItem | null, private readonly grab: Grab, day: LocalDate, count = 1) {
 		this.el = document.createElement("div");
 		this.el.className = item ? "tc-float" : "tc-float is-new";
-		if (item) this.showTask(item, day);
+		if (item) this.showTask(item, day, count);
 		else this.showNew();
 	}
 
@@ -39,14 +42,21 @@ export class FloatingCard implements Float {
 		document.body.appendChild(this.el);
 	}
 
-	private showTask(item: TaskItem, day: LocalDate): void {
+	private showTask(item: TaskItem, day: LocalDate, count: number): void {
 		fillCard(this.el, item, { day });
-		if (item.subtasks.length > 0) {
+		if (item.subtasks.length > 0 || count > 1) {
 			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(document.body.appendChild(Object.assign(document.createElement("div"), { className: `tc-float-under is-${depth}` })));
 		}
 		document.body.appendChild(this.el);
 		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
 		this.fitStack();
+		if (count > 1) this.showCount(count);
+	}
+
+	/** The number of tasks carried, on the top card's upper right corner, moved along with it. */
+	private showCount(count: number): void {
+		const badge = (this.count = document.body.appendChild(Object.assign(document.createElement("div"), { className: "tc-float-count", textContent: String(count) })));
+		badge.style.left = px(this.el.offsetWidth);
 	}
 
 	/** Each layer is narrower by the inset on both sides than the one over it. */
@@ -59,11 +69,13 @@ export class FloatingCard implements Float {
 		const transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;
+		if (this.count) this.count.style.transform = transform;
 	}
 
 	/** Slides to the rect, taking its size and the look of a card at rest, its title fading at the edge again. */
 	async flyTo(rect: DOMRect): Promise<void> {
 		for (const layer of this.stack) layer.classList.add("is-gone");
+		this.count?.classList.add("is-gone");
 		this.el.classList.remove("is-stretched");
 		this.el.classList.add("is-flying");
 		void this.el.offsetWidth;
@@ -76,6 +88,7 @@ export class FloatingCard implements Float {
 
 	remove(): void {
 		for (const layer of this.stack) layer.remove();
+		this.count?.remove();
 		this.el.remove();
 	}
 }

@@ -26,6 +26,19 @@ export interface TaskDragPayload {
 	readonly grabPx: number;
 	/** How far right of the card's left edge the finger holds it: in its own list, the card's left edge picks the level it lands on. */
 	readonly grabX: number;
+	/** The other picked tasks that go along (bulk actions spec); none for a task carried alone. */
+	readonly carried?: readonly CarriedTask[];
+}
+
+/** A picked task carried along with the one under the finger, and the list it comes from. */
+export interface CarriedTask {
+	readonly item: TaskItem;
+	readonly from: ListColumn;
+}
+
+/** Several tasks carried at once: they go only to the lists, never to the timeline. */
+export function carriesMany(drag: DragPayload): boolean {
+	return drag.from !== "new" && (drag.carried?.length ?? 0) > 0;
 }
 
 /** The drag of a task that does not exist yet: it has no card in any list and no duration. */

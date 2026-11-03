@@ -44,16 +44,21 @@ export function stretchWhole(copy: HTMLElement, size: Size, widest: number): { r
 	copy.style.height = px(size.height);
 	const title = copy.querySelector<HTMLElement>(".tc-card-title");
 	if (!title) return { width: size.width, cut: false };
+	const width = textWidth(title);
+	if (width <= title.clientWidth - tokenPx(copy, "--tc-fade-card")) return { width: size.width, cut: false };
+	const missing = Math.ceil(width - title.clientWidth);
+	const stretched = wholeWidth(size.width, missing, widest);
+	const cut = stretched < size.width + missing;
+	copy.classList.toggle("is-stretched", !cut);
+	copy.style.width = px(stretched);
+	return { width: stretched, cut };
+}
+
+/** The width of a title's text on one line, however much of it its box shows. */
+function textWidth(title: HTMLElement): number {
 	const range = document.createRange();
 	range.selectNodeContents(title);
-	const textWidth = range.getBoundingClientRect().width;
-	if (textWidth <= title.clientWidth - tokenPx(copy, "--tc-fade-card")) return { width: size.width, cut: false };
-	const missing = Math.ceil(textWidth - title.clientWidth);
-	const width = wholeWidth(size.width, missing, widest);
-	const cut = width < size.width + missing;
-	copy.classList.toggle("is-stretched", !cut);
-	copy.style.width = px(width);
-	return { width, cut };
+	return range.getBoundingClientRect().width;
 }
 
 /** The copy over the menu goes further: a title still cut after stretching wraps onto more lines, and the copy grows down. */
@@ -66,4 +71,27 @@ export function showWhole(copy: HTMLElement, size: Size, widest: number): Size {
 	const height = Math.max(size.height, Math.ceil(title.getBoundingClientRect().height + parseFloat(body.paddingTop) + parseFloat(body.paddingBottom)));
 	copy.style.height = px(height);
 	return { width, height };
+}
+
+/** How tall an event grows to show its wrapped title: no shorter than it was, its own padding around the lines. */
+export function wholeHeight(height: number, lines: number, padding: number): number {
+	return Math.max(height, Math.ceil(lines + padding));
+}
+
+/**
+ * An event is tall already: the copy of one, pressed, wraps a title it cuts inside its own width and grows down only when
+ * the lines need more than its height. A tiny event takes the usual title size to wrap. Its width never changes.
+ */
+export function showWholeEvent(copy: HTMLElement, size: Size): Size {
+	copy.style.width = px(size.width);
+	copy.style.height = px(size.height);
+	const title = copy.querySelector<HTMLElement>(".tc-item-title");
+	const body = copy.querySelector<HTMLElement>(".tc-event-body");
+	if (!title || !body || textWidth(title) <= title.clientWidth - tokenPx(copy, "--tc-fade-block")) return size;
+	copy.classList.add("is-whole");
+	copy.querySelector(".tc-event")?.classList.remove("is-tiny");
+	const style = getComputedStyle(body);
+	const height = wholeHeight(size.height, title.getBoundingClientRect().height, parseFloat(style.paddingTop) + parseFloat(style.paddingBottom));
+	copy.style.height = px(height);
+	return { width: size.width, height };
 }
