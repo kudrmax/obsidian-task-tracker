@@ -1711,6 +1711,22 @@
    "h": 844,
    "page": "components",
    "title": "Компонент экранов «Зоны при переносе»"
+  },
+  "MenuMoveBoard.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1928,
+   "h": 1290,
+   "page": "menumove",
+   "title": "Перенос и секция в меню задачи"
+  },
+  "MenuMove.dc.html": {
+   "x": 6264,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Меню задачи: перенос и секция"
   }
  },
  "createdOnFiles": {
@@ -2292,7 +2308,9 @@
   "Ev2B.dc.html",
   "Ev2C.dc.html",
   "DragCover.dc.html",
-  "DragCoverBoard.dc.html"
+  "DragCoverBoard.dc.html",
+  "MenuMove.dc.html",
+  "MenuMoveBoard.dc.html"
  ],
  "pages": [
   {
@@ -2366,6 +2384,10 @@
   {
    "id": "dragcover",
    "name": "Зоны при переносе"
+  },
+  {
+   "id": "menumove",
+   "name": "Перенос в меню"
   }
  ],
  "title": "Task Calendar"
