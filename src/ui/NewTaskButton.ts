@@ -3,7 +3,7 @@ import { icon } from "./icons";
 
 /**
  * The dashed button under a list; pressed, it runs the handler the view gives it. The container stays when the button is
- * hidden: it hosts the drag zones that take the button's place while a card is carried.
+ * hidden.
  */
 export class NewTaskButton {
 	readonly el: HTMLElement;

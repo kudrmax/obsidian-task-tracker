@@ -30,8 +30,8 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 	return dot;
 }
 
-/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear. */
-export type PlaceIconName = "inbox" | "soon" | "now" | "calendar";
+/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear, and Tomorrow, which a quick move wears. */
+export type PlaceIconName = "inbox" | "soon" | "now" | "calendar" | "tomorrow";
 export type TileIconName = MenuIconName | PlaceIconName;
 
 function tileIcon(name: TileIconName): SVGSVGElement {

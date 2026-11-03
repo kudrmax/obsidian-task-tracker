@@ -125,15 +125,6 @@ describe("DragController.beginNew", () => {
 		expect(preview).toHaveBeenCalledWith(150, 300, expect.objectContaining({ grabPx: 10, grabX: 10 }));
 		pointer("pointercancel", 150, 300);
 	});
-
-	it("never reports a drop that asks first as a place", async () => {
-		const { controller, source } = setup();
-		const onDrop = vi.fn();
-		controller.beginNew(source, down(20, 610), [new StubTarget({ kind: "pickDate" })], onDrop);
-		pointer("pointermove", 150, 300);
-		pointer("pointerup", 150, 300);
-		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
-	});
 });
 
 describe("DragController: a long tap on the timeline's free room", () => {

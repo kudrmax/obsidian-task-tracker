@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NewTaskPlace, Placement, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
 import type { RightMode } from "../../src/settings";
-import type { DragPayload, DropResult, DropTarget, ListColumn, PlacedResult } from "../../src/ui/drag/DropTarget";
+import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
 import { TaskMenu } from "../../src/ui/menu/TaskMenu";
@@ -50,7 +50,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const buttons = [{ shown: true }, { shown: true }, { shown: true }];
 	const created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
-	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void) => boolean>(() => true);
+	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void) => boolean>(() => true);
 	/** Each write waits for the lists to catch up; held, the test says when they have. */
 	let holdFresh = false;
 	const freshWaiting: (() => void)[] = [];
@@ -318,7 +318,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", result));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			const dropped = targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult;
+			const dropped = targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult;
 			onDrop(dropped);
 			expect(rowsOf("left")).toEqual(["A", "field", "B"]);
 		});
@@ -329,7 +329,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", { kind: "nest", parent: parent.key, before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
+			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult);
 			const rows = [...lists.left.el.children] as HTMLElement[];
 			expect(rows[2].className).toBe("tc-quick-row");
 			expect(rows[2].style.getPropertyValue("--tc-level")).toBe("1");
@@ -641,7 +641,7 @@ describe("QuickEntryController", () => {
 			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
-			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as PlacedResult);
+			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult);
 			expect(rowsOf("left")).toEqual(["A", "B", "field"]);
 			type("C");
 			press("Enter");
@@ -763,7 +763,7 @@ describe("QuickEntryController", () => {
 				stackEl.className = "tc-menu-subtasks";
 				const source = stackEl.appendChild(document.createElement("div"));
 				source.className = "tc-card";
-				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
@@ -817,7 +817,7 @@ describe("QuickEntryController", () => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
 				source.getBoundingClientRect = () => at;
-				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, setDueDate: async () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 

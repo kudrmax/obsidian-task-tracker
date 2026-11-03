@@ -6,7 +6,6 @@ export const MENU_ICONS = {
 	progress: { d: CIRCLE, fill: "M12 3a9 9 0 0 1 0 18z" },
 	done: { d: CIRCLE, fill: CIRCLE },
 	wontdo: { d: `${CIRCLE} M8 12h8`, fill: "" },
-	due: { d: "M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z M3.5 10h17 M8 3v4 M16 3v4", fill: "" },
 	rename: { d: "M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4", fill: "" },
 	delete: { d: "M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13", fill: "" },
 	removeDue: { d: `${CIRCLE} M9 9l6 6 M15 9l-6 6`, fill: "" },
@@ -16,6 +15,9 @@ export const MENU_ICONS = {
 	subtask: { d: "M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4", fill: "" },
 	openFile: { d: "M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5", fill: "" },
 	description: { d: "M4 6h16 M4 12h16 M4 18h10", fill: "" },
+	section: { d: "M4 6h9 M4 12h16 M4 18h16", fill: "" },
+	check: { d: "M5 12.5l4.5 4.5L19 7", fill: "" },
+	plus: { d: "M12 5v14 M5 12h14", fill: "" },
 } as const;
 
 export type MenuIconName = keyof typeof MENU_ICONS;

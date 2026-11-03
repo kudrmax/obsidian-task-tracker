@@ -58,24 +58,7 @@ export class ListDrop implements DropTarget {
 		);
 	}
 
-	/**
-	 * The zones have taken the foot of the column, and the list ends over them: a card lifted from what they now cover
-	 * would have its place out of sight. The list scrolls it back into view, right over them: a finger carried up from the
-	 * zones comes to it first.
-	 */
-	lift(): void {
-		const home = this.liftedFrom();
-		if (home) {
-			const below = this.gapRect(home).bottom - this.list.el.getBoundingClientRect().bottom;
-			if (below > 0) this.list.el.scrollTop += below;
-		}
-		this.leave();
-	}
-
-	/**
-	 * The list and the column's title over it: a finger carried up past the list puts the card on its top. Under the list
-	 * nothing is it: the zones stand there while a card is carried, and the switch under them.
-	 */
+	/** The list and the column's title over it: a finger carried up past the list puts the card on its top. Under the list nothing is it. */
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
 		if (!this.accepts(drag)) return false;
 		const r = this.area.getBoundingClientRect();

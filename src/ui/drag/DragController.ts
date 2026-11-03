@@ -9,10 +9,7 @@ import type { ResizeEdge, Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
-import type { DropResult, DropTarget, NewTaskPayload, PlacedResult, TaskDragPayload, TaskOrigin } from "./DropTarget";
-
-/** A drop on New section: the column it was under, and whose sections. */
-export type NameGroup = Extract<DropResult, { readonly kind: "nameGroup" }>;
+import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
@@ -26,13 +23,9 @@ export interface DragControllerDeps {
 	targets(): readonly DropTarget[];
 	readonly haptics: Haptics;
 	readonly arbiter: GestureArbiter;
-	/** A card is lifted or settled: the lists swap New task for the zones that put it off. */
+	/** A card is lifted or settled: the lists hide New task while it is carried. */
 	onDragging(active: boolean): void;
-	onResult(drag: TaskDragPayload, result: PlacedResult): Promise<void>;
-	/** A card dropped on Pick a date, back in its place: the date picker opens over it. */
-	onPickDate(item: TaskItem, source: HTMLElement): void;
-	/** A card dropped on New section, back in its place: the list asks for the section's name. */
-	onNameGroup(item: TaskItem, asked: NameGroup): void;
+	onResult(drag: TaskDragPayload, result: DropResult): Promise<void>;
 	onResize(item: TaskItem, slot: Slot): Promise<void>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
@@ -201,24 +194,9 @@ export class DragController {
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
-		/** A drop that asks first: the day on Pick a date, the name on New section. */
-		let asking: { readonly kind: "pickDate" } | NameGroup | null = null;
 		const reopen = () => {
 			for (const card of lifted) card.classList.remove("is-lifted");
 			timeline?.layoutTasks();
-		};
-		/** The card has come to rest. Over one dropped on Pick a date, back in its place by now, the picker opens; the screen is held until it does. */
-		const settled = () => {
-			this.deps.onDragging(false);
-			if (!asking) return;
-			this.deps.haptics.tap();
-			if (asking.kind === "pickDate") {
-				this.deps.onPickDate(payload.item, source);
-				this.deps.arbiter.release(DRAG);
-				return;
-			}
-			this.deps.arbiter.release(DRAG);
-			this.deps.onNameGroup(payload.item, asking);
 		};
 		this.follow(
 			source,
@@ -232,27 +210,21 @@ export class DragController {
 					onReturn: reopen,
 					onEnd: async (result) => {
 						detach();
-						if (result?.kind === "pickDate" || result?.kind === "nameGroup") {
-							asking = result;
-							reopen();
-							return;
-						}
 						this.deps.arbiter.release(DRAG);
 						if (!result) return;
 						this.deps.haptics.tap();
 						await this.deps.onResult(payload, result);
 					},
 				}),
-			settled,
+			() => this.deps.onDragging(false),
 		);
 	}
 
 	/**
-	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted and no
-	 * zone appears. Let go off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let
-	 * go on one, `onDrop` hears where once the card has landed. False when another gesture holds the screen: nothing starts.
+	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted. Let go
+	 * off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once the card has landed. False when another gesture holds the screen: nothing starts.
 	 */
-	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: PlacedResult | null) => void): boolean {
+	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
@@ -260,7 +232,7 @@ export class DragController {
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
 		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };
-		let placed: PlacedResult | null = null;
+		let placed: DropResult | null = null;
 		this.follow(
 			source,
 			e,
@@ -272,7 +244,7 @@ export class DragController {
 					origin,
 					onEnd: async (result) => {
 						detach();
-						placed = result && result.kind !== "pickDate" && result.kind !== "nameGroup" ? result : null;
+						placed = result;
 					},
 				}),
 			() => {
@@ -290,7 +262,7 @@ export class DragController {
 	 */
 	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
 		const session = makeSession(() => detach());
-		session.start(e.clientX, e.clientY);
+		session.move(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) session.move(ev.clientX, ev.clientY);
 		};

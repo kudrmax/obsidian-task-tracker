@@ -45,23 +45,10 @@ export type DropResult =
 	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
 	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
-	| { readonly kind: "clearSlot" }
-	| { readonly kind: "postpone"; readonly date: LocalDate }
-	/** A zone that starts a section of that name in the list, or the one it has. */
-	| { readonly kind: "newGroup"; readonly list: GroupedList; readonly date: LocalDate | null; readonly name: string }
-	/** New section: the card goes back, and the list asks for the name. */
-	| { readonly kind: "nameGroup"; readonly column: ListColumn; readonly list: GroupedList; readonly date: LocalDate | null }
-	| { readonly kind: "pickDate" };
-
-/** A drop that changes the file at once; Pick a date asks for the day first. */
-export type PlacedResult = Exclude<DropResult, { readonly kind: "pickDate" } | { readonly kind: "nameGroup" }>;
+	| { readonly kind: "clearSlot" };
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 export interface DropTarget {
-	/** A zone that appears over the place a card was lifted from: under the finger at the lift, it takes the card only once the finger has left it. */
-	readonly waitsForEntry?: boolean;
-	/** The card has just been lifted and the zones stand: a list shows where the card came from, scrolled clear of them. */
-	lift?(): void;
 	hitTest(x: number, y: number, drag: DragPayload): boolean;
 	preview(x: number, y: number, drag: DragPayload): void;
 	/** Where the card will come to rest, in client pixels, while a preview shows. */

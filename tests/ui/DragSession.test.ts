@@ -138,65 +138,6 @@ describe("DragSession", () => {
 		expect(order).toEqual(["return", "clear"]);
 	});
 
-	describe("zones over the place a card was lifted from", () => {
-		class Zone extends FakeTarget {
-			readonly waitsForEntry = true;
-		}
-
-		it("a zone under the finger at the lift takes nothing until the finger has left it", async () => {
-			const zone = new Zone("zone", 0, 100, { kind: "postpone", date: "2026-11-04" });
-			const ended: unknown[] = [];
-			const s = session([zone], new FakeFloat(), ended);
-			s.start(50, 10);
-			s.move(60, 10);
-			expect(zone.log).toEqual([]);
-			await s.release(60, 10);
-			expect(ended).toEqual([null]);
-		});
-
-		it("nor does a list behind it, whose area reaches under the zones", async () => {
-			const zone = new Zone("zone", 0, 100, { kind: "clearSlot" });
-			const list = new FakeTarget("list", 0, 300, { kind: "clearSlot" });
-			const ended: unknown[] = [];
-			const s = session([zone, list], new FakeFloat(), ended);
-			s.start(50, 10);
-			expect(list.log).toEqual([]);
-			s.move(150, 10);
-			expect(list.log).toEqual(["preview 150,10"]);
-			s.move(50, 10);
-			await s.release(50, 10);
-			expect(zone.log).toEqual(["preview 50,10", "drop", "clear"]);
-		});
-
-		it("left and come back to, it lights and takes the card", async () => {
-			const result: DropResult = { kind: "postpone", date: "2026-11-04" };
-			const zone = new Zone("zone", 0, 100, result);
-			const ended: unknown[] = [];
-			const s = session([zone], new FakeFloat(), ended);
-			s.start(50, 10);
-			s.move(150, 10);
-			s.move(50, 10);
-			expect(zone.log).toEqual(["preview 50,10"]);
-			await s.release(50, 10);
-			expect(ended).toEqual([result]);
-		});
-
-		it("other zones and the lists answer at once, and every target hears of the lift", () => {
-			const lifts: string[] = [];
-			const zone = new Zone("zone", 0, 100, null);
-			const other = new Zone("other", 100, 200, null);
-			const list = new FakeTarget("list", 200, 300, null);
-			for (const t of [zone, other, list] as DropTarget[]) (t as { lift?: () => void }).lift = () => void lifts.push(String(t));
-			const s = session([zone, other, list], new FakeFloat(), []);
-			s.start(50, 10);
-			expect(lifts).toEqual(["zone", "other", "list"]);
-			s.move(150, 10);
-			s.move(250, 10);
-			expect(other.log).toEqual(["preview 150,10", "leave"]);
-			expect(list.log).toEqual(["preview 250,10"]);
-		});
-	});
-
 	describe("carrying a new task", () => {
 		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20, grabX: 20 };
 
