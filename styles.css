@@ -185,7 +185,7 @@ body {
 	/* Under a list column, below its New task: the switch's row, and Obsidian's navigation or status bar under it. */
 	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room));
 	/* While a task is typed, the list's end can rise this far: over the bar at the view's bottom, with the field 16 px above it. */
-	--tc-entry-room: calc(var(--tc-bar-h) + var(--tc-space-16));
+	--tc-entry-room: calc(var(--tc-bar-h) + var(--tc-bar-bottom) + var(--tc-space-16));
 
 	/* Sizes: cards */
 	/* The card's height and the gap between cards, in the list and in a stack on the timeline: the settings set them on the body. */
@@ -294,6 +294,10 @@ body {
 	--tc-bar-btn-w: 44px;
 	--tc-bar-btn-h: 36px;
 	--tc-radius-bar-btn: 18px;
+	/* How far the top of Obsidian's toolbar over the phone keyboard is over the view's bottom: the code measures it. */
+	--tc-toolbar-room: 0px;
+	/* The bar's buttons stand the cards' gap over that toolbar (over the view's bottom where it does not show). */
+	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-toolbar-room) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
 	--tc-bar-icon: 22px;
 	--tc-bar-flag: 20px;
 	--tc-stroke-bar: 1.9px;
@@ -594,7 +598,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 /* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
 body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
 /* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
-body.is-mobile .task-calendar.is-entering > .tc-fade { height: var(--tc-bar-h); }
+body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
@@ -953,7 +957,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-hairline-half) solid var(--tc-separator); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
-.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-status-room); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); }
+.tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-quick-bar::before { content: ""; position: absolute; inset: 0; z-index: var(--tc-layer-bar-ground); background: var(--tc-bg); }
 .tc-quick-bar > button, .tc-bar-shifts { z-index: var(--tc-layer-bar-button); }
 .tc-bar-shifts { display: flex; flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
