@@ -28,7 +28,7 @@ export class TimelineDrop implements DropTarget {
 
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
 		if (carriesMany(drag)) return false;
-		const r = this.timeline.el.getBoundingClientRect();
+		const r = this.timeline.viewBox();
 		return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
 	}
 
@@ -36,7 +36,7 @@ export class TimelineDrop implements DropTarget {
 	preview(x: number, y: number, drag: DragPayload): void {
 		this.last = { x, y, drag };
 		const wanted = this.timeline.minutesAt(y - drag.grabPx);
-		const box = this.timeline.el.getBoundingClientRect();
+		const box = this.timeline.viewBox();
 		this.show(wanted, drag.durationMin);
 		this.scroll.follow(y, box);
 	}

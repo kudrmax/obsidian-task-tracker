@@ -72,6 +72,21 @@ interface Stretch {
 	readonly edge: ResizeEdge;
 }
 
+/** The timeline as read for a gesture: its box, and where its canvas stands with the day scrolled to the top. */
+interface Frame {
+	readonly view: DOMRect;
+	readonly canvasAt: number;
+}
+
+/** What the drop line was last written with, so a move writes only what changed. */
+interface DropShown {
+	start: number | null;
+	y: number | null;
+	left: number | null;
+	width: number | null;
+	hidden: boolean | null;
+}
+
 const MINUTES_PER_HOUR = 60;
 
 function isOpen(item: TaskItem): boolean {
@@ -96,6 +111,11 @@ export class Timeline {
 	private dropEl: HTMLElement | null = null;
 	private drop: TaskSpan | null = null;
 	private stretch: Stretch | null = null;
+	/** Read once while a drop or a stretch is shown; a scroll is followed by `scrollTop`. */
+	private frame: Frame | null = null;
+	private dropShown: DropShown = noDropShown();
+	private room: { top: number; bottom: number } | null = null;
+	private hourShown: number | null = null;
 	private selected: TaskKey | null = null;
 	private field: ShownField | null = null;
 	private anchor: Anchor | null = null;
@@ -113,6 +133,7 @@ export class Timeline {
 		this.itemsEl = make(this.canvas, "div", "tc-items");
 		this.grips = make(null, "div", "tc-grips");
 		this.sizeWatch = new ResizeObserver(() => {
+			this.frame = null;
 			this.deps.onResize?.();
 			this.holdAnchor();
 		});
@@ -143,7 +164,26 @@ export class Timeline {
 	}
 
 	minutesAt(clientY: number): number {
-		return pxToMinutes(clientY - this.canvas.getBoundingClientRect().top, this.hourPx);
+		return pxToMinutes(clientY - this.measured().canvasTop, this.hourPx);
+	}
+
+	/** The timeline's box on the screen, read once while a drop or a stretch is shown. */
+	viewBox(): DOMRect {
+		return this.measured().view;
+	}
+
+	/**
+	 * The box and the canvas's top on the screen. While a drop or a stretch is shown they are read once and kept, the
+	 * canvas following a scroll by `scrollTop`; otherwise read afresh each time.
+	 */
+	private measured(): { view: DOMRect; canvasTop: number } {
+		const held = this.drop !== null || this.stretch !== null;
+		const frame = (held ? this.frame : null) ?? {
+			view: this.el.getBoundingClientRect(),
+			canvasAt: this.canvas.getBoundingClientRect().top + this.el.scrollTop,
+		};
+		if (held) this.frame = frame;
+		return { view: frame.view, canvasTop: frame.canvasAt - this.el.scrollTop };
 	}
 
 	/** Minutes from the start of the shown day to the start and the end of `slot`; a null end for a task without a duration. */
@@ -203,6 +243,9 @@ export class Timeline {
 	}
 
 	private setRoom(top: number, bottom: number): void {
+		if (this.room?.top === top && this.room.bottom === bottom) return;
+		this.room = { top, bottom };
+		this.frame = null;
 		this.canvas.style.setProperty(PROPERTY.roomTop, px(top));
 		this.canvas.style.setProperty(PROPERTY.roomBottom, px(bottom));
 	}
@@ -210,6 +253,7 @@ export class Timeline {
 	render(): void {
 		for (const child of [...this.itemsEl.children]) if (child !== this.field?.box) child.remove();
 		this.stretch = null;
+		this.frame = null;
 		const boundary = this.deps.boundary();
 		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
 		const events = this.deps.events().filter((e) => !e.allDay);
@@ -241,7 +285,10 @@ export class Timeline {
 	/** Applies the hour's height to everything placed; cheap enough to run on every frame of a zoom. */
 	layout(): void {
 		const hourPx = this.hourPx;
-		this.el.style.setProperty(PROPERTY.hour, px(hourPx));
+		if (this.hourShown !== hourPx) {
+			this.hourShown = hourPx;
+			this.canvas.style.setProperty(PROPERTY.hour, px(hourPx));
+		}
 		const nowMinutes = this.deps.boundary().offsetOf(this.deps.date(), this.deps.now());
 		const nowY = this.yOf(nowMinutes);
 		const today = this.deps.date() === this.deps.today();
@@ -281,30 +328,49 @@ export class Timeline {
 	 */
 	showDrop(span: TaskSpan): void {
 		this.drop = span;
+		const { view, canvasTop } = this.measured();
 		if (!this.dropEl) {
 			this.dropEl = make(document.body, "div", "tc-drop");
 			make(this.dropEl, "span", "tc-drop-pill");
 			make(this.dropEl, "div", "tc-drop-line");
+			this.dropShown = noDropShown();
 		}
-		this.dropEl.firstElementChild!.textContent = formatTime(this.slotAt(span.start, null).start);
-		this.placeDrop();
+		if (this.dropShown.start !== span.start) {
+			this.dropShown.start = span.start;
+			this.dropEl.firstElementChild!.textContent = formatTime(this.slotAt(span.start, null).start);
+		}
+		this.writeDrop(view, canvasTop);
 	}
 
 	/** The line in the window's pixels, where the minute is on screen now; hidden while that minute is scrolled out of the day's view. */
 	private placeDrop(): void {
 		if (!this.drop || !this.dropEl) return;
-		const view = this.el.getBoundingClientRect();
-		const y = this.canvas.getBoundingClientRect().top + this.yOf(this.drop.start);
-		this.dropEl.style.setProperty(PROPERTY.y, px(y));
-		this.dropEl.style.left = px(view.left);
-		this.dropEl.style.width = px(view.width);
-		this.dropEl.classList.toggle("is-hidden", y < view.top || y > view.bottom);
+		const { view, canvasTop } = this.measured();
+		this.writeDrop(view, canvasTop);
+	}
+
+	/** Writes only what moved since the last time. */
+	private writeDrop(view: DOMRect, canvasTop: number): void {
+		const el = this.dropEl!;
+		const shown = this.dropShown;
+		const y = canvasTop + this.yOf(this.drop!.start);
+		const hidden = y < view.top || y > view.bottom;
+		if (shown.y !== y) el.style.setProperty(PROPERTY.y, px(y));
+		if (shown.left !== view.left) el.style.left = px(view.left);
+		if (shown.width !== view.width) el.style.width = px(view.width);
+		if (shown.hidden !== hidden) el.classList.toggle("is-hidden", hidden);
+		shown.y = y;
+		shown.left = view.left;
+		shown.width = view.width;
+		shown.hidden = hidden;
 	}
 
 	clearDrop(): void {
 		this.drop = null;
+		this.frame = null;
 		this.dropEl?.remove();
 		this.dropEl = null;
+		this.dropShown = noDropShown();
 	}
 
 	/**
@@ -373,6 +439,7 @@ export class Timeline {
 	/** Shows a card stretched to `span` while its dot moves, the moving edge's time on the pill; null puts it back. */
 	stretchTo(el: HTMLElement, span: TaskSpan | null, edge: ResizeEdge): void {
 		this.stretch = span ? { el, span, edge } : null;
+		if (!span) this.frame = null;
 		el.classList.toggle("is-resizing", span !== null);
 		this.layoutTasks();
 	}
@@ -508,4 +575,8 @@ export class Timeline {
 		this.deps.onBlock?.(block, item);
 		return { el: block, item, meta, pill };
 	}
+}
+
+function noDropShown(): DropShown {
+	return { start: null, y: null, left: null, width: null, hidden: null };
 }

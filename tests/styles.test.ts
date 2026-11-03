@@ -237,6 +237,12 @@ describe("styles.css keeps to its design system", () => {
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
 
+	it("reads the hour only on the canvas", () => {
+		const reading = sheet.rules.filter((d) => d.value.includes("var(--tc-hour)"));
+		expect(reading.length).toBeGreaterThan(0);
+		expect(reading.every((d) => d.selector === ".tc-canvas")).toBe(true);
+	});
+
 	it("moves only the cards a drag draws off their place, flat", () => {
 		const moving = sheet.rules.filter((d) => d.value.includes("var(--tc-room)"));
 		expect(moving.length).toBe(1);
