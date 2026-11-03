@@ -18,6 +18,14 @@ describe("VaultTaskFileStore", () => {
 		expect(await store.read()).toBe("## Now\n");
 	});
 
+	it("reads from Obsidian's cache, not from the disk", async () => {
+		const { vault, store } = setup();
+		vault.files.set("TODOs Tasks.md", "## Now\n");
+		expect(await store.read()).toBe("## Now\n");
+		expect(vault.cachedReads).toBe(1);
+		expect(vault.reads).toBe(0);
+	});
+
 	it("writes through vault.process", async () => {
 		const { vault, store } = setup();
 		vault.files.set("TODOs Tasks.md", "## Now\n");

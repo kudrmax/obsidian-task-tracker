@@ -29,6 +29,8 @@ Never in `~/Obsidian`: it is production and syncs to the phone. A separate Obsid
 
 Per `~/.claude/CLAUDE.md`, «Свои плагины Obsidian». Version in `manifest.json`, `package.json`, `versions.json`. No CI: `npm run build`, then `gh release create <version> main.js manifest.json styles.css`. BRAT: `kudrmax/obsidian-task-tracker`, plugin id `task-calendar`.
 
+The release is the task; installing it through BRAT is a try, not a must. If the `obsidian` CLI can't reach Max's Obsidian (no socket, «Command line interface is not enabled», another session's test Obsidian holds it), say so in one line and the task is done: Max runs the update himself. Don't wait for the CLI, don't offer to restart his Obsidian, don't close or restart any test Obsidian to free it.
+
 ## Files
 
 Delete only with `trash`, never `rm`. Work on branches; `design` holds the docs, `mvp` the implementation.
