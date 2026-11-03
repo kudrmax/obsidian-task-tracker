@@ -202,6 +202,47 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector)).toHaveLength(1);
 	});
 
+	it("quiets Obsidian's hover on our buttons without touching their own ground", () => {
+		const quiet = sheet.rules.filter((d) => d.property === "background" && /:hover|:active/.test(d.selector) && d.value === "transparent");
+		expect(quiet.length).toBeGreaterThan(0);
+		const selectors = (list: string) => list.split(/,(?![^(]*\))/).map((s) => s.trim());
+		for (const d of quiet) expect(selectors(d.selector).every((s) => s.startsWith(":where(")), d.selector).toBe(true);
+	});
+
+	it("answers Obsidian's phone tap (button:not(.clickable-icon).mobile-tap, weight 0,2,1) at its weight, and the divider's handle keeps its ground above it", () => {
+		const tap = sheet.rules.filter((d) => d.selector === ":is(.task-calendar, .tc-panel, .tc-picker, .tc-popover, .tc-quick-bar) button.mobile-tap");
+		expect(tap.map((d) => `${d.property}: ${d.value}`)).toEqual(["background-color: transparent", "box-shadow: none"]);
+		expect(sheet.rules.some((d) => d.selector === ".task-calendar button.tc-divider-handle" && d.property === "background")).toBe(true);
+	});
+
+	it("casts every shadow from a shadow token, or rings an element with token measures", () => {
+		const parts = (value: string) => value.split(/,(?![^(]*\))/).map((part) => part.trim());
+		const allowed = [/^none$/, /^var\(--tc-(shadow|level|ring)-[\w-]+\)$/, /^(inset )?0 0 0 (var\(--tc-[\w-]+\)|calc\([^)]*var\(--tc-[\w-]+\)\)) var\(--tc-[\w-]+\)$/];
+		const offenders = sheet.rules
+			.filter((d) => d.property === "box-shadow" || d.property === "filter")
+			.filter((d) => !parts(d.value).every((part) => allowed.some((pattern) => pattern.test(part))))
+			.map(where);
+		expect(offenders).toEqual([]);
+	});
+
+	it("gives the bottom row one shadow: the wheel, the plus, the plus under the finger, Undo and the desktop capsule", () => {
+		const shadowOf = (element: string) =>
+			sheet.rules.filter((d) => d.property === "box-shadow" && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-seg", ".task-calendar > button.tc-plus", ".tc-float-plus", ".task-calendar > button.tc-undo", ".tc-quick-bar.is-desk::before"])
+			expect(shadowOf(element), element).toEqual(["var(--tc-shadow-control)"]);
+	});
+
+	it("draws the menus, the description's peek and the sources window as one window", () => {
+		const of = (element: string, property: string) =>
+			sheet.rules.filter((d) => d.property === property && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-panel", ".tc-desc-peek", ".tc-popover"]) {
+			expect(of(element, "background"), element).toEqual(["var(--tc-panel-bg)"]);
+			expect(of(element, "box-shadow"), element).toEqual(["var(--tc-shadow-panel)"]);
+		}
+		const numbers = (value: string) => value.match(/\d+(\.\d+)?/g)!.slice(0, 7);
+		for (const tokens of [sheet.tokens, sheet.lightTokens]) expect(numbers(tokens.get("--tc-level-shadow")!)).toEqual(numbers(tokens.get("--tc-shadow-panel")!));
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
