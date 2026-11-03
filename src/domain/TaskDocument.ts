@@ -334,6 +334,21 @@ export class TaskDocument {
 		return new TaskDocument(lines, this.eol, true, this.names, this.markers);
 	}
 
+	/** Under each list's heading one blank line, then what is under it; a heading with nothing below it stays as it is. */
+	spacedHeadings(): TaskDocument {
+		const headings = [...this.sections.values()].map((s) => s.headingLine).sort((a, b) => b - a);
+		let lines: string[] | null = null;
+		for (const heading of headings) {
+			const current: readonly string[] = lines ?? this.lines;
+			let filled = heading + 1;
+			while (filled < current.length && current[filled].trim() === "") filled++;
+			if (filled === current.length || (filled === heading + 2 && current[heading + 1] === "")) continue;
+			lines ??= [...this.lines];
+			lines.splice(heading + 1, filled - heading - 1, "");
+		}
+		return lines ? this.withLines(lines) : this;
+	}
+
 	private withLines(lines: readonly string[]): TaskDocument {
 		return new TaskDocument(lines, this.eol, this.trailingEol, this.names, this.markers);
 	}
@@ -399,8 +414,7 @@ export class TaskDocument {
 		const index = typeof position === "object" ? position.endOf : ungroupedIndex(groups);
 		const group = groups[index];
 		if (!group) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
-		const block = this.blockLists.get(section)![index];
-		if (group.entries.length === 0) return block.start;
+		if (group.entries.length === 0) return this.emptyBlockLine(section, index);
 		if (position === "start") return this.spans.get(group.entries[0])!.line;
 		return this.lineAfter(group.entries[group.entries.length - 1]);
 	}
@@ -408,8 +422,18 @@ export class TaskDocument {
 	private groupInsertionLine(section: SectionKey, index: number, at: "start" | "end"): number {
 		const group = this.groups(section)[index];
 		if (!group) throw new Error(`Group missing: ${this.names[section]}[${index}]`);
-		if (group.entries.length === 0) return this.blockOf(section, index).start;
+		if (group.entries.length === 0) return this.emptyBlockLine(section, index);
 		return at === "start" ? this.spans.get(group.entries[0])!.line : this.lineAfter(group.entries[group.entries.length - 1]);
+	}
+
+	/**
+	 * Where a task goes in a block without tasks: right under its heading. The top block's blank lines stay under the
+	 * list's heading when a `###` follows, and part the list from the next one when it is the last.
+	 */
+	private emptyBlockLine(section: SectionKey, index: number): number {
+		const block = this.blockOf(section, index);
+		const last = index === this.blockLists.get(section)!.length - 1;
+		return block.headingLine === null && !last ? this.firstFilled(block) : block.start;
 	}
 
 	/** Where group `index` begins; the number of groups: after the list's last filled line. */
