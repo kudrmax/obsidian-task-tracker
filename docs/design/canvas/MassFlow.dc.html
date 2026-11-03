@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>2. Массовые действия на десктопе</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 6448px; height: 2276px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">2. Массовые действия на десктопе</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 6320px; font-size: 18px; line-height: 24px; color: #6B6A65;">Только десктоп: на телефоне всё как раньше. Выделение — вариант A. Пунктиром выделено новое</div>
+<sc-for list="{{wins}}" as="p" hint-placeholder-count="10">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 1200px; height: 800px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="MassDesk" view="{{p.view}}" look="{{p.look}}" theme="{{p.theme}}" hint-size="1200px,800px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.ctop}}px; width: 1200px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":6448,"height":2276}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { wins: [{"view": "select", "name": "1. ⌘-клик выделяет", "caption": "⌘-клик по задаче добавляет её к выделению или снимает; Shift-клик — все задачи между ней и последней выделенной в этом списке. Выделять можно в любых списках сразу (Inbox, Soon, Now). Esc или клик по пустому месту снимает выделение. Обычный клик по невыделенной задаче снимает выделение и открывает её меню, как сейчас", "look": "fill", "theme": "dark", "left": 64, "top": 176, "ctop": 994}, {"view": "menu", "name": "2. Меню для всех выделенных", "caption": "Клик или правая кнопка по выделенной задаче открывает одно меню на все. Выделенные остаются над подложкой на своих местах, поэтому меню стоит справа от списка, а не под задачей. Сверху — сколько задач. Остаются статус, приоритет, перенос, Section и Delete; Rename, описание, подзадача и Open in Obsidian пропадают", "look": "fill", "theme": "dark", "left": 1344, "top": 176, "ctop": 994}, {"view": "drag", "name": "3. Перетаскивание в списке", "caption": "Тянешь любую выделенную — едут все: под курсором стопка с числом. В списке раскрывается место размером с одну задачу, как при переносе одной; отпустил — место разворачивается, и задачи встают туда подряд в прежнем порядке. Плюс на время переноса становится кнопкой отмены", "look": "fill", "theme": "dark", "left": 2624, "top": 176, "ctop": 994}, {"view": "calendar", "name": "4. Курсор ушёл из списка", "caption": "Курсор ушёл из списка (на календарь, к отмене) — пунктир возвращается на исходные места каждой задачи: видно, откуда их взяли. Над календарём цели броска нет; отпустил там — ничего не происходит, задачи возвращаются на свои места", "look": "fill", "theme": "dark", "left": 3904, "top": 176, "ctop": 994}, {"view": "cancel", "name": "5. Отмена", "caption": "Стопку подвели к кнопке отмены — она загорается, как место плюса при его тяге. Отпустил — перенос отменён, задачи на исходных местах. Esc во время переноса делает то же самое", "look": "fill", "theme": "dark", "left": 5184, "top": 176, "ctop": 994}, {"view": "select", "name": "1. ⌘-клик выделяет — светлая", "caption": "⌘-клик по задаче добавляет её к выделению или снимает; Shift-клик — все задачи между ней и последней выделенной в этом списке. Выделять можно в любых списках сразу (Inbox, Soon, Now). Esc или клик по пустому месту снимает выделение. Обычный клик по невыделенной задаче снимает выделение и открывает её меню, как сейчас", "look": "fill", "theme": "light", "left": 64, "top": 1236, "ctop": 2054}, {"view": "menu", "name": "2. Меню для всех выделенных — светлая", "caption": "Клик или правая кнопка по выделенной задаче открывает одно меню на все. Выделенные остаются над подложкой на своих местах, поэтому меню стоит справа от списка, а не под задачей. Сверху — сколько задач. Остаются статус, приоритет, перенос, Section и Delete; Rename, описание, подзадача и Open in Obsidian пропадают", "look": "fill", "theme": "light", "left": 1344, "top": 1236, "ctop": 2054}, {"view": "drag", "name": "3. Перетаскивание в списке — светлая", "caption": "Тянешь любую выделенную — едут все: под курсором стопка с числом. В списке раскрывается место размером с одну задачу, как при переносе одной; отпустил — место разворачивается, и задачи встают туда подряд в прежнем порядке. Плюс на время переноса становится кнопкой отмены", "look": "fill", "theme": "light", "left": 2624, "top": 1236, "ctop": 2054}, {"view": "calendar", "name": "4. Курсор ушёл из списка — светлая", "caption": "Курсор ушёл из списка (на календарь, к отмене) — пунктир возвращается на исходные места каждой задачи: видно, откуда их взяли. Над календарём цели броска нет; отпустил там — ничего не происходит, задачи возвращаются на свои места", "look": "fill", "theme": "light", "left": 3904, "top": 1236, "ctop": 2054}, {"view": "cancel", "name": "5. Отмена — светлая", "caption": "Стопку подвели к кнопке отмены — она загорается, как место плюса при его тяге. Отпустил — перенос отменён, задачи на исходных местах. Esc во время переноса делает то же самое", "look": "fill", "theme": "light", "left": 5184, "top": 1236, "ctop": 2054}] };
+  }
+}
+</script>
+</body>
+</html>

@@ -14,14 +14,36 @@ import {
 	type GroupPlace,
 	type NewTaskPlace,
 	type Placement,
+	type TaskChange,
 	type TaskDraft,
 	type TaskItem,
 	type TaskKey,
 	type TaskService,
+	type TaskStep,
 } from "./contracts";
+import { EntryTags } from "../domain/EntryTags";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 
 type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
+
+/** The changes that take a task elsewhere: its subtasks go along with it. */
+const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
+
+/** The other tasks a change names: the task to stand before, or the parent and the subtask to stand before. */
+function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
+	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
+	if (change.kind === "nest") return [change.parent, change.before];
+	return [];
+}
+
+function sameKey(a: TaskKey, b: TaskKey): boolean {
+	return a.section === b.section && a.index === b.index && a.raw === b.raw && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+}
+
+/** `a` is a task `b` sits under, at any depth. */
+function isAncestor(a: TaskKey, b: TaskKey): boolean {
+	return a.section === b.section && a.index === b.index && a.path.length < b.path.length && a.path.every((i, k) => b.path[k] === i);
+}
 
 function allSectionNames(settings: TaskCalendarSettings): readonly string[] {
 	const s = settings.sections;
@@ -206,6 +228,62 @@ export class TaskServiceImpl implements TaskService {
 			this.groupOf(doc, list, group);
 			return ops.removeGroup(doc, list, group);
 		});
+	}
+
+	async applyAll(steps: readonly TaskStep[]): Promise<void> {
+		if (steps.length === 0) return;
+		await this.mutate((doc, today, settings) => {
+			const named: TaskKey[] = [];
+			const tagOf = (key: TaskKey): number => {
+				const at = named.findIndex((k) => sameKey(k, key));
+				return at >= 0 ? at : named.push(key) - 1;
+			};
+			const lineOf = (key: TaskKey) => doc.lineOf(this.entryOf(doc, key));
+			const plan = steps
+				.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isAncestor(other.key, step.key))))
+				.sort((a, b) => lineOf(a.key) - lineOf(b.key))
+				.map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => (ref === null ? null : tagOf(ref))) }));
+			const { doc: tagged, tags } = EntryTags.tag(doc, named.map((key) => this.entryOf(doc, key)));
+			let current = tagged;
+			for (const { change, own, refs } of plan) {
+				const entry = tags.find(current, own);
+				if (!entry) continue;
+				const [first, second] = refs.map((ref) => (ref === null ? null : tags.find(current, ref)));
+				current = this.change(current, entry, change, first ?? null, second ?? null, today, settings);
+			}
+			return tags.untag(current);
+		});
+	}
+
+	/** One step of `applyAll`; `first` and `second` are the tasks its change names, in the order `refsOf` gives them. */
+	private change(doc: TaskDocument, entry: TaskEntry, change: TaskChange, first: TaskEntry | null, second: TaskEntry | null, today: LocalDate, settings: TaskCalendarSettings): TaskDocument {
+		switch (change.kind) {
+			case "status":
+				return ops.setStatus(doc, entry, change.status);
+			case "priority":
+				return ops.setPriority(doc, entry, change.priority);
+			case "dueDate":
+				return ops.setDueDate(doc, entry, change.date);
+			case "postpone":
+				return ops.postpone(doc, entry, change.date, today);
+			case "remove":
+				return ops.remove(doc, entry);
+			case "moveBefore":
+				return ops.moveBefore(doc, entry, first, change.date, today);
+			case "moveToList":
+				return ops.moveToList(doc, entry, change.date, today);
+			case "moveToSoon":
+				return ops.moveToSoon(doc, entry, change.date, today);
+			case "moveToEnd":
+				return ops.moveToEnd(doc, entry, change.section);
+			case "moveToGroup":
+				this.groupOf(doc, change.list, change.group);
+				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
+			case "createGroup":
+				return this.blank(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
+			case "nest":
+				return first ? ops.nest(doc, entry, first, second) : doc;
+		}
 	}
 
 	async normalize(): Promise<void> {

@@ -1727,6 +1727,30 @@
    "h": 844,
    "page": "components",
    "title": "Меню задачи: перенос и секция"
+  },
+  "MassDesk.dc.html": {
+   "x": 6734,
+   "y": 0,
+   "w": 1200,
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экранов массовых действий на десктопе (его показывают доски «Массовые действия»)"
+  },
+  "MassLook.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 3888,
+   "h": 1106,
+   "page": "bulk",
+   "title": "1. Как выглядит выделенная задача"
+  },
+  "MassFlow.dc.html": {
+   "x": 0,
+   "y": 1226,
+   "w": 6448,
+   "h": 2276,
+   "page": "bulk",
+   "title": "2. Массовые действия на десктопе"
   }
  },
  "createdOnFiles": {
@@ -2310,7 +2334,10 @@
   "DragCover.dc.html",
   "DragCoverBoard.dc.html",
   "MenuMove.dc.html",
-  "MenuMoveBoard.dc.html"
+  "MenuMoveBoard.dc.html",
+  "MassDesk.dc.html",
+  "MassLook.dc.html",
+  "MassFlow.dc.html"
  ],
  "pages": [
   {
@@ -2388,6 +2415,10 @@
   {
    "id": "menumove",
    "name": "Перенос в меню"
+  },
+  {
+   "id": "bulk",
+   "name": "Массовые действия"
   }
  ],
  "title": "Task Calendar"

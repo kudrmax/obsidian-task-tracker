@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>1. Как выглядит выделенная задача</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 3888px; height: 1106px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 52px; font-size: 34px; line-height: 40px; font-weight: 700; color: #1C1C1E;">1. Как выглядит выделенная задача</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 3760px; font-size: 18px; line-height: 24px; color: #6B6A65;">Три варианта вида выделения на десктопе. Выделены три задачи из Now: одна в процессе, одна с приоритетом p2</div>
+<sc-for list="{{wins}}" as="p" hint-placeholder-count="3">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 1200px; height: 800px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="MassDesk" view="{{p.view}}" look="{{p.look}}" theme="{{p.theme}}" hint-size="1200px,800px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.ctop}}px; width: 1200px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.caption}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3888,"height":1106}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { wins: [{"view": "select", "look": "fill", "theme": "dark", "name": "A. Заливка акцентом — выбрано", "caption": "Выделенная задача целиком подкрашена акцентом, как выделение в Finder и Things. Не спутать с полем ввода (у него кольцо) и с местом броска (пунктир). Оттенок приоритета на время выделения уступает заливке", "left": 64, "top": 176, "ctop": 994}, {"view": "select", "look": "ring", "theme": "dark", "name": "B. Кольцо акцентом", "caption": "Карточка не меняет фон, вокруг кольцо 2 px. Приоритет виден, но выделение похоже на поле быстрого ввода — у того такое же кольцо", "left": 1344, "top": 176, "ctop": 994}, {"view": "select", "look": "check", "theme": "dark", "name": "C. Галка слева", "caption": "Перед названием — кружок акцента с галкой, как в режиме выбора Напоминаний. Название сдвигается вправо, в узком списке теряет пару букв", "left": 2624, "top": 176, "ctop": 994}] };
+  }
+}
+</script>
+</body>
+</html>

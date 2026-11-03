@@ -304,6 +304,7 @@ export class DemoTaskService implements TaskService {
 	async renameGroup(): Promise<void> {}
 
 	async removeGroup(): Promise<void> {}
+	async applyAll(): Promise<void> {}
 
 	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
 		const t = this.take(key);

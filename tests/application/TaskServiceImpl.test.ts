@@ -552,3 +552,80 @@ describe("lineOf", () => {
 		await expect(svc.lineOf({ ...a.key, raw: "- [ ] Other" })).rejects.toBeInstanceOf(StaleTaskError);
 	});
 });
+
+describe("applyAll", () => {
+	it("changes several tasks in one write", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");
+		const [a, , c] = (await svc.dayView(T)).list;
+		await svc.applyAll([a, c].map((item) => ({ key: item.key, change: { kind: "priority", priority: "p1" } as const })));
+		expect(store.writes).toBe(1);
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] p1 A\n- [ ] B\n- [ ] p1 C\n\n## Soon\n\n## Done\n");
+	});
+
+	it("moves tasks to one place in the order they stood, whatever order the steps came in", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] C\n- [ ] D\n\n## Soon\n\n## Done\n");
+		const [a, b, , d] = (await svc.dayView(T)).list;
+		await svc.applyAll([d, a].map((item) => ({ key: item.key, change: { kind: "moveBefore", before: b.key, date: T } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] A 📅 2026-10-30\n- [ ] D 📅 2026-10-30\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");
+	});
+
+	it("finds the task to stand before after the moves before it shifted it", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n- [ ] B\n- [ ] C\n- [ ] D\n\n## Soon\n\n## Done\n");
+		const [a, b, , d] = (await svc.dayView(T)).list;
+		await svc.applyAll([a, b].map((item) => ({ key: item.key, change: { kind: "moveBefore", before: d.key, date: T } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] C\n- [ ] A 📅 2026-10-30\n- [ ] B 📅 2026-10-30\n- [ ] D\n\n## Soon\n\n## Done\n");
+	});
+
+	it("tells twin tasks apart", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] X\n- [ ] A\n- [ ] X\n\n## Soon\n\n## Done\n");
+		const [, a, x2] = (await svc.dayView(T)).list;
+		await svc.applyAll([{ key: a.key, change: { kind: "moveToSoon", date: T } }, { key: x2.key, change: { kind: "status", status: "inProgress" } }]);
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] X\n- [/] X\n\n## Soon\n- [ ] A\n\n## Done\n");
+	});
+
+	it("postpones tasks from different lists and removes others in the same write", async () => {
+		const { store, svc } = setup("## Inbox\n- [ ] I\n\n## Now\n- [ ] A\n- [ ] B\n\n## Soon\n- [ ] S\n\n## Done\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		const [s] = await svc.soonWithoutDateView();
+		await svc.applyAll([
+			{ key: s.key, change: { kind: "postpone", date: D } },
+			{ key: a.key, change: { kind: "postpone", date: D } },
+			{ key: b.key, change: { kind: "remove" } },
+		]);
+		expect(store.writes).toBe(1);
+		expect(store.text).toBe("## Inbox\n- [ ] I\n\n## Now\n\n## Soon\n- [ ] S 📅 2026-11-03\n- [ ] A 📅 2026-11-03\n\n## Done\n");
+	});
+
+	it("moves a task with its subtasks once when both are chosen, but changes the status of each", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n\t- [ ] A1\n- [ ] B\n\n## Soon\n\n## Done\n");
+		const [a] = (await svc.dayView(T)).list;
+		const a1 = a.subtasks[0];
+		await svc.applyAll([a, a1].map((item) => ({ key: item.key, change: { kind: "moveToSoon", date: T } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [ ] A\n\t- [ ] A1\n\n## Done\n");
+		const [moved] = await svc.soonWithoutDateView();
+		await svc.applyAll([moved, moved.subtasks[0]].map((item) => ({ key: item.key, change: { kind: "status", status: "inProgress" } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n- [/] A\n\t- [/] A1\n\n## Done\n");
+	});
+
+	it("skips a subtask already gone with its removed task", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] A\n\t- [ ] A1\n- [ ] B\n\n## Soon\n\n## Done\n");
+		const [a] = (await svc.dayView(T)).list;
+		await svc.applyAll([a, a.subtasks[0]].map((item) => ({ key: item.key, change: { kind: "remove" } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] B\n\n## Soon\n\n## Done\n");
+	});
+
+	it("nests tasks under one parent in their order", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n- [ ] P\n- [ ] A\n- [ ] B\n\n## Soon\n\n## Done\n");
+		const [p, a, b] = (await svc.dayView(T)).list;
+		await svc.applyAll([b, a].map((item) => ({ key: item.key, change: { kind: "nest", parent: p.key, before: null } as const })));
+		expect(store.text).toBe("## Inbox\n\n## Now\n- [ ] P\n\t- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n");
+	});
+
+	it("rejects a stale key and writes nothing", async () => {
+		const { store, svc } = setup("## Now\n- [ ] A\n- [ ] B\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		store.text = "## Now\n- [ ] A\n- [ ] Changed\n";
+		await expect(svc.applyAll([a, b].map((item) => ({ key: item.key, change: { kind: "remove" } as const })))).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe("## Now\n- [ ] A\n- [ ] Changed\n");
+	});
+});
