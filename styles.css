@@ -676,6 +676,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
 .task-calendar.is-switching :is(.tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip), gap 0s linear var(--tc-slide-flip); }
+/* The next day beside the screen while a finger draws it in: drawn as the screen draws a day, under the foot, out of reach of the fingers. */
+.tc-peek { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
 
 /* A list of cards scrolls in the room its column's foot leaves; no row ever shrinks. While a task is typed the foot steps aside and the list's end leaves room over the bar. */
 .tc-list { position: relative; flex: 1 1 0; min-height: 0; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); }

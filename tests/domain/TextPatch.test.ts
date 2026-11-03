@@ -74,9 +74,13 @@ describe("TextPatch on big files", () => {
 		const lines = Array.from({ length: 2000 }, (_, i) => (i % 50 === 0 ? "" : `- [ ] Task ${i}`));
 		const before = lines.join("\n");
 		const after = [...lines.slice(0, 10), ...lines.slice(11), lines[10]].join("\n");
-		const started = performance.now();
+		const took = () => {
+			const started = performance.now();
+			TextPatch.between(before, after);
+			return performance.now() - started;
+		};
+		expect(Math.min(...Array.from({ length: 5 }, took))).toBeLessThan(20);
 		const patch = TextPatch.between(before, after);
-		expect(performance.now() - started).toBeLessThan(50);
 		expect(patch.revert(after)).toBe(before);
 		expect(patch.apply(before)).toBe(after);
 	});

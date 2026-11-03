@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GestureArbiter } from "../../src/ui/gestures";
 import type { Shift } from "../../src/ui/screens";
-import { Swipe, swipeStartsAt } from "../../src/ui/Swipe";
+import { Swipe, swipeStartsAt, type SwipeTarget } from "../../src/ui/Swipe";
 
 const SLOW_STEP_MS = 1000;
 let now = 0;
@@ -15,39 +15,76 @@ function pointer(type: string, x: number, y = 300, { after = SLOW_STEP_MS, id = 
 	return e;
 }
 
-function setUp(arbiter = new GestureArbiter()) {
+/** The screens a swipe draws: the next one `WIDTH` away either way, none past `ends`. */
+const WIDTH = 200;
+
+function setUp(arbiter = new GestureArbiter(), ends: readonly Shift[] = []) {
 	const root = document.createElement("div");
 	const inner = root.appendChild(document.createElement("div"));
 	const sheet = root.appendChild(document.createElement("div"));
 	const shifts: Shift[] = [];
-	new Swipe(root, { arbiter, accepts: (target) => target !== sheet, onSwipe: (shift) => shifts.push(shift) });
+	const settles: (Shift | null)[] = [];
+	const follows: number[] = [];
+	const target: SwipeTarget = {
+		distance: (shift) => (ends.includes(shift) ? null : WIDTH),
+		follow: (dx) => follows.push(dx),
+		settle: (shift) => {
+			settles.push(shift);
+			if (shift !== null) shifts.push(shift);
+			return Promise.resolve();
+		},
+	};
+	new Swipe(root, { arbiter, accepts: (target) => target !== sheet, target });
 	const swipe = (from: HTMLElement, ...points: [number, number][]) => {
 		from.dispatchEvent(pointer("pointerdown", ...points[0]));
 		for (const point of points.slice(1)) from.dispatchEvent(pointer("pointermove", ...point));
 		from.dispatchEvent(pointer("pointerup", ...points[points.length - 1]));
 	};
-	return { root, inner, sheet, shifts, arbiter, swipe };
+	return { root, inner, sheet, shifts, settles, follows, arbiter, swipe };
 }
+
+/** The screen settles, and only then lets the screen go. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("Swipe", () => {
 	it("steps on when the finger goes left, and back when it goes right, from anywhere on the screen", () => {
 		const { inner, shifts, swipe } = setUp();
-		swipe(inner, [300, 300], [280, 302], [200, 305]);
+		swipe(inner, [300, 300], [280, 302], [150, 305]);
 		swipe(inner, [100, 300], [120, 298], [250, 290]);
 		expect(shifts).toEqual([1, -1]);
 	});
 
-	it("holds the screen while the finger is on its way, and lets it go when lifted", () => {
+	it("draws the screen with the finger from where it went sideways, no further than the next screen", () => {
+		const { inner, follows } = setUp();
+		inner.dispatchEvent(pointer("pointerdown", 300));
+		inner.dispatchEvent(pointer("pointermove", 290));
+		inner.dispatchEvent(pointer("pointermove", 250));
+		inner.dispatchEvent(pointer("pointermove", 320));
+		inner.dispatchEvent(pointer("pointermove", -100));
+		expect(follows).toEqual([-40, 30, -WIDTH]);
+	});
+
+	it("lands on whichever screen stands nearer when let go", () => {
+		const { inner, settles, swipe } = setUp();
+		swipe(inner, [300, 300], [290, 300], [191, 300]);
+		swipe(inner, [300, 300], [290, 300], [189, 300]);
+		swipe(inner, [300, 300], [310, 300], [409, 300]);
+		swipe(inner, [300, 300], [310, 300], [411, 300]);
+		expect(settles).toEqual([null, 1, null, -1]);
+	});
+
+	it("holds the screen while the finger is on its way, and lets it go once the screen stands", async () => {
 		const { inner, arbiter } = setUp();
 		inner.dispatchEvent(pointer("pointerdown", 300));
 		inner.dispatchEvent(pointer("pointermove", 280));
 		expect(arbiter.busy).toBe(true);
 		inner.dispatchEvent(pointer("pointerup", 200));
+		await settled();
 		expect(arbiter.busy).toBe(false);
 	});
 
 	it("leaves a finger that goes up or down to the scroll", () => {
-		const { inner, shifts, arbiter, swipe } = setUp();
+		const { inner, shifts, follows, arbiter, swipe } = setUp();
 		inner.dispatchEvent(pointer("pointerdown", 300, 300));
 		inner.dispatchEvent(pointer("pointermove", 295, 280));
 		expect(arbiter.busy).toBe(false);
@@ -55,9 +92,10 @@ describe("Swipe", () => {
 		inner.dispatchEvent(pointer("pointerup", 150, 270));
 		swipe(inner, [300, 300], [302, 340], [310, 500]);
 		expect(shifts).toEqual([]);
+		expect(follows).toEqual([]);
 	});
 
-	it("does nothing for a short, slow slide, and steps for a short flick", () => {
+	it("goes back for a short, slow slide, and steps for a short flick", () => {
 		const { inner, shifts, swipe } = setUp();
 		swipe(inner, [300, 300], [285, 300], [270, 300]);
 		expect(shifts).toEqual([]);
@@ -68,16 +106,33 @@ describe("Swipe", () => {
 		expect(shifts).toEqual([1]);
 	});
 
+	it("goes back for a flick back, however far the screen was drawn", () => {
+		const { inner, settles } = setUp();
+		inner.dispatchEvent(pointer("pointerdown", 300));
+		inner.dispatchEvent(pointer("pointermove", 290));
+		inner.dispatchEvent(pointer("pointermove", 130));
+		inner.dispatchEvent(pointer("pointermove", 145, 300, { after: 10 }));
+		inner.dispatchEvent(pointer("pointerup", 160, 300, { after: 10 }));
+		expect(settles).toEqual([null]);
+	});
+
 	it("takes the way the finger was let go, not the way it set off", () => {
 		const { inner, shifts, swipe } = setUp();
 		swipe(inner, [300, 300], [250, 300], [260, 300], [330, 300], [380, 300]);
 		expect(shifts).toEqual([-1]);
 	});
 
-	it("does nothing when the finger comes back before it is lifted", () => {
-		const { inner, shifts, swipe } = setUp();
-		swipe(inner, [300, 300], [200, 300], [295, 300]);
-		expect(shifts).toEqual([]);
+	it("goes back when the finger comes back before it is lifted", () => {
+		const { inner, settles, swipe } = setUp();
+		swipe(inner, [300, 300], [290, 300], [150, 300], [285, 300]);
+		expect(settles).toEqual([null]);
+	});
+
+	it("only gives past the row's end, and goes back", () => {
+		const { inner, settles, follows, swipe } = setUp(new GestureArbiter(), [-1]);
+		swipe(inner, [100, 300], [110, 300], [500, 300]);
+		expect(follows).toEqual([390, 390]);
+		expect(settles).toEqual([null]);
 	});
 
 	it("waits while another gesture holds the screen, and never takes it from one", () => {
@@ -108,12 +163,14 @@ describe("Swipe", () => {
 		expect(shifts).toEqual([]);
 	});
 
-	it("drops a swipe the browser cancels", () => {
-		const { inner, shifts, arbiter } = setUp();
+	it("brings the screen back for a swipe the browser cancels", async () => {
+		const { inner, settles, arbiter } = setUp();
 		inner.dispatchEvent(pointer("pointerdown", 300));
 		inner.dispatchEvent(pointer("pointermove", 200));
-		inner.dispatchEvent(pointer("pointercancel", 100));
-		expect(shifts).toEqual([]);
+		inner.dispatchEvent(pointer("pointermove", 50));
+		inner.dispatchEvent(pointer("pointercancel", 50));
+		await settled();
+		expect(settles).toEqual([null]);
 		expect(arbiter.busy).toBe(false);
 	});
 
@@ -142,13 +199,44 @@ describe("Swipe", () => {
 		const LEFT = [3, 11, 8, 6, 10, 21, 26, 43, 35, 32, 11, 5, 18, 43, 100, 51, 52, 49, 50, 47, 47, 46, 45, 43, 42, 41, 41, 39, 37, 37, 37, 36, 33, 33, 31, 31, 29, 28, 27, 27, 26, 26, 25, 24, 23, 21, 21, 20, 19, 19, 17];
 		const TURN_RIGHT = [-4, -16, -3, -17, -11, -33, -60, -70, -50];
 
-		it("steps on when two fingers go left, and back when they go right, once per stroke", () => {
-			const { inner, shifts } = setUp();
+		it("sends the screen on at once when two fingers sweep left, and back when they sweep right, once per stroke", () => {
+			const { inner, shifts, follows } = setUp();
 			for (const delta of [10, 20, 30, 30, 20, 10, 5, 2, 1]) wheel(inner, delta);
+			expect(follows).toEqual([-10, -30, -60]);
 			expect(shifts).toEqual([1]);
 			vi.advanceTimersByTime(1000);
 			for (const delta of [-15, -25, -30, -10]) wheel(inner, delta);
 			expect(shifts).toEqual([1, -1]);
+		});
+
+		it("steps as soon as slow fingers have drawn the whole way, and passes the glide after by", () => {
+			const { inner, shifts, follows } = setUp();
+			for (let i = 0; i < 60; i++) wheel(inner, 4);
+			expect(shifts).toEqual([1]);
+			expect(follows[follows.length - 1]).toBe(-WIDTH);
+			expect(follows).toHaveLength(WIDTH / 4);
+		});
+
+		it("lets the screen go the moment the fingers lift, not when their glide dies", () => {
+			const { inner, settles } = setUp();
+			for (let i = 0; i < 30; i++) wheel(inner, 4);
+			for (const delta of [3.8, 3.6, 3.4, 3.2]) wheel(inner, delta);
+			expect(settles).toEqual([1]);
+			for (let size = 3; size > 0.1; size *= 0.95) wheel(inner, size);
+			vi.advanceTimersByTime(1000);
+			expect(settles).toEqual([1]);
+		});
+
+		it("sends the screen on for fingers lifted on their way, and back for fingers that slowed first", () => {
+			const { inner, settles, follows } = setUp();
+			for (let i = 0; i < 10; i++) wheel(inner, 4);
+			for (let size = 3.8; size > 0.1; size *= 0.95) wheel(inner, size);
+			expect(settles).toEqual([1]);
+			expect(follows).toHaveLength(14);
+			vi.advanceTimersByTime(1000);
+			for (let i = 0; i < 10; i++) wheel(inner, 2);
+			for (let size = 1.9; size > 0.1; size *= 0.95) wheel(inner, size);
+			expect(settles).toEqual([1, null]);
 		});
 
 		it("keeps the screen from scrolling sideways, and leaves an up-or-down scroll alone", () => {
@@ -177,19 +265,21 @@ describe("Swipe", () => {
 			expect(shifts).toEqual([1, -1]);
 		});
 
-		it("does nothing while the fingers creep, and steps once they sweep", () => {
-			const { inner, shifts } = setUp();
-			for (let i = 0; i < 60; i++) wheel(inner, 3);
-			expect(shifts).toEqual([]);
-			for (const delta of [5, 8, 10, 14, 17, 20, 25]) wheel(inner, delta);
-			expect(shifts).toEqual([1]);
+		it("draws the screen however slowly the fingers creep, and goes back when they stop short of halfway", () => {
+			const { inner, settles } = setUp();
+			for (let i = 0; i < 30; i++) wheel(inner, 3);
+			vi.advanceTimersByTime(1000);
+			for (let i = 0; i < 40; i++) wheel(inner, 3);
+			vi.advanceTimersByTime(1000);
+			expect(settles).toEqual([null, 1]);
 		});
 
-		it("does nothing for a short stroke", () => {
+		it("goes back after a short stroke", () => {
 			const { inner, shifts } = setUp();
 			for (const delta of [10, 10, 10]) wheel(inner, delta);
 			vi.advanceTimersByTime(1000);
 			for (const delta of [10, 10, 10]) wheel(inner, delta);
+			vi.advanceTimersByTime(1000);
 			expect(shifts).toEqual([]);
 		});
 

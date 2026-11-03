@@ -13,6 +13,8 @@ export interface DayDataDeps {
 export type DayPart = "tasks" | "events";
 
 interface TasksState {
+	/** The day the tasks were read for: a missing file read for another day is news too, the screen lands on that day. */
+	readonly date: LocalDate | null;
 	readonly day: DayView | null;
 	readonly soon: readonly TaskItem[];
 	readonly inbox: readonly TaskItem[];
@@ -20,7 +22,7 @@ interface TasksState {
 	readonly missing: boolean;
 }
 
-const MISSING: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: true };
+const MISSING = { day: null, soon: [], inbox: [], backlog: [], missing: true } as const;
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -28,7 +30,7 @@ const MISSING: TasksState = { day: null, soon: [], inbox: [], backlog: [], missi
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { day: null, soon: [], inbox: [], backlog: [], missing: false };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -104,12 +106,13 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const tasks = this.deps.tasks;
+		const date = this.deps.date();
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(this.deps.date()), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
-			return { day, soon, inbox, backlog, missing: false };
+			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
+			return { date, day, soon, inbox, backlog, missing: false };
 		} catch (error) {
-			if (error instanceof TasksFileMissingError) return MISSING;
+			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;
 		}
 	}
