@@ -23,6 +23,7 @@ import {
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
+import type { UndoHistory } from "./UndoHistory";
 
 type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
 
@@ -63,6 +64,7 @@ export class TaskServiceImpl implements TaskService {
 		private readonly store: TaskFileStore,
 		private readonly settings: SettingsStore,
 		private readonly clock: Clock,
+		private readonly history: UndoHistory | null = null,
 	) {}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -293,7 +295,7 @@ export class TaskServiceImpl implements TaskService {
 		const doc = this.parse(text, settings);
 		const boundary = this.boundary(settings);
 		if (normalize(doc, boundary.dayOf(this.clock.now()), boundary, ops.usablePresets(settings.groups.presets)) === doc) return;
-		await this.mutate((d) => d);
+		await this.mutate((d) => d, false);
 	}
 
 	async createFile(): Promise<void> {
@@ -312,22 +314,27 @@ export class TaskServiceImpl implements TaskService {
 		};
 	}
 
-	private async mutate(operation: Operation): Promise<void> {
+	/** One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an action). */
+	private async mutate(operation: Operation, record = true): Promise<void> {
 		const settings = this.settings.get();
 		const boundary = this.boundary(settings);
 		const today = boundary.dayOf(this.clock.now());
 		let failure: unknown = null;
+		let change = null as { before: string; after: string } | null;
 		await this.store.write((text) => {
 			try {
 				const presets = ops.usablePresets(settings.groups.presets);
 				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary, presets);
-				return normalize(operation(doc, today, settings, boundary), today, boundary, presets).serialize();
+				const after = normalize(operation(doc, today, settings, boundary), today, boundary, presets).serialize();
+				change = { before: text, after };
+				return after;
 			} catch (e) {
 				failure = e;
 				return text;
 			}
 		});
 		if (failure !== null) throw failure;
+		if (change && record) this.history?.record(change.before, change.after);
 	}
 
 	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate; boundary: DayBoundary }> {
