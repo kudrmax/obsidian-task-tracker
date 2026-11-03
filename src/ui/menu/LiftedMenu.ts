@@ -36,8 +36,9 @@ export abstract class LiftedMenu {
 		return (this.copy = new DOMRect(left, top, size.width, size.height));
 	}
 
+	/** The panel of either menu: the same width and rows. */
 	protected addPanel(cls: string): HTMLElement {
-		return this.overlay.add(el(null, "div", `tc-panel ${cls}`));
+		return this.overlay.add(el(null, "div", `tc-panel is-menu ${cls}`));
 	}
 
 	get raised(): number {

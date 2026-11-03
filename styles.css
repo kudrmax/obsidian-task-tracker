@@ -889,7 +889,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-panel .tc-menu-row.is-apart { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
 .tc-menu-label { flex: 1; min-width: 0; }
 .tc-menu-value { font-size: var(--tc-font-value); color: var(--tc-muted); }
-.tc-panel.is-task { width: var(--tc-menu-w); }
+.tc-panel.is-menu { width: var(--tc-menu-w); }
 .tc-menu-tiles { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-6); }
 .tc-menu-tiles + .tc-menu-tiles, .tc-menu-tiles + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
 .tc-menu-tile-row { display: flex; gap: var(--tc-space-6); }
