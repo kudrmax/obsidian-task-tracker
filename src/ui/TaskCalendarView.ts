@@ -92,7 +92,7 @@ export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
 	/** The day the last minute's tick saw as today: the next day's first tick releases the slots and reads the tasks anew. */
 	private shownToday: LocalDate;
-	/** A minute passed while the view was hidden: it ticks once as soon as it shows again. */
+	/** A minute passed while the view was hidden or a gesture held it: it ticks once as soon as it can. */
 	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
 	private switcher: ColumnSwitch | null = null;
@@ -383,7 +383,10 @@ export class TaskCalendarView extends ItemView {
 		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
 		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
-		this.arbiter.onIdle(() => this.parts.flush());
+		this.arbiter.onIdle(() => {
+			this.parts.flush();
+			this.catchUpTick();
+		});
 		this.registerEvent(this.app.workspace.on("css-change", () => this.parts.request("events")));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
 		this.polling.start();
@@ -393,10 +396,10 @@ export class TaskCalendarView extends ItemView {
 
 	/**
 	 * Once a minute: the now line moves, nothing else is drawn. A day that ended releases its slots (the file is written
-	 * only when a rule fires) and the lists, which depend on today, are drawn and read anew. A hidden view waits.
+	 * only when a rule fires) and the lists, which depend on today, are drawn and read anew. A hidden view, or one a gesture holds, waits.
 	 */
 	private async tick(): Promise<void> {
-		if (document.hidden || !this.contentEl.isShown()) {
+		if (document.hidden || !this.contentEl.isShown() || this.arbiter.busy) {
 			this.missedTick = true;
 			return;
 		}
