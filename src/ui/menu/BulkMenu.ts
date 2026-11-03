@@ -86,16 +86,16 @@ export class BulkMenu {
 
 	private constructor(private readonly context: BulkMenuContext) {
 		this.overlay = new Overlay(() => this.close());
-		for (const card of context.cards) this.lift(card);
+		const rects = context.cards.map((card) => card.getBoundingClientRect());
 		this.anchor = this.besideList(context.source);
+		context.cards.forEach((card, i) => this.lift(card, rects[i]));
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task is-bulk"), true);
 		this.showMenu();
 		this.overlay.show();
 	}
 
-	/** A copy of a picked card over the blur, where the card stands; cards out of sight have none. */
-	private lift(card: HTMLElement): void {
-		const rect = card.getBoundingClientRect();
+	/** A copy of a picked card over the blur, at `rect`, where the card stands, read before any copy; cards out of sight have none. */
+	private lift(card: HTMLElement, rect: DOMRect): void {
 		if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
 		const item = this.context.items[this.context.cards.indexOf(card)];
 		const copy = this.overlay.add(el(null, "div", "tc-lifted is-selected"), true);

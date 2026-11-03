@@ -66,9 +66,13 @@ export class GroupDrag {
 		for (const node of [head, ...cards]) node.classList.add(FOLDED);
 		const mark = el(null, "div", "tc-group-drop");
 		let slot = lifted;
+		/** The slot the mark was last put at: the finger moving within one slot leaves it be. */
+		let marked: number | null = null;
 		const moveTo = (x: number, y: number) => {
 			float.style.transform = `translate3d(${x - grab.dx}px, ${y - grab.dy}px, 0)`;
 			slot = nearestSlot(places, y);
+			if (slot === marked) return;
+			marked = slot;
 			if (liftedPlace(names, lifted, slot) === null) mark.remove();
 			else if (slot < heads.length) heads[slot].before(mark);
 			else taskList.el.appendChild(mark);
