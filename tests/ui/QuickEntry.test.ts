@@ -211,6 +211,37 @@ describe("QuickEntry", () => {
 		expect(tasks.drawnNext.slice(after)).not.toContain(true);
 	});
 
+	it("typing does not read the cards again", () => {
+		const tasks = new FakeTasks(["A", ["A0", 1], "B"]);
+		let walks = 0;
+		const slice = tasks.cards.slice.bind(tasks.cards);
+		Object.assign(tasks.cards, {
+			slice: (...args: [number?, number?]) => {
+				walks++;
+				return slice(...args);
+			},
+		});
+		const entry = tasks.entry();
+		entry.open(at(2, 1));
+		walks = 0;
+		for (const text of ["a", "ab", "abc", "abcd", "abcde", "p1 abcde", "x", "xy", "xyz", "xyzw"]) entry.type(text);
+		entry.setPriority("!!");
+		expect(entry.state).toMatchObject({ canIndent: true, canOutdent: true });
+		expect(walks).toBe(0);
+		entry.indent(-1);
+		expect(walks).toBeGreaterThan(0);
+	});
+
+	it("what the field may do follows cards drawn anew", () => {
+		const tasks = new FakeTasks(["A", ["A0", 1]]);
+		const entry = tasks.entry();
+		entry.open(at(2, 1));
+		entry.type("x");
+		expect(entry.state).toMatchObject({ canOutdent: true });
+		tasks.cards = [card("A"), card("A0", 1), card("A1", 1)];
+		expect(entry.state).toMatchObject({ canOutdent: false });
+	});
+
 	it("queues rapid enters in order", async () => {
 		const tasks = new FakeTasks(["A", "B", "C"]);
 		const gate = deferred();
