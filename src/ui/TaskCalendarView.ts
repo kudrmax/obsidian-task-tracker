@@ -163,7 +163,8 @@ export class TaskCalendarView extends ItemView {
 		this.polling = new CalendarPolling({
 			refresh: () => this.data.calendars(),
 			intervalMs: () => this.settings.google.refreshSeconds * SECOND_MS,
-			hidden: () => document.hidden,
+			hidden: () => document.hidden || !this.contentEl.isShown(),
+			now: () => Date.now(),
 			timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) },
 		});
 		this.groupDrag = new GroupDrag({
@@ -397,12 +398,13 @@ export class TaskCalendarView extends ItemView {
 			this.deps.calendars.onChange(() => void this.data.calendars()),
 			this.deps.settings.onChange(() => this.onSettings()),
 		);
-		this.registerDomEvent(window, "focus", () => void this.polling.refresh());
+		this.registerDomEvent(window, "focus", () => this.polling.wake());
 		this.registerDomEvent(document, "visibilitychange", () => {
 			if (document.hidden) return;
-			void this.polling.refresh();
+			this.polling.wake();
 			this.catchUpTick();
 		});
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.polling.catchUp()));
 		this.registerDomEvent(root, "touchmove", (e) => {
 			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
 			e.stopPropagation();
@@ -461,6 +463,7 @@ export class TaskCalendarView extends ItemView {
 		this.fitListWidth();
 		this.quick?.reveal();
 		this.catchUpTick();
+		this.polling.catchUp();
 	}
 
 	private get settings() {

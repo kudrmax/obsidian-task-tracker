@@ -30,11 +30,13 @@ function setup(seconds = 60) {
 	const timers = new FakeTimers();
 	let interval = seconds * 1000;
 	let hidden = false;
+	let now = 1_000_000;
 	const answers: (() => void)[] = [];
 	const polling = new CalendarPolling({
 		refresh: () => new Promise<void>((resolve) => answers.push(resolve)),
 		intervalMs: () => interval,
 		hidden: () => hidden,
+		now: () => now,
 		timers,
 	});
 	return {
@@ -48,6 +50,7 @@ function setup(seconds = 60) {
 		},
 		setInterval: (s: number) => (interval = s * 1000),
 		setHidden: (h: boolean) => (hidden = h),
+		pass: (ms: number) => (now += ms),
 	};
 }
 
@@ -104,5 +107,87 @@ describe("CalendarPolling", () => {
 		expect(on.timers.delays).toEqual([]);
 		void on.polling.refresh();
 		expect(on.timers.delays).toEqual([]);
+	});
+
+	it("a tick while the view is off screen fetches nothing; coming back fetches once", async () => {
+		const t = setup();
+		t.polling.start();
+		t.setHidden(true);
+		t.timers.fire();
+		expect(t.fetches()).toBe(0);
+		t.setHidden(false);
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(1);
+		await t.answer();
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(1);
+	});
+
+	it("coming back without a missed tick fetches nothing", () => {
+		const t = setup();
+		t.polling.start();
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(0);
+	});
+
+	it("coming back while still off screen fetches nothing and keeps the missed tick", () => {
+		const t = setup();
+		t.polling.start();
+		t.setHidden(true);
+		t.timers.fire();
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(0);
+		t.setHidden(false);
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(1);
+	});
+
+	it("wake right after the view opened fetches nothing", () => {
+		const t = setup();
+		t.polling.start();
+		t.polling.wake();
+		expect(t.fetches()).toBe(0);
+	});
+
+	it("wake fetches once half the interval passed since the last fetch", async () => {
+		const t = setup(60);
+		t.polling.start();
+		t.pass(29_000);
+		t.polling.wake();
+		expect(t.fetches()).toBe(0);
+		t.pass(2_000);
+		t.polling.wake();
+		expect(t.fetches()).toBe(1);
+		await t.answer();
+		t.polling.wake();
+		expect(t.fetches()).toBe(1);
+	});
+
+	it("wake fetches nothing for a view off screen, and coming back catches up", () => {
+		const t = setup();
+		t.polling.start();
+		t.pass(60_000);
+		t.setHidden(true);
+		t.polling.wake();
+		expect(t.fetches()).toBe(0);
+		t.setHidden(false);
+		t.polling.catchUp();
+		expect(t.fetches()).toBe(1);
+	});
+
+	it("Refresh now fetches even right after another fetch", async () => {
+		const t = setup();
+		t.polling.start();
+		void t.polling.refresh();
+		await t.answer();
+		void t.polling.refresh();
+		expect(t.fetches()).toBe(2);
+	});
+
+	it("with the timer off, wake fetches at once", () => {
+		const t = setup(0);
+		t.polling.start();
+		t.polling.wake();
+		expect(t.fetches()).toBe(1);
 	});
 });
