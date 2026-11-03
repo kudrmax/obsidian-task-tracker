@@ -426,6 +426,12 @@ describe("styles.css keeps to its design system", () => {
 });
 
 describe("the code keeps to the design system", () => {
+	it("styles no tc- class the code never writes", () => {
+		const written = code.files.map(({ text }) => text).join("\n");
+		const read = new Set(sheet.rules.flatMap((d) => [...d.selector.matchAll(/\.(tc-[\w-]+)/g)].map(([, name]) => name)));
+		expect([...read].filter((name) => !new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(written))).toEqual([]);
+	});
+
 	it("hides by the plugin's own classes, never by an inline style, and calls the DOM helper by its name", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(of(".task-calendar > .tc-hidden").get("display")).toBe("none");

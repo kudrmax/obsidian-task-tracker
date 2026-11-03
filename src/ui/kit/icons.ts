@@ -2,8 +2,8 @@ const NS = "http://www.w3.org/2000/svg";
 const CIRCLE = "M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z";
 
 export interface IconSpec {
-	/** The stroke, as the board draws it; stroke widths come from the stylesheet. */
-	readonly d: string;
+	/** The stroke, as the board draws it; stroke widths come from the stylesheet. Strokes that cross are drawn one over the other, each its own path. */
+	readonly d: string | readonly string[];
 	/** A part painted solid: the half of In progress, the whole of Done. */
 	readonly fill?: string;
 }
@@ -22,7 +22,7 @@ const DRAWINGS = {
 	outdent: { d: "M21 6H11 M21 12H11 M21 18H11 M7 8l-4 4 4 4" },
 	indent: { d: "M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4" },
 	description: { d: "M4 6h16 M4 12h16 M4 18h10" },
-	plus: { d: "M12 5v14 M5 12h14" },
+	plus: { d: ["M12 5v14", "M5 12h14"] },
 	cross: { d: "M6 6l12 12 M18 6L6 18" },
 	undo: { d: "M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" },
 	progress: { d: CIRCLE, fill: "M12 3a9 9 0 0 1 0 18z" },
@@ -61,7 +61,7 @@ export function icon(name: IconName): SVGSVGElement {
 	svg.setAttribute("stroke-linecap", "round");
 	svg.setAttribute("stroke-linejoin", "round");
 	svg.setAttribute("aria-hidden", "true");
-	path(svg, spec.d);
+	for (const stroke of typeof spec.d === "string" ? [spec.d] : spec.d) path(svg, stroke);
 	if (spec.fill) {
 		const filled = path(svg, spec.fill);
 		filled.setAttribute("fill", "currentColor");

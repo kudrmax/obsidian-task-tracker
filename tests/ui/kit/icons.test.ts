@@ -11,7 +11,8 @@ describe("the icon set", () => {
 			expect(svg.getAttribute("viewBox"), name).toBe("0 0 24 24");
 			expect(svg.getAttribute("aria-hidden"), name).toBe("true");
 			expect(svg.getAttribute("stroke-linejoin"), name).toBe("round");
-			expect(svg.querySelector("path")?.getAttribute("d"), name).toBe(ICONS[name].d);
+			const strokes = [ICONS[name].d].flat();
+			expect([...svg.querySelectorAll("path")].slice(0, strokes.length).map((p) => p.getAttribute("d")), name).toEqual(strokes);
 		}
 	});
 
@@ -20,10 +21,11 @@ describe("the icon set", () => {
 		expect(paths).toHaveLength(2);
 		expect([paths[1].getAttribute("fill"), paths[1].getAttribute("stroke")]).toEqual(["currentColor", "none"]);
 		expect(icon("rename").querySelectorAll("path")).toHaveLength(1);
+		expect(icon("plus").querySelectorAll("path")).toHaveLength(2);
 	});
 
 	it("keeps every drawing once", () => {
-		const drawings = names.map((name) => `${ICONS[name].d}|${ICONS[name].fill ?? ""}`);
+		const drawings = names.map((name) => `${[ICONS[name].d].flat().join(" ")}|${ICONS[name].fill ?? ""}`);
 		expect(drawings.filter((d, i) => drawings.indexOf(d) !== i)).toEqual([]);
 	});
 });

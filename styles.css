@@ -1012,7 +1012,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-ask-title.is-long { -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
 .tc-menu-ask-buttons { display: flex; gap: var(--tc-space-6); }
 .tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; }
-.tc-menu-ask-confirm > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
+.tc-menu-ask-btn > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-band); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
 .tc-panel button.tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-band); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }
