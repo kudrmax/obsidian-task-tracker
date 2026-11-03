@@ -574,6 +574,7 @@ export class TaskCalendarView extends ItemView {
 				onArrive: (mode) => this.arriveAt(mode),
 			});
 		}
+		this.timeline?.stopHolding();
 		const peek = new DayPeek(root, to.date, {
 			tasks: this.deps.tasks,
 			calendars: this.deps.calendars,
@@ -585,7 +586,7 @@ export class TaskCalendarView extends ItemView {
 			grouped: (date) => dayColumn(date, this.today()).sections,
 			ungroupedName: () => this.settings.groups.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
-			timelineScroll: () => this.timeline?.el.scrollTop ?? 0,
+			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
 			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 		});
 		const list: DayLane = {
@@ -999,14 +1000,25 @@ export class TaskCalendarView extends ItemView {
 			this.backlogTitle.textContent = this.settings.sections.backlog;
 			this.backlogList.render();
 		}
+		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
+		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
 			this.scrollToOpen(this.timeline, this.selectedDate);
 		}
 		if (this.landing?.peek.date === this.selectedDate && (this.data.missing || this.data.day?.date === this.selectedDate)) this.landed();
 		this.quick?.rendered();
+	}
+
+	/**
+	 * The day a swipe brought in may end sooner, or have more or fewer rows of all-day events, than the one it replaced:
+	 * the timeline keeps its scroll, moved by as much as the rows push it, so the hours stay where they stood.
+	 */
+	private keepHoursAt(at: { readonly top: number; readonly scroll: number }): void {
+		if (!this.timeline) return;
+		this.timeline.holdScroll(at.scroll + this.timeline.el.getBoundingClientRect().top - at.top);
 	}
 
 	/** Today opens on the now line, another day at the hour the settings name. */

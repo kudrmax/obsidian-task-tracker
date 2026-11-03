@@ -509,3 +509,25 @@ describe("a stretched block while its new time is written (block 3)", () => {
 		expect(length(block(view))).toBe(unstretched);
 	});
 });
+
+describe("a timeline beside another day's", () => {
+	it("stands as the other stands: the same room around the hours and the same scroll", () => {
+		const shown = timeline({ hourPx: 60 });
+		const next = timeline({ hourPx: 60 });
+		(shown as unknown as { setRoom(top: number, bottom: number): void }).setRoom(120, 40);
+		Object.defineProperty(shown.el, "scrollTop", { value: 300, writable: true });
+		next.alignWith(shown);
+		expect(next.canvas.style.getPropertyValue("--tc-room-top")).toBe("120px");
+		expect(next.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("40px");
+		expect(next.el.scrollTop).toBe(300);
+	});
+
+	it("keeps its scroll when its day ends sooner, taking the room under the hours it lacks", () => {
+		const view = timeline({ hourPx: 60 });
+		let top = 0;
+		Object.defineProperty(view.el, "scrollTop", { get: () => top, set: (value: number) => (top = Math.min(value, view.canvas.style.getPropertyValue("--tc-room-bottom") === "50px" ? 400 : 350)) });
+		view.holdScroll(400);
+		expect(view.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("50px");
+		expect(view.el.scrollTop).toBe(400);
+	});
+});
