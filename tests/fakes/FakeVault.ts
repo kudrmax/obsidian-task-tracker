@@ -6,6 +6,8 @@ type FileListener = (file: { path: string }, oldPath?: string) => void;
 export class FakeVault {
 	readonly files = new Map<string, string>();
 	created: string[] = [];
+	reads = 0;
+	cachedReads = 0;
 	private readonly listeners = new Map<EventRef, { name: VaultEvent; callback: FileListener }>();
 
 	getFileByPath(path: string): TFile | null {
@@ -13,6 +15,12 @@ export class FakeVault {
 	}
 
 	async read(file: TFile): Promise<string> {
+		this.reads++;
+		return this.files.get(file.path)!;
+	}
+
+	async cachedRead(file: TFile): Promise<string> {
+		this.cachedReads++;
 		return this.files.get(file.path)!;
 	}
 

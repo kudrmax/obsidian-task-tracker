@@ -56,11 +56,11 @@ afterEach(() => {
 });
 
 describe("DragController.beginNew", () => {
-	it("shows a New task card, lifts nothing and offers no zones", () => {
+	it("carries the plus itself, lifts nothing and offers no zones", () => {
 		const { controller, source, calls } = setup();
 		controller.beginNew(source, down(20, 610), [], vi.fn());
-		expect(document.querySelector(".tc-float.is-new")?.textContent).toBe("New task");
-		expect(document.querySelector(".tc-float.is-new svg")).not.toBeNull();
+		expect(document.querySelector(".tc-float-plus svg")).not.toBeNull();
+		expect(document.querySelector(".tc-float")).toBeNull();
 		expect(calls).not.toContain("dragging");
 	});
 
@@ -69,7 +69,7 @@ describe("DragController.beginNew", () => {
 		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(true);
 		expect(arbiter.busy).toBe(true);
 		expect(controller.beginNew(source, down(20, 610), [], vi.fn())).toBe(false);
-		expect(document.querySelectorAll(".tc-float").length).toBe(1);
+		expect(document.querySelectorAll(".tc-float-plus").length).toBe(1);
 		pointer("pointerup", 20, 610);
 		await vi.waitFor(() => expect(arbiter.busy).toBe(false));
 	});
@@ -81,7 +81,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointermove", 30, 620);
 		pointer("pointerup", 30, 620);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 	});
 
 	it("flies back and says null when cancelled", async () => {
@@ -91,7 +91,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointermove", 150, 300);
 		pointer("pointercancel", 150, 300);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(null));
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 	});
 
 	it("says where the card landed once it has landed on a target", async () => {
@@ -104,7 +104,7 @@ describe("DragController.beginNew", () => {
 		pointer("pointerup", 150, 300);
 		await vi.waitFor(() => expect(onDrop).toHaveBeenCalledWith(result));
 		expect(target.cleared).toBeGreaterThan(0);
-		expect(document.querySelector(".tc-float")).toBeNull();
+		expect(document.querySelector(".tc-float-plus")).toBeNull();
 		expect(arbiter.busy).toBe(false);
 	});
 
@@ -152,5 +152,22 @@ describe("DragController: a long tap on the timeline's free room", () => {
 		expect(target.previewNew).toHaveBeenCalledWith(300);
 		pointer("pointerup", 50, 300);
 		expect(opened).toEqual([{ slot, cleared: 1 }]);
+	});
+
+	it("lets the target go when its finger's lift never arrives: the next finger down frees the screen", () => {
+		vi.useFakeTimers();
+		const target = { previewNew: vi.fn(), clear: vi.fn(), slot: { date: "2026-11-01", start: 600, end: null } };
+		const arbiter = new GestureArbiter();
+		const onNewSlot = vi.fn();
+		const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter, timeline: () => null, newSlot: () => target, onNewSlot } as unknown as DragControllerDeps;
+		const canvas = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).attachCanvas(canvas);
+		canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerId: 1, clientX: 50, clientY: 300, isPrimary: true, button: 0, pointerType: "touch" }));
+		vi.advanceTimersByTime(300);
+		expect(arbiter.busy).toBe(true);
+		document.body.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 2, clientX: 80, clientY: 400, isPrimary: true, button: 0, pointerType: "touch" }));
+		expect(arbiter.busy).toBe(false);
+		expect(target.clear).toHaveBeenCalledTimes(1);
+		expect(onNewSlot).not.toHaveBeenCalled();
 	});
 });

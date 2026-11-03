@@ -1,8 +1,8 @@
 import type { GroupedList, GroupName, TaskItem, TaskKey } from "../../application/contracts";
 import type { LocalDate, Slot } from "../types";
 
-/** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon and Inbox. */
-export type ListColumn = "left" | "soon" | "inbox";
+/** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
+export type ListColumn = "left" | "soon" | "inbox" | "backlog";
 
 /** Where a task that exists is dragged from. */
 export type TaskOrigin = ListColumn | "timeline";
@@ -10,7 +10,7 @@ export type TaskOrigin = ListColumn | "timeline";
 /** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */
 export type DragOrigin = TaskOrigin | "new";
 
-/** Whose sections a column shows: Inbox's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
+/** Whose sections a column shows: Inbox's, Backlog's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
 export interface ColumnSections {
 	readonly list: GroupedList;
 	/** The later day the column shows; null for one of no day or for today. */
@@ -76,6 +76,9 @@ export interface DropTarget {
 /** The card under the finger. */
 export interface Float {
 	moveTo(x: number, y: number): void;
+	/** Settles where the drop puts it. */
+	land(rect: DOMRect): Promise<void>;
+	/** Flies back to where it came from. */
 	flyTo(rect: DOMRect): Promise<void>;
 	remove(): void;
 }

@@ -5,7 +5,7 @@ import { icon } from "../icons";
 import { MENU_ICONS, type MenuIconName, menuIcon } from "./menuIcons";
 
 /** The menu's own icons and the wheel's places, which the quick bar's place tiles wear, and Tomorrow, which a quick move wears. */
-export type PlaceIconName = "inbox" | "soon" | "now" | "calendar" | "tomorrow";
+export type PlaceIconName = "inbox" | "backlog" | "soon" | "now" | "calendar" | "tomorrow";
 export type TileIconName = MenuIconName | PlaceIconName;
 
 function tileIcon(name: TileIconName): SVGSVGElement {

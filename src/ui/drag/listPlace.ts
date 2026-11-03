@@ -57,7 +57,8 @@ export function samePlace(a: ListPlace, b: ListPlace): boolean {
  * shallower than the card below. A header breaks nesting: the first card under it is a task.
  *
  * `held`, the place shown now, keeps the finger until it is more than `hysteresis` px past that place's edge, so at an
- * edge the place does not flip between its two sides; its level still follows the finger.
+ * edge the place does not flip between its two sides; its level still follows the finger. With `nests` false nothing goes
+ * into a card: the finger over one picks the gap nearer it.
  */
 export function placeAt(
 	cards: readonly PlacedCard[],
@@ -68,21 +69,22 @@ export function placeAt(
 	heads: readonly PlacedHead[] = [],
 	held: ListPlace | null = null,
 	hysteresis = 0,
+	nests = true,
 ): ListPlace {
-	const at = (finger: number) => rawPlaceAt(cards, finger, level, shift, room, heads);
+	const at = (finger: number) => rawPlaceAt(cards, finger, level, shift, room, heads, nests);
 	const place = at(y);
 	if (!held || hysteresis <= 0 || samePlace(place, held)) return place;
 	if (!samePlace(at(y - hysteresis), held) && !samePlace(at(y + hysteresis), held)) return place;
 	return held.kind === "into" ? held : fitLevel(cards, { ...held, level: Math.round(level) });
 }
 
-function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shift: number, room: ListPlace | null, heads: readonly PlacedHead[]): ListPlace {
+function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shift: number, room: ListPlace | null, heads: readonly PlacedHead[], nests: boolean): ListPlace {
 	const gap = room?.kind === "gap" ? room : null;
 	const top = (i: number) => cards[i].top + (gap && i >= gap.index ? shift : 0);
 	const headAfterGap = (h: PlacedHead) => gap !== null && (h.firstCard > gap.index || (h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, gap.group)));
 	/** Past this a finger is under the header. The first header with no task outside any section above it takes its whole height: above it is where a card leaves every section. */
 	const headEdge = (h: PlacedHead, i: number) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
-	const into = cards.findIndex((c, i) => y > top(i) + c.height * INTO_EDGE && y < top(i) + c.height * (1 - INTO_EDGE));
+	const into = !nests ? -1 : cards.findIndex((c, i) => y > top(i) + c.height * INTO_EDGE && y < top(i) + c.height * (1 - INTO_EDGE));
 	if (into >= 0) return { kind: "into", index: into };
 	const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
 	let group: GroupName = index > 0 ? cards[index - 1].group : heads.length > 0 ? null : (cards[0]?.group ?? null);

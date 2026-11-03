@@ -11,6 +11,7 @@ import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
 import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 import { FloatingCard } from "./FloatingCard";
+import { PlusFloat } from "./PlusFloat";
 import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
 import type { PickedCard } from "../TaskSelection";
@@ -205,6 +206,7 @@ export class DragController {
 		};
 		const finish = (ev: PointerEvent, open: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
+			lost();
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
@@ -216,6 +218,7 @@ export class DragController {
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);
+		const lost = onLostLift(e.pointerId, () => finish(e, false));
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);
@@ -262,14 +265,14 @@ export class DragController {
 	}
 
 	/**
-	 * The plus taken: a "New task" card follows the finger over the same targets as a task, but no card is lifted. Let go
-	 * off every target, or cancelled, the card flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once the card has landed. False when another gesture holds the screen: nothing starts.
+	 * The plus taken: the plus itself follows the finger over the same targets as a task, but no card is lifted. Let go
+	 * off every target, or cancelled, the plus flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once it has landed. False when another gesture holds the screen: nothing starts.
 	 */
 	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
-		const float = new FloatingCard(null, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day());
+		const float = new PlusFloat({ dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
 		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };
@@ -327,7 +330,9 @@ export class DragController {
 			ev.stopPropagation();
 			end(() => session.cancel());
 		};
+		const lost = onLostLift(e.pointerId, () => end(() => session.cancel()));
 		const detach = () => {
+			lost();
 			document.removeEventListener("keydown", escape, true);
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", up);
@@ -383,4 +388,16 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
+}
+
+/**
+ * iOS sends a finger's lift to the element it touched, and a redraw (a pinch's new hour lines) may have taken that element
+ * away: a finger that comes down alone proves the held one gone, and `lost` ends what it held. Returns the unsubscribe.
+ */
+function onLostLift(pointerId: number, lost: () => void): () => void {
+	const down = (ev: PointerEvent) => {
+		if (ev.isPrimary && ev.pointerId !== pointerId) lost();
+	};
+	document.addEventListener("pointerdown", down, true);
+	return () => document.removeEventListener("pointerdown", down, true);
 }

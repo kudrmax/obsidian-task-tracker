@@ -5,6 +5,8 @@ import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 export interface SectionNamesOf {
 	/** Left out by a reader Inbox means nothing to: the phone's reminders, Inbox tasks having no slot. */
 	readonly inbox?: string;
+	/** Left out by a reader Backlog means nothing to, as Inbox. */
+	readonly backlog?: string;
 	readonly now: string;
 	readonly soon: string;
 	readonly done: string;
@@ -76,7 +78,7 @@ interface Block {
 	readonly end: number;
 }
 
-const SECTION_KEYS: readonly SectionKey[] = ["inbox", "now", "soon", "done"];
+const SECTION_KEYS: readonly SectionKey[] = ["inbox", "backlog", "now", "soon", "done"];
 const LIST_END_RE = /^#{1,2}(\s|$)/;
 const GROUP_HEADING_RE = /^###\s+(.*?)\s*$/;
 const SECTION_HEADING_RE = /^##\s+(.*?)\s*$/;
@@ -97,9 +99,12 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
-		a.children.length === b.children.length &&
-		a.children.every((c, i) => c === b.children[i])
+		sameLines(a.children, b.children)
 	);
+}
+
+function sameLines(a: readonly string[], b: readonly string[]): boolean {
+	return a.length === b.length && a.every((line, i) => line === b[i]);
 }
 
 function contains(entry: TaskEntry, other: TaskEntry): boolean {
@@ -200,6 +205,34 @@ export class TaskDocument {
 		const span = this.spanOf(entry);
 		if (sameTask(entry.task, task)) return this;
 		return this.withLines(this.splice(span.line, span.lineCount, this.linesOf(entry.indent, entry.bullet, task)));
+	}
+
+	/**
+	 * Each entry of this document becomes its task, as `replace` one after another would, in one rewrite. Only the task's
+	 * own line changes unless its description and subtasks do; those rewritten lines may not hold another change.
+	 */
+	replaceAll(changes: readonly (readonly [TaskEntry, Task])[]): TaskDocument {
+		const edits: { line: number; count: number; lines: string[] }[] = [];
+		for (const [entry, task] of changes) {
+			const span = this.spanOf(entry);
+			if (sameTask(entry.task, task)) continue;
+			const own = sameLines(entry.task.children, task.children);
+			edits.push(
+				own
+					? { line: span.line, count: 1, lines: [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)] }
+					: { line: span.line, count: span.lineCount, lines: this.linesOf(entry.indent, entry.bullet, task) },
+			);
+		}
+		if (edits.length === 0) return this;
+		edits.sort((a, b) => b.line - a.line);
+		const lines = [...this.lines];
+		let below = lines.length;
+		for (const edit of edits) {
+			if (edit.line + edit.count > below) throw new Error(`Changes overlap at line ${edit.line + 1}`);
+			lines.splice(edit.line, edit.count, ...edit.lines);
+			below = edit.line;
+		}
+		return this.withLines(lines);
 	}
 
 	removeEntry(entry: TaskEntry): TaskDocument {

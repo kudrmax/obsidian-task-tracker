@@ -1,7 +1,7 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
-import { dayList, inboxList, slottedOn, soonWithoutDate, toItem } from "../domain/queries";
+import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate, toItem } from "../domain/queries";
 import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
@@ -9,6 +9,7 @@ import {
 	StaleTaskError,
 	TasksFileMissingError,
 	type DayView,
+	type EndList,
 	type GroupedList,
 	type GroupName,
 	type GroupPlace,
@@ -24,6 +25,16 @@ import {
 import { EntryTags } from "../domain/EntryTags";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import type { UndoHistory } from "./UndoHistory";
+
+/** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
+interface Normalized {
+	readonly text: string;
+	readonly today: LocalDate;
+	/** What of the settings the document is read and normalized by: another divider or zoom keeps it. */
+	readonly reading: string;
+	readonly doc: TaskDocument;
+	readonly changed: boolean;
+}
 
 type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
 
@@ -46,19 +57,15 @@ function isAncestor(a: TaskKey, b: TaskKey): boolean {
 	return a.section === b.section && a.index === b.index && a.path.length < b.path.length && a.path.every((i, k) => b.path[k] === i);
 }
 
-function allSectionNames(settings: TaskCalendarSettings): readonly string[] {
+function sectionNames(settings: TaskCalendarSettings): readonly string[] {
 	const s = settings.sections;
 	return [s.inbox, s.now, s.soon, s.backlog, s.done];
-}
-
-function managedSectionNames(settings: TaskCalendarSettings): readonly string[] {
-	const s = settings.sections;
-	return [s.inbox, s.now, s.soon, s.done];
 }
 
 export class TaskServiceImpl implements TaskService {
 	private readonly listeners = new Set<() => void>();
 	private unsubscribeStore: (() => void) | null = null;
+	private normalized: Normalized | null = null;
 
 	constructor(
 		private readonly store: TaskFileStore,
@@ -81,6 +88,11 @@ export class TaskServiceImpl implements TaskService {
 	async inboxView(): Promise<readonly TaskItem[]> {
 		const { doc } = await this.readNormalized();
 		return inboxList(doc).map(this.itemOf());
+	}
+
+	async backlogView(): Promise<readonly TaskItem[]> {
+		const { doc } = await this.readNormalized();
+		return backlogList(doc).map(this.itemOf());
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -121,7 +133,7 @@ export class TaskServiceImpl implements TaskService {
 	placementOf(item: TaskItem): Placement {
 		if (item.dueDate === this.boundary(this.settings.get()).dayOf(this.clock.now())) return { kind: "now" };
 		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
-		if (item.key.section === "inbox") return { kind: "inbox" };
+		if (item.key.section === "inbox" || item.key.section === "backlog") return { kind: item.key.section };
 		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
 	}
 
@@ -194,7 +206,7 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today) => ops.postpone(doc, this.entryOf(doc, key), date, today));
 	}
 
-	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
+	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
 		await this.mutate((doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section));
 	}
 
@@ -292,14 +304,13 @@ export class TaskServiceImpl implements TaskService {
 		const text = await this.store.read();
 		if (text === null) return;
 		const settings = this.settings.get();
-		const doc = this.parse(text, settings);
 		const boundary = this.boundary(settings);
-		if (normalize(doc, boundary.dayOf(this.clock.now()), boundary, ops.usablePresets(settings.groups.presets)) === doc) return;
+		if (!this.normalizedOf(text, settings, boundary.dayOf(this.clock.now()), boundary).changed) return;
 		await this.mutate((d) => d, false);
 	}
 
 	async createFile(): Promise<void> {
-		await this.store.create(TaskDocument.empty(allSectionNames(this.settings.get())));
+		await this.store.create(TaskDocument.empty(sectionNames(this.settings.get())));
 	}
 
 	onChange(listener: () => void): () => void {
@@ -320,13 +331,14 @@ export class TaskServiceImpl implements TaskService {
 		const boundary = this.boundary(settings);
 		const today = boundary.dayOf(this.clock.now());
 		let failure: unknown = null;
-		let change = null as { before: string; after: string } | null;
+		let change = null as { before: string; after: string; doc: TaskDocument } | null;
 		await this.store.write((text) => {
 			try {
 				const presets = ops.usablePresets(settings.groups.presets);
-				const doc = normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary, presets);
-				const after = normalize(operation(doc, today, settings, boundary), today, boundary, presets).serialize();
-				change = { before: text, after };
+				const doc = normalize(this.parse(text, settings).ensureSections(sectionNames(settings)), today, boundary, presets);
+				const result = normalize(operation(doc, today, settings, boundary), today, boundary, presets);
+				const after = result.serialize();
+				change = { before: text, after, doc: result };
 				return after;
 			} catch (e) {
 				failure = e;
@@ -334,7 +346,9 @@ export class TaskServiceImpl implements TaskService {
 			}
 		});
 		if (failure !== null) throw failure;
-		if (change && record) this.history?.record(change.before, change.after);
+		if (!change) return;
+		this.normalized = { text: change.after, today, reading: this.readingOf(settings), doc: change.doc, changed: false };
+		if (record) this.history?.record(change.before, change.after);
 	}
 
 	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate; boundary: DayBoundary }> {
@@ -343,14 +357,34 @@ export class TaskServiceImpl implements TaskService {
 		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
 		const boundary = this.boundary(settings);
 		const today = boundary.dayOf(this.clock.now());
-		return { doc: normalize(this.parse(text, settings).ensureSections(managedSectionNames(settings)), today, boundary, ops.usablePresets(settings.groups.presets)), today, boundary };
+		return { doc: this.normalizedOf(text, settings, today, boundary).doc, today, boundary };
+	}
+
+	/** The text parsed and normalized, kept until the text, the day or the settings change. */
+	private normalizedOf(text: string, settings: TaskCalendarSettings, today: LocalDate, boundary: DayBoundary): Normalized {
+		const last = this.normalized;
+		const reading = this.readingOf(settings);
+		if (last && last.text === text && last.today === today && last.reading === reading) return last;
+		const presets = ops.usablePresets(settings.groups.presets);
+		const parsed = this.parse(text, settings);
+		const whole = parsed.ensureSections(sectionNames(settings));
+		const doc = normalize(whole, today, boundary, presets);
+		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
+		this.normalized = { text, today, reading, doc, changed };
+		return this.normalized;
+	}
+
+	private readingOf(settings: TaskCalendarSettings): string {
+		const { sections, groups, dueDateMarker, slotMarker, dayStartHour } = settings;
+		const prefixes = this.levels(settings).map((l) => l.prefix);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, prefixes, dayStartHour]);
 	}
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
 		const s = settings.sections;
 		return TaskDocument.parse(
 			text,
-			{ inbox: s.inbox, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
+			{ inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
 			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
 		);
 	}

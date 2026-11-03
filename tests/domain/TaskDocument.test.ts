@@ -4,7 +4,7 @@ import { TaskDocument, ungroupedIndex } from "../../src/domain/TaskDocument";
 import type { Markers } from "../../src/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
 const ALL = ["Inbox", "Now", "Soon", "Backlog", "Done"];
 const TEXT = `---\ntags: [todo]\n---\n# Список\n\n## Inbox\n- [ ] В инбоксе\n\n## Now\n- [ ] Первая\n- [/] Вторая ⏰ 2026-10-30 14:00-15:00\n  - заметка\n  - [ ] подпункт\n## Soon\n- [ ] Третья 📅 2026-11-03\nПросто текст\n\n## Backlog\n- [ ] Бэклог\n\n## Done\n- [x] Готово\n`;
 
@@ -24,9 +24,10 @@ describe("TaskDocument.parse", () => {
 		expect(parse("## Now\r\n- [ ] A\r\n").serialize()).toBe("## Now\r\n- [ ] A\r\n");
 	});
 
-	it("reads tasks of the four sections only, never Backlog", () => {
+	it("reads tasks of the five sections", () => {
 		const d = parse(TEXT);
 		expect(d.tasks("inbox").map((e) => e.task.text)).toEqual(["В инбоксе"]);
+		expect(d.tasks("backlog").map((e) => e.task.text)).toEqual(["Бэклог"]);
 		expect(d.tasks("now").map((e) => e.task.text)).toEqual(["Первая", "Вторая"]);
 		expect(d.tasks("now")[1].task.children).toEqual(["  - заметка", "  - [ ] подпункт"]);
 		expect(d.tasks("soon").map((e) => e.task.text)).toEqual(["Третья"]);
@@ -36,7 +37,7 @@ describe("TaskDocument.parse", () => {
 	it("gives every entry its section, index and raw line", () => {
 		const d = parse(TEXT);
 		expect(d.tasks("now")[1]).toMatchObject({ section: "now", index: 1, raw: "- [/] Вторая ⏰ 2026-10-30 14:00-15:00", indent: "", bullet: "-" });
-		expect(d.allTasks().map((e) => [e.section, e.index])).toEqual([["inbox", 0], ["now", 0], ["now", 1], ["soon", 0], ["done", 0]]);
+		expect(d.allTasks().map((e) => [e.section, e.index])).toEqual([["inbox", 0], ["backlog", 0], ["now", 0], ["now", 1], ["soon", 0], ["done", 0]]);
 	});
 
 	it("knows which sections exist", () => {
@@ -277,5 +278,72 @@ describe("group blocks", () => {
 		expect(d.deleteGroup("now", 1).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] B\n### Z\n\n## Soon\n");
 		expect(d.deleteGroup("now", 3).serialize()).toBe("## Now\n- [ ] A\n### X\n\n### Y\n- [ ] B\n\n## Soon\n");
 		expect(() => d.deleteGroup("now", 2)).toThrow();
+	});
+});
+
+describe("TaskDocument.replaceAll", () => {
+	const TEXT3 = "## Now\n- [ ] A\n- [/] B 📅 2026-11-03\n\tОписание\n\t- [ ] B1\n\t\t- [ ] B11\n- [ ] C ⏰ 2026-11-03 10:00\n\n## Done\n- [x] D\n";
+
+	it("rewrites the tasks as one replace after another would", () => {
+		const doc = parse(TEXT3);
+		const [a, b, c] = doc.tasks("now");
+		const changes = [
+			[c, { ...c.task, text: "C2", slot: null }],
+			[a, { ...a.task, status: "done", statusChar: "x" }],
+			[b, { ...b.task, text: "B2", dueDate: null, children: ["\tДругое", "\tописание", ...b.task.children.slice(1)] }],
+		] as const;
+		let sequential = doc;
+		for (const [entry, next] of changes) sequential = sequential.replace(sequential.find(entry.section, entry.index, entry.path)!, next);
+		expect(doc.replaceAll(changes).serialize()).toBe(sequential.serialize());
+		expect(doc.replaceAll(changes).serialize()).toBe(
+			"## Now\n- [x] A\n- [/] B2\n\tДругое\n\tописание\n\t- [ ] B1\n\t\t- [ ] B11\n- [ ] C2\n\n## Done\n- [x] D\n",
+		);
+	});
+
+	it("rewrites a task and its subtasks together when only their own lines change", () => {
+		const doc = parse(TEXT3);
+		const b = doc.tasks("now")[1];
+		const b1 = b.subtasks[0];
+		const b11 = b1.subtasks[0];
+		const changes = [
+			[b11, { ...b11.task, text: "B11!" }],
+			[b, { ...b.task, text: "B!" }],
+			[b1, { ...b1.task, text: "B1!" }],
+		] as const;
+		let sequential = doc;
+		for (const [entry, next] of changes) {
+			const fresh = sequential.find(entry.section, entry.index, entry.path)!;
+			sequential = sequential.replace(fresh, { ...fresh.task, text: next.text });
+		}
+		expect(doc.replaceAll(changes).serialize()).toBe(sequential.serialize());
+		expect(doc.replaceAll(changes).serialize()).toBe("## Now\n- [ ] A\n- [/] B! 📅 2026-11-03\n\tОписание\n\t- [ ] B1!\n\t\t- [ ] B11!\n- [ ] C ⏰ 2026-11-03 10:00\n\n## Done\n- [x] D\n");
+	});
+
+	it("refuses to rewrite the lines under a task along with one of its subtasks", () => {
+		const doc = parse(TEXT3);
+		const b = doc.tasks("now")[1];
+		const b1 = b.subtasks[0];
+		expect(() => doc.replaceAll([[b, { ...b.task, children: [] }], [b1, { ...b1.task, text: "B1!" }]])).toThrow(/overlap/);
+		expect(() => doc.replaceAll([[b1, { ...b1.task, text: "X" }], [b1, { ...b1.task, text: "Y" }]])).toThrow(/overlap/);
+	});
+
+	it("keeps the file's line ends", () => {
+		const doc = parse("## Now\r\n- [ ] A\r\n- [ ] B");
+		const [a, b] = doc.tasks("now");
+		expect(doc.replaceAll([[a, { ...a.task, text: "A2" }], [b, { ...b.task, text: "B2" }]]).serialize()).toBe("## Now\r\n- [ ] A2\r\n- [ ] B2");
+	});
+
+	it("gives back the document itself when nothing changes", () => {
+		const doc = parse(TEXT3);
+		const a = doc.tasks("now")[0];
+		expect(doc.replaceAll([])).toBe(doc);
+		expect(doc.replaceAll([[a, { ...a.task }]])).toBe(doc);
+	});
+
+	it("refuses a task of another document", () => {
+		const doc = parse(TEXT3);
+		const a = doc.tasks("now")[0];
+		const other = doc.replace(a, { ...a.task, text: "A2" });
+		expect(() => other.replaceAll([[a, { ...a.task, text: "A3" }]])).toThrow(/Task not found/);
 	});
 });

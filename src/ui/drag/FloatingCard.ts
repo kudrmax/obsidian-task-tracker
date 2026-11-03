@@ -1,8 +1,7 @@
 import type { TaskItem } from "../../application/contracts";
 import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
-import { el, px } from "../dom";
-import { icon } from "../icons";
+import { px } from "../dom";
 import { fillCard } from "../TaskCard";
 import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
@@ -20,8 +19,7 @@ const STACK_DEPTH = 2;
 /**
  * The copy of the card that follows the finger: fixed over everything, moved by transform alone, stretched to the right
  * to show its whole title. A task with subtasks carries them as a stack of layers under it, and so do several picked
- * tasks carried at once, with their number on the top card's corner. A new task, not written yet, is a plus and "New
- * task" in its place.
+ * tasks carried at once, with their number on the top card's corner.
  */
 export class FloatingCard implements Float {
 	readonly el: HTMLElement;
@@ -29,17 +27,10 @@ export class FloatingCard implements Float {
 	private count: HTMLElement | null = null;
 
 	/** `count`: how many tasks are carried, this one among them. */
-	constructor(item: TaskItem | null, private readonly grab: Grab, day: LocalDate, count = 1) {
+	constructor(item: TaskItem, private readonly grab: Grab, day: LocalDate, count = 1) {
 		this.el = document.createElement("div");
-		this.el.className = item ? "tc-float" : "tc-float is-new";
-		if (item) this.showTask(item, day, count);
-		else this.showNew();
-	}
-
-	private showNew(): void {
-		this.el.appendChild(icon("plus"));
-		el(this.el, "span", "", "New task");
-		document.body.appendChild(this.el);
+		this.el.className = "tc-float";
+		this.showTask(item, day, count);
 	}
 
 	private showTask(item: TaskItem, day: LocalDate, count: number): void {
@@ -70,6 +61,10 @@ export class FloatingCard implements Float {
 		this.el.style.transform = transform;
 		for (const layer of this.stack) layer.style.transform = transform;
 		if (this.count) this.count.style.transform = transform;
+	}
+
+	land(rect: DOMRect): Promise<void> {
+		return this.flyTo(rect);
 	}
 
 	/** Slides to the rect, taking its size and the look of a card at rest, its title fading at the edge again. */

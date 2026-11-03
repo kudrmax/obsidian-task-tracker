@@ -153,13 +153,13 @@ describe("the priority panel", () => {
 });
 
 describe("the place panel", () => {
-	it("has Inbox, Soon, Now and Date in a row, the current place on without a cross", () => {
+	it("has Inbox, Backlog, Soon, Now and Date in a row, the current place on without a cross", () => {
 		const { parent } = setup();
 		q(parent, ".tc-bar-place").click();
 		const all = tiles(parent);
-		expect(all.map((t) => t.querySelector(".tc-menu-tile-label")?.textContent)).toEqual(["Inbox", "Soon", "Now", "Date"]);
-		expect(all.map((t) => t.classList.contains("is-on"))).toEqual([false, true, false, false]);
-		expect(all.map((t) => t.dataset.priority)).toEqual([undefined, undefined, undefined, undefined]);
+		expect(all.map((t) => t.querySelector(".tc-menu-tile-label")?.textContent)).toEqual(["Inbox", "Backlog", "Soon", "Now", "Date"]);
+		expect(all.map((t) => t.classList.contains("is-on"))).toEqual([false, false, true, false, false]);
+		expect(all.map((t) => t.dataset.priority)).toEqual([undefined, undefined, undefined, undefined, undefined]);
 		expect(parent.querySelector(".tc-menu-badge")).toBeNull();
 		expect(parent.querySelectorAll(".tc-menu-tile-row")).toHaveLength(1);
 	});
@@ -167,7 +167,7 @@ describe("the place panel", () => {
 	it("puts Date on for a day", () => {
 		const { parent } = setup({ place: { kind: "date", date: "2026-11-05" } });
 		q(parent, ".tc-bar-place").click();
-		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([false, false, false, true]);
+		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([false, false, false, false, true]);
 	});
 
 	it("reports another place and closes", () => {
@@ -181,7 +181,7 @@ describe("the place panel", () => {
 	it("only closes on a tap on the current place", () => {
 		const { parent, places } = setup();
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[1].click();
+		tiles(parent)[2].click();
 		expect(places).toEqual([]);
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
@@ -190,7 +190,7 @@ describe("the place panel", () => {
 		const { parent } = setup();
 		q(parent, ".tc-bar-place").click();
 		const panel = q<HTMLElement>(parent, ".tc-quick-panel");
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		expect(parent.querySelectorAll(".tc-quick-panel")).toHaveLength(1);
 		expect(panel.classList.contains("is-picker")).toBe(true);
 		expect(panel.querySelector(".tc-menu-tile")).toBeNull();
@@ -200,7 +200,7 @@ describe("the place panel", () => {
 	it("reports a picked day as a date and closes", () => {
 		const { parent, places } = setup();
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		const days = [...parent.querySelectorAll<HTMLButtonElement>(".tc-day")];
 		days.find((d) => d.textContent === "5" && !d.classList.contains("is-other"))!.click();
 		expect(places).toEqual([{ kind: "date", date: "2026-11-05" }]);
@@ -210,7 +210,7 @@ describe("the place panel", () => {
 	it("reports today as Now", () => {
 		const { parent, places } = setup({ place: { kind: "inbox" } });
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		q(parent, ".tc-day.is-today").click();
 		expect(places).toEqual([{ kind: "now" }]);
 	});
@@ -218,7 +218,7 @@ describe("the place panel", () => {
 	it("marks the field's day in the picker and starts at its month", () => {
 		const { parent } = setup({ place: { kind: "date", date: "2026-12-24" } });
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		expect(q(parent, ".tc-picker-title").textContent).toBe("December 2026");
 		expect(q(parent, ".tc-day.is-selected").textContent).toBe("24");
 	});
@@ -226,7 +226,7 @@ describe("the place panel", () => {
 	it("closes without a report on the field's own day", () => {
 		const { parent, places } = setup({ place: { kind: "date", date: "2026-11-05" } });
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		q(parent, ".tc-day.is-selected").click();
 		expect(places).toEqual([]);
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
@@ -239,7 +239,7 @@ describe("the panels' opening and closing", () => {
 		q(parent, ".tc-bar-flag").click();
 		q(parent, ".tc-bar-place").click();
 		expect(parent.querySelectorAll(".tc-quick-panel")).toHaveLength(1);
-		expect(parent.querySelectorAll(".tc-menu-tile")).toHaveLength(4);
+		expect(parent.querySelectorAll(".tc-menu-tile")).toHaveLength(5);
 		q(parent, ".tc-bar-flag").click();
 		expect(parent.querySelectorAll(".tc-menu-tile")).toHaveLength(3);
 	});
@@ -294,7 +294,7 @@ describe("the panels' opening and closing", () => {
 	it("leaves the month picker alone when the field's state is shown again", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-place").click();
-		tiles(parent)[3].click();
+		tiles(parent)[4].click();
 		bar.show(STATE);
 		expect(parent.querySelector(".tc-picker")).not.toBeNull();
 	});

@@ -1,4 +1,4 @@
-import { type DayView, type NewTaskPlace, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type EndList, type NewTaskPlace, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
@@ -22,7 +22,7 @@ const two = (n: number) => String(n).padStart(2, "0");
 const time = (m: number) => `${two(Math.floor(m / 60))}:${two(m % 60)}`;
 const localDateOf = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
-/** The board's tasks, in memory: the same seven on the list, four on the timeline, eight in Soon, six in Inbox. */
+/** The board's tasks, in memory: the same seven on the list, four on the timeline, eight in Soon, six in Inbox, four in Backlog. */
 export class DemoTaskService implements TaskService {
 	private sections: Record<SectionKey, DemoTask[]> = {
 		inbox: [
@@ -32,6 +32,12 @@ export class DemoTaskService implements TaskService {
 			task("Посмотреть «Дюну 2»"),
 			task("Почитать про налоговое резидентство"),
 			task("Сменить тариф мобильной связи"),
+		],
+		backlog: [
+			task("Выучить японский"),
+			task("Сделать сайт-портфолио"),
+			task("Съездить в Грузию"),
+			task("Пройти курс по Rust"),
 		],
 		now: [
 			task("Созвониться с врачом"),
@@ -135,6 +141,10 @@ export class DemoTaskService implements TaskService {
 		return this.items("inbox");
 	}
 
+	async backlogView(): Promise<readonly TaskItem[]> {
+		return this.items("backlog");
+	}
+
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */
 	async createSubtask(): Promise<void> {}
 
@@ -177,7 +187,7 @@ export class DemoTaskService implements TaskService {
 	placementOf(item: TaskItem): Placement {
 		if (item.dueDate === this.today()) return { kind: "now" };
 		if (item.dueDate) return { kind: "date", date: item.dueDate };
-		if (item.key.section === "inbox") return { kind: "inbox" };
+		if (item.key.section === "inbox" || item.key.section === "backlog") return { kind: item.key.section };
 		return { kind: item.key.section === "soon" ? "soon" : "now" };
 	}
 
@@ -187,7 +197,7 @@ export class DemoTaskService implements TaskService {
 			this.sections[placement.date <= this.today() ? "now" : "soon"].push(t);
 		} else {
 			t.dueDate = placement.kind === "now" ? this.today() : null;
-			if (placement.kind === "inbox") t.slot = null;
+			if (placement.kind === "inbox" || placement.kind === "backlog") t.slot = null;
 			this.sections[placement.kind].push(t);
 		}
 	}
@@ -306,9 +316,9 @@ export class DemoTaskService implements TaskService {
 	async removeGroup(): Promise<void> {}
 	async applyAll(): Promise<void> {}
 
-	async moveToEnd(key: TaskKey, section: "inbox" | "soon"): Promise<void> {
+	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
 		const t = this.take(key);
-		if (section === "inbox") {
+		if (section !== "soon") {
 			t.dueDate = null;
 			t.slot = null;
 		}

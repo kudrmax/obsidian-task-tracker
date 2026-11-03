@@ -1,3 +1,4 @@
+import type { Task } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
 /** Characters of Unicode's private use area: no text a person writes carries them. */
@@ -13,11 +14,12 @@ export class EntryTags {
 
 	/** Tags `entries` in their order: the n-th is found again as `find(doc, n)`. */
 	static tag(doc: TaskDocument, entries: readonly TaskEntry[]): { readonly doc: TaskDocument; readonly tags: EntryTags } {
-		let tagged = doc;
-		entries.forEach((entry, n) => {
-			const same = tagged.find(entry.section, entry.index, entry.path)!;
-			tagged = tagged.replace(same, { ...same.task, text: same.task.text + markOf(n) });
-		});
+		const tagged = doc.replaceAll(
+			entries.map((entry, n) => {
+				const same = doc.find(entry.section, entry.index, entry.path)!;
+				return [same, { ...same.task, text: same.task.text + markOf(n) }] as const;
+			}),
+		);
 		return { doc: tagged, tags: new EntryTags(entries.length) };
 	}
 
@@ -36,12 +38,12 @@ export class EntryTags {
 	}
 
 	untag(doc: TaskDocument): TaskDocument {
-		let clean = doc;
+		const changes: (readonly [TaskEntry, Task])[] = [];
 		for (let n = 0; n < this.count; n++) {
-			const entry = this.find(clean, n);
-			if (entry) clean = clean.replace(entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) });
+			const entry = this.find(doc, n);
+			if (entry) changes.push([entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) }]);
 		}
-		return clean;
+		return doc.replaceAll(changes);
 	}
 }
 
