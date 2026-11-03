@@ -239,6 +239,22 @@ export interface TaskService {
 	onChange(listener: () => void): () => void;
 }
 
+/** What a step back or forward did: changed the file, found nothing to do, or found its lines edited since and left the file as it is. */
+export type UndoOutcome = "done" | "nothing" | "conflict";
+
+/**
+ * The plugin's own changes of the tasks file, one step per action, taken back and done again. Edits by hand and through
+ * Sync are not steps; taking a step back leaves them as they are. The steps live while the plugin does.
+ */
+export interface UndoService {
+	undo(): Promise<UndoOutcome>;
+	redo(): Promise<UndoOutcome>;
+	canUndo(): boolean;
+	canRedo(): boolean;
+	/** Fires when a step is added, taken back or done again. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
+}
+
 export type CalendarSource = "google" | "work";
 
 export interface CalendarEvent {

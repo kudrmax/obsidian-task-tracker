@@ -1,5 +1,5 @@
-import { ItemView, MarkdownView, Notice, Platform, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
+import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
+import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -40,6 +40,7 @@ import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { NewTaskButton } from "./NewTaskButton";
+import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
@@ -70,6 +71,8 @@ function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
+	/** The plugin's own changes of the tasks file, taken back by the corner button and Cmd+Z. */
+	readonly undo: UndoService;
 	readonly calendars: CalendarService;
 	readonly settings: SettingsStore;
 	readonly clock: Clock;
@@ -354,6 +357,11 @@ export class TaskCalendarView extends ItemView {
 			render: () => this.render(),
 			onError: (error) => this.reportFailure(error),
 		});
+		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
+		this.unsubscribe.push(() => undo.destroy());
+		this.scope = new Scope(this.app.scope);
+		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
+		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
@@ -493,6 +501,21 @@ export class TaskCalendarView extends ItemView {
 			new Notice(error.message);
 		}
 		await this.data.tasks();
+	}
+
+	/** Cmd+Z and Cmd+Shift+Z in the calendar; in a field they stay the field's, taking typing back. */
+	private undoKey(step: "undo" | "redo"): boolean {
+		const focus = this.contentEl.ownerDocument.activeElement;
+		if (focus instanceof HTMLElement && (focus.isContentEditable || focus.matches("input, textarea"))) return true;
+		void this.undoStep(step);
+		return false;
+	}
+
+	/** A step back or forward; one whose lines were edited since by hand or through Sync is said and dropped. */
+	private async undoStep(step: "undo" | "redo"): Promise<void> {
+		const outcome = await (step === "undo" ? this.deps.undo.undo() : this.deps.undo.redo());
+		if (outcome === "conflict") new Notice(step === "undo" ? "Can’t undo: the tasks file changed" : "Can’t redo: the tasks file changed");
+		if (outcome !== "nothing") await this.data.tasks();
 	}
 
 	/** A write the screen did not wait for failed: said as any failed change is, and the lists show the file as it is. */

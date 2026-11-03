@@ -49,6 +49,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => window.open(url), runScript: runAppleScript });
 		return {
 			tasks: services.tasks,
+			undo: services.undo,
 			calendars: services.calendars,
 			settings: this,
 			clock,

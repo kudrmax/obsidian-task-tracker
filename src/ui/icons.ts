@@ -34,6 +34,7 @@ const ICONS = {
 		],
 	},
 	cancel: { fill: false, join: false, shapes: [["path", { d: "M6 6l12 12 M18 6L6 18" }]] },
+	undo: { fill: false, join: true, shapes: [["path", { d: "M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" }]] },
 } satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof ICONS;

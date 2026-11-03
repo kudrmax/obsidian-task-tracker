@@ -10,12 +10,14 @@ import { WorkCalendarExportScript } from "../infrastructure/WorkCalendarExportSc
 import { WorkCalendarFileSource } from "../infrastructure/WorkCalendarFileSource";
 import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "../infrastructure/WorkCalendarShortcut";
 import { CalendarServiceImpl } from "./CalendarServiceImpl";
-import type { CalendarService, TaskService } from "./contracts";
+import type { CalendarService, TaskService, UndoService } from "./contracts";
 import { systemClock, type Clock, type SettingsStore } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
+import { UndoHistory } from "./UndoHistory";
 
 export interface Services {
 	readonly tasks: TaskService;
+	readonly undo: UndoService;
 	readonly calendars: CalendarService;
 	readonly google: GoogleAuth;
 	readonly googleSource: GoogleCalendarSource;
@@ -32,12 +34,14 @@ export interface ServicesHost {
 
 export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock): Services {
 	const store = new VaultTaskFileStore(app, () => settings.get().tasksFile);
+	const history = new UndoHistory(store);
 	const login = new GoogleRedirectLogin(browserLoginDeps((fields) => requestToken(settings.get().google.clientId, settings.get().google.clientSecret, fields)));
 	const google = new GoogleAuth(settings, login);
 	const googleSource = new GoogleCalendarSource(google, settings);
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
 	return {
-		tasks: new TaskServiceImpl(store, settings, clock),
+		tasks: new TaskServiceImpl(store, settings, clock, history),
+		undo: history,
 		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app)),
 		google,
 		googleSource,
