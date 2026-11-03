@@ -41,7 +41,7 @@ describe("renderTaskCard", () => {
 		expect(card.parentElement).toBe(parent);
 		expect(card.classList.contains("tc-card")).toBe(true);
 		expect(card.querySelector(".tc-card-title")?.textContent).toBe("Купить билеты в Белград");
-		expect(card.querySelector(".tc-strip")).toBeNull();
+		expect(card.querySelector(".tc-progress-dot")).toBeNull();
 		expect(card.querySelector(".tc-due")).toBeNull();
 	});
 
@@ -57,8 +57,8 @@ describe("renderTaskCard", () => {
 
 	it("marks a task in progress with the strip", () => {
 		const card = renderTaskCard(document.createElement("div"), item({ status: "inProgress" }), { day: null });
-		expect(card.querySelector(".tc-strip")).not.toBeNull();
-		expect(card.firstElementChild?.classList.contains("tc-strip")).toBe(true);
+		expect(card.querySelector(".tc-progress-dot")).not.toBeNull();
+		expect(card.firstElementChild?.classList.contains("tc-progress-dot")).toBe(true);
 	});
 
 	it("shows the due date as the day over the month, in capitals", () => {

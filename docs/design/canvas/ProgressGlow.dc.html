@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача в процессе: градиент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 674px; height: 1370px; display: flex; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px; line-height: 1.5;">
+<sc-for list="{{columns}}" as="c" hint-placeholder-count="2">
+<div style="width: {{c.panel}}px; flex-shrink: 0; box-sizing: border-box; padding: 24px {{c.padEnd}}px 24px {{c.padStart}}px; background: {{c.ground}}; color: {{c.text}}; display: flex; flex-direction: column; gap: 16px;">
+<sc-for list="{{c.blocks}}" as="b" hint-placeholder-count="2">
+<div style="font-size: 13px; line-height: 16px; font-weight: 600; color: #8E8E93; margin-top: {{b.top}}px;">{{b.label}}</div>
+<div style="width: {{c.width}}px; display: flex; flex-direction: column; gap: {{gap}}px;">
+<sc-for list="{{b.rows}}" as="r" hint-placeholder-count="15">
+<sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}">
+<div style="height: 26px; margin-top: {{r.headTop}}px; margin-bottom: -{{gap}}px; padding: 0 4px 0 14px; display: flex; align-items: flex-end; font-size: 13px; line-height: 20px; font-weight: 600; color: {{r.headInk}}; white-space: nowrap;">{{r.title}}</div>
+</sc-if>
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; flex-shrink: 0; margin-left: {{r.indent}}px; margin-top: {{r.top}}px; height: {{cardH}}px; box-sizing: border-box; border-radius: {{radius}}px; background: {{r.bg}}; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-for list="{{r.passes}}" as="p" hint-placeholder-count="0">
+<span style="position: absolute; left: {{p.left}}px; top: -{{rise}}px; width: 1.5px; height: calc(100% + {{rise}}px); background: {{c.branch}};"></span>
+</sc-for>
+<sc-if value="{{r.hasBranch}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: -10.75px; top: -{{rise}}px; width: 10.75px; height: {{r.branchH}}; box-sizing: border-box; border-left: 1.5px solid {{c.branch}}; border-bottom: {{r.branchBottom}}; border-bottom-left-radius: {{r.branchRadius}}px;"></span>
+<sc-if value="{{r.branchTick}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: -10.75px; top: {{tickTop}}px; width: 10.75px; height: 1.5px; background: {{c.branch}};"></span>
+</sc-if>
+</sc-if>
+<sc-if value="{{r.glow}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; inset: 0; border-radius: {{radius}}px; pointer-events: none; background: {{r.glowBg}};"></span>
+</sc-if>
+<sc-if value="{{r.dot}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; left: {{dotLeft}}px; top: calc(50% - {{dotHalf}}px); width: {{dotSize}}px; height: {{dotSize}}px; border-radius: 50%; background: {{r.dotInk}};"></span>
+</sc-if>
+<div style="position: relative; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; line-height: 18px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}">
+<span style="position: relative; flex-shrink: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: #8E8E93; font-variant-numeric: tabular-nums;">{{r.count}}</span>
+</sc-if>
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}">
+<span style="position: relative; width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.dueInk}}; font-variant-numeric: tabular-nums;">31</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: #8E8E93; letter-spacing: 0.3px;">ОКТ</span></span>
+</sc-if>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","default":"glow","options":["glow","dot"]},"glowInk":{"editor":"enum","default":"text","options":["text","meta"],"section":"Градиент"},"glowStrength":{"editor":"range","default":9,"min":3,"max":60,"step":1,"unit":"%","section":"Градиент"},"glowLen":{"editor":"range","default":170,"min":0,"max":400,"step":10,"unit":"px","section":"Градиент"},"dotSize":{"editor":"range","default":5,"min":3,"max":8,"step":0.5,"unit":"px","section":"Точка"},"dotLeft":{"editor":"range","default":3.5,"min":2,"max":7,"step":0.5,"unit":"px","section":"Точка"},"dotCentered":{"editor":"boolean","default":false,"section":"Точка"},"dotColor":{"editor":"enum","default":"meta","options":["meta","priority"],"section":"Точка"},"dotPlain":{"editor":"enum","default":"muted","options":["muted","text"],"section":"Точка"},"$preview":{"width":674,"height":1370}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const mode = this.props.mode ?? 'glow';
+    const glowInk = this.props.glowInk ?? 'text';
+    const glowStrength = Number(this.props.glowStrength ?? 9);
+    const glowLen = Number(this.props.glowLen ?? 170);
+    const dotSize = Number(this.props.dotSize ?? 5);
+    const dotCentered = this.props.dotCentered === true || this.props.dotCentered === 'true';
+    const dotColor = this.props.dotColor ?? 'meta';
+    const dotPlain = this.props.dotPlain ?? 'muted';
+    const dotLeft = dotCentered ? 7 - Number(this.props.dotSize ?? 5) / 2 : Number(this.props.dotLeft ?? 3.5);
+    const cardH = 35;
+    const gap = 2;
+    const rise = gap + 2;
+
+    const themes = {
+      light: {
+        panel: 455, padStart: 40, padEnd: 40, width: 375,
+        ground: '#FFFFFF', text: '#000000', card: '#F2F2F2', branch: '#C7C7CC', head: '#6C6C70', dueInk: '#1C1C1E',
+        priority: {
+          red: { card: '#F4D5D7', meta: '#C36261', ink: '#FF3B30' }, orange: { card: '#F4E3CF', meta: '#AA7D40', ink: '#FF9500' },
+          yellow: { card: '#F4ECCF', meta: '#9D893A', ink: '#FFCC00' }, green: { card: '#D4EBDE', meta: '#549266', ink: '#34C759' },
+          teal: { card: '#D3E7EF', meta: '#548C99', ink: '#30B0C7' }, blue: { card: '#CBDFF8', meta: '#4682C7', ink: '#007AFF' }
+        }
+      },
+      dark: {
+        panel: 219, padStart: 10, padEnd: 22, width: 187,
+        ground: '#000000', text: '#FFFFFF', card: '#1C1C1C', branch: '#48484A', head: '#AEAEB2', dueInk: '#E5E5EA',
+        priority: {
+          red: { card: '#572725', meta: '#D89A97', ink: '#FF453A' }, orange: { card: '#573E19', meta: '#D8B785', ink: '#FF9F0A' },
+          yellow: { card: '#574C19', meta: '#D8CB86', ink: '#FFD60A' }, green: { card: '#214B2D', meta: '#91C9A0', ink: '#30D158' },
+          teal: { card: '#254950', meta: '#97C5D0', ink: '#40C8E0' }, blue: { card: '#173759', meta: '#83AEDA', ink: '#0A84FF' }
+        }
+      }
+    };
+
+    const list = [
+      { head: 'Morning' },
+      { title: 'Ева спланировать план', level: 0, progress: true },
+      { head: 'No section', ungrouped: true },
+      { title: 'Бангкок календарь заполнить: примерный план', level: 0, priority: 'red', count: '0/2' },
+      { title: 'Выбрать экскурсии в Бангкоке', level: 1, count: '0/1', due: true },
+      { title: 'Trips: конкретные записаться', level: 2, count: '0/6' },
+      { title: 'Велосипеды', level: 3 },
+      { title: 'Тусовка', level: 3 },
+      { title: 'Кинотеатр оплатить', level: 3, progress: true },
+      { title: 'Корабль', level: 3 },
+      { title: 'Гастротур', level: 3 },
+      { title: 'Массаж', level: 3 },
+      { title: 'Составить список кафе на Бангкок', level: 1, priority: 'red', due: true, progress: true },
+      { title: 'Выбрать дату когда зайду за презиками', level: 0, priority: 'orange' },
+      { head: 'Evening' },
+      { title: 'Скинуть папе деньги', level: 0, priority: 'orange', progress: true },
+      { title: '[[Элина (ex)]] ответить', level: 0 },
+      { title: 'Сестре позвонить', level: 0 }
+    ];
+
+    const pairs = [];
+    [null, 'red', 'orange', 'yellow', 'green', 'teal', 'blue'].forEach((priority, i) => {
+      pairs.push({ title: 'Обычная', level: 0, priority, top: i === 0 ? 0 : 8 });
+      pairs.push({ title: 'В процессе', level: 0, priority, progress: true });
+    });
+
+    const mix = (color, percent) => 'color-mix(in srgb, ' + color + ' ' + percent + '%, transparent)';
+    const glowFor = (base) => {
+      const end = glowLen > 0 ? glowLen + 'px' : '100%';
+      const mid = glowLen > 0 ? Math.round(glowLen * 0.45) + 'px' : '45%';
+      return 'linear-gradient(to right, ' + mix(base, glowStrength) + ' 0, ' + mix(base, glowStrength * 0.4) + ' ' + mid + ', transparent ' + end + ')';
+    };
+
+    const rowsFor = (t, items) => {
+      const goesOn = (i, level) => {
+        for (let j = i + 1; j < items.length; j++) {
+          const next = items[j];
+          if (next.head || next.level < level) return false;
+          if (next.level === level) return true;
+        }
+        return false;
+      };
+      return items.map((item, i) => {
+        if (item.head) {
+          return { isHead: true, isCard: false, title: item.head, headTop: i === 0 ? 0 : 10, headInk: item.ungrouped ? '#8E8E93' : t.head };
+        }
+        const prio = item.priority ? t.priority[item.priority] : null;
+        const meta = prio ? prio.meta : '#8E8E93';
+        const on = !!item.progress;
+        const passes = [];
+        for (let k = 1; k < item.level; k++) {
+          let ancestor = -1;
+          for (let j = i - 1; j >= 0; j--) if (items[j].level === k) { ancestor = j; break; }
+          if (ancestor >= 0 && goesOn(ancestor, k)) passes.push({ left: -((item.level - k) * 20 + 10.75) });
+        }
+        const isLast = item.level > 0 && !goesOn(i, item.level);
+        return {
+          isHead: false,
+          isCard: true,
+          title: item.title,
+          indent: item.level * 20,
+          top: item.top ?? 0,
+          bg: prio ? prio.card : t.card,
+          passes,
+          hasBranch: item.level > 0,
+          branchH: isLast ? 'calc(' + rise + 'px + 50% + 0.75px)' : 'calc(100% + ' + rise + 'px)',
+          branchBottom: isLast ? '1.5px solid ' + t.branch : '0',
+          branchRadius: isLast ? 6 : 0,
+          branchTick: !isLast,
+          glow: on && mode === 'glow',
+          glowBg: glowFor(glowInk === 'meta' ? meta : t.text),
+          dot: on && mode === 'dot',
+          dotInk: prio ? (dotColor === 'priority' ? prio.ink : meta) : (dotPlain === 'text' ? t.text : '#8E8E93'),
+          hasCount: !!item.count,
+          count: item.count,
+          hasDue: !!item.due && t.width >= 160
+        };
+      });
+    };
+
+    const labels = { light: 'Светлая тема, широкая колонка', dark: 'Тёмная тема, телефон' };
+    return {
+      columns: ['light', 'dark'].map((key) => {
+        const t = themes[key];
+        return {
+          ...t,
+          blocks: [
+            { label: labels[key], top: 0, rows: rowsFor(t, list) },
+            { label: 'Каждый приоритет', top: 16, rows: rowsFor(t, pairs) }
+          ]
+        };
+      }),
+      cardH,
+      gap,
+      rise,
+      radius: cardH / 2,
+      tickTop: (cardH - 1.5) / 2,
+      dotLeft,
+      dotSize,
+      dotHalf: dotSize / 2
+    };
+  }
+}
+</script>
+</body>
+</html>

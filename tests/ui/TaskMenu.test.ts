@@ -426,7 +426,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		expect(row.classList.contains("tc-menu-field")).toBe(true);
 		expect(row.classList.contains("tc-quick-row")).toBe(true);
 		expect([row.style.left, row.style.top, row.style.width]).toEqual(["200px", "300px", "150px"]);
-		expect(row.querySelector(".tc-strip")).not.toBeNull();
+		expect(row.querySelector(".tc-progress-dot")).not.toBeNull();
 	});
 
 	it("tells the field's holder how it closed", () => {

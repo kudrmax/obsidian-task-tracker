@@ -224,11 +224,11 @@ describe("a renamed task in progress on the timeline", () => {
 		const field = document.createElement("textarea");
 		view.showRename(doing, field);
 		const box = view.itemsEl.querySelector<HTMLElement>(".tc-quick-row")!;
-		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		expect(box.querySelectorAll(".tc-progress-dot")).toHaveLength(1);
 		view.showRename(doing, field);
-		expect(box.querySelectorAll(".tc-strip")).toHaveLength(1);
+		expect(box.querySelectorAll(".tc-progress-dot")).toHaveLength(1);
 		view.showRename(task("todo"), field);
-		expect(box.querySelector(".tc-strip")).toBeNull();
+		expect(box.querySelector(".tc-progress-dot")).toBeNull();
 	});
 });
 
