@@ -38,11 +38,10 @@ export class AutoScroll {
 		private readonly frames: Frames = WINDOW_FRAMES,
 	) {}
 
-	/** The finger is at `y`: a step is planned near an edge it heads for, and none elsewhere. */
-	follow(y: number): void {
+	/** The finger is at `y`, the scroller's box read by the caller before it wrote anything: a step is planned near an edge it heads for, and none elsewhere. */
+	follow(y: number, box: DOMRect): void {
 		const el = this.scroller();
-		const r = el.getBoundingClientRect();
-		const velocity = edgeVelocity(y, r.top, r.bottom);
+		const velocity = edgeVelocity(y, box.top, box.bottom);
 		const from = this.lastY;
 		this.lastY = y;
 		const towards = from !== null && (y === from ? this.scrolling : velocity > 0 === y > from);

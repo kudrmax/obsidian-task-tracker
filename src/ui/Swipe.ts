@@ -215,8 +215,9 @@ export class Swipe {
 		return Math.abs(dx) * 2 >= distance ? shift : null;
 	}
 
-	/** The screen goes no further than the next one. */
+	/** The screen goes no further than the next one; a finger that has gone neither way yet asks for no screen. */
 	private within(dx: number): number {
+		if (dx === 0) return 0;
 		const distance = this.opts.target.distance(dx < 0 ? 1 : -1);
 		return distance === null ? dx : Math.sign(dx) * Math.min(Math.abs(dx), distance);
 	}

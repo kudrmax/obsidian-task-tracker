@@ -72,6 +72,21 @@ describe("Swipe", () => {
 		expect(follows).toEqual([-40, 30, -WIDTH]);
 	});
 
+	it("asks for no screen while the finger has gone neither way since the screen took it", () => {
+		const root = document.createElement("div");
+		const asked: Shift[] = [];
+		new Swipe(root, {
+			arbiter: new GestureArbiter(),
+			accepts: () => true,
+			target: { distance: (shift) => (asked.push(shift), WIDTH), follow: () => undefined, settle: () => Promise.resolve(), stand: () => undefined },
+		});
+		root.dispatchEvent(pointer("pointerdown", 277));
+		root.dispatchEvent(pointer("pointermove", 266));
+		root.dispatchEvent(pointer("pointermove", 266));
+		root.dispatchEvent(pointer("pointermove", 254));
+		expect(asked).toEqual([1]);
+	});
+
 	it("lands on whichever screen stands nearer when let go", () => {
 		const { inner, settles, swipe } = setUp();
 		swipe(inner, [300, 300], [290, 300], [191, 300]);

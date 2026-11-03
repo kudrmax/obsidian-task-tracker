@@ -364,14 +364,19 @@ export class DragController {
 		const step = this.deps.step();
 		let start = slot.start;
 		let end = slot.end ?? slot.start;
+		/** The span last shown: the stack is laid out again only when a grid step changes it. */
+		let shown = { start, end };
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
 			const at = snapMinutes(timeline.minutesAt(ev.clientY), step);
 			if (edge === "end") end = Math.min(LAYOUT.minutesPerDay, Math.max(start, at));
 			else if (slot.end === null) start = Math.max(0, Math.min(at, slot.start));
 			else start = Math.max(0, Math.min(at, end));
+			if (start === shown.start && end === shown.end) return;
+			shown = { start, end };
 			timeline.stretchTo(block, { start, end }, edge);
 		};
+		/** The screen stays held until the write is done: a second grab of the card, or another gesture, would start from its old time. */
 		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
 			document.removeEventListener("pointermove", move);
@@ -380,14 +385,22 @@ export class DragController {
 			releasePointer(block, e.pointerId);
 			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx, shownCardSize().height);
 			const changed = next.start !== slot.start || next.end !== slot.end;
-			if (apply && changed) {
-				this.deps.haptics.tap();
+			if (!apply || !changed) {
+				timeline.stretchTo(block, null, edge);
+				this.deps.arbiter.release(RESIZE);
+				return;
+			}
+			this.deps.haptics.tap();
+			try {
 				await this.deps.onResize(item, timeline.slotAt(next.start, next.end));
-			} else timeline.stretchTo(block, null, edge);
-			this.deps.arbiter.release(RESIZE);
+			} finally {
+				timeline.endStretch(item.key);
+				this.deps.arbiter.release(RESIZE);
+			}
 		};
-		const up = (ev: PointerEvent) => void finish(ev, true);
-		const cancel = (ev: PointerEvent) => void finish(ev, false);
+		const report = (error: unknown) => console.error("Task Calendar: resize", error);
+		const up = (ev: PointerEvent) => void finish(ev, true).catch(report);
+		const cancel = (ev: PointerEvent) => void finish(ev, false).catch(report);
 		timeline.stretchTo(block, { start, end }, edge);
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);

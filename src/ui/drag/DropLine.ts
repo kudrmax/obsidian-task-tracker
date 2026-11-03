@@ -1,5 +1,6 @@
 import { tokenPx } from "../design";
 import { el, px } from "../dom";
+import { type ListFrame, toContent } from "./listFrame";
 
 /**
  * Where a dragged task will stand: the calendar's drop line between two cards, from a dot at the left edge of the level it
@@ -11,30 +12,28 @@ export class DropLine {
 
 	constructor(private readonly list: () => HTMLElement) {}
 
-	/** Through `y` from `left` to `right`, in client pixels; a new line comes out of the plus at `finger`, or fades in where it stands. */
-	show(left: number, right: number, y: number, finger: { readonly x: number; readonly y: number } | null): void {
+	/** Through `y` from `left` to `right`, in client pixels of the list as `frame` read it; a new line comes out of the plus at `finger`, or fades in where it stands. */
+	show(left: number, right: number, y: number, frame: ListFrame, finger: { readonly x: number; readonly y: number } | null): void {
 		const list = this.list();
-		const box = list.getBoundingClientRect();
 		if (!this.el || this.el.parentElement !== list) {
 			this.el?.remove();
-			const dot = tokenPx(list, "--tc-drop-dot");
 			this.el = el(null, "div", "tc-list-drop");
 			el(this.el, "div", "tc-list-drop-dot");
 			el(this.el, "div", "tc-drop-line");
-			if (finger) this.place(list, box, finger.x - dot / 2, finger.x + dot / 2, finger.y);
-			else this.place(list, box, left, right, y);
+			const dot = finger ? tokenPx(list, "--tc-drop-dot") : 0;
+			if (finger) this.place(frame, finger.x - dot / 2, finger.x + dot / 2, finger.y);
+			else this.place(frame, left, right, y);
 			list.appendChild(this.el);
 			void this.el.offsetWidth;
 		}
-		this.place(list, box, left, right, y);
+		this.place(frame, left, right, y);
 		this.el.classList.add("is-shown");
 	}
 
-	/** Measured before the line joins the list, so a new one first stands at the plus, not at the list's corner. */
-	private place(list: HTMLElement, box: DOMRect, left: number, right: number, y: number): void {
-		const x = left - box.left - list.clientLeft + list.scrollLeft;
-		const top = y - box.top - list.clientTop + list.scrollTop;
-		this.el!.style.transform = `translate3d(${x}px, ${top}px, 0)`;
+	/** Placed before the line joins the list, so a new one first stands at the plus, not at the list's corner. */
+	private place(frame: ListFrame, left: number, right: number, y: number): void {
+		const at = toContent(frame, left, y);
+		this.el!.style.transform = `translate3d(${at.x}px, ${at.y}px, 0)`;
 		this.el!.style.width = px(right - left);
 	}
 

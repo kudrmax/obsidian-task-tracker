@@ -233,6 +233,16 @@ describe("styles.css keeps to its design system", () => {
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
+
+	it("reads the hour only on the canvas", () => {
+		const reading = sheet.rules.filter((d) => d.value.includes("var(--tc-hour)"));
+		expect(reading.length).toBeGreaterThan(0);
+		expect(reading.every((d) => d.selector === ".tc-canvas")).toBe(true);
+	});
+
+	it("moves no card of a list while a task is dragged: the drop line shows the place", () => {
+		expect(sheet.rules.filter((d) => d.value.includes("var(--tc-room)"))).toEqual([]);
+	});
 });
 
 describe("the code keeps to the design system", () => {

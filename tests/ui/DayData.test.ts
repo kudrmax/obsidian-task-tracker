@@ -206,4 +206,23 @@ describe("DayData", () => {
 		await second;
 		expect(parts).toEqual(["events", "events"]);
 	});
+
+	it("runs beforeShow before telling the tasks changed", async () => {
+		const order: string[] = [];
+		const calendars = new SlowCalendars();
+		const data = new DayData({ tasks: new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) }), calendars, date: () => TODAY, onUpdate: (part) => order.push(part) });
+		await data.tasks(() => order.push("before"));
+		expect(order).toEqual(["before", "tasks"]);
+	});
+
+	it("runs beforeShow even when the tasks read are the same", async () => {
+		const { data, updates } = setup();
+		await data.tasks();
+		const shown = updates();
+		let before = 0;
+		await data.tasks(() => before++);
+		expect(before).toBe(1);
+		expect(updates()).toBe(shown);
+	});
 });
+
