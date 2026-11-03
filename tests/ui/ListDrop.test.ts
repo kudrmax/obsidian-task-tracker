@@ -76,7 +76,7 @@ describe("ListDrop", () => {
 		expect(drop.hitTest(50, 20, from)).toBe(false);
 	});
 
-	it("under the list, where the zones and the switch stand while a card is carried, the column takes nothing", () => {
+	it("under the list the column takes nothing", () => {
 		const only = item("now", 0, "A", null);
 		const { drop, list } = setup([only], "left", "now");
 		list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 300);
@@ -246,24 +246,6 @@ describe("ListDrop", () => {
 			drop.clear();
 			expect(room(list)).toEqual(["", "", "", ""]);
 			expect(list.el.classList.contains("is-making-room")).toBe(false);
-		});
-
-		it("at the lift, scrolls a place the zones now cover back right above them, and shows it dashed", () => {
-			const { list, drop } = lifted(3);
-			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 3 * STEP);
-			let scrollTop = 0;
-			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
-			drop.lift();
-			expect(scrollTop).toBe(35);
-			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
-		});
-
-		it("at the lift, leaves a list alone whose lifted place is in sight", () => {
-			const { list, drop } = lifted(0);
-			let scrollTop = 0;
-			Object.defineProperty(list.el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = v) });
-			drop.lift();
-			expect(scrollTop).toBe(0);
 		});
 
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {

@@ -1,6 +1,5 @@
-import type { TaskItem } from "../../application/contracts";
+import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
-import { dayMonth } from "../dates";
 import { tokenPx } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
@@ -8,7 +7,7 @@ import { linkAt, type TaskLink } from "../TaskTitle";
 import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import { type CloseHow, Overlay } from "./Overlay";
-import { dueOptions } from "./dueOptions";
+import { canRemoveDue, moveTiles } from "./quickMoves";
 import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
@@ -16,7 +15,7 @@ import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 
 export type StatusTileId = "done" | "progress" | "wontdo";
-export type EditRowId = "rename" | "description" | "due" | "subtask";
+export type EditRowId = "rename" | "description" | "section" | "subtask";
 
 export interface StatusTile {
 	readonly id: StatusTileId;
@@ -40,12 +39,21 @@ export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	];
 }
 
-/** The edit group: Rename, Add description for a task without one, the due date with the date beside it, a subtask. */
-export function editRows(item: TaskItem): readonly EditRow[] {
+/** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */
+export interface SectionChoice {
+	/** The sections the list has, in its order, then the presets it lacks, in the settings' order. */
+	readonly names: readonly string[];
+	readonly current: GroupName;
+	/** The name of the tasks outside any section. */
+	readonly ungrouped: string;
+}
+
+/** The edit group: Rename, Add description for a task without one, the section with its name beside it, a subtask. */
+export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
-		{ id: "due", label: "Due date", value: item.dueDate ? dayMonth(item.dueDate) : "", icon: "due" },
+		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
 	];
 }
@@ -77,7 +85,13 @@ export function tileRows<T>(tiles: readonly T[]): readonly (readonly T[])[] {
 
 export interface MenuActions {
 	setStatus(status: TaskStatus): Promise<void>;
-	setDueDate(date: LocalDate | null): Promise<void>;
+	/** Puts the task off to `date`: due that day, no slot, at the end of Now for today, of Soon for a later day. */
+	postpone(date: LocalDate): Promise<void>;
+	removeDue(): Promise<void>;
+	/** To the end of that section of its list; null: among the tasks outside any. */
+	toSection(name: GroupName): Promise<void>;
+	/** The task waits at the end of its list under a field for the new section's name. */
+	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
@@ -103,8 +117,8 @@ export interface TaskMenuContext {
 	readonly actions: MenuActions;
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
-	/** `picker`: the menu opens on its date picker (a card dropped on Pick a date). */
-	readonly opening?: "picker";
+	/** The sections a list card can go to; none for any other. */
+	readonly sections?: SectionChoice;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
 	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
@@ -113,7 +127,7 @@ export interface TaskMenuContext {
 
 /**
  * The task menu over a blurred screen: the tapped card stays as it is above the blur, a timeline card with its subtasks
- * under it, and the panel grows out under them; the due submenu and the month picker take its place.
+ * under it, and the panel grows out under them; the sections and the month picker take its place.
  */
 export class TaskMenu {
 	private readonly overlay: Overlay;
@@ -149,8 +163,7 @@ export class TaskMenu {
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
 		this.peek = this.peekOf(context);
-		if (context.opening === "picker") this.showPicker();
-		else this.showMenu();
+		this.showMenu();
 		this.overlay.show();
 	}
 
@@ -309,33 +322,37 @@ export class TaskMenu {
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
 			description: this.pick(() => actions.openDescription(true)),
-			due: () => this.showDue(),
+			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
 		tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		const rows = editRows(item).filter((row) => !(this.inStack && row.id === "subtask"));
+		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
+			label,
+			icon,
+			onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
+		}));
+		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
+		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
 		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) }, "tc-menu-row is-tall is-apart");
 		menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: this.pick(() => actions.remove()) }, "tc-menu-row is-tall is-apart");
 		this.place();
 	}
 
-	private showDue(): void {
+	/** The sections of the task's list, its own checked, then the tasks outside any; New section asks for a name. */
+	private showSections(): void {
+		const sections = this.context.sections;
+		if (!sections) return;
 		clear(this.panel);
-		this.panel.classList.remove("is-picker");
-		const { item, actions, today } = this.context;
-		const options = dueOptions(today, item.dueDate);
-		backRow(this.panel, "Due date", () => this.showMenu());
-		const choose = (date: LocalDate) => this.pick(() => actions.setDueDate(date));
-		menuGroup(this.panel, [
-			{ label: "Today", value: options.today.label, onPick: choose(options.today.value) },
-			{ label: "Tomorrow", value: options.tomorrow.label, onPick: choose(options.tomorrow.value) },
-			{ label: "Next week", value: options.nextWeek.label, onPick: choose(options.nextWeek.value) },
-			{ label: "Pick a date", value: options.pick.label, onPick: () => this.showPicker() },
-		]);
-		if (options.canRemove) menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.setDueDate(null)) }, "tc-menu-row is-tall is-apart");
+		const { item, actions } = this.context;
+		backRow(this.panel, "Section", () => this.showMenu());
+		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
+		const group = menuGroup(this.panel, []);
+		for (const name of sections.names) menuRow(group, { label: name, icon: name === sections.current ? "check" : undefined, onPick: choose(name) }, "tc-menu-row is-choice");
+		menuRow(group, { label: sections.ungrouped, icon: sections.current === null ? "check" : undefined, onPick: choose(null) }, "tc-menu-row is-choice is-quiet");
+		menuRow(this.panel, { label: "New section", icon: "plus", onPick: this.pick(() => actions.newSection()) }, "tc-menu-row is-tall is-apart is-add");
 		this.place();
 	}
 
@@ -347,10 +364,10 @@ export class TaskMenu {
 			month: item.dueDate ?? today,
 			today,
 			selected: item.dueDate,
-			onPick: (date) => this.pick(() => actions.setDueDate(date))(),
+			onPick: (date) => this.pick(() => actions.postpone(date))(),
 		});
-		if (dueOptions(today, item.dueDate).canRemove) {
-			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.setDueDate(null)) }, "tc-menu-row tc-picker-remove");
+		if (canRemoveDue(today, item.dueDate)) {
+			menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.removeDue()) }, "tc-menu-row tc-picker-remove");
 		}
 		this.place();
 	}

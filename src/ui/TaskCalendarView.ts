@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, DayBoundary, type GroupedList, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
+import { type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -9,20 +9,18 @@ import { addDays } from "./dates";
 import { DayData } from "./DayData";
 import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
-import { DragController, type NameGroup } from "./drag/DragController";
+import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
 import { sameTask } from "./drag/listPlace";
-import type { ColumnSections, DropTarget, ListColumn, PlacedResult, TaskDragPayload } from "./drag/DropTarget";
+import type { ColumnSections, DropResult, ListColumn, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
-import { GroupZones } from "./drag/GroupZones";
 import { GroupMenu } from "./menu/GroupMenu";
 import type { ListGroup } from "./listGroups";
-import { PostponeZones } from "./drag/PostponeZones";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
-import { TaskMenu } from "./menu/TaskMenu";
+import { type SectionChoice, TaskMenu } from "./menu/TaskMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
@@ -51,6 +49,11 @@ const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
+
+/** A new section asked for from a card's menu: the column the card waits at the end of, and whose sections. */
+interface NameGroup extends ColumnSections {
+	readonly column: ListColumn;
+}
 
 /** The task with `key` among `items` and their subtasks. */
 function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
@@ -114,10 +117,8 @@ export class TaskCalendarView extends ItemView {
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
-	private postponeZones: PostponeZones | null = null;
-	private groupZones: GroupZones[] = [];
 	private readonly groupDrag: GroupDrag;
-	/** A card dropped on New section, waiting at the end of its list for the section's name. */
+	/** A card sent to New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
 	private switching = 0;
 	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
@@ -152,20 +153,14 @@ export class TaskCalendarView extends ItemView {
 			day: () => this.selectedDate,
 			step: () => stepFor(this.hourPx),
 			timeline: () => this.timeline,
-			targets: () => this.dropTargets(),
+			targets: () => this.shownDrops(),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
 				this.quick?.onDragging(active);
-				if (active) {
-					this.postponeZones?.show();
-					for (const zones of this.groupZones) zones.show();
-				}
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
-			onPickDate: (item, source) => this.showMenu(item, source, undefined, "picker"),
-			onNameGroup: (item, asked) => this.askGroupName(item, asked),
 			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			onRename: (item) => this.quick?.rename(item),
@@ -295,13 +290,6 @@ export class TaskCalendarView extends ItemView {
 		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
 		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
 		this.newInbox.pressOnDoubleClick(this.inboxEl, this.inboxList.el);
-		const sections = (items: () => readonly TaskItem[]) => () => items().flatMap((item) => (item.group === null ? [] : [item.group]));
-		this.groupZones = [
-			new GroupZones(this.newTask.el, "left", { presets: () => this.settings.groups.presets, present: sections(() => this.data.day?.list ?? []), sections: () => this.sectionsOf("left") }),
-			new GroupZones(this.newSoon.el, "soon", { presets: () => this.settings.groups.presets, present: sections(() => this.data.soon), sections: () => this.sectionsOf("soon") }),
-			new GroupZones(this.newInbox.el, "inbox", { presets: () => this.settings.groups.presets, present: sections(() => this.data.inbox), sections: () => this.sectionsOf("inbox") }),
-		];
-		this.postponeZones = new PostponeZones(this.newTask.el, () => this.today(), () => this.selectedDate);
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.settings.rightMode,
 			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
@@ -535,11 +523,6 @@ export class TaskCalendarView extends ItemView {
 		this.zoomFrame = requestAnimationFrame(frame);
 	}
 
-	/** The zones that put a task off, under the Today column, then the two columns the window shows. */
-	private dropTargets(): DropTarget[] {
-		return [...this.groupZones.flatMap((zones) => zones.targets), ...(this.postponeZones?.targets ?? []), ...this.shownDrops()];
-	}
-
 	/** The two columns the window shows, as places to drop. */
 	private shownDrops(): (ListDrop | TimelineDrop)[] {
 		const shown: Record<RightMode, (ListDrop | TimelineDrop | null)[]> = {
@@ -556,15 +539,13 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/** What a drop means for the file: the table in spec §5.1. */
-	private applyDrop(drag: TaskDragPayload, result: PlacedResult): Promise<void> {
+	private applyDrop(drag: TaskDragPayload, result: DropResult): Promise<void> {
 		const key = drag.item.key;
 		const tasks = this.deps.tasks;
 		return this.act(() => {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
-			if (result.kind === "postpone") return tasks.postpone(key, result.date);
 			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before, result.date ?? undefined);
-			if (result.kind === "newGroup") return tasks.createGroup(key, result.list, result.name, result.date ?? undefined);
 			if (result.kind === "nest") return tasks.nest(key, result.parent, result.before);
 			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
 			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
@@ -633,6 +614,28 @@ export class TaskCalendarView extends ItemView {
 		return sections ? { list, date } : null;
 	}
 
+	/**
+	 * Whose sections a task's menu offers: its own list's, a task of Soon keeping its due date, and the list column its
+	 * card stands in, which then shows the task waiting for a new section's name. None for a subtask, a done task, a card
+	 * on the timeline or in a column without sections.
+	 */
+	private sectionsHome(item: TaskItem, card: HTMLElement): NameGroup | null {
+		const list = item.key.section;
+		if (item.parentText !== null || list === "done") return null;
+		const columns: ListColumn[] = ["left", "soon", "inbox"];
+		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
+		if (!column || !this.sectionsOf(column)) return null;
+		return { column, list, date: list === "soon" ? item.dueDate : null };
+	}
+
+	/** The sections the list has, in its order, then the presets it lacks, in the settings' order; the No section name is none of them. */
+	private sectionChoice(list: GroupedList, item: TaskItem): SectionChoice {
+		const { presets, ungrouped } = this.settings.groups;
+		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox].filter((task) => task.key.section === list);
+		const names = [...tasks.flatMap((task) => (task.group === null ? [] : [task.group])), ...presets.map((preset) => preset.trim())];
+		return { names: [...new Set(names)].filter((name) => name !== "" && name !== ungrouped), current: item.group, ungrouped };
+	}
+
 	private listOf(column: ListColumn): TaskList | null {
 		return { left: this.list, soon: this.soonList, inbox: this.inboxList }[column];
 	}
@@ -671,15 +674,20 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** The task menu; opened on its picker, a chosen day puts the task off as Tomorrow does. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, opening?: "picker"): TaskMenu {
+	/** The task menu; a list card's offers the sections of its list too. */
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
 		const tasks = this.deps.tasks;
-		const setDueDate = (date: LocalDate | null) => (opening === "picker" && date !== null ? tasks.postpone(item.key, date) : tasks.setDueDate(item.key, date));
+		const home = this.sectionsHome(item, source);
+		const toSection = (name: GroupName) => {
+			if (!home) return Promise.resolve();
+			const date = home.date ?? undefined;
+			return name === null ? tasks.moveToGroup(item.key, home.list, null, null, date) : tasks.createGroup(item.key, home.list, name, date);
+		};
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
-			opening,
+			sections: home ? this.sectionChoice(home.list, item) : undefined,
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			markdown: this.markdown,
 			today: this.today(),
@@ -687,7 +695,12 @@ export class TaskCalendarView extends ItemView {
 			levels: usableLevels(this.settings.priorities),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
-				setDueDate: (date) => this.act(() => setDueDate(date)),
+				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
+				removeDue: () => this.act(() => tasks.setDueDate(item.key, null)),
+				toSection: (name) => this.act(() => toSection(name)),
+				newSection: () => {
+					if (home) this.askGroupName(item, home);
+				},
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				rename: (menu) => this.quick?.rename(item, menu),
 				openDescription: (editing) => this.descriptionSheet(item, editing),

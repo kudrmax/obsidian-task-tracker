@@ -4,7 +4,7 @@ import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { type DayColumn, dayColumn } from "../dayColumn";
 import { DESIGN, LAYOUT } from "../design";
 import type { DragController } from "../drag/DragController";
-import type { DropTarget, ListColumn, PlacedResult } from "../drag/DropTarget";
+import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
 import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
@@ -82,7 +82,7 @@ const LOOK_IN: Readonly<Record<RightMode, readonly ListColumn[]>> = {
 };
 
 /** What a drop of the plus on a list means for the file; null for a drop elsewhere. */
-function placeResultOf(result: PlacedResult): PlaceResult | null {
+function placeResultOf(result: DropResult): PlaceResult | null {
 	switch (result.kind) {
 		case "listBefore":
 			return { kind: "task", group: null, before: result.before };
@@ -376,7 +376,7 @@ export class QuickEntryController {
 	}
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
-	private dropped(result: PlacedResult | null): void {
+	private dropped(result: DropResult | null): void {
 		this.carrying = false;
 		this.ring.hide();
 		const column = this.droppedOn;
