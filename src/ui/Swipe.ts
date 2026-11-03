@@ -36,17 +36,22 @@ interface Press {
 
 /**
  * What a trackpad sends without a pause: one stroke, its glide after the fingers lift, and any stroke begun while it
- * glides. The screen follows it until it has gone the whole way to the next screen; then the glide that follows is passed by.
+ * glides. The screen follows the fingers and is let go the moment they are: when they sweep, when the glide sets in, or
+ * when they have drawn it the whole way; the glide that follows is passed by.
  */
 interface Stream {
 	/** How far the stroke has drawn the screen. */
 	dx: number;
 	/** Whether the screen follows the stroke now. */
 	following: boolean;
-	/** Where and when it reached the next screen: the glide that follows runs the same way and only slows down. */
+	/** Where and when the screen was let go: the glide that follows runs the same way and only slows down. */
 	stepped: { readonly time: number; readonly shift: Shift } | null;
+	/** The sideways moves of the last moments. */
+	recent: { readonly time: number; readonly delta: number }[];
 	/** The size of the last move. */
 	last: number;
+	/** How many times in a row the moves have shrunk, with none growing: the glide after the fingers lift only shrinks. */
+	shrinking: number;
 	timer: number;
 }
 
@@ -61,6 +66,10 @@ export function swipeStartsAt(target: EventTarget | null): boolean {
 const SWIPE = "swipe";
 /** The stream ends once the trackpad has sent nothing for this long: the fingers stopped, or lifted and the glide died. */
 const STREAM_SETTLE_MS = 150;
+/** The fingers sweep: only the moves of this long count towards a sweep, so a slow creep never makes one. */
+const SWEEP_MS = 100;
+/** Moves that shrink this many times in a row, none growing, are the glide: the fingers have lifted. */
+const GLIDE_SHRINKS = 4;
 /** Fingers come down again no sooner than this after a step; until then the stroke that stepped is still going. */
 const NEXT_STROKE_MS = 150;
 /** A glide only slows down: a move this many times the last one is fingers that came down and swept again. */
@@ -92,27 +101,42 @@ export class Swipe {
 
 	private wheel(e: WheelEvent): void {
 		if (e.ctrlKey || e.metaKey || !this.free() || !this.opts.accepts(e.target)) return;
-		const stream = (this.stream ??= { dx: 0, following: false, stepped: null, last: 0, timer: 0 });
+		const stream = (this.stream ??= { dx: 0, following: false, stepped: null, recent: [], last: 0, shrinking: 0, timer: 0 });
 		window.clearTimeout(stream.timer);
 		stream.timer = window.setTimeout(() => this.endStream(stream), STREAM_SETTLE_MS);
 		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 		e.preventDefault();
 		const size = Math.abs(e.deltaX);
 		if (stream.stepped && this.nextStroke(stream.stepped, e, stream.last)) stream.stepped = null;
+		stream.shrinking = size < stream.last ? stream.shrinking + 1 : size > stream.last ? 0 : stream.shrinking;
 		stream.last = size;
 		if (stream.stepped) return;
 		if (!stream.following) {
 			if (!this.hold()) return;
 			stream.following = true;
 			stream.dx = 0;
+			stream.recent = [];
+			stream.shrinking = 0;
 		}
 		stream.dx = this.within(stream.dx - e.deltaX);
 		this.opts.target.follow(stream.dx);
+		stream.recent = [...stream.recent.filter((move) => e.timeStamp - move.time < SWEEP_MS), { time: e.timeStamp, delta: e.deltaX }];
+		const sweep = stream.recent.reduce((sum, move) => sum + move.delta, 0);
+		const going: Shift = e.deltaX > 0 ? 1 : -1;
+		if (Math.abs(sweep) >= LAYOUT.swipeWheelDistance) return this.stepStream(stream, e, sweep > 0 ? 1 : -1, sweep > 0 ? 1 : -1);
 		const shift: Shift = stream.dx < 0 ? 1 : -1;
 		const distance = this.opts.target.distance(shift);
-		if (distance === null || Math.abs(stream.dx) < distance) return;
-		stream.stepped = { time: e.timeStamp, shift };
-		this.letStreamGo(stream, shift);
+		if (distance !== null && Math.abs(stream.dx) >= distance) return this.stepStream(stream, e, going, shift);
+		if (stream.shrinking < GLIDE_SHRINKS) return;
+		const span = Math.max(1, e.timeStamp - stream.recent[0].time);
+		const fling = Math.abs(sweep) / span >= LAYOUT.swipeFlickSpeed ? going : 0;
+		this.stepStream(stream, e, going, this.landing(stream.dx, fling));
+	}
+
+	/** The screen is let go: on to `shift`'s screen or back; the glide that follows, going `going`'s way, is passed by. */
+	private stepStream(stream: Stream, e: WheelEvent, going: Shift, shift: Shift | null): void {
+		stream.stepped = { time: e.timeStamp, shift: going };
+		this.letStreamGo(stream, shift === null || this.opts.target.distance(shift) === null ? null : shift);
 	}
 
 	/** After a step the glide runs the same way and slows down; a move the other way, or a sudden rise, is the next stroke. */

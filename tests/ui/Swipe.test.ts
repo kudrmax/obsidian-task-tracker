@@ -199,23 +199,44 @@ describe("Swipe", () => {
 		const LEFT = [3, 11, 8, 6, 10, 21, 26, 43, 35, 32, 11, 5, 18, 43, 100, 51, 52, 49, 50, 47, 47, 46, 45, 43, 42, 41, 41, 39, 37, 37, 37, 36, 33, 33, 31, 31, 29, 28, 27, 27, 26, 26, 25, 24, 23, 21, 21, 20, 19, 19, 17];
 		const TURN_RIGHT = [-4, -16, -3, -17, -11, -33, -60, -70, -50];
 
-		it("steps on when two fingers go left, and back when they go right, once they stop past halfway", () => {
+		it("sends the screen on at once when two fingers sweep left, and back when they sweep right, once per stroke", () => {
 			const { inner, shifts, follows } = setUp();
 			for (const delta of [10, 20, 30, 30, 20, 10, 5, 2, 1]) wheel(inner, delta);
-			expect(follows.slice(0, 3)).toEqual([-10, -30, -60]);
-			expect(shifts).toEqual([]);
-			vi.advanceTimersByTime(1000);
+			expect(follows).toEqual([-10, -30, -60]);
 			expect(shifts).toEqual([1]);
-			for (const delta of [-30, -50, -60, -20]) wheel(inner, delta);
 			vi.advanceTimersByTime(1000);
+			for (const delta of [-15, -25, -30, -10]) wheel(inner, delta);
 			expect(shifts).toEqual([1, -1]);
 		});
 
-		it("steps as soon as the fingers have drawn the whole way, and passes the glide after by", () => {
+		it("steps as soon as slow fingers have drawn the whole way, and passes the glide after by", () => {
 			const { inner, shifts, follows } = setUp();
-			for (const delta of [60, 80, 80, 70, 50, 30]) wheel(inner, delta);
+			for (let i = 0; i < 60; i++) wheel(inner, 4);
 			expect(shifts).toEqual([1]);
-			expect(follows).toEqual([-60, -140, -WIDTH]);
+			expect(follows[follows.length - 1]).toBe(-WIDTH);
+			expect(follows).toHaveLength(WIDTH / 4);
+		});
+
+		it("lets the screen go the moment the fingers lift, not when their glide dies", () => {
+			const { inner, settles } = setUp();
+			for (let i = 0; i < 30; i++) wheel(inner, 4);
+			for (const delta of [3.8, 3.6, 3.4, 3.2]) wheel(inner, delta);
+			expect(settles).toEqual([1]);
+			for (let size = 3; size > 0.1; size *= 0.95) wheel(inner, size);
+			vi.advanceTimersByTime(1000);
+			expect(settles).toEqual([1]);
+		});
+
+		it("sends the screen on for fingers lifted on their way, and back for fingers that slowed first", () => {
+			const { inner, settles, follows } = setUp();
+			for (let i = 0; i < 10; i++) wheel(inner, 4);
+			for (let size = 3.8; size > 0.1; size *= 0.95) wheel(inner, size);
+			expect(settles).toEqual([1]);
+			expect(follows).toHaveLength(14);
+			vi.advanceTimersByTime(1000);
+			for (let i = 0; i < 10; i++) wheel(inner, 2);
+			for (let size = 1.9; size > 0.1; size *= 0.95) wheel(inner, size);
+			expect(settles).toEqual([1, null]);
 		});
 
 		it("keeps the screen from scrolling sideways, and leaves an up-or-down scroll alone", () => {

@@ -144,6 +144,8 @@ export const LAYOUT = {
 	minutesPerDay: 1440,
 	/** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
 	swipeFlickSpeed: 0.3,
+	/** Two fingers swept this far on a trackpad within a moment send the screen on at once, as a flick does. */
+	swipeWheelDistance: 60,
 	/** How stiffly the screen gives past the row's end: drawn a whole width, it moves this share of it at first, less and less after. */
 	swipeEdgeGive: 0.55,
 	/** The list scrolls a field typed in at least this far above the bar. */
