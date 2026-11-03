@@ -50,8 +50,8 @@ describe("ListDrop", () => {
 		const { drop, list } = setup([item("soon", 0, "A", null), b, item("soon", 2, "C", "Morning")], "soon", "soon");
 		const from = drag("left", item("now", 0, "N", null));
 		drop.preview(50, 100 + 3 * 40 + 2, from);
-		expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, false, true, true]);
-		expect(document.querySelector(".tc-drop-gap")).not.toBeNull();
+		expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", "", "", ""]);
+		expect(list.el.querySelector(".tc-list-drop.is-shown .tc-drop-line")).not.toBeNull();
 		expect(drop.drop(50, 100 + 3 * 40 + 2, from)).toEqual({ kind: "group", list: "soon", date: null, group: "Morning", before: b.key });
 		drop.clear();
 		expect(drop.drop(50, 100 + 5 * 40, from)).toEqual({ kind: "group", list: "soon", date: null, group: "Morning", before: null });
@@ -137,7 +137,7 @@ describe("ListDrop", () => {
 			const { drop, list } = setup(items, "soon", null);
 			const y = 100 + 2 * 40 + 2;
 			drop.preview(50, y, fresh);
-			expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, false]);
+			expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", ""]);
 			expect(list.el.querySelector(".tc-list-drop .tc-drop-line")).not.toBeNull();
 			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
 		});
@@ -207,102 +207,87 @@ describe("ListDrop", () => {
 		});
 	});
 
-	describe("making room (the owner's decision of 02.11)", () => {
+	describe("a task carried: its place waits dashed, the cards stay, the drop line shows where it goes", () => {
 		const STEP = 37;
-		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null), item("now", 3, "D", null)];
-		const room = (list: TaskList) => list.elements.map((n) => n.style.getPropertyValue("--tc-room"));
-		const gapEl = () => document.querySelector<HTMLElement>(".tc-drop-gap");
+		const four = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null), item("now", 3, "D", null)];
+		const lineEl = () => document.querySelector<HTMLElement>(".tc-list-drop");
 
-		/** Cards a step apart, as drawn: the lifted one keeps its place in the layout. */
+		/** Cards a step apart, as drawn: the lifted one waits where it stood, a dashed place as tall as a card. */
 		function lifted(at: number) {
-			const items = three();
+			const items = four();
 			const { list, drop } = setup(items, "left", null);
+			list.el.style.setProperty("--tc-subtask-indent", "20px");
 			list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * STEP, 175, 35)));
 			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
-			list.elements[at].classList.add("is-lifted");
+			list.elements[at].classList.add("is-lifted", "is-waiting");
 			return { list, drop, items, from: drag("left", items[at]) };
 		}
 
 		beforeEach(() => document.body.replaceChildren());
-		afterEach(() => {
-			document.body.replaceChildren();
-			vi.useRealTimers();
-		});
+		afterEach(() => document.body.replaceChildren());
 
-		it("keeps the lifted card's place open from the lift, dashed, the other cards where they were", () => {
-			const { list, drop, from } = lifted(1);
-			drop.preview(10 + 17, 100 + STEP + 17, from);
-			expect(room(list)).toEqual(["0px", "0px", "0px", "0px"]);
-			expect(list.el.classList.contains("is-making-room")).toBe(true);
-			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
-			expect(gapEl()?.parentElement).toBe(list.el);
+		it("over the place it was lifted from shows no line: the dashed place says it stays", () => {
+			const { drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			expect(lineEl()).toBeNull();
 			expect(drop.landing()?.top).toBe(100 + STEP);
+			expect(drop.drop(27, 100 + STEP + 17, from)).toBeNull();
 		});
 
-		it("moves the room only when the finger picks another gap: the cards step aside by transform, none reflows", () => {
-			const { list, drop, from } = lifted(1);
-			drop.preview(27, 100 + STEP + 17, from);
+		it("between two other cards draws the line in their gap; no card moves", () => {
+			const { list, drop, items, from } = lifted(1);
 			drop.preview(27, 100 + 3 * STEP + 2, from);
-			expect(room(list)).toEqual(["0px", "0px", `-${STEP}px`, "0px"]);
-			expect(list.elements[1].classList.contains("is-lifted")).toBe(true);
+			expect(lineEl()?.classList.contains("is-shown")).toBe(true);
+			expect(lineEl()?.parentElement).toBe(list.el);
+			const top = Number(/, ([\d.]+)px, 0\)$/.exec(lineEl()!.style.transform)![1]);
+			expect(top).toBeGreaterThan(2 * STEP + 35);
+			expect(top).toBeLessThanOrEqual(3 * STEP);
+			expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", "", ""]);
+			expect(list.elements[1].classList.contains("is-waiting")).toBe(true);
+			expect(drop.drop(27, 100 + 3 * STEP + 2, from)).toEqual({ kind: "listBefore", before: items[3].key, column: "left" });
 		});
 
-		it("keeps the room where it is while the finger is over a card: the card under it does not slide away", () => {
-			const { list, drop, from } = lifted(1);
-			drop.preview(27, 100 + STEP + 17, from);
-			const before = room(list);
-			drop.preview(27, 100 + 2 * STEP + 17, from);
-			expect(list.elements[2].classList.contains("is-target")).toBe(true);
-			expect(room(list)).toEqual(before);
-			expect(gapEl()?.classList.contains("is-shown")).toBe(false);
-			drop.preview(27, 100 + 2 * STEP + 18, from);
-			expect(list.elements[2].classList.contains("is-target")).toBe(true);
-		});
-
-		it("keeps the lifted card's place open, dashed, while the finger is outside the list (the owner's decision of 02.11)", () => {
-			const { list, drop, from } = lifted(1);
-			drop.preview(27, 100 + 3 * STEP + 2, from);
-			drop.leave();
-			expect(room(list)).toEqual(["0px", "0px", "0px", "0px"]);
-			expect(gapEl()?.classList.contains("is-shown")).toBe(true);
-			expect(gapEl()?.style.transform).toBe(`translate3d(0px, ${STEP}px, 0)`);
-			drop.preview(27, 100 + STEP + 17, from);
-			expect(drop.landing()?.top).toBe(100 + STEP);
-		});
-
-		it("let go at the place it was lifted from, the card only goes back: nothing to write", () => {
+		it("lands where the card will stand once its dashed place above has gone", () => {
 			const { drop, from } = lifted(1);
 			drop.preview(27, 100 + 3 * STEP + 2, from);
-			drop.leave();
-			drop.preview(27, 100 + STEP + 17, from);
-			expect(drop.drop(27, 100 + STEP + 17, from)).toBeNull();
+			expect(drop.landing()?.top).toBe(100 + 3 * STEP - STEP);
+		});
+
+		it("over the middle of a card lights it and hides the line", () => {
+			const { list, drop, items, from } = lifted(1);
 			drop.preview(27, 100 + 3 * STEP + 2, from);
-			expect(drop.drop(27, 100 + 3 * STEP + 2, from)).not.toBeNull();
+			drop.preview(27, 100 + 2 * STEP + 17, from);
+			expect(list.elements[2].classList.contains("is-target")).toBe(true);
+			expect(lineEl()).toBeNull();
+			expect(drop.drop(27, 100 + 2 * STEP + 17, from)).toEqual({ kind: "nest", parent: items[2].key, before: null });
 		});
 
-		it("a list nothing was lifted from closes when the finger leaves it", () => {
-			vi.useFakeTimers();
+		it("at its own place a level deeper, the line runs through the dashed place's middle", () => {
+			const { drop, items, from } = lifted(1);
+			drop.preview(27 + 20, 100 + STEP + 17, from);
+			expect(lineEl()?.style.transform).toBe(`translate3d(20px, ${STEP + 35 / 2}px, 0)`);
+			expect(drop.drop(27 + 20, 100 + STEP + 17, from)).toEqual({ kind: "nest", parent: items[0].key, before: null });
+		});
+
+		it("the finger gone from the list takes the line away; the dashed place waits", () => {
 			const { list, drop, from } = lifted(1);
-			list.elements[1].classList.remove("is-lifted");
-			drop.preview(27, 100 + 2 * STEP + 2, from);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
 			drop.leave();
-			expect(room(list)).toEqual(["", "", "", ""]);
-			vi.runAllTimers();
-			expect(gapEl()).toBeNull();
+			expect(lineEl()).toBeNull();
+			expect(list.elements[1].classList.contains("is-waiting")).toBe(true);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			expect(lineEl()).not.toBeNull();
+			drop.clear();
+			expect(lineEl()).toBeNull();
 		});
 
-		it("closes over the lifted card when the drag is over, and stands as drawn once the card is back", () => {
-			vi.useFakeTimers();
-			const { list, drop, from } = lifted(1);
-			drop.preview(27, 100 + STEP + 17, from);
-			drop.clear();
-			expect(room(list)).toEqual(["0px", "0px", `-${STEP}px`, `-${STEP}px`]);
-			vi.runAllTimers();
-			expect(gapEl()).toBeNull();
-			list.elements[1].classList.remove("is-lifted");
-			drop.clear();
-			expect(room(list)).toEqual(["", "", "", ""]);
-			expect(list.el.classList.contains("is-making-room")).toBe(false);
+		it("several cards carried: let go at the place of one of them, they still move there", () => {
+			const { list, drop, items } = lifted(1);
+			list.elements[3].classList.add("is-lifted", "is-waiting");
+			const many: DragPayload = { item: items[1], from: "left", durationMin: null, grabPx: 17, grabX: 17, carried: [{ item: items[3], from: "left" }] };
+			drop.preview(27, 100 + STEP + 17, many);
+			expect(lineEl()).not.toBeNull();
+			expect(drop.drop(27, 100 + STEP + 17, many)).toEqual({ kind: "listBefore", before: items[2].key, column: "left" });
 		});
 
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {

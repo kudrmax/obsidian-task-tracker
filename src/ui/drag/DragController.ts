@@ -16,7 +16,9 @@ import { LongPress } from "./LongPress";
 import { snapMinutes } from "./snap";
 import type { PickedCard } from "../TaskSelection";
 
+/** A lifted card stays where it stood as a dashed place, its subtasks folded away under it. */
 const WAITING = "is-waiting";
+const FOLDED = "is-folded";
 
 export interface DragControllerDeps {
 	longPressMs(): number;
@@ -224,7 +226,7 @@ export class DragController {
 		document.addEventListener("pointercancel", cancel);
 	}
 
-	/** `carried`: the other picked cards, lifted with this one; each waits as a dashed place where it stood until the pointer is over its list. */
+	/** `carried`: the other picked cards, lifted with this one; each waits as a dashed place where it stood. */
 	private begin(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
 		if (!this.deps.arbiter.claim(DRAG)) return;
 		this.deps.haptics.tap();
@@ -232,14 +234,17 @@ export class DragController {
 		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length);
 		float.moveTo(e.clientX, e.clientY);
 		const timeline = payload.from === "timeline" ? this.deps.timeline() : null;
-		const lifted = [source, ...subtree, ...carried.flatMap((c) => [c.card, ...c.subtree])];
+		const waiting = [source, ...carried.map((c) => c.card)];
+		const folded = [...subtree, ...carried.flatMap((c) => c.subtree)];
+		const lifted = [...waiting, ...folded];
 		for (const card of lifted) card.classList.add("is-lifted");
-		if (carried.length > 0) for (const card of lifted) card.classList.add(WAITING);
+		for (const card of waiting) card.classList.add(WAITING);
+		for (const card of folded) card.classList.add(FOLDED);
 		timeline?.layoutTasks();
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		const reopen = () => {
-			for (const card of lifted) card.classList.remove("is-lifted", WAITING);
+			for (const card of lifted) card.classList.remove("is-lifted", WAITING, FOLDED);
 			timeline?.layoutTasks();
 		};
 		this.follow(
