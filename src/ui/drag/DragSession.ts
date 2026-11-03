@@ -21,15 +21,16 @@ export class DragSession {
 
 	constructor(private readonly opts: DragSessionOptions) {}
 
+	/** The targets read the layout first; the float, fixed over everything, is written last, so it moves nothing they measure. */
 	move(x: number, y: number): void {
 		if (this.done) return;
-		this.opts.float.moveTo(x, y);
 		const target = this.opts.targets.find((t) => t.hitTest(x, y, this.opts.payload)) ?? null;
 		if (target !== this.current) {
 			this.current?.leave();
 			this.current = target;
 		}
 		target?.preview(x, y, this.opts.payload);
+		this.opts.float.moveTo(x, y);
 	}
 
 	async release(x: number, y: number): Promise<void> {
