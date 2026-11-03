@@ -80,8 +80,7 @@ export class ListDrop implements DropTarget {
 			return;
 		}
 		const card = shownCardSize();
-		const indent = this.indent();
-		const level = indent > 0 ? (x - drag.grabX - this.baseLeft()) / indent : 0;
+		const level = drag.from === "new" ? this.newTaskLevel(x) : this.cardLevel(x, drag);
 		const heads = this.sections() ? layout.heads : [];
 		const room = this.room ?? this.liftedFrom();
 		const held = this.place ?? room;
@@ -271,6 +270,22 @@ export class ListDrop implements DropTarget {
 		if (at < 0) return null;
 		const before = all.slice(0, at).filter((entry) => !entry.card.classList.contains(LIFTED)).length;
 		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
+	}
+
+	/** A card carried along: the level its left edge stands at. */
+	private cardLevel(x: number, drag: DragPayload): number {
+		const indent = this.indent();
+		return indent > 0 ? (x - drag.grabX - this.baseLeft()) / indent : 0;
+	}
+
+	/**
+	 * A new task: the finger on the list's right half makes it a subtask of the card above, as deep as the neighbours
+	 * allow; on the left half it stays as shallow as they allow. The thumb of either hand reaches its half without
+	 * stretching to the list's left edge.
+	 */
+	private newTaskLevel(x: number): number {
+		const r = this.list.el.getBoundingClientRect();
+		return x >= r.left + r.width / 2 ? Number.POSITIVE_INFINITY : 0;
 	}
 
 	private indent(): number {

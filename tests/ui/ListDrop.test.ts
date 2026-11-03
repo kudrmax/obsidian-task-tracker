@@ -124,6 +124,18 @@ describe("ListDrop", () => {
 			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
 		});
 
+		it("let go between cards with the finger on the list's right half, becomes a subtask of the card above", () => {
+			const items = three();
+			const { drop } = setup(items, "soon", null);
+			expect(drop.drop(150, 100 + 2 * 40 + 2, fresh)).toEqual({ kind: "nest", parent: items[1].key, before: null });
+		});
+
+		it("let go with the finger on the list's left half, stays a task wherever the card stood", () => {
+			const items = three();
+			const { drop } = setup(items, "soon", null);
+			expect(drop.drop(90, 100 + 2 * 40 + 2, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
+		});
+
 		it("goes to the end of a list when let go below its cards", () => {
 			const { drop } = setup(three(), "inbox", null);
 			expect(drop.drop(50, 100 + 3 * 40 + 10, fresh)).toEqual({ kind: "listBefore", before: null, column: "inbox" });
