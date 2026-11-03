@@ -242,7 +242,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"));
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"), true, () => this.haptics.tap());
 		this.inboxEl = el(root, "div", "tc-inbox");
 		const inboxPane = el(this.inboxEl, "div", "tc-pane is-inbox");
 		const backlogPane = el(this.inboxEl, "div", "tc-pane is-backlog");
@@ -257,7 +257,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", undatedTakes, () => this.sectionsOf("inbox"));
+		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", undatedTakes, () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
 		this.backlogList = new TaskList(el(backlogPane, "div"), {
 			items: () => this.unnamed(this.data.backlog),
@@ -270,7 +270,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
 		});
-		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", undatedTakes, () => this.sectionsOf("backlog"), false);
+		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", undatedTakes, () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
@@ -283,7 +283,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"));
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"), true, () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {

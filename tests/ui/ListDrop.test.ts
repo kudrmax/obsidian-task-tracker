@@ -18,7 +18,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	parentText: null, description: null,
 });
 
-function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | null, date: string | null = null) {
+function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | null, date: string | null = null, onNewPlace = () => undefined) {
 	const area = document.createElement("div");
 	document.body.appendChild(area);
 	const list = new TaskList(document.createElement("div"), {
@@ -32,7 +32,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	area.getBoundingClientRect = () => new DOMRect(0, 100, 187, 554);
 	list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
 	list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * 40, 175, 35)));
-	const drop = new ListDrop(list, area, column, () => true, () => (grouped ? { list: grouped, date } : null));
+	const drop = new ListDrop(list, area, column, () => true, () => (grouped ? { list: grouped, date } : null), true, onNewPlace);
 	return { list, drop };
 }
 
@@ -111,7 +111,10 @@ describe("ListDrop", () => {
 			const { drop } = setup(items, "left", null);
 			const y = 100 + 40 + 2;
 			drop.preview(50, y, fresh);
-			expect(drop.landing()?.top).toBe(140);
+			const line = drop.landing()!;
+			expect(line.height).toBe(0);
+			expect(line.top).toBeGreaterThan(135);
+			expect(line.top).toBeLessThan(140);
 			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[1].key, column: "left" });
 		});
 
@@ -124,15 +127,56 @@ describe("ListDrop", () => {
 	describe("a new task", () => {
 		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
 		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null)];
+		const indented = <T extends { list: TaskList }>(made: T): T => {
+			made.list.el.style.setProperty("--tc-subtask-indent", "20px");
+			return made;
+		};
 
-		it("takes a gap anywhere in a list without sections, in a column it is not from", () => {
+		it("takes a gap anywhere in a list without sections, in a column it is not from: a line shows it, the cards stay", () => {
 			const items = three();
 			const { drop, list } = setup(items, "soon", null);
 			const y = 100 + 2 * 40 + 2;
 			drop.preview(50, y, fresh);
-			expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, true]);
-			expect(document.querySelector(".tc-drop-gap")).not.toBeNull();
+			expect(list.elements.map((n) => n.classList.contains("is-shifted"))).toEqual([false, false, false]);
+			expect(list.el.querySelector(".tc-list-drop .tc-drop-line")).not.toBeNull();
 			expect(drop.drop(50, y, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
+		});
+
+		it("let go between cards with the finger on the list's right half, becomes a subtask of the card above", () => {
+			const items = three();
+			const { drop } = indented(setup(items, "soon", null));
+			expect(drop.drop(150, 100 + 2 * 40 + 2, fresh)).toEqual({ kind: "nest", parent: items[1].key, before: null });
+		});
+
+		it("let go with the finger on the list's left half, stays a task", () => {
+			const items = three();
+			const { drop } = setup(items, "soon", null);
+			expect(drop.drop(90, 100 + 2 * 40 + 2, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "soon" });
+		});
+
+		it("goes a level deeper for each indent the finger stands right of the list's middle (97.5)", () => {
+			const a = item("now", 0, "A", null);
+			const sub = { ...item("now", 0, "A1", null), key: { section: "now" as const, index: 0, path: [0], raw: "\t- [ ] A1" } };
+			const items = [{ ...a, subtasks: [sub] }, item("now", 1, "B", null)];
+			const { drop } = indented(setup(items, "soon", null));
+			const y = 100 + 2 * 40 - 2;
+			expect(drop.drop(105, y, fresh)).toEqual({ kind: "listBefore", before: items[1].key, column: "soon" });
+			drop.clear();
+			expect(drop.drop(120, y, fresh)).toEqual({ kind: "nest", parent: a.key, before: null });
+			drop.clear();
+			expect(drop.drop(140, y, fresh)).toEqual({ kind: "nest", parent: sub.key, before: null });
+		});
+
+		it("ticks each time the line moves to another gap or level, not while it stays", () => {
+			const ticks = vi.fn();
+			const { drop } = indented(setup(three(), "soon", null, null, ticks));
+			drop.preview(50, 100 + 40 - 2, fresh);
+			drop.preview(52, 100 + 40 - 1, fresh);
+			expect(ticks).toHaveBeenCalledTimes(1);
+			drop.preview(52, 100 + 2 * 40 - 2, fresh);
+			expect(ticks).toHaveBeenCalledTimes(2);
+			drop.preview(150, 100 + 2 * 40 - 2, fresh);
+			expect(ticks).toHaveBeenCalledTimes(3);
 		});
 
 		it("goes to the end of a list when let go below its cards", () => {
@@ -140,10 +184,12 @@ describe("ListDrop", () => {
 			expect(drop.drop(50, 100 + 3 * 40 + 10, fresh)).toEqual({ kind: "listBefore", before: null, column: "inbox" });
 		});
 
-		it("goes into the card under the middle of it as a subtask", () => {
+		it("never goes into a card: over its middle it takes the nearer gap", () => {
 			const items = three();
 			const { drop } = setup(items, "left", null);
-			expect(drop.drop(50, 140 + 17, fresh)).toEqual({ kind: "nest", parent: items[1].key, before: null });
+			expect(drop.drop(50, 140 + 17, fresh)).toEqual({ kind: "listBefore", before: items[1].key, column: "left" });
+			drop.clear();
+			expect(drop.drop(50, 140 + 18, fresh)).toEqual({ kind: "listBefore", before: items[2].key, column: "left" });
 		});
 
 		it("takes the gap of a section in a list that shows sections", () => {

@@ -39,7 +39,7 @@ export class DragSession {
 		const result = target?.drop(x, y, this.opts.payload) ?? null;
 		if (!target || !result) return this.settleBack();
 		const landing = target.landing() ?? this.opts.origin;
-		await Promise.all([this.opts.float.flyTo(landing), this.opts.onEnd(result)]);
+		await Promise.all([this.opts.float.land(landing), this.opts.onEnd(result)]);
 		this.clearAll();
 		this.opts.float.remove();
 	}
