@@ -4,11 +4,21 @@ import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
 import type { Shift } from "./screens";
 
+/** What a swipe draws: the screen, beside the next one either way. */
+export interface SwipeTarget {
+	/** How far the screen travels to stand on the next one `shift`'s way; null where the row of screens ends. */
+	distance(shift: Shift): number | null;
+	/** The screen drawn `dx` px from where it stood, left negative. */
+	follow(dx: number): void;
+	/** Let go: on to the next screen `shift`'s way, or back where it stood (null); resolves once it stands. */
+	settle(shift: Shift | null): Promise<void>;
+}
+
 export interface SwipeOptions {
 	readonly arbiter: GestureArbiter;
 	/** Whether a press here may swipe: what lies over the screen keeps its fingers. */
 	accepts(target: EventTarget | null): boolean;
-	onSwipe(shift: Shift): void;
+	readonly target: SwipeTarget;
 }
 
 interface Press {
@@ -16,20 +26,32 @@ interface Press {
 	readonly x: number;
 	readonly y: number;
 	readonly speed: PointerSpeed;
+	/** Where the finger stood when the screen took it: the screen follows it from there. */
+	from: number;
+	lastX: number;
+	/** The way the finger last went: on (left) or back (right). */
+	way: Shift | 0;
 	swiping: boolean;
 }
 
 /**
  * What a trackpad sends without a pause: one stroke, its glide after the fingers lift, and any stroke begun while it
- * glides. It steps once the fingers have swept far enough lately; then it waits for the next stroke.
+ * glides. The screen follows the fingers and is let go the moment they are: when they sweep, when the glide sets in, or
+ * when they have drawn it the whole way; the glide that follows is passed by.
  */
 interface Stream {
-	/** The sideways moves of the last moments, while it may step. */
-	recent: { readonly time: number; readonly delta: number }[];
-	/** Where and when it stepped: the glide that follows runs the same way and only slows down. */
+	/** How far the stroke has drawn the screen. */
+	dx: number;
+	/** Whether the screen follows the stroke now. */
+	following: boolean;
+	/** Where and when the screen was let go: the glide that follows runs the same way and only slows down. */
 	stepped: { readonly time: number; readonly shift: Shift } | null;
+	/** The sideways moves of the last moments. */
+	recent: { readonly time: number; readonly delta: number }[];
 	/** The size of the last move. */
 	last: number;
+	/** How many times in a row the moves have shrunk, with none growing: the glide after the fingers lift only shrinks. */
+	shrinking: number;
 	timer: number;
 }
 
@@ -42,25 +64,29 @@ export function swipeStartsAt(target: EventTarget | null): boolean {
 }
 
 const SWIPE = "swipe";
-/** The stream ends once the trackpad has sent nothing for this long. */
+/** The stream ends once the trackpad has sent nothing for this long: the fingers stopped, or lifted and the glide died. */
 const STREAM_SETTLE_MS = 150;
-/** The fingers sweep: only the moves of this long count towards a step, so a slow creep never makes one. */
+/** The fingers sweep: only the moves of this long count towards a sweep, so a slow creep never makes one. */
 const SWEEP_MS = 100;
+/** Moves that shrink this many times in a row, none growing, are the glide: the fingers have lifted. */
+const GLIDE_SHRINKS = 4;
 /** Fingers come down again no sooner than this after a step; until then the stroke that stepped is still going. */
 const NEXT_STROKE_MS = 150;
 /** A glide only slows down: a move this many times the last one is fingers that came down and swept again. */
 const NEXT_STROKE_RISE = 1.5;
 
 /**
- * A finger drawn sideways across the screen steps to the next screen, to the left, or back, to the right; up or down it is
- * a scroll and stays one. It holds the screen once it goes sideways, so a press that set off as a swipe is not also
- * lifted or scrolled, and it steps when let go far enough along, or quickly. Two fingers drawn sideways on a
- * trackpad step the same way, once a stroke, however soon the next stroke follows; a pinch (ctrl or cmd with the wheel)
- * is the zoom's.
+ * A finger drawn sideways draws the screen with it, the next screen coming in beside it, to the left or back to the right;
+ * up or down it is a scroll and stays one. Let go, the screen runs on to whichever screen stands nearer, or the way a quick
+ * flick sends it, never further than the next one. It holds the screen from the moment it goes sideways until the screen
+ * stands again, so a press that set off as a swipe is not also lifted or scrolled. Two fingers drawn sideways on a trackpad
+ * draw it the same way, and it settles once they stop; a pinch (ctrl or cmd with the wheel) is the zoom's.
  */
 export class Swipe {
 	private press: Press | null = null;
 	private stream: Stream | null = null;
+	/** The swipes and settlings now holding the screen. */
+	private holds = 0;
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -74,23 +100,43 @@ export class Swipe {
 	}
 
 	private wheel(e: WheelEvent): void {
-		if (e.ctrlKey || e.metaKey || this.opts.arbiter.busy || !this.opts.accepts(e.target)) return;
-		const stream = (this.stream ??= { recent: [], stepped: null, last: 0, timer: 0 });
+		if (e.ctrlKey || e.metaKey || !this.free() || !this.opts.accepts(e.target)) return;
+		const stream = (this.stream ??= { dx: 0, following: false, stepped: null, recent: [], last: 0, shrinking: 0, timer: 0 });
 		window.clearTimeout(stream.timer);
-		stream.timer = window.setTimeout(() => (this.stream = null), STREAM_SETTLE_MS);
+		stream.timer = window.setTimeout(() => this.endStream(stream), STREAM_SETTLE_MS);
 		if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 		e.preventDefault();
 		const size = Math.abs(e.deltaX);
 		if (stream.stepped && this.nextStroke(stream.stepped, e, stream.last)) stream.stepped = null;
+		stream.shrinking = size < stream.last ? stream.shrinking + 1 : size > stream.last ? 0 : stream.shrinking;
 		stream.last = size;
 		if (stream.stepped) return;
+		if (!stream.following) {
+			if (!this.hold()) return;
+			stream.following = true;
+			stream.dx = 0;
+			stream.recent = [];
+			stream.shrinking = 0;
+		}
+		stream.dx = this.within(stream.dx - e.deltaX);
+		this.opts.target.follow(stream.dx);
 		stream.recent = [...stream.recent.filter((move) => e.timeStamp - move.time < SWEEP_MS), { time: e.timeStamp, delta: e.deltaX }];
-		const travel = stream.recent.reduce((sum, move) => sum + move.delta, 0);
-		if (Math.abs(travel) < LAYOUT.swipeWheelDistance) return;
-		const shift: Shift = travel > 0 ? 1 : -1;
-		stream.stepped = { time: e.timeStamp, shift };
-		stream.recent = [];
-		this.opts.onSwipe(shift);
+		const sweep = stream.recent.reduce((sum, move) => sum + move.delta, 0);
+		const going: Shift = e.deltaX > 0 ? 1 : -1;
+		if (Math.abs(sweep) >= LAYOUT.swipeWheelDistance) return this.stepStream(stream, e, sweep > 0 ? 1 : -1, sweep > 0 ? 1 : -1);
+		const shift: Shift = stream.dx < 0 ? 1 : -1;
+		const distance = this.opts.target.distance(shift);
+		if (distance !== null && Math.abs(stream.dx) >= distance) return this.stepStream(stream, e, going, shift);
+		if (stream.shrinking < GLIDE_SHRINKS) return;
+		const span = Math.max(1, e.timeStamp - stream.recent[0].time);
+		const fling = Math.abs(sweep) / span >= LAYOUT.swipeFlickSpeed ? going : 0;
+		this.stepStream(stream, e, going, this.landing(stream.dx, fling));
+	}
+
+	/** The screen is let go: on to `shift`'s screen or back; the glide that follows, going `going`'s way, is passed by. */
+	private stepStream(stream: Stream, e: WheelEvent, going: Shift, shift: Shift | null): void {
+		stream.stepped = { time: e.timeStamp, shift: going };
+		this.letStreamGo(stream, shift === null || this.opts.target.distance(shift) === null ? null : shift);
 	}
 
 	/** After a step the glide runs the same way and slows down; a move the other way, or a sudden rise, is the next stroke. */
@@ -99,29 +145,46 @@ export class Swipe {
 		return Math.sign(e.deltaX) !== stepped.shift || Math.abs(e.deltaX) > last * NEXT_STROKE_RISE + 1;
 	}
 
+	private endStream(stream: Stream): void {
+		if (this.stream === stream) this.stream = null;
+		if (stream.following) this.letStreamGo(stream, this.landing(stream.dx, 0));
+	}
+
+	private letStreamGo(stream: Stream, shift: Shift | null): void {
+		stream.following = false;
+		stream.dx = 0;
+		void this.opts.target.settle(shift).then(() => this.letGo());
+	}
+
 	private down(e: PointerEvent): void {
 		if (e.pointerType === "mouse") return;
 		if (!e.isPrimary) {
 			if (this.press && !this.press.swiping) this.press = null;
 			return;
 		}
-		if (this.opts.arbiter.busy || !this.opts.accepts(e.target)) return;
-		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, speed: new PointerSpeed(e.clientX, e.timeStamp), swiping: false };
+		if (!this.free() || !this.opts.accepts(e.target)) return;
+		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, speed: new PointerSpeed(e.clientX, e.timeStamp), from: e.clientX, lastX: e.clientX, way: 0, swiping: false };
 	}
 
 	private move(e: PointerEvent): void {
 		const press = this.press;
 		if (!press || e.pointerId !== press.pointerId) return;
 		press.speed.update(e.clientX, e.timeStamp);
-		if (press.swiping) return;
+		if (e.clientX !== press.lastX) press.way = e.clientX < press.lastX ? 1 : -1;
+		press.lastX = e.clientX;
+		if (press.swiping) {
+			this.opts.target.follow(this.within(e.clientX - press.from));
+			return;
+		}
 		const dx = Math.abs(e.clientX - press.x);
 		const dy = Math.abs(e.clientY - press.y);
 		if (Math.hypot(dx, dy) <= LAYOUT.pressTolerance) return;
-		if (dx <= dy || !this.opts.arbiter.claim(SWIPE)) {
+		if (dx <= dy || !this.hold()) {
 			this.press = null;
 			return;
 		}
 		press.swiping = true;
+		press.from = e.clientX;
 		capturePointer(this.el, press.pointerId);
 	}
 
@@ -132,10 +195,40 @@ export class Swipe {
 		if (!press.swiping) return;
 		press.speed.update(e.clientX, e.timeStamp);
 		releasePointer(this.el, press.pointerId);
-		this.opts.arbiter.release(SWIPE);
-		const dx = e.clientX - press.x;
-		const far = Math.abs(dx) >= LAYOUT.swipeDistance;
-		const quick = Math.abs(dx) > LAYOUT.pressTolerance && press.speed.value >= LAYOUT.swipeFlickSpeed;
-		if (released && (far || quick)) this.opts.onSwipe(dx < 0 ? 1 : -1);
+		const dx = this.within(e.clientX - press.from);
+		this.opts.target.follow(dx);
+		const fling = press.speed.value >= LAYOUT.swipeFlickSpeed ? press.way : 0;
+		void this.opts.target.settle(released ? this.landing(dx, fling) : null).then(() => this.letGo());
+	}
+
+	/** Where the screen stands once let go: the next screen when it is the nearer one, or when a flick sends it there. */
+	private landing(dx: number, fling: Shift | 0): Shift | null {
+		if (dx === 0) return null;
+		const shift: Shift = dx < 0 ? 1 : -1;
+		const distance = this.opts.target.distance(shift);
+		if (distance === null) return null;
+		if (fling !== 0) return fling === shift ? shift : null;
+		return Math.abs(dx) * 2 >= distance ? shift : null;
+	}
+
+	/** The screen goes no further than the next one. */
+	private within(dx: number): number {
+		const distance = this.opts.target.distance(dx < 0 ? 1 : -1);
+		return distance === null ? dx : Math.sign(dx) * Math.min(Math.abs(dx), distance);
+	}
+
+	/** The screen is free for a swipe: no other gesture holds it, though a swipe still settling may. */
+	private free(): boolean {
+		return this.holds > 0 || !this.opts.arbiter.busy;
+	}
+
+	private hold(): boolean {
+		if (this.holds === 0 && !this.opts.arbiter.claim(SWIPE)) return false;
+		this.holds++;
+		return true;
+	}
+
+	private letGo(): void {
+		if (--this.holds === 0) this.opts.arbiter.release(SWIPE);
 	}
 }

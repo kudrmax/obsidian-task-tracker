@@ -142,12 +142,12 @@ export const LAYOUT = {
 	/** The least a finger moves for one step: under this the snapped time would flicker between neighbours. */
 	snapStepPx: 9,
 	minutesPerDay: 1440,
-	/** A finger drawn sideways this far steps to the next screen when let go. */
-	swipeDistance: 48,
-	/** So does a shorter flick still this fast when let go, px per ms. */
+	/** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
 	swipeFlickSpeed: 0.3,
-	/** Two fingers drawn sideways this far on a trackpad step to the next screen. */
+	/** Two fingers swept this far on a trackpad within a moment send the screen on at once, as a flick does. */
 	swipeWheelDistance: 60,
+	/** How stiffly the screen gives past the row's end: drawn a whole width, it moves this share of it at first, less and less after. */
+	swipeEdgeGive: 0.55,
 	/** The list scrolls a field typed in at least this far above the bar. */
 	fieldOverBar: 16,
 } as const;

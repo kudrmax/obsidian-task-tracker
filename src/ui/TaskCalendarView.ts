@@ -43,6 +43,9 @@ import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
+import { DayPeek } from "./DayPeek";
+import { ScreenPager, type ScreenTrack } from "./ScreenPager";
+import { DayTrack, EdgeTrack, StripTrack, stripParts } from "./ScreenTracks";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -136,6 +139,10 @@ export class TaskCalendarView extends ItemView {
 	/** A card sent to New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
 	private switching = 0;
+	/** The place a swipe has just brought the screen to, until the settings have it. */
+	private shownMode: RightMode | null = null;
+	/** The day a swipe brought in, drawn over the screen until the screen has drawn it itself. */
+	private landing: { readonly peek: DayPeek; readonly parts: readonly HTMLElement[] } | null = null;
 	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
 	private quick: QuickEntryController | null = null;
 	private readonly unsubscribe: (() => void)[] = [];
@@ -334,7 +341,7 @@ export class TaskCalendarView extends ItemView {
 		this.newInbox.pressOnDoubleClick(inboxPane, this.inboxList.el);
 		this.newBacklog.pressOnDoubleClick(backlogPane, this.backlogList.el);
 		const switcher = new ColumnSwitch(root, {
-			value: () => this.settings.rightMode,
+			value: () => this.mode(),
 			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
@@ -362,7 +369,7 @@ export class TaskCalendarView extends ItemView {
 			chromeTop: () => statusBarTop(root.ownerDocument),
 			toolbarTop: () => keyboardToolbarTop(root.ownerDocument),
 			day: () => this.selectedDate,
-			mode: () => this.settings.rightMode,
+			mode: () => this.mode(),
 			turnTo: (mode) => this.switcher?.show(mode),
 			showDay: (date) => {
 				this.select(date);
@@ -380,7 +387,7 @@ export class TaskCalendarView extends ItemView {
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
-			onSwipe: (shift) => void this.afterEntry(() => this.step(shift)),
+			target: new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth }),
 		});
 		this.unsubscribe.push(
 			this.deps.tasks.onChange(() => void this.data.tasks()),
@@ -473,25 +480,84 @@ export class TaskCalendarView extends ItemView {
 		void this.data.selectDay();
 	}
 
-	/** A swipe walks the row of screens: the switch carries the window to its place, and the day turns as the arrows turn it. */
-	private step(shift: Shift): void {
-		const to = stepScreen({ mode: this.settings.rightMode, date: this.selectedDate }, shift, this.today());
-		if (!to) return;
-		if (to.date !== this.selectedDate) this.select(to.date);
-		if (to.mode !== this.settings.rightMode) this.switcher?.show(to.mode);
+	private mode(): RightMode {
+		return this.shownMode ?? this.settings.rightMode;
+	}
+
+	/**
+	 * A swipe walks the row of screens as the switch and the arrows do: to the next pair of columns the strip slides under
+	 * the finger, to another day the screen moves aside for that day drawn beside it, and past the row's end it only gives.
+	 */
+	private trackTo(shift: Shift): ScreenTrack {
+		this.landed();
+		const root = this.contentEl;
+		const parts = stripParts(root);
+		const from = { mode: this.mode(), date: this.selectedDate };
+		const to = stepScreen(from, shift, this.today());
+		if (!to) return new EdgeTrack(parts, root.clientWidth);
+		if (to.mode !== from.mode) {
+			window.clearTimeout(this.switching);
+			root.classList.remove("is-switching");
+			return new StripTrack({
+				root,
+				from: from.mode,
+				to: to.mode,
+				showMode: (mode) => this.showMode(mode),
+				turnWheel: (position) => this.switcher?.follow(position),
+				onArrive: (mode) => this.arriveAt(mode),
+			});
+		}
+		const peek = new DayPeek(root, to.date, {
+			tasks: this.deps.tasks,
+			calendars: this.deps.calendars,
+			theme: () => this.theme(),
+			today: () => this.today(),
+			boundary: () => this.boundary(),
+			hourPx: () => this.hourPx,
+			now: () => this.deps.clock.now(),
+			grouped: (date) => dayColumn(date, this.today()).sections,
+			ungroupedName: () => this.settings.groups.ungrouped,
+			scrollTimeline: (timeline, date) => this.scrollToOpen(timeline, date),
+			listScroll: () => this.list?.el.scrollTop ?? 0,
+		});
+		return new DayTrack(parts, peek, shift, root.clientWidth, (arrived) => {
+			this.landing = { peek: arrived, parts };
+			void this.afterEntry(() => this.select(arrived.date));
+		});
+	}
+
+	/** The strip stands at the place a swipe brought it to: the switch turns there, and the choice is saved. */
+	private arriveAt(mode: RightMode): void {
+		this.shownMode = mode;
+		this.showMode(mode);
+		this.switcher?.show(mode);
+		void this.afterEntry(() => this.setMode(mode, false));
+	}
+
+	/** The screen has drawn the day a swipe brought in: it comes back from aside, and the day drawn over it goes. */
+	private landed(): void {
+		const landing = this.landing;
+		if (!landing) return;
+		this.landing = null;
+		for (const part of landing.parts) part.style.transform = "";
+		landing.peek.remove();
 	}
 
 	/**
 	 * The strip slides only while the window moves to the other pair, in step with the switch's pill, before the choice is
-	 * saved; the divider's drag and a resize move it at once.
+	 * saved; the divider's drag, a resize and a swipe that already brought it there move it at once.
 	 */
-	private async setMode(mode: RightMode): Promise<void> {
+	private async setMode(mode: RightMode, slide = true): Promise<void> {
 		const root = this.contentEl;
-		window.clearTimeout(this.switching);
-		root.classList.add("is-switching");
-		this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
+		if (slide) {
+			window.clearTimeout(this.switching);
+			root.classList.add("is-switching");
+			this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
+		}
+		this.shownMode = mode;
 		this.showMode(mode);
 		await this.deps.settings.update({ rightMode: mode });
+		if (this.shownMode === mode) this.shownMode = null;
 		this.render();
 	}
 
@@ -585,7 +651,7 @@ export class TaskCalendarView extends ItemView {
 			soon: [this.soonDrop, this.leftDrop],
 			inbox: [this.inboxDrop, this.backlogDrop, this.soonDrop],
 		};
-		return shown[this.settings.rightMode].filter((target) => target !== null);
+		return shown[this.mode()].filter((target) => target !== null);
 	}
 
 	/** A list's card: its gestures. */
@@ -828,7 +894,7 @@ export class TaskCalendarView extends ItemView {
 		this.list.render();
 		const missing = this.data.missing;
 		root.classList.toggle("is-missing", missing);
-		this.showMode(this.settings.rightMode);
+		this.showMode(this.mode());
 		for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el, this.newBacklog.el]) part.style.display = missing ? "none" : "";
 		root.querySelector(".tc-missing")?.remove();
 		if (missing) this.renderMissing(root);
@@ -840,11 +906,17 @@ export class TaskCalendarView extends ItemView {
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;
-			const boundary = this.boundary();
-			if (this.selectedDate === this.today()) this.timeline.scrollTo(boundary.offsetOf(this.selectedDate, this.deps.clock.now()), LAYOUT.nowFraction);
-			else this.timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
+			this.scrollToOpen(this.timeline, this.selectedDate);
 		}
+		if (this.landing?.peek.date === this.selectedDate && (this.data.missing || this.data.day?.date === this.selectedDate)) this.landed();
 		this.quick?.rendered();
+	}
+
+	/** Today opens on the now line, another day at the hour the settings name. */
+	private scrollToOpen(timeline: Timeline, date: LocalDate): void {
+		const boundary = this.boundary();
+		if (date === this.today()) timeline.scrollTo(boundary.offsetOf(date, this.deps.clock.now()), LAYOUT.nowFraction);
+		else timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
 	}
 
 	private renderMissing(root: HTMLElement): void {
