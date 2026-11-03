@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTaskLine, parseTaskLine, statusOf, type Markers } from "../../src/domain/TaskLine";
+import { fieldSlicerFor, formatTaskLine, parseTaskLine, statusOf, type Markers } from "../../src/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
 
@@ -155,5 +155,20 @@ describe("priority prefix", () => {
 
 	it("reads no priority without levels", () => {
 		expect(parseTaskLine("- [ ] p1 X", M)!.task).toMatchObject({ priority: null, text: "p1 X" });
+	});
+});
+
+describe("fieldSlicerFor", () => {
+	it("compiles the markers' patterns once for the same markers", () => {
+		const a = fieldSlicerFor({ dueDate: "📅", slot: "⏰" });
+		const b = fieldSlicerFor({ dueDate: "📅", slot: "⏰", priorities: ["!"] });
+		expect(a).toBe(b);
+	});
+
+	it("gives each set of markers its own patterns", () => {
+		const line = "- [ ] A @due 2026-11-03";
+		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
+		expect(parseTaskLine(line, { dueDate: "@due", slot: "⏰" })!.task.dueDate).toBe("2026-11-03");
+		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
 	});
 });

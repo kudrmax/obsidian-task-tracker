@@ -344,11 +344,21 @@ var FieldSlicer = class {
     return { date, start, end: end < start ? end + DAY_MINUTES2 : end };
   }
 };
+var slicers = /* @__PURE__ */ new Map();
+function fieldSlicerFor(markers) {
+  const key = `${markers.slot}\0${markers.dueDate}`;
+  let slicer = slicers.get(key);
+  if (!slicer) {
+    slicer = new FieldSlicer(markers);
+    slicers.set(key, slicer);
+  }
+  return slicer;
+}
 function parseTaskLine(line, markers) {
   const m = LINE_RE.exec(line);
   if (!m) return null;
   const statusChar = m[3];
-  const fields = new FieldSlicer(markers).slice(m[4]);
+  const fields = fieldSlicerFor(markers).slice(m[4]);
   return {
     indent: m[1],
     bullet: m[2],
