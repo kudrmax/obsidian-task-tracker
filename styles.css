@@ -131,7 +131,7 @@ body {
 	--tc-stroke-seg: 2px;
 
 	/* Sizes: the column headers */
-	--tc-day-row-top: 16px;
+	--tc-day-row-top: 0px;
 	--tc-day-row: 36px;
 	--tc-arrow: 36px;
 	/* Over a half-wide column the day's arrows close in, so that the longest day's name fits between them. */
@@ -147,8 +147,9 @@ body {
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
-	/* The switch's row at the bottom, over Obsidian's phone navigation. */
-	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
+	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
+	--tc-foot-gap: 12px;
+	--tc-switch-row: calc(var(--tc-seg) + var(--tc-foot-gap));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
 	--tc-plus-icon: 22px;
@@ -158,7 +159,9 @@ body {
 	--tc-plus-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 
 	/* Sizes: the columns */
-	--tc-columns-top: 64px;
+	/* The title row, then the head gap: the titles' type stands as far over the first card as Obsidian's header over it. */
+	--tc-columns-top: 40px;
+	--tc-head-gap: 4px;
 	--tc-list-width: 187px;
 	--tc-divider: 16px;
 	/* Soon and Now share the window evenly on both sides of the fixed divider. */
@@ -597,13 +600,13 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
 /* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; border-radius: var(--tc-radius-circle); display: flex; align-items: center; justify-content: center; touch-action: none; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus { background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: var(--tc-plus-shadow); }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-undo { position: absolute; left: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); width: var(--tc-plus-size); height: var(--tc-plus-size); box-sizing: border-box; padding: 0; border-radius: var(--tc-radius-circle); background: var(--tc-track-bg); box-shadow: var(--tc-desk-bar-shadow); color: var(--tc-text); display: flex; align-items: center; justify-content: center; z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
 .task-calendar > button.tc-undo:active { opacity: var(--tc-pressed); }
 .task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
@@ -662,7 +665,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-pane { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 /* The screen's foot (the switch's row, the fade) lies over Backlog's half: the half is that much taller, so both lists show as much. */
 .tc-pane.is-backlog { flex-basis: calc(var(--tc-foot-room) + var(--tc-foot-fade)); border-top: var(--tc-hairline) solid var(--tc-line); }
-.tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; }
+.tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-head-gap) 0; display: flex; align-items: center; }
 /* Inbox's half ends over the line, out of the screen's foot. */
 .task-calendar .tc-pane.is-inbox .tc-list::after { height: var(--tc-space-8); }
 .tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
