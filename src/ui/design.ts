@@ -62,8 +62,6 @@ export const PROPERTY = {
 	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
 	roomTop: "--tc-room-top",
 	roomBottom: "--tc-room-bottom",
-	column: "--tc-col",
-	columns: "--tc-cols",
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",
 	eventText: "--tc-event-text",
