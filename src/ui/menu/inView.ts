@@ -1,3 +1,5 @@
+import { LAYOUT } from "../design";
+
 /** A stretch of the screen from top to bottom, in window pixels. */
 export interface Band {
 	readonly top: number;
@@ -38,13 +40,42 @@ export function shownBoxOf(el: HTMLElement): ShownBox | null {
 	return null;
 }
 
-/**
- * Before its menu opens, what was pressed comes into view in its column: the column scrolls to show it whole, or from
- * its top when it is taller; then answers what of it the column shows, and the column's shown box.
- */
-export function bringIntoView(el: HTMLElement): { readonly rect: DOMRect; readonly box: ShownBox | null } {
+/** What of `el` its column shows, and the column's shown box; the whole of it outside a scrolling column. */
+export function shownPart(el: HTMLElement): { readonly rect: DOMRect; readonly box: ShownBox | null } {
 	const box = shownBoxOf(el);
-	if (!box) return { rect: el.getBoundingClientRect(), box };
-	box.scroller.scrollTop += scrollToShow(el.getBoundingClientRect(), box);
-	return { rect: clipTo(el.getBoundingClientRect(), box), box };
+	const rect = el.getBoundingClientRect();
+	return { rect: box ? clipTo(rect, box) : rect, box };
+}
+
+/**
+ * `el` comes into view in its column with the column's own smooth scroll, whole or from its top when it is taller;
+ * `then` runs once the column stands still, at once when it needs no scroll. Answers how to call it off.
+ */
+export function scrollIntoColumn(el: HTMLElement, then: () => void, idleMs: number = LAYOUT.scrollIdleMs): () => void {
+	const box = shownBoxOf(el);
+	const by = box ? scrollToShow(el.getBoundingClientRect(), box) : 0;
+	if (!box || Math.abs(by) < 1) {
+		then();
+		return () => undefined;
+	}
+	const scroller = box.scroller;
+	let timer = 0;
+	const stop = () => {
+		window.clearTimeout(timer);
+		scroller.removeEventListener("scroll", wait);
+		scroller.removeEventListener("scrollend", finish);
+	};
+	const finish = () => {
+		stop();
+		then();
+	};
+	const wait = () => {
+		window.clearTimeout(timer);
+		timer = window.setTimeout(finish, idleMs);
+	};
+	scroller.addEventListener("scroll", wait);
+	scroller.addEventListener("scrollend", finish);
+	wait();
+	scroller.scrollBy({ top: by, behavior: "smooth" });
+	return stop;
 }
