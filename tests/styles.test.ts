@@ -240,11 +240,8 @@ describe("styles.css keeps to its design system", () => {
 		expect(reading.every((d) => d.selector === ".tc-canvas")).toBe(true);
 	});
 
-	it("moves only the cards a drag draws off their place, flat", () => {
-		const moving = sheet.rules.filter((d) => d.value.includes("var(--tc-room)"));
-		expect(moving.length).toBe(1);
-		expect(moving[0].selector).toContain(".is-moved");
-		expect(moving[0].value).toBe("translateY(var(--tc-room))");
+	it("moves no card of a list while a task is dragged: the drop line shows the place", () => {
+		expect(sheet.rules.filter((d) => d.value.includes("var(--tc-room)"))).toEqual([]);
 	});
 });
 
