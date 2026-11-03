@@ -5,13 +5,12 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
-import { type GapPlace, type ListPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
+import { type GapPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
-const TARGET = "is-target";
 
 /** A card where it stands in the list's content, the folded cards gone. */
 interface Measured {
@@ -41,14 +40,14 @@ interface Layout {
 /**
  * A list as a place to drop. No card moves while a drag goes on: a card lifted from the list waits as a dashed place where
  * it stood, and the calendar's drop line between two cards shows the gap and the level, as it does for a new task carried
- * on the plus. A card carried along takes the gap its top edge picks and the level its left edge picks, so the line stays in
- * sight over it; over another card's lower part it goes into that card, lit; a new task takes its level from the list's
- * middle, goes only between cards, and each new place ticks under the finger. A list that shows sections takes a card from
+ * on the plus. Nothing goes into a card: a card carried along takes the gap its top edge picks and the level its left edge
+ * picks, so the line stays in sight over it; a new task takes its level from the list's middle, and each of its new places
+ * ticks under the finger. A list that shows sections takes a card from
  * anywhere this way, into the section of the gap; another list takes a card from elsewhere at its end.
  */
 export class ListDrop implements DropTarget {
 	/** What a drop means now. */
-	private place: ListPlace | null = null;
+	private place: GapPlace | null = null;
 	private layout: Layout | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly line: DropLine;
@@ -98,12 +97,10 @@ export class ListDrop implements DropTarget {
 					this.sections() ? this.placedHeads(frame) : [],
 					this.place ?? this.liftedFrom(),
 					LAYOUT.dropHysteresis,
-					!fresh,
 				);
 		this.place = place;
-		if (fresh && (before?.kind !== "gap" || place.kind !== "gap" || !samePlace(before, place) || before.level !== place.level)) this.onNewPlace();
-		layout.cards.forEach(({ entry }, i) => entry.card.classList.toggle(TARGET, place.kind === "into" && i === place.index));
-		if (place.kind === "gap" && !this.isHome(place)) {
+		if (fresh && (!before || !samePlace(before, place) || before.level !== place.level)) this.onNewPlace();
+		if (!this.isHome(place)) {
 			const line = this.lineRect(place, frame);
 			this.line.show(line.left, line.right, line.top, frame, fresh ? { x, y } : null);
 		} else this.line.hide();
@@ -113,7 +110,6 @@ export class ListDrop implements DropTarget {
 	landing(): DOMRect | null {
 		if (!this.layout || !this.place) return null;
 		const frame = readFrame(this.list.el);
-		if (this.place.kind === "into") return this.cardRect(this.layout.cards[this.place.index], frame);
 		if (this.last?.drag.from === "new") return this.lineRect(this.place, frame);
 		const gap = this.gapRect(this.place, frame);
 		const leaving = this.waitingAbove(this.place.index) * (this.layout.size.height + this.layout.size.gap);
@@ -135,7 +131,6 @@ export class ListDrop implements DropTarget {
 
 	private reset(): void {
 		this.scroll.stop();
-		for (const node of this.list.elements) node.classList.remove(TARGET);
 		this.place = null;
 		this.last = null;
 	}
@@ -153,9 +148,9 @@ export class ListDrop implements DropTarget {
 	}
 
 	/** The place the card was lifted from, at its level: let go there, the card only goes back. Several cards carried have none. */
-	private isHome(place: ListPlace): boolean {
+	private isHome(place: GapPlace): boolean {
 		const home = this.liftedFrom();
-		return home !== null && !this.carriesMany() && place.kind === "gap" && samePlace(place, home) && place.level === home.level;
+		return home !== null && !this.carriesMany() && samePlace(place, home) && place.level === home.level;
 	}
 
 	private carriesMany(): boolean {
@@ -269,11 +264,7 @@ export class ListDrop implements DropTarget {
 		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
 	}
 
-	/**
-	 * A card carried along: the gap is picked by its top edge, so the line stands in the nearest gap above the card, never
-	 * under it. Read as a finger half a card above that edge, the card goes into another one when its top edge is over
-	 * that card's lower part, the lit card in sight above it.
-	 */
+	/** A card carried along: the gap is picked by its top edge, read as a finger half a card above it, so the line stands in the nearest gap above the card, never under it. */
 	private cardY(y: number, drag: DragPayload, layout: Layout): number {
 		return y - drag.grabPx - layout.size.height / 2;
 	}
@@ -295,14 +286,14 @@ export class ListDrop implements DropTarget {
 		return indent > 0 ? (x - (r.left + r.width / 2)) / indent : 0;
 	}
 
-	/** The drop line: through the middle of the gap, or of the dashed place a card is moved to another level in; from the left edge of its level, with no height. */
+	/** The drop line: through the middle of the gap, from the left edge of its level, with no height; a card moved to another level where it stood has it in the gap over its dashed place, never on it. */
 	private lineRect(place: GapPlace, frame: ListFrame): DOMRect {
 		const layout = this.layoutFor(frame);
 		const gap = this.gapRect(place, frame);
 		const home = this.liftedFrom();
 		if (layout.waiting && home && samePlace(place, home) && !this.carriesMany()) {
-			const middle = toClient(frame, 0, layout.waiting.top + layout.waiting.height / 2).y;
-			return new DOMRect(gap.left, middle, gap.width, 0);
+			const over = toClient(frame, 0, layout.waiting.top - layout.size.gap / 2).y;
+			return new DOMRect(gap.left, over, gap.width, 0);
 		}
 		return new DOMRect(gap.left, gap.top - layout.size.gap / 2, gap.width, 0);
 	}
