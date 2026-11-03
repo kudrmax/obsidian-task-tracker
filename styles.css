@@ -57,6 +57,7 @@ body {
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
 	--tc-accent-ui: var(--interactive-accent);
 	--tc-danger: #FF453A;
+	--tc-on-danger: #FFFFFF;
 	--tc-ink-dim: #636366;
 	--tc-separator: #48484A;
 	--tc-backdrop: rgba(0, 0, 0, 0.55);
@@ -425,6 +426,7 @@ body {
 	--tc-font-now: 10px;
 	--tc-font-menu: 16px;
 	--tc-font-value: 15px;
+	--tc-font-ask: 15px;
 	--tc-font-weekday: 11px;
 	--tc-font-day: 16px;
 	--tc-font-sheet-btn: 17px;
@@ -943,6 +945,18 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-row.is-quiet { color: var(--tc-muted); }
 .tc-menu-row.is-choice svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-check); }
 .tc-menu-row.is-add svg { color: var(--tc-accent-ui); stroke-width: var(--tc-stroke-add); }
+.tc-menu-ask { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.tc-panel > * + .tc-menu-ask, .tc-menu-ask + .tc-menu-tiles, .tc-menu-ask + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
+.tc-menu-ask-question { padding: 0 var(--tc-space-8); display: flex; font-size: var(--tc-font-ask); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
+.tc-menu-ask-question > span { flex-shrink: 0; }
+.tc-menu-ask-question > .tc-menu-ask-title { flex-shrink: 1; min-width: 0; overflow: hidden; }
+.tc-menu-ask-title.is-long { -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-tile)), transparent calc(100% - var(--tc-space-8))); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-tile)), transparent calc(100% - var(--tc-space-8))); }
+.tc-menu-ask-buttons { display: flex; gap: var(--tc-space-6); }
+.tc-panel button.tc-menu-ask-btn { flex: 1; min-width: 0; height: var(--tc-row); padding: 0; border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); color: var(--tc-text); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-8); }
+.tc-panel button.tc-menu-ask-confirm { background: var(--tc-ink-strong); color: var(--tc-on-strong); font-weight: var(--tc-weight-semibold); }
+.tc-menu-ask.is-danger button.tc-menu-ask-confirm { background: var(--tc-danger); color: var(--tc-on-danger); }
+.tc-panel button.tc-menu-ask-btn:active { opacity: var(--tc-pressed); }
+.tc-menu-ask-confirm > svg { width: var(--tc-menu-icon); height: var(--tc-menu-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-group-gap) solid var(--tc-gap-ink); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
 .tc-panel .tc-menu-back { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16) 0 var(--tc-space-10); border-bottom: var(--tc-group-gap) solid var(--tc-gap-ink); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-menu); font-weight: var(--tc-weight-semibold); }
 .tc-menu-back svg { width: var(--tc-back-icon); height: var(--tc-back-icon); stroke-width: var(--tc-stroke-chevron); }

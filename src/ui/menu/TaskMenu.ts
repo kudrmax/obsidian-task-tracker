@@ -9,7 +9,8 @@ import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
+import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
+import { plainText } from "../../application/taskText";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
@@ -17,6 +18,7 @@ import { DescriptionPeek } from "./DescriptionPeek";
 
 export type StatusTileId = "done" | "progress" | "wontdo";
 export type EditRowId = "rename" | "description" | "section" | "subtask";
+type Asking = "delete" | "wontdo";
 
 export interface StatusTile {
 	readonly id: StatusTileId;
@@ -143,6 +145,15 @@ export class TaskMenu extends LiftedMenu {
 	/** Whoever types in the menu hears when it closes, and how. */
 	private fieldClosed: ((how: CloseHow) => void) | null = null;
 	private peek: DescriptionPeek | null = null;
+	/** What the menu asks about now, if anything; Enter confirms it, as its button does. */
+	private asking: Asking | null = null;
+	private confirmAsked: (() => void) | null = null;
+	private readonly onEnter = (e: KeyboardEvent) => {
+		if (e.key !== "Enter" || !this.confirmAsked) return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.confirmAsked();
+	};
 
 	static open(context: TaskMenuContext): TaskMenu {
 		return new TaskMenu(context);
@@ -285,13 +296,13 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	/** A menu split over and under the card leaves no side to the description, which then stays away. */
-	private place(): void {
-		this.placeBy(this.panel, this.anchor, this.upper);
+	private place(keepAbove?: number): void {
+		this.placeBy(this.panel, this.anchor, this.upper, keepAbove);
 		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
 		else this.peek?.hide();
 	}
 
-	private showMenu(): void {
+	private showMenu(keepAbove?: number): void {
 		clear(this.panel);
 		clear(this.upper);
 		this.panel.classList.remove("is-picker");
@@ -300,7 +311,7 @@ export class TaskMenu extends LiftedMenu {
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
 			progress: this.pick(() => actions.setStatus(nextStatus)),
-			wontdo: this.pick(() => actions.setStatus("cancelled")),
+			wontdo: () => this.askFor("wontdo"),
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
@@ -308,7 +319,8 @@ export class TaskMenu extends LiftedMenu {
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
-		tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
+		if (this.asking === "wontdo") this.askGroup("wontdo");
+		else tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
 		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
@@ -320,14 +332,48 @@ export class TaskMenu extends LiftedMenu {
 		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
 		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) }, "tc-menu-row is-tall is-apart");
-		menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: this.pick(() => actions.remove()) }, "tc-menu-row is-tall is-apart");
-		this.place();
+		if (this.asking === "delete") this.askGroup("delete");
+		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, onPick: () => this.askFor("delete") }, "tc-menu-row is-tall is-apart");
+		this.place(keepAbove);
+		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
+	}
+
+	/** Delete and Won’t do ask first, in place of what was pressed; the rest of the menu stays as it is. */
+	private askFor(what: Asking | null, show = true): void {
+		this.asking = what;
+		this.confirmAsked = null;
+		if (what === null) document.removeEventListener("keydown", this.onEnter, true);
+		else document.addEventListener("keydown", this.onEnter, true);
+		if (show) this.showMenu(this.groupsAbove());
+	}
+
+	/** How many of the panel's groups stand over the card now: a question takes the place of a group and moves none. */
+	private groupsAbove(): number {
+		if (this.panel.classList.contains("is-above")) return this.panel.children.length;
+		return this.upper.hidden ? 0 : this.upper.children.length;
+	}
+
+	private askGroup(what: Asking): void {
+		const { item, actions } = this.context;
+		const del = what === "delete";
+		const confirm = this.pick(() => (del ? actions.remove() : actions.setStatus("cancelled")));
+		this.confirmAsked = confirm;
+		askGroup(this.panel, {
+			verb: del ? "Delete" : "Won’t do",
+			title: plainText(item.text),
+			confirm: del ? "Delete" : "Won’t do",
+			icon: del ? "delete" : "wontdo",
+			danger: del,
+			onCancel: () => this.askFor(null),
+			onConfirm: confirm,
+		});
 	}
 
 	/** The sections of the task's list, its own checked, then the tasks outside any; New section asks for a name. */
 	private showSections(): void {
 		const sections = this.context.sections;
 		if (!sections) return;
+		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
 		const { item, actions } = this.context;
@@ -341,6 +387,7 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	private showPicker(): void {
+		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
 		this.panel.classList.add("is-picker");
@@ -379,6 +426,7 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	protected override closed(how: CloseHow): void {
+		document.removeEventListener("keydown", this.onEnter, true);
 		this.fieldClosed?.(how);
 	}
 }

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Подтверждение: кадр</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: {{f.w}}px; height: {{f.h}}px; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<dc-import name="Screen" foot="prod" platform="{{platform}}" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="{{f.hint}}"></dc-import>
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<div style="position: absolute; inset: 0; filter: {{c.level}}; z-index: 11; pointer-events: none;">
+<div style="position: absolute; left: {{f.cardLeft}}px; top: {{f.cardTop}}px; min-width: {{f.cardW}}px; width: max-content; max-width: {{f.cardMax}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px;">
+<span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;">{{title}}</span>
+</div>
+
+<sc-if value="{{menuOn}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{f.cardLeft}}px; top: {{f.panelTop}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.ring}};">
+
+<sc-if value="{{statusAsk}}" hint-placeholder-val="{{false}}">
+<div style="padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+<div style="padding: 0 8px; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap;">{{q.question}}</span>
+<span style="font-size: 13px; line-height: 16px; color: {{c.muted}}; white-space: nowrap; overflow: hidden; -webkit-mask-image: {{q.popMask}}; mask-image: {{q.popMask}};">{{title}}</span>
+</div>
+<div style="display: flex; gap: 6px;">
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; font-size: 16px;">Cancel</button>
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{q.bg}}; color: {{q.ink}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{q.icon}}"></path></svg>{{q.confirm}}</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{statusTiles}}" hint-placeholder-val="{{true}}">
+<div style="padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{tiles}}" as="r" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{r.bg}}; box-shadow: {{r.ring}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{moves}}" as="m" hint-placeholder-count="2">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.accentUi}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.d}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap;">{{m.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1; min-width: 0;">{{r.label}}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg></button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Open in Obsidian</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></button>
+
+<sc-if value="{{deleteAsk}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+<div style="height: 20px; padding: 0 8px; display: flex; font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap;"><span style="flex-shrink: 0;">{{q.pre}}</span><span style="min-width: 0; overflow: hidden; -webkit-mask-image: {{q.mask}}; mask-image: {{q.mask}};">{{title}}</span><span style="flex-shrink: 0;">{{q.post}}</span></div>
+<div style="display: flex; gap: 6px;">
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; font-size: 16px;">Cancel</button>
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{q.bg}}; color: {{q.ink}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{q.icon}}"></path></svg>{{q.confirm}}</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{deleteRow}}" hint-placeholder-val="{{true}}">
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: {{deleteBg}}; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13"></path></svg></button>
+</sc-if>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{popOn}}" hint-placeholder-val="{{false}}">
+<div role="dialog" style="position: absolute; left: {{pop.left}}px; top: {{pop.top}}px; width: 268px; border-radius: 14px; overflow: hidden; background: {{c.popover}}; box-shadow: {{c.popShadow}}; z-index: 12;">
+<div style="padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+<div style="padding: 0 8px; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap;">{{q.question}}</span>
+<span style="font-size: 13px; line-height: 16px; color: {{c.muted}}; white-space: nowrap; overflow: hidden; -webkit-mask-image: {{q.popMask}}; mask-image: {{q.popMask}};">{{title}}</span>
+</div>
+<div style="display: flex; gap: 6px;">
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; font-size: 16px;">Cancel</button>
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{q.bg}}; color: {{q.ink}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{q.icon}}"></path></svg>{{q.confirm}}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{sheetOn}}" hint-placeholder-val="{{false}}">
+<div role="dialog" style="position: absolute; left: 8px; right: 8px; bottom: {{f.sheetBottom}}px; display: flex; flex-direction: column; gap: 8px; z-index: 12;">
+<div style="border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.panelShadow}};">
+<div style="padding: 14px 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;">
+<span style="font-size: 13px; line-height: 18px; font-weight: 600; color: {{c.muted}};">{{q.question}}</span>
+<span style="max-width: 100%; font-size: 15px; line-height: 20px; white-space: nowrap; overflow: hidden;">{{title}}</span>
+<span style="font-size: 13px; line-height: 18px; color: {{c.muted}};">{{q.hint}}</span>
+</div>
+<button style="width: 100%; height: 52px; border: 0; border-top: 0.5px solid {{c.sep}}; padding: 0; background: transparent; color: {{q.sheetInk}}; font: inherit; font-size: 17px; display: flex; align-items: center; justify-content: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{q.icon}}"></path></svg>{{q.confirm}}</button>
+</div>
+<button style="width: 100%; height: 52px; border: 0; border-radius: 14px; padding: 0; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; color: {{c.text}}; font: inherit; font-size: 17px; font-weight: 600;">Cancel</button>
+</div>
+</sc-if>
+
+<sc-if value="{{dialogOn}}" hint-placeholder-val="{{false}}">
+<div role="dialog" style="position: absolute; left: {{f.dialogLeft}}px; top: {{f.dialogTop}}px; width: 300px; box-sizing: border-box; padding: 16px 8px 8px; border-radius: 14px; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; display: flex; flex-direction: column; gap: 16px; z-index: 12;">
+<div style="padding: 0 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;">
+<span style="font-size: 16px; line-height: 20px; font-weight: 600;">{{q.question}}</span>
+<span style="max-width: 100%; font-size: 15px; line-height: 20px; white-space: nowrap; overflow: hidden;">{{title}}</span>
+<span style="font-size: 13px; line-height: 18px; color: {{c.muted}};">{{q.hint}}</span>
+</div>
+<div style="display: flex; gap: 6px;">
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{c.tile}}; color: {{c.text}}; font: inherit; font-size: 16px;">Cancel</button>
+<button style="flex: 1; height: 44px; border: 0; border-radius: 10px; padding: 0; background: {{q.bg}}; color: {{q.ink}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{q.icon}}"></path></svg>{{q.confirm}}</button>
+</div>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"platform":{"editor":"enum","default":"phone","options":["phone","desk"]},"variant":{"editor":"enum","default":"inline","options":["menu","inline","popover","native"]},"action":{"editor":"enum","default":"delete","options":["delete","wontdo"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const platform = this.props.platform === 'desk' ? 'desk' : 'phone';
+    const desk = platform === 'desk';
+    const variant = this.props.variant ?? 'inline';
+    const del = (this.props.action ?? 'delete') === 'delete';
+    const light = this.props.theme === 'light';
+    const ground = desk ? (light ? '#FFFFFF' : '#1E1E1E') : (light ? '#FFFFFF' : '#000000');
+    const c = light
+      ? { bg: ground, card: '#F2F2F2', text: '#000000', muted: '#8E8E93', strong: '#1C1C1E', onStrong: '#FFFFFF', accentUi: '#8A5CF5', danger: '#FF3B30', onDanger: '#FFFFFF', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', level: 'drop-shadow(0 16px 40px rgba(0,0,0,0.18))', ring: '0 0 0 0.5px rgba(0,0,0,0.1)', popover: 'rgba(250,250,252,0.97)', popShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', tile: 'rgba(0,0,0,0.05)', onTile: 'rgba(0,0,0,0.1)', gap: '#E5E5EA', sep: '#D1D1D6', mark: '#FF9500', p: ['#FF3B30', '#FF9500', '#FFCC00'] }
+      : { bg: ground, card: desk ? '#373737' : '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', strong: '#E5E5EA', onStrong: '#000000', accentUi: '#8A6CEF', danger: '#FF453A', onDanger: '#FFFFFF', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', level: 'drop-shadow(0 16px 40px rgba(0,0,0,0.6))', ring: 'none', popover: 'rgba(44,44,46,0.97)', popShadow: '0 16px 40px rgba(0,0,0,0.7)', tile: 'rgba(255,255,255,0.08)', onTile: 'rgba(255,255,255,0.16)', gap: '#1C1C1E', sep: '#48484A', mark: '#FFD60A', p: ['#FF453A', '#FF9F0A', '#FFD60A'] };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const ICON = {
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13',
+      wontdo: CIRCLE + ' M8 12h8',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      pick: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const title = 'Созвониться с врачом';
+    const f = desk
+      ? { w: 1200, h: 800, hint: '1200px,800px', cardLeft: 54, cardTop: 104, cardW: 348, cardMax: 1136, sheetBottom: 0, dialogLeft: 472, dialogTop: 330 }
+      : { w: 390, h: 844, hint: '390px,844px', cardLeft: 10, cardTop: 166, cardW: 175, cardMax: 370, sheetBottom: 76, dialogLeft: 0, dialogTop: 0 };
+    f.panelTop = f.cardTop + 35 + 12;
+    const TILE_W = (300 - 16 - 12) / 3;
+    const native = variant === 'native';
+    const inline = variant === 'inline';
+    const pop = variant === 'popover';
+    const FADE = 'linear-gradient(to right, #000 calc(100% - 20px), transparent calc(100% - 8px))';
+    const pre = del ? 'Delete “' : 'Won’t do “';
+    const textW = (s) => s.length * 8.4;
+    const q = {
+      pre, post: '”?',
+      mask: textW(pre + title + '”?') > 268 ? FADE : 'none',
+      popMask: title.length * 7.2 > 236 ? FADE : 'none',
+      confirm: del ? 'Delete' : 'Won’t do',
+      icon: del ? ICON.del : ICON.wontdo,
+      bg: del ? c.danger : c.strong,
+      ink: del ? c.onDanger : c.onStrong,
+      sheetInk: del ? c.danger : c.text,
+      question: del ? 'Delete this task?' : 'Mark it won’t do?',
+      hint: del ? 'It leaves the tasks file' : 'It stays in the file, marked won’t do'
+    };
+    const statusAsk = inline && !del;
+    const deleteAsk = inline && del;
+    const pressedWont = pop && !del;
+    const tiles = [
+      { label: 'Done', d: CIRCLE, fd: CIRCLE },
+      { label: 'In progress', d: CIRCLE, fd: 'M12 3a9 9 0 0 1 0 18z' },
+      { label: 'Won’t do', d: ICON.wontdo, fd: '' }
+    ].map((t, i) => ({ ...t, bg: pressedWont && i === 2 ? c.onTile : c.tile, ring: pressedWont && i === 2 ? 'inset 0 0 0 1.5px ' + c.strong : 'none' }));
+    const rows = [
+      { label: 'Rename', d: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4' },
+      { label: 'Add description', d: 'M4 6h16 M4 12h16 M4 18h10' },
+      { label: 'Add subtask', d: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4' }
+    ].map((r, i, a) => ({ ...r, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const statusH = statusAsk ? 106 : 82;
+    const deleteTop = f.panelTop + statusH + 90 + 90 + 140 + 60;
+    const vw = desk ? { left: 44, right: 1200 } : { left: 0, right: 390 };
+    const clampLeft = (centre) => Math.max(vw.left + 10, Math.min(vw.right - 10 - 268, centre - 134));
+    const popBox = del
+      ? { left: clampLeft(f.cardLeft + 150), top: deleteTop + 8 - 10 - 106 }
+      : { left: clampLeft(f.cardLeft + 8 + 2 * (TILE_W + 6) + TILE_W / 2), top: f.panelTop + 8 + 66 + 10 };
+    const marks = [];
+    const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
+    const above = (left, top) => 'left: ' + (left - 4) + 'px; top: ' + (top - 30) + 'px;';
+    if (deleteAsk) marks.push(ring(f.cardLeft, deleteTop + 8, 300, 88, 0, 'Вопрос на месте Delete', above(f.cardLeft, deleteTop + 8)));
+    if (statusAsk) marks.push(ring(f.cardLeft, f.panelTop, 300, 106, 14, 'Вопрос на месте статусов', desk ? 'left: ' + (f.cardLeft + 300 + 8) + 'px; top: ' + (f.panelTop + 34) + 'px;' : 'left: 192px; top: ' + (f.panelTop - 30) + 'px;'));
+    if (pop) marks.push(ring(popBox.left, popBox.top, 268, 106, 14, 'Окно у пункта', del ? above(popBox.left, popBox.top) : 'left: ' + (popBox.left - 4) + 'px; top: ' + (popBox.top + 106 + 10) + 'px;'));
+    const sheetH = 14 + 18 + 2 + 20 + 2 + 18 + 14 + 52 + 8 + 52;
+    if (native && !desk) marks.push(ring(8, 844 - f.sheetBottom - sheetH, 374, sheetH, 14, 'Лист снизу', above(8, 844 - f.sheetBottom - sheetH)));
+    if (native && desk) marks.push(ring(f.dialogLeft, f.dialogTop, 300, 16 + 62 + 16 + 44 + 8, 14, 'Диалог по центру', above(f.dialogLeft, f.dialogTop)));
+    return {
+      c, f, q, title, tiles, rows, platform,
+      theme: light ? 'light' : 'dark',
+      levels: [{ name: 'p1', c: c.p[0] }, { name: 'p2', c: c.p[1] }, { name: 'p3', c: c.p[2] }],
+      moves: [{ label: 'Tomorrow', d: ICON.tomorrow }, { label: 'Pick a date', d: ICON.pick }],
+      menuOn: !native,
+      statusAsk,
+      statusTiles: !statusAsk,
+      deleteAsk,
+      deleteRow: !deleteAsk,
+      deleteBg: pop && del ? c.onTile : 'transparent',
+      popOn: pop,
+      pop: popBox,
+      sheetOn: native && !desk,
+      dialogOn: native && desk,
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

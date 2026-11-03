@@ -73,8 +73,8 @@ export abstract class LiftedMenu {
 	}
 
 	/** The panel by `anchor`, which never moves; one too tall for either side splits its first groups into `upper`, over it. */
-	protected placeBy(panel: HTMLElement, anchor: DOMRect, upper?: HTMLElement): void {
-		placePanel(panel, anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom(), upper);
+	protected placeBy(panel: HTMLElement, anchor: DOMRect, upper?: HTMLElement, keepAbove?: number): void {
+		placePanel(panel, anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom(), upper, keepAbove);
 	}
 
 	/** A row's action: the menu closes, then the action runs. */
