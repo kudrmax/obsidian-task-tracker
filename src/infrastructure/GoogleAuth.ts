@@ -1,5 +1,5 @@
-import type { SettingsStore } from "../application/ports";
-import { requestToken } from "./GoogleToken";
+import type { Clock, SettingsStore } from "../application/ports";
+import type { TokenResponse } from "./GoogleToken";
 
 /** How the consent screen is shown and answered; the redirect login on Obsidian, a fake in tests. */
 export interface LoginFlow {
@@ -11,10 +11,13 @@ const EXPIRY_MARGIN_MS = 60_000;
 export class GoogleAuth {
 	private accessTokenValue = "";
 	private expiresAt = 0;
+	private refreshing: { readonly refreshToken: string; readonly promise: Promise<string> } | null = null;
 
 	constructor(
 		private readonly settings: SettingsStore,
 		private readonly flow: LoginFlow,
+		private readonly token: (fields: Record<string, string>) => Promise<TokenResponse>,
+		private readonly clock: Clock,
 	) {}
 
 	isLoggedIn(): boolean {
@@ -34,19 +37,34 @@ export class GoogleAuth {
 		await this.saveRefreshToken("");
 	}
 
+	/** Calls that come while the token is being refreshed share that refresh; one answered after a logout is not kept. */
 	async accessToken(): Promise<string> {
-		const { clientId, clientSecret, refreshToken } = this.settings.get().google;
+		const { refreshToken } = this.settings.get().google;
 		if (!refreshToken) throw new Error("not logged in");
-		if (this.accessTokenValue && Date.now() < this.expiresAt - EXPIRY_MARGIN_MS) return this.accessTokenValue;
-		const token = await requestToken(clientId, clientSecret, { grant_type: "refresh_token", refresh_token: refreshToken });
-		this.accessTokenValue = token.access_token;
-		this.expiresAt = Date.now() + token.expires_in * 1000;
-		return this.accessTokenValue;
+		if (this.accessTokenValue && this.clock.now().getTime() < this.expiresAt - EXPIRY_MARGIN_MS) return this.accessTokenValue;
+		if (this.refreshing?.refreshToken === refreshToken) return this.refreshing.promise;
+		const refreshing = { refreshToken, promise: this.refresh(refreshToken) };
+		this.refreshing = refreshing;
+		try {
+			return await refreshing.promise;
+		} finally {
+			if (this.refreshing === refreshing) this.refreshing = null;
+		}
+	}
+
+	private async refresh(refreshToken: string): Promise<string> {
+		const token = await this.token({ grant_type: "refresh_token", refresh_token: refreshToken });
+		if (this.settings.get().google.refreshToken === refreshToken) {
+			this.accessTokenValue = token.access_token;
+			this.expiresAt = this.clock.now().getTime() + token.expires_in * 1000;
+		}
+		return token.access_token;
 	}
 
 	private async saveRefreshToken(refreshToken: string): Promise<void> {
 		this.accessTokenValue = "";
 		this.expiresAt = 0;
+		this.refreshing = null;
 		await this.settings.update({ google: { ...this.settings.get().google, refreshToken } });
 	}
 }
