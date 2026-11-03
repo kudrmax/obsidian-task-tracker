@@ -41,29 +41,60 @@ export class EdgeTrack implements ScreenTrack {
 }
 
 /**
- * Another day: the screen moves aside as one sheet and the day drawn beside it comes in. Arrived, the screen stays aside
- * under the day drawn in until it has drawn that day itself.
+ * One part of the screen a day slides through: what it shows goes out one side as the next day's comes in from the
+ * other, within its own column. A header that no column holds fades as it goes.
+ */
+export interface DayLane {
+	readonly shown: readonly HTMLElement[];
+	readonly next: readonly HTMLElement[];
+	readonly width: number;
+	readonly fades?: boolean;
+}
+
+/**
+ * Another day: the list stays the list and the timeline the timeline, the divider standing still between them; in each
+ * column the day slides out and the next comes in, the `lead` column under the finger. Arrived, what the screen showed
+ * stays out of sight until the screen has drawn the day itself.
  */
 export class DayTrack implements ScreenTrack {
+	readonly distance: number;
+
 	constructor(
-		private readonly parts: readonly HTMLElement[],
+		private readonly lanes: readonly DayLane[],
+		lead: DayLane,
 		private readonly peek: DayPeek,
 		private readonly shift: Shift,
-		readonly distance: number,
-		private readonly onArrive: (peek: DayPeek) => void,
+		private readonly onArrive: (peek: DayPeek, shown: readonly HTMLElement[]) => void,
 	) {
+		this.distance = lead.width;
 		this.at(0);
 	}
 
 	at(dx: number): void {
-		shiftParts(this.parts, dx);
-		this.peek.el.style.transform = `translate3d(${this.shift * this.distance + dx}px, 0, 0)`;
+		const share = this.distance > 0 ? dx / this.distance : 0;
+		for (const lane of this.lanes) {
+			const offset = share * lane.width;
+			shiftParts(lane.shown, offset);
+			shiftParts(lane.next, this.shift * lane.width + offset);
+			if (!lane.fades) continue;
+			for (const part of lane.shown) part.style.opacity = share === 0 ? "" : String(1 - Math.abs(share));
+			for (const part of lane.next) part.style.opacity = String(Math.abs(share));
+		}
 	}
 
 	land(arrived: boolean): void {
-		if (arrived) return this.onArrive(this.peek);
-		shiftParts(this.parts, 0);
+		const shown = this.lanes.flatMap((lane) => lane.shown);
+		if (arrived) return this.onArrive(this.peek, shown);
+		restore(shown);
 		this.peek.remove();
+	}
+}
+
+/** What a swipe moved stands where it stood, as drawn. */
+export function restore(parts: readonly HTMLElement[]): void {
+	for (const part of parts) {
+		part.style.transform = "";
+		part.style.opacity = "";
 	}
 }
 
