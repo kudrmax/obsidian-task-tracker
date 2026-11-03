@@ -1,6 +1,6 @@
 import type { CalendarEvent, CalendarService, DayBoundary, DayView, TaskService } from "../application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
-import { dayTitle } from "./dayTitle";
+import { PROPERTY } from "./design";
 import { el } from "./dom";
 import type { Theme } from "./eventColors";
 import { TaskList } from "./TaskList";
@@ -18,20 +18,21 @@ export interface DayPeekDeps {
 	/** Whether the day's list shows its sections. */
 	grouped(date: LocalDate): boolean;
 	ungroupedName(): string;
-	/** Puts the day's timeline where the screen opens it for that day. */
-	scrollTimeline(timeline: Timeline, date: LocalDate): void;
-	/** How far the shown day's list is scrolled: the next day's opens there too. */
+	/** How far the shown day's list and timeline are scrolled: the next day's open there too, the hours standing still. */
 	listScroll(): number;
+	timelineScroll(): number;
+	/** The shown day's rows of all-day events past the first: the next day's timeline starts where the shown one does. */
+	allDayExtraRows(): string;
 }
 
 /**
- * Another day under the screen while a finger draws it in: its header, its list and its timeline drawn as the screen
- * would draw them, each in the screen's own column, out of reach of the fingers. Its tasks and the events last fetched for it come in a moment after.
+ * Another day under the screen while a finger draws it in: its list, its cards and events on the timeline and its
+ * all-day events, each in the screen's own column, out of reach of the fingers. The header and the hours are the
+ * screen's own, which stand still. Its tasks and the events last fetched for it come in a moment after.
  */
 export class DayPeek {
 	readonly el: HTMLElement;
-	/** The day's header, its list column and its timeline column, standing where the screen's own do. */
-	readonly nav: HTMLElement | null = null;
+	/** The day's list column and its timeline column, standing where the screen's own do. */
 	readonly left: HTMLElement;
 	readonly right: HTMLElement;
 	private day: DayView | null = null;
@@ -49,13 +50,6 @@ export class DayPeek {
 		this.el = el(null, "div", "tc-peek");
 		this.el.setAttribute("aria-hidden", "true");
 		root.insertBefore(this.el, root.querySelector(":scope > .tc-fade"));
-		const nav = root.querySelector(":scope > .tc-day-nav")?.cloneNode(true);
-		if (nav instanceof HTMLElement) {
-			this.nav = nav;
-			this.el.appendChild(nav);
-			const title = nav.querySelector(".tc-day-title");
-			if (title) title.textContent = dayTitle(date, deps.today());
-		}
 		this.left = el(this.el, "div", "tc-left");
 		this.list = new TaskList(el(this.left, "div"), {
 			items: () => this.day?.list ?? [],
@@ -86,10 +80,21 @@ export class DayPeek {
 			this.day = day;
 			this.render();
 			this.list.el.scrollTop = deps.listScroll();
+			this.timeline.el.scrollTop = deps.timelineScroll();
 		});
 		this.render();
-		deps.scrollTimeline(this.timeline, date);
+		this.timeline.el.scrollTop = deps.timelineScroll();
 		this.list.el.scrollTop = deps.listScroll();
+	}
+
+	/** What shows this day in the list column: its list. */
+	listParts(): HTMLElement[] {
+		return [this.list.el];
+	}
+
+	/** What shows this day in the timeline column: its cards, events and now line, and its all-day events. */
+	timelineParts(): HTMLElement[] {
+		return [...this.timeline.dayLayers(), ...this.allDayEl.querySelectorAll<HTMLElement>(".tc-allday")];
 	}
 
 	remove(): void {
@@ -101,6 +106,7 @@ export class DayPeek {
 		if (this.removed) return;
 		this.list.render();
 		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme());
+		this.right.style.setProperty(PROPERTY.allDayExtraRows, this.deps.allDayExtraRows());
 		this.timeline.render();
 	}
 }

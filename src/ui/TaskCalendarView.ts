@@ -148,6 +148,8 @@ export class TaskCalendarView extends ItemView {
 	private shownMode: RightMode | null = null;
 	/** The day a swipe brought in, drawn over the screen until the screen has drawn it itself. */
 	private landing: { readonly peek: DayPeek; readonly parts: readonly HTMLElement[] } | null = null;
+	/** The day a swipe has drawn nearer than the selected one: the header names it. */
+	private titleDay: LocalDate | null = null;
 	/** Typing tasks in place: the field, the bar over the keyboard, the plus. */
 	private quick: QuickEntryController | null = null;
 	private readonly unsubscribe: (() => void)[] = [];
@@ -238,7 +240,7 @@ export class TaskCalendarView extends ItemView {
 		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
-			title: () => dayTitle(this.selectedDate, this.today()),
+			title: () => dayTitle(this.titleDay ?? this.selectedDate, this.today()),
 			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
@@ -565,17 +567,33 @@ export class TaskCalendarView extends ItemView {
 			now: () => this.deps.clock.now(),
 			grouped: (date) => dayColumn(date, this.today()).sections,
 			ungroupedName: () => this.settings.groups.ungrouped,
-			scrollTimeline: (timeline, date) => this.scrollToOpen(timeline, date),
 			listScroll: () => this.list?.el.scrollTop ?? 0,
+			timelineScroll: () => this.timeline?.el.scrollTop ?? 0,
+			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
 		});
-		const inside = (column: Element | null): HTMLElement[] => (column ? [...column.children].filter((part) => part instanceof HTMLElement) : []);
-		const nav = root.querySelector<HTMLElement>(":scope > .tc-day-nav");
-		const list: DayLane = { shown: inside(this.leftEl), next: inside(peek.left), width: this.leftEl?.offsetWidth ?? 0 };
-		const timeline: DayLane = { shown: inside(this.rightEl), next: inside(peek.right), width: this.rightEl?.offsetWidth ?? root.clientWidth };
-		const header: DayLane = { shown: nav ? [nav] : [], next: peek.nav ? [peek.nav] : [], width: list.width, fades: true };
-		return new DayTrack([list, timeline, header], timeline, peek, shift, (arrived, shown) => {
-			this.landing = { peek: arrived, parts: shown };
-			void this.afterEntry(() => this.select(arrived.date));
+		const list: DayLane = {
+			shown: () => (this.leftEl ? [...this.leftEl.children].filter((part) => part instanceof HTMLElement) : []),
+			next: () => peek.listParts(),
+			width: this.leftEl?.offsetWidth ?? 0,
+		};
+		const timeline: DayLane = {
+			shown: () => [...(this.timeline?.dayLayers() ?? []), ...(this.allDayEl?.querySelectorAll<HTMLElement>(".tc-allday") ?? [])],
+			next: () => peek.timelineParts(),
+			width: this.rightEl?.offsetWidth ?? root.clientWidth,
+		};
+		return new DayTrack([list, timeline], timeline, peek, shift, {
+			onNearer: (nearer) => {
+				this.titleDay = nearer ? to.date : null;
+				this.headers?.render();
+			},
+			onArrive: (arrived, shown) => {
+				this.landing = { peek: arrived, parts: shown };
+				this.scrolledFor = arrived.date;
+				void this.afterEntry(() => {
+					this.titleDay = null;
+					this.select(arrived.date);
+				});
+			},
 		});
 	}
 
