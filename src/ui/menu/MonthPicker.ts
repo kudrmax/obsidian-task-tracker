@@ -1,6 +1,6 @@
 import { addDays, addMonths, gridStart, monthTitle, sameMonth, startOfMonth } from "../dates";
 import { clear, el as make } from "../dom";
-import { icon } from "../kit/icons";
+import { Button } from "../kit/Button";
 import type { LocalDate } from "../types";
 
 export interface MonthPickerOptions {
@@ -28,19 +28,23 @@ export class MonthPicker {
 		const head = make(el, "div", "tc-picker-head");
 		this.titleEl = make(head, "span", "tc-picker-title");
 		const nav = make(head, "div", "tc-picker-nav");
-		this.arrow(nav, "tc-picker-prev", "chevronLeft", "Previous month", -1);
-		this.arrow(nav, "tc-picker-next", "chevronRight", "Next month", 1);
+		this.arrow(nav, "tc-picker-prev", "Previous month", -1);
+		this.arrow(nav, "tc-picker-next", "Next month", 1);
 		this.gridEl = make(el, "div", "tc-picker-grid");
 		this.render();
 	}
 
-	private arrow(parent: HTMLElement, cls: string, name: "chevronLeft" | "chevronRight", label: string, months: number): void {
-		const button = make(parent, "button", `tc-picker-arrow ${cls}`);
-		button.setAttribute("aria-label", label);
-		button.appendChild(icon(name));
-		button.addEventListener("click", () => {
-			this.month = addMonths(this.month, months);
-			this.render();
+	private arrow(parent: HTMLElement, cls: string, label: string, months: -1 | 1): void {
+		Button.create(parent, {
+			kind: "icon",
+			tone: "accent",
+			label,
+			icon: months < 0 ? "chevronLeft" : "chevronRight",
+			cls: `tc-picker-arrow ${cls}`,
+			onPress: () => {
+				this.month = addMonths(this.month, months);
+				this.render();
+			},
 		});
 	}
 
@@ -51,7 +55,7 @@ export class MonthPicker {
 		const start = gridStart(this.month);
 		for (let i = 0; i < CELLS; i++) {
 			const date = addDays(start, i);
-			const day = make(this.gridEl, "button", "tc-day", String(Number(date.slice(-2))));
+			const day = make(this.gridEl, "button", "tc-btn tc-day", String(Number(date.slice(-2))));
 			day.classList.toggle("is-other", !sameMonth(date, this.month));
 			day.classList.toggle("is-today", date === this.opts.today);
 			day.classList.toggle("is-selected", date === this.opts.selected);

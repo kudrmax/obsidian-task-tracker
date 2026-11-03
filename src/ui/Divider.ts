@@ -35,7 +35,9 @@ export class Divider {
 	) {
 		el.classList.add("tc-divider");
 		make(el, "div", "tc-divider-line");
-		const handle = make(el, "button", "tc-divider-handle");
+		const handle = make(el, "span", "tc-divider-handle");
+		handle.setAttribute("role", "separator");
+		handle.setAttribute("aria-orientation", "vertical");
 		handle.setAttribute("aria-label", "Resize columns");
 		el.addEventListener("pointerdown", (e) => this.down(e));
 		el.addEventListener("pointermove", (e) => this.move(e));

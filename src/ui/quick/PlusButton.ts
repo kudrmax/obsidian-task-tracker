@@ -1,7 +1,7 @@
 import { LAYOUT } from "../design";
-import { capturePointer, el, releasePointer } from "../dom";
+import { capturePointer, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
-import { icon } from "../kit/icons";
+import { Button } from "../kit/Button";
 
 export interface PlusButtonDeps {
 	onTap(): void;
@@ -21,33 +21,38 @@ interface Press {
  * hands the gesture over to the drag of a new task, at once: there is no long press.
  */
 export class PlusButton {
-	private readonly button: HTMLElement;
+	private readonly plus: Button;
 	private press: Press | null = null;
 	private isHidden = false;
 
 	constructor(parent: HTMLElement, private readonly deps: PlusButtonDeps) {
-		this.button = el(parent, "button", "tc-plus");
-		this.button.setAttribute("aria-label", "New task");
-		this.button.appendChild(icon("plus"));
-		this.button.addEventListener("pointerdown", (e) => this.down(e));
-		this.button.addEventListener("pointermove", (e) => this.move(e));
-		this.button.addEventListener("pointerup", (e) => this.up(e));
-		this.button.addEventListener("pointercancel", (e) => this.cancel(e));
-		this.button.addEventListener("click", (e) => {
-			if (e.detail === 0 && !this.isHidden) this.deps.onTap();
+		this.plus = Button.create(parent, {
+			kind: "round",
+			tone: "accent",
+			label: "New task",
+			icon: "plus",
+			cls: "tc-plus",
+			onPress: (e) => {
+				if (e.detail === 0 && !this.isHidden) this.deps.onTap();
+			},
 		});
+		const button = this.plus.el;
+		button.addEventListener("pointerdown", (e) => this.down(e));
+		button.addEventListener("pointermove", (e) => this.move(e));
+		button.addEventListener("pointerup", (e) => this.up(e));
+		button.addEventListener("pointercancel", (e) => this.cancel(e));
 	}
 
 	set hidden(value: boolean) {
 		this.isHidden = value;
-		this.button.classList.toggle("is-hidden", value);
+		this.plus.setHidden(value);
 		if (value) this.end();
 	}
 
 	private down(e: PointerEvent): void {
 		if (this.isHidden || this.press || !e.isPrimary || e.button !== 0 || this.deps.arbiter.busy) return;
 		this.press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
-		capturePointer(this.button, e.pointerId);
+		capturePointer(this.plus.el, e.pointerId);
 		if (e.pointerType === "mouse") e.preventDefault();
 	}
 
@@ -58,7 +63,7 @@ export class PlusButton {
 	private move(e: PointerEvent): void {
 		if (!this.press || e.pointerId !== this.press.pointerId || !this.moved(e)) return;
 		this.end();
-		this.deps.onDrag(e, this.button);
+		this.deps.onDrag(e, this.plus.el);
 	}
 
 	private up(e: PointerEvent): void {
@@ -73,7 +78,7 @@ export class PlusButton {
 
 	private end(): void {
 		if (!this.press) return;
-		releasePointer(this.button, this.press.pointerId);
+		releasePointer(this.plus.el, this.press.pointerId);
 		this.press = null;
 	}
 }

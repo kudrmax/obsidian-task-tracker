@@ -41,7 +41,7 @@ export class SourcesPopover {
 			const time = el(row, "span", "tc-source-time", text.time);
 			time.classList.toggle("is-stale", text.stale);
 		}
-		const refresh = el(panel, "button", "tc-source-refresh");
+		const refresh = el(panel, "button", "tc-btn tc-source-refresh");
 		refresh.appendChild(icon("refresh"));
 		refresh.appendChild(document.createTextNode("Refresh now"));
 		refresh.addEventListener("click", () => {

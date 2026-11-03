@@ -1,6 +1,7 @@
 import type { PriorityColor } from "../../settings";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
+import { Button } from "../kit/Button";
 import { icon, type IconName } from "../kit/icons";
 
 /** The wheel's places, which the quick bar's place tiles wear. */
@@ -16,7 +17,7 @@ export interface MenuRowSpec {
 
 /** A row of a panel: the label, a value beside it, the icon on the right. */
 export function menuRow(parent: HTMLElement, spec: MenuRowSpec, cls = "tc-menu-row"): HTMLButtonElement {
-	const row = el(parent, "button", cls);
+	const row = el(parent, "button", `tc-btn ${cls}`);
 	row.classList.toggle("is-danger", spec.danger === true);
 	el(row, "span", "tc-menu-label", spec.label);
 	if (spec.value) el(row, "span", "tc-menu-value", spec.value);
@@ -44,7 +45,7 @@ export interface MenuTileSpec {
 
 /** A tile: the icon over the label; the level a task has carries a badge with a cross, since a tap on it takes the level off. */
 function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
-	const tile = el(parent, "button", "tc-menu-tile");
+	const tile = el(parent, "button", "tc-btn tc-menu-tile");
 	if (spec.color) tile.dataset.priority = spec.color;
 	tile.classList.toggle("is-on", spec.on === true);
 	tile.appendChild(icon(spec.icon));
@@ -79,17 +80,13 @@ export interface MenuAskSpec {
 /** A question in place of what asked it: one line naming the task, a too long name fading out, then Cancel and the confirming button. */
 export function askGroup(parent: HTMLElement, spec: MenuAskSpec): HTMLElement {
 	const group = el(parent, "div", "tc-menu-ask");
-	group.classList.toggle("is-danger", spec.danger);
 	const question = el(group, "div", "tc-menu-ask-question");
 	el(question, "span", "", `${spec.verb} “`);
 	el(question, "span", "tc-menu-ask-title", spec.title);
 	el(question, "span", "", "”?");
 	const buttons = el(group, "div", "tc-menu-ask-buttons");
-	el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-cancel", "Cancel").addEventListener("click", spec.onCancel);
-	const confirm = el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-confirm");
-	confirm.appendChild(icon(spec.icon));
-	confirm.appendChild(document.createTextNode(spec.confirm));
-	confirm.addEventListener("click", spec.onConfirm);
+	Button.create(buttons, { kind: "pill", label: "Cancel", cls: "tc-menu-ask-btn", onPress: spec.onCancel });
+	Button.create(buttons, { kind: "pill", tone: spec.danger ? "danger" : "strong", label: spec.confirm, icon: spec.icon, cls: "tc-menu-ask-btn", onPress: spec.onConfirm });
 	return group;
 }
 
@@ -102,7 +99,7 @@ export function menuGroup(parent: HTMLElement, rows: readonly MenuRowSpec[]): HT
 
 /** The submenu's first row: the way back and the title. */
 export function backRow(parent: HTMLElement, title: string, onBack: () => void): HTMLButtonElement {
-	const row = el(parent, "button", "tc-menu-back");
+	const row = el(parent, "button", "tc-btn tc-menu-back");
 	row.appendChild(icon("chevronLeft"));
 	row.appendChild(document.createTextNode(title));
 	row.addEventListener("click", onBack);

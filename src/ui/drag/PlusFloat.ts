@@ -1,6 +1,5 @@
 import { DURATION, tokenMs } from "../design";
-import { el } from "../dom";
-import { icon } from "../kit/icons";
+import { roundShape } from "../kit/Button";
 import type { Grab } from "./FloatingCard";
 import type { Float } from "./DropTarget";
 
@@ -11,8 +10,7 @@ export class PlusFloat implements Float {
 	private readonly el: HTMLElement;
 
 	constructor(private readonly grab: Grab) {
-		this.el = el(document.body, "div", "tc-float-plus");
-		this.el.appendChild(icon("plus"));
+		this.el = roundShape(document.body, "plus", "accent", "tc-float-plus");
 	}
 
 	moveTo(x: number, y: number): void {

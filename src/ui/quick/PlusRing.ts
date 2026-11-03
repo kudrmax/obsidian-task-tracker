@@ -1,7 +1,7 @@
 import { LAYOUT } from "../design";
 import type { DropTarget } from "../drag/DropTarget";
-import { el } from "../dom";
-import { icon, type IconName } from "../kit/icons";
+import { roundShape } from "../kit/Button";
+import type { IconName } from "../kit/icons";
 
 const CANCELLING = "tc-cancelling";
 
@@ -20,8 +20,7 @@ export class PlusRing implements DropTarget {
 
 	show(): void {
 		if (this.ring) return;
-		this.ring = el(this.parent, "div", `tc-plus-ring is-${this.mark}`);
-		this.ring.appendChild(icon(this.mark));
+		this.ring = roundShape(this.parent, this.mark, "quiet", `tc-plus-ring is-${this.mark}`);
 	}
 
 	hide(): void {
