@@ -7,16 +7,29 @@ function isOpen(task: Task): boolean {
 	return task.status === "todo" || task.status === "inProgress";
 }
 
+/** A rewritten line can show another date or slot that was text before it: the rule runs again until nothing changes. */
+function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocument): TaskDocument {
+	for (;;) {
+		const next = pass(doc);
+		if (next === doc) return doc;
+		doc = next;
+	}
+}
+
 /** A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. */
 function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
-	const past = doc.allTasks().filter((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
-	return doc.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot!) }] as const));
+	return untilSettled(doc, (d) => {
+		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
+		return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot!) }] as const));
+	});
 }
 
 /** What was left undone stays for today: a past due date becomes today's. */
 function pastDatesToToday(doc: TaskDocument, today: LocalDate): TaskDocument {
-	const past = doc.allTasks().filter((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
-	return doc.replaceAll(past.map((e) => [e, { ...e.task, dueDate: today }] as const));
+	return untilSettled(doc, (d) => {
+		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
+		return d.replaceAll(past.map((e) => [e, { ...e.task, dueDate: today }] as const));
+	});
 }
 
 /** The candidates go to the start of the tasks outside any section of `target`, in file order: the last one goes first. */

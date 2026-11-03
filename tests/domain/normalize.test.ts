@@ -34,6 +34,10 @@ describe("rule 1: past slots", () => {
 		);
 	});
 
+	it("erases a second past slot the first one hid in the task's text", () => {
+		expect(normalize(parse("## Now\n- [ ] A ⏰ 2020-01-01 10:00 ⏰ 2020-01-02 10:00\n"), T).serialize()).toBe("## Now\n- [ ] A 📅 2026-10-30\n");
+	});
+
 	it("gives a task left without a date the slot's day, which turns into today", () => {
 		expect(normalize(parse("## Now\n- [ ] A ⏰ 2026-10-29 10:00-11:00\n"), T).serialize()).toBe("## Now\n- [ ] A 📅 2026-10-30\n");
 	});
@@ -252,13 +256,13 @@ describe("one pass per rule", () => {
 
 	afterEach(() => vi.restoreAllMocks());
 
-	it("rewrites 200 overdue tasks and 50 past slots as before, one rewrite of the document per rule", () => {
+	it("rewrites 200 overdue tasks and 50 past slots as before, one rewrite of the document per rule and one more pass to find nothing left", () => {
 		const doc = TaskDocument.parse(overdue(), OVERDUE_SECTIONS, M);
 		const replace = vi.spyOn(TaskDocument.prototype, "replace");
 		const replaceAll = vi.spyOn(TaskDocument.prototype, "replaceAll");
 		expect(normalize(doc, T, undefined, ["Work"]).serialize()).toBe(OVERDUE_NORMALIZED);
 		expect(replace).not.toHaveBeenCalled();
-		expect(replaceAll).toHaveBeenCalledTimes(2);
+		expect(replaceAll).toHaveBeenCalledTimes(4);
 	});
 
 	it("gives back a normal document itself without writing it out", () => {

@@ -133,11 +133,36 @@ function changedBlocks(before: readonly string[], after: readonly string[]): (re
 	return blocks;
 }
 
-/**
- * The pairs of lines `b` and `a` share, as [index in b, index in a] in order: Myers' shortest edit script, which takes
- * time and memory by the number of lines changed, not by the size of the file.
- */
+/** Up to this many cells the table of common runs is kept: about 8 MB, and the blocks found are the ones it always found. */
+const TABLE_CELLS = 4_000_000;
+
+/** The pairs of lines `b` and `a` share, as [index in b, index in a] in order. */
 function sharedLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+	return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
+}
+
+/** The longest run of shared lines by a table, taking a line added before a line removed where both keep it as long. */
+function tableLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+	const width = a.length + 1;
+	const common = new Uint16Array((b.length + 1) * width);
+	for (let i = b.length - 1; i >= 0; i--) {
+		for (let j = a.length - 1; j >= 0; j--) {
+			common[i * width + j] = b[i] === a[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+		}
+	}
+	const pairs: (readonly [number, number])[] = [];
+	let i = 0;
+	let j = 0;
+	while (i < b.length || j < a.length) {
+		if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
+		else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+		else i++;
+	}
+	return pairs;
+}
+
+/** Myers' shortest edit script, for a change too wide for the table: time and memory by the lines changed, not the file. */
+function myersLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
 	const n = b.length;
 	const m = a.length;
 	const offset = n + m + 1;

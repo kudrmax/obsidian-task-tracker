@@ -34,6 +34,13 @@ describe("TextPatch", () => {
 		expect(TextPatch.between(FILE, after).revert(edited)).toBe(FILE.replace("- [ ] E", "- [ ] E edited"));
 	});
 
+	it("keeps apart two changes with shared lines between them, as it always did", () => {
+		const before = text("c", "c", "b", "b", "b", "b", "c", "b");
+		const after = text("b", "b", "b", "b", "b", "b", "c");
+		const edited = text("b", "b", "b", "b", "x", "b", "c");
+		expect(TextPatch.between(before, after).revert(edited)).toBe(text("c", "c", "b", "b", "x", "b", "c", "b"));
+	});
+
 	it("finds its lines though lines were added above them since", () => {
 		const after = FILE.replace("- [ ] D", "- [x] D");
 		const shifted = after.replace("# Now\n", "# Now\n- [ ] new 1\n- [ ] new 2\n");
