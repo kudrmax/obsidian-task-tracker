@@ -34,8 +34,6 @@ export interface QuickEntryControllerDeps {
 	timeline(): Timeline | null;
 	/** A task of the timeline as the screen shows it now; null once it is not there. */
 	task(key: TaskKey): TaskItem | null;
-	/** The New task buttons under the lists. */
-	newTasks(): readonly { shown: boolean }[];
 	/** Where the plus may be carried: the lists the window shows, and the timeline while it shows. */
 	dropTargets(): { readonly lists: readonly ColumnDrop[]; readonly timeline: DropTarget | null };
 	levels(): readonly PriorityLevel[];
@@ -104,7 +102,7 @@ function movesRows(before: EntryState | null, after: EntryState): boolean {
 }
 
 /**
- * Typing tasks in place (quick-add spec §4.2–4.9): opens the entry from New task, the plus, a long tap on the timeline,
+ * Typing tasks in place (quick-add spec §4.2–4.9): opens the entry from a double click on a list, the plus, a long tap on the timeline,
  * the task menu; draws the field in its list, in its slot or over its card on the timeline, or last in a calendar menu's
  * stack of subtasks, and keeps it focused across redraws, 16 px over the bar; shows the bar and hides the plus while the
  * entry is open. What the entry means for the file is QuickEntry's.
@@ -186,7 +184,7 @@ export class QuickEntryController {
 		deps.root.addEventListener("transitionend", this.settled, true);
 	}
 
-	/** New task, or a double click on a list's free room: the field at the end of the column. */
+	/** A double click on a list's free room: the field at the end of the column. */
 	openAtEnd(column: ListColumn): void {
 		this.open(this.endOf(column));
 	}
@@ -278,13 +276,11 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The screen was drawn: New task for the window's place, the plus, and the field focused and in sight. The cards may
+	 * The screen was drawn: the plus, and the field focused and in sight. The cards may
 	 * have changed under the field, a written line landing, so what the field may do is read again.
 	 */
 	rendered(): void {
 		if (this.state) this.state = this.entry.state;
-		const shown = this.deps.mode() !== "calendar";
-		for (const button of this.deps.newTasks()) button.shown = shown;
 		this.deps.root.classList.toggle("is-entering", this.state !== null);
 		this.showPlus();
 		this.placeOffLists(this.state);

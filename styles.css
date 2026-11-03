@@ -33,7 +33,7 @@ body {
 	/* The marks between the hours, once the zoom gives them room: greyer than the hours'. */
 	--tc-minor-label: #636366;
 	--tc-minor-line: #161618;
-	/* The dashed edge of New task. */
+	/* The dashed edge of a place to drop on. */
 	--tc-dash: #3A3A3C;
 	--tc-drop-bg: #251F3D;
 	/* A picked card (bulk actions): the accent mixed into the ground. */
@@ -147,7 +147,7 @@ body {
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
-	/* The switch's row at the bottom, between New task and Obsidian's phone navigation. */
+	/* The switch's row at the bottom, over Obsidian's phone navigation. */
 	--tc-switch-row: calc(var(--tc-seg) + 2 * var(--tc-space-8));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
@@ -183,7 +183,7 @@ body {
 	--tc-status-room: 0px;
 	/* What Obsidian keeps under the view's bottom row (the switch and the plus): the phone's navigation, the desktop's status bar. */
 	--tc-chrome-room: calc(var(--tc-nav-room) + var(--tc-status-room));
-	/* Under a list column, below its New task: the switch's row, and Obsidian's navigation or status bar under it. */
+	/* Under a list column: the switch's row, and Obsidian's navigation or status bar under it. */
 	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room));
 	/* While a task is typed, the list's end can rise this far: over the bar at the view's bottom, with the field 16 px above it. */
 	--tc-entry-room: calc(var(--tc-bar-h) + var(--tc-bar-bottom) + var(--tc-space-16));
@@ -208,7 +208,7 @@ body {
 	--tc-fade-block: 16px;
 	/*
 	 * The bottom of the view fades into the background over every column at once: it starts this far above the topmost
-	 * control of the foot (the switch beside the calendar, New task under two lists), half gone and nearly gone at the next
+	 * control of the foot (the switch's track), half gone and nearly gone at the next
 	 * two stops, solid at the last, down under Obsidian's navigation. Scrolled to the end, a list or the day ends where it starts.
 	 */
 	--tc-foot-fade: 64px;
@@ -217,9 +217,8 @@ body {
 	--tc-foot-fade-solid: 120px;
 	--tc-foot-fade-half-ink: 50%;
 	--tc-foot-fade-deep-ink: 86%;
-	/* Its height beside the calendar, from over the switch; and under two lists, from over their New task. */
+	/* Its height, from over the switch. */
 	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade));
-	--tc-foot-fade-lists: calc(2 * var(--tc-space-8) + var(--tc-card-h) + var(--tc-foot-room) + var(--tc-foot-fade));
 	--tc-float-w: 190px;
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
@@ -454,8 +453,6 @@ body {
 	--tc-layer-now: 3;
 	--tc-layer-backing: 3;
 	--tc-layer-fade: 3;
-	/* New task stands on the fade. */
-	--tc-layer-foot: 4;
 	--tc-layer-allday: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-drop-gap: 999;
@@ -566,7 +563,7 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .task-calendar button { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 /* Obsidian lights its buttons under the pointer; the board's buttons keep their own ground, and dim while pressed. */
 .task-calendar button:hover, .task-calendar button:active, .tc-panel button:hover, .tc-panel button:active, .tc-picker button:hover, .tc-picker button:active, .tc-popover button:hover, .tc-popover button:active, .tc-quick-bar button:hover, .tc-quick-bar button:active { background: transparent; box-shadow: none; }
-.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-new-btn:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-tile:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
+.task-calendar .tc-arrow:active, .task-calendar .tc-day-title:active, .task-calendar .tc-missing-btn:active, .tc-panel .tc-menu-row:active, .tc-panel .tc-menu-tile:active, .tc-panel .tc-menu-back:active, .tc-popover .tc-source-refresh:active, .tc-picker .tc-picker-arrow:active, .tc-picker .tc-day:active { opacity: var(--tc-pressed); }
 .task-calendar svg { display: block; }
 
 /* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
@@ -586,7 +583,6 @@ body .workspace-leaf-content .view-content.tc-view { padding: 0; overflow: hidde
 .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
 /* One fade over the bottom of every column, under the foot's controls, the switch and the plus. */
 .task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
-.task-calendar:is(.is-lists, .is-inbox) > .tc-fade { height: var(--tc-foot-fade-lists); }
 /* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
 body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
 /* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
@@ -642,7 +638,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 
 
 /* The columns on the strip, Inbox, Soon, the list and the right column; the fixed dividers between the halves, and the one with its handle. */
-/* A list column: its list runs to the bottom of the view, under its foot (New task, the switch's row, Obsidian's navigation) and the fade. */
+/* A list column: its list runs to the bottom of the view, under its foot (the switch's row, Obsidian's navigation) and the fade. */
 .tc-left, .tc-soon, .tc-inbox { display: flex; flex-direction: column; }
 .tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: 0 var(--tc-space-2) 0 var(--tc-space-10); box-sizing: border-box; overflow: hidden; }
 .task-calendar.is-lists .tc-left { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: 0 var(--tc-space-10) 0 var(--tc-space-2); }
@@ -658,9 +654,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 /* The screen's foot (the switch's row, the fade) lies over Backlog's half: the half is that much taller, so both lists show as much. */
 .tc-pane.is-backlog { flex-basis: calc(var(--tc-foot-room) + var(--tc-foot-fade)); border-top: var(--tc-hairline) solid var(--tc-line); }
 .tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; }
-/* Inbox's New task stands at the foot of its half, over the line, with no room for the switch's row under it. */
-.tc-pane.is-inbox .tc-new { padding-bottom: var(--tc-space-8); }
-.task-calendar .tc-pane.is-inbox .tc-list::after { height: calc(2 * var(--tc-space-8) + var(--tc-card-h)); }
+/* Inbox's half ends over the line, out of the screen's foot. */
+.task-calendar .tc-pane.is-inbox .tc-list::after { height: var(--tc-space-8); }
 .tc-divider { position: absolute; left: var(--tc-list-width); top: var(--tc-columns-top); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; touch-action: none; cursor: col-resize; }
 .task-calendar.is-lists .tc-divider { left: 100%; }
 .tc-divider.is-fixed { left: calc(-1 * var(--tc-divider)); touch-action: auto; cursor: auto; }
@@ -684,9 +679,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-list > * { flex-shrink: 0; }
 /* The room at a list's end, so its last card can rise to where the fade starts; while a task is typed, at least the room over the bar. */
 .tc-list::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
-.task-calendar:is(.is-lists, .is-inbox) .tc-list::after { height: var(--tc-foot-fade-lists); }
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
-.task-calendar.is-entering:is(.is-lists, .is-inbox) .tc-list::after { height: max(var(--tc-foot-fade-lists), var(--tc-entry-room)); }
 .tc-list::-webkit-scrollbar { display: none; }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
@@ -733,12 +726,6 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
 .tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
 
-/* A list column's foot, over the bottom of its list: the dashed New task filled with the background (hidden beside the calendar and while a card is carried), then the room for the switch and Obsidian's phone navigation. Only what it holds takes touches; the list scrolls under the rest. */
-.tc-new { flex-shrink: 0; position: absolute; left: 0; right: 0; bottom: 0; padding-top: var(--tc-space-8); padding-bottom: calc(var(--tc-space-8) + var(--tc-foot-room)); padding-left: inherit; padding-right: inherit; z-index: var(--tc-layer-foot); pointer-events: none; }
-.tc-new > * { pointer-events: auto; }
-.task-calendar .tc-new-btn { width: 100%; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); border: var(--tc-hairline) dashed var(--tc-dash); padding: 0 var(--tc-card-pad-start); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); font-size: var(--tc-font-body); color: var(--tc-muted); white-space: nowrap; overflow: hidden; }
-.tc-new-btn svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); flex-shrink: 0; stroke: var(--tc-accent); stroke-width: var(--tc-stroke-chevron); }
-.task-calendar.is-dragging .tc-new-btn, .task-calendar .tc-new-btn.is-hidden { display: none; }
 /* A new section's name, typed where its header will stand, over the card that starts it. */
 .tc-group-slot { flex-shrink: 0; display: flex; flex-direction: column; margin-top: var(--tc-section-gap); }
 .tc-group-slot:first-child { margin-top: 0; }
@@ -748,7 +735,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar input[type="text"].tc-group-input::selection { background: var(--tc-selection); }
 .tc-quick-row { position: relative; flex-shrink: 0; }
 .tc-list > .tc-card.is-renaming { display: none; }
-.task-calendar.is-entering > .tc-seg, .task-calendar.is-entering .tc-new { display: none; }
+.task-calendar.is-entering > .tc-seg { display: none; }
 .tc-quick-row > .tc-branch.is-last { height: calc(var(--tc-branch-rise) + var(--tc-card-h) / 2 + var(--tc-branch-w) / 2); }
 .task-calendar .tc-quick-field, .tc-menu-subtasks .tc-quick-field, .tc-menu-field .tc-quick-field { display: block; width: 100%; min-height: var(--tc-card-h); box-sizing: border-box; margin: 0; padding: var(--tc-block-pad-top) var(--tc-card-pad-end) var(--tc-block-pad-top) var(--tc-card-pad-start); border: 0; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); outline: none; resize: none; overflow: hidden; overflow-wrap: anywhere; font-family: var(--tc-font-inherit); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); cursor: text; -webkit-user-select: text; user-select: text; }
 .task-calendar .tc-quick-field[data-priority], .tc-menu-subtasks .tc-quick-field[data-priority], .tc-menu-field .tc-quick-field[data-priority] { background: var(--tc-priority-fill); }

@@ -47,7 +47,6 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	let mode = startMode;
 	let day = startDay;
 	const turned: RightMode[] = [];
-	const buttons = [{ shown: true }, { shown: true }, { shown: true }];
 	const created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void) => boolean>(() => true);
@@ -104,7 +103,6 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		list: (column) => lists[column],
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
-		newTasks: () => buttons,
 		dropTargets: () => ({ lists: drops, timeline: null }),
 		levels: () => [{ prefix: "p1", color: "red" }],
 		today: () => TODAY,
@@ -150,7 +148,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		holdFresh = false;
 		freshWaiting.splice(0).forEach((resolve) => resolve());
 	};
-	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
+	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
 }
 
 afterEach(() => {
@@ -337,15 +335,6 @@ describe("QuickEntryController", () => {
 		});
 	});
 
-	it("shows New task beside another list, and not with Now and the calendar", () => {
-		const { buttons, setMode } = setUp();
-		expect(buttons.map((b) => b.shown)).toEqual([false, false, false]);
-		setMode("soon");
-		expect(buttons.map((b) => b.shown)).toEqual([true, true, true]);
-		setMode("inbox");
-		expect(buttons.map((b) => b.shown)).toEqual([true, true, true]);
-	});
-
 	it("writes the task typed at the place of the field on Enter, and opens the next field under it", async () => {
 		const { controller, type, press, created, rowsOf } = setUp({ items: { left: [item("A", key("now", 0))] } });
 		controller.openAtEnd("left");
@@ -380,7 +369,7 @@ describe("QuickEntryController", () => {
 		expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
 	});
 
-	it("shows the bar while the field is open, and puts the switch and New task away", () => {
+	it("shows the bar while the field is open, and puts the switch away", () => {
 		const { controller, root, press } = setUp();
 		controller.openAtEnd("soon");
 		expect(root.querySelector<HTMLElement>(".tc-quick-bar")!.hidden).toBe(false);
