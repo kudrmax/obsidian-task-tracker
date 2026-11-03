@@ -345,6 +345,16 @@ describe("QuickBar over a menu", () => {
 	});
 });
 
+describe("QuickBar over a menu on the desktop", () => {
+	it("stands away without docking at the view's bottom when the field has no spot", () => {
+		const { bar } = setup({}, true);
+		const el = q<HTMLElement>(document, ".tc-quick-bar");
+		bar.follow({ field: null, room: new DOMRect(0, 0, 300, 400), overMenu: new DOMRect(10, 0, 300, window.innerHeight - 50), toolbarTop: null });
+		expect(el.classList.contains("is-away")).toBe(true);
+		expect([el.style.left, el.style.width, el.style.bottom]).toEqual(["", "", ""]);
+	});
+});
+
 describe("QuickBar on the desktop", () => {
 	const VIEW = new DOMRect(100, 50, 800, 600);
 	const ROOM_BOX = new DOMRect(110, 90, 360, 540);

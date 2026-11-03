@@ -17,10 +17,11 @@ export class Reload<T> {
 	request(beforeApply?: () => void): Promise<void> {
 		this.requested = true;
 		if (beforeApply) this.hooks.push(beforeApply);
-		this.running ??= this.drain().finally(() => (this.running = null));
+		this.running ??= this.drain();
 		return this.running;
 	}
 
+	/** It lets go of the screen before applying: a request made from here on is served by a fetch of its own. */
 	private async drain(): Promise<void> {
 		let value: T;
 		try {
@@ -30,9 +31,12 @@ export class Reload<T> {
 			} while (this.requested);
 		} catch (error) {
 			this.hooks = [];
+			this.running = null;
 			throw error;
 		}
-		this.hooks.splice(0).forEach((hook) => hook());
+		const hooks = this.hooks.splice(0);
+		this.running = null;
+		hooks.forEach((hook) => hook());
 		this.apply(value);
 	}
 }

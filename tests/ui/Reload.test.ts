@@ -76,6 +76,21 @@ describe("Reload", () => {
 		expect(applied).toEqual(["fresh"]);
 	});
 
+	it("serves a request made while the last value is applied with a fetch of its own, its hook with it", async () => {
+		let n = 0;
+		const applied: number[] = [];
+		const order: string[] = [];
+		let late: Promise<void> | null = null;
+		const reload: Reload<number> = new Reload(async () => ++n, (v) => {
+			applied.push(v);
+			late ??= reload.request(() => order.push("late hook"));
+		});
+		await reload.request();
+		await late;
+		expect(applied).toEqual([1, 2]);
+		expect(order).toEqual(["late hook"]);
+	});
+
 	it("drops the hooks of a fetch that failed", async () => {
 		let fail = true;
 		let hooks = 0;

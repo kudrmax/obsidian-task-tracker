@@ -304,11 +304,13 @@ export class QuickEntry {
 	 */
 	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
 		const shown = (landed?: () => void) => () => {
+			const held = this.field?.run;
+			const was = held?.spot;
 			landed?.();
 			run.pending.shift();
 			onShown();
 			this.shifts = null;
-			if (run === this.field?.run) this.deps.onChange(this.state, true);
+			if (held && (held === run || held.spot !== was)) this.deps.onChange(this.state, true);
 		};
 		const { spot } = run;
 		switch (spot.kind) {

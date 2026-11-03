@@ -640,6 +640,21 @@ describe("QuickEntry", () => {
 		expect(entry.state).toMatchObject({ spot: at(3) });
 	});
 
+	it("a field reopened at the column end is told it moved in the drawing that shows the task written above it", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.type("X");
+		entry.blur();
+		entry.open(at(1));
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.changes[tasks.changes.length - 1]).toMatchObject({ spot: at(2) });
+		expect(tasks.drawnNext[tasks.drawnNext.length - 1]).toBe(true);
+	});
+
 	it("a field opened above a task still being written stays where it is", async () => {
 		const tasks = new FakeTasks(["A", "B"]);
 		const gate = deferred();

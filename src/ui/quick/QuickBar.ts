@@ -173,7 +173,7 @@ export class QuickBar {
 		this.desk = spot ? { room: spot.room, side: spot.side } : null;
 		reclass(this.bar, "is-away", desk !== null && spot === null);
 		const origin = desk?.overMenu || !view ? { left: 0, top: 0 } : view;
-		this.position(spot ? { left: px(spot.left - origin.left), top: px(spot.top - origin.top) } : over ? this.dock(over) : {});
+		this.position(spot ? { left: px(spot.left - origin.left), top: px(spot.top - origin.top) } : over && !desktop ? this.dock(over) : {});
 		if (spot) this.sidePanel();
 	}
 
