@@ -9,9 +9,8 @@ export interface ZoomAnchor {
 
 export interface PinchZoomOptions {
 	hourPx(): number;
-	/** The bounds follow the screen's height: the whole day is the farthest a pinch goes out. */
-	min(): number;
-	max(): number;
+	/** The bounds follow the screen's height: the whole day is the farthest a pinch goes out. Read once a gesture. */
+	bounds(): { readonly min: number; readonly max: number };
 	arbiter: GestureArbiter;
 	minutesAt(clientY: number): number;
 	onScale(hourPx: number, anchor: ZoomAnchor): void;
@@ -36,6 +35,8 @@ export class PinchZoom {
 	private lastAnchor: ZoomAnchor | null = null;
 	/** The scale last asked for: the view lays it out on the next frame, so its own hour may still be the one before. */
 	private scaled: number | null = null;
+	/** The bounds of the gesture under way, taken as it began. */
+	private limits: { readonly min: number; readonly max: number } | null = null;
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -53,7 +54,8 @@ export class PinchZoom {
 	}
 
 	private clamp(hourPx: number): number {
-		return Math.min(this.opts.max(), Math.max(this.opts.min(), hourPx));
+		const limits = (this.limits ??= this.opts.bounds());
+		return Math.min(limits.max, Math.max(limits.min, hourPx));
 	}
 
 	private geometry(): { distance: number; midY: number } {
@@ -68,6 +70,7 @@ export class PinchZoom {
 		if (this.pointers.size !== 2 || this.pinch || !this.opts.arbiter.claim(PINCH)) return;
 		const { distance, midY } = this.geometry();
 		this.pinch = { distance: Math.max(distance, 1), hourPx: this.opts.hourPx(), anchor: { minutes: this.opts.minutesAt(midY), clientY: midY } };
+		this.limits = this.opts.bounds();
 		for (const id of this.pointers.keys()) capturePointer(this.el, id);
 	}
 
@@ -90,6 +93,7 @@ export class PinchZoom {
 		if (!this.pinch) return;
 		const anchor = this.pinch.anchor;
 		this.pinch = null;
+		this.limits = null;
 		this.opts.arbiter.release(PINCH);
 		this.release(anchor);
 	}
@@ -107,6 +111,7 @@ export class PinchZoom {
 	private wheel(e: WheelEvent): void {
 		if (!e.ctrlKey && !e.metaKey) return;
 		e.preventDefault();
+		if (this.lastAnchor === null) this.limits = this.opts.bounds();
 		const anchor = this.lastAnchor ?? { minutes: this.opts.minutesAt(e.clientY), clientY: e.clientY };
 		this.lastAnchor = anchor;
 		this.scale((this.scaled ?? this.opts.hourPx()) * Math.pow(2, -e.deltaY / WHEEL_UNITS_PER_DOUBLING), anchor);
@@ -114,6 +119,7 @@ export class PinchZoom {
 		this.wheelTimer = window.setTimeout(() => {
 			this.wheelTimer = null;
 			this.lastAnchor = null;
+			this.limits = null;
 			this.release(anchor);
 		}, WHEEL_SETTLE_MS);
 	}

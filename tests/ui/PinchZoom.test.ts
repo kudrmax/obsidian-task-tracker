@@ -19,8 +19,7 @@ function zoomOf(el: HTMLElement, arbiter = new GestureArbiter()): { scales: numb
 	let hour = 56;
 	new PinchZoom(el, {
 		hourPx: () => hour,
-		min: () => 28,
-		max: () => 224,
+		bounds: () => ({ min: 28, max: 224 }),
 		arbiter,
 		minutesAt: (y) => y,
 		onScale: (h) => {
@@ -44,8 +43,7 @@ describe("PinchZoom", () => {
 		let hour = 56;
 		new PinchZoom(el, {
 			hourPx: () => hour,
-			min: () => 28,
-			max: () => 224,
+			bounds: () => ({ min: 28, max: 224 }),
 			arbiter,
 			minutesAt: (y) => y,
 			onScale: (h) => {
@@ -70,7 +68,7 @@ describe("PinchZoom", () => {
 	it("releases at the scale the fingers left, though the view lays it out a frame later", () => {
 		const el = document.createElement("div");
 		const released: number[] = [];
-		new PinchZoom(el, { hourPx: () => 56, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: () => {}, onRelease: (h) => released.push(h) });
+		new PinchZoom(el, { hourPx: () => 56, bounds: () => ({ min: 28, max: 224 }), arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: () => {}, onRelease: (h) => released.push(h) });
 		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
 		el.dispatchEvent(pointer("pointerdown", 2, 100, 200));
 		el.dispatchEvent(pointer("pointermove", 2, 100, 270));
@@ -81,7 +79,7 @@ describe("PinchZoom", () => {
 	it("keeps within its bounds", () => {
 		const el = document.createElement("div");
 		const scales: number[] = [];
-		new PinchZoom(el, { hourPx: () => 56, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => scales.push(h), onRelease: () => {} });
+		new PinchZoom(el, { hourPx: () => 56, bounds: () => ({ min: 28, max: 224 }), arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => scales.push(h), onRelease: () => {} });
 		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
 		el.dispatchEvent(pointer("pointerdown", 2, 100, 110));
 		el.dispatchEvent(pointer("pointermove", 2, 100, 700));
@@ -89,12 +87,46 @@ describe("PinchZoom", () => {
 		expect(scales).toEqual([224, 28]);
 	});
 
+	it("takes its bounds once a pinch", () => {
+		const el = document.createElement("div");
+		const bounds = vi.fn(() => ({ min: 28, max: 224 }));
+		const scales: number[] = [];
+		new PinchZoom(el, { hourPx: () => 56, bounds, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => scales.push(h), onRelease: () => {} });
+		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
+		el.dispatchEvent(pointer("pointerdown", 2, 100, 110));
+		for (let i = 0; i < 30; i++) el.dispatchEvent(pointer("pointermove", 2, 100, 120 + i * 20));
+		expect(bounds).toHaveBeenCalledTimes(1);
+		expect(scales[scales.length - 1]).toBe(224);
+		el.dispatchEvent(pointer("pointerup", 2, 100, 700));
+		el.dispatchEvent(pointer("pointerup", 1, 100, 100));
+		el.dispatchEvent(pointer("pointerdown", 1, 100, 100));
+		el.dispatchEvent(pointer("pointerdown", 2, 100, 110));
+		el.dispatchEvent(pointer("pointermove", 2, 100, 120));
+		expect(bounds).toHaveBeenCalledTimes(2);
+	});
+
+	it("takes its bounds once a run of the wheel", () => {
+		const el = document.createElement("div");
+		const bounds = vi.fn(() => ({ min: 28, max: 224 }));
+		new PinchZoom(el, { hourPx: () => 56, bounds, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: () => {}, onRelease: () => {} });
+		const notch = () => {
+			const wheel = new WheelEvent("wheel", { deltaY: -10, clientY: 300, bubbles: true, cancelable: true });
+			Object.defineProperty(wheel, "ctrlKey", { value: true });
+			el.dispatchEvent(wheel);
+		};
+		for (let i = 0; i < 10; i++) notch();
+		expect(bounds).toHaveBeenCalledTimes(1);
+		vi.advanceTimersByTime(150);
+		notch();
+		expect(bounds).toHaveBeenCalledTimes(2);
+	});
+
 	it("zooms with the wheel and a modifier on a computer, settling after the wheel stops", () => {
 		const el = document.createElement("div");
 		const scales: number[] = [];
 		const released: number[] = [];
 		let hour = 56;
-		new PinchZoom(el, { hourPx: () => hour, min: () => 28, max: () => 224, arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => { hour = h; scales.push(h); }, onRelease: (h) => released.push(h) });
+		new PinchZoom(el, { hourPx: () => hour, bounds: () => ({ min: 28, max: 224 }), arbiter: new GestureArbiter(), minutesAt: (y) => y, onScale: (h) => { hour = h; scales.push(h); }, onRelease: (h) => released.push(h) });
 		const zoomIn = new WheelEvent("wheel", { deltaY: -100, clientY: 300, bubbles: true, cancelable: true });
 		Object.defineProperty(zoomIn, "ctrlKey", { value: true });
 		el.dispatchEvent(zoomIn);
