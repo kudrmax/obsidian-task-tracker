@@ -35,16 +35,19 @@ export interface QuickEntryDeps {
 	/** The cards of `column` as it shows the file now. */
 	cards(column: ListColumn): readonly ListCard[];
 	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace;
-	/** Resolves once the lists show the file as of the last write. */
-	fresh(): Promise<void>;
+	/** Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it. */
+	fresh(beforeShow?: () => void): Promise<void>;
 	createInPlace: TaskService["createInPlace"];
 	edit: TaskService["edit"];
 	/** The placement a rename at `spot` gives the task. */
 	placement(spot: EntrySpot): Placement;
 	/** The priority levels a text may start with: a text that is only one's prefix is blank. */
 	levels(): readonly PriorityLevel[];
-	/** After every change of the state; null once the field closed. */
-	onChange(state: EntryState | null): void;
+	/**
+	 * After every change of the state; null once the field closed. `drawnNext`: the lists are about to draw the data this
+	 * change belongs to, so it needs no drawing of its own.
+	 */
+	onChange(state: EntryState | null, drawnNext?: boolean): void;
 	/** A write that failed; the ones after it still go. */
 	onError(error: unknown): void;
 }
@@ -108,6 +111,14 @@ interface Rename {
 	readonly home: Run;
 }
 
+/** What the field may do, worked out for these cards and this spot of its run. */
+interface Shifts {
+	readonly cards: readonly ListCard[];
+	readonly spot: EntrySpot;
+	readonly indent: boolean;
+	readonly outdent: boolean;
+}
+
 interface Field {
 	readonly run: Run;
 	readonly text: string;
@@ -124,6 +135,8 @@ export class QuickEntry {
 	private readonly queue: WriteQueue;
 	private readonly runs = new Runs();
 	private field: Field | null = null;
+	/** Kept while the field only changes its text or level, which do not change where it may go. */
+	private shifts: Shifts | null = null;
 
 	constructor(private readonly deps: QuickEntryDeps) {
 		this.queue = new WriteQueue((error) => deps.onError(error));
@@ -138,9 +151,20 @@ export class QuickEntry {
 			priority: field.priority,
 			pending: field.run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename?.item ?? null,
-			canIndent: this.shifted(1) !== null,
-			canOutdent: this.shifted(-1) !== null,
+			...this.mayShift(field),
 		};
+	}
+
+	/** Whether the field may go a level deeper or shallower: worked out again only for other cards or another spot. */
+	private mayShift(field: Field): { readonly canIndent: boolean; readonly canOutdent: boolean } {
+		const { spot } = field.run;
+		if (field.rename || spot.kind !== "list") return { canIndent: false, canOutdent: false };
+		const cards = this.deps.cards(spot.column);
+		const kept = this.shifts;
+		if (kept?.cards === cards && kept.spot === spot) return { canIndent: kept.indent, canOutdent: kept.outdent };
+		const shifts = { cards, spot, indent: field.run.shifted(cards, 1) !== null, outdent: field.run.shifted(cards, -1) !== null };
+		this.shifts = shifts;
+		return { canIndent: shifts.indent, canOutdent: shifts.outdent };
 	}
 
 	/** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
@@ -151,11 +175,11 @@ export class QuickEntry {
 	}
 
 	type(text: string): void {
-		if (this.field) this.reset({ ...this.field, text });
+		if (this.field) this.reset({ ...this.field, text }, true);
 	}
 
 	setPriority(prefix: string | null): void {
-		if (this.field) this.reset({ ...this.field, priority: prefix });
+		if (this.field) this.reset({ ...this.field, priority: prefix }, true);
 	}
 
 	indent(delta: 1 | -1): void {
@@ -163,6 +187,7 @@ export class QuickEntry {
 		const run = this.field?.run;
 		if (!place || run?.spot.kind !== "list") return;
 		run.spot = { ...run.spot, place };
+		this.shifts = null;
 		this.changed();
 	}
 
@@ -218,12 +243,16 @@ export class QuickEntry {
 		this.reset(field.run.spot.kind === "slot" ? null : { ...field, text: "", priority: null });
 	}
 
-	/** The field becomes `field` (none: closed); the runs it stands on are held while it does. */
-	private reset(field: Field | null): void {
+	/**
+	 * The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text
+	 * or level changed, so what it may do stands.
+	 */
+	private reset(field: Field | null, sameShifts = false): void {
 		const old = this.field;
 		for (const run of runsOf(field)) this.runs.hold(run);
 		for (const run of runsOf(old)) this.runs.release(run);
 		this.field = field;
+		if (!sameShifts) this.shifts = null;
 		this.changed();
 	}
 
@@ -255,31 +284,47 @@ export class QuickEntry {
 		const line = { text: field.text, priority: field.priority, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
 		run.pending.push(line);
 		this.queued(run, async () => {
+			let shown = false;
 			try {
 				await this.deps.fresh();
-				await this.write(run.spot, line);
+				await this.write(run, line, () => (shown = true));
 			} finally {
-				run.pending.shift();
-				if (run === this.field?.run) this.changed();
+				if (!shown) {
+					run.pending.shift();
+					this.shifts = null;
+					if (run === this.field?.run) this.changed();
+				}
 			}
 		});
 	}
 
-	/** The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a moment. */
-	private async write(spot: EntrySpot, line: Line): Promise<void> {
+	/**
+	 * The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a
+	 * moment. It leaves the queue, and the places after it move down, in the very drawing that shows its card.
+	 */
+	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
+		const shown = (landed?: () => void) => () => {
+			const held = this.field?.run;
+			const was = held?.spot;
+			landed?.();
+			run.pending.shift();
+			onShown();
+			this.shifts = null;
+			if (held && (held === run || held.spot !== was)) this.deps.onChange(this.state, true);
+		};
+		const { spot } = run;
 		switch (spot.kind) {
 			case "slot":
 				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
-				return this.deps.fresh();
+				return this.deps.fresh(shown());
 			case "stack":
 				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
-				return this.deps.fresh();
+				return this.deps.fresh(shown());
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
 				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)));
-				await this.deps.fresh();
-				this.runs.landed(spot.column, place.index);
+				return this.deps.fresh(shown(() => this.runs.landed(spot.column, place.index)));
 			}
 		}
 	}

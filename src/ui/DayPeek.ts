@@ -25,15 +25,18 @@ export interface DayPeekDeps {
 }
 
 /**
- * Another day beside the screen while a finger draws it in: its header, its list and its timeline drawn as the screen
- * would draw them, out of reach of the fingers. Its tasks and the events last fetched for it come in a moment after.
+ * Another day under the screen while a finger draws it in: its header, its list and its timeline drawn as the screen
+ * would draw them, each in the screen's own column, out of reach of the fingers. Its tasks and the events last fetched for it come in a moment after.
  */
 export class DayPeek {
 	readonly el: HTMLElement;
+	/** The day's header, its list column and its timeline column, standing where the screen's own do. */
+	readonly nav: HTMLElement | null = null;
+	readonly left: HTMLElement;
+	readonly right: HTMLElement;
 	private day: DayView | null = null;
 	private events: readonly CalendarEvent[] = [];
 	private readonly list: TaskList;
-	private readonly rightEl: HTMLElement;
 	private readonly allDayEl: HTMLElement;
 	private readonly timeline: Timeline;
 	private removed = false;
@@ -48,22 +51,21 @@ export class DayPeek {
 		root.insertBefore(this.el, root.querySelector(":scope > .tc-fade"));
 		const nav = root.querySelector(":scope > .tc-day-nav")?.cloneNode(true);
 		if (nav instanceof HTMLElement) {
+			this.nav = nav;
 			this.el.appendChild(nav);
 			const title = nav.querySelector(".tc-day-title");
 			if (title) title.textContent = dayTitle(date, deps.today());
 		}
-		const left = el(this.el, "div", "tc-left");
-		this.list = new TaskList(el(left, "div"), {
+		this.left = el(this.el, "div", "tc-left");
+		this.list = new TaskList(el(this.left, "div"), {
 			items: () => this.day?.list ?? [],
 			day: () => date,
 			grouped: () => deps.grouped(date),
 			ungroupedName: () => deps.ungroupedName(),
 		});
-		const divider = root.querySelector(":scope > .tc-divider:not(.is-fixed)")?.cloneNode(true);
-		if (divider) this.el.appendChild(divider);
-		this.rightEl = el(this.el, "div", "tc-right");
-		this.allDayEl = el(this.rightEl, "div");
-		this.timeline = new Timeline(el(this.rightEl, "div"), {
+		this.right = el(this.el, "div", "tc-right");
+		this.allDayEl = el(this.right, "div");
+		this.timeline = new Timeline(el(this.right, "div"), {
 			theme: () => deps.theme(),
 			date: () => date,
 			today: () => deps.today(),
@@ -98,7 +100,7 @@ export class DayPeek {
 	private render(): void {
 		if (this.removed) return;
 		this.list.render();
-		renderAllDayRows(this.allDayEl, this.rightEl, this.events.filter((e) => e.allDay), this.deps.theme());
+		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme());
 		this.timeline.render();
 	}
 }

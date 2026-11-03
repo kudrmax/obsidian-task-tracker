@@ -1,5 +1,6 @@
 import { DURATION, tokenMs } from "../design";
 import { px } from "../dom";
+import { type ListFrame, toContent } from "./listFrame";
 
 const SHOWN = "is-shown";
 
@@ -13,8 +14,8 @@ export class DropGap {
 
 	constructor(private readonly list: () => HTMLElement) {}
 
-	/** At `rect`, in client pixels; `visible` false keeps it there, faded out. A new one stands there at once and fades in. */
-	show(rect: DOMRect, visible: boolean): void {
+	/** At `rect`, in client pixels of the list as `frame` read it; `visible` false keeps it there, faded out. A new one stands there at once and fades in. */
+	show(rect: DOMRect, visible: boolean, frame: ListFrame): void {
 		const list = this.list();
 		window.clearTimeout(this.leaving);
 		const fresh = !this.el || this.el.parentElement !== list;
@@ -24,10 +25,8 @@ export class DropGap {
 			this.el.className = "tc-drop-gap";
 		}
 		const el = this.el!;
-		const box = list.getBoundingClientRect();
-		const left = rect.left - box.left - list.clientLeft + list.scrollLeft;
-		const top = rect.top - box.top - list.clientTop + list.scrollTop;
-		el.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+		const at = toContent(frame, rect.left, rect.top);
+		el.style.transform = `translate3d(${at.x}px, ${at.y}px, 0)`;
 		el.style.width = px(rect.width);
 		if (fresh) {
 			list.appendChild(el);

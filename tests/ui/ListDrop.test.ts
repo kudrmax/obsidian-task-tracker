@@ -18,6 +18,27 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	parentText: null, description: null,
 });
 
+/** How often each node's place was read: a drag measures a card once. */
+const offsetReads = new Map<HTMLElement, number>();
+
+/** The nodes stand `step` apart in the list's content, as the layout puts them, whatever transform they are drawn at. */
+function standAt(nodes: readonly HTMLElement[], step: number): void {
+	nodes.forEach((node, i) =>
+		Object.defineProperties(node, {
+			offsetTop: {
+				configurable: true,
+				get: () => {
+					offsetReads.set(node, (offsetReads.get(node) ?? 0) + 1);
+					return i * step;
+				},
+			},
+			offsetHeight: { configurable: true, value: 35 },
+			offsetLeft: { configurable: true, value: 0 },
+			offsetWidth: { configurable: true, value: 175 },
+		}),
+	);
+}
+
 function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | null, date: string | null = null, onNewPlace = () => undefined) {
 	const area = document.createElement("div");
 	document.body.appendChild(area);
@@ -31,7 +52,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	list.render();
 	area.getBoundingClientRect = () => new DOMRect(0, 100, 187, 554);
 	list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
-	list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * 40, 175, 35)));
+	standAt(list.elements, 40);
 	const drop = new ListDrop(list, area, column, () => true, () => (grouped ? { list: grouped, date } : null), true, onNewPlace);
 	return { list, drop };
 }
@@ -217,7 +238,7 @@ describe("ListDrop", () => {
 		function lifted(at: number) {
 			const items = three();
 			const { list, drop } = setup(items, "left", null);
-			list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * STEP, 175, 35)));
+			standAt(list.elements, STEP);
 			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
 			list.elements[at].classList.add("is-lifted");
 			return { list, drop, items, from: drag("left", items[at]) };
@@ -305,6 +326,38 @@ describe("ListDrop", () => {
 			expect(list.el.classList.contains("is-making-room")).toBe(false);
 		});
 
+		it("writes the room only into the cards whose room changed", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + STEP + 17, from);
+			const sets = list.elements.map((node) => vi.spyOn(node.style, "setProperty"));
+			const roomed = () => sets.filter((set) => set.mock.calls.some(([name]) => name === "--tc-room")).length;
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			expect(roomed()).toBe(1);
+			for (const set of sets) set.mockClear();
+			drop.preview(27, 100 + 3 * STEP + 3, from);
+			expect(roomed()).toBe(0);
+			for (const set of sets) set.mockRestore();
+		});
+
+		it("marks as moved only the cards drawn off their place", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			const rooms = room(list);
+			expect(list.elements.map((n) => n.classList.contains("is-moved"))).toEqual(rooms.map((value) => value !== "0px"));
+			expect(list.elements[0].classList.contains("is-moved")).toBe(false);
+			expect(list.elements[1].classList.contains("is-moved")).toBe(false);
+			expect(list.elements[2].classList.contains("is-moved")).toBe(true);
+		});
+
+		it("stands as drawn after the drag: no room and no mark left", () => {
+			const { list, drop, from } = lifted(1);
+			drop.preview(27, 100 + 3 * STEP + 2, from);
+			list.elements[1].classList.remove("is-lifted");
+			drop.clear();
+			expect(list.elements.some((n) => n.classList.contains("is-moved"))).toBe(false);
+			expect(room(list)).toEqual(["", "", "", ""]);
+		});
+
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {
 			const frames: (() => void)[] = [];
 			vi.stubGlobal("requestAnimationFrame", (fn: () => void) => frames.push(fn));
@@ -320,5 +373,78 @@ describe("ListDrop", () => {
 			drop.clear();
 			vi.unstubAllGlobals();
 		});
+	});
+
+	describe("measuring once (block 3)", () => {
+		const thirty = () => Array.from({ length: 30 }, (_, i) => item("now", i, `T${i}`, null));
+		function liftedOf30(at: number) {
+			const items = thirty();
+			const made = setup(items, "left", null);
+			made.list.elements[at].classList.add("is-lifted");
+			return { ...made, from: drag("left", items[at]) };
+		}
+
+		afterEach(() => {
+			vi.restoreAllMocks();
+			document.body.replaceChildren();
+		});
+
+		it("measures each card once over a whole drag: 50 moves read no card's rect and no computed style", () => {
+			const { list, drop, from } = liftedOf30(3);
+			const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+			const style = vi.spyOn(window, "getComputedStyle");
+			offsetReads.clear();
+			for (let i = 0; i < 50; i++) drop.preview(27, 140 + i * 8, from);
+			const nodes = new Set<unknown>(list.elements);
+			expect(rect.mock.contexts.filter((self) => nodes.has(self))).toEqual([]);
+			expect(style.mock.calls.length).toBeLessThanOrEqual(1);
+			const standing = list.elements.filter((node) => !node.classList.contains("is-lifted"));
+			expect(standing.map((node) => offsetReads.get(node))).toEqual(standing.map(() => 1));
+		});
+
+		it("reads the list's own rect once per move", () => {
+			const { list, drop, from } = liftedOf30(3);
+			const box = vi.fn(() => new DOMRect(10, 100, 175, 554));
+			list.el.getBoundingClientRect = box;
+			for (let i = 0; i < 50; i++) drop.preview(27, 140 + i * 8, from);
+			expect(box).toHaveBeenCalledTimes(50);
+		});
+
+		it("follows a scroll by scrollTop, not by measuring again", () => {
+			const { list, drop, from } = liftedOf30(29);
+			let scrollTop = 0;
+			Object.defineProperty(list.el, "scrollTop", { configurable: true, get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+			const y = 100 + 5 * 40 + 17;
+			drop.preview(27, y, from);
+			expect(list.elements[5].classList.contains("is-target")).toBe(true);
+			offsetReads.clear();
+			scrollTop = 40;
+			drop.preview(27, y, from);
+			expect(list.elements[6].classList.contains("is-target")).toBe(true);
+			expect(list.elements[5].classList.contains("is-target")).toBe(false);
+			expect(offsetReads.size).toBe(0);
+		});
+
+		it("measures again once the list is drawn anew", () => {
+			const { list, drop, from } = liftedOf30(29);
+			drop.preview(27, 300, from);
+			list.render();
+			standAt(list.elements, 40);
+			offsetReads.clear();
+			drop.preview(27, 302, from);
+			expect(offsetReads.size).toBe(list.elements.length);
+		});
+	});
+});
+
+describe("ListDrop with picked cards carried along", () => {
+	it("closes the list up over the carried cards from the first move, not only after the finger came back", () => {
+		const items = ["A", "B", "C", "D"].map((t, i) => item("soon", i, t, null));
+		const { drop, list } = setup(items, "soon", null);
+		for (const at of [0, 2]) list.elements[at].classList.add("is-lifted", "is-waiting");
+		const carried = { ...drag("soon", items[0]), carried: [{ item: items[2], from: "soon" }] } as unknown as DragPayload;
+		drop.preview(20, 220, carried);
+		expect(list.elements.map((n) => n.classList.contains("is-waiting"))).toEqual([false, false, false, false]);
+		expect(list.elements[1].style.getPropertyValue("--tc-room")).not.toBe(list.elements[3].style.getPropertyValue("--tc-room"));
 	});
 });

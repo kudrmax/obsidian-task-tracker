@@ -80,9 +80,9 @@ export class DayData {
 		return this.tasks();
 	}
 
-	/** The tasks file read afresh: after a change to it. */
-	tasks(): Promise<void> {
-		return this.taskReload.request();
+	/** The tasks file read afresh: after a change to it. `beforeShow` runs right before what was read is shown. */
+	tasks(beforeShow?: () => void): Promise<void> {
+		return this.taskReload.request(beforeShow);
 	}
 
 	/** The events fetched afresh: Refresh now in the sources popover, the polling. */

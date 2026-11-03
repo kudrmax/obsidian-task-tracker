@@ -28,6 +28,7 @@ import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
+import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -37,7 +38,7 @@ import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
-import { clear, el, px, restingTop } from "./dom";
+import { clear, el, px } from "./dom";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { Keyboard } from "./Keyboard";
 import { UndoButton } from "./UndoButton";
@@ -48,7 +49,7 @@ import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
-import { DayTrack, EdgeTrack, StripTrack, stripParts } from "./ScreenTracks";
+import { type DayLane, DayTrack, EdgeTrack, restore, StripTrack, stripParts } from "./ScreenTracks";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -328,8 +329,10 @@ export class TaskCalendarView extends ItemView {
 		const timeline = this.timeline;
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
-			min: () => this.zoomLevels()[0].hourPx,
-			max: () => this.zoomLevels()[this.zoomLevels().length - 1].hourPx,
+			bounds: () => {
+				const levels = this.zoomLevels();
+				return { min: levels[0].hourPx, max: levels[levels.length - 1].hourPx };
+			},
 			arbiter: this.arbiter,
 			minutesAt: (y) => timeline.minutesAt(y),
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
@@ -348,6 +351,7 @@ export class TaskCalendarView extends ItemView {
 			arbiter: this.arbiter,
 		});
 		this.switcher = switcher;
+		const chrome = new ObsidianChrome(root.ownerDocument);
 		this.quick = new QuickEntryController({
 			root,
 			tasks: this.deps.tasks,
@@ -364,8 +368,8 @@ export class TaskCalendarView extends ItemView {
 			levels: () => this.settings.priorities,
 			today: () => this.today(),
 			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
-			chromeTop: () => statusBarTop(root.ownerDocument),
-			toolbarTop: () => keyboardToolbarTop(root.ownerDocument),
+			chromeTop: () => chrome.statusBarTop(),
+			toolbarTop: () => chrome.toolbarTop(),
 			day: () => this.selectedDate,
 			mode: () => this.mode(),
 			turnTo: (mode) => this.switcher?.show(mode),
@@ -373,8 +377,8 @@ export class TaskCalendarView extends ItemView {
 				this.select(date);
 				return this.data.tasks();
 			},
-			fresh: () => this.data.tasks(),
-			render: () => this.render(),
+			fresh: (beforeShow) => this.data.tasks(beforeShow),
+			render: () => this.parts.request("tasks"),
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
@@ -525,7 +529,7 @@ export class TaskCalendarView extends ItemView {
 
 	/**
 	 * A swipe walks the row of screens as the switch and the arrows do: to the next pair of columns the strip slides under
-	 * the finger, to another day the screen moves aside for that day drawn beside it, and past the row's end it only gives.
+	 * the finger, to another day each column turns to that day's within itself, and past the row's end it only gives.
 	 */
 	private trackTo(shift: Shift): ScreenTrack {
 		this.landed();
@@ -559,8 +563,13 @@ export class TaskCalendarView extends ItemView {
 			scrollTimeline: (timeline, date) => this.scrollToOpen(timeline, date),
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 		});
-		return new DayTrack(parts, peek, shift, root.clientWidth, (arrived) => {
-			this.landing = { peek: arrived, parts };
+		const inside = (column: Element | null): HTMLElement[] => (column ? [...column.children].filter((part) => part instanceof HTMLElement) : []);
+		const nav = root.querySelector<HTMLElement>(":scope > .tc-day-nav");
+		const list: DayLane = { shown: inside(this.leftEl), next: inside(peek.left), width: this.leftEl?.offsetWidth ?? 0 };
+		const timeline: DayLane = { shown: inside(this.rightEl), next: inside(peek.right), width: this.rightEl?.offsetWidth ?? root.clientWidth };
+		const header: DayLane = { shown: nav ? [nav] : [], next: peek.nav ? [peek.nav] : [], width: list.width, fades: true };
+		return new DayTrack([list, timeline, header], timeline, peek, shift, (arrived, shown) => {
+			this.landing = { peek: arrived, parts: shown };
 			void this.afterEntry(() => this.select(arrived.date));
 		});
 	}
@@ -578,7 +587,7 @@ export class TaskCalendarView extends ItemView {
 		const landing = this.landing;
 		if (!landing) return;
 		this.landing = null;
-		for (const part of landing.parts) part.style.transform = "";
+		restore(landing.parts);
 		landing.peek.remove();
 	}
 
@@ -974,18 +983,4 @@ export class TaskCalendarView extends ItemView {
 		button.addEventListener("click", () => void this.act(() => this.deps.tasks.createFile()));
 	}
 
-}
-
-/** Where the buttons of Obsidian's toolbar over the phone keyboard stop while it shows, though still sliding there; null otherwise. */
-function keyboardToolbarTop(doc: Document): number | null {
-	const toolbar = doc.body.querySelector<HTMLElement>(".mobile-toolbar .mobile-toolbar-options-container");
-	const box = toolbar?.getBoundingClientRect();
-	return toolbar && box && box.height > 0 ? restingTop(toolbar) : null;
-}
-
-/** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */
-function statusBarTop(doc: Document): number {
-	const bar = doc.body.querySelector<HTMLElement>(":scope > .app-container > .status-bar");
-	const box = bar?.getBoundingClientRect();
-	return box && box.height > 0 ? box.top : Infinity;
 }

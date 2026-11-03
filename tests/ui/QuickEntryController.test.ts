@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { NewTaskPlace, Placement, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
 import type { RightMode } from "../../src/settings";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
@@ -41,11 +41,29 @@ interface SetUp {
 	desktop?: { readonly chromeTop: number };
 	/** Where Obsidian's toolbar over the phone keyboard stops: a function, since the keyboard moves it. */
 	toolbarTop?: () => number | null;
+	/**
+	 * The lists read the file after a write and draw it only when it changed, as the view's do: "grows" lands each write
+	 * as a card at the end of the day column, "same" lands nothing.
+	 */
+	drawsOnFresh?: "grows" | "same";
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, toolbarTop = () => null }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, toolbarTop = () => null, drawsOnFresh }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
+	/** The animation frames asked for, run when the test says. */
+	const frames = new Map<number, FrameRequestCallback>();
+	let nextFrame = 1;
+	vi.stubGlobal("requestAnimationFrame", (run: FrameRequestCallback) => {
+		frames.set(nextFrame, run);
+		return nextFrame++;
+	});
+	vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+	const runFrames = () => {
+		const due = [...frames.values()];
+		frames.clear();
+		due.forEach((run) => run(0));
+	};
 	let mode = startMode;
 	let day = startDay;
 	const turned: RightMode[] = [];
@@ -79,16 +97,23 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		events: () => [],
 		now: () => new Date(2026, 10, 1, 8, 0),
 	});
+	let draws = 0;
+	/** The day column's rows as each drawing left them. */
+	const drawnLeft: string[][] = [];
 	const render = () => {
+		draws++;
 		for (const column of COLUMNS) lists[column].render();
 		timeline.render();
 		controller?.rendered();
+		drawnLeft.push(rowsOf("left"));
 	};
+	let shownLeft = (items.left ?? []).length;
 	controller = new QuickEntryController({
 		root,
 		tasks: {
 			createInPlace: async (text, priority, place) => {
 				created.push({ text, priority, place });
+				if (drawsOnFresh === "grows") (items.left ??= []).push(item(text, key("now", (items.left ?? []).length)));
 			},
 			edit: async (k, draft) => {
 				edits.push({ key: k, draft });
@@ -122,14 +147,22 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			day = date;
 			render();
 		},
-		fresh: () => (holdFresh ? new Promise<void>((resolve) => freshWaiting.push(resolve)) : Promise.resolve()),
+		fresh: async (beforeShow) => {
+			if (holdFresh) await new Promise<void>((resolve) => freshWaiting.push(resolve));
+			beforeShow?.();
+			const left = (items.left ?? []).length;
+			if (drawsOnFresh && left !== shownLeft) render();
+			shownLeft = left;
+		},
 		render,
 		onError: vi.fn(),
 	});
 	render();
 	const plus = root.querySelector<HTMLElement>(".tc-plus")!;
 	const field = () => root.querySelector<HTMLTextAreaElement>("textarea.tc-quick-field");
-	const rowsOf = (column: ListColumn) => [...lists[column].el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent || row.className));
+	function rowsOf(column: ListColumn): string[] {
+		return [...lists[column].el.children].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent || row.className));
+	}
 	const type = (text: string) => {
 		field()!.value = text;
 		field()!.dispatchEvent(new Event("input", { bubbles: true }));
@@ -150,11 +183,43 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		holdFresh = false;
 		freshWaiting.splice(0).forEach((resolve) => resolve());
 	};
-	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
+	return {
+		controller,
+		root,
+		plus,
+		field,
+		titleFields,
+		lists,
+		timeline,
+		slotted,
+		render,
+		rowsOf,
+		type,
+		press,
+		created,
+		edits,
+		beginNew,
+		drops,
+		turned,
+		setMode,
+		switchDay,
+		holdWrites,
+		releaseWrites,
+		day: () => day,
+		runFrames,
+		framesAsked: () => frames.size,
+		draws: () => draws,
+		drawnLeft,
+		resetDraws: () => {
+			draws = 0;
+			drawnLeft.length = 0;
+		},
+	};
 }
 
 afterEach(() => {
 	document.body.replaceChildren();
+	vi.unstubAllGlobals();
 });
 
 describe("QuickEntryController", () => {
@@ -402,7 +467,7 @@ describe("QuickEntryController", () => {
 	});
 
 	it("scrolls the list as the text wraps and the field grows, keeping it 16 px over the bar", () => {
-		const { controller, root, type, field, lists } = setUp();
+		const { controller, root, type, field, lists, runFrames } = setUp();
 		controller.openAtEnd("inbox");
 		root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
 		const list = lists.inbox.el;
@@ -412,6 +477,7 @@ describe("QuickEntryController", () => {
 		field()!.getBoundingClientRect = () => new DOMRect(10, 405 - list.scrollTop, 175, height);
 		height = 71;
 		type("A text long enough to wrap onto three lines");
+		runFrames();
 		expect(field()!.getBoundingClientRect().bottom).toBe(500 - 44 - 16);
 	});
 
@@ -422,6 +488,7 @@ describe("QuickEntryController", () => {
 		function withKeyboard() {
 			let toolbar: number | null = null;
 			const set = setUp({ toolbarTop: () => toolbar });
+			vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "performance"] });
 			set.controller.openAtEnd("inbox");
 			set.root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
 			const list = set.lists.inbox.el;
@@ -437,7 +504,6 @@ describe("QuickEntryController", () => {
 		afterEach(() => vi.useRealTimers());
 
 		it("scrolls the field over the bar's new place along with the keyboard, not at once", () => {
-			vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "performance"] });
 			const { list, field, slide } = withKeyboard();
 			const before = list.scrollTop;
 			slide(200);
@@ -449,7 +515,6 @@ describe("QuickEntryController", () => {
 		});
 
 		it("stops riding the keyboard once a finger scrolls the list", () => {
-			vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "performance"] });
 			const { list, slide } = withKeyboard();
 			slide(200);
 			vi.advanceTimersByTime(100);
@@ -457,6 +522,102 @@ describe("QuickEntryController", () => {
 			list.dispatchEvent(new Event("scroll"));
 			vi.advanceTimersByTime(500);
 			expect(list.scrollTop).toBe(3);
+		});
+	});
+
+	describe("Enter", () => {
+		const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+		const twoCards = () => ({ left: [item("X", key("now", 0)), item("Y", key("now", 1))] });
+
+		it("Enter draws the lists twice: the line moving up at once, and once with its card", async () => {
+			const { controller, type, press, draws, resetDraws, rowsOf } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(draws()).toBe(2);
+			expect(rowsOf("left")).toEqual(["X", "Y", "A", "field"]);
+		});
+
+		it("no drawing shows the line twice or the field over its card", async () => {
+			const { controller, type, press, drawnLeft, resetDraws } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(drawnLeft.length).toBeGreaterThan(0);
+			for (const rows of drawnLeft) {
+				expect(rows.filter((row) => row === "A").length).toBeLessThanOrEqual(1);
+				expect(rows[rows.length - 1]).toBe("field");
+			}
+		});
+
+		it("Enter keeps the field's own element, focused, with no blur", async () => {
+			const { controller, type, press, field } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
+			controller.openAtEnd("left");
+			type("A");
+			const before = field()!;
+			let blurs = 0;
+			let focuses = 0;
+			before.addEventListener("blur", () => blurs++);
+			before.addEventListener("focus", () => focuses++);
+			press("Enter");
+			await settled();
+			expect(field()).toBe(before);
+			expect(document.activeElement).toBe(before);
+			expect(blurs).toBe(0);
+			expect(focuses).toBe(0);
+		});
+
+		it("a write whose read draws nothing redraws the lists itself", async () => {
+			const { controller, type, press, draws, resetDraws, rowsOf, created } = setUp({ items: twoCards(), drawsOnFresh: "same" });
+			controller.openAtEnd("left");
+			type("A");
+			resetDraws();
+			press("Enter");
+			await settled();
+			expect(created.map((c) => c.text)).toEqual(["A"]);
+			expect(draws()).toBe(2);
+			expect(rowsOf("left")).toEqual(["X", "Y", "field"]);
+		});
+	});
+
+	describe("once a frame", () => {
+		it("ten letters measure nothing until the frame, then once", () => {
+			const { controller, type, runFrames, framesAsked } = setUp({ items: { inbox: [item("I", key("inbox", 0))] } });
+			controller.openAtEnd("inbox");
+			runFrames();
+			const measured = vi.spyOn(Element.prototype, "getBoundingClientRect");
+			onTestFinished(() => measured.mockRestore());
+			type("a");
+			expect(measured).not.toHaveBeenCalled();
+			runFrames();
+			const perPass = measured.mock.calls.length;
+			expect(perPass).toBeGreaterThan(0);
+			measured.mockClear();
+			for (const text of ["ab", "abc", "abcd", "abcde", "abcdef", "abcdefg", "abcdefgh", "abcdefghi", "abcdefghij", "abcdefghijk"]) type(text);
+			expect(measured).not.toHaveBeenCalled();
+			expect(framesAsked()).toBe(1);
+			runFrames();
+			expect(measured.mock.calls.length).toBe(perPass);
+		});
+
+		it("a burst of transitionend moves the bar once", () => {
+			const { controller, root, runFrames, framesAsked } = setUp();
+			controller.openAtEnd("inbox");
+			runFrames();
+			for (let i = 0; i < 20; i++) root.firstElementChild!.dispatchEvent(new Event("transitionend", { bubbles: true }));
+			expect(framesAsked()).toBe(1);
+		});
+
+		it("scrolls in one frame are one pass", () => {
+			const { controller, lists, runFrames, framesAsked } = setUp();
+			controller.openAtEnd("inbox");
+			runFrames();
+			for (let i = 0; i < 5; i++) lists.inbox.el.dispatchEvent(new Event("scroll"));
+			expect(framesAsked()).toBe(1);
 		});
 	});
 
@@ -489,10 +650,11 @@ describe("QuickEntryController", () => {
 		});
 
 		it("follows the field as its list scrolls, and goes over it at the bottom of the column", () => {
-			const { bar, list, field } = onDesk();
+			const { bar, list, field, runFrames } = onDesk();
 			const scrollTo = (top: number) => {
 				field()!.getBoundingClientRect = () => new DOMRect(10, top, 175, 35);
 				list.dispatchEvent(new Event("scroll"));
+				runFrames();
 			};
 			scrollTo(380);
 			expect(bar.style.top).toBe(`${380 + 35 + 8}px`);
@@ -501,11 +663,13 @@ describe("QuickEntryController", () => {
 		});
 
 		it("follows the field once the columns have slid under it", () => {
-			const { bar, field, root } = onDesk();
+			const { bar, field, root, runFrames } = onDesk();
 			field()!.getBoundingClientRect = () => new DOMRect(-400, 300, 175, 35);
 			root.dispatchEvent(new Event("scroll"));
+			runFrames();
 			field()!.getBoundingClientRect = () => new DOMRect(10, 250, 175, 35);
 			root.firstElementChild!.dispatchEvent(new Event("transitionend", { bubbles: true }));
+			runFrames();
 			expect([bar.style.left, bar.style.top]).toEqual([`${185 - 105}px`, `${285 + 8}px`]);
 		});
 	});
@@ -544,8 +708,9 @@ describe("QuickEntryController", () => {
 		});
 
 		it("goes back to the field once the text changes", () => {
-			const { type, list, followed } = scrolledAway();
+			const { type, list, followed, runFrames } = scrolledAway();
 			type("Call");
+			runFrames();
 			expect(list.scrollTop).toBe(followed);
 		});
 

@@ -40,11 +40,11 @@ const FRAME_SLACK_MS = 100;
 const easeOut = (t: number): number => 1 - (1 - t) ** 3;
 
 /**
- * The screen under the finger: it follows the finger either way, each way along its own track, and once let go it runs
+ * The screen under the finger: it follows the finger either way, one way's track at a time, and once let go it runs
  * on to the next screen or back to where it stood. A new swipe while it runs puts it where it was going at once.
  */
 export class ScreenPager implements SwipeTarget {
-	private readonly tracks = new Map<Shift, ScreenTrack>();
+	private way: { readonly shift: Shift; readonly track: ScreenTrack } | null = null;
 	private shift: Shift | null = null;
 	private dx = 0;
 	private settling: Settling | null = null;
@@ -58,18 +58,14 @@ export class ScreenPager implements SwipeTarget {
 
 	follow(dx: number): void {
 		this.finish();
-		if (dx !== 0) {
-			const shift: Shift = dx < 0 ? 1 : -1;
-			if (this.shift !== null && this.shift !== shift) this.tracks.get(this.shift)?.at(0);
-			this.shift = shift;
-		}
+		if (dx !== 0) this.shift = dx < 0 ? 1 : -1;
 		this.dx = dx;
 		if (this.shift !== null) this.trackOf(this.shift).at(dx);
 	}
 
 	settle(shift: Shift | null): Promise<void> {
 		this.finish();
-		const track = this.shift === null ? null : this.tracks.get(this.shift);
+		const track = this.way?.shift === this.shift ? this.way.track : null;
 		if (!track || this.shift === null) {
 			this.reset();
 			return Promise.resolve();
@@ -85,6 +81,10 @@ export class ScreenPager implements SwipeTarget {
 			settling.frame = requestAnimationFrame((time) => this.frame(settling, time));
 			settling.timer = window.setTimeout(() => this.finish(), ms + FRAME_SLACK_MS);
 		});
+	}
+
+	stand(): void {
+		this.finish();
 	}
 
 	private frame(settling: Settling, time: number): void {
@@ -105,27 +105,30 @@ export class ScreenPager implements SwipeTarget {
 		cancelAnimationFrame(settling.frame);
 		window.clearTimeout(settling.timer);
 		settling.track.at(settling.to);
-		for (const track of this.tracks.values()) if (track !== settling.track) track.land(false);
 		settling.track.land(settling.arrived);
-		this.tracks.clear();
+		this.way = null;
 		this.shift = null;
 		this.dx = 0;
 		settling.resolve();
 	}
 
 	private reset(): void {
-		for (const track of this.tracks.values()) track.land(false);
-		this.tracks.clear();
+		this.way?.track.land(false);
+		this.way = null;
 		this.shift = null;
 		this.dx = 0;
 	}
 
+	/**
+	 * One way at a time: the screen turned the other way drops the way it was drawn first, so the new way is drawn from
+	 * the screen as it stands, never from the screen as the other way holds it.
+	 */
 	private trackOf(shift: Shift): ScreenTrack {
-		let track = this.tracks.get(shift);
-		if (!track) {
-			track = this.deps.track(shift);
-			this.tracks.set(shift, track);
-		}
+		if (this.way?.shift === shift) return this.way.track;
+		this.way?.track.land(false);
+		this.way = null;
+		const track = this.deps.track(shift);
+		this.way = { shift, track };
 		return track;
 	}
 }

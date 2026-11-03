@@ -40,15 +40,41 @@ describe("ScreenPager", () => {
 	beforeEach(() => vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] }));
 	afterEach(() => vi.useRealTimers());
 
-	it("draws the screen along the track of the way the finger goes, and each way along its own", () => {
-		const { pager, tracks, made } = setUp();
-		pager.follow(-30);
-		pager.follow(-80);
-		pager.follow(40);
-		pager.follow(-10);
-		expect(made).toEqual([1, -1]);
-		expect(tracks.get(1)?.shown).toEqual([-30, -80, 0, -10]);
-		expect(tracks.get(-1)?.shown).toEqual([40, 0]);
+	it("draws the screen along the track of the way the finger goes, one way at a time", () => {
+		const made: Shift[] = [];
+		const tracks: FakeTrack[] = [];
+		const built = new ScreenPager({
+			track: (shift) => {
+				made.push(shift);
+				const track = fakeTrack(WIDTH);
+				tracks.push(track);
+				return track;
+			},
+			duration: () => SLIDE_MS,
+			width: () => WIDTH,
+		});
+		built.follow(-30);
+		built.follow(-80);
+		built.follow(40);
+		built.follow(-10);
+		expect(made).toEqual([1, -1, 1]);
+		expect(tracks.map((track) => track.shown)).toEqual([[-30, -80], [40], [-10]]);
+		expect(tracks.map((track) => track.landed)).toEqual([[false], [false], []]);
+	});
+
+	it("puts the other way away before it draws a new one, so the new way is measured from the screen as it stands", () => {
+		const events: string[] = [];
+		const pager = new ScreenPager({
+			track: (shift) => {
+				events.push(`make ${shift}`);
+				return { distance: WIDTH, at: () => undefined, land: (arrived) => events.push(`land ${shift} ${arrived}`) };
+			},
+			duration: () => SLIDE_MS,
+			width: () => WIDTH,
+		});
+		pager.distance(-1);
+		pager.follow(-12);
+		expect(events).toEqual(["make -1", "land -1 false", "make 1"]);
 	});
 
 	it("runs on to the next screen once let go, slowing down, and stands there", async () => {

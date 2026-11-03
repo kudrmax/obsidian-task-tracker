@@ -239,6 +239,19 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
 		expect(of(".task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
+
+	it("reads the hour only on the canvas", () => {
+		const reading = sheet.rules.filter((d) => d.value.includes("var(--tc-hour)"));
+		expect(reading.length).toBeGreaterThan(0);
+		expect(reading.every((d) => d.selector === ".tc-canvas")).toBe(true);
+	});
+
+	it("moves only the cards a drag draws off their place, flat", () => {
+		const moving = sheet.rules.filter((d) => d.value.includes("var(--tc-room)"));
+		expect(moving.length).toBe(1);
+		expect(moving[0].selector).toContain(".is-moved");
+		expect(moving[0].value).toBe("translateY(var(--tc-room))");
+	});
 });
 
 describe("the code keeps to the design system", () => {

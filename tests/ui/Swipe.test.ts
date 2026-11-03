@@ -25,13 +25,21 @@ function setUp(arbiter = new GestureArbiter(), ends: readonly Shift[] = []) {
 	const shifts: Shift[] = [];
 	const settles: (Shift | null)[] = [];
 	const follows: number[] = [];
+	let stood = 0;
+	let stand = () => undefined as void;
+	/** Whether the screen takes its time to settle, until made to stand. */
+	let running = false;
 	const target: SwipeTarget = {
 		distance: (shift) => (ends.includes(shift) ? null : WIDTH),
 		follow: (dx) => follows.push(dx),
 		settle: (shift) => {
 			settles.push(shift);
 			if (shift !== null) shifts.push(shift);
-			return Promise.resolve();
+			return running ? new Promise<void>((resolve) => (stand = resolve)) : Promise.resolve();
+		},
+		stand: () => {
+			stood++;
+			stand();
 		},
 	};
 	new Swipe(root, { arbiter, accepts: (target) => target !== sheet, target });
@@ -40,7 +48,7 @@ function setUp(arbiter = new GestureArbiter(), ends: readonly Shift[] = []) {
 		for (const point of points.slice(1)) from.dispatchEvent(pointer("pointermove", ...point));
 		from.dispatchEvent(pointer("pointerup", ...points[points.length - 1]));
 	};
-	return { root, inner, sheet, shifts, settles, follows, arbiter, swipe };
+	return { root, inner, sheet, shifts, settles, follows, arbiter, swipe, stood: () => stood, slow: () => (running = true) };
 }
 
 /** The screen settles, and only then lets the screen go. */
@@ -62,6 +70,21 @@ describe("Swipe", () => {
 		inner.dispatchEvent(pointer("pointermove", 320));
 		inner.dispatchEvent(pointer("pointermove", -100));
 		expect(follows).toEqual([-40, 30, -WIDTH]);
+	});
+
+	it("asks for no screen while the finger has gone neither way since the screen took it", () => {
+		const root = document.createElement("div");
+		const asked: Shift[] = [];
+		new Swipe(root, {
+			arbiter: new GestureArbiter(),
+			accepts: () => true,
+			target: { distance: (shift) => (asked.push(shift), WIDTH), follow: () => undefined, settle: () => Promise.resolve(), stand: () => undefined },
+		});
+		root.dispatchEvent(pointer("pointerdown", 277));
+		root.dispatchEvent(pointer("pointermove", 266));
+		root.dispatchEvent(pointer("pointermove", 266));
+		root.dispatchEvent(pointer("pointermove", 254));
+		expect(asked).toEqual([1]);
 	});
 
 	it("lands on whichever screen stands nearer when let go", () => {
@@ -116,6 +139,16 @@ describe("Swipe", () => {
 		expect(settles).toEqual([null]);
 	});
 
+	it("steps on for a quick swipe whose finger rolls back a little as it lifts", () => {
+		const { inner, settles } = setUp();
+		inner.dispatchEvent(pointer("pointerdown", 300));
+		inner.dispatchEvent(pointer("pointermove", 290, 300, { after: 10 }));
+		for (const x of [270, 250, 230, 210]) inner.dispatchEvent(pointer("pointermove", x, 300, { after: 10 }));
+		inner.dispatchEvent(pointer("pointermove", 212, 300, { after: 4 }));
+		inner.dispatchEvent(pointer("pointerup", 212, 300, { after: 4 }));
+		expect(settles).toEqual([1]);
+	});
+
 	it("takes the way the finger was let go, not the way it set off", () => {
 		const { inner, shifts, swipe } = setUp();
 		swipe(inner, [300, 300], [250, 300], [260, 300], [330, 300], [380, 300]);
@@ -161,6 +194,29 @@ describe("Swipe", () => {
 		inner.dispatchEvent(pointer("pointermove", 100));
 		inner.dispatchEvent(pointer("pointerup", 100));
 		expect(shifts).toEqual([]);
+	});
+
+	it("stands the screen at once for a finger that comes down while it settles, and frees it for what lies under the finger", async () => {
+		const { inner, arbiter, swipe, stood, slow } = setUp();
+		slow();
+		swipe(inner, [300, 300], [290, 300], [100, 300]);
+		expect(arbiter.busy).toBe(true);
+		inner.dispatchEvent(pointer("pointerdown", 200));
+		expect(stood()).toBe(1);
+		expect(arbiter.claim("divider")).toBe(true);
+		arbiter.release("divider");
+		await settled();
+		expect(arbiter.busy).toBe(false);
+	});
+
+	it("starts no swipe on the divider between the columns", () => {
+		const root = document.body.appendChild(document.createElement("div"));
+		const divider = root.appendChild(document.createElement("div"));
+		divider.className = "tc-divider";
+		const fixed = root.appendChild(document.createElement("div"));
+		fixed.className = "tc-divider is-fixed";
+		expect(swipeStartsAt(divider.appendChild(document.createElement("i")))).toBe(false);
+		expect(swipeStartsAt(fixed)).toBe(true);
 	});
 
 	it("brings the screen back for a swipe the browser cancels", async () => {
