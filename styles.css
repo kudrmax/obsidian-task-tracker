@@ -715,15 +715,16 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-branch.is-last::after { content: none; }
 .tc-branch-pass { left: calc(-1 * (var(--tc-pass) * var(--tc-subtask-indent) + (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2)); width: var(--tc-branch-w); }
 /* A card another one is dragged over: it will take it as its last subtask. */
-.tc-card.is-target { background: var(--tc-drop-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-accent); }
 .tc-meta { flex-shrink: 0; min-width: var(--tc-meta-min); display: flex; flex-direction: column; align-items: center; gap: var(--tc-meta-gap); color: var(--tc-muted); }
 .tc-meta.is-pair .tc-count { line-height: var(--tc-leading-count-pair); }
 .tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
 .tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* Where a dragged task will land: the calendar's drop line between two cards, at the level it picks, inside the list so it scrolls with the cards. */
-.tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); height: var(--tc-drop-dot); display: flex; align-items: center; z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), width var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); width: 0; height: var(--tc-drop-dot); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop.is-shown { opacity: 1; }
+/* The line hangs from its right edge, where the box stands: a new level stretches it to the left only. */
+.tc-list-drop-bar { position: absolute; top: 0; right: 0; height: 100%; display: flex; align-items: center; transition: width var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop-dot { width: var(--tc-drop-dot); height: var(--tc-drop-dot); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-accent); }
 /* The dot of a task in progress, level with the first line of the title; on a card with a priority it takes the level's meta tint, like the date and the time. */
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
