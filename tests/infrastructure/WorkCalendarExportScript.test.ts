@@ -9,11 +9,14 @@ const VAULT = "/private/var/mobile/Obsidian/Vault";
 
 class FakeAdapter implements ExportScriptAdapter {
 	readonly writes: string[] = [];
+	looks = 0;
 	constructor(readonly files: Map<string, string> = new Map()) {}
 	async exists(path: string): Promise<boolean> {
+		this.looks++;
 		return this.files.has(path);
 	}
 	async read(path: string): Promise<string> {
+		this.looks++;
 		return this.files.get(path) ?? "";
 	}
 	async write(path: string, data: string): Promise<void> {
@@ -116,6 +119,17 @@ describe("WorkCalendarExportScript", () => {
 		await settings.update({ workCalendarFile: "third.json" });
 		await new Promise((resolve) => setTimeout(resolve));
 		expect(adapter.files.get(EXPORT)).toMatch(/^const OUTPUT = "other\.json";/);
+	});
+
+	it("a settings change that keeps the work file path does not look at the export", async () => {
+		const { export: s, adapter, settings } = script();
+		s.keepInstalled();
+		await s.install();
+		const looks = adapter.looks;
+		await settings.update({ rightMode: "soon" });
+		await settings.update({ scrollToHour: 3 });
+		await new Promise((resolve) => setTimeout(resolve));
+		expect(adapter.looks).toBe(looks);
 	});
 
 	it("gives a loader that finds the export in the plugin's own folder", () => {

@@ -3,7 +3,7 @@ import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
-import { createServices, type ServicesHost } from "./application/services";
+import { createServices, type Services, type ServicesHost } from "./application/services";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
@@ -12,6 +12,8 @@ import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarVie
 /** The plugin is the settings store the view sees; PluginSettings keeps them. */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
 	private pluginSettings!: PluginSettings;
+	/** The real services, once built (the demo build has none): open for a look from the console. */
+	services: Services | null = null;
 
 	override async onload(): Promise<void> {
 		this.pluginSettings = new PluginSettings(
@@ -39,7 +41,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	/** The real services over the vault and the network; the demo build replaces them with fakes. */
 	protected createDeps(clock: Clock = systemClock): ViewDeps {
 		const services = createServices(this.app, this.servicesHost(), this, clock);
-		this.register(services.workExport.keepInstalled());
+		this.services = services;
+		this.app.workspace.onLayoutReady(() => this.register(services.workExport.keepInstalled()));
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
 			services.login.receive(params).then(
 				() => new Notice("Google Calendar: logged in"),
