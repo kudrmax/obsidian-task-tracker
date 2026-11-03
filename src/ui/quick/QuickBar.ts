@@ -72,6 +72,7 @@ const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "
  */
 export class QuickBar {
 	private readonly bar: HTMLElement;
+	private readonly shifts: HTMLElement;
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
@@ -91,6 +92,7 @@ export class QuickBar {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
+		this.shifts = el(this.bar, "span", "tc-bar-shifts");
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		el(this.bar, "span", "tc-bar-spacer");
@@ -107,7 +109,7 @@ export class QuickBar {
 	}
 
 	private shiftButton(cls: string, name: "outdent" | "indent", label: string, key: string, delta: 1 | -1): HTMLButtonElement {
-		const button = el(this.bar, "button", `tc-bar-shift ${cls}`);
+		const button = el(this.shifts, "button", `tc-bar-shift ${cls}`);
 		button.setAttribute("aria-label", label);
 		button.title = `${label} (${key})`;
 		button.appendChild(icon(name));
@@ -119,7 +121,7 @@ export class QuickBar {
 		this.state = state;
 		this.bar.hidden = false;
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
-		this.outdent.hidden = this.indent.hidden = !state.indents;
+		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
 		this.flag.hidden = this.levels().length === 0;

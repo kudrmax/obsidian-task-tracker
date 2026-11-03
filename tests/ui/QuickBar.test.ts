@@ -65,6 +65,7 @@ describe("QuickBar", () => {
 
 	it("has no shift buttons for a field that does not shift", () => {
 		const { parent } = setup({ indents: false });
+		expect(q<HTMLElement>(parent, ".tc-bar-shifts").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-outdent").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-indent").hidden).toBe(true);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(false);
