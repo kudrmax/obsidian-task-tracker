@@ -229,8 +229,8 @@ describe("styles.css keeps to its design system", () => {
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
-		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) - var(--tc-keyboard-room))");
-		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + 2 * var(--tc-space-8) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
+		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
