@@ -35,9 +35,11 @@
 
 | Где | Состояния |
 |---|---|
-| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `sheet`, `quick`, `drag`, `undo`, `settings`, `active-handle` |
-| Только Mac | `hover-row`, `hover-plus`, `active-tile`, `focus-arrow`, `hover-tile-on`, `hover-day`, `focus-row`, `focus-seg`, `hover-sheet` |
+| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `sheet`, `quick`, `quick-priority`, `quick-place`, `quick-picker`, `block-menu`, `drag`, `undo`, `settings`, `active-handle` |
+| Только Mac | `bulk`, `bulk-section`, `bulk-picker`, `hover-row`, `hover-plus`, `active-tile`, `focus-arrow`, `hover-tile-on`, `hover-day`, `focus-row`, `focus-seg`, `hover-sheet` |
 | Только телефон | `active-row` |
+
+`bulk` выбирает ⌘-нажатием «Work task 2» и «Work task 4» и открывает меню выбранных задач; `bulk-section` и `bulk-picker` — его подменю. `quick-*` — панели полосы быстрого ввода. `block-menu` — меню карточки таймлайна с подзадачами.
 
 `hover-tile-on` ставит карточке первый уровень приоритета через меню и снимает его на выходе.
 

@@ -45,8 +45,14 @@ const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 const V=()=>app.workspace.getLeavesOfType("task-calendar")[0].view;
 const vis=(el)=>el&&el.getClientRects().length>0;
 const byText=(t)=>[...document.querySelectorAll("button,[role=button],.tc-menu-row,.tc-menu-tile,div,span")].reverse().find(e=>vis(e)&&e.textContent.trim()===t);
-const pe=(t,x,y,el,id=7)=>(el??document).dispatchEvent(new PointerEvent(t,{pointerId:id,clientX:x,clientY:y,bubbles:true,isPrimary:true,pointerType:"mouse",button:0}));
-const tap=async(el)=>{const r=el.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;pe("pointerdown",x,y,el);await sleep(40);pe("pointerup",x,y,el);el.dispatchEvent(new MouseEvent("click",{bubbles:true,clientX:x,clientY:y}));await sleep(500);};
+const pe=(t,x,y,el,id=7,metaKey=false)=>(el??document).dispatchEvent(new PointerEvent(t,{pointerId:id,clientX:x,clientY:y,bubbles:true,isPrimary:true,pointerType:"mouse",button:0,metaKey}));
+const tap=async(el,metaKey=false)=>{const r=el.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;pe("pointerdown",x,y,el,7,metaKey);await sleep(40);pe("pointerup",x,y,el,7,metaKey);el.dispatchEvent(new MouseEvent("click",{bubbles:true,clientX:x,clientY:y,metaKey}));await sleep(500);};
+const named=(t)=>[...V().contentEl.querySelectorAll(".tc-left .tc-card")].find(c=>vis(c)&&c.textContent.includes(t));
+const bulk=async()=>{top(); await tap(named("Work task 2"),true); await tap(named("Work task 4"),true); await tap(named("Work task 2")); await sleep(400);};
+const field=()=>V().contentEl.querySelector(".tc-quick-field [contenteditable=true]")??V().contentEl.querySelector(".tc-quick-field");
+const quick=async()=>{top(); V().quick.openAtEnd("left"); await sleep(600); field().focus(); for (const ch of "Новая задача") { document.execCommand("insertText", false, ch); await sleep(15);} await sleep(900);};
+const unquick=async()=>{field()?.focus(); document.execCommand("selectAll"); document.execCommand("delete"); V().quick.close(); await sleep(600);};
+const block=(t)=>[...V().contentEl.querySelectorAll(".tc-block")].find(b=>vis(b)&&b.textContent.includes(t));
 const card=(i=1)=>[...V().contentEl.querySelectorAll(".tc-left .tc-card")].filter(vis)[i];
 const top=()=>{const s=V().contentEl.querySelector(".tc-left > div"); if(s) s.scrollTop=0;};
 const esc=async()=>{for(let i=0;i<3;i++){document.activeElement?.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",bubbles:true,cancelable:true}));document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",code:"Escape",bubbles:true,cancelable:true}));await sleep(250);}};
@@ -67,10 +73,14 @@ const states = {
 		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
 		teardown: `document.querySelector(".tc-sheet-bar > .tc-btn")?.click(); await sleep(700);`,
 	},
-	quick: {
-		setup: `top(); V().quick.openAtEnd("left"); await sleep(600); const e=V().contentEl.querySelector(".tc-quick-field [contenteditable=true]")??V().contentEl.querySelector(".tc-quick-field"); e.focus(); for (const ch of "Новая задача") { document.execCommand("insertText", false, ch); await sleep(15);} await sleep(900);`,
-		teardown: `document.execCommand("selectAll"); document.execCommand("delete"); V().quick.close(); await sleep(600);`,
-	},
+	quick: { setup: `await quick();`, teardown: `await unquick();` },
+	"quick-priority": { setup: `await quick(); await tap(V().containerEl.ownerDocument.querySelector(".tc-bar-flag")); await sleep(400);`, teardown: `await unquick();` },
+	"quick-place": { setup: `await quick(); await tap(document.querySelector(".tc-bar-place")); await sleep(400);`, teardown: `await unquick();` },
+	"quick-picker": { setup: `await quick(); await tap(document.querySelector(".tc-bar-place")); await tap(byText("Date")); await sleep(400);`, teardown: `await unquick();` },
+	"block-menu": { setup: `top(); await tap(block("Work task 9")); await sleep(500);` },
+	bulk: { on: "mac", setup: `await bulk();` },
+	"bulk-section": { on: "mac", setup: `await bulk(); await tap(byText("Section")); await sleep(400);` },
+	"bulk-picker": { on: "mac", setup: `await bulk(); await tap(byText("Pick a date")); await sleep(400);` },
 	drag: {
 		setup: `top(); const c=card(1); const r=c.getBoundingClientRect(); const x=r.left+40,y=r.top+10; window.__tcDrag={x,y}; pe("pointerdown",x,y,c,9); pe("pointermove",x+10,y+10,c,9); await sleep(50); for(let i=0;i<=25;i++){pe("pointermove",x+10,y+10+i*6,undefined,9); await sleep(16);} await sleep(900);`,
 		teardown: `const {x,y}=window.__tcDrag; pe("pointermove",x+10,y+10,undefined,9); await sleep(100); pe("pointerup",x+10,y+10,undefined,9); await sleep(900);`,
