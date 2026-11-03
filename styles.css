@@ -827,6 +827,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted.is-whole:not(.is-block) { padding-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-block-card { padding-bottom: var(--tc-block-pad-top); }
 .is-whole .tc-card-title { white-space: normal; overflow-wrap: anywhere; line-height: var(--tc-leading-card); }
+.is-whole .tc-event .tc-item-title { white-space: normal; overflow-wrap: anywhere; -webkit-mask-image: none; mask-image: none; }
 .tc-lifted.is-whole .tc-meta.is-pair { margin-top: calc((var(--tc-card-h) - var(--tc-leading-count-pair) - var(--tc-meta-gap) - var(--tc-desc-mark-pair)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 
@@ -846,7 +847,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-section-card-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-section-card-count { flex-shrink: 0; font-size: var(--tc-font-count); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 .tc-lifted.is-block { background: none; padding: 0; border-radius: 0; overflow: visible; }
-.tc-lifted.is-block > .tc-block { top: 0; left: 0; right: 0; height: 100%; }
+.tc-lifted.is-block > .tc-block, .tc-lifted.is-block > .tc-event { top: 0; left: 0; right: 0; height: 100%; }
 /* Closing, the copy fades with the sheet and the panel: they go together. */
 /* A timeline card's subtasks, between its copy and the menu. */
 .tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }

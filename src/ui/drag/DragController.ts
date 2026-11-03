@@ -83,6 +83,23 @@ export class DragController {
 		});
 	}
 
+	/** An event can't be moved: a tap, a held finger, a long click or a right click open its menu. */
+	attachEvent(block: HTMLElement, onMenu: () => void): void {
+		block.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			onMenu();
+		});
+		new LongPress(block, {
+			delayMs: () => this.deps.longPressMs(),
+			busy: () => this.deps.arbiter.busy,
+			onStart: (e) => {
+				if (e.pointerType !== "mouse") onMenu();
+			},
+			onTap: onMenu,
+			onLongTap: onMenu,
+		});
+	}
+
 	private payload(card: HTMLElement, item: TaskItem, from: TaskOrigin, e: PointerEvent): TaskDragPayload {
 		const onTimeline = from === "timeline" && item.slot;
 		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;

@@ -24,6 +24,7 @@ export interface TimelineDeps {
 	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
 	onResize?(): void;
 	onBlock?(block: HTMLElement, item: TaskItem): void;
+	onEvent?(block: HTMLElement, event: CalendarEvent): void;
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
 }
@@ -472,6 +473,7 @@ export class Timeline {
 		paintEvent(block, event, this.deps.theme());
 		make(block, "div", "tc-event-bar");
 		make(make(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
+		this.deps.onEvent?.(block, event);
 		return { el: block, ...span, level };
 	}
 
