@@ -220,7 +220,7 @@ describe("styles.css keeps to its design system", () => {
 		expect([dot.get("left"), dot.get("top")]).toEqual(["calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2)", "calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2)"]);
 		expect([dot.get("width"), dot.get("height"), dot.get("border-radius")]).toEqual(["var(--tc-progress-dot)", "var(--tc-progress-dot)", "var(--tc-radius-circle)"]);
 		expect(dot.get("background")).toBe("var(--tc-muted)");
-		expect(of("[data-priority] .tc-progress-dot").get("background")).toBe("var(--tc-priority-meta)");
+		expect(of("[data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot").get("background")).toBe("var(--tc-priority-meta)");
 		expect(sheet.tokens.get("--tc-progress-dot")).toBe("4px");
 	});
 

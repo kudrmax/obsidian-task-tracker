@@ -736,7 +736,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: var(--tc-bar-h); 
 .tc-drop-gap.is-shown { opacity: 1; }
 /* The dot of a task in progress, level with the first line of the title; on a card with a priority it takes the level's meta tint, like the date and the time. */
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
-[data-priority] .tc-progress-dot { background: var(--tc-priority-meta); }
+[data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot { background: var(--tc-priority-meta); }
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent); }
 .tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
 .tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
@@ -881,13 +881,13 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 
-/* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. */
-[data-priority="red"] { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); --tc-priority-meta: var(--tc-priority-red-meta); }
-[data-priority="orange"] { --tc-priority-ink: var(--tc-priority-orange); --tc-priority-fill: var(--tc-priority-orange-card); --tc-priority-meta: var(--tc-priority-orange-meta); }
-[data-priority="yellow"] { --tc-priority-ink: var(--tc-priority-yellow); --tc-priority-fill: var(--tc-priority-yellow-card); --tc-priority-meta: var(--tc-priority-yellow-meta); }
-[data-priority="green"] { --tc-priority-ink: var(--tc-priority-green); --tc-priority-fill: var(--tc-priority-green-card); --tc-priority-meta: var(--tc-priority-green-meta); }
-[data-priority="teal"] { --tc-priority-ink: var(--tc-priority-teal); --tc-priority-fill: var(--tc-priority-teal-card); --tc-priority-meta: var(--tc-priority-teal-meta); }
-[data-priority="blue"] { --tc-priority-ink: var(--tc-priority-blue); --tc-priority-fill: var(--tc-priority-blue-card); --tc-priority-meta: var(--tc-priority-blue-meta); }
+/* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. A field's row takes its field's level, for the dot of the task it renames. */
+[data-priority="red"], .tc-quick-row:has(> [data-priority="red"]) { --tc-priority-ink: var(--tc-priority-red); --tc-priority-fill: var(--tc-priority-red-card); --tc-priority-meta: var(--tc-priority-red-meta); }
+[data-priority="orange"], .tc-quick-row:has(> [data-priority="orange"]) { --tc-priority-ink: var(--tc-priority-orange); --tc-priority-fill: var(--tc-priority-orange-card); --tc-priority-meta: var(--tc-priority-orange-meta); }
+[data-priority="yellow"], .tc-quick-row:has(> [data-priority="yellow"]) { --tc-priority-ink: var(--tc-priority-yellow); --tc-priority-fill: var(--tc-priority-yellow-card); --tc-priority-meta: var(--tc-priority-yellow-meta); }
+[data-priority="green"], .tc-quick-row:has(> [data-priority="green"]) { --tc-priority-ink: var(--tc-priority-green); --tc-priority-fill: var(--tc-priority-green-card); --tc-priority-meta: var(--tc-priority-green-meta); }
+[data-priority="teal"], .tc-quick-row:has(> [data-priority="teal"]) { --tc-priority-ink: var(--tc-priority-teal); --tc-priority-fill: var(--tc-priority-teal-card); --tc-priority-meta: var(--tc-priority-teal-meta); }
+[data-priority="blue"], .tc-quick-row:has(> [data-priority="blue"]) { --tc-priority-ink: var(--tc-priority-blue); --tc-priority-fill: var(--tc-priority-blue-card); --tc-priority-meta: var(--tc-priority-blue-meta); }
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
 .tc-card.is-selected, .tc-lifted.is-selected { background: var(--tc-select-bg); }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
