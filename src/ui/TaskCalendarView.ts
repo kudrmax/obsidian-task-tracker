@@ -327,8 +327,10 @@ export class TaskCalendarView extends ItemView {
 		const timeline = this.timeline;
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
-			min: () => this.zoomLevels()[0].hourPx,
-			max: () => this.zoomLevels()[this.zoomLevels().length - 1].hourPx,
+			bounds: () => {
+				const levels = this.zoomLevels();
+				return { min: levels[0].hourPx, max: levels[levels.length - 1].hourPx };
+			},
 			arbiter: this.arbiter,
 			minutesAt: (y) => timeline.minutesAt(y),
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),

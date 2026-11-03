@@ -76,6 +76,19 @@ describe("DragSession", () => {
 		expect(b.log).toEqual(["preview 150,20", "leave"]);
 	});
 
+	it("reads the targets before it moves the float", () => {
+		const journal: string[] = [];
+		const target = new FakeTarget("a", 0, 100, null);
+		target.hitTest = () => (journal.push("hit"), true);
+		target.preview = () => void journal.push("preview");
+		const float = new FakeFloat();
+		float.moveTo = () => void journal.push("float");
+		const s = session([target], float, []);
+		s.move(10, 10);
+		s.move(20, 20);
+		expect(journal).toEqual(["hit", "preview", "float", "hit", "preview", "float"]);
+	});
+
 	it("drops on the target, flies the float there and reports the result", async () => {
 		const slot: DropResult = { kind: "slot", slot: { date: "2026-10-30", start: 990, end: 1050 } };
 		const a = new FakeTarget("a", 0, 100, slot);

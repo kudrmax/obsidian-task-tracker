@@ -26,9 +26,11 @@ class ManualFrames implements Frames {
 	}
 }
 
-function scroller(top: number, bottom: number, room: number): HTMLElement {
+/** The scroller's box, from 100 to 600, as the caller reads it before the move. */
+const BOX = new DOMRect(0, 100, 100, 500);
+
+function scroller(room: number): HTMLElement {
 	const el = document.createElement("div");
-	el.getBoundingClientRect = () => new DOMRect(0, top, 100, bottom - top);
 	let scrollTop = 0;
 	Object.defineProperty(el, "scrollTop", { get: () => scrollTop, set: (v: number) => (scrollTop = Math.max(0, Math.min(room, v))) });
 	return el;
@@ -57,14 +59,14 @@ describe("edgeVelocity", () => {
 describe("AutoScroll", () => {
 	it("scrolls a frame at a time while the finger holds near an edge, previewing the drop again after each step", () => {
 		const frames = new ManualFrames();
-		const el = scroller(100, 600, 1000);
+		const el = scroller(1000);
 		let previews = 0;
 		const scroll = new AutoScroll(() => el, () => {
 			previews++;
-			scroll.follow(600);
+			scroll.follow(600, BOX);
 		}, frames);
-		scroll.follow(590);
-		scroll.follow(600);
+		scroll.follow(590, BOX);
+		scroll.follow(600, BOX);
 		frames.tick();
 		frames.tick();
 		frames.tick();
@@ -74,25 +76,25 @@ describe("AutoScroll", () => {
 
 	it("plans one step per frame however often the finger moves", () => {
 		const frames = new ManualFrames();
-		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
-		scroll.follow(597);
-		scroll.follow(598);
-		scroll.follow(599);
+		const scroll = new AutoScroll(() => scroller(1000), () => {}, frames);
+		scroll.follow(597, BOX);
+		scroll.follow(598, BOX);
+		scroll.follow(599, BOX);
 		expect(frames.pending).toBe(1);
 	});
 
 	it("stops when the finger leaves the edge, and when the end of the list is reached", () => {
 		const frames = new ManualFrames();
-		const el = scroller(100, 600, SPEED);
+		const el = scroller(SPEED);
 		let previews = 0;
 		const scroll = new AutoScroll(() => el, () => previews++, frames);
-		scroll.follow(590);
-		scroll.follow(600);
-		scroll.follow(300);
+		scroll.follow(590, BOX);
+		scroll.follow(600, BOX);
+		scroll.follow(300, BOX);
 		expect(frames.pending).toBe(0);
-		scroll.follow(600);
+		scroll.follow(600, BOX);
 		frames.tick();
-		scroll.follow(600);
+		scroll.follow(600, BOX);
 		frames.tick();
 		expect(el.scrollTop).toBe(SPEED);
 		expect(previews).toBe(1);
@@ -100,25 +102,25 @@ describe("AutoScroll", () => {
 
 	it("leaves the list where it is under a finger that lifts a card near the edge and stays", () => {
 		const frames = new ManualFrames();
-		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
-		scroll.follow(590);
-		scroll.follow(590);
+		const scroll = new AutoScroll(() => scroller(1000), () => {}, frames);
+		scroll.follow(590, BOX);
+		scroll.follow(590, BOX);
 		expect(frames.pending).toBe(0);
-		scroll.follow(592);
+		scroll.follow(592, BOX);
 		expect(frames.pending).toBe(1);
 	});
 
 	it("leaves the list where it is under a finger carried in across an edge, away from it", () => {
 		const frames = new ManualFrames();
-		const scroll = new AutoScroll(() => scroller(100, 600, 1000), () => {}, frames);
-		scroll.follow(620);
-		scroll.follow(595);
-		scroll.follow(580);
+		const scroll = new AutoScroll(() => scroller(1000), () => {}, frames);
+		scroll.follow(620, BOX);
+		scroll.follow(595, BOX);
+		scroll.follow(580, BOX);
 		expect(frames.pending).toBe(0);
 		scroll.stop();
-		scroll.follow(110);
+		scroll.follow(110, BOX);
 		expect(frames.pending).toBe(0);
-		scroll.follow(105);
+		scroll.follow(105, BOX);
 		expect(frames.pending).toBe(1);
 	});
 });

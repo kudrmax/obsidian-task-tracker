@@ -360,3 +360,109 @@ describe("the timeline's size", () => {
 		}
 	});
 });
+
+describe("measuring once (block 3)", () => {
+	/** A timeline at 100 on the screen, its canvas 8 below while it is not scrolled, scrolled as the test says. */
+	function framed() {
+		const view = timeline({ hourPx: 56 });
+		let scrollTop = 0;
+		Object.defineProperty(view.el, "scrollTop", { configurable: true, get: () => scrollTop, set: (v: number) => (scrollTop = v) });
+		const viewRect = vi.fn(() => new DOMRect(0, 100, 300, 600));
+		const canvasRect = vi.fn(() => new DOMRect(0, 108 - scrollTop, 300, 24 * 56));
+		view.el.getBoundingClientRect = viewRect;
+		view.canvas.getBoundingClientRect = canvasRect;
+		return { view, viewRect, canvasRect, scroll: (by: number) => (scrollTop += by) };
+	}
+	const lineY = () => parseFloat(document.body.querySelector<HTMLElement>(".tc-drop")!.style.getPropertyValue("--tc-y"));
+
+	it("measures itself once for a whole drop, following a scroll by scrollTop", () => {
+		const { view, viewRect, canvasRect, scroll } = framed();
+		view.showDrop({ start: 600, end: null });
+		for (let i = 0; i < 20; i++) {
+			scroll(7);
+			view.minutesAt(300);
+			view.showDrop({ start: 600 + 15 * (i % 3), end: null });
+		}
+		expect(viewRect).toHaveBeenCalledTimes(1);
+		expect(canvasRect).toHaveBeenCalledTimes(1);
+		const before = view.minutesAt(300);
+		scroll(56);
+		expect(view.minutesAt(300)).toBeCloseTo(before + 60);
+		view.clearDrop();
+		view.minutesAt(300);
+		expect(canvasRect).toHaveBeenCalledTimes(2);
+	});
+
+	it("writes the drop's time only when its minute changes", () => {
+		const { view } = framed();
+		view.showDrop({ start: 600, end: null });
+		const watch = new MutationObserver(() => undefined);
+		watch.observe(document.body.querySelector(".tc-drop")!, { childList: true, characterData: true, subtree: true });
+		for (let i = 0; i < 10; i++) view.showDrop({ start: 600, end: null });
+		expect(watch.takeRecords()).toEqual([]);
+		view.showDrop({ start: 615, end: null });
+		expect(watch.takeRecords().length).toBeGreaterThan(0);
+		watch.disconnect();
+		view.clearDrop();
+	});
+
+	it("moves the drop line with the day under a still minute", () => {
+		const { view, scroll } = framed();
+		view.showDrop({ start: 600, end: null });
+		const before = lineY();
+		scroll(20);
+		view.showDrop({ start: 600, end: null });
+		expect(lineY()).toBe(before - 20);
+		view.clearDrop();
+	});
+
+	it("sets the hour on the canvas, the only rule that reads it", () => {
+		const view = timeline({ hourPx: 56 });
+		expect(view.canvas.style.getPropertyValue("--tc-hour")).toBe("56px");
+		expect(view.el.style.getPropertyValue("--tc-hour")).toBe("");
+	});
+
+	it("keeps the room as it is while a pinch zooms", () => {
+		const view = timeline({ hourPx: 56 });
+		const set = vi.spyOn(view.canvas.style, "setProperty");
+		view.zoomTo(600, 300);
+		view.zoomTo(600, 310);
+		expect(set.mock.calls.filter(([name]) => name === "--tc-room-top").length).toBeLessThanOrEqual(1);
+	});
+});
+
+describe("a stretched block while its new time is written (block 3)", () => {
+	const task = (start: number, end: number): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null });
+	const block = (view: Timeline) => view.itemsEl.querySelector<HTMLElement>(".tc-block")!;
+	const length = (el: HTMLElement) => el.style.getPropertyValue("--tc-len");
+
+	it("keeps a block stretched across a redraw until its new time comes", () => {
+		const tasks = [task(600, 660)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const unstretched = length(block(view));
+		view.stretchTo(block(view), { start: 600, end: 720 }, "end");
+		const stretched = length(block(view));
+		expect(stretched).not.toBe(unstretched);
+		const before = block(view);
+		view.render();
+		expect(block(view)).not.toBe(before);
+		expect(block(view).classList.contains("is-resizing")).toBe(true);
+		expect(length(block(view))).toBe(stretched);
+		tasks[0] = task(600, 720);
+		view.render();
+		expect(block(view).classList.contains("is-resizing")).toBe(false);
+		expect(length(block(view))).toBe(stretched);
+	});
+
+	it("puts the block back once its change is over, and leaves another task's stretch alone", () => {
+		const tasks = [task(600, 660)];
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, tasks);
+		const unstretched = length(block(view));
+		view.stretchTo(block(view), { start: 600, end: 720 }, "end");
+		view.endStretch({ section: "now", index: 1, path: [], raw: "" });
+		expect(block(view).classList.contains("is-resizing")).toBe(true);
+		view.endStretch(tasks[0].key);
+		expect(block(view).classList.contains("is-resizing")).toBe(false);
+		expect(length(block(view))).toBe(unstretched);
+	});
+});
