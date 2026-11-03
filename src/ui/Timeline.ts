@@ -283,6 +283,11 @@ export class Timeline {
 		this.layout();
 	}
 
+	/** What shows the day itself rather than its hours: the cards and events, and the now line on today. */
+	dayLayers(): HTMLElement[] {
+		return this.nowEl ? [this.itemsEl, this.nowEl] : [this.itemsEl];
+	}
+
 	/** A minute passed: the now line, its time, and the tasks it carries move; nothing is drawn anew. */
 	tickNow(): void {
 		if (!this.nowEl) return;
