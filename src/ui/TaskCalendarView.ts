@@ -422,6 +422,7 @@ export class TaskCalendarView extends ItemView {
 	override async onClose(): Promise<void> {
 		this.quick?.close();
 		this.polling.stop();
+		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
 

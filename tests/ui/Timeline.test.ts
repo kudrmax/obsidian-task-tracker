@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DayBoundary } from "../../src/application/contracts";
 import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
@@ -338,5 +338,25 @@ describe("the minute's tick", () => {
 		view.tickNow();
 		expect(block.style.getPropertyValue("--tc-y")).toBe(`${13 * hourPx + 1}px`);
 		expect(line.style.getPropertyValue("--tc-y")).toBe(`${13 * hourPx}px`);
+	});
+});
+
+describe("the timeline's size", () => {
+	it("stops watching its size once destroyed", () => {
+		const real = globalThis.ResizeObserver;
+		const disconnect = vi.fn();
+		globalThis.ResizeObserver = class {
+			observe(): void {}
+			unobserve(): void {}
+			disconnect = disconnect;
+		} as unknown as typeof ResizeObserver;
+		try {
+			const view = timeline({ hourPx: 56 });
+			expect(disconnect).not.toHaveBeenCalled();
+			view.destroy();
+			expect(disconnect).toHaveBeenCalledOnce();
+		} finally {
+			globalThis.ResizeObserver = real;
+		}
 	});
 });

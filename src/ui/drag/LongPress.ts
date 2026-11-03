@@ -82,11 +82,12 @@ export class LongPress {
 		if (this.press && e.pointerId === this.press.pointerId) this.end();
 	}
 
+	/** A redraw may have taken the element away while the finger held it: nothing starts from a card no longer on the page. */
 	private fire(press: Press): void {
 		if (this.press !== press) return;
 		const e = press.last;
 		this.end();
-		if (this.opts.busy()) return;
+		if (!this.el.isConnected || this.opts.busy()) return;
 		if (press.mouse) this.opts.onLongTap?.(e);
 		else this.opts.onStart(e);
 	}
