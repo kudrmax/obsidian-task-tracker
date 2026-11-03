@@ -226,6 +226,17 @@ describe("styles.css keeps to its design system", () => {
 			expect(shadowOf(element), element).toEqual(["var(--tc-shadow-control)"]);
 	});
 
+	it("draws the menus, the description's peek and the sources window as one window", () => {
+		const of = (element: string, property: string) =>
+			sheet.rules.filter((d) => d.property === property && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-panel", ".tc-desc-peek", ".tc-popover"]) {
+			expect(of(element, "background"), element).toEqual(["var(--tc-panel-bg)"]);
+			expect(of(element, "box-shadow"), element).toEqual(["var(--tc-shadow-panel)"]);
+		}
+		const numbers = (value: string) => value.match(/\d+(\.\d+)?/g)!.slice(0, 7);
+		for (const tokens of [sheet.tokens, sheet.lightTokens]) expect(numbers(tokens.get("--tc-level-shadow")!)).toEqual(numbers(tokens.get("--tc-shadow-panel")!));
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);

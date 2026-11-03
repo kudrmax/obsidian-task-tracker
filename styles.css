@@ -68,8 +68,6 @@ body {
 	--tc-level-ring: none;
 	/* A source gone stale, and its dot. */
 	--tc-stale: #FF9F0A;
-	--tc-popover-bg: rgba(44, 44, 46, 0.97);
-	--tc-shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.7);
 	--tc-pull-ink: #AEAEB2;
 	/* The segmented control's ground, and the bands between a menu's groups. */
 	--tc-track-bg: var(--tc-card-bg);
@@ -125,7 +123,7 @@ body {
 	--tc-radius-panel: 14px;
 	--tc-radius-day: calc(var(--tc-day) / 2);
 	--tc-stroke-source: var(--tc-stroke-1-8);
-	--tc-stroke-refresh: var(--tc-stroke-1-9);
+	--tc-stroke-refresh: var(--tc-stroke-1-8);
 	--tc-hairline-half: 0.5px;
 	--tc-rule: var(--tc-hairline-half) solid var(--tc-separator);
 	--tc-stroke-menu: var(--tc-stroke-1-8);
@@ -350,7 +348,7 @@ body {
 	--tc-dot-top: 2px;
 	--tc-dot-right: 6px;
 	--tc-popover-w: 268px;
-	--tc-popover-gap: var(--tc-space-10);
+	--tc-popover-gap: var(--tc-space-12);
 	--tc-source-row: 56px;
 	--tc-source-icon: var(--tc-icon-l);
 
@@ -473,7 +471,6 @@ body {
 	--tc-space-8: 8px;
 	--tc-space-10: 10px;
 	--tc-space-12: 12px;
-	--tc-space-14: 14px;
 	--tc-space-16: 16px;
 	--tc-space-20: 20px;
 	--tc-grid-columns: 7;
@@ -562,8 +559,6 @@ body.theme-light {
 	--tc-level-shadow: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
 	--tc-level-ring: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-stale: #FF9500;
-	--tc-popover-bg: rgba(250, 250, 252, 0.97);
-	--tc-shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-pull-ink: #6C6C70;
 	--tc-gap-ink: #E5E5EA;
 	--tc-place-on-bg: rgba(0, 0, 0, 0.1);
@@ -663,10 +658,13 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
 .tc-popover, .tc-panel, .tc-float, .tc-section-float, .tc-lifted, .tc-menu-subtasks, .tc-quick-bar.is-over, .tc-drop, .tc-menu-field { font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-panel, .tc-popover, .tc-desc-peek { border-radius: var(--tc-radius-panel); overflow: hidden; }
-.tc-panel, .tc-desc-peek { box-sizing: border-box; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); }
-.tc-popover { position: fixed; bottom: calc(var(--tc-panel-y) + var(--tc-popover-gap)); margin-left: calc(-1 * var(--tc-popover-w) / 2); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); background: var(--tc-popover-bg); box-shadow: var(--tc-shadow-popover); -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
-.tc-popover.is-shown { opacity: 1; }
-.tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-14); display: flex; align-items: center; gap: var(--tc-space-10); }
+/* One window over the screen: the menus, the description's peek and the sources window share its ground and its shadow. */
+.tc-panel, .tc-desc-peek, .tc-popover { box-sizing: border-box; background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); }
+.tc-popover { position: fixed; bottom: calc(var(--tc-panel-y) + var(--tc-popover-gap)); margin-left: calc(-1 * var(--tc-popover-w) / 2); z-index: var(--tc-layer-panel); width: var(--tc-popover-w); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 50% 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+/* It grows out of the wheel as a menu grows out of its card, and goes with the backdrop. */
+.tc-popover.is-shown { opacity: 1; transform: none; }
+.tc-popover.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-source-row { min-height: var(--tc-source-row); box-sizing: border-box; padding: var(--tc-space-8) var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); }
 .tc-source-row:not(:last-of-type) { border-bottom: var(--tc-rule); }
 .tc-source-row svg { width: var(--tc-source-icon); height: var(--tc-source-icon); flex-shrink: 0; color: var(--tc-ink-soft); stroke-width: var(--tc-stroke-source); }
 .tc-source-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tc-space-2); }
@@ -674,7 +672,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-source-sub { font-size: var(--tc-font-sub); color: var(--tc-muted); }
 .tc-source-time { font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tc-source-time.is-stale { color: var(--tc-stale); }
-.tc-popover .tc-source-refresh { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-14); border-top: var(--tc-band); color: var(--tc-accent-ui); font-size: var(--tc-font-menu); display: flex; align-items: center; gap: var(--tc-space-10); }
+.tc-popover .tc-source-refresh { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; padding: 0 var(--tc-space-16); border-top: var(--tc-band); color: var(--tc-accent-ui); font-size: var(--tc-font-menu); display: flex; align-items: center; gap: var(--tc-space-10); }
 .tc-source-refresh svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-refresh); }
 
 
