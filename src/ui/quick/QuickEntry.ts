@@ -35,16 +35,19 @@ export interface QuickEntryDeps {
 	/** The cards of `column` as it shows the file now. */
 	cards(column: ListColumn): readonly ListCard[];
 	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace;
-	/** Resolves once the lists show the file as of the last write. */
-	fresh(): Promise<void>;
+	/** Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it. */
+	fresh(beforeShow?: () => void): Promise<void>;
 	createInPlace: TaskService["createInPlace"];
 	edit: TaskService["edit"];
 	/** The placement a rename at `spot` gives the task. */
 	placement(spot: EntrySpot): Placement;
 	/** The priority levels a text may start with: a text that is only one's prefix is blank. */
 	levels(): readonly PriorityLevel[];
-	/** After every change of the state; null once the field closed. */
-	onChange(state: EntryState | null): void;
+	/**
+	 * After every change of the state; null once the field closed. `drawnNext`: the lists are about to draw the data this
+	 * change belongs to, so it needs no drawing of its own.
+	 */
+	onChange(state: EntryState | null, drawnNext?: boolean): void;
 	/** A write that failed; the ones after it still go. */
 	onError(error: unknown): void;
 }
@@ -255,31 +258,43 @@ export class QuickEntry {
 		const line = { text: field.text, priority: field.priority, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
 		run.pending.push(line);
 		this.queued(run, async () => {
+			let shown = false;
 			try {
 				await this.deps.fresh();
-				await this.write(run.spot, line);
+				await this.write(run, line, () => (shown = true));
 			} finally {
-				run.pending.shift();
-				if (run === this.field?.run) this.changed();
+				if (!shown) {
+					run.pending.shift();
+					if (run === this.field?.run) this.changed();
+				}
 			}
 		});
 	}
 
-	/** The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a moment. */
-	private async write(spot: EntrySpot, line: Line): Promise<void> {
+	/**
+	 * The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a
+	 * moment. It leaves the queue, and the places after it move down, in the very drawing that shows its card.
+	 */
+	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
+		const shown = (landed?: () => void) => () => {
+			landed?.();
+			run.pending.shift();
+			onShown();
+			if (run === this.field?.run) this.deps.onChange(this.state, true);
+		};
+		const { spot } = run;
 		switch (spot.kind) {
 			case "slot":
 				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
-				return this.deps.fresh();
+				return this.deps.fresh(shown());
 			case "stack":
 				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
-				return this.deps.fresh();
+				return this.deps.fresh(shown());
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
 				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)));
-				await this.deps.fresh();
-				this.runs.landed(spot.column, place.index);
+				return this.deps.fresh(shown(() => this.runs.landed(spot.column, place.index)));
 			}
 		}
 	}

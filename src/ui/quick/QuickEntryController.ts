@@ -159,7 +159,10 @@ export class QuickEntryController {
 		this.entry = new QuickEntry({
 			cards: (column) => this.cards(column),
 			placeOf: (column, result) => this.placeOf(column, result),
-			fresh: () => deps.fresh(),
+			fresh: async (beforeShow) => {
+				await deps.fresh();
+				beforeShow?.();
+			},
 			createInPlace: (text, priority, place) => deps.tasks.createInPlace(text, priority, place),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),

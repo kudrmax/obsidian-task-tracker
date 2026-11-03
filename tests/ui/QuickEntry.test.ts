@@ -40,6 +40,12 @@ class FakeTasks {
 	readonly created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
 	readonly edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	readonly changes: (EntryState | null)[] = [];
+	/** Per change: whether the lists were about to draw it anyway. */
+	readonly drawnNext: boolean[] = [];
+	/** The reads, counted from 1, that fail. */
+	failingReads = new Set<number>();
+	private reads = 0;
+	private lastState: EntryState | null = null;
 	readonly errors: unknown[] = [];
 	gate: Promise<void> = Promise.resolve();
 	failing = new Set<string>();
@@ -60,10 +66,13 @@ class FakeTasks {
 				result.kind === "task"
 					? { kind: "list", list: "now", group: result.group, before: result.before }
 					: { kind: "subtask", parent: result.parent, before: result.before },
-			fresh: async () => {
+			fresh: async (beforeShow) => {
 				await this.gate;
+				if (this.failingReads.has(++this.reads)) throw new Error("no read");
+				beforeShow?.();
 				if (this.written) this.cards = this.written;
 				this.written = null;
+				if (beforeShow) this.see(this.lastState);
 			},
 			createInPlace: async (text, priority, place) => {
 				if (this.failing.has(text)) throw new Error(`no ${text}`);
@@ -79,12 +88,18 @@ class FakeTasks {
 				{ prefix: "!!", color: "red" },
 				{ prefix: "p1", color: "orange" },
 			],
-			onChange: (state) => {
+			onChange: (state, drawnNext) => {
 				this.changes.push(state);
-				this.seen.push([...this.cards.map((c) => c.key.raw), ...(state?.pending.map((line) => line.text) ?? [])]);
+				this.drawnNext.push(drawnNext === true);
+				this.lastState = state;
+				if (drawnNext !== true) this.see(state);
 			},
 			onError: (e) => this.errors.push(e),
 		});
+	}
+
+	private see(state: EntryState | null): void {
+		this.seen.push([...this.cards.map((c) => c.key.raw), ...(state?.pending.map((line) => line.text) ?? [])]);
 	}
 
 	get names(): string[] {
@@ -141,6 +156,59 @@ describe("QuickEntry", () => {
 		const both = (seen: string[]) => seen.filter((name) => name === "1" || name === "2");
 		const entered = tasks.seen.findIndex((seen) => both(seen).length === 2);
 		for (const seen of tasks.seen.slice(entered)) expect(both(seen)).toEqual(["1", "2"]);
+	});
+
+	it("a written line leaves the queue in the change that comes with its card, not after it", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const entry = tasks.entry();
+		entry.open(at(2));
+		entry.type("1");
+		entry.enter();
+		const after = tasks.changes.length;
+		await entry.idle();
+		const drawn = tasks.drawnNext.slice(after);
+		expect(drawn).toEqual([true]);
+		expect(tasks.changes[after]).toMatchObject({ pending: [], spot: at(3) });
+	});
+
+	it("a write that fails takes its line off the queue with a redraw", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.failing = new Set(["1"]);
+		const entry = tasks.entry();
+		entry.open(at(2));
+		entry.type("1");
+		entry.enter();
+		await entry.idle();
+		expect(tasks.drawnNext[tasks.drawnNext.length - 1]).toBe(false);
+		expect(tasks.changes[tasks.changes.length - 1]).toMatchObject({ pending: [] });
+	});
+
+	it("a read that fails after the write takes its line off the queue with a redraw", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.failingReads = new Set([2]);
+		const entry = tasks.entry();
+		entry.open(at(2));
+		entry.type("1");
+		entry.enter();
+		await entry.idle();
+		expect(tasks.drawnNext[tasks.drawnNext.length - 1]).toBe(false);
+		expect(tasks.changes[tasks.changes.length - 1]).toMatchObject({ pending: [], spot: at(2) });
+	});
+
+	it("a line written for a field that has moved changes nothing shown", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(at(2));
+		entry.type("1");
+		entry.enter();
+		entry.moveTo(at(0));
+		const after = tasks.changes.length;
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.created.map((c) => c.text)).toEqual(["1"]);
+		expect(tasks.drawnNext.slice(after)).not.toContain(true);
 	});
 
 	it("queues rapid enters in order", async () => {
