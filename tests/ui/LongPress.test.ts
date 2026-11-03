@@ -78,6 +78,30 @@ describe("LongPress", () => {
 		vi.advanceTimersByTime(300);
 		expect(log).toEqual([]);
 	});
+
+	it("is no tap when a second finger joins: the press was a pinch, whichever finger lifts first", () => {
+		const el = document.body.appendChild(document.createElement("div"));
+		const log: Log = [];
+		press(el, log);
+		el.dispatchEvent(pointer("pointerdown", 10, 10));
+		document.body.dispatchEvent(new PointerEvent("pointerdown", { clientX: 10, clientY: 200, pointerId: 8, isPrimary: false, button: 0, bubbles: true, pointerType: "touch" }));
+		document.body.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 300, pointerId: 8, isPrimary: false, button: 0, bubbles: true, pointerType: "touch" }));
+		el.dispatchEvent(pointer("pointerup", 10, 10));
+		vi.advanceTimersByTime(300);
+		expect(log).toEqual([]);
+		el.remove();
+	});
+
+	it("is no tap when another gesture holds the screen as the finger lifts", () => {
+		const el = document.createElement("div");
+		const log: Log = [];
+		let busy = false;
+		press(el, log, () => busy);
+		el.dispatchEvent(pointer("pointerdown", 10, 10));
+		busy = true;
+		el.dispatchEvent(pointer("pointerup", 10, 10));
+		expect(log).toEqual([]);
+	});
 });
 
 describe("LongPress tap", () => {
