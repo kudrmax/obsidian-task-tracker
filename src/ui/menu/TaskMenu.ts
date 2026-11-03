@@ -154,7 +154,7 @@ export class TaskMenu extends LiftedMenu {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		const copy = this.liftWhole(context.source.getBoundingClientRect(), showWhole);
+		const copy = this.liftWhole(context.source, showWhole);
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
