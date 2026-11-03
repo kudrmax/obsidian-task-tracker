@@ -302,7 +302,7 @@ body {
 	--tc-bar-icon: 22px;
 	--tc-bar-flag: 20px;
 	--tc-stroke-bar: 1.9px;
-	--tc-place-w: 100px;
+	--tc-place-w: 108px;
 	--tc-place-h: 36px;
 	--tc-place-on-bg: rgba(255, 255, 255, 0.16);
 	--tc-place-icon: 18px;
@@ -654,7 +654,8 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar.is-inbox .tc-inbox { left: 0; }
 /* The first column is Inbox over Backlog, half and half; Backlog's title stands in its half under a line, as a column's stands over it. */
 .tc-pane { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
-.tc-pane.is-backlog { border-top: var(--tc-hairline) solid var(--tc-line); }
+/* The screen's foot (the switch's row, the fade) lies over Backlog's half: the half is that much taller, so both lists show as much. */
+.tc-pane.is-backlog { flex-basis: calc(var(--tc-foot-room) + var(--tc-foot-fade)); border-top: var(--tc-hairline) solid var(--tc-line); }
 .tc-pane-head { flex-shrink: 0; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); display: flex; align-items: center; }
 /* Inbox's New task stands at the foot of its half, over the line, with no room for the switch's row under it. */
 .tc-pane.is-inbox .tc-new { padding-bottom: var(--tc-space-8); }
