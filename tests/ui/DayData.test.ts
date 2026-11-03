@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type CalendarEvent, type CalendarService, type DayEvents, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
-import { DayData } from "../../src/ui/DayData";
+import { DayData, type DayPart } from "../../src/ui/DayData";
 import type { LocalDate } from "../../src/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
 
@@ -51,9 +51,9 @@ class SlowCalendars implements CalendarService {
 function setup(tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) })) {
 	const calendars = new SlowCalendars();
 	let date: LocalDate = TODAY;
-	let updates = 0;
-	const data = new DayData({ tasks, calendars, date: () => date, onUpdate: () => updates++ });
-	return { data, tasks, calendars, setDate: (d: LocalDate) => (date = d), updates: () => updates };
+	const parts: DayPart[] = [];
+	const data = new DayData({ tasks, calendars, date: () => date, onUpdate: (part) => parts.push(part) });
+	return { data, tasks, calendars, setDate: (d: LocalDate) => (date = d), updates: () => parts.length, parts };
 }
 
 const titles = (data: DayData) => data.events.map((e) => e.title);
@@ -132,5 +132,54 @@ describe("DayData", () => {
 		expect(data.soon).toEqual([]);
 		expect(data.events).toEqual([]);
 		expect(data.statuses).toEqual([]);
+	});
+
+	it("tells the tasks changed and not the events", async () => {
+		const { data, tasks, parts } = setup();
+		await data.tasks();
+		parts.splice(0);
+		await tasks.rename(data.day!.list[0].key, "Renamed");
+		await data.tasks();
+		expect(parts).toEqual(["tasks"]);
+	});
+
+	it("stays silent when the tasks read are the same", async () => {
+		const { data, parts } = setup();
+		await data.tasks();
+		await data.tasks();
+		expect(parts).toEqual(["tasks"]);
+	});
+
+	it("stays silent when a poll brings the same events", async () => {
+		const { data, calendars, parts } = setup();
+		for (let poll = 0; poll < 2; poll++) {
+			const fetched = data.calendars();
+			calendars.answer();
+			await fetched;
+		}
+		expect(parts).toEqual(["events"]);
+	});
+
+	it("stays silent when a poll brings the same events only fetched later", async () => {
+		const { data, calendars, parts } = setup();
+		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
+		let at = 0;
+		calendars.eventsOn = async () => later(at++);
+		await data.calendars();
+		await data.calendars();
+		expect(parts).toEqual(["events"]);
+		expect(data.statuses[0].updatedAt).toEqual(new Date(1));
+	});
+
+	it("tells the events changed when a poll brings new ones", async () => {
+		const { data, calendars, setDate, parts } = setup();
+		const first = data.calendars();
+		calendars.answer();
+		await first;
+		setDate(TOMORROW);
+		const second = data.calendars();
+		calendars.answer();
+		await second;
+		expect(parts).toEqual(["events", "events"]);
 	});
 });

@@ -6,9 +6,11 @@ export interface DayDataDeps {
 	readonly tasks: TaskService;
 	readonly calendars: CalendarService;
 	readonly date: () => LocalDate;
-	/** The data changed: redraw. */
-	readonly onUpdate: () => void;
+	/** A part of the data changed: redraw what shows it. Data read the same as shown says nothing. */
+	readonly onUpdate: (part: DayPart) => void;
 }
+
+export type DayPart = "tasks" | "events";
 
 interface TasksState {
 	readonly day: DayView | null;
@@ -27,6 +29,8 @@ const MISSING: TasksState = { day: null, soon: [], inbox: [], missing: true };
 export class DayData {
 	private state: TasksState = { day: null, soon: [], inbox: [], missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
+	/** What the screen was last told of each part, to tell only a change. */
+	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
 	private readonly taskReload: Reload<TasksState>;
 	private readonly eventReload: Reload<DayEvents>;
 
@@ -107,6 +111,17 @@ export class DayData {
 
 	private show(change: () => void): void {
 		change();
-		this.deps.onUpdate();
+		for (const part of ["tasks", "events"] as const) {
+			const drawn = this.drawnOf(part);
+			if (drawn === this.shown[part]) continue;
+			this.shown[part] = drawn;
+			this.deps.onUpdate(part);
+		}
+	}
+
+	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched. */
+	private drawnOf(part: DayPart): string {
+		if (part === "tasks") return JSON.stringify(this.state);
+		return JSON.stringify([this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale)]);
 	}
 }
