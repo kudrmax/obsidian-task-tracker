@@ -188,6 +188,20 @@ describe("styles.css keeps to its design system", () => {
 		expect(differences).toEqual([]);
 	});
 
+	it("takes icon sizes, type sizes and stroke widths from their scales", () => {
+		const tokens = sheet.tokens;
+		const ref = (name: string, scale: RegExp) => expect(tokens.get(name), name).toMatch(scale);
+		for (const name of tokens.keys()) {
+			if (/^--tc-[\w-]*-(icon|flag)$/.test(name) && !/^--tc-icon-/.test(name)) ref(name, /^var\(--tc-icon-(xs|s|m|l|xl)\)$/);
+			if (/^--tc-font-/.test(name) && !["--tc-font-ui", "--tc-font-inherit"].includes(name) && !/var\(--font-/.test(tokens.get(name)!)) ref(name, /^var\(--tc-(text-\d+|font-[\w-]+)\)$/);
+			if (/^--tc-stroke-/.test(name) && !/^--tc-stroke-\d/.test(name)) ref(name, /^var\(--tc-stroke-\d[\d-]*\)$/);
+		}
+	});
+
+	it("resets a button in one rule", () => {
+		expect(sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector)).toHaveLength(1);
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
@@ -228,9 +242,10 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
+		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
-		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
@@ -257,7 +272,7 @@ describe("styles.css keeps to its design system", () => {
 	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
-		expect(of(".task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
+		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 
 	it("reads the hour only on the canvas", () => {

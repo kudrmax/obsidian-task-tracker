@@ -1,21 +1,21 @@
 {
-  "name": "obsidian-task-tracker",
-  "version": "0.4.94",
-  "private": true,
-  "main": "main.js",
-  "scripts": {
-    "build": "tsc --noEmit && node esbuild.config.mjs production && node scriptable/build.mjs",
-    "dev": "node esbuild.config.mjs",
-    "build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
-    "test": "vitest run"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^26.6.3",
-    "esbuild": "^0.28.2",
-    "happy-dom": "^21.0.4",
-    "obsidian": "^1.13.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.2"
-  }
+	"name": "obsidian-task-tracker",
+	"version": "0.4.95",
+	"private": true,
+	"main": "main.js",
+	"scripts": {
+		"build": "tsc --noEmit && node esbuild.config.mjs production && node scriptable/build.mjs",
+		"dev": "node esbuild.config.mjs",
+		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
+		"test": "vitest run"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^26.6.3",
+		"esbuild": "^0.28.2",
+		"happy-dom": "^21.0.4",
+		"obsidian": "^1.13.1",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.2"
+	}
 }
