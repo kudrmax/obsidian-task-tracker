@@ -1,4 +1,4 @@
-import type { GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
+import type { EndList, GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
 import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
 import { STATUS_CHARS, type GroupName, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
@@ -8,6 +8,11 @@ const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
 	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, priority: null, children: [], ...patch };
+}
+
+/** The lists whose tasks have neither a due date nor a slot: Inbox, not sorted yet, and Backlog, put off to some day. */
+export function isUndated(section: SectionKey): section is "inbox" | "backlog" {
+	return section === "inbox" || section === "backlog";
 }
 
 function listSection(date: LocalDate, today: LocalDate): SectionKey {
@@ -143,7 +148,7 @@ function toList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: Loc
 export function placementOfEntry(entry: TaskEntry, today: LocalDate): Placement {
 	if (entry.task.dueDate === today) return { kind: "now" };
 	if (entry.task.dueDate !== null) return { kind: "date", date: entry.task.dueDate };
-	if (entry.section === "inbox") return { kind: "inbox" };
+	if (entry.section === "inbox" || entry.section === "backlog") return { kind: entry.section };
 	return entry.section === "soon" ? { kind: "soon" } : { kind: "now" };
 }
 
@@ -155,7 +160,8 @@ export function samePlacement(a: Placement, b: Placement): boolean {
 function placementTarget(placement: Placement, today: LocalDate): { section: SectionKey; dueDate: LocalDate | null } {
 	switch (placement.kind) {
 		case "inbox":
-			return { section: "inbox", dueDate: null };
+		case "backlog":
+			return { section: placement.kind, dueDate: null };
 		case "soon":
 			return { section: "soon", dueDate: null };
 		case "now":
@@ -165,11 +171,11 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 	}
 }
 
-/** Inbox is what is not sorted yet: a task placed there loses its slot as well as its due date. */
+/** Inbox is what is not sorted yet, Backlog what waits for some day: a task placed in either loses its slot as well as its due date. */
 export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
 	const { priority } = draft;
-	const unsorted = section === "inbox";
+	const unsorted = isUndated(section);
 	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }));
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
@@ -185,9 +191,9 @@ function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, tod
 	return patch(doc, entry, { text: draft.text.trim(), priority: draft.priority, dueDate });
 }
 
-/** The end of Inbox or Soon: a drop on that column from the other one, or at the end of its own. Into Inbox the due date and slot go. */
-function toEnd(doc: TaskDocument, entry: TaskEntry, section: "inbox" | "soon"): TaskDocument {
-	const prepared = section === "inbox" ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
+/** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */
+function toEnd(doc: TaskDocument, entry: TaskEntry, section: EndList): TaskDocument {
+	const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
 	return prepared.moveEntry(sameEntryIn(prepared, entry), section, "end");
 }
 
@@ -227,7 +233,7 @@ export function presetPlace(groups: readonly TaskGroup[], name: string, presets:
 }
 
 /**
- * What a task takes entering a list: Now is today; Soon and Inbox hold tasks without a slot, Soon on a later day's column
+ * What a task takes entering a list: Now is today; Soon, Inbox and Backlog hold tasks without a slot, Soon on a later day's column
  * with that day as the due date, else with none.
  */
 function enteringList(list: GroupedList, today: LocalDate, date: LocalDate | null): Partial<Task> {

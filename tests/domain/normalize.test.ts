@@ -6,7 +6,7 @@ import { TaskDocument } from "../../src/domain/TaskDocument";
 const AT_FOUR = new DayBoundary(4);
 
 const M = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
 const T = "2026-10-30";
 
 function parse(text: string): TaskDocument {
@@ -125,6 +125,22 @@ describe("a day that starts at 4", () => {
 
 	it("keeps a slot after midnight of today and brings its Soon task to Now", () => {
 		expect(normalize(parse("## Now\n\n## Soon\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n"), T, AT_FOUR).serialize()).toBe("## Now\n- [ ] S ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n");
+	});
+});
+
+describe("rule 3 for Backlog: a Backlog task that got its day leaves Backlog", () => {
+	it("a due date in the future sends it to the end of Soon, today's to Now", () => {
+		expect(normalize(parse("## Backlog\n- [ ] A 📅 2026-11-03\n- [ ] B\n- [ ] C 📅 2026-10-30\n\n## Now\n\n## Soon\n- [ ] S\n"), T).serialize()).toBe(
+			"## Backlog\n- [ ] B\n\n## Now\n- [ ] C 📅 2026-10-30\n\n## Soon\n- [ ] S\n- [ ] A 📅 2026-11-03\n",
+		);
+	});
+
+	it("a done Backlog task goes to Done", () => {
+		expect(normalize(parse("## Backlog\n- [x] A\n\n## Done\n"), T).serialize()).toBe("## Backlog\n\n## Done\n- [x] A\n");
+	});
+
+	it("keeps its sections, and drops an empty one", () => {
+		expect(normalize(parse("## Backlog\n- [ ] A\n### Дом\n- [ ] B\n### Пусто\n\n## Done\n"), T).serialize()).toBe("## Backlog\n- [ ] A\n### Дом\n- [ ] B\n\n## Done\n");
 	});
 });
 

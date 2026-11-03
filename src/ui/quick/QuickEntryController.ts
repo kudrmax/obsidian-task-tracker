@@ -74,13 +74,13 @@ interface MenuField {
 /** What closes the field when tapped: anything but the field and what its editor shows, the bar with its panels, and the plus. */
 const KEEPS_FIELD = ".tc-quick-row, .tc-quick-bar, .tc-plus";
 
-const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", soon: "soon", left: "now" };
+const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
 
 /** The columns to look for a task in: those the window shows first. */
 const LOOK_IN: Readonly<Record<RightMode, readonly ListColumn[]>> = {
-	calendar: ["left", "soon", "inbox"],
-	soon: ["soon", "left", "inbox"],
-	inbox: ["inbox", "soon", "left"],
+	calendar: ["left", "soon", "inbox", "backlog"],
+	soon: ["soon", "left", "inbox", "backlog"],
+	inbox: ["inbox", "backlog", "soon", "left"],
 };
 
 /** What a drop of the plus on a list means for the file; null for a drop elsewhere. */
@@ -561,7 +561,7 @@ export class QuickEntryController {
 	 * written, as it was written for the day shown; the field then goes to the end of that day's list.
 	 */
 	private async moveTo(placement: Placement): Promise<void> {
-		const column: ListColumn = placement.kind === "inbox" || placement.kind === "soon" ? placement.kind : "left";
+		const column: ListColumn = placement.kind === "now" || placement.kind === "date" ? "left" : placement.kind;
 		const date = placement.kind === "now" ? this.deps.today() : placement.kind === "date" ? placement.date : null;
 		this.moved = true;
 		this.entry.moveTo(this.endOf(column));

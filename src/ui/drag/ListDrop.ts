@@ -57,6 +57,8 @@ export class ListDrop implements DropTarget {
 		private readonly accepts: (drag: DragPayload) => boolean,
 		/** Whose sections the column shows; null for a past day's column. */
 		private readonly sections: () => ColumnSections | null = () => null,
+		/** The list's title stands over its area, as a column's does; Backlog's stands in its own area, under Inbox. */
+		private readonly titleOver = true,
 		/** A new task's place moved to another gap or level. */
 		private readonly onNewPlace: () => void = () => undefined,
 	) {
@@ -68,12 +70,12 @@ export class ListDrop implements DropTarget {
 		);
 	}
 
-	/** The list and the column's title over it: a finger carried up past the list puts the card on its top. Under the list nothing is it. */
+	/** The list and its title: a finger carried up past the list puts the card on its top. Under the list nothing is it. */
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
 		if (!this.takes(drag)) return false;
 		const r = this.area.getBoundingClientRect();
 		const bottom = Math.min(r.bottom, this.list.el.getBoundingClientRect().bottom);
-		return x >= r.left && x < r.right && y >= r.top - DESIGN.columnsTop && y < bottom;
+		return x >= r.left && x < r.right && y >= r.top - (this.titleOver ? DESIGN.columnsTop : 0) && y < bottom;
 	}
 
 	preview(x: number, y: number, drag: DragPayload): void {

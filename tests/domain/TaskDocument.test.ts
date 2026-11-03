@@ -4,7 +4,7 @@ import { TaskDocument, ungroupedIndex } from "../../src/domain/TaskDocument";
 import type { Markers } from "../../src/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
-const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };
+const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
 const ALL = ["Inbox", "Now", "Soon", "Backlog", "Done"];
 const TEXT = `---\ntags: [todo]\n---\n# Список\n\n## Inbox\n- [ ] В инбоксе\n\n## Now\n- [ ] Первая\n- [/] Вторая ⏰ 2026-10-30 14:00-15:00\n  - заметка\n  - [ ] подпункт\n## Soon\n- [ ] Третья 📅 2026-11-03\nПросто текст\n\n## Backlog\n- [ ] Бэклог\n\n## Done\n- [x] Готово\n`;
 
@@ -24,9 +24,10 @@ describe("TaskDocument.parse", () => {
 		expect(parse("## Now\r\n- [ ] A\r\n").serialize()).toBe("## Now\r\n- [ ] A\r\n");
 	});
 
-	it("reads tasks of the four sections only, never Backlog", () => {
+	it("reads tasks of the five sections", () => {
 		const d = parse(TEXT);
 		expect(d.tasks("inbox").map((e) => e.task.text)).toEqual(["В инбоксе"]);
+		expect(d.tasks("backlog").map((e) => e.task.text)).toEqual(["Бэклог"]);
 		expect(d.tasks("now").map((e) => e.task.text)).toEqual(["Первая", "Вторая"]);
 		expect(d.tasks("now")[1].task.children).toEqual(["  - заметка", "  - [ ] подпункт"]);
 		expect(d.tasks("soon").map((e) => e.task.text)).toEqual(["Третья"]);
@@ -36,7 +37,7 @@ describe("TaskDocument.parse", () => {
 	it("gives every entry its section, index and raw line", () => {
 		const d = parse(TEXT);
 		expect(d.tasks("now")[1]).toMatchObject({ section: "now", index: 1, raw: "- [/] Вторая ⏰ 2026-10-30 14:00-15:00", indent: "", bullet: "-" });
-		expect(d.allTasks().map((e) => [e.section, e.index])).toEqual([["inbox", 0], ["now", 0], ["now", 1], ["soon", 0], ["done", 0]]);
+		expect(d.allTasks().map((e) => [e.section, e.index])).toEqual([["inbox", 0], ["backlog", 0], ["now", 0], ["now", 1], ["soon", 0], ["done", 0]]);
 	});
 
 	it("knows which sections exist", () => {
