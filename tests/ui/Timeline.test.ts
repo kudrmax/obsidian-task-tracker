@@ -478,4 +478,13 @@ describe("a timeline beside another day's", () => {
 		expect(next.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("40px");
 		expect(next.el.scrollTop).toBe(300);
 	});
+
+	it("keeps its scroll when its day ends sooner, taking the room under the hours it lacks", () => {
+		const view = timeline({ hourPx: 60 });
+		let top = 0;
+		Object.defineProperty(view.el, "scrollTop", { get: () => top, set: (value: number) => (top = Math.min(value, view.canvas.style.getPropertyValue("--tc-room-bottom") === "50px" ? 400 : 350)) });
+		view.holdScroll(400);
+		expect(view.canvas.style.getPropertyValue("--tc-room-bottom")).toBe("50px");
+		expect(view.el.scrollTop).toBe(400);
+	});
 });

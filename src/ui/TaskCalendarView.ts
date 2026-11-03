@@ -983,7 +983,7 @@ export class TaskCalendarView extends ItemView {
 			this.backlogTitle.textContent = this.settings.sections.backlog;
 			this.backlogList.render();
 		}
-		const hoursAt = this.landing?.peek.date === this.selectedDate ? this.timeline.el.getBoundingClientRect().top : null;
+		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
@@ -996,12 +996,12 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/**
-	 * The day a swipe brought in may have more or fewer rows of all-day events than the one it replaced: the timeline
-	 * under them scrolls by as much as they push it, so the hours stay where they stood.
+	 * The day a swipe brought in may end sooner, or have more or fewer rows of all-day events, than the one it replaced:
+	 * the timeline keeps its scroll, moved by as much as the rows push it, so the hours stay where they stood.
 	 */
-	private keepHoursAt(top: number): void {
+	private keepHoursAt(at: { readonly top: number; readonly scroll: number }): void {
 		if (!this.timeline) return;
-		this.timeline.el.scrollTop += this.timeline.el.getBoundingClientRect().top - top;
+		this.timeline.holdScroll(at.scroll + this.timeline.el.getBoundingClientRect().top - at.top);
 	}
 
 	/** Today opens on the now line, another day at the hour the settings name. */

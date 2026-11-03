@@ -249,7 +249,16 @@ export class Timeline {
 	alignWith(other: Timeline): void {
 		this.anchor = null;
 		this.setRoom(other.room?.top ?? 0, other.room?.bottom ?? 0);
-		this.el.scrollTop = other.el.scrollTop;
+		this.holdScroll(other.el.scrollTop);
+	}
+
+	/** Scrolled to `top` even when its day ends sooner than the one before: it takes the room under the hours it lacks. */
+	holdScroll(top: number): void {
+		this.el.scrollTop = top;
+		const lack = top - this.el.scrollTop;
+		if (lack <= 0) return;
+		this.setRoom(this.room?.top ?? 0, (this.room?.bottom ?? 0) + lack);
+		this.el.scrollTop = top;
 	}
 
 	private holdAnchor(): void {
