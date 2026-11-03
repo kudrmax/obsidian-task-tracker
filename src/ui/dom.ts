@@ -31,3 +31,19 @@ export function releasePointer(target: Element, pointerId: number): void {
 		return;
 	}
 }
+
+/** How far a transform drawn on `el` shifts it down now: a translation's y, 0 for none. */
+function shiftY(el: Element): number {
+	const transform = getComputedStyle(el).transform;
+	const values = /matrix(3d)?\(([^)]*)\)/.exec(transform ?? "");
+	if (!values) return 0;
+	const parts = values[2].split(",").map(Number);
+	return (values[1] ? parts[13] : parts[5]) || 0;
+}
+
+/** Where the top of `el` stands once the transforms running on it and on what holds it have stopped: its box less their shifts. */
+export function restingTop(el: Element): number {
+	let shift = 0;
+	for (let node: Element | null = el; node && node !== node.ownerDocument.body; node = node.parentElement) shift += shiftY(node);
+	return el.getBoundingClientRect().top - shift;
+}

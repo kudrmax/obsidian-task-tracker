@@ -40,6 +40,7 @@ import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
+import { Keyboard } from "./Keyboard";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -381,6 +382,8 @@ export class TaskCalendarView extends ItemView {
 			render: () => this.parts.request("tasks"),
 			onError: (error) => this.reportFailure(error),
 		});
+		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
+		this.unsubscribe.push(() => keyboard.destroy());
 		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
 		this.unsubscribe.push(() => undo.destroy());
 		this.scope = new Scope(this.app.scope);

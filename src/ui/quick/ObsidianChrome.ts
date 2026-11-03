@@ -1,3 +1,5 @@
+import { restingTop } from "../dom";
+
 const KEYBOARD_TOOLBAR = ".mobile-toolbar .mobile-toolbar-options-container";
 const STATUS_BAR = ":scope > .app-container > .status-bar";
 
@@ -11,10 +13,10 @@ export class ObsidianChrome {
 
 	constructor(private readonly doc: Document) {}
 
-	/** The top of the buttons of Obsidian's toolbar over the phone keyboard while it shows; null otherwise. */
+	/** Where the buttons of Obsidian's toolbar over the phone keyboard stop while it shows, though still sliding there; null otherwise. */
 	toolbarTop(): number | null {
 		this.toolbar = this.found(this.toolbar, KEYBOARD_TOOLBAR);
-		return topOf(this.toolbar) ?? null;
+		return this.toolbar && topOf(this.toolbar) !== undefined ? restingTop(this.toolbar) : null;
 	}
 
 	/** The top of Obsidian's desktop status bar while it shows; Infinity on the phone or while it is hidden. */
