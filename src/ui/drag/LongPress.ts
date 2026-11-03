@@ -24,9 +24,15 @@ interface Press {
 	last: PointerEvent;
 }
 
-/** How a press on a card or a block turns into a drag: a finger waits out the delay without wandering; a mouse just moves. */
+/**
+ * How a press on a card or a block turns into a drag: a finger waits out the delay without wandering; a mouse just moves.
+ * A second finger anywhere makes the press part of a pinch: it is forgotten, so lifting it is no tap.
+ */
 export class LongPress {
 	private press: Press | null = null;
+	private readonly otherFinger = (e: PointerEvent) => {
+		if (this.press && e.pointerId !== this.press.pointerId) this.end();
+	};
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -44,6 +50,7 @@ export class LongPress {
 		const press: Press = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse", timer: null, last: e };
 		press.timer = window.setTimeout(() => this.fire(press), this.opts.delayMs());
 		this.press = press;
+		this.el.ownerDocument.addEventListener("pointerdown", this.otherFinger, true);
 		capturePointer(this.el, e.pointerId);
 		if (press.mouse) e.preventDefault();
 	}
@@ -68,7 +75,7 @@ export class LongPress {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
 		const moved = this.distance(e) > LAYOUT.pressTolerance;
 		this.end();
-		if (!moved) this.opts.onTap?.(e);
+		if (!moved && !this.opts.busy()) this.opts.onTap?.(e);
 	}
 
 	private cancel(e: PointerEvent): void {
@@ -87,6 +94,7 @@ export class LongPress {
 	private end(): void {
 		if (!this.press) return;
 		if (this.press.timer !== null) window.clearTimeout(this.press.timer);
+		this.el.ownerDocument.removeEventListener("pointerdown", this.otherFinger, true);
 		releasePointer(this.el, this.press.pointerId);
 		this.press = null;
 	}
