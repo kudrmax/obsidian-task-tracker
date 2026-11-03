@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, type WorkspaceLeaf } from "obsidian";
-import { type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -22,6 +22,7 @@ import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
+import { EventMenu } from "./menu/EventMenu";
 import { type SectionChoice, TaskMenu } from "./menu/TaskMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
@@ -74,6 +75,8 @@ export interface ViewDeps {
 	readonly clock: Clock;
 	/** Asks the phone for fresh work calendar events; a refresh the user asks for runs it before reading the sources. */
 	exportWorkCalendar(): void;
+	/** Apple's Calendar at the event. */
+	openInCalendar(event: CalendarEvent): void;
 }
 
 /**
@@ -283,6 +286,7 @@ export class TaskCalendarView extends ItemView {
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
 			onBlock: (block, item) => this.drag.attachBlock(block, item),
+			onEvent: (block, event) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) })),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(root, "div", "tc-fade");

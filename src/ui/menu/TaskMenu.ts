@@ -1,14 +1,15 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
-import { LAYOUT, tokenPx } from "../design";
+import { LAYOUT } from "../design";
 import { clear, el, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showStrip } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
-import { grownStart, roomWidth, showWhole, windowRoom } from "../wholeCard";
+import { showWhole } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { type CloseHow, Overlay } from "./Overlay";
+import type { CloseHow } from "./Overlay";
+import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
+import { backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup } from "./MenuPanel";
 import type { MenuIconName } from "./menuIcons";
 import { MonthPicker } from "./MonthPicker";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
@@ -129,21 +130,16 @@ export interface TaskMenuContext {
  * The task menu over a blurred screen: the tapped card stays as it is above the blur, a timeline card with its subtasks
  * under it, and the panel grows out under them; the sections and the month picker take its place.
  */
-export class TaskMenu {
-	private readonly overlay: Overlay;
-	private readonly lifted: HTMLElement;
+export class TaskMenu extends LiftedMenu {
 	private readonly panel: HTMLElement;
 	/** The first groups of a panel too tall for either side of the card, over the card; hidden while the panel is whole. */
 	private readonly upper: HTMLElement;
 	private readonly anchor: DOMRect;
-	private readonly copy: DOMRect;
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
 	private stack: HTMLElement | null = null;
 	private stackRow: HTMLElement | null = null;
 	/** The card turned into the field's row, in place of the copy. */
 	private fieldRow: HTMLElement | null = null;
-	/** How far the parts over the blur stand above the card, to keep a field over the keyboard. */
-	private raisedBy = 0;
 	/** Whoever types in the menu hears when it closes, and how. */
 	private fieldClosed: ((how: CloseHow) => void) | null = null;
 	private readonly peek: DescriptionPeek | null;
@@ -153,18 +149,17 @@ export class TaskMenu {
 	}
 
 	private constructor(private readonly context: TaskMenuContext) {
-		this.overlay = new Overlay((how) => this.close(how));
-		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"));
+		super();
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
 		} else fillCard(this.lifted, context.item, { day: context.day });
-		const copy = (this.copy = this.liftWhole(context.source.getBoundingClientRect()));
+		const copy = this.liftWhole(context.source.getBoundingClientRect(), showWhole);
 		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
-		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
-		this.upper = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.panel = this.addPanel("is-task");
+		this.upper = this.addPanel("is-task");
 		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
@@ -180,17 +175,6 @@ export class TaskMenu {
 		this.pick(() => this.context.actions.openLink(link))();
 	}
 
-	/** The copy stands where the card does; a title the card cuts grows it past the column, kept inside the window, and the panel goes by the copy. */
-	private liftWhole(card: DOMRect): DOMRect {
-		const room = windowRoom(this.lifted);
-		const size = showWhole(this.lifted, card, roomWidth(room));
-		const left = grownStart(card.left, card.width, size.width, room.width, room.margin);
-		const top = grownStart(card.top, card.height, size.height, room.height, room.margin);
-		this.lifted.style.left = px(left);
-		this.lifted.style.top = px(top);
-		return new DOMRect(left, top, size.width, size.height);
-	}
-
 	/** The menu of a timeline card: its subtasks stand in a stack under its copy. */
 	get stacks(): boolean {
 		return this.context.source.classList.contains("tc-block");
@@ -201,15 +185,10 @@ export class TaskMenu {
 		return this.context.source.closest(".tc-menu-subtasks") !== null;
 	}
 
-	get raised(): number {
-		return this.raisedBy;
-	}
-
-	/** The copy, the stack and the field's row stand `by` px above the card, never below it: a field kept over the keyboard. */
-	raise(by: number): void {
-		this.raisedBy = Math.max(0, by);
+	/** The stack and the field's row go up with the copy: a field kept over the keyboard. */
+	override raise(by: number): void {
+		super.raise(by);
 		const top = this.copy.top - this.raisedBy;
-		this.lifted.style.top = px(top);
 		if (this.fieldRow) this.fieldRow.style.top = px(top);
 		if (this.stack) this.stack.style.top = px(this.copy.bottom - this.raisedBy);
 	}
@@ -302,16 +281,9 @@ export class TaskMenu {
 
 	/** A menu split over and under the card leaves no side to the description, which then stays away. */
 	private place(): void {
-		placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom(), this.upper);
+		this.placeBy(this.panel, this.anchor, this.upper);
 		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
 		else this.peek?.hide();
-	}
-
-	private pick(action: () => void | Promise<void>): () => void {
-		return () => {
-			this.close();
-			void action();
-		};
 	}
 
 	private showMenu(): void {
@@ -401,8 +373,7 @@ export class TaskMenu {
 		window.addEventListener("pointerdown", press, true);
 	}
 
-	/** `how`: Escape, or anything else that closed it. */
-	close(how: CloseHow = "away"): void {
-		if (this.overlay.close()) this.fieldClosed?.(how);
+	protected override closed(how: CloseHow): void {
+		this.fieldClosed?.(how);
 	}
 }

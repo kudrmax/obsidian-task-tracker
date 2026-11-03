@@ -1,4 +1,5 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
+import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices, type ServicesHost } from "./application/services";
@@ -45,7 +46,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				scriptableLoader: () => services.workExport.loader,
 			}),
 		);
-		return { tasks: services.tasks, calendars: services.calendars, settings: this, clock, exportWorkCalendar: () => services.workShortcut.run() };
+		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => window.open(url), runScript: runAppleScript });
+		return {
+			tasks: services.tasks,
+			calendars: services.calendars,
+			settings: this,
+			clock,
+			exportWorkCalendar: () => services.workShortcut.run(),
+			openInCalendar: (event) => calendarApp.open(event),
+		};
 	}
 
 	private servicesHost(): ServicesHost {
@@ -107,4 +116,11 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		await leaf.setViewState({ type: VIEW_TYPE, active: true });
 		await workspace.revealLeaf(leaf);
 	}
+}
+
+/** The Mac runs it through osascript; Node's modules exist only in the desktop app, so they are reached for only here. */
+function runAppleScript(script: string, args: readonly string[]): void {
+	if (!Platform.isMacOS || !Platform.isDesktopApp) return;
+	const { execFile } = (window as unknown as { require: (id: string) => typeof import("child_process") }).require("child_process");
+	execFile("osascript", ["-e", script, ...args], () => undefined);
 }

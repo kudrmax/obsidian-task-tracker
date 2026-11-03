@@ -4,10 +4,18 @@ import { el, px } from "../dom";
 import { icon } from "../icons";
 import { MENU_ICONS, type MenuIconName, menuIcon } from "./menuIcons";
 
+/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear, and Tomorrow, which a quick move wears. */
+export type PlaceIconName = "inbox" | "soon" | "now" | "calendar" | "tomorrow";
+export type TileIconName = MenuIconName | PlaceIconName;
+
+function tileIcon(name: TileIconName): SVGSVGElement {
+	return name in MENU_ICONS ? menuIcon(name as MenuIconName) : icon(name as PlaceIconName);
+}
+
 export interface MenuRowSpec {
 	readonly label: string;
 	readonly value?: string;
-	readonly icon?: MenuIconName;
+	readonly icon?: TileIconName;
 	readonly danger?: boolean;
 	readonly onPick: () => void;
 }
@@ -18,7 +26,7 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec, cls = "tc-menu-r
 	row.classList.toggle("is-danger", spec.danger === true);
 	el(row, "span", "tc-menu-label", spec.label);
 	if (spec.value) el(row, "span", "tc-menu-value", spec.value);
-	if (spec.icon) row.appendChild(menuIcon(spec.icon));
+	if (spec.icon) row.appendChild(tileIcon(spec.icon));
 	row.addEventListener("click", spec.onPick);
 	return row;
 }
@@ -28,14 +36,6 @@ export function priorityDot(parent: HTMLElement, color: PriorityColor, cls: stri
 	const dot = el(parent, "span", `tc-priority-dot ${cls}`);
 	dot.dataset.priority = color;
 	return dot;
-}
-
-/** The menu's own icons and the wheel's places, which the quick bar's place tiles wear, and Tomorrow, which a quick move wears. */
-export type PlaceIconName = "inbox" | "soon" | "now" | "calendar" | "tomorrow";
-export type TileIconName = MenuIconName | PlaceIconName;
-
-function tileIcon(name: TileIconName): SVGSVGElement {
-	return name in MENU_ICONS ? menuIcon(name as MenuIconName) : icon(name as PlaceIconName);
 }
 
 export interface MenuTileSpec {
