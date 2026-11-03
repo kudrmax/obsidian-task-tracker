@@ -1,7 +1,7 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
 import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
@@ -42,6 +42,7 @@ import { NewTaskButton } from "./NewTaskButton";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
+import { settingsEffect } from "./settingsEffect";
 import { type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { TaskList } from "./TaskList";
@@ -115,9 +116,8 @@ export class TaskCalendarView extends ItemView {
 	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
-	private dayStartHour: number;
-	/** The levels the tasks were last read with: other levels colour them anew. */
-	private priorities: readonly PriorityLevel[];
+	/** The settings the screen last followed: a change is weighed against them. */
+	private seen: TaskCalendarSettings;
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -144,8 +144,7 @@ export class TaskCalendarView extends ItemView {
 		private readonly deps: ViewDeps,
 	) {
 		super(leaf);
-		this.dayStartHour = this.settings.dayStartHour;
-		this.priorities = this.settings.priorities;
+		this.seen = this.settings;
 		this.selectedDate = this.today();
 		this.shownToday = this.selectedDate;
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
@@ -444,15 +443,20 @@ export class TaskCalendarView extends ItemView {
 		return new DayBoundary(this.settings.dayStartHour);
 	}
 
-	/** Another hour for the day's start moves today and the timeline: the screen opens today afresh. Another card size restacks the timeline. */
+	/**
+	 * Another card size restacks the timeline. Another file, its names or marks, or other levels: the headers and the lists
+	 * follow the names at once, and the tasks are read anew. Another hour for the day's start moves today and the timeline:
+	 * the screen opens today afresh. Anything else redraws nothing.
+	 */
 	private onSettings(): void {
-		this.timeline?.layoutTasks();
-		if (!sameLevels(this.settings.priorities, this.priorities)) {
-			this.priorities = this.settings.priorities;
+		const effect = settingsEffect(this.seen, this.settings);
+		this.seen = this.settings;
+		if (effect.restack) this.timeline?.layoutTasks();
+		if (effect.reload) {
+			this.parts.request("frame", "tasks");
 			void this.data.tasks();
 		}
-		if (this.settings.dayStartHour === this.dayStartHour) return;
-		this.dayStartHour = this.settings.dayStartHour;
+		if (!effect.newDay) return;
 		this.scrolledFor = null;
 		void this.afterEntry(() => this.select(this.today()));
 	}
