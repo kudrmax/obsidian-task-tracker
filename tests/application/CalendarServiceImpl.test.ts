@@ -334,6 +334,18 @@ describe("CalendarServiceImpl.eventsAround", () => {
 		expect(next.statuses.map((s) => s.source)).toEqual(["google", "work"]);
 	});
 
+	it("a failure for the day shown makes its neighbours unfresh too: Google is asked again on the swipe", async () => {
+		const google = threeDays();
+		const { svc, pass } = around([google]);
+		await svc.eventsAround(D);
+		pass(20_000);
+		google.failWith = new Error("offline");
+		await svc.eventsOn(D);
+		google.failWith = null;
+		await svc.eventsAround("2026-10-31");
+		expect(google.calls).toHaveLength(3);
+	});
+
 	it("a failed answer is not fresh", async () => {
 		const google = threeDays();
 		const { svc } = around([google]);

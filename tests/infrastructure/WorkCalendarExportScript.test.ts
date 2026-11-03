@@ -121,6 +121,25 @@ describe("WorkCalendarExportScript", () => {
 		expect(adapter.files.get(EXPORT)).toMatch(/^const OUTPUT = "other\.json";/);
 	});
 
+	it("a failed write is tried again on the next settings change", async () => {
+		const { export: s, adapter, settings } = script();
+		const write = adapter.write.bind(adapter);
+		let fail = true;
+		adapter.write = async (path: string, data: string) => {
+			if (fail) throw new Error("disk full");
+			return write(path, data);
+		};
+		const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		s.keepInstalled();
+		await new Promise((resolve) => setTimeout(resolve));
+		expect(adapter.files.has(EXPORT)).toBe(false);
+		fail = false;
+		await settings.update({ scrollToHour: 3 });
+		await new Promise((resolve) => setTimeout(resolve));
+		expect(adapter.files.get(EXPORT)).toMatch(/^const OUTPUT = /);
+		quiet.mockRestore();
+	});
+
 	it("a settings change that keeps the work file path does not look at the export", async () => {
 		const { export: s, adapter, settings } = script();
 		s.keepInstalled();

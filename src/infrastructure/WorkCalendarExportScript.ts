@@ -38,10 +38,16 @@ export class WorkCalendarExportScript {
 		});
 	}
 
-	/** One write at a time, so the last settings win. Writes only when the file differs: Sync is not woken for nothing. */
+	/** One write at a time, so the last settings win. Writes only when the file differs: Sync is not woken for nothing. A failed write is tried again on the next change of the settings. */
 	install(): Promise<void> {
-		this.installedFor = this.settings.get().workCalendarFile;
-		this.writing = this.writing.then(() => this.write()).catch((e: unknown) => console.error("Task Calendar: work calendar export", e));
+		const path = this.settings.get().workCalendarFile;
+		this.installedFor = path;
+		this.writing = this.writing
+			.then(() => this.write())
+			.catch((e: unknown) => {
+				if (this.installedFor === path) this.installedFor = null;
+				console.error("Task Calendar: work calendar export", e);
+			});
 		return this.writing;
 	}
 

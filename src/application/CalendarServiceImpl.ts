@@ -212,11 +212,11 @@ export class CalendarServiceImpl implements CalendarService {
 		answers.forEach((answer, i) => {
 			const source = this.sources[i];
 			if (!answer || source.onChange) return;
-			for (const date of dates) {
-				const id = `${source.name}|${date}`;
-				if (answer.ok) this.answered.set(id, { at, key });
-				else this.answered.delete(id);
+			if (!answer.ok) {
+				for (const id of [...this.answered.keys()]) if (id.startsWith(`${source.name}|`)) this.answered.delete(id);
+				return;
 			}
+			for (const date of dates) this.answered.set(`${source.name}|${date}`, { at, key });
 		});
 	}
 
