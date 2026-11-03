@@ -89,6 +89,10 @@ export interface ViewDeps {
  */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
+	/** The day the last minute's tick saw as today: the next day's first tick releases the slots and reads the tasks anew. */
+	private shownToday: LocalDate;
+	/** A minute passed while the view was hidden: it ticks once as soon as it shows again. */
+	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
 	private switcher: ColumnSwitch | null = null;
 	private leftEl: HTMLElement | null = null;
@@ -143,6 +147,7 @@ export class TaskCalendarView extends ItemView {
 		this.dayStartHour = this.settings.dayStartHour;
 		this.priorities = this.settings.priorities;
 		this.selectedDate = this.today();
+		this.shownToday = this.selectedDate;
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
 		this.polling = new CalendarPolling({
 			refresh: () => this.data.calendars(),
@@ -367,7 +372,9 @@ export class TaskCalendarView extends ItemView {
 		);
 		this.registerDomEvent(window, "focus", () => void this.polling.refresh());
 		this.registerDomEvent(document, "visibilitychange", () => {
-			if (!document.hidden) void this.polling.refresh();
+			if (document.hidden) return;
+			void this.polling.refresh();
+			this.catchUpTick();
 		});
 		this.registerDomEvent(root, "touchmove", (e) => {
 			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
@@ -385,10 +392,32 @@ export class TaskCalendarView extends ItemView {
 		await this.data.load();
 	}
 
-	/** Once a minute: the now line moves, and a day that ended releases its slots (the file is written only when a rule fires). */
+	/**
+	 * Once a minute: the now line moves, nothing else is drawn. A day that ended releases its slots (the file is written
+	 * only when a rule fires) and the lists, which depend on today, are drawn and read anew. A hidden view waits.
+	 */
 	private async tick(): Promise<void> {
-		this.render();
-		await this.deps.tasks.normalize();
+		if (document.hidden || !this.contentEl.isShown()) {
+			this.missedTick = true;
+			return;
+		}
+		this.missedTick = false;
+		const today = this.today();
+		if (today === this.shownToday) {
+			this.timeline?.tickNow();
+			return;
+		}
+		this.shownToday = today;
+		try {
+			await this.deps.tasks.normalize();
+		} finally {
+			this.parts.request("frame", "tasks");
+			void this.data.tasks();
+		}
+	}
+
+	private catchUpTick(): void {
+		if (this.missedTick) void this.tick();
 	}
 
 	override async onClose(): Promise<void> {
@@ -400,6 +429,7 @@ export class TaskCalendarView extends ItemView {
 	override onResize(): void {
 		this.fitListWidth();
 		this.quick?.reveal();
+		this.catchUpTick();
 	}
 
 	private get settings() {

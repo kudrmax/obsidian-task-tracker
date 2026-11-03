@@ -224,6 +224,13 @@ export class Timeline {
 		this.layout();
 	}
 
+	/** A minute passed: the now line, its time, and the tasks it carries move; nothing is drawn anew. */
+	tickNow(): void {
+		if (!this.nowEl) return;
+		this.nowEl.querySelector(".tc-now-pill")!.textContent = formatTime(minutesOf(this.deps.now()));
+		this.layout();
+	}
+
 	/** Applies the hour's height to everything placed; cheap enough to run on every frame of a zoom. */
 	layout(): void {
 		const hourPx = this.hourPx;
