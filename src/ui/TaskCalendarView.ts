@@ -30,7 +30,6 @@ import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
-import { PullToRefresh } from "./sources/PullToRefresh";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, stepFor } from "./zoomLevels";
 import { dayColumn } from "./dayColumn";
@@ -123,7 +122,6 @@ export class TaskCalendarView extends ItemView {
 	private zoomFrame = 0;
 	/** The pinch settled on the whole day: it keeps fitting as the timeline's height changes. */
 	private wholeDay = false;
-	private pull: PullToRefresh | null = null;
 	private newTask: NewTaskButton | null = null;
 	private newSoon: NewTaskButton | null = null;
 	private newInbox: NewTaskButton | null = null;
@@ -296,13 +294,6 @@ export class TaskCalendarView extends ItemView {
 		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
-		this.pull = new PullToRefresh(timeline.el, {
-			column: this.rightEl,
-			arbiter: this.arbiter,
-			statuses: () => this.data.statuses,
-			now: () => this.deps.clock.now(),
-			onRefresh: () => this.refreshNow(),
-		});
 		new PinchZoom(timeline.el, {
 			hourPx: () => this.hourPx,
 			min: () => this.zoomLevels()[0].hourPx,
@@ -819,7 +810,6 @@ export class TaskCalendarView extends ItemView {
 		if (missing) this.renderMissing(root);
 		this.soonList.render();
 		this.inboxList.render();
-		this.pull?.renderArea();
 		renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
 		this.timeline.render();
 		if (this.scrolledFor !== this.selectedDate) {

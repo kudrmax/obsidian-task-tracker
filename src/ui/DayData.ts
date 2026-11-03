@@ -74,7 +74,7 @@ export class DayData {
 		return this.taskReload.request();
 	}
 
-	/** The events fetched afresh: pull to refresh, the sources popover. */
+	/** The events fetched afresh: Refresh now in the sources popover, the polling. */
 	calendars(): Promise<void> {
 		return this.eventReload.request();
 	}

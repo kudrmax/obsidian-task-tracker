@@ -114,7 +114,6 @@ body {
 	--tc-radius-dot: 4px;
 	--tc-stroke-source: 1.8px;
 	--tc-stroke-refresh: 1.9px;
-	--tc-stroke-pull: 2px;
 	--tc-hairline-half: 0.5px;
 	--tc-stroke-menu: 1.8px;
 	/* The check on the section a task is in, and the plus of New section, in the menu. */
@@ -333,13 +332,6 @@ body {
 	--tc-popover-gap: 10px;
 	--tc-source-row: 56px;
 	--tc-source-icon: 20px;
-	--tc-pull-top: 32px;
-	--tc-pull-h: 80px;
-	--tc-pull-left: 4px;
-	--tc-pull-right: 6px;
-	--tc-pull-icon: 14px;
-	--tc-pull-shift: 84px;
-	--tc-pull: 0px;
 
 	/* Sizes: a description's own screen over the view */
 	--tc-sheet-bar: 44px;
@@ -433,8 +425,6 @@ body {
 	--tc-font-sub: 13px;
 	--tc-font-group: 13px;
 	--tc-leading-group: 20px;
-	--tc-font-pull: 12px;
-	--tc-leading-pull: 16px;
 	--tc-leading-normal: normal;
 	--tc-weight-normal: 400;
 	--tc-weight-semibold: 600;
@@ -468,7 +458,6 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-drop-gap: 999;
-	--tc-layer-pull: 5;
 	--tc-layer-switch: 5;
 	--tc-layer-plus: 5;
 	--tc-layer-bar: 6;
@@ -496,12 +485,9 @@ body {
 	--tc-duration-menu: 200ms;
 	--tc-duration-fly: 180ms;
 	--tc-duration-snap: 120ms;
-	--tc-duration-pull: 200ms;
 	--tc-duration-fade: 160ms;
 	/* A description's screen rises this far as it fades in. */
 	--tc-rise: 12px;
-	--tc-duration-spin: 900ms;
-	--tc-turn: 1turn;
 }
 
 /* The light theme follows Obsidian's: the same roles, the values of the board «Палитра» (docs/design/README.md, «Светлая тема»). */
@@ -648,23 +634,10 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-source-name { font-size: var(--tc-font-menu); }
 .tc-source-sub { font-size: var(--tc-font-sub); color: var(--tc-muted); }
 .tc-source-time { font-size: var(--tc-font-value); color: var(--tc-muted); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tc-source-time.is-stale, .tc-pull-time.is-stale { color: var(--tc-stale); }
+.tc-source-time.is-stale { color: var(--tc-stale); }
 .tc-popover .tc-source-refresh { width: 100%; height: var(--tc-row-tall); box-sizing: border-box; margin: 0; padding: 0 var(--tc-space-14); border: 0; border-top: var(--tc-group-gap) solid var(--tc-gap-ink); background: transparent; color: var(--tc-accent-ui); font: inherit; font-family: var(--tc-font-inherit); font-size: var(--tc-font-menu); display: flex; align-items: center; justify-content: flex-start; gap: var(--tc-space-10); cursor: pointer; box-shadow: none; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .tc-source-refresh svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-refresh); }
 
-/* Pulling the timeline down opens the sources' lines above it. */
-.tc-timeline { transform: translate3d(0, var(--tc-pull), 0); transition: transform var(--tc-duration-pull) var(--tc-ease-out); }
-.tc-timeline.is-pulling { transition: none; }
-.tc-pull { display: none; position: absolute; left: var(--tc-pull-left); right: var(--tc-pull-right); top: var(--tc-pull-top); height: var(--tc-pull-h); z-index: var(--tc-layer-pull); flex-direction: column; gap: var(--tc-space-6); opacity: calc(var(--tc-pull) / var(--tc-pull-shift)); }
-.tc-pull.is-open { display: flex; }
-.tc-pull-spinner { align-self: center; color: var(--tc-muted); }
-.tc-pull-spinner svg { width: var(--tc-source-icon); height: var(--tc-source-icon); stroke-width: var(--tc-stroke-pull); }
-.tc-pull.is-refreshing .tc-pull-spinner svg { animation: tc-spin var(--tc-duration-spin) linear infinite; }
-.tc-pull-row { display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-pull); line-height: var(--tc-leading-pull); }
-.tc-pull-row svg { width: var(--tc-pull-icon); height: var(--tc-pull-icon); flex-shrink: 0; color: var(--tc-pull-ink); stroke-width: var(--tc-stroke-pull); }
-.tc-pull-name { flex: 1; min-width: 0; color: var(--tc-pull-ink); white-space: nowrap; }
-.tc-pull-time { color: var(--tc-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-@keyframes tc-spin { to { transform: rotate(var(--tc-turn)); } }
 
 
 /* The columns on the strip, Inbox, Soon, the list and the right column; the fixed dividers between the halves, and the one with its handle. */
