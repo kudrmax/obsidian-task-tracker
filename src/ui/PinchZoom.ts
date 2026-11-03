@@ -15,7 +15,7 @@ export interface PinchZoomOptions {
 	arbiter: GestureArbiter;
 	minutesAt(clientY: number): number;
 	onScale(hourPx: number, anchor: ZoomAnchor): void;
-	/** The fingers lifted (or the wheel stopped): time to settle on a level. */
+	/** The fingers lifted (or the wheel stopped): the scale stays where it is. */
 	onRelease(hourPx: number, anchor: ZoomAnchor): void;
 }
 
@@ -34,6 +34,8 @@ export class PinchZoom {
 	private pinch: { readonly distance: number; readonly hourPx: number; readonly anchor: ZoomAnchor } | null = null;
 	private wheelTimer: number | null = null;
 	private lastAnchor: ZoomAnchor | null = null;
+	/** The scale last asked for: the view lays it out on the next frame, so its own hour may still be the one before. */
+	private scaled: number | null = null;
 
 	constructor(
 		private readonly el: HTMLElement,
@@ -74,7 +76,7 @@ export class PinchZoom {
 		this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (!this.pinch || this.pointers.size < 2) return;
 		const { distance } = this.geometry();
-		this.opts.onScale(this.clamp((this.pinch.hourPx * distance) / this.pinch.distance), this.pinch.anchor);
+		this.scale((this.pinch.hourPx * distance) / this.pinch.distance, this.pinch.anchor);
 	}
 
 	private up(e: PointerEvent): void {
@@ -89,7 +91,17 @@ export class PinchZoom {
 		const anchor = this.pinch.anchor;
 		this.pinch = null;
 		this.opts.arbiter.release(PINCH);
-		this.opts.onRelease(this.opts.hourPx(), anchor);
+		this.release(anchor);
+	}
+
+	private scale(hourPx: number, anchor: ZoomAnchor): void {
+		this.scaled = this.clamp(hourPx);
+		this.opts.onScale(this.scaled, anchor);
+	}
+
+	private release(anchor: ZoomAnchor): void {
+		this.opts.onRelease(this.scaled ?? this.opts.hourPx(), anchor);
+		this.scaled = null;
 	}
 
 	private wheel(e: WheelEvent): void {
@@ -97,12 +109,12 @@ export class PinchZoom {
 		e.preventDefault();
 		const anchor = this.lastAnchor ?? { minutes: this.opts.minutesAt(e.clientY), clientY: e.clientY };
 		this.lastAnchor = anchor;
-		this.opts.onScale(this.clamp(this.opts.hourPx() * Math.pow(2, -e.deltaY / WHEEL_UNITS_PER_DOUBLING)), anchor);
+		this.scale((this.scaled ?? this.opts.hourPx()) * Math.pow(2, -e.deltaY / WHEEL_UNITS_PER_DOUBLING), anchor);
 		if (this.wheelTimer !== null) window.clearTimeout(this.wheelTimer);
 		this.wheelTimer = window.setTimeout(() => {
 			this.wheelTimer = null;
 			this.lastAnchor = null;
-			this.opts.onRelease(this.opts.hourPx(), anchor);
+			this.release(anchor);
 		}, WHEEL_SETTLE_MS);
 	}
 }

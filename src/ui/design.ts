@@ -147,8 +147,6 @@ export const LAYOUT = {
 	minutesPerDay: 1440,
 	/** A pull let go past this far refreshes the sources. */
 	pullThreshold: 60,
-	/** A released pinch settles on the nearest zoom level over this long. */
-	zoomSnapMs: 200,
 	/** A finger drawn sideways this far steps to the next screen when let go. */
 	swipeDistance: 48,
 	/** So does a shorter flick still this fast when let go, px per ms. */
