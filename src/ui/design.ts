@@ -67,8 +67,6 @@ export const PROPERTY = {
 	eventText: "--tc-event-text",
 	/** The edge of the pressed card a panel hangs from: its bottom, or its top measured from the screen's bottom. */
 	panelY: "--tc-panel-y",
-	/** How far the timeline is pulled down from its top. */
-	pull: "--tc-pull",
 	/** How deep a subtask's card stands under its task: 0 for a task. */
 	level: "--tc-level",
 	/** How far a card of a list stands from its place while a drag makes room in the list, px. */
@@ -88,7 +86,6 @@ export const PROPERTY = {
 export const DURATION = {
 	collapse: "--tc-duration-collapse",
 	fly: "--tc-duration-fly",
-	pull: "--tc-duration-pull",
 	fade: "--tc-duration-fade",
 	slide: "--tc-duration-slide",
 } as const;
@@ -145,8 +142,6 @@ export const LAYOUT = {
 	/** The least a finger moves for one step: under this the snapped time would flicker between neighbours. */
 	snapStepPx: 9,
 	minutesPerDay: 1440,
-	/** A pull let go past this far refreshes the sources. */
-	pullThreshold: 60,
 	/** A finger drawn sideways this far steps to the next screen when let go. */
 	swipeDistance: 48,
 	/** So does a shorter flick still this fast when let go, px per ms. */

@@ -8,6 +8,10 @@
 
 The plugin is used every day on the phone (iOS) and on the desktop (macOS). Every screen, gesture and control must work and look designed on both: a board for each platform where they differ, and a visual check of both in the test Obsidian (phone view and a desktop window, light and dark) before a release. A feature checked on one platform only is not done.
 
+## Documentation
+
+`docs/plugin/` is the plugin's documentation: what Max sets up by hand (Scriptable, Shortcuts, Google) and how to check it, in Russian. Not the spec and not the design. A change to anything set up by hand (steps, names, buttons, files) updates these pages in the same branch.
+
 ## Layers
 
 `src/domain` (pure: the file, the tasks, the rules), `src/application` (`contracts.ts` is the API the UI talks to; services), `src/infrastructure` (vault, Google, the work file), `src/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `src/settings.ts` and `src/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.

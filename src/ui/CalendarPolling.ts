@@ -15,7 +15,7 @@ export interface PollingDeps {
 
 /**
  * Keeps the events fresh while the view is open: a fetch every interval, and one at once when asked (the app came back to the
- * front, a pull, Refresh now). Every fetch restarts the interval; asked during a fetch, it waits for that one.
+ * front, Refresh now). Every fetch restarts the interval; asked during a fetch, it waits for that one.
  */
 export class CalendarPolling {
 	private timer: number | null = null;

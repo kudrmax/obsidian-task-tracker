@@ -41,7 +41,7 @@ Left: the tasks of the selected day (today: everything in Now that has no slot t
 - Long press a task for its menu: In progress, Done, Won’t do, Due date, Rename, Delete.
 - “New task” opens the task screen: a title and three tiles, Soon / Now / Date. A long press on an empty spot of the timeline creates a task at that time.
 - Pinch to zoom the timeline; the drag step follows the grid.
-- The calendar button in the day row gets an orange dot when a source is stale; tap it (with the calendar already shown) to see the sources and refresh them, or pull the timeline down.
+- The calendar button in the switch gets an orange dot when a source is stale; with the calendar shown, a long press on the switch opens the sources window: when each was last updated, and Refresh now.
 
 ## Google Calendar
 
@@ -68,29 +68,13 @@ While the project’s publishing status is **Testing**, Google makes every refre
 
 The plugin cannot read Apple’s calendars itself. A Scriptable script exports the events of every calendar on the phone, from yesterday to two weeks ahead (meetings you declined left out), to a JSON file in the vault; the plugin reads that file (Settings → Work calendar → File path, default `calendar/work.json`).
 
-The export itself comes with the plugin: it keeps it in its own folder (`.obsidian/plugins/task-calendar/work-calendar-export.js`) and updates it with every release. Scriptable holds only a short script that runs it, [`scriptable/Export Work Calendar.js`](scriptable/Export%20Work%20Calendar.js), pasted once.
-
-1. Install Scriptable, create a script named `Export Work Calendar`, paste the script from Settings → Work calendar → Scriptable script → **Copy**.
-2. Scriptable → Settings → File Bookmarks → **+** → pick the vault folder → name it `ObsidianVault`.
-3. Run the script once: iOS asks for calendar access, the alert shows the number of events.
-4. Shortcuts → **+** → a shortcut named `Export Work Calendar` with two actions: Scriptable “Create File Bookmark” (`ObsidianVault`, the vault folder) → Scriptable “Run Script” → `Export Work Calendar`, Run In App off. The plugin and the automations below run this shortcut.
-5. Shortcuts → Automation → **+** → App → Obsidian → Is Opened → Run Immediately → Run Shortcut `Export Work Calendar`: the events are fresh every time Obsidian opens.
-6. The same with Time of Day, Run Immediately, one automation per hour you want a refresh at (iOS has no “every hour”), for example 9:00 to 19:00.
-7. In the plugin settings, list the calendar titles to take from the file (empty: all of them), so Google calendars are not shown twice.
-
-On the iPhone, pulling the timeline down (or Refresh now in the sources window) runs the shortcut too: Shortcuts comes up for a moment and returns to Obsidian with the new events. On the Mac the same file arrives through Obsidian Sync.
+The export itself comes with the plugin and updates with it; Scriptable holds only a short script that runs it, pasted once. Setup, step by step, with how to check it: [docs/plugin/work-calendar.md](docs/plugin/work-calendar.md).
 
 ## Notifications (iPhone)
 
 A task put on a time rings on the phone at its start: the task’s title, its time below, a tap opens Obsidian. A Scriptable script reads the tasks file with the plugin’s own parser and keeps one pending notification per unfinished task with a slot in Now and Soon; a task moved, unslotted, done or cancelled loses its old one on the next run. Due dates alone do not notify.
 
-1. Scriptable → **+** → a script named `Task Notifications`, paste [`scriptable/Task Notifications.js`](scriptable/Task%20Notifications.js). If the plugin’s tasks file, section names or markers differ from the defaults, change them in `SETTINGS` at its top.
-2. The `ObsidianVault` file bookmark from the work calendar setup serves this script too.
-3. Run it once: iOS asks to allow notifications; the alert shows how many tasks are ahead.
-4. Shortcuts → Automation → **+** → App → Obsidian → **Is Closed** → Run Immediately, with the actions Scriptable “Create File Bookmark” (`ObsidianVault`, the vault folder) → Scriptable “Run Script” → `Task Notifications`. Leaving Obsidian is when the file holds your last changes and those synced from the Mac: Obsidian syncs only while it is open, so a task put on a time on the Mac reaches the phone the next time you open and leave Obsidian there.
-5. To make them hard to miss: Settings → Notifications → Scriptable → Sounds on, Banner Style **Persistent** (the banner stays until you swipe it). For every Focus you use during the day: Settings → Focus → the Focus → Apps → Allowed Apps → **+** → Scriptable, or it rings silently.
-
-The script is built from `src/scriptable` by `node scriptable/build.mjs` (part of `npm run build`); a test fails when the committed script is stale.
+Setup, step by step: [docs/plugin/notifications.md](docs/plugin/notifications.md).
 
 ## Development
 
@@ -100,4 +84,4 @@ npm test
 npm run build
 ```
 
-`docs/design/README.md` is the approved design, `docs/superpowers/specs/` the spec, `docs/superpowers/plans/` the implementation plan. Builds are tried in a separate Obsidian with a scratch vault, never in the real one (see `CLAUDE.md`).
+`docs/plugin/` is the plugin's documentation (setup guides), `docs/design/README.md` is the approved design, `docs/superpowers/specs/` the spec, `docs/superpowers/plans/` the implementation plan. Builds are tried in a separate Obsidian with a scratch vault, never in the real one (see `CLAUDE.md`).

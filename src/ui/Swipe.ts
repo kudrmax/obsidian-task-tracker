@@ -54,7 +54,7 @@ const NEXT_STROKE_RISE = 1.5;
 /**
  * A finger drawn sideways across the screen steps to the next screen, to the left, or back, to the right; up or down it is
  * a scroll and stays one. It holds the screen once it goes sideways, so a press that set off as a swipe is not also
- * lifted, scrolled or pulled, and it steps when let go far enough along, or quickly. Two fingers drawn sideways on a
+ * lifted or scrolled, and it steps when let go far enough along, or quickly. Two fingers drawn sideways on a
  * trackpad step the same way, once a stroke, however soon the next stroke follows; a pinch (ctrl or cmd with the wheel)
  * is the zoom's.
  */
