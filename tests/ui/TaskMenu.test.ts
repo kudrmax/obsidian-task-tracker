@@ -213,6 +213,72 @@ describe("the menu", () => {
 		expect(actions.setStatus).toHaveBeenCalledWith("done");
 	});
 
+	describe("asking before Delete and Won’t do", () => {
+		const ask = () => panel().querySelector<HTMLElement>(".tc-menu-ask");
+		const askButton = (cls: string) => ask()!.querySelector<HTMLButtonElement>(cls)!;
+		const wontDo = () => panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")[2];
+
+		it("turns the Delete row into the question, the task named, and deletes only on Delete", () => {
+			const actions = open(item({ text: "Call the doctor" }));
+			row("Delete").click();
+			expect(actions.remove).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+			expect(row("Delete")).toBeUndefined();
+			expect(ask()!.classList.contains("is-danger")).toBe(true);
+			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Delete “Call the doctor”?");
+			expect(askButton(".tc-menu-ask-confirm").textContent).toBe("Delete");
+			askButton(".tc-menu-ask-confirm").click();
+			expect(actions.remove).toHaveBeenCalled();
+			expect(closing()).toBe(true);
+		});
+
+		it("turns the status tiles into the question for Won’t do, and marks it only on Won’t do", () => {
+			const actions = open(item({ text: "Call the doctor" }));
+			wontDo().click();
+			expect(actions.setStatus).not.toHaveBeenCalled();
+			expect(panel().querySelector(".tc-menu-tiles.is-status")).toBeNull();
+			expect(ask()!.classList.contains("is-danger")).toBe(false);
+			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Won’t do “Call the doctor”?");
+			expect(panel().firstElementChild).toBe(ask());
+			askButton(".tc-menu-ask-confirm").click();
+			expect(actions.setStatus).toHaveBeenCalledWith("cancelled");
+			expect(closing()).toBe(true);
+		});
+
+		it("gives the menu back as it was on Cancel", () => {
+			const actions = open(item());
+			row("Delete").click();
+			askButton(".tc-menu-ask-cancel").click();
+			expect(ask()).toBeNull();
+			expect(row("Delete")).toBeDefined();
+			expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
+			expect(actions.remove).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+		});
+
+		it("asks one thing at a time: Won’t do while Delete asks gives the Delete row back", () => {
+			open(item());
+			row("Delete").click();
+			wontDo().click();
+			expect(panel().querySelectorAll(".tc-menu-ask")).toHaveLength(1);
+			expect(row("Delete")).toBeDefined();
+		});
+
+		it("confirms on Enter, as the button does", () => {
+			const actions = open(item());
+			row("Delete").click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			expect(actions.remove).toHaveBeenCalled();
+		});
+
+		it("leaves Enter alone while nothing asks", () => {
+			const actions = open(item());
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			expect(actions.remove).not.toHaveBeenCalled();
+			expect(actions.setStatus).not.toHaveBeenCalled();
+		});
+	});
+
 	it("shows the start of the description over the copy, drawn by the surface, with the menu", () => {
 		open(item({ description: "- note" }));
 		const peek = document.querySelector(".tc-desc-peek");
