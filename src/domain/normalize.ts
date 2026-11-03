@@ -7,22 +7,29 @@ function isOpen(task: Task): boolean {
 	return task.status === "todo" || task.status === "inProgress";
 }
 
+/** A rewritten line can show another date or slot that was text before it: the rule runs again until nothing changes. */
+function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocument): TaskDocument {
+	for (;;) {
+		const next = pass(doc);
+		if (next === doc) return doc;
+		doc = next;
+	}
+}
+
 /** A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. */
 function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
-	for (;;) {
-		const entry = doc.allTasks().find((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
-		if (!entry?.task.slot) return doc;
-		doc = doc.replace(entry, { ...entry.task, slot: null, dueDate: entry.task.dueDate ?? boundary.dayOfSlot(entry.task.slot) });
-	}
+	return untilSettled(doc, (d) => {
+		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
+		return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot!) }] as const));
+	});
 }
 
 /** What was left undone stays for today: a past due date becomes today's. */
 function pastDatesToToday(doc: TaskDocument, today: LocalDate): TaskDocument {
-	for (;;) {
-		const entry = doc.allTasks().find((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
-		if (!entry) return doc;
-		doc = doc.replace(entry, { ...entry.task, dueDate: today });
-	}
+	return untilSettled(doc, (d) => {
+		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
+		return d.replaceAll(past.map((e) => [e, { ...e.task, dueDate: today }] as const));
+	});
 }
 
 /** The candidates go to the start of the tasks outside any section of `target`, in file order: the last one goes first. */
@@ -33,8 +40,11 @@ function gatherAtStart(
 ): TaskDocument {
 	if (!doc.hasSection(target)) return doc;
 	for (;;) {
-		const entry = [...doc.allTasks()].reverse().find((e) => e.section !== target && candidate(e));
-		if (!entry) return doc;
+		const all = doc.allTasks();
+		let i = all.length - 1;
+		while (i >= 0 && (all[i].section === target || !candidate(all[i]))) i--;
+		if (i < 0) return doc;
+		const entry = all[i];
 		doc = doc.moveEntry(entry, target, "start");
 	}
 }
@@ -149,5 +159,6 @@ function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT, presets: readonly string[] = []): TaskDocument {
 	const listed = dueToNow(datedOutOfUndated(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
 	const result = normalizeGroups(listed, today);
+	if (result === doc) return doc;
 	return result.serialize() === doc.serialize() ? doc : result;
 }

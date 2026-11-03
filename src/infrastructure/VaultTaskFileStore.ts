@@ -11,7 +11,7 @@ export class VaultTaskFileStore implements TaskFileStore {
 
 	async read(): Promise<string | null> {
 		const file = this.file();
-		return file ? this.app.vault.read(file) : null;
+		return file ? this.app.vault.cachedRead(file) : null;
 	}
 
 	async write(fn: (text: string) => string): Promise<void> {
