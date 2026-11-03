@@ -264,9 +264,9 @@ export class ListDrop implements DropTarget {
 		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
 	}
 
-	/** A card carried along: the gap is picked by its top edge, read as a finger half a card above it, so the line stands in the nearest gap above the card, never under it. */
+	/** A card carried along: the gap is picked by its middle, so it goes into the gap its middle is nearest to. */
 	private cardY(y: number, drag: DragPayload, layout: Layout): number {
-		return y - drag.grabPx - layout.size.height / 2;
+		return y - drag.grabPx + layout.size.height / 2;
 	}
 
 	/** A card carried along: the level its left edge stands at. */

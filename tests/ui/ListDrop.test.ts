@@ -60,8 +60,8 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 
 const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17, grabX: 17 });
 
-/** The finger holding a carried card by 17 px so that the card picks the place at `y`: half a card above its top edge. */
-const picking = (y: number) => y + 17 + shownCardSize().height / 2;
+/** The finger holding a carried card by 17 px so that the card picks the place at `y`: its middle. */
+const picking = (y: number) => y + 17 - shownCardSize().height / 2;
 
 describe("ListDrop", () => {
 	it("draws a header per group once a list has a section", () => {
@@ -232,7 +232,7 @@ describe("ListDrop", () => {
 		});
 	});
 
-	describe("a task carried: its place waits dashed, the cards stay, the drop line shows where it goes; the card's top edge picks the place", () => {
+	describe("a task carried: its place waits dashed, the cards stay, the drop line shows where it goes; the card's middle picks the place", () => {
 		const STEP = 37;
 		const four = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null), item("now", 3, "D", null)];
 		const lineEl = () => document.querySelector<HTMLElement>(".tc-list-drop");
@@ -278,13 +278,18 @@ describe("ListDrop", () => {
 			expect(drop.landing()?.top).toBe(100 + 3 * STEP - STEP);
 		});
 
-		it("the line stands in the gap over the carried card, never under it", () => {
+		it("the line stands in the gap nearest the carried card's middle", () => {
 			const { list, drop, from } = lifted(1);
 			const finger = 100 + 3 * STEP + 30;
+			const middle = finger - 17 + shownCardSize().height / 2;
 			drop.preview(27, finger, from);
 			const lineTop = Number(/, ([\d.]+)px, 0\)$/.exec(lineEl()!.style.transform)![1]) + list.el.getBoundingClientRect().top;
-			expect(lineTop).toBeLessThanOrEqual(finger - 17);
-			expect(lineTop).toBeGreaterThan(finger - 17 - STEP);
+			expect(Math.abs(lineTop - middle)).toBeLessThanOrEqual(STEP / 2);
+		});
+
+		it("the card's middle over a card's upper half puts it before that card", () => {
+			const { drop, items, from } = lifted(0);
+			expect(drop.drop(27, picking(100 + 2 * STEP + 8), from)).toEqual({ kind: "listBefore", before: items[2].key, column: "left" });
 		});
 
 		it("never goes into a card: over its middle the line stands in the gap nearer, the card unlit", () => {
