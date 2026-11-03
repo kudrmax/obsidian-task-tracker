@@ -93,6 +93,15 @@ describe("placePanel", () => {
 		expect([...panel.children]).toEqual(groups);
 	});
 
+	it("keeps the groups over the card as they stood when told to, though the panel would now fit whole under it", () => {
+		const panel = growingPanel([130, 130, 120, 110]);
+		const upper = document.createElement("div");
+		const groups = [...panel.children];
+		placePanel(panel, new DOMRect(10, 100, 300, 40), 12, PHONE, upper, 1);
+		expect([...upper.children]).toEqual(groups.slice(0, 1));
+		expect([...panel.children]).toEqual(groups.slice(1));
+	});
+
 	it("scrolls a panel that fits nowhere and can't split, and drops the scroll once it fits", () => {
 		const panel = growingPanel([800]);
 		placePanel(panel, new DOMRect(10, 400, 300, 40), 12, PHONE);

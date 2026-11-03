@@ -70,6 +70,35 @@ export function tileGroup(parent: HTMLElement, kind: string, rows: readonly (rea
 	return group;
 }
 
+export interface MenuAskSpec {
+	/** What the question does to the task, its name after it: «Delete “…”?». */
+	readonly verb: string;
+	readonly title: string;
+	readonly confirm: string;
+	readonly icon: MenuIconName;
+	/** The confirming button in the danger colour: what it does can't be taken back. */
+	readonly danger: boolean;
+	readonly onCancel: () => void;
+	readonly onConfirm: () => void;
+}
+
+/** A question in place of what asked it: one line naming the task, a too long name fading out, then Cancel and the confirming button. */
+export function askGroup(parent: HTMLElement, spec: MenuAskSpec): HTMLElement {
+	const group = el(parent, "div", "tc-menu-ask");
+	group.classList.toggle("is-danger", spec.danger);
+	const question = el(group, "div", "tc-menu-ask-question");
+	el(question, "span", "", `${spec.verb} “`);
+	el(question, "span", "tc-menu-ask-title", spec.title);
+	el(question, "span", "", "”?");
+	const buttons = el(group, "div", "tc-menu-ask-buttons");
+	el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-cancel", "Cancel").addEventListener("click", spec.onCancel);
+	const confirm = el(buttons, "button", "tc-menu-ask-btn tc-menu-ask-confirm");
+	confirm.appendChild(menuIcon(spec.icon));
+	confirm.appendChild(document.createTextNode(spec.confirm));
+	confirm.addEventListener("click", spec.onConfirm);
+	return group;
+}
+
 /** A group of rows; groups stand apart by a thick dark line. */
 export function menuGroup(parent: HTMLElement, rows: readonly MenuRowSpec[]): HTMLElement {
 	const group = el(parent, "div", "tc-menu-group");
@@ -86,9 +115,9 @@ export function backRow(parent: HTMLElement, title: string, onBack: () => void):
 	return row;
 }
 
-/** A tile's label too long for its tile is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
+/** A tile's label too long for its tile, and a question's task name too long for its line, is marked, all in one layout once the panel is built: tiles mark no label as they are made. */
 export function markLongLabels(panel: HTMLElement): void {
-	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label")];
+	const labels = [...panel.querySelectorAll<HTMLElement>(".tc-menu-tile-label, .tc-menu-ask-title")];
 	const long = labels.map((label) => label.scrollWidth > label.clientWidth);
 	labels.forEach((label, i) => label.classList.toggle("is-long", long[i]));
 }
@@ -143,9 +172,10 @@ function keepWithin(part: HTMLElement, space: number): void {
  * Puts a fixed panel under `anchor`, aligned to its left edge, or over it when it would not fit below; the sheet adds the
  * gap. When it fits on neither side and there is an `upper` part to take them, its first groups stand over the anchor
  * and the rest under it (see groupsAbove); a part that still doesn't fit scrolls. The anchor never moves. The panel is
- * measured by its layout, not its box on screen: it is placed while it is still shrunk to grow in.
+ * measured by its layout, not its box on screen: it is placed while it is still shrunk to grow in. `keepAbove` keeps that
+ * many groups over the anchor, as they stood, for a panel that changes in place and must not jump.
  */
-export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom, upper?: HTMLElement): void {
+export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, room: MenuRoom, upper?: HTMLElement, keepAbove?: number): void {
 	if (upper) {
 		panel.prepend(...upper.children);
 		upper.hidden = true;
@@ -159,7 +189,7 @@ export function placePanel(panel: HTMLElement, anchor: DOMRect, gap: number, roo
 	const above = anchor.top - gap - room.top;
 	const below = room.bottom - anchor.bottom - gap;
 	const groups = [...panel.children] as HTMLElement[];
-	const count = groupsAbove(groups.slice(1).map((group) => group.offsetTop), panel.offsetHeight, above, below, upper !== undefined && groups.length > 1);
+	const count = keepAbove ?? groupsAbove(groups.slice(1).map((group) => group.offsetTop), panel.offsetHeight, above, below, upper !== undefined && groups.length > 1);
 	const overY = px(room.windowHeight - anchor.top);
 	panel.style.left = left;
 	if (count > 0 && count < groups.length && upper) {

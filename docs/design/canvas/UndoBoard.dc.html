@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Отмена: итог</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 6448px; height: 3330px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 40px; font-size: 44px; line-height: 52px; font-weight: 700; color: #1C1C1E;">Отмена — плашка снизу и кнопка в углу</div>
+<div style="position: absolute; left: 64px; top: 100px; width: 4200px; font-size: 18px; line-height: 24px; color: #6B6A65;">Плашка собрана из панели меню и строки окна источников, кнопка отмены — по форме плюса. Пунктиром обведено новое</div>
+<sc-for list="{{labels}}" as="l" hint-placeholder-count="4">
+<div style="position: absolute; left: {{l.left}}px; top: {{l.top}}px; font-size: 26px; line-height: 32px; font-weight: 700; color: #1C1C1E;">{{l.text}}</div>
+</sc-for>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="20">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: {{p.w}}px; height: {{p.h}}px; overflow: hidden; border-radius: {{p.r}}px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="UndoKit" platform="{{p.p}}" state="{{p.s}}" theme="{{p.t}}" hint-size="{{p.w}}px,{{p.h}}px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: {{p.capW}}px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":6448,"height":3330}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { labels: [{"left": 64, "top": 150, "text": "Телефон, тёмная"}, {"left": 2294, "top": 150, "text": "Телефон, светлая"}, {"left": 64, "top": 1244, "text": "Mac, тёмная"}, {"left": 64, "top": 2354, "text": "Mac, светлая"}], frames: [{"phone": true, "desk": false, "p": "phone", "s": "idle", "t": "dark", "left": 64, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Нечего отменять", "cap": "Кнопка в левом углу нижнего ряда, напротив плюса, погашена. Плашки нет", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "done", "t": "dark", "left": 494, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Сразу после Done", "cap": "Задача ушла из списка. Плашка над нижним рядом: что сделано, какая задача, Undo. Полоса внизу тает, пока плашка видна", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "delete", "t": "dark", "left": 924, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Сразу после Delete", "cap": "Та же плашка, корзина красная. Undo возвращает задачу на её место", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "undone", "t": "dark", "left": 1354, "top": 196, "w": 390, "h": 844, "r": 34, "name": "После отмены", "cap": "Задача вернулась в список. Плашка говорит куда, в ней теперь Redo", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "conflict", "t": "dark", "left": 1784, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Отмена невозможна", "cap": "Файл задач правили с тех пор. Оранжевый знак и причина, кнопки в плашке нет", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "idle", "t": "light", "left": 2294, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Нечего отменять", "cap": "То же в светлой теме", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "done", "t": "light", "left": 2724, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Сразу после Done", "cap": "То же в светлой теме", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "delete", "t": "light", "left": 3154, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Сразу после Delete", "cap": "То же в светлой теме", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "undone", "t": "light", "left": 3584, "top": 196, "w": 390, "h": 844, "r": 34, "name": "После отмены", "cap": "То же в светлой теме", "capTop": 1060, "capW": 390}, {"phone": true, "desk": false, "p": "phone", "s": "conflict", "t": "light", "left": 4014, "top": 196, "w": 390, "h": 844, "r": 34, "name": "Отмена невозможна", "cap": "То же в светлой теме", "capTop": 1060, "capW": 390}, {"phone": false, "desk": true, "p": "desk", "s": "idle", "t": "dark", "left": 64, "top": 1290, "w": 1200, "h": 800, "r": 10, "name": "Нечего отменять", "cap": "Кнопка отмены в левом углу нижнего ряда, над строкой состояния Obsidian. Плашки нет", "capTop": 2106, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "done", "t": "dark", "left": 1344, "top": 1290, "w": 1200, "h": 800, "r": 10, "name": "Сразу после Done", "cap": "Компактная плашка шириной с панель меню, над кнопкой отмены, по её левому краю. Длинное название гаснет к краю. Рядом с Undo его клавиши", "capTop": 2106, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "delete", "t": "dark", "left": 2624, "top": 1290, "w": 1200, "h": 800, "r": 10, "name": "Сразу после Delete", "cap": "Та же плашка после удаления. Кнопка в углу, ⌘Z и Undo в плашке отменяют одинаково", "capTop": 2106, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "undone", "t": "dark", "left": 3904, "top": 1290, "w": 1200, "h": 800, "r": 10, "name": "После отмены", "cap": "После отмены в плашке Redo и его клавиши", "capTop": 2106, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "conflict", "t": "dark", "left": 5184, "top": 1290, "w": 1200, "h": 800, "r": 10, "name": "Отмена невозможна", "cap": "Отказ: оранжевый знак и причина, кнопки и клавиш нет", "capTop": 2106, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "idle", "t": "light", "left": 64, "top": 2400, "w": 1200, "h": 800, "r": 10, "name": "Нечего отменять", "cap": "То же в светлой теме", "capTop": 3216, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "done", "t": "light", "left": 1344, "top": 2400, "w": 1200, "h": 800, "r": 10, "name": "Сразу после Done", "cap": "То же в светлой теме", "capTop": 3216, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "delete", "t": "light", "left": 2624, "top": 2400, "w": 1200, "h": 800, "r": 10, "name": "Сразу после Delete", "cap": "То же в светлой теме", "capTop": 3216, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "undone", "t": "light", "left": 3904, "top": 2400, "w": 1200, "h": 800, "r": 10, "name": "После отмены", "cap": "То же в светлой теме", "capTop": 3216, "capW": 760}, {"phone": false, "desk": true, "p": "desk", "s": "conflict", "t": "light", "left": 5184, "top": 2400, "w": 1200, "h": 800, "r": 10, "name": "Отмена невозможна", "cap": "То же в светлой теме", "capTop": 3216, "capW": 760}] };
+  }
+}
+</script>
+</body>
+</html>
