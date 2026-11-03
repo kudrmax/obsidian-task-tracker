@@ -1,8 +1,10 @@
-import { ItemView, MarkdownView, Notice, type WorkspaceLeaf } from "obsidian";
+import { ItemView, MarkdownView, Notice, Platform, type WorkspaceLeaf } from "obsidian";
 import { type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type PriorityLevel, type RightMode, sameLevels, usableLevels, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
+import { BulkController, type BulkSections } from "./BulkController";
+import type { PickedCard } from "./TaskSelection";
 import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
 import { addDays } from "./dates";
@@ -108,6 +110,8 @@ export class TaskCalendarView extends ItemView {
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
+	/** Picking several list cards on the desktop, and what is done to them all. */
+	private readonly bulk: BulkController;
 	private leftDrop: ListDrop | null = null;
 	private timelineDrop: TimelineDrop | null = null;
 	private zoomFrame = 0;
@@ -148,15 +152,32 @@ export class TaskCalendarView extends ItemView {
 			onTap: (head, list, group) => this.showGroupMenu(head, list, group),
 			onMove: (list, group, place) => this.act(() => this.deps.tasks.moveGroup(list, group, place)),
 		});
+		this.bulk = new BulkController({
+			root: this.contentEl,
+			apply: (steps) => this.act(() => this.deps.tasks.applyAll(steps)),
+			today: () => this.today(),
+			day: () => this.selectedDate,
+			levels: () => usableLevels(this.settings.priorities),
+			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
+			sections: (cards) => this.bulkSections(cards),
+			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
+			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
+		});
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
 			day: () => this.selectedDate,
 			step: () => stepFor(this.hourPx),
 			timeline: () => this.timeline,
-			targets: () => this.shownDrops(),
+			targets: (drag) => [...this.bulk.targets(drag), ...this.shownDrops()],
+			pick: (_item, card, e, how) => {
+				const picked = this.bulk.selection.cardOf(card);
+				return picked !== undefined && this.bulk.pick(picked, e, how);
+			},
+			carried: (item) => this.bulk.carried(item),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
+				if (!active) this.bulk.settled();
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
@@ -348,6 +369,8 @@ export class TaskCalendarView extends ItemView {
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
+		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
+		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
 		this.arbiter.onIdle(() => this.renderPending && this.render());
 		this.registerEvent(this.app.workspace.on("css-change", () => this.render()));
 		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
@@ -535,6 +558,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A list's card: its gestures. */
 	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+		this.bulk.attach({ item, card, column, subtree });
 		this.drag.attachCard(card, item, column, subtree);
 	}
 
@@ -542,6 +566,8 @@ export class TaskCalendarView extends ItemView {
 	private applyDrop(drag: TaskDragPayload, result: DropResult): Promise<void> {
 		const key = drag.item.key;
 		const tasks = this.deps.tasks;
+		const steps = this.bulk.dropSteps(drag, result);
+		if (steps) return this.act(() => tasks.applyAll(steps));
 		return this.act(() => {
 			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
 			if (result.kind === "clearSlot") return tasks.clearSlot(key);
@@ -626,6 +652,22 @@ export class TaskCalendarView extends ItemView {
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
 		if (!column || !this.sectionsOf(column)) return null;
 		return { column, list, date: list === "soon" ? item.dueDate : null };
+	}
+
+	/** The picked tasks' sections: only when they all stand in one list whose column shows its sections. */
+	private bulkSections(cards: readonly PickedCard[]): BulkSections | null {
+		const homes = cards.map((card) => this.sectionsHome(card.item, card.card));
+		const first = homes[0];
+		if (!first || homes.some((home) => !home || home.list !== first.list)) return null;
+		const list = first.list;
+		return {
+			choice: this.sectionChoice(list, cards[0].item),
+			shared: cards.every((card) => card.item.group === cards[0].item.group),
+			change: (card, name) => {
+				const date = (card.item.key.section === "soon" ? card.item.dueDate : null) ?? undefined;
+				return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
+			},
+		};
 	}
 
 	/** The sections the list has, in its order, then the presets it lacks, in the settings' order; the No section name is none of them. */
