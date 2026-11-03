@@ -4,7 +4,7 @@ import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
 import { clear, el, px } from "../dom";
 import { icon } from "../icons";
-import { type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
+import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
 import { menuIcon } from "../menu/menuIcons";
 import { MonthPicker } from "../menu/MonthPicker";
 import { tileRows } from "../menu/TaskMenu";
@@ -262,7 +262,7 @@ export class QuickBar {
 			const on = level.prefix === current?.prefix;
 			return { label: level.prefix, icon: "priority", color: level.color, on, onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
 		});
-		tileGroup(parent, "is-priority", tileRows(specs));
+		markLongLabels(tileGroup(parent, "is-priority", tileRows(specs)));
 	}
 
 	private renderPlaces(parent: HTMLElement): void {
@@ -282,7 +282,7 @@ export class QuickBar {
 				this.renderPanel();
 			},
 		};
-		tileGroup(parent, "is-place", [[...fixed, date]]);
+		markLongLabels(tileGroup(parent, "is-place", [[...fixed, date]]));
 	}
 
 	private renderPicker(parent: HTMLElement): void {

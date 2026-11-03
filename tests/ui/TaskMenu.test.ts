@@ -244,6 +244,35 @@ describe("the menu", () => {
 		expect(actions.openDescription).toHaveBeenCalledWith(true);
 	});
 
+	it("takes a second click right after the opening one as a double click, even on the panel: no tile is picked, the menu goes and renames", () => {
+		vi.useFakeTimers();
+		const actions = open(item());
+		const menu = TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
+		const rename = vi.fn();
+		menu.onClickedAgain(rename);
+		vi.advanceTimersByTime(100);
+		const tile = [...document.querySelectorAll<HTMLElement>(".tc-panel .tc-menu-tile")].pop()!;
+		tile.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+		tile.click();
+		expect(rename).toHaveBeenCalled();
+		expect(actions.postpone).not.toHaveBeenCalled();
+		expect([...document.querySelectorAll(".tc-backdrop")].pop()?.classList.contains("is-closing")).toBe(true);
+		vi.useRealTimers();
+	});
+
+	it("leaves a later click on the copy to the copy, the menu open", () => {
+		vi.useFakeTimers();
+		const menu = TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: open(item()) });
+		const rename = vi.fn();
+		menu.onClickedAgain(rename);
+		vi.advanceTimersByTime(300);
+		const copies = document.querySelectorAll(".tc-lifted");
+		copies[copies.length - 1].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+		expect(rename).not.toHaveBeenCalled();
+		expect([...document.querySelectorAll(".tc-backdrop")].pop()?.classList.contains("is-closing")).toBe(false);
+		vi.useRealTimers();
+	});
+
 	it("leaves out the priority group when no level is set up", () => {
 		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: [], actions });
