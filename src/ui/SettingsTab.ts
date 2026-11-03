@@ -153,7 +153,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.display();
 	}
 
-	/** The cards' size, the same in the list, on New task and in a stack on the timeline: they change as the slider moves. */
+	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
 	private cardsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Cards").setHeading();
 		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.settings.cardHeight, (cardHeight) => ({ cardHeight }));

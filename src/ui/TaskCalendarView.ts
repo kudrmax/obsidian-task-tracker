@@ -38,7 +38,7 @@ import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
 import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./listWidth";
 import { clear, el, px } from "./dom";
-import { NewTaskButton } from "./NewTaskButton";
+import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -137,10 +137,6 @@ export class TaskCalendarView extends ItemView {
 	private zoomFrame = 0;
 	/** The pinch settled on the whole day: it keeps fitting as the timeline's height changes. */
 	private wholeDay = false;
-	private newTask: NewTaskButton | null = null;
-	private newSoon: NewTaskButton | null = null;
-	private newInbox: NewTaskButton | null = null;
-	private newBacklog: NewTaskButton | null = null;
 	private readonly groupDrag: GroupDrag;
 	/** A card sent to New section, waiting at the end of its list for the section's name. */
 	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
@@ -338,14 +334,10 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx) => this.settleZoom(hourPx),
 		});
-		this.newTask = new NewTaskButton(this.leftEl, "now", () => this.quick?.openAtEnd("left"));
-		this.newSoon = new NewTaskButton(this.soonEl, "soon", () => this.quick?.openAtEnd("soon"));
-		this.newInbox = new NewTaskButton(inboxPane, "inbox", () => this.quick?.openAtEnd("inbox"));
-		this.newBacklog = new NewTaskButton(backlogPane, "backlog", () => this.quick?.openAtEnd("backlog"));
-		this.newTask.pressOnDoubleClick(this.leftEl, this.list.el);
-		this.newSoon.pressOnDoubleClick(this.soonEl, this.soonList.el);
-		this.newInbox.pressOnDoubleClick(inboxPane, this.inboxList.el);
-		this.newBacklog.pressOnDoubleClick(backlogPane, this.backlogList.el);
+		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("left"));
+		new FreeRoomDoubleClick([this.soonEl, this.soonList.el], () => this.quick?.openAtEnd("soon"));
+		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
+		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.mode(),
 			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
@@ -364,7 +356,6 @@ export class TaskCalendarView extends ItemView {
 			list: (column) => this.listOf(column),
 			timeline: () => this.timeline,
 			task: (key) => findTask(this.data.day?.slotted ?? [], key),
-			newTasks: () => [this.newTask, this.newSoon, this.newInbox, this.newBacklog].filter((button) => button !== null),
 			dropTargets: () => {
 				const shown = this.shownDrops();
 				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
@@ -941,7 +932,7 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
-		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.newTask || !this.newSoon || !this.newInbox || !this.newBacklog || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
+		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
 		if (parts.has("frame")) {
 			this.fitListWidth();
 			this.headers.render();
@@ -953,7 +944,7 @@ export class TaskCalendarView extends ItemView {
 			this.list.render();
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl, this.newTask.el, this.newSoon.el, this.newInbox.el, this.newBacklog.el]) part.style.display = missing ? "none" : "";
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl]) part.style.display = missing ? "none" : "";
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
