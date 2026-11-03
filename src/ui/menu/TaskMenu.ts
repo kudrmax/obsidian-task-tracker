@@ -133,6 +133,8 @@ export class TaskMenu {
 	private readonly overlay: Overlay;
 	private readonly lifted: HTMLElement;
 	private readonly panel: HTMLElement;
+	/** The first groups of a panel too tall for either side of the card, over the card; hidden while the panel is whole. */
+	private readonly upper: HTMLElement;
 	private readonly anchor: DOMRect;
 	private readonly copy: DOMRect;
 	/** A timeline card's subtasks under its copy; none until there are some or a new one is typed there. */
@@ -162,6 +164,8 @@ export class TaskMenu {
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.upper = this.overlay.add(el(null, "div", "tc-panel is-task"));
+		this.upper.hidden = true;
 		this.peek = this.peekOf(context);
 		this.showMenu();
 		this.overlay.show();
@@ -240,6 +244,7 @@ export class TaskMenu {
 	/** Typing in the menu: the panel and the start of the description go, the field and its bar take their place. */
 	private giveToField(): void {
 		this.panel.hidden = true;
+		this.upper.hidden = true;
 		this.peek?.hide();
 	}
 
@@ -295,11 +300,11 @@ export class TaskMenu {
 		});
 	}
 
-	/** A menu too tall for either side of the card raises the card with it, as far as the panel needs. */
+	/** A menu split over and under the card leaves no side to the description, which then stays away. */
 	private place(): void {
-		this.raise(placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom()));
-		const anchor = this.anchor;
-		this.peek?.place(new DOMRect(anchor.x, anchor.y - this.raisedBy, anchor.width, anchor.height), this.panel);
+		placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom(), this.upper);
+		if (this.upper.hidden) this.peek?.place(this.anchor, this.panel);
+		else this.peek?.hide();
 	}
 
 	private pick(action: () => void | Promise<void>): () => void {
@@ -311,6 +316,7 @@ export class TaskMenu {
 
 	private showMenu(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.remove("is-picker");
 		const { item, actions, levels } = this.context;
 		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
@@ -346,6 +352,7 @@ export class TaskMenu {
 		const sections = this.context.sections;
 		if (!sections) return;
 		clear(this.panel);
+		clear(this.upper);
 		const { item, actions } = this.context;
 		backRow(this.panel, "Section", () => this.showMenu());
 		const choose = (name: GroupName) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)));
@@ -358,6 +365,7 @@ export class TaskMenu {
 
 	private showPicker(): void {
 		clear(this.panel);
+		clear(this.upper);
 		this.panel.classList.add("is-picker");
 		const { item, actions, today } = this.context;
 		new MonthPicker(el(this.panel, "div"), {
