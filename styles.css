@@ -44,14 +44,12 @@ body {
 	--tc-accent: #9580FF;
 	/* Typed text selected in a section's name field: the accent, see-through. */
 	--tc-selection: rgba(149, 128, 255, 0.38);
+	/* The layers under a lifted section or a dragged task with subtasks. */
 	--tc-stack-1: #242426;
 	--tc-stack-2: #1C1C1E;
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
-	/* The layers of a dragged task's subtasks, under it. */
-	--tc-float-under-1: #242426;
-	--tc-float-under-2: #1C1C1E;
 	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
@@ -225,7 +223,7 @@ body {
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
 	--tc-section-gap: var(--tc-space-10);
-	/* A lifted section: two layers of its cards under its header, each a step further down and in. */
+	/* A lifted section, and a dragged task with subtasks: two layers under it, each a step further down and narrower by a step on each side. */
 	--tc-stack-step-x: 7px;
 	--tc-stack-step-y: 6px;
 	--tc-fade-block: 16px;
@@ -246,9 +244,6 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
-	/* Each layer under a dragged task with subtasks hangs this much lower, and this much narrower on each side. */
-	--tc-stack-step: 6px;
-	--tc-stack-inset: 7px;
 	/* The number of tasks carried at once, on the top card's upper right corner, standing out of it by `out`. */
 	--tc-float-count-size: 22px;
 	--tc-float-count-out: 9px;
@@ -269,13 +264,11 @@ body {
 	--tc-menu-rise: 8px;
 	--tc-menu-gap: var(--tc-space-12);
 	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
-	--tc-desc-peek-w: 300px;
 	--tc-desc-peek-max: 214px;
 	--tc-desc-peek-pad: 10px 14px 10px 6px;
 	--tc-desc-fade: 40px;
 	--tc-font-desc-peek: var(--tc-font-body);
 	--tc-panel-w: 250px;
-	--tc-picker-w: 300px;
 	--tc-menu-w: 300px;
 	--tc-row: 44px;
 	/* The bulk menu's first line: how many tasks it acts on. */
@@ -290,7 +283,6 @@ body {
 	--tc-menu-tile-icon: var(--tc-icon-xl);
 	--tc-font-menu-tile: var(--tc-font-caption);
 	--tc-weight-menu-tile: 500;
-	--tc-menu-tile-ring: 1.5px;
 	/* A label too long for its tile fades out from here to the tile's edge padding. */
 	--tc-fade-tile: 20px;
 	/* The cross on the task's own level: a tap there takes the priority off. */
@@ -325,7 +317,6 @@ body {
 	--tc-bar-flag: var(--tc-icon-l);
 	--tc-stroke-bar: var(--tc-stroke-1-9);
 	--tc-place-w: 108px;
-	--tc-place-h: 36px;
 	--tc-place-on-bg: rgba(255, 255, 255, 0.16);
 	--tc-place-icon: var(--tc-icon-m);
 	/*
@@ -374,8 +365,6 @@ body {
 	--tc-timeline-top: 34px;
 	--tc-allday-h: 22px;
 	--tc-allday-gap: 4px;
-	--tc-allday-left: 28px;
-	--tc-allday-right: 4px;
 	--tc-allday-extra-rows: 0;
 	/* The black under the all-day rows, which the timeline scrolls beneath. */
 	--tc-allday-backing: 26px;
@@ -554,8 +543,6 @@ body.theme-light {
 	--tc-float-month: #8E8E93;
 	--tc-float-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
 	--tc-plus-shadow: 0 6px 16px rgba(138, 92, 245, 0.35);
-	--tc-float-under-1: #F7F7F9;
-	--tc-float-under-2: #EFEFF2;
 	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
 	--tc-ink-dim: #C7C7CC;
@@ -805,7 +792,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* The all-day events over the timeline, in their calendar's colour. */
 .tc-allday-backing { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-allday-backing); background: var(--tc-bg); z-index: var(--tc-layer-backing); }
-.tc-allday { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-allday-right) var(--tc-allday-gap) var(--tc-allday-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
+.tc-allday { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-items-right) var(--tc-allday-gap) var(--tc-items-left); height: var(--tc-allday-h); border-radius: var(--tc-radius-event); background: var(--tc-event-bg); display: flex; overflow: hidden; }
 .tc-event-bar { width: var(--tc-bar); flex-shrink: 0; background: var(--tc-event-bar); }
 .tc-allday-title { flex: 1; min-width: 0; padding: 0 var(--tc-space-6); display: flex; align-items: center; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-event-text); white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); mask-image: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent); }
 
@@ -867,8 +854,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon { color: var(--tc-float-month); }
 .tc-float-under { position: fixed; left: 0; top: 0; height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-float-shadow); z-index: var(--tc-layer-float); pointer-events: none; will-change: transform; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
-.tc-float-under.is-1 { margin: var(--tc-stack-step) 0 0 var(--tc-stack-inset); background: var(--tc-float-under-1); }
-.tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step)) 0 0 calc(2 * var(--tc-stack-inset)); background: var(--tc-float-under-2); }
+.tc-float-under.is-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }
+.tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step-y)) 0 0 calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
 .tc-float-under.is-gone { opacity: 0; }
 /* The whole title of a pressed card: the card stretches to the right on its one line; the copy over the menu then wraps a title still too long, its first line where it stood. */
 .is-stretched .tc-card-title, .is-whole .tc-card-title { -webkit-mask-image: none; mask-image: none; }
@@ -920,7 +907,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancelling .tc-float-count { opacity: var(--tc-float-cancel-opacity); }
 .tc-block-card[data-priority] .tc-block-meta { color: var(--tc-priority-meta); }
 .tc-priority-dot { flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); }
-.tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-desc-peek-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; overflow: hidden; padding: var(--tc-desc-peek-pad); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-desc-peek { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-menu-w); max-height: var(--tc-desc-peek-max); box-sizing: border-box; overflow: hidden; padding: var(--tc-desc-peek-pad); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-panel-shadow); cursor: pointer; opacity: 0; transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-desc-peek.is-under { transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
 .tc-desc-peek.is-shown { opacity: 1; transform: none; }
 .tc-desc-peek.is-closing { transition-duration: var(--tc-duration-collapse); }
@@ -936,7 +923,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel.is-scrolled { overflow-y: auto; overscroll-behavior: contain; }
 .tc-safe-probe { position: fixed; visibility: hidden; pointer-events: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 .tc-panel.is-closing { transition-duration: var(--tc-duration-collapse); }
-.tc-panel.is-picker { width: var(--tc-picker-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
+.tc-panel.is-picker { width: var(--tc-menu-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
 .tc-panel button, .tc-picker button, .tc-quick-bar button { margin: 0; border: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-family: var(--tc-font-inherit); height: auto; justify-content: flex-start; cursor: pointer; -webkit-tap-highlight-color: transparent; appearance: none; border-radius: 0; corner-shape: var(--tc-corner); }
 .tc-menu-group + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
 .tc-panel .tc-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
@@ -952,7 +939,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-tiles + .tc-menu-tiles, .tc-menu-tiles + .tc-menu-group { border-top: var(--tc-group-gap) solid var(--tc-gap-ink); }
 .tc-menu-tile-row { display: flex; gap: var(--tc-space-6); }
 .tc-panel .tc-menu-tile { position: relative; flex: 1; min-width: 0; height: var(--tc-menu-tile-h); padding: 0; border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-6); }
-.tc-panel .tc-menu-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-priority-ink); }
+.tc-panel .tc-menu-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
 .tc-menu-tile > svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-menu-tile[data-priority] > svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
 /* The quick moves: their icons in the accent, as the drop zones' were. */
@@ -1010,7 +997,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-bar-flag svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
 .tc-quick-bar .tc-bar-flag.is-set { color: var(--tc-priority-ink); }
 .tc-bar-flag.is-set svg { fill: var(--tc-priority-ink); }
-.tc-quick-bar .tc-bar-place { width: var(--tc-place-w); height: var(--tc-place-h); flex-shrink: 0; box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); }
+.tc-quick-bar .tc-bar-place { width: var(--tc-place-w); height: var(--tc-bar-btn-h); flex-shrink: 0; box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); display: flex; align-items: center; justify-content: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); color: var(--tc-text); }
 .tc-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
 .tc-bar-place-label { overflow: hidden; white-space: nowrap; }
 .task-calendar .tc-quick-bar .tc-bar-place, .task-calendar .tc-quick-bar .tc-bar-place:hover, .task-calendar .tc-quick-bar .tc-bar-place:active { background: var(--tc-track-bg); }
@@ -1020,7 +1007,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* Over a menu's blur the bar leaves the view for the page, at the view's bottom, which the code gives it. */
 .tc-quick-bar.is-over { position: fixed; right: auto; z-index: var(--tc-layer-panel); font-family: var(--tc-font-ui); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-quick-bar.is-over button { padding: 0; }
-.tc-quick-bar .tc-quick-panel { position: absolute; z-index: var(--tc-layer-bar-panel); top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-picker-w); transform-origin: 100% 100%; }
+.tc-quick-bar .tc-quick-panel { position: absolute; z-index: var(--tc-layer-bar-panel); top: auto; right: var(--tc-space-8); bottom: calc(100% + var(--tc-space-8)); width: var(--tc-menu-w); transform-origin: 100% 100%; }
 /* On the desktop: a capsule next to the field, placed by the code; its panels hang from its right end, away from the field. */
 .tc-quick-bar.is-desk { right: auto; bottom: auto; height: var(--tc-seg); padding: var(--tc-seg-pad); gap: 0; }
 .tc-quick-bar.is-desk.is-away { visibility: hidden; }
@@ -1041,7 +1028,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-bar.is-desk .tc-quick-panel.is-below { top: calc(100% + var(--tc-desk-bar-gap)); bottom: auto; transform-origin: 100% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }
 .tc-quick-bar.is-desk .tc-quick-panel.is-above { bottom: calc(100% + var(--tc-desk-bar-gap)); }
 .tc-quick-bar.is-desk .tc-quick-panel.is-shown { transform: none; }
-.tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-menu-tile-ring) var(--tc-ink-strong); }
+.tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
 
 
 /* A description's own screen over the whole view: the bar with Close and Edit, or Cancel and Save, the title, the text. */

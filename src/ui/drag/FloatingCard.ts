@@ -52,7 +52,7 @@ export class FloatingCard implements Float {
 
 	/** Each layer is narrower by the inset on both sides than the one over it. */
 	private fitStack(): void {
-		const inset = tokenPx(this.el, "--tc-stack-inset");
+		const inset = tokenPx(this.el, "--tc-stack-step-x");
 		this.stack.forEach((layer, i) => (layer.style.width = px(this.el.offsetWidth - 2 * inset * (STACK_DEPTH - i))));
 	}
 
