@@ -287,20 +287,29 @@ describe("ListDrop", () => {
 			expect(lineTop).toBeGreaterThan(finger - 17 - STEP);
 		});
 
-		it("over the middle of a card lights it and hides the line", () => {
+		it("never goes into a card: over its middle the line stands in the gap nearer, the card unlit", () => {
 			const { list, drop, items, from } = lifted(1);
-			drop.preview(27, picking(100 + 3 * STEP + 2), from);
-			drop.preview(27, picking(100 + 2 * STEP + 17), from);
-			expect(list.elements[2].classList.contains("is-target")).toBe(true);
-			expect(lineEl()).toBeNull();
-			expect(drop.drop(27, picking(100 + 2 * STEP + 17), from)).toEqual({ kind: "nest", parent: items[2].key, before: null });
+			drop.preview(27, picking(100 + 2 * STEP + 26), from);
+			expect(list.elements.some((node) => node.classList.contains("is-target"))).toBe(false);
+			expect(lineEl()).not.toBeNull();
+			expect(drop.drop(27, picking(100 + 2 * STEP + 26), from)).toEqual({ kind: "listBefore", before: items[3].key, column: "left" });
 		});
 
-		it("at its own place a level deeper, the line runs through the dashed place's middle", () => {
-			const { drop, items, from } = lifted(1);
+		it("at its own place a level deeper, the line stands in the gap over the dashed place, never on it", () => {
+			const { list, drop, items, from } = lifted(1);
 			drop.preview(27 + 20, picking(100 + STEP + 17), from);
-			expect(lineEl()?.style.transform).toBe(`translate3d(20px, ${STEP + 35 / 2}px, 0)`);
+			const [, right, y] = /translate3d\(([\d.]+)px, ([\d.]+)px, 0\)/.exec(lineEl()!.style.transform)!.map(Number);
+			expect(y).toBe(STEP - (STEP - 35) / 2);
+			expect(right - parseFloat(list.el.querySelector<HTMLElement>(".tc-list-drop-bar")!.style.width)).toBe(20);
 			expect(drop.drop(27 + 20, picking(100 + STEP + 17), from)).toEqual({ kind: "nest", parent: items[0].key, before: null });
+		});
+
+		it("a new level moves the line's left end only: its right end, where it hangs, stays", () => {
+			const { drop, from } = lifted(1);
+			drop.preview(27, picking(100 + 3 * STEP + 2), from);
+			const before = lineEl()!.style.transform;
+			drop.preview(27 + 20, picking(100 + 3 * STEP + 2), from);
+			expect(lineEl()!.style.transform).toBe(before);
 		});
 
 		it("the finger gone from the list takes the line away; the dashed place waits", () => {
@@ -380,13 +389,13 @@ describe("ListDrop", () => {
 			let scrollTop = 0;
 			Object.defineProperty(list.el, "scrollTop", { configurable: true, get: () => scrollTop, set: (v: number) => (scrollTop = v) });
 			const y = 100 + 5 * 40 + 17;
+			const lineY = () => Number(/, ([\d.]+)px, 0\)$/.exec(document.querySelector<HTMLElement>(".tc-list-drop")!.style.transform)![1]);
 			drop.preview(27, picking(y), from);
-			expect(list.elements[5].classList.contains("is-target")).toBe(true);
+			const before = lineY();
 			offsetReads.clear();
 			scrollTop = 40;
 			drop.preview(27, picking(y), from);
-			expect(list.elements[6].classList.contains("is-target")).toBe(true);
-			expect(list.elements[5].classList.contains("is-target")).toBe(false);
+			expect(lineY()).toBe(before + 40);
 			expect(offsetReads.size).toBe(0);
 		});
 

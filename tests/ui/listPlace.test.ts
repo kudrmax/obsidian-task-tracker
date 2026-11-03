@@ -19,18 +19,17 @@ describe("placeAt", () => {
 
 	describe("hysteresis: the place shown keeps a finger that trembles at its edge", () => {
 		const HOLD = 6;
-		/** B's top edge of the into zone, with the gap before A10 open: B stands a step lower. */
-		const intoEdge = 4 * STEP + STEP + H * 0.2;
+		/** B's middle, with the gap before A10 open: B stands a step lower. The edge between the gaps before and after B. */
+		const edge = 4 * STEP + STEP + H / 2;
 
 		it("keeps the place shown until the finger is more than the hysteresis past its edge", () => {
-			expect(placeAt(CARDS, intoEdge + 2, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual(gap(4));
-			expect(placeAt(CARDS, intoEdge + HOLD + 1, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual({ kind: "into", index: 4 });
+			expect(placeAt(CARDS, edge + 2, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual(gap(4));
+			expect(placeAt(CARDS, edge + HOLD + 1, 0, STEP, gap(4), [], gap(4), HOLD)).toEqual(gap(5));
 		});
 
-		it("holds a card the finger is over the same way when it slips off its middle", () => {
-			const into = { kind: "into", index: 4 } as const;
-			expect(placeAt(CARDS, intoEdge - 2, 0, STEP, gap(4), [], into, HOLD)).toEqual(into);
-			expect(placeAt(CARDS, intoEdge - HOLD - 1, 0, STEP, gap(4), [], into, HOLD)).toEqual(gap(4));
+		it("holds the gap past a card the same way when the finger comes back over its middle", () => {
+			expect(placeAt(CARDS, edge - 2, 0, STEP, gap(4), [], gap(5), HOLD)).toEqual(gap(5));
+			expect(placeAt(CARDS, edge - HOLD - 1, 0, STEP, gap(4), [], gap(5), HOLD)).toEqual(gap(4));
 		});
 
 		it("lets a fast finger, far past the edge, take the new place at once", () => {
@@ -45,13 +44,13 @@ describe("placeAt", () => {
 
 		it("sees one place in two that differ only by level", () => {
 			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 2, level: 1, group: null })).toBe(true);
-			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "into", index: 2 })).toBe(false);
+			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 3, level: 0, group: null })).toBe(false);
 		});
 	});
 
-	it("measures the cards against the room left open while the finger is over a card, so the card does not slide from under it", () => {
-		const into = { kind: "into", index: 4 } as const;
-		expect(placeAt(CARDS, 4 * STEP + STEP + H / 2, 0, STEP, gap(4), [], into)).toEqual(into);
+	it("never goes into a card: over one the finger picks the gap nearer it, against the room left open", () => {
+		expect(placeAt(CARDS, 4 * STEP + STEP + H * 0.4, 0, STEP, gap(4))).toEqual(gap(4));
+		expect(placeAt(CARDS, 4 * STEP + STEP + H * 0.6, 0, STEP, gap(4))).toEqual(gap(5));
 	});
 
 	it("opens the gap where the finger is, at the level its edge picks within what the neighbours allow", () => {
@@ -67,13 +66,6 @@ describe("placeAt", () => {
 		expect(placeAt(CARDS, lifted + 3, 0, STEP, gap(4))).toEqual(gap(4));
 		expect(placeAt(CARDS, lifted - 3, 0, STEP, gap(4))).toEqual(gap(4));
 	});
-
-	it("takes a card in over its middle as it stands, and opens the gap on past it", () => {
-		expect(placeAt(CARDS, 4 * STEP + H / 2 + STEP, 0, STEP, gap(4))).toEqual({ kind: "into", index: 4 });
-		expect(placeAt(CARDS, 4 * STEP + H * 0.3, 0, STEP, { kind: "into", index: 4 })).toEqual({ kind: "into", index: 4 });
-		expect(placeAt(CARDS, 4 * STEP + H * 0.9, 0, STEP, { kind: "into", index: 4 })).toEqual(gap(5));
-		expect(placeAt(CARDS, 4 * STEP + H * 0.1, 0, STEP, { kind: "into", index: 4 })).toEqual(gap(4));
-	});
 });
 
 describe("resultOf", () => {
@@ -86,7 +78,6 @@ describe("resultOf", () => {
 		expect(resultOf(CARDS, { kind: "gap", index: 2, level: 1, group: null })).toEqual({ kind: "subtask", parent: key(0), before: key(0, [1]) });
 		expect(resultOf(CARDS, { kind: "gap", index: 4, level: 1, group: null })).toEqual({ kind: "subtask", parent: key(0), before: null });
 		expect(resultOf(CARDS, { kind: "gap", index: 4, level: 3, group: null })).toEqual({ kind: "subtask", parent: key(0, [1, 0]), before: null });
-		expect(resultOf(CARDS, { kind: "into", index: 4 })).toEqual({ kind: "subtask", parent: key(1), before: null });
 	});
 });
 

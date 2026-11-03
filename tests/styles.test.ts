@@ -235,6 +235,14 @@ describe("styles.css keeps to its design system", () => {
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
 
+	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
+		const lifted = sheet.rules
+			.filter((d) => d.property === "z-index" && d.value === "var(--tc-layer-bar-button)")
+			.flatMap((d) => d.selector.split(",").map((part) => part.trim()));
+		expect(sheet.rules.some((d) => d.selector.includes(".tc-quick-bar.is-desk .tc-bar-shifts") && d.property === "display" && d.value === "contents")).toBe(true);
+		expect(lifted).toContain(".tc-bar-shift");
+	});
+
 	it("no rule reads an element's inline style", () => {
 		const offenders = sheet.rules.filter((d) => /\[style\s*[~|^$*]?=/.test(d.selector)).map(where);
 		expect(offenders).toEqual([]);

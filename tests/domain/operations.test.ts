@@ -513,7 +513,7 @@ describe("groups", () => {
 
 	it("renameGroup to an existing name merges; to the ungrouped name empties into No section", () => {
 		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
-		expect(normalize(renameGroup(d, "now", "Y", "X", "No section"), T).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(normalize(renameGroup(d, "now", "Y", "X", "No section"), T).serialize()).toBe("## Now\n\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
 		expect(renameGroup(d, "now", "Y", "No section", "No section").serialize()).toBe("## Now\n- [ ] A\n- [ ] C\n### X\n- [ ] B\n");
 		expect(renameGroup(d, "now", "Y", "  ", "No section")).toBe(d);
 		expect(renameGroup(d, "now", "Y", "Вечер", "No section").serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\n### Вечер\n- [ ] C\n");
@@ -528,14 +528,14 @@ describe("groups", () => {
 		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
 		expect(moveGroupTo(d, "now", "Y", { before: "X" }).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n### X\n- [ ] B\n");
 		const down = normalize(moveGroupTo(d, "now", null, "end"), T);
-		expect(down.serialize()).toBe("## Now\n### X\n- [ ] B\n### Y\n- [ ] C\n### No section\n- [ ] A\n");
-		expect(normalize(moveGroupTo(down, "now", null, { before: "X" }), T).serialize()).toBe(d.serialize());
-		expect(normalize(moveGroupTo(d, "now", "Y", { before: null }), T).serialize()).toBe("## Now\n### Y\n- [ ] C\n### No section\n- [ ] A\n### X\n- [ ] B\n");
+		expect(down.serialize()).toBe("## Now\n\n### X\n- [ ] B\n### Y\n- [ ] C\n### No section\n- [ ] A\n");
+		expect(normalize(moveGroupTo(down, "now", null, { before: "X" }), T).serialize()).toBe("## Now\n\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(normalize(moveGroupTo(d, "now", "Y", { before: null }), T).serialize()).toBe("## Now\n\n### Y\n- [ ] C\n### No section\n- [ ] A\n### X\n- [ ] B\n");
 	});
 
 	it("moving the last task out of a group removes the group and, with only No section left, its heading", () => {
 		const d = parseG("## Now\n### X\n- [ ] B\n### No section\n- [ ] A\n");
-		expect(normalize(moveToGroup(d, d.tasks("now")[0], "now", null, null, T), T).serialize()).toBe("## Now\n- [ ] A\n- [ ] B 📅 2026-10-30\n");
+		expect(normalize(moveToGroup(d, d.tasks("now")[0], "now", null, null, T), T).serialize()).toBe("## Now\n\n- [ ] A\n- [ ] B 📅 2026-10-30\n");
 	});
 
 	it("groupIndex finds a section by name, No section always, a missing one never", () => {
@@ -571,7 +571,7 @@ describe("groups spaced by blank lines, as written by hand", () => {
 
 	it("an emptied last section goes with the blank line before it", () => {
 		const d = parseG("## Now\n- [ ] U\n\n### A\n- [ ] a 📅 2026-11-03\n\n## Soon\n");
-		expect(normalize(d, T).serialize()).toBe("## Now\n- [ ] U\n- [ ] a 📅 2026-11-03\n\n## Soon\n");
+		expect(normalize(d, T).serialize()).toBe("## Now\n\n- [ ] U\n- [ ] a 📅 2026-11-03\n\n## Soon\n");
 	});
 
 	it("a top block of blank lines only: a section put above No section moves alone, no other section dissolves", () => {

@@ -158,7 +158,7 @@ function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
 /** `presets`: the section presets in their order, for a section rule 4 has to make in Now. */
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT, presets: readonly string[] = []): TaskDocument {
 	const listed = dueToNow(datedOutOfUndated(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
-	const result = normalizeGroups(listed, today);
+	const result = normalizeGroups(listed, today).spacedHeadings();
 	if (result === doc) return doc;
 	return result.serialize() === doc.serialize() ? doc : result;
 }
