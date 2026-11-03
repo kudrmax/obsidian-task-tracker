@@ -235,6 +235,17 @@ describe("styles.css keeps to its design system", () => {
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
 
+	it("stands the bar on the phone keyboard as it slides in, Obsidian's toolbar hidden while a task is typed", () => {
+		expect(sheet.tokens.get("--tc-bar-bottom")).toContain("var(--tc-keyboard-lift)");
+		expect(sheet.tokens.get("--tc-bar-bottom")).not.toContain("toolbar");
+		const lift = sheet.rules.find((d) => d.property === "--tc-keyboard-lift");
+		expect(lift?.selector).toBe("body.is-mobile.keyboard-animating");
+		expect(lift?.value).toBe("var(--tc-keyboard-room)");
+		const hidden = sheet.rules.find((d) => d.selector.includes(".mobile-toolbar") && d.property === "display");
+		expect(hidden?.selector).toBe("body.is-mobile:has(.task-calendar.is-entering) :is(.mobile-toolbar, .mobile-toolbar-spacer)");
+		expect(hidden?.value).toBe("none");
+	});
+
 	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
 		const lifted = sheet.rules
 			.filter((d) => d.property === "z-index" && d.value === "var(--tc-layer-bar-button)")

@@ -31,8 +31,6 @@ export interface BarAnchor {
 	readonly room: DOMRect;
 	/** The view's box while the field is over a menu's blur, which lies over the whole page; null otherwise. */
 	readonly overMenu: DOMRect | null;
-	/** The top of Obsidian's toolbar over the phone keyboard, which the bar stands over; null while it does not show. */
-	readonly toolbarTop: number | null;
 }
 
 export interface QuickBarDeps {
@@ -71,7 +69,6 @@ const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string
 	{ kind: "now", label: "Now" },
 ];
 
-const TOOLBAR_ROOM = "--tc-toolbar-room";
 const GLIDING = "is-gliding";
 
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
@@ -160,11 +157,10 @@ export class QuickBar {
 
 	/**
 	 * The bar stands by the field `anchor` gives, after the field moved, grew or scrolled or the view changed. Over a menu's
-	 * blur it leaves the view for the page, above the blur; null puts it back last in the view. With `glide`, the phone
-	 * keyboard has started to slide: the bar slides from where it is drawn to its new place with it.
+	 * blur it leaves the view for the page, above the blur; null puts it back last in the view. A `rise`: the phone keyboard
+	 * has started to slide in, and the bar, already standing on it, rises that far with it from where it stood.
 	 */
-	follow(anchor: BarAnchor | null, glide = false): void {
-		const from = glide && !this.bar.hidden && !this.deps.desktop() ? this.bar.getBoundingClientRect().top : null;
+	follow(anchor: BarAnchor | null, rise = 0): void {
 		this.anchor = anchor;
 		const over = anchor?.overMenu ?? null;
 		// Leaving the view for the page, or coming back, restyles the bar: that is done before it is measured.
@@ -172,23 +168,19 @@ export class QuickBar {
 		const holder = over ? this.bar.ownerDocument.body : this.parent;
 		if (this.bar.parentElement !== holder) holder.appendChild(this.bar);
 		const desktop = this.deps.desktop();
-		const toolbarTop = desktop ? null : (anchor?.toolbarTop ?? null);
 		const desk = desktop ? anchor : null;
-		const view = toolbarTop !== null || (desk && !desk.overMenu) ? this.parent.getBoundingClientRect() : null;
+		const view = desk && !desk.overMenu ? this.parent.getBoundingClientRect() : null;
 		const spot = desk && this.standBy(desk);
-		this.standOverToolbar(toolbarTop === null || !view ? 0 : Math.max(0, view.bottom - toolbarTop));
 		this.desk = spot ? { room: spot.room, side: spot.side } : null;
 		reclass(this.bar, "is-away", desk !== null && spot === null);
 		const origin = desk?.overMenu || !view ? { left: 0, top: 0 } : view;
 		this.position(spot ? { left: px(spot.left - origin.left), top: px(spot.top - origin.top) } : over && !desktop ? this.dock(over) : {});
 		if (spot) this.sidePanel();
-		if (from !== null) this.glideFrom(from);
+		if (rise >= 1 && !this.bar.hidden && !desktop) this.glideFrom(rise);
 	}
 
-	/** Drawn at `top` again, the bar slides to where it now stands in the keyboard's time and easing. */
-	private glideFrom(top: number): void {
-		const by = top - restingTop(this.bar);
-		if (Math.abs(by) < 1) return;
+	/** Drawn `by` lower again, the bar slides to where it now stands in the keyboard's time and easing. */
+	private glideFrom(by: number): void {
 		this.stopGlide();
 		this.bar.style.transform = `translateY(${px(by)})`;
 		this.bar.getBoundingClientRect(); // draws it where it was, so the slide starts there
@@ -199,15 +191,6 @@ export class QuickBar {
 	private stopGlide(): void {
 		this.bar.classList.remove(GLIDING);
 		this.bar.style.removeProperty("transform");
-	}
-
-	/**
-	 * On the phone the bar stands over Obsidian's toolbar, wherever the keyboard and the toolbar put it: the page learns how
-	 * far the toolbar's top is over the view's bottom, and the styles keep the cards' gap above it. The page, since the
-	 * tokens built on it are worked out on its body.
-	 */
-	private standOverToolbar(room: number): void {
-		restyle(this.parent.ownerDocument.body, TOOLBAR_ROOM, room > 0 ? px(room) : null);
 	}
 
 	private position(position: BarPosition): void {
