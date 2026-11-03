@@ -145,7 +145,10 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		render();
 	};
 	const holdWrites = () => (holdFresh = true);
-	const releaseWrites = () => freshWaiting.splice(0).forEach((resolve) => resolve());
+	const releaseWrites = () => {
+		holdFresh = false;
+		freshWaiting.splice(0).forEach((resolve) => resolve());
+	};
 	return { controller, root, plus, field, titleFields, lists, timeline, slotted, render, rowsOf, type, press, buttons, created, edits, beginNew, drops, turned, setMode, switchDay, holdWrites, releaseWrites, day: () => day };
 }
 
