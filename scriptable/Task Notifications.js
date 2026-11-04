@@ -300,6 +300,14 @@ function decoded(href) {
   }
 }
 
+// src/domain/Task.ts
+var STATUS_CHARS = {
+  todo: " ",
+  inProgress: "/",
+  done: "x",
+  cancelled: "-"
+};
+
 // src/domain/Repeat.ts
 var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
@@ -438,14 +446,6 @@ var Repeat = class _Repeat {
   }
 };
 
-// src/domain/Task.ts
-var STATUS_CHARS = {
-  todo: " ",
-  inProgress: "/",
-  done: "x",
-  cancelled: "-"
-};
-
 // src/domain/TaskLine.ts
 var DAY_MINUTES2 = 1440;
 var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
@@ -563,7 +563,7 @@ function indentWidth(line) {
   return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
 }
 function sameLines(a, b) {
   return a.length === b.length && a.every((line, i) => line === b[i]);
@@ -740,6 +740,18 @@ var TaskDocument = class _TaskDocument {
     const indent = descriptionIndent(entry) ?? this.childIndent(entry);
     const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
     return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
+  }
+  /** The entry's child lines with every subtask `[ ]` and without its due date and slot; description lines as they are. */
+  freshChildren(entry) {
+    const first = this.spanOf(entry).line + 1;
+    const children = [...entry.task.children];
+    const open = (sub) => {
+      const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null };
+      children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
+      sub.subtasks.forEach(open);
+    };
+    entry.subtasks.forEach(open);
+    return children;
   }
   /** A new subtask of `parent`, right before its subtask `before` or last. */
   insertUnder(parent, task, before = null) {

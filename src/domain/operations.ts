@@ -1,6 +1,7 @@
 import type { EndList, GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
 import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
+import { Repeat, type RepeatRule } from "./Repeat";
 import { STATUS_CHARS, type GroupName, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
@@ -8,6 +9,11 @@ const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
 	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, repeat: null, priority: null, children: [], ...patch };
+}
+
+/** The day a task is set for: its due date, else its slot's day. */
+export function dayOf(task: Task, boundary: DayBoundary): LocalDate | null {
+	return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
 }
 
 /** The lists whose tasks have neither a due date nor a slot: Inbox, not sorted yet, and Backlog, put off to some day. */
@@ -76,6 +82,29 @@ export function createAtTime(
 
 export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatus): TaskDocument {
 	return patch(doc, entry, { status, statusChar: STATUS_CHARS[status] });
+}
+
+/** A schedule of every few units counts from `date`; any other rule as it is. */
+function anchoredRepeat(rule: RepeatRule, date: LocalDate): Repeat {
+	return Repeat.of(rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule);
+}
+
+/**
+ * Spec §3.5: sets or replaces the rule; a schedule on an undated task gives it `first(today)` and anchors there; on a dated
+ * task anchors at its due date, else its slot's day. After done leaves an undated task without a date. Null takes the rule away.
+ */
+export function setRepeat(doc: TaskDocument, entry: TaskEntry, rule: RepeatRule | null, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+	if (rule === null) return patch(doc, entry, { repeat: null });
+	const day = dayOf(entry.task, boundary);
+	if (day !== null) return patch(doc, entry, { repeat: anchoredRepeat(rule, day) });
+	const first = anchoredRepeat(rule, today).first(today);
+	if (first === null) return patch(doc, entry, { repeat: Repeat.of(rule) });
+	return patch(doc, entry, { repeat: anchoredRepeat(rule, first), dueDate: first });
+}
+
+/** Spec §3.4 Stop: the field goes, the task is done; no copy. */
+export function stop(doc: TaskDocument, entry: TaskEntry): TaskDocument {
+	return patch(doc, entry, { repeat: null, status: "done", statusChar: STATUS_CHARS.done });
 }
 
 export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate | null): TaskDocument {

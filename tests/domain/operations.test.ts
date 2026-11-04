@@ -25,7 +25,9 @@ import {
 	setDueDate,
 	setPriority,
 	setSlot,
+	setRepeat,
 	setStatus,
+	stop,
 } from "../../src/domain/operations";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { normalize } from "../../src/domain/normalize";
@@ -607,5 +609,62 @@ describe("sections of a later day", () => {
 		expect(moveToGroup(d, d.tasks("now")[1], "soon", "Morning", d.tasks("now")[0], T, "2026-10-31").serialize()).toBe(
 			"## Now\n- [ ] N 📅 2026-10-31\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n- [ ] A 📅 2026-10-31\n",
 		);
+	});
+});
+
+describe("repeat", () => {
+	const R = { ...M, repeat: "🔁" };
+	const parseR = (text: string) => TaskDocument.parse(text, SECTIONS, R);
+	const TODAY = "2026-11-05";
+	const FILE = "## Inbox\n- [ ] Зал\n\n## Now\n- [ ] Отчёт 📅 2026-11-05\n\n## Soon\n- [ ] Врач 📅 2026-11-12\n- [ ] Встреча ⏰ 2026-11-10 09:00\n\n## Done\n";
+	const weekly = (days: (0 | 1 | 2 | 3 | 4 | 5 | 6)[], every = 1) => ({ kind: "schedule" as const, every, unit: "week" as const, days, dayOfMonth: null, from: null });
+	const afterDone = { kind: "afterDone" as const, every: 3, unit: "week" as const, days: [], dayOfMonth: null, from: null };
+
+	it("setRepeat on an undated Inbox task gives it the first day of the schedule", () => {
+		const d = parseR(FILE);
+		const set = setRepeat(d, d.tasks("inbox")[0], weekly([3]), TODAY);
+		expect(set.tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-05 🔁 every week on Thu");
+		expect(normalize(set, TODAY).tasks("now").map((e) => e.task.text)).toEqual(["Зал", "Отчёт"]);
+	});
+
+	it("setRepeat anchors a schedule of every few weeks at the first day", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("inbox")[0], weekly([4], 2), TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-06 🔁 every 2 weeks on Fri from 2026-11-06");
+	});
+
+	it("setRepeat afterDone on an undated task gives no date", () => {
+		const d = parseR(FILE);
+		const set = setRepeat(d, d.tasks("inbox")[0], afterDone, TODAY);
+		expect(set.tasks("inbox")[0].raw).toBe("- [ ] Зал 🔁 every 3 weeks when done");
+		expect(normalize(set, TODAY).tasks("inbox").map((e) => e.task.text)).toEqual(["Зал"]);
+	});
+
+	it("setRepeat on a dated task keeps its date and anchors at it", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("soon")[0], weekly([0], 2), TODAY).tasks("soon")[0].raw).toBe("- [ ] Врач 📅 2026-11-12 🔁 every 2 weeks on Mon from 2026-11-12");
+	});
+
+	it("setRepeat on a task with a slot anchors at the slot's day and adds no date", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("soon")[1], weekly([1], 2), TODAY).tasks("soon")[1].raw).toBe("- [ ] Встреча ⏰ 2026-11-10 09:00 🔁 every 2 weeks on Tue from 2026-11-10");
+	});
+
+	it("setRepeat replaces the rule", () => {
+		const d = parseR("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every week on Mon, Wed, Fri\n");
+		expect(setRepeat(d, d.tasks("soon")[0], afterDone, TODAY).serialize()).toBe("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every 3 weeks when done\n");
+	});
+
+	it("setRepeat null removes the field", () => {
+		const d = parseR("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every week on Mon, Wed, Fri\n");
+		expect(setRepeat(d, d.tasks("soon")[0], null, TODAY).serialize()).toBe("## Soon\n- [ ] Зал 📅 2026-11-06\n");
+	});
+
+	it("stop closes the task without the field, and no copy follows", () => {
+		const d = parseR("## Now\n- [/] Зал 📅 2026-11-05 🔁 every week on Mon, Wed, Fri\n\n## Soon\n\n## Done\n");
+		const stopped = stop(d, d.tasks("now")[0]);
+		expect(stopped.tasks("now")[0].raw).toBe("- [x] Зал 📅 2026-11-05");
+		const normalized = normalize(stopped, TODAY);
+		expect(normalized.tasks("soon")).toEqual([]);
+		expect(normalized.tasks("done").map((e) => e.raw)).toEqual(["- [x] Зал 📅 2026-11-05"]);
 	});
 });
