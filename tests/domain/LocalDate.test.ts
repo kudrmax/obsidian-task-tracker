@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../src/domain/LocalDate";
+import { addDays, addMonths, weekdayOf, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../src/domain/LocalDate";
 
 describe("LocalDate", () => {
 	it("formats the machine's local date", () => {
@@ -33,5 +33,18 @@ describe("LocalDate", () => {
 		expect(parseHHMM("25:00")).toBeNull();
 		expect(parseHHMM("10:60")).toBeNull();
 		expect(parseHHMM("9:05")).toBeNull();
+	});
+
+	it("adds months, clamping to the last day", () => {
+		expect(addMonths("2026-10-31", 1)).toBe("2026-11-30");
+		expect(addMonths("2027-01-31", 1)).toBe("2027-02-28");
+		expect(addMonths("2028-01-31", 1)).toBe("2028-02-29");
+		expect(addMonths("2026-11-15", 2)).toBe("2027-01-15");
+		expect(addMonths("2026-01-15", -2)).toBe("2025-11-15");
+	});
+
+	it("numbers weekdays from Monday", () => {
+		expect(weekdayOf("2026-11-02")).toBe(0);
+		expect(weekdayOf("2026-11-08")).toBe(6);
 	});
 });
