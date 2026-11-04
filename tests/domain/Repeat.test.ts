@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Repeat } from "../../src/domain/Repeat";
+import { Repeat, type RepeatRule } from "../../src/domain/Repeat";
 
 const cases = [
 	"every week on Mon, Wed, Fri",
@@ -34,5 +34,33 @@ describe("Repeat", () => {
 	it("anchoredAt sets from only for N > 1", () => {
 		expect(Repeat.parse("every 2 weeks on Fri from 2026-01-02")!.anchoredAt("2026-11-06").format()).toBe("every 2 weeks on Fri from 2026-11-06");
 		expect(Repeat.parse("every week on Fri")!.anchoredAt("2026-11-06").format()).toBe("every week on Fri");
+	});
+});
+
+describe("Repeat.of", () => {
+	const base = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null } as const;
+	const invalid: [string, Partial<RepeatRule>][] = [
+		["every below 1", { every: 0 }],
+		["a fractional every", { every: 1.5 }],
+		["a week without days", { days: [] }],
+		["unsorted days", { days: [2, 0] }],
+		["duplicate days", { days: [1, 1] }],
+		["a month without a day", { unit: "month", days: [], dayOfMonth: null }],
+		["a month day above 31", { unit: "month", days: [], dayOfMonth: 32 }],
+		["a month day below 1", { unit: "month", days: [], dayOfMonth: 0 }],
+		["days on a day rule", { unit: "day" }],
+		["a day of month on a week rule", { dayOfMonth: 5 }],
+		["from on every 1", { from: "2026-11-06" }],
+		["no from for every 2", { every: 2 }],
+		["from on a when-done rule", { kind: "afterDone", unit: "day", days: [], every: 2, from: "2026-11-06" }],
+		["days on a when-done rule", { kind: "afterDone", unit: "day" }],
+	];
+
+	it.each(invalid)("throws for %s", (_, patch) => {
+		expect(() => Repeat.of({ ...base, ...patch })).toThrow(/repeat/i);
+	});
+
+	it("accepts the rules it parses", () => {
+		for (const text of cases) expect(() => Repeat.of(Repeat.parse(text)!.rule)).not.toThrow();
 	});
 });

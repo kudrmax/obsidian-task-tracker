@@ -15,7 +15,7 @@ const SETTINGS = {
 	tasksFile: "TODOs Tasks.md",
 	sections: { now: "Now", soon: "Soon", done: "Done" },
 	// Префиксы приоритетов: в заголовке уведомления их нет.
-	markers: { dueDate: "📅", slot: "⏰", priorities: ["p1", "p2"] },
+	markers: { dueDate: "📅", slot: "⏰", repeat: "🔁", priorities: ["p1", "p2"] },
 };
 
 
@@ -86,6 +86,24 @@ function isValidLocalDate(s) {
 }
 function addDays(date, n) {
   return formatUtc(new Date(utcMs(date) + n * DAY_MS));
+}
+function addMonths(date, n) {
+  const { year, month, day } = partsOf(date);
+  const index = year * 12 + (month - 1) + n;
+  const y = Math.floor(index / 12);
+  const m = index - y * 12 + 1;
+  return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
+}
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+function weekdayOf(date) {
+  return (new Date(utcMs(date)).getUTCDay() + 6) % 7;
+}
+function partsOf(date) {
+  const m = DATE_RE.exec(date);
+  if (!m) throw new Error(`Not a date: ${date}`);
+  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
 }
 function daysBetween(from, to) {
   return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);
@@ -282,6 +300,144 @@ function decoded(href) {
   }
 }
 
+// src/domain/Repeat.ts
+var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
+var ORDINAL_RE = /^the (\d{1,2})(?:st|nd|rd|th)$/;
+function ordinal(n) {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  const suffix = { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+function monthIndexOf(date) {
+  const { year, month } = partsOf(date);
+  return year * 12 + month - 1;
+}
+function mondayOf(date) {
+  return addDays(date, -weekdayOf(date));
+}
+var Repeat = class _Repeat {
+  constructor(rule) {
+    this.rule = rule;
+  }
+  /** Throws for a rule the grammar cannot write: it would loop in `next` or not read back. */
+  static of(rule) {
+    const problem = _Repeat.problemWith(rule);
+    if (problem) throw new Error(`Invalid repeat rule: ${problem}`);
+    return new _Repeat(rule);
+  }
+  static problemWith({ kind, every, unit, days, dayOfMonth, from }) {
+    if (!Number.isInteger(every) || every < 1) return "every must be a whole number from 1";
+    const wantsDays = kind === "schedule" && unit === "week";
+    const wantsDayOfMonth = kind === "schedule" && unit === "month";
+    if (wantsDays && (days.length === 0 || !days.every((d, i) => Number.isInteger(d) && d >= 0 && d <= 6 && (i === 0 || d > days[i - 1])))) {
+      return "days must be Monday to Sunday, in week order, without repeats";
+    }
+    if (!wantsDays && days.length > 0) return "days belong to a weekly schedule only";
+    if (wantsDayOfMonth && !(dayOfMonth !== null && Number.isInteger(dayOfMonth) && dayOfMonth >= 1 && dayOfMonth <= 31)) {
+      return "the day of the month must be from 1 to 31";
+    }
+    if (!wantsDayOfMonth && dayOfMonth !== null) return "a day of the month belongs to a monthly schedule only";
+    const wantsFrom = kind === "schedule" && every > 1;
+    if (wantsFrom && (from === null || !isValidLocalDate(from))) return "a schedule with every above 1 needs a valid from date";
+    if (!wantsFrom && from !== null) return "from belongs to a schedule with every above 1 only";
+    return null;
+  }
+  static parse(text) {
+    const m = RULE_RE.exec(text.trim());
+    if (!m) return null;
+    const [, count2, unit, plural, whenDone, on, from] = m;
+    const every = count2 === void 0 ? 1 : Number(count2);
+    if (every < 1 || count2 !== void 0 && every === 1) return null;
+    if (from !== void 0 && (every === 1 || !isValidLocalDate(from))) return null;
+    if (plural !== void 0 !== every > 1) return null;
+    const rule = { every, unit, days: [], dayOfMonth: null, from: from ?? null };
+    if (whenDone !== void 0) {
+      return from === void 0 ? new _Repeat({ ...rule, kind: "afterDone" }) : null;
+    }
+    if (every > 1 && from === void 0) return null;
+    if (unit === "day") return on === void 0 ? new _Repeat({ ...rule, kind: "schedule" }) : null;
+    if (on === void 0) return null;
+    if (unit === "week") {
+      const days = _Repeat.parseDays(on);
+      return days ? new _Repeat({ ...rule, kind: "schedule", days }) : null;
+    }
+    const dayOfMonth = Number(ORDINAL_RE.exec(on)?.[1]);
+    if (!(dayOfMonth >= 1 && dayOfMonth <= 31) || on !== `the ${ordinal(dayOfMonth)}`) return null;
+    return new _Repeat({ ...rule, kind: "schedule", dayOfMonth });
+  }
+  static parseDays(text) {
+    const days = text.split(", ").map((name) => WEEKDAY_NAMES.indexOf(name));
+    const inWeekOrder = days.every((d, i) => d >= 0 && (i === 0 || d > days[i - 1]));
+    return inWeekOrder ? days : null;
+  }
+  format() {
+    const { kind, every, unit, days, dayOfMonth, from } = this.rule;
+    const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
+    if (kind === "afterDone") return `${head} when done`;
+    const on = unit === "week" ? ` on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : unit === "month" ? ` on the ${ordinal(dayOfMonth ?? 1)}` : "";
+    return `${head}${on}${from ? ` from ${from}` : ""}`;
+  }
+  /** Spec §3.2: strictly after max(today, taskDate); afterDone: today + N. */
+  next(taskDate, today) {
+    const { kind, every, unit } = this.rule;
+    if (kind === "afterDone") {
+      return unit === "month" ? addMonths(today, every) : addDays(today, every * (unit === "week" ? 7 : 1));
+    }
+    const base = taskDate !== null && taskDate > today ? taskDate : today;
+    return this.firstAfter(this.rule.from ?? taskDate ?? today, base);
+  }
+  /** Spec §3.5: first matching day ≥ today for a schedule, null for afterDone. */
+  first(today) {
+    if (this.rule.kind === "afterDone") return null;
+    return this.firstAfter(this.rule.from ?? today, addDays(today, -1));
+  }
+  /** The same rule anchored: `from` set to `date` when every > 1, else unchanged. */
+  anchoredAt(date) {
+    const { kind, every } = this.rule;
+    return kind === "schedule" && every > 1 ? new _Repeat({ ...this.rule, from: date }) : this;
+  }
+  firstAfter(anchor, base) {
+    switch (this.rule.unit) {
+      case "day":
+        return this.firstDayAfter(anchor, base);
+      case "week":
+        return this.firstWeekdayAfter(anchor, base);
+      case "month":
+        return this.firstMonthDayAfter(anchor, base);
+    }
+  }
+  firstDayAfter(anchor, base) {
+    const { every } = this.rule;
+    const cycles = Math.max(0, Math.floor(daysBetween(anchor, base) / every) + 1);
+    return addDays(anchor, cycles * every);
+  }
+  firstWeekdayAfter(anchor, base) {
+    const { every, days } = this.rule;
+    const anchorWeek = mondayOf(anchor);
+    const weeks = Math.floor(daysBetween(anchorWeek, mondayOf(base)) / 7);
+    for (let cycle = Math.max(0, Math.floor(weeks / every)); ; cycle++) {
+      const week = addDays(anchorWeek, cycle * every * 7);
+      const hit = days.map((d) => addDays(week, d)).find((date) => date > base);
+      if (hit) return hit;
+    }
+  }
+  firstMonthDayAfter(anchor, base) {
+    const { every, dayOfMonth } = this.rule;
+    const anchorMonth = monthIndexOf(anchor);
+    const months = monthIndexOf(base) - anchorMonth;
+    for (let cycle = Math.max(0, Math.floor(months / every)); ; cycle++) {
+      const index = anchorMonth + cycle * every;
+      const year = Math.floor(index / 12);
+      const month = index - year * 12 + 1;
+      const day = Math.min(dayOfMonth ?? 1, daysInMonth(year, month));
+      const date = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (date > base) return date;
+    }
+  }
+};
+
 // src/domain/Task.ts
 var STATUS_CHARS = {
   todo: " ",
@@ -309,11 +465,13 @@ var FieldSlicer = class {
   constructor(markers) {
     this.slotRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.slot)}\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
     this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
+    this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
   }
   slice(body) {
     let text = body;
     let dueDate = null;
     let slot = null;
+    let repeat = null;
     for (; ; ) {
       const slotMatch = slot === null ? this.slotRe.exec(text) : null;
       if (slotMatch) {
@@ -330,9 +488,17 @@ var FieldSlicer = class {
         text = text.slice(0, dueMatch.index);
         continue;
       }
+      const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
+      if (repeatMatch) {
+        const parsed = Repeat.parse(repeatMatch[1]);
+        if (!parsed) break;
+        repeat = parsed;
+        text = text.slice(0, repeatMatch.index);
+        continue;
+      }
       break;
     }
-    return { text: text.trim(), dueDate, slot };
+    return { text: text.trim(), dueDate, slot, repeat };
   }
   slotOf(m) {
     const date = m[1];
@@ -346,7 +512,7 @@ var FieldSlicer = class {
 };
 var slicers = /* @__PURE__ */ new Map();
 function fieldSlicerFor(markers) {
-  const key = `${markers.slot}\0${markers.dueDate}`;
+  const key = `${markers.slot}\0${markers.dueDate}\0${markers.repeat ?? ""}`;
   let slicer = slicers.get(key);
   if (!slicer) {
     slicer = new FieldSlicer(markers);
@@ -378,6 +544,7 @@ function formatTaskLine(parsed, markers) {
     const { date, start, end } = task.slot;
     line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES2 ? end - DAY_MINUTES2 : end)}`}`;
   }
+  if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
   return line;
 }
 

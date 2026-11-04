@@ -37,8 +37,29 @@ function mondayOf(date: LocalDate): LocalDate {
 export class Repeat {
 	private constructor(readonly rule: RepeatRule) {}
 
+	/** Throws for a rule the grammar cannot write: it would loop in `next` or not read back. */
 	static of(rule: RepeatRule): Repeat {
+		const problem = Repeat.problemWith(rule);
+		if (problem) throw new Error(`Invalid repeat rule: ${problem}`);
 		return new Repeat(rule);
+	}
+
+	private static problemWith({ kind, every, unit, days, dayOfMonth, from }: RepeatRule): string | null {
+		if (!Number.isInteger(every) || every < 1) return "every must be a whole number from 1";
+		const wantsDays = kind === "schedule" && unit === "week";
+		const wantsDayOfMonth = kind === "schedule" && unit === "month";
+		if (wantsDays && (days.length === 0 || !days.every((d, i) => Number.isInteger(d) && d >= 0 && d <= 6 && (i === 0 || d > days[i - 1])))) {
+			return "days must be Monday to Sunday, in week order, without repeats";
+		}
+		if (!wantsDays && days.length > 0) return "days belong to a weekly schedule only";
+		if (wantsDayOfMonth && !(dayOfMonth !== null && Number.isInteger(dayOfMonth) && dayOfMonth >= 1 && dayOfMonth <= 31)) {
+			return "the day of the month must be from 1 to 31";
+		}
+		if (!wantsDayOfMonth && dayOfMonth !== null) return "a day of the month belongs to a monthly schedule only";
+		const wantsFrom = kind === "schedule" && every > 1;
+		if (wantsFrom && (from === null || !isValidLocalDate(from))) return "a schedule with every above 1 needs a valid from date";
+		if (!wantsFrom && from !== null) return "from belongs to a schedule with every above 1 only";
+		return null;
 	}
 
 	static parse(text: string): Repeat | null {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TaskDocument } from "../../src/domain/TaskDocument";
 import { fieldSlicerFor, formatTaskLine, parseTaskLine, statusOf, type Markers } from "../../src/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
@@ -105,6 +106,7 @@ describe("formatTaskLine", () => {
 						priority: null,
 						text: "A",
 						dueDate: "2026-11-03",
+						repeat: null,
 						slot: { date: "2026-11-02", start: 600, end: 660 },
 						children: [],
 					},
@@ -117,7 +119,7 @@ describe("formatTaskLine", () => {
 	it("formats a slot ending at midnight", () => {
 		expect(
 			formatTaskLine(
-				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, priority: null, children: [] } },
+				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, repeat: null, priority: null, children: [] } },
 				M,
 			),
 		).toBe("- [x] A ⏰ 2026-11-02 23:00-24:00");
@@ -170,5 +172,68 @@ describe("fieldSlicerFor", () => {
 		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
 		expect(parseTaskLine(line, { dueDate: "@due", slot: "⏰" })!.task.dueDate).toBe("2026-11-03");
 		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
+	});
+});
+
+describe("the repeat field", () => {
+	const R: Markers = { dueDate: "📅", slot: "⏰", repeat: "🔁" };
+	const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
+	const SPEC_LINES = [
+		"- [ ] Зал 📅 2026-11-09 🔁 every week on Mon, Wed, Fri",
+		"- [ ] Созвон 📅 2026-11-06 🔁 every 3 weeks on Fri from 2026-11-06",
+		"- [ ] Оплатить счёт 📅 2026-12-05 🔁 every month on the 5th",
+		"- [ ] Отчёт 📅 2026-12-31 🔁 every 2 months on the 31st from 2026-10-31",
+		"- [ ] Полить цветы 📅 2026-11-07 🔁 every 3 days from 2026-11-04",
+		"- [ ] Постричься 📅 2026-11-25 🔁 every 3 weeks when done",
+	];
+
+	it("parses a repeat after the due date", () => {
+		const p = parseTaskLine("- [ ] Зал 📅 2026-11-09 🔁 every week on Mon, Wed, Fri", R)!;
+		expect(p.task).toMatchObject({ text: "Зал", dueDate: "2026-11-09" });
+		expect(p.task.repeat!.format()).toBe("every week on Mon, Wed, Fri");
+	});
+
+	it("parses a repeat before the due date and keeps the hand-written order", () => {
+		const line = "- [ ] Зал 🔁 every week on Mon 📅 2026-11-09";
+		const p = parseTaskLine(line, R)!;
+		expect(p.task).toMatchObject({ text: "Зал", dueDate: "2026-11-09" });
+		expect(p.task.repeat!.format()).toBe("every week on Mon");
+		expect(TaskDocument.parse(`## Now\n${line}\n`, SECTIONS, R).serialize()).toBe(`## Now\n${line}\n`);
+	});
+
+	it("keeps an unknown repeat as text", () => {
+		const p = parseTaskLine("- [ ] Зал 🔁 weekly", R)!;
+		expect(p.task).toMatchObject({ text: "Зал 🔁 weekly", repeat: null });
+	});
+
+	it("reads a task without the field as not repeating", () => {
+		expect(parseTaskLine("- [ ] Зал 📅 2026-11-09", R)!.task.repeat).toBeNull();
+		expect(parseTaskLine("- [ ] Зал 🔁 every day", { dueDate: "📅", slot: "⏰" })!.task).toMatchObject({ text: "Зал 🔁 every day", repeat: null });
+	});
+
+	it("reads all three fields together", () => {
+		const p = parseTaskLine("- [ ] A ⏰ 2026-11-09 10:00-11:00 🔁 every day 📅 2026-11-09", R)!;
+		expect(p.task).toMatchObject({ text: "A", dueDate: "2026-11-09", slot: { date: "2026-11-09", start: 600, end: 660 } });
+		expect(p.task.repeat!.format()).toBe("every day");
+	});
+
+	it("writes the field last", () => {
+		const p = parseTaskLine("- [ ] Зал 📅 2026-11-09 🔁 every week on Mon", R)!;
+		expect(formatTaskLine(p, R)).toBe("- [ ] Зал 📅 2026-11-09 🔁 every week on Mon");
+		const swapped = parseTaskLine("- [ ] Зал 🔁 every week on Mon 📅 2026-11-09", R)!;
+		expect(formatTaskLine(swapped, R)).toBe("- [ ] Зал 📅 2026-11-09 🔁 every week on Mon");
+		const all = parseTaskLine("- [ ] A 🔁 every day ⏰ 2026-11-09 10:00 📅 2026-11-09", R)!;
+		expect(formatTaskLine(all, R)).toBe("- [ ] A 📅 2026-11-09 ⏰ 2026-11-09 10:00 🔁 every day");
+	});
+
+	it.each(SPEC_LINES)("round-trips %s", (line) => {
+		expect(formatTaskLine(parseTaskLine(line, R)!, R)).toBe(line);
+	});
+
+	it("uses a custom marker", () => {
+		const custom: Markers = { ...R, repeat: "rep:" };
+		const p = parseTaskLine("- [ ] A 📅 2026-11-09 rep: every week on Mon", custom)!;
+		expect(p.task.repeat!.format()).toBe("every week on Mon");
+		expect(formatTaskLine(p, custom)).toBe("- [ ] A 📅 2026-11-09 rep: every week on Mon");
 	});
 });

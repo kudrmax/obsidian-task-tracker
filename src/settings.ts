@@ -64,6 +64,7 @@ export interface TaskCalendarSettings {
 	readonly sections: SectionNames;
 	readonly dueDateMarker: string;
 	readonly slotMarker: string;
+	readonly repeatMarker: string;
 	readonly workCalendarFile: string;
 	/** Calendar titles to take from the work file; empty means all. */
 	readonly workCalendarTitles: readonly string[];
@@ -102,6 +103,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
 	dueDateMarker: "📅",
 	slotMarker: "⏰",
+	repeatMarker: "🔁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },

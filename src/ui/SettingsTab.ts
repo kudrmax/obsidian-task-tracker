@@ -67,6 +67,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		}
 		this.text(el, "Due date marker", "Precedes the due date on a task line.", this.settings.dueDateMarker, (dueDateMarker) => ({ dueDateMarker }));
 		this.text(el, "Slot marker", "Precedes the time slot on a task line.", this.settings.slotMarker, (slotMarker) => ({ slotMarker }));
+		this.text(el, "Repeat marker", "Precedes the repeat rule on a task line.", this.settings.repeatMarker, (repeatMarker) => ({ repeatMarker }));
 	}
 
 	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */

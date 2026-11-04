@@ -1,3 +1,5 @@
+import type { Repeat } from "./Repeat";
+
 /** A calendar day as `YYYY-MM-DD`. Compared as strings. */
 export type LocalDate = string;
 
@@ -28,6 +30,8 @@ export interface Task {
 	readonly text: string;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** The rule after the repeat marker; null for a task that does not repeat. */
+	readonly repeat: Repeat | null;
 	/** The prefix of a priority level, the first word of the line's text; null without one. */
 	readonly priority: string | null;
 	/** Nested lines (deeper indent than the task), raw, in file order. They travel with the task. */

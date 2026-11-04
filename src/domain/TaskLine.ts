@@ -1,3 +1,4 @@
+import { Repeat } from "./Repeat";
 import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
 
 const DAY_MINUTES = 1440;
@@ -6,6 +7,7 @@ import { STATUS_CHARS, type Slot, type Task, type TaskStatus } from "./Task";
 export interface Markers {
 	readonly dueDate: string;
 	readonly slot: string;
+	readonly repeat?: string;
 	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
 	readonly priorities?: readonly string[];
 }
@@ -35,16 +37,19 @@ function escapeRegExp(s: string): string {
 class FieldSlicer {
 	private readonly slotRe: RegExp;
 	private readonly dueRe: RegExp;
+	private readonly repeatRe: RegExp | null;
 
 	constructor(markers: Markers) {
 		this.slotRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.slot)}\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
 		this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
+		this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
 	}
 
-	slice(body: string): { text: string; dueDate: string | null; slot: Slot | null } {
+	slice(body: string): { text: string; dueDate: string | null; slot: Slot | null; repeat: Repeat | null } {
 		let text = body;
 		let dueDate: string | null = null;
 		let slot: Slot | null = null;
+		let repeat: Repeat | null = null;
 		for (;;) {
 			const slotMatch: RegExpExecArray | null = slot === null ? this.slotRe.exec(text) : null;
 			if (slotMatch) {
@@ -61,9 +66,17 @@ class FieldSlicer {
 				text = text.slice(0, dueMatch.index);
 				continue;
 			}
+			const repeatMatch: RegExpExecArray | null = repeat === null ? (this.repeatRe?.exec(text) ?? null) : null;
+			if (repeatMatch) {
+				const parsed = Repeat.parse(repeatMatch[1]);
+				if (!parsed) break;
+				repeat = parsed;
+				text = text.slice(0, repeatMatch.index);
+				continue;
+			}
 			break;
 		}
-		return { text: text.trim(), dueDate, slot };
+		return { text: text.trim(), dueDate, slot, repeat };
 	}
 
 	private slotOf(m: RegExpExecArray): Slot | null {
@@ -81,7 +94,7 @@ const slicers = new Map<string, FieldSlicer>();
 
 /** The slicer for these markers, compiled once per pair of markers. */
 export function fieldSlicerFor(markers: Markers): FieldSlicer {
-	const key = `${markers.slot}\u0000${markers.dueDate}`;
+	const key = `${markers.slot}\u0000${markers.dueDate}\u0000${markers.repeat ?? ""}`;
 	let slicer = slicers.get(key);
 	if (!slicer) {
 		slicer = new FieldSlicer(markers);
@@ -116,5 +129,6 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 		const { date, start, end } = task.slot;
 		line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES ? end - DAY_MINUTES : end)}`}`;
 	}
+	if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
 	return line;
 }

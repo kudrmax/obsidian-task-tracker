@@ -58,6 +58,14 @@ async function loaded(host = new FakeHost()) {
 }
 
 describe("PluginSettings", () => {
+	it("a file without the repeat marker loads it as the default", async () => {
+		const host = new FakeHost();
+		const { repeatMarker: _, ...old } = DEFAULT_SETTINGS;
+		host.file = old;
+		const { settings } = await loaded(host);
+		expect(settings.get().repeatMarker).toBe("🔁");
+	});
+
 	it("a device-only patch neither reads nor writes data.json and tells the listeners once", async () => {
 		const { settings, host, told } = await loaded();
 		await settings.update({ rightMode: "soon" });

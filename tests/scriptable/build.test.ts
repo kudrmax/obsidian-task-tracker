@@ -72,11 +72,11 @@ describe(SCRIPT, () => {
 	});
 
 	it("starts with the plugin's default settings", () => {
-		const { tasksFile, sections, dueDateMarker, slotMarker, priorities } = DEFAULT_SETTINGS;
+		const { tasksFile, sections, dueDateMarker, slotMarker, repeatMarker, priorities } = DEFAULT_SETTINGS;
 		for (const line of [
 			`tasksFile: ${JSON.stringify(tasksFile)},`,
 			`sections: { now: ${JSON.stringify(sections.now)}, soon: ${JSON.stringify(sections.soon)}, done: ${JSON.stringify(sections.done)} },`,
-			`markers: { dueDate: ${JSON.stringify(dueDateMarker)}, slot: ${JSON.stringify(slotMarker)}, priorities: [${priorities.map((l) => JSON.stringify(l.prefix)).join(", ")}] },`,
+			`markers: { dueDate: ${JSON.stringify(dueDateMarker)}, slot: ${JSON.stringify(slotMarker)}, repeat: ${JSON.stringify(repeatMarker)}, priorities: [${priorities.map((l) => JSON.stringify(l.prefix)).join(", ")}] },`,
 		]) {
 			expect(committed).toContain(line);
 		}

@@ -375,9 +375,9 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, repeatMarker, dayStartHour } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, prefixes, dayStartHour]);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, repeatMarker, prefixes, dayStartHour]);
 	}
 
 	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
@@ -385,7 +385,7 @@ export class TaskServiceImpl implements TaskService {
 		return TaskDocument.parse(
 			text,
 			{ inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
+			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, repeat: settings.repeatMarker, priorities: this.levels(settings).map((l) => l.prefix) },
 		);
 	}
 

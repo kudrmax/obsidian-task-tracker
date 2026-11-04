@@ -22,7 +22,7 @@ const SETTINGS = {
 	tasksFile: "TODOs Tasks.md",
 	sections: { now: "Now", soon: "Soon", done: "Done" },
 	// Префиксы приоритетов: в заголовке уведомления их нет.
-	markers: { dueDate: "📅", slot: "⏰", priorities: ["p1", "p2"] },
+	markers: { dueDate: "📅", slot: "⏰", repeat: "🔁", priorities: ["p1", "p2"] },
 };
 `;
 
