@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
+import { UndoHistory } from "../../src/application/UndoHistory";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -746,5 +747,80 @@ describe("one parse per version of the file", () => {
 		const [, , inbox] = await reload(svc);
 		expect(parse).toHaveBeenCalledTimes(1);
 		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
+	});
+});
+
+describe("repeat", () => {
+	const WEEKLY_THU = { kind: "schedule" as const, every: 1, unit: "week" as const, days: [3 as const], dayOfMonth: null, from: null };
+	const GYM = "## Inbox\n\n## Now\n\n- [ ] Gym 📅 2026-10-30 🔁 every week on Fri\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	function withHistory(text: string) {
+		const store = new InMemoryTaskFileStore(text);
+		const history = new UndoHistory(store);
+		return { store, history, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, history) };
+	}
+
+	it("setStatus done on a recurring task is one write and one undo step", async () => {
+		const { store, history, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.setStatus(view.list[0].key, "done");
+		expect(store.writes).toBe(1);
+		expect(store.text).toContain("- [x] Gym 📅 2026-10-30");
+		expect(store.text).toContain("- [ ] Gym 📅 2026-11-06 🔁 every week on Fri");
+		expect(history.canUndo()).toBe(true);
+		await history.undo();
+		expect(store.text).toBe(GYM);
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("stop closes without a copy", async () => {
+		const { store, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.stop(view.list[0].key);
+		expect(store.text).toContain("- [x] Gym 📅 2026-10-30");
+		expect(store.text).not.toContain("🔁");
+		expect(store.text!.match(/Gym/g)).toHaveLength(1);
+	});
+
+	it("setRepeat writes the field", async () => {
+		const { store, svc } = setup(FULL);
+		const view = await svc.dayView(T);
+		await svc.setRepeat(view.list[0].key, WEEKLY_THU);
+		expect(store.text).toContain("- [ ] A 📅 2026-11-05 🔁 every week on Thu");
+	});
+
+	it("setRepeat null removes it", async () => {
+		const { store, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.setRepeat(view.list[0].key, null);
+		expect(store.text).toContain("- [ ] Gym 📅 2026-10-30\n");
+		expect(store.text).not.toContain("🔁");
+	});
+
+	it("createInPlace with a schedule gives the first day", async () => {
+		const { store, svc } = setup(FULL);
+		await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, WEEKLY_THU);
+		const view = await svc.dayView("2026-11-05");
+		expect(view.list.map((i) => i.text)).toContain("Run");
+		expect(store.text).toContain("- [ ] Run 📅 2026-11-05 🔁 every week on Thu");
+	});
+
+	it("create and edit take the draft's rule; undefined leaves it", async () => {
+		const { store, svc } = withHistory(GYM);
+		await svc.create({ text: "Run", placement: { kind: "inbox" }, priority: null, repeat: WEEKLY_THU });
+		expect(store.text).toContain("Run 📅 2026-11-05 🔁 every week on Thu");
+		const view = await svc.dayView(T);
+		await svc.edit(view.list[0].key, { text: "Gym2", placement: { kind: "now" }, priority: null });
+		expect(store.text).toContain("Gym2 📅 2026-10-30 🔁 every week on Fri");
+		const again = await svc.dayView(T);
+		await svc.edit(again.list[0].key, { text: "Gym2", placement: { kind: "now" }, priority: null, repeat: null });
+		expect(store.text).not.toContain("Gym2 📅 2026-10-30 🔁");
+	});
+
+	it("dayView items carry the rule", async () => {
+		const { svc } = setup(GYM);
+		const view = await svc.dayView(T);
+		expect(view.list[0].repeat).toEqual({ kind: "schedule", every: 1, unit: "week", days: [4], dayOfMonth: null, from: null });
+		expect((await svc.dayView(T)).list[0].repeat).not.toBeNull();
 	});
 });

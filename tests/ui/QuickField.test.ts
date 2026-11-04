@@ -172,6 +172,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	repeat: null,
 	priority: null,
 	group: null,
 	subtasks,

@@ -1,7 +1,9 @@
 import type { GroupName, LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { RepeatRule } from "../domain/Repeat";
 import type { PriorityLevel } from "../settings";
 
 export type { GroupName, SectionKey };
+export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
 
@@ -46,6 +48,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** The rule after the task's repeat marker; null for a task that does not repeat. */
+	readonly repeat: RepeatRule | null;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
 	/** The section of its list it sits in; null outside any. */
@@ -99,6 +103,8 @@ export interface TaskDraft {
 	readonly placement: Placement;
 	/** A level's prefix, or none. */
 	readonly priority: string | null;
+	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off; undefined leaves the task's own (a new task has none). */
+	readonly repeat?: RepeatRule | null;
 }
 
 /** One change `applyAll` makes to a task: each kind does what the single call of that name does. */
@@ -145,9 +151,10 @@ export interface TaskService {
 	 * Quick entry. `list`: in section `group` of the list right before `before` (null: at the end of the section), with the
 	 * due-date rules of `moveToGroup`: Now gets today, Inbox none, Soon `date` (the column's day) or none. `subtask`: among
 	 * `parent`'s subtasks before `before` or last; it has no due date of its own. `slot`: as `createAtTime`. `priority` is a
-	 * level's prefix or null; whitespace-only text creates nothing. One write per call.
+	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write.
+	 * One write per call.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<void>;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
@@ -173,6 +180,13 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/**
+	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
+	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.
+	 */
+	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void>;
+	/** Stops a repeating task: the rule goes and the task is done, with no next copy. */
+	stop(key: TaskKey): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes

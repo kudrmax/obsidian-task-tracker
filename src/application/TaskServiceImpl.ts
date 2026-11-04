@@ -15,6 +15,7 @@ import {
 	type GroupPlace,
 	type NewTaskPlace,
 	type Placement,
+	type RepeatRule,
 	type TaskChange,
 	type TaskDraft,
 	type TaskItem,
@@ -110,14 +111,14 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void> {
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<void> {
 		if (this.blank(text)) return;
-		await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary));
+		await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary, repeat));
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
 		if (this.blank(draft.text)) return;
-		await this.mutate((doc, today) => ops.placeTask(doc, null, draft, today, slot));
+		await this.mutate((doc, today, _settings, boundary) => ops.placeTask(doc, null, draft, today, slot, boundary));
 	}
 
 	async createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
@@ -127,7 +128,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
 		if (this.blank(draft.text)) return;
-		await this.mutate((doc, today) => ops.placeTask(doc, this.entryOf(doc, key), draft, today));
+		await this.mutate((doc, today, _settings, boundary) => ops.placeTask(doc, this.entryOf(doc, key), draft, today, undefined, boundary));
 	}
 
 	placementOf(item: TaskItem): Placement {
@@ -147,6 +148,14 @@ export class TaskServiceImpl implements TaskService {
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
+	}
+
+	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
+		await this.mutate((doc, today, _settings, boundary) => ops.setRepeat(doc, this.entryOf(doc, key), rule, today, boundary));
+	}
+
+	async stop(key: TaskKey): Promise<void> {
+		await this.mutate((doc) => ops.stop(doc, this.entryOf(doc, key)));
 	}
 
 	async rename(key: TaskKey, text: string): Promise<void> {

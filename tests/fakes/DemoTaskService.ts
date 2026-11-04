@@ -1,4 +1,4 @@
-import { type DayView, type EndList, type NewTaskPlace, type Placement, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
@@ -9,6 +9,7 @@ interface DemoTask {
 	dueDate: LocalDate | null;
 	slot: Slot | null;
 	priority: string | null;
+	repeat?: RepeatRule | null;
 	description?: string | null;
 }
 
@@ -95,6 +96,7 @@ export class DemoTaskService implements TaskService {
 			status: t.status,
 			dueDate: t.dueDate,
 			slot: t.slot,
+			repeat: t.repeat ?? null,
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			subtasks: [],
 			progress: null,
@@ -162,9 +164,9 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void> {
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat: RepeatRule | null = null): Promise<void> {
 		if (!text.trim()) return;
-		const added = task(text.trim(), { priority });
+		const added = task(text.trim(), { priority, repeat });
 		if (place.kind === "slot") {
 			added.slot = place.slot;
 			this.sections[place.slot.date === this.today() ? "now" : "soon"].push(added);
@@ -204,7 +206,7 @@ export class DemoTaskService implements TaskService {
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
 		if (!draft.text.trim()) return;
-		this.place(task(draft.text.trim(), { slot: slot ?? null, priority: draft.priority }), draft.placement);
+		this.place(task(draft.text.trim(), { slot: slot ?? null, priority: draft.priority, repeat: draft.repeat ?? null }), draft.placement);
 		this.changed();
 	}
 
@@ -212,6 +214,7 @@ export class DemoTaskService implements TaskService {
 		const t = this.find(key);
 		t.text = draft.text.trim() || t.text;
 		t.priority = draft.priority;
+		if (draft.repeat !== undefined) t.repeat = draft.repeat;
 		const current = this.placementOf(this.item(key.section, key.index));
 		if (JSON.stringify(current) !== JSON.stringify(draft.placement)) this.place(this.take(key), draft.placement);
 		this.changed();
@@ -233,6 +236,19 @@ export class DemoTaskService implements TaskService {
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		this.find(key).priority = priority;
+		this.changed();
+	}
+
+	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
+		this.find(key).repeat = rule;
+		this.changed();
+	}
+
+	async stop(key: TaskKey): Promise<void> {
+		const t = this.take(key);
+		t.repeat = null;
+		t.status = "done";
+		this.sections.done.unshift(t);
 		this.changed();
 	}
 

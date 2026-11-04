@@ -9,6 +9,7 @@ const item = (index: number): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	repeat: null,
 	priority: null,
 	group: null,
 	subtasks: [],

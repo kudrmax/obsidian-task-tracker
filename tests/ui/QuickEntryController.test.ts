@@ -23,6 +23,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	repeat: null,
 	priority: null,
 	group,
 	subtasks,
