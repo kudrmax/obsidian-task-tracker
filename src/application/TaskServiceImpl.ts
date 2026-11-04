@@ -336,8 +336,10 @@ export class TaskServiceImpl implements TaskService {
 		};
 	}
 
-	/** One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an action). */
-	/** The write, and the document as normalized before and after it; null when it changed nothing. */
+	/**
+	 * One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an
+	 * action). Gives the document as normalized before and after the write; null when it changed nothing.
+	 */
 	private async mutate(operation: Operation, record = true): Promise<{ readonly before: TaskDocument; readonly after: TaskDocument } | null> {
 		const settings = this.settings.get();
 		const boundary = this.boundary(settings);
