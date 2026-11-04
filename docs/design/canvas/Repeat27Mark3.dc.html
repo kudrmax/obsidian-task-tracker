@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Вариант 3 — без метки на карточке</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 948px; height: 1310px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 820px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Вариант 3 — без метки на карточке</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">Карточка не меняется: что задача повторяется, видно только в её меню, в строке Repeat. Обведены карточки, которые повторяются</div>
+</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="2">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: {{p.w}}px; height: {{p.h}}px; overflow: hidden; border-radius: {{p.r}}px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="Repeat27Phone" view="{{p.view}}" theme="{{p.theme}}" hint-size="{{p.w}}px,{{p.h}}px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: {{p.w}}px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":948,"height":1310}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { frames: [{"view": "mark3", "theme": "dark", "name": "Тёмная", "cap": "Зал и Оплатить счёт повторяются, но выглядят как все. Список остаётся самым тихим", "left": 64, "top": 330, "w": 390, "h": 844, "r": 34, "capTop": 1190}, {"view": "mark3", "theme": "light", "name": "Светлая", "cap": "То же в светлой теме", "left": 494, "top": 330, "w": 390, "h": 844, "r": 34, "capTop": 1190}] };
+  }
+}
+</script>
+</body>
+</html>

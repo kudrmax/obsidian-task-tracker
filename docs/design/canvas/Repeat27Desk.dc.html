@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Десктоп: повтор в капсуле у поля</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2568px; height: 1266px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 2440px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Десктоп: повтор в капсуле у поля</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">В капсуле у поля кнопка повтора встаёт между флажком и местом. Панель повтора та же, что на телефоне (вариант А), висит от капсулы по её правому краю. Пунктиром обведено новое</div>
+</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="2">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: {{p.w}}px; height: {{p.h}}px; overflow: hidden; border-radius: {{p.r}}px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="Repeat27DeskKit" view="{{p.view}}" theme="{{p.theme}}" hint-size="{{p.w}}px,{{p.h}}px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: {{p.w}}px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2568,"height":1266}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { frames: [{"view": "all", "theme": "dark", "name": "Тёмная", "cap": "Повтор задан: кнопка горит акцентом, под курсором — общий слой наведения", "left": 64, "top": 330, "w": 1200, "h": 800, "r": 10, "capTop": 1146}, {"view": "all", "theme": "light", "name": "Светлая", "cap": "То же в светлой теме", "left": 1304, "top": 330, "w": 1200, "h": 800, "r": 10, "capTop": 1146}] };
+  }
+}
+</script>
+</body>
+</html>

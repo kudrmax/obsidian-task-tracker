@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Повторы на десктопе: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<div style="position: absolute; left: 0; top: 0; width: 44px; height: 800px; background: {{c.chrome}}; box-shadow: inset -1px 0 0 {{c.chromeLine}};"></div>
+<div style="position: absolute; left: 14px; top: 14px; display: flex; gap: 8px; flex-direction: column;">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840;"></span>
+</div>
+<div style="position: absolute; left: 44px; top: 0; width: 1156px; height: 40px; background: {{c.bg}}; box-shadow: inset 0 -1px 0 {{c.chromeLine}}; display: flex; align-items: center; padding-left: 72px; box-sizing: border-box; font-size: 13px; color: {{c.text}};">Task Calendar</div>
+
+<div style="position: absolute; left: 64px; top: 58px; font-size: 28px; line-height: 34px; font-weight: 700;">Now</div>
+<div style="position: absolute; left: 470px; top: 58px; display: flex; align-items: center; gap: 12px; font-size: 28px; line-height: 34px; font-weight: 700;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>Today<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg>
+</div>
+
+<div style="position: absolute; left: 431px; top: 104px; width: 2px; height: 672px; border-radius: 1px; background: {{c.line}};"></div>
+
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="12">
+<div style="position: absolute; left: 448px; top: {{h.top}}px; width: 40px; font-size: 12px; line-height: 14px; font-weight: 500; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{h.label}}</div>
+<div style="position: absolute; left: 492px; top: {{h.line}}px; width: 698px; height: 1px; background: {{c.hourLine}};"></div>
+</sc-for>
+<sc-for list="{{events}}" as="ev" hint-placeholder-count="3">
+<div style="position: absolute; left: 496px; top: {{ev.top}}px; width: 690px; height: {{ev.height}}px; box-sizing: border-box; border-radius: 6px; overflow: hidden; background: {{ev.bg}}; color: {{ev.ink}}; display: flex; font-size: 13px; line-height: 16px; font-weight: 600;"><span style="width: 3px; flex-shrink: 0; background: {{ev.bar}};"></span><span style="padding: 4px 8px;">{{ev.title}}</span></div>
+</sc-for>
+<div style="position: absolute; left: 448px; top: {{nowTop}}px; width: 742px; height: 2px; background: {{c.now}};"></div>
+
+<div style="position: absolute; left: 54px; top: 104px; width: 360px; height: 672px; overflow: hidden;">
+<svg width="360" height="900" viewBox="0 0 360 900" style="position: absolute; left: 0; top: 0;" aria-hidden="true"><path d="{{branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 5px; top: 15.5px; width: 4px; height: 4px; border-radius: 50%; background: {{c.muted}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden;">{{r.title}}</div>
+<sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{r.isField}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.width}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; box-shadow: inset 0 0 0 1.5px {{c.accent}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; white-space: nowrap;">
+<sc-if value="{{r.typed}}" hint-placeholder-val="{{false}}"><span>{{r.text}}</span><span style="width: 2px; height: 18px; flex-shrink: 0; margin-left: 1px; background: {{c.accent}}; border-radius: 1px;"></span></sc-if>
+<sc-if value="{{r.empty}}" hint-placeholder-val="{{false}}"><span style="width: 2px; height: 18px; flex-shrink: 0; margin-right: 1px; background: {{c.accent}}; border-radius: 1px;"></span><span style="color: {{c.muted}};">New task</span></sc-if>
+</div>
+</sc-if>
+</sc-for>
+</div>
+
+<div style="position: absolute; left: {{cap.left}}px; top: {{cap.top}}px; height: 32px; box-sizing: border-box; padding: 2px; border-radius: 16px; background: {{c.track}}; box-shadow: {{c.capShadow}}; display: flex; align-items: center; z-index: 10;">
+<sc-if value="{{cap.indents}}" hint-placeholder-val="{{true}}">
+<button aria-label="Move out" style="width: 32px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 14px; background: {{cap.outBg}}; color: {{cap.outInk}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H11 M21 12H11 M21 18H11 M7 8l-4 4 4 4"></path></svg></button>
+<button aria-label="Move in" style="width: 32px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 14px; background: transparent; color: {{cap.inInk}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4"></path></svg></button>
+<span style="width: 1px; height: 16px; margin: 0 2px; flex-shrink: 0; background: {{c.separator}};"></span>
+</sc-if>
+<button aria-label="Priority" style="width: 32px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 14px; background: {{cap.flagBg}}; color: {{cap.flagInk}}; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="{{cap.flagFill}}" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5z"></path><path d="M5.5 21V4"></path></svg></button>
+<button aria-label="Repeat" aria-pressed="true" style="width: 32px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 14px; background: {{cap.repBg}}; color: {{cap.repInk}}; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13"></path></svg></button>
+<sc-if value="{{cap.place}}" hint-placeholder-val="{{true}}">
+<button aria-label="Place" style="width: 80px; height: 28px; flex-shrink: 0; margin-left: 2px; box-sizing: border-box; padding: 0 10px 0 8px; border: 0; border-radius: 14px; background: {{cap.placeBg}}; color: {{c.text}}; font: inherit; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{cap.placePath}}"></path></svg>{{cap.placeLabel}}</button>
+</sc-if>
+</div>
+
+<sc-if value="{{tip.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{tip.left}}px; top: {{tip.top}}px; box-sizing: border-box; padding: 3px 7px; border-radius: 5px; background: {{c.tip}}; box-shadow: {{c.tipShadow}}; color: {{c.text}}; font-size: 12px; line-height: 15px; white-space: nowrap; z-index: 12;">{{tip.text}}</div>
+</sc-if>
+
+<sc-if value="{{repeatPanel}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: {{panel.left}}px; top: {{panel.top}}px; width: 300px; z-index: 11;">
+<dc-import name="Repeat27Panel" variant="all" theme="{{theme}}" set="true" hint-size="300px,214px"></dc-import>
+</div>
+</sc-if>
+
+<sc-if value="{{priorityPanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{panel.left}}px; top: {{panel.top}}px; width: 300px; box-sizing: border-box; padding: 8px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; display: flex; gap: 6px; z-index: 11;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button aria-label="{{l.aria}}" style="position: relative; flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{l.bg}}; box-shadow: {{l.ring}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+<sc-if value="{{l.on}}" hint-placeholder-val="{{false}}">
+<span style="position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border-radius: 9px; background: {{l.c}}; color: {{c.onDot}}; display: flex; align-items: center; justify-content: center;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12 M18 6L6 18"></path></svg></span>
+</sc-if>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{placePanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{panel.left}}px; top: {{panel.top}}px; width: 300px; box-sizing: border-box; padding: 8px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; display: flex; gap: 6px; z-index: 11;">
+<sc-for list="{{tiles}}" as="tl" hint-placeholder-count="4">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{tl.bg}}; box-shadow: {{tl.ring}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{tl.path}}"></path></svg><span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{tl.label}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{datePanel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: {{panel.left}}px; top: {{panel.top}}px; width: 300px; box-sizing: border-box; padding: 8px 10px 10px; border-radius: 14px; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 4px;">
+<span style="font-size: 16px; font-weight: 600;">November 2026</span>
+<div style="display: flex; gap: 4px;">
+<button aria-label="Previous month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{c.accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button aria-label="Next month" style="width: 32px; height: 32px; border: 0; padding: 0; border-radius: 16px; background: transparent; color: {{c.accent}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 1px;">
+<sc-for list="{{weekdays}}" as="w" hint-placeholder-count="7">
+<span style="height: 18px; text-align: center; font-size: 11px; font-weight: 600; color: {{c.muted}};">{{w}}</span>
+</sc-for>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="42">
+<button style="justify-self: center; width: 36px; height: 36px; border: 0; padding: 0; border-radius: 18px; background: {{d.bg}}; color: {{d.color}}; font: inherit; font-size: 16px; font-weight: {{d.weight}}; font-variant-numeric: tabular-nums;">{{d.n}}</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<div style="position: absolute; right: 0; bottom: 0; height: 24px; box-sizing: border-box; padding: 0 12px; border-top-left-radius: 6px; background: {{c.chrome}}; box-shadow: inset 1px 1px 0 {{c.chromeLine}}; display: flex; align-items: center; gap: 16px; font-size: 12px; color: {{c.muted}}; z-index: 13;"><span>0 backlinks</span><span>14 words</span><span>112 characters</span></div>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"all","options":["all","typing","priority","subtask","place","above"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'all';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', chrome: '#F6F6F6', chromeLine: '#E3E3E3', card: '#F2F2F2', track: '#F2F2F2', text: '#000000', muted: '#8E8E93', accent: '#8A5CF5', line: '#E5E5EA', hourLine: '#EFEFF4', now: '#FF3B30', branch: '#C7C7CC', separator: '#D1D1D6', off: '#A1A4AB', placeBg: 'rgba(0,0,0,0.07)', hover: 'rgba(0,0,0,0.06)', capShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', menu: 'rgba(250,250,252,0.97)', menuTile: 'rgba(0,0,0,0.05)', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', placeOnBg: 'rgba(0,0,0,0.1)', placeRing: 'inset 0 0 0 1.5px #1C1C1E', onDot: '#FFFFFF', tip: '#ECECEC', tipShadow: '0 2px 8px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,0.15)', mark: '#FF9500', outside: '#C7C7CC', p1: '#FF3B30', p1Card: '#F4D5D7', p2: '#FF9500', p2Card: '#F4E3CF', p3: '#FFCC00', p3Card: '#F4ECCF', ev: { bg: 'rgba(0,122,255,0.13)', ink: '#0058B8', bar: '#007AFF' }, ev2: { bg: 'rgba(52,199,89,0.16)', ink: '#1F7735', bar: '#34C759' } }
+      : { bg: '#1E1E1E', chrome: '#262626', chromeLine: '#363636', card: '#373737', track: '#373737', text: '#FFFFFF', muted: '#8E8E93', accent: '#9580FF', line: '#2C2C2E', hourLine: '#2A2A2A', now: '#D92C24', branch: '#48484A', separator: '#48484A', off: '#5A5A5E', placeBg: 'rgba(255,255,255,0.1)', hover: 'rgba(255,255,255,0.08)', capShadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', menu: 'rgba(44,44,46,0.96)', menuTile: 'rgba(255,255,255,0.08)', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', placeOnBg: 'rgba(255,255,255,0.16)', placeRing: 'inset 0 0 0 1.5px #E5E5EA', onDot: '#000000', tip: '#3A3A3C', tipShadow: '0 2px 8px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.12)', mark: '#FFD60A', outside: '#636366', p1: '#FF453A', p1Card: '#572725', p2: '#FF9F0A', p2Card: '#573E19', p3: '#FFD60A', p3Card: '#574C19', ev: { bg: 'rgba(10,132,255,0.24)', ink: '#85C1FF', bar: '#0A84FF' }, ev2: { bg: 'rgba(48,209,88,0.22)', ink: '#97E8AC', bar: '#30D158' } };
+
+    const LIST_X = 54, LIST_TOP = 104, LIST_W = 360, CARD = 35, STEP = 37, INDENT = 20;
+    const GAP = 8, CAP_H = 32, ROOM_BOTTOM = 776;
+    const PATHS = {
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      date: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const card = (title, level, extra) => ({ kind: 'card', title, level: level ?? 0, ...extra });
+    const field = (text, level, extra) => ({ kind: 'field', text, level: level ?? 0, ...extra });
+    const base = [
+      card('Созвониться с врачом'),
+      card('Записаться в барбершоп', 0, { progress: true }),
+      card('Позвонить маме'),
+      card('Чай масала'),
+      card('Разобрать почту'),
+      card('Оплатить интернет')
+    ];
+    const more = ['Купить подарок Косте', 'Забрать посылку', 'Вернуть книгу в библиотеку', 'Заказать воду', 'Продлить страховку', 'Сдать показания счётчиков', 'Ответить Лёше про поход', 'Почистить фильтр', 'Записать идеи к ретро', 'Поменять резину', 'Оплатить кружок'].map((t) => card(t));
+    const trip = card('Собрать вещи в поездку', 0, { count: '0/1' });
+    const bread = 'Купить хлеб';
+    const V = {
+      all: { rows: [...base, field('Зал')], cap: { out: false, in: true, place: 'now', open: 'repeat', repeat: true }, panel: 'repeat', mark: ['cap', 'panel'] },
+      typing: { rows: [...base, field(bread)], cap: { out: false, in: true, place: 'now' }, tip: 'in', mark: ['field', 'cap'] },
+      priority: { rows: [...base, field(bread, 0, { tint: c.p1Card })], cap: { out: false, in: true, place: 'now', priority: 'p1', open: 'flag' }, panel: 'priority', mark: ['cap', 'panel'] },
+      subtask: { rows: [...base.slice(0, 4), trip, field('Зарядка для ноутбука', 1)], cap: { out: true, in: false }, tip: 'out', mark: ['field', 'cap'] },
+      place: { rows: [...base, field(bread)], cap: { out: false, in: true, place: 'now', open: 'place' }, panel: 'place', mark: ['cap', 'panel'] },
+      above: { rows: [...base, ...more, field(bread)], cap: { out: false, in: true, place: 'now', open: 'place' }, panel: 'date', mark: ['field', 'cap', 'panel'] }
+    };
+    const cfg = V[view] ?? V.all;
+    const b = cfg.cap;
+
+    const rows = cfg.rows.map((r, i) => {
+      const level = r.level ?? 0;
+      return { ...r, isCard: r.kind === 'card', isField: r.kind === 'field', left: level * INDENT, width: LIST_W - level * INDENT, top: i * STEP, progress: !!r.progress, hasCount: !!r.count, count: r.count ?? '', bg: r.tint ?? c.card, typed: r.kind === 'field' && !!r.text, empty: r.kind === 'field' && !r.text, text: r.text ?? '' };
+    });
+    const branches = [];
+    rows.forEach((r, i) => {
+      const kids = [];
+      for (let j = i + 1; j < rows.length && (rows[j].level ?? 0) > (r.level ?? 0); j++) if (rows[j].level === (r.level ?? 0) + 1) kids.push(j);
+      if (!kids.length) return;
+      const x = r.left + INDENT / 2, mid = (j) => rows[j].top + CARD / 2, last = mid(kids[kids.length - 1]);
+      branches.push(`M${x} ${mid(i)}V${last - 6}Q${x} ${last} ${x + 6} ${last}H${x + INDENT / 2}`);
+    });
+
+    const f = rows.find((r) => r.isField);
+    const fieldTop = LIST_TOP + f.top, fieldBottom = fieldTop + CARD, fieldRight = LIST_X + LIST_W;
+    const indents = b.indents !== false;
+    const capW = 4 + (indents ? 64 + 5 : 0) + 32 + 32 + (b.place ? 82 : 0);
+    const below = fieldBottom + GAP + CAP_H <= ROOM_BOTTOM;
+    const capTop = below ? fieldBottom + GAP : fieldTop - GAP - CAP_H;
+    const pr = b.priority ? { p1: c.p1, p2: c.p2, p3: c.p3 }[b.priority] : null;
+    const cap = {
+      left: fieldRight - capW, top: capTop, indents,
+      outInk: b.out ? c.text : c.off, inInk: b.in ? c.text : c.off,
+      outBg: cfg.tip === 'out' ? c.hover : 'transparent',
+      flagInk: pr ?? c.text, flagFill: pr ?? 'none', flagBg: b.open === 'flag' ? c.hover : 'transparent', repBg: b.open === 'repeat' ? c.hover : 'transparent', repInk: b.repeat ? c.accent : c.text,
+      place: !!b.place, placeBg: b.open === 'place' ? c.placeOnBg : c.placeBg, placePath: PATHS[b.place ?? 'now'], placeLabel: { inbox: 'Inbox', soon: 'Soon', now: 'Now', date: '5 Nov' }[b.place ?? 'now']
+    };
+
+    const panelH = { priority: 82, place: 82, date: 294, repeat: 214 }[cfg.panel] ?? 0;
+    const panelTop = below ? capTop + CAP_H + GAP : capTop - GAP - panelH;
+    const panel = { left: fieldRight - 300, top: panelTop };
+
+    const tipX = { out: cap.left + 2, in: cap.left + 34 };
+    const tip = { on: !!cfg.tip, left: (tipX[cfg.tip] ?? 0) + 6, top: capTop + CAP_H + 6, text: cfg.tip === 'out' ? 'Move out (Shift+Tab)' : 'Move in (Tab)' };
+
+    const levels = [['p1', c.p1, c.p1Card], ['p2', c.p2, c.p2Card], ['p3', c.p3, c.p3Card]].map(([name, col, tint]) => {
+      const on = b.priority === name;
+      return { name, c: col, on, aria: (on ? 'Remove priority ' : 'Priority ') + name, bg: on ? tint : c.menuTile, ring: on ? 'inset 0 0 0 1.5px ' + col : 'none' };
+    });
+    const tiles = ['inbox', 'soon', 'now', 'date'].map((k) => ({ label: { inbox: 'Inbox', soon: 'Soon', now: 'Now', date: 'Date' }[k], path: PATHS[k], bg: b.place === k ? c.placeOnBg : c.menuTile, ring: b.place === k ? c.placeRing : 'none' }));
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(2026, 9, 26 + i);
+      const inMonth = d.getMonth() === 10, isToday = inMonth && d.getDate() === 2;
+      days.push({ n: d.getDate(), bg: 'transparent', color: isToday ? c.accent : inMonth ? c.text : c.outside, weight: isToday ? 700 : 400 });
+    }
+
+    const HOUR = 56, FIRST = 9;
+    const hours = [];
+    for (let h = 0; h < 12; h++) hours.push({ label: String(FIRST + h).padStart(2, '0') + ':00', top: 104 + h * HOUR - 7, line: 104 + h * HOUR });
+    const at = (hh) => 104 + (hh - FIRST) * HOUR + 1;
+    const events = [
+      { title: 'Стендап', top: at(10), height: HOUR / 2 - 2, ...c.ev },
+      { title: 'Обед с Сашей', top: at(13), height: HOUR - 2, ...c.ev2 },
+      { title: 'Ревью дизайна', top: at(16), height: HOUR * 1.5 - 2, ...c.ev }
+    ];
+
+    const box = (left, top, width, height, radius, tag) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius ?? Math.min(height + 8, 44) / 2, tag: tag ?? '', tagPos: tag ? 'left: ' + (left + width + 12) + 'px; top: ' + (top + Math.min(height, 32) / 2 - 10) + 'px;' : 'display: none;' });
+    const want = cfg.mark ?? [];
+    const marks = [];
+    if (want.includes('field')) marks.push(box(LIST_X + f.left, fieldTop, f.width, CARD));
+    if (want.includes('cap')) marks.push(box(cap.left, capTop, capW, CAP_H, undefined, b.repeat ? '← Кнопка повтора в капсуле' : ''));
+    if (want.includes('panel')) marks.push(box(panel.left, panelTop, 300, panelH, 18, cfg.panel === 'repeat' ? '← Панель повтора' : ''));
+
+    return {
+      c, rows, branches: branches.join('') || 'M0 0', cap, tip, panel,
+      repeatPanel: cfg.panel === 'repeat', theme: light ? 'light' : 'dark', priorityPanel: cfg.panel === 'priority', placePanel: cfg.panel === 'place', datePanel: cfg.panel === 'date',
+      levels, tiles, days, weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+      hours, events, nowTop: at(11.5),
+      marks: this.props.marks === false ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>
