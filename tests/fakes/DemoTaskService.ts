@@ -97,6 +97,7 @@ export class DemoTaskService implements TaskService {
 			dueDate: t.dueDate,
 			slot: t.slot,
 			repeat: t.repeat ?? null,
+			repeatable: section !== "done" && (t.status === "todo" || t.status === "inProgress"),
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			subtasks: [],
 			progress: null,

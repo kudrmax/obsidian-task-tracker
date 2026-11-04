@@ -173,6 +173,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 	dueDate: null,
 	slot: null,
 	repeat: null,
+	repeatable: true,
 	priority: null,
 	group: null,
 	subtasks,

@@ -1,4 +1,4 @@
-import type { GroupName, RepeatRule, TaskItem, Weekday } from "../../application/contracts";
+import { type GroupName, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
@@ -38,24 +38,13 @@ export interface EditRow {
 	readonly icon: IconName;
 }
 
-/** The same rule but for where it is anchored: the file anchors it, the panel never does. */
-function sameRule(a: RepeatRule, b: RepeatRule | null): boolean {
-	const days = (rule: RepeatRule) => [...rule.days].sort((x, y) => x - y).join();
-	return b !== null && a.kind === b.kind && a.every === b.every && a.unit === b.unit && a.dayOfMonth === b.dayOfMonth && days(a) === days(b);
-}
-
-/** An open task of its own can repeat; a subtask goes with its parent, and a closed task repeats no more. */
-function canRepeat(item: TaskItem): boolean {
-	return item.parentText === null && item.status !== "done" && item.status !== "cancelled";
-}
-
 /** The status group: Done first, the most used; Stop last for a task that repeats. */
 export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	return [
 		{ id: "done", label: "Done", icon: "done" },
 		{ id: "progress", label: item.status === "inProgress" ? "Stop progress" : "In progress", icon: "progress" },
 		{ id: "wontdo", label: "Won’t do", icon: "wontdo" },
-		...(item.repeat !== null && canRepeat(item) ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
+		...(item.repeat !== null && item.repeatable ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
 	];
 }
 
@@ -71,7 +60,7 @@ export function editRows(item: TaskItem, sections: SectionChoice | null = null):
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
-		...(canRepeat(item) ? [repeatRow(item.repeat)] : []),
+		...(item.repeatable ? [repeatRow(item.repeat)] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
 	];

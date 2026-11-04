@@ -64,9 +64,9 @@ export function createInSoon(doc: TaskDocument, text: string): TaskDocument {
 	return doc.insert("soon", "end", newTask(text));
 }
 
-function createInSlot(doc: TaskDocument, slot: Slot, text: string, priority: string | null, today: LocalDate, boundary: DayBoundary, finish: (task: Task) => Task = (task) => task): TaskDocument {
+function createInSlot(doc: TaskDocument, slot: Slot, text: string, priority: string | null, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const clamped = boundary.clamp(slot, SLOT_STEP);
-	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", finish(newTask(text, { slot: clamped, priority })));
+	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, priority }));
 }
 
 export function createAtTime(
@@ -306,17 +306,18 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot };
 
+/** A new task at `place`; `repeat` is set as `setRepeat` sets it on a task of its own, and a subtask or a slot takes none. */
 export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null): TaskDocument {
-	const finish = (task: Task) => (repeat === undefined ? task : repeated(task, repeat, today, boundary));
 	switch (place.kind) {
 		case "subtask":
-			return doc.insertUnder(place.parent, finish(newTask(text, { priority })), place.before);
+			return doc.insertUnder(place.parent, newTask(text, { priority }), place.before);
 		case "slot":
-			return createInSlot(doc, place.slot, text, priority, today, boundary, finish);
+			return createInSlot(doc, place.slot, text, priority, today, boundary);
 		case "list": {
 			const { list, group, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
-			return doc.insert(list, positionIn(doc, list, group, before), finish(newTask(text, { dueDate, priority })));
+			const task = newTask(text, { dueDate, priority });
+			return doc.insert(list, positionIn(doc, list, group, before), repeat ? repeated(task, repeat, today, boundary) : task);
 		}
 	}
 }

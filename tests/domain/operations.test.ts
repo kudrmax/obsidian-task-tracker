@@ -153,6 +153,15 @@ describe("createInPlace", () => {
 		}
 	});
 
+	it("takes a rule for a task of its own only: a subtask goes with its parent, a task on the calendar has its slot", () => {
+		const rule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null } as const;
+		const parseR = (text: string) => TaskDocument.parse(text, G, { ...M, repeat: "🔁" });
+		const d = parseR("## Now\n- [ ] P\n\n## Soon\n");
+		const sub = createInPlace(d, "X", null, { kind: "subtask", parent: d.tasks("now")[0], before: null }, T, DayBoundary.MIDNIGHT, rule);
+		const slot = createInPlace(parseR("## Now\n"), "X", null, { kind: "slot", slot: { date: T, start: 600, end: null } }, T, DayBoundary.MIDNIGHT, rule);
+		expect([sub.serialize(), slot.serialize()]).toEqual(["## Now\n- [ ] P\n\t- [ ] X\n\n## Soon\n", "## Now\n- [ ] X ⏰ 2026-10-30 10:00\n"]);
+	});
+
 	it("writes the priority before the text", () => {
 		const place = { kind: "list", list: "inbox", group: null, before: null, date: null } as const;
 		expect(createInPlace(parseG(BASE), "X", "p1", place, T, DayBoundary.MIDNIGHT).serialize()).toContain("- [ ] I\n- [ ] p1 X\n");

@@ -20,6 +20,7 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		dueDate: null,
 		slot: null,
 		repeat: null,
+		repeatable: true,
 		priority: { prefix: "!", color: "red" },
 		group: null,
 		subtasks,
@@ -448,6 +449,27 @@ describe("QuickEntry", () => {
 		await entry.idle();
 		expect(tasks.edits).toEqual([{ key: key("A"), draft: { text: "A2", placement: { kind: "now" }, priority: "!" } }]);
 		expect(tasks.created).toEqual([]);
+	});
+
+	it("a rename sends no rule when the bar's rule is the task's own: anchored or not, weekdays in any order", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(0), { ...item("A"), repeat: { ...WEEKLY, days: [0, 3], from: "2026-10-26" } });
+		entry.setRepeat({ ...WEEKLY, days: [3, 0] });
+		entry.type("A2");
+		entry.blur();
+		await entry.idle();
+		expect(tasks.edits.map((e) => "repeat" in e.draft)).toEqual([false]);
+	});
+
+	it("a rename sends the bar's rule when it differs from the task's", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(0), { ...item("A"), repeat: WEEKLY });
+		entry.setRepeat(AFTER_DONE);
+		entry.blur();
+		await entry.idle();
+		expect(tasks.edits.map((e) => e.draft.repeat)).toEqual([AFTER_DONE]);
 	});
 
 	it("rename enter on a parent opens the first subtask", () => {

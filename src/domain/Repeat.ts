@@ -14,6 +14,13 @@ export interface RepeatRule {
 	readonly from: LocalDate | null;
 }
 
+/** The same rule but for where it is anchored, its weekdays a set; none is the same as none only. */
+export function sameRule(a: RepeatRule | null, b: RepeatRule | null): boolean {
+	if (a === null || b === null) return a === b;
+	const days = (rule: RepeatRule) => [...rule.days].sort((x, y) => x - y).join();
+	return a.kind === b.kind && a.every === b.every && a.unit === b.unit && a.dayOfMonth === b.dayOfMonth && days(a) === days(b);
+}
+
 const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
 const ORDINAL_RE = /^the (\d{1,2})(?:st|nd|rd|th)$/;

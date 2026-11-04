@@ -4,7 +4,7 @@ import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
 import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, repeat: null, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, repeat: null, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
 
 const weekly = (days: RepeatRule["days"]): RepeatRule => ({ kind: "schedule", every: 1, unit: "week", days, dayOfMonth: null, from: null });
 const THURSDAY = "2026-11-05";
@@ -31,10 +31,8 @@ describe("the status group", () => {
 		expect(tiles.map((t) => [t.id, t.label, t.icon])).toEqual([["done", "Done", "done"], ["progress", "In progress", "progress"], ["wontdo", "Won’t do", "wontdo"], ["stop", "Stop", "stop"]]);
 	});
 
-	it("offers no Stop for a subtask or a task already closed", () => {
-		expect(statusTiles(item({ repeat: EVERY_3_DAYS, parentText: "Parent" }))).toHaveLength(3);
-		expect(statusTiles(item({ repeat: EVERY_3_DAYS, status: "done" }))).toHaveLength(3);
-		expect(statusTiles(item({ repeat: EVERY_3_DAYS, status: "cancelled" }))).toHaveLength(3);
+	it("offers no Stop for a task the file says may not repeat", () => {
+		expect(statusTiles(item({ repeat: EVERY_3_DAYS, repeatable: false }))).toHaveLength(3);
 	});
 });
 
@@ -63,10 +61,8 @@ describe("the edit group", () => {
 		expect(editRows(item()).find((r) => r.id === "repeat")).toMatchObject({ label: "Repeat", value: "", icon: "repeat" });
 	});
 
-	it("offers no Repeat for a subtask or a task already closed", () => {
-		expect(editRows(item({ parentText: "Parent" })).map((r) => r.id)).not.toContain("repeat");
-		expect(editRows(item({ status: "done" })).map((r) => r.id)).not.toContain("repeat");
-		expect(editRows(item({ status: "cancelled" })).map((r) => r.id)).not.toContain("repeat");
+	it("offers no Repeat for a task the file says may not repeat", () => {
+		expect(editRows(item({ repeatable: false })).map((r) => r.id)).not.toContain("repeat");
 	});
 
 	it("shows the rule beside Repeat: a week's days as letters, any other rule in words", () => {
@@ -639,7 +635,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		document.body.innerHTML = "";
 	});
 
-	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress", parentText: "A" });
+	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress", parentText: "A", repeatable: false });
 	const openOnStackCard = (description: string | null = null) => {
 		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const stack = document.body.appendChild(document.createElement("div"));

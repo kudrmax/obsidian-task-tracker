@@ -24,6 +24,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	dueDate: null,
 	slot: null,
 	repeat: null,
+	repeatable: true,
 	priority: null,
 	group,
 	subtasks,
@@ -835,7 +836,7 @@ describe("QuickEntryController", () => {
 			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
 		});
 
-		it("is not on a subtask's field, and a subtask is written without a rule", async () => {
+		it("is not on a subtask's field; the write is a subtask's, whose rule the file drops", async () => {
 			const parent = item("A", key("now", 0));
 			const { controller, root, type, press, created } = setUp({ items: { left: [parent] } });
 			controller.openAtEnd("left");
@@ -845,7 +846,7 @@ describe("QuickEntryController", () => {
 			type("Sub");
 			press("Enter");
 			await vi.waitFor(() => expect(created).toHaveLength(1));
-			expect(created[0].repeat).toBeUndefined();
+			expect(created[0].place.kind).toBe("subtask");
 		});
 
 		it("is not on a field on the calendar", () => {

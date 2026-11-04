@@ -10,6 +10,7 @@ const item = (text: string, group: GroupName): TaskItem => ({
 	dueDate: null,
 	slot: null,
 	repeat: null,
+	repeatable: true,
 	priority: null,
 	group,
 	subtasks: [],

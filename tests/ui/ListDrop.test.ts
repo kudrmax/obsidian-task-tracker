@@ -13,6 +13,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	dueDate: null,
 	slot: null,
 	repeat: null,
+	repeatable: true,
 	priority: null,
 	group,
 	subtasks: [],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Repeat, type RepeatRule } from "../../src/domain/Repeat";
+import { Repeat, type RepeatRule, sameRule } from "../../src/domain/Repeat";
 
 const cases = [
 	"every week on Mon, Wed, Fri",
@@ -62,5 +62,22 @@ describe("Repeat.of", () => {
 
 	it("accepts the rules it parses", () => {
 		for (const text of cases) expect(() => Repeat.of(Repeat.parse(text)!.rule)).not.toThrow();
+	});
+});
+
+describe("sameRule", () => {
+	const weekly = (days: RepeatRule["days"], from: string | null = null): RepeatRule => ({ kind: "schedule", every: 2, unit: "week", days, dayOfMonth: null, from });
+
+	it("is the same rule wherever it is anchored, its weekdays in any order", () => {
+		expect(sameRule(weekly([0, 3], "2026-10-26"), weekly([3, 0]))).toBe(true);
+		expect(sameRule(null, null)).toBe(true);
+	});
+
+	it("is another rule for another kind, step, unit, weekday or month day, and against none", () => {
+		expect(sameRule(weekly([0]), weekly([0, 3]))).toBe(false);
+		expect(sameRule(weekly([0]), { ...weekly([0]), every: 1 })).toBe(false);
+		expect(sameRule(weekly([0]), { ...weekly([0]), kind: "afterDone" })).toBe(false);
+		expect(sameRule({ ...weekly([]), unit: "month", dayOfMonth: 5 }, { ...weekly([]), unit: "month", dayOfMonth: 6 })).toBe(false);
+		expect(sameRule(weekly([0]), null)).toBe(false);
 	});
 });

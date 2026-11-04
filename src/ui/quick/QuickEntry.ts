@@ -1,4 +1,4 @@
-import type { NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey, TaskService } from "../../application/contracts";
+import { type NewTaskPlace, type Placement, type RepeatRule, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import type { ListColumn } from "../drag/DropTarget";
 import { type GapPlace, type ListCard, type PlaceResult, fitLevel, resultOf, sameTask, shiftLevel } from "../drag/listPlace";
@@ -276,10 +276,10 @@ export class QuickEntry {
 
 	/**
 	 * Edits once the writes before it show, by the key the lists give the task then: the one read at the open may have gone
-	 * stale. The task's own rule, untouched in the bar, is left as the file has it.
+	 * stale. The task's own rule, the same in the bar, is left as the file has it.
 	 */
 	private saveRename(field: Field, { item, home }: Rename): void {
-		const draft: TaskDraft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority, ...(field.repeat !== item.repeat && { repeat: field.repeat }) };
+		const draft: TaskDraft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority, ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }) };
 		this.queued(home, async () => {
 			await this.deps.fresh();
 			await this.deps.edit(this.keyAt(home, item), draft);
@@ -317,7 +317,6 @@ export class QuickEntry {
 	 * The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a
 	 * moment. It leaves the queue, and the places at or past its card move down, in the very drawing that shows its
 	 * card: where the lists are about to draw the task the file holds, which its rules may have put in another column.
-	 * Only a task of its own repeats: a subtask and a task on the calendar are written without the rule.
 	 */
 	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
 		const shown = (landed?: { readonly column: ListColumn; readonly key: TaskKey | null }) => (coming: (column: ListColumn) => readonly ListCard[]) => {
@@ -340,7 +339,7 @@ export class QuickEntry {
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
-				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), place.level === 0 ? line.repeat : null);
+				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), line.repeat);
 				return this.deps.fresh(shown({ column: spot.column, key }));
 			}
 		}

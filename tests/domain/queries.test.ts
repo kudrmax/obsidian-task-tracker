@@ -79,12 +79,19 @@ describe("toItem", () => {
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
 			repeat: null,
+			repeatable: true,
 			priority: null,
 			group: null,
 			subtasks: [],
 			progress: null,
 			parentText: null, description: null,
 		});
+	});
+
+	it("tells whether the task may repeat: an open task of its own; not a subtask, nor a closed task", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A\n\t- [ ] A1\n- [x] B\n- [-] C\n- [/] D\n", SECTIONS, M);
+		const [a, b, c, dd] = d.tasks("now");
+		expect([toItem(a).repeatable, toItem(a).subtasks[0].repeatable, toItem(b).repeatable, toItem(c).repeatable, toItem(dd).repeatable]).toEqual([true, false, false, false, true]);
 	});
 });
 
