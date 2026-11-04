@@ -272,7 +272,7 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
   }
   function sameLines(a, b) {
     return a.length === b.length && a.every((line, i) => line === b[i]);
@@ -970,6 +970,12 @@
   function readDocument(text, settings, today, boundary = boundaryOf(settings)) {
     return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
   }
+  function applyOperationAsRead(text, settings, now, op) {
+    const boundary = boundaryOf(settings);
+    const today = boundary.dayOf(now);
+    const doc = parseText(text, settings).ensureSections(sectionNames(settings));
+    return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
+  }
   function applyOperation(text, settings, now, op) {
     const boundary = boundaryOf(settings);
     const today = boundary.dayOf(now);
@@ -1077,17 +1083,19 @@
       return this.act(text, id, now, (doc, entry, today, boundary) => setSlot(doc, entry, this.from(now, minutes, entry.task.slot), today, boundary));
     }
     act(text, id, now, op) {
-      try {
-        const after = applyOperation(text, this.settings, now, (doc, today, boundary) => {
-          const entry = openSlotted(doc).find((e) => e.raw === id);
-          if (!entry) throw new StaleTask();
-          return op(doc, entry, today, boundary);
-        });
-        return { changed: true, text: after };
-      } catch (e) {
-        if (e instanceof StaleTask) return { changed: false, reason: "stale" };
-        throw e;
+      const onTask = (doc, today, boundary) => {
+        const entry = openSlotted(doc).find((e) => e.raw === id);
+        if (!entry) throw new StaleTask();
+        return op(doc, entry, today, boundary);
+      };
+      for (const apply of [applyOperation, applyOperationAsRead]) {
+        try {
+          return { changed: true, text: apply(text, this.settings, now, onTask) };
+        } catch (e) {
+          if (!(e instanceof StaleTask)) throw e;
+        }
       }
+      return { changed: false, reason: "stale" };
     }
     /** `slot` moved to start `minutes` from now, as long as it was. */
     from(now, minutes, slot) {

@@ -1,4 +1,4 @@
-import { applyOperation, boundaryOf, readDocument } from "../application/documentText";
+import { applyOperation, applyOperationAsRead, boundaryOf, readDocument } from "../application/documentText";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { addDays, localDateOf, minutesToHHMM } from "../domain/LocalDate";
 import * as ops from "../domain/operations";
@@ -61,17 +61,20 @@ export class PhoneReminders {
 	}
 
 	private act(text: string, id: string, now: Date, op: (doc: TaskDocument, entry: TaskEntry, today: LocalDate, boundary: DayBoundary) => TaskDocument): PhoneAction {
-		try {
-			const after = applyOperation(text, this.settings, now, (doc, today, boundary) => {
-				const entry = openSlotted(doc).find((e) => e.raw === id);
-				if (!entry) throw new StaleTask();
-				return op(doc, entry, today, boundary);
-			});
-			return { changed: true, text: after };
-		} catch (e) {
-			if (e instanceof StaleTask) return { changed: false, reason: "stale" };
-			throw e;
+		const onTask = (doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument => {
+			const entry = openSlotted(doc).find((e) => e.raw === id);
+			if (!entry) throw new StaleTask();
+			return op(doc, entry, today, boundary);
+		};
+		// A reminder still shown after its day ended names a slot that today's normalizing has already erased.
+		for (const apply of [applyOperation, applyOperationAsRead]) {
+			try {
+				return { changed: true, text: apply(text, this.settings, now, onTask) };
+			} catch (e) {
+				if (!(e instanceof StaleTask)) throw e;
+			}
 		}
+		return { changed: false, reason: "stale" };
 	}
 
 	/** `slot` moved to start `minutes` from now, as long as it was. */

@@ -121,6 +121,13 @@ describe("TaskDocument operations", () => {
 		expect(d.replace(e, { ...e.task, status: "done", statusChar: "x" }).serialize()).toBe("## Now\n- [x] A\n");
 	});
 
+	it("replace writes a change of the reminder kind alone", () => {
+		const R = { ...M, alarmSlot: "🚨" };
+		const d = TaskDocument.parse("## Now\n- [ ] A ⏰ 2026-10-30 10:00\n", SECTIONS, R);
+		const e = d.tasks("now")[0];
+		expect(d.replace(e, { ...e.task, reminder: "alarm" }).serialize()).toBe("## Now\n- [ ] A 🚨 2026-10-30 10:00\n");
+	});
+
 	it("replace keeps the children and the position", () => {
 		const d = parse("## Now\n- [ ] A\n  - note\n- [ ] B\n");
 		const e = d.tasks("now")[0];

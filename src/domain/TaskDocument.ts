@@ -99,6 +99,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
+		a.reminder === b.reminder &&
 		sameLines(a.children, b.children)
 	);
 }

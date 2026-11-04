@@ -40,12 +40,25 @@ export function readDocument(text: string, settings: TaskCalendarSettings, today
 	return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
 }
 
+type Operation = (doc: TaskDocument, today: LocalDate, boundary: DayBoundary) => TaskDocument;
+
+/**
+ * The text after `op` on the file as it is, before today's normalizing: for a task that normalizing would change, such as
+ * yesterday's slot, which the next day erases. The result is normalized as usual.
+ */
+export function applyOperationAsRead(text: string, settings: TaskCalendarSettings, now: Date, op: Operation): string {
+	const boundary = boundaryOf(settings);
+	const today = boundary.dayOf(now);
+	const doc = parseText(text, settings).ensureSections(sectionNames(settings));
+	return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
+}
+
 /** The text after `op`, as the service would write it at `now`. */
 export function applyOperation(
 	text: string,
 	settings: TaskCalendarSettings,
 	now: Date,
-	op: (doc: TaskDocument, today: LocalDate, boundary: DayBoundary) => TaskDocument,
+	op: Operation,
 ): string {
 	const boundary = boundaryOf(settings);
 	const today = boundary.dayOf(now);

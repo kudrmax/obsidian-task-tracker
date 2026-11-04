@@ -52,6 +52,12 @@ describe("PhoneReminders actions", () => {
 		expect(result.changed && result.text).toContain("- [x] A 🚨 2026-11-04 10:00-11:00");
 	});
 
+	it("Done on a reminder left from yesterday still closes the task", () => {
+		const late = "- [ ] B ⏰ 2026-11-04 23:30";
+		const result = phone.complete(file(late), late, at(5, 7, 30));
+		expect(result.changed && result.text).toMatch(/- \[x\] B/);
+	});
+
 	it("complete of a changed line is stale", () => {
 		expect(phone.complete(file(line), "- [ ] A 🚨 2026-11-04 09:00", at(4, 10))).toEqual({ changed: false, reason: "stale" });
 	});
