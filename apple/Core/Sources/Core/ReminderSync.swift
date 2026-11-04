@@ -43,6 +43,7 @@ public actor ReminderSync {
         case sync
         case complete(String)
         case snooze(String, minutes: Int)
+        case silence(String)
     }
 
     private let vault: TasksVault
@@ -74,6 +75,10 @@ public actor ReminderSync {
         await inTurn(.snooze(reminderID, minutes: minutes))
     }
 
+    public func silence(reminderID: String) async -> SyncStatus {
+        await inTurn(.silence(reminderID))
+    }
+
     private func inTurn(_ operation: Operation) async -> SyncStatus {
         let previous = turn
         let mine = Task {
@@ -92,6 +97,8 @@ public actor ReminderSync {
             return await act { [rules] text, settings, at in try rules.complete(id: id, text: text, settingsJSON: settings, now: at) }
         case .snooze(let id, let minutes):
             return await act { [rules] text, settings, at in try rules.snooze(id: id, minutes: minutes, text: text, settingsJSON: settings, now: at) }
+        case .silence(let id):
+            return await act { [rules] text, settings, at in try rules.silence(id: id, text: text, settingsJSON: settings, now: at) }
         }
     }
 

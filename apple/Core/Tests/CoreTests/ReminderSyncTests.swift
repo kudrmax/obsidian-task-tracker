@@ -187,4 +187,15 @@ actor FakeAlarms: AlarmScheduling {
         _ = await s.sync()
         #expect(await notifications.problems == ["No access to the vault folder: choose it in the app", nil])
     }
+
+    @Test func silenceKeepsTheTimeAndClearsTheReminders() async {
+        let vault = FakeVault(Fixtures.file(Self.alarm))
+        let s = sync(vault, at: Fixtures.date(4, 11))
+        _ = await s.sync()
+        #expect(await s.silence(reminderID: Self.alarm) == .ok(reminders: 0, at: Fixtures.date(4, 11)))
+        #expect(vault.text.contains("- [ ] Wake 🔕 2026-11-04 12:00"))
+        #expect(await alarms.alarms.isEmpty)
+        #expect(await notifications.pendingIDs.isEmpty)
+    }
 }
+

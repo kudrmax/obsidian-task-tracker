@@ -2,7 +2,7 @@ import AlarmKit
 import Core
 import SwiftUI
 
-/// The reminders' alarms in AlarmKit: the task's title, the system Stop, and Snooze.
+/// The reminders' alarms in AlarmKit: the task's title, Stop (turns the task's reminder off) and Snooze.
 final class Alarms: AlarmScheduling {
     private let ids = AlarmIDs()
 
@@ -27,10 +27,11 @@ final class Alarms: AlarmScheduling {
             presentation: AlarmPresentation(alert: alert),
             metadata: TaskAlarmMetadata(reminderID: reminder.id),
             tintColor: .orange)
+        let stop = StopAlarmIntent(reminderID: reminder.id, title: reminder.title, date: reminder.date)
         let snooze = SnoozeAlarmIntent(reminderID: reminder.id, title: reminder.title, date: reminder.date)
         _ = try await manager.schedule(
             id: ids.id(for: reminder.id),
-            configuration: .alarm(schedule: .fixed(reminder.start), attributes: attributes, secondaryIntent: snooze, sound: .named("alarm.caf")))
+            configuration: .alarm(schedule: .fixed(reminder.start), attributes: attributes, stopIntent: stop, secondaryIntent: snooze, sound: .named("alarm.caf")))
     }
 
     func cancel(_ reminderIDs: [String]) async {

@@ -38,4 +38,6 @@ public protocol TaskRules: Sendable {
     func reminders(text: String, settingsJSON: String, now: Date) throws -> [Reminder]
     func complete(id: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
     func snooze(id: String, minutes: Int, text: String, settingsJSON: String, now: Date) throws -> ActionResult
+    /// The task keeps its time and stops reminding.
+    func silence(id: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
 }

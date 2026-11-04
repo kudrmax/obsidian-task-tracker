@@ -26,6 +26,10 @@ final class AppServices: Sendable {
         report(await sync.snooze(reminderID: reminder.id, minutes: minutes), for: reminder)
     }
 
+    func silence(_ reminder: ShownReminder) async {
+        report(await sync.silence(reminderID: reminder.id), for: reminder)
+    }
+
     private func report(_ status: SyncStatus, for reminder: ShownReminder) {
         LastSync.save(status)
         if case .failed(let reason) = status { UserNotifications.showFailure(reason, of: reminder) }

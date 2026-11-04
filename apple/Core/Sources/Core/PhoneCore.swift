@@ -40,6 +40,10 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         try Self.action(call("snooze", text, settingsJSON, id, minutes, Self.ms(now)))
     }
 
+    public func silence(id: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult {
+        try Self.action(call("silence", text, settingsJSON, id, Self.ms(now)))
+    }
+
     private func call(_ name: String, _ arguments: Any...) throws -> JSValue {
         lock.lock()
         defer { lock.unlock() }
