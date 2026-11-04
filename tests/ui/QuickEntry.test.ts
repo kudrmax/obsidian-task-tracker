@@ -53,7 +53,7 @@ class FakeTasks {
 	readonly errors: unknown[] = [];
 	gate: Promise<void> = Promise.resolve();
 	failing = new Set<string>();
-	/** The column shows only tasks without a date, as Soon does. */
+	/** The column holds only tasks without a date: Soon shows only those, and normalize moves a dated Inbox or Backlog task out. */
 	undated = false;
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
@@ -678,6 +678,26 @@ describe("QuickEntry", () => {
 		expect(tasks.names).toEqual(["A:0"]);
 		expect(entry.state).toMatchObject({ spot: inSoon(1) });
 	});
+
+	for (const column of ["inbox", "backlog"] as const) {
+		it(`a field in ${column} stays where it is when the task written above it takes a day and goes to Soon or Now`, async () => {
+			const tasks = new FakeTasks(["A"]);
+			tasks.undated = true;
+			const gate = deferred();
+			tasks.gate = gate.promise;
+			const entry = tasks.entry();
+			const spot = (index: number): EntrySpot => ({ kind: "list", column, place: { kind: "gap", index, level: 0, group: null } });
+			entry.open(spot(1));
+			entry.type("X");
+			entry.setRepeat(WEEKLY);
+			entry.blur();
+			entry.open(spot(1));
+			gate.resolve();
+			await entry.idle();
+			expect(tasks.names).toEqual(["A:0"]);
+			expect(entry.state).toMatchObject({ spot: spot(1) });
+		});
+	}
 
 	it("a field moves down under a task written above it with a repeat that keeps it in its column", async () => {
 		const tasks = new FakeTasks(["A"]);

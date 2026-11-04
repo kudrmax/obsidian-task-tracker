@@ -59,9 +59,12 @@ interface Line extends PendingText {
 	readonly repeat: RepeatRule | null;
 }
 
-/** Soon shows only tasks without a date, and a schedule gives an undated task its first day: such a task lands elsewhere. */
+/** The columns of tasks without a date: Soon shows only those, and a dated Inbox or Backlog task moves to Soon or Now. */
+const UNDATED: readonly ListColumn[] = ["soon", "inbox", "backlog"];
+
+/** A schedule gives an undated task its first day: written in a column of undated tasks, it lands elsewhere. */
 function staysIn(column: ListColumn, repeat: RepeatRule | null): boolean {
-	return !(column === "soon" && repeat?.kind === "schedule");
+	return !(UNDATED.includes(column) && repeat?.kind === "schedule");
 }
 
 /** The key of a card that stands for a text not yet written: only its level counts. */
