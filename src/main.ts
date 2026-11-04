@@ -1,6 +1,7 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
+
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { createServices, type Services, type ServicesHost } from "./application/services";
@@ -8,6 +9,9 @@ import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
+
+/** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
+const OPEN_ACTION = "task-calendar-open";
 
 /** The plugin is the settings store the view sees; PluginSettings keeps them. */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
@@ -49,6 +53,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				(e: unknown) => new Notice(`Google Calendar: ${e instanceof Error ? e.message : String(e)}`),
 			);
 		});
+		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.addSettingTab(
 			new TaskCalendarSettingsTab(this.app, this, {
 				login: () => services.google.login(),

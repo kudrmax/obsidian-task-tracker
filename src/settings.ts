@@ -64,6 +64,10 @@ export interface TaskCalendarSettings {
 	readonly sections: SectionNames;
 	readonly dueDateMarker: string;
 	readonly slotMarker: string;
+	/** Precedes the slot of a task that rings as an alarm on the phone. */
+	readonly alarmSlotMarker: string;
+	/** Precedes the slot of a task that the phone does not remind of. */
+	readonly silentSlotMarker: string;
 	readonly workCalendarFile: string;
 	/** Calendar titles to take from the work file; empty means all. */
 	readonly workCalendarTitles: readonly string[];
@@ -102,6 +106,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
 	dueDateMarker: "📅",
 	slotMarker: "⏰",
+	alarmSlotMarker: "🚨",
+	silentSlotMarker: "🔕",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },

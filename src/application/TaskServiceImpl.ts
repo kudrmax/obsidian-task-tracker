@@ -23,6 +23,7 @@ import {
 	type TaskStep,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
+import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import type { UndoHistory } from "./UndoHistory";
 
@@ -55,11 +56,6 @@ function sameKey(a: TaskKey, b: TaskKey): boolean {
 /** `a` is a task `b` sits under, at any depth. */
 function isAncestor(a: TaskKey, b: TaskKey): boolean {
 	return a.section === b.section && a.index === b.index && a.path.length < b.path.length && a.path.every((i, k) => b.path[k] === i);
-}
-
-function sectionNames(settings: TaskCalendarSettings): readonly string[] {
-	const s = settings.sections;
-	return [s.inbox, s.now, s.soon, s.backlog, s.done];
 }
 
 export class TaskServiceImpl implements TaskService {
@@ -167,7 +163,7 @@ export class TaskServiceImpl implements TaskService {
 		const settings = this.settings.get();
 		const text = await this.store.read();
 		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
-		const doc = this.parse(text, settings);
+		const doc = parseText(text, settings);
 		return doc.lineOf(this.entryOf(doc, key));
 	}
 
@@ -334,9 +330,8 @@ export class TaskServiceImpl implements TaskService {
 		let change = null as { before: string; after: string; doc: TaskDocument } | null;
 		await this.store.write((text) => {
 			try {
-				const presets = ops.usablePresets(settings.groups.presets);
-				const doc = normalize(this.parse(text, settings).ensureSections(sectionNames(settings)), today, boundary, presets);
-				const result = normalize(operation(doc, today, settings, boundary), today, boundary, presets);
+				const doc = readDocument(text, settings, today, boundary);
+				const result = normalize(operation(doc, today, settings, boundary), today, boundary, ops.usablePresets(settings.groups.presets));
 				const after = result.serialize();
 				change = { before: text, after, doc: result };
 				return after;
@@ -366,7 +361,7 @@ export class TaskServiceImpl implements TaskService {
 		const reading = this.readingOf(settings);
 		if (last && last.text === text && last.today === today && last.reading === reading) return last;
 		const presets = ops.usablePresets(settings.groups.presets);
-		const parsed = this.parse(text, settings);
+		const parsed = parseText(text, settings);
 		const whole = parsed.ensureSections(sectionNames(settings));
 		const doc = normalize(whole, today, boundary, presets);
 		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
@@ -375,18 +370,9 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, dayStartHour } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, prefixes, dayStartHour]);
-	}
-
-	private parse(text: string, settings: TaskCalendarSettings): TaskDocument {
-		const s = settings.sections;
-		return TaskDocument.parse(
-			text,
-			{ inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-			{ dueDate: settings.dueDateMarker, slot: settings.slotMarker, priorities: this.levels(settings).map((l) => l.prefix) },
-		);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, prefixes, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
@@ -425,7 +411,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private boundary(settings: TaskCalendarSettings): DayBoundary {
-		return new DayBoundary(settings.dayStartHour);
+		return boundaryOf(settings);
 	}
 
 	private blank(text: string): boolean {
