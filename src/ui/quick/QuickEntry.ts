@@ -59,6 +59,11 @@ interface Line extends PendingText {
 	readonly repeat: RepeatRule | null;
 }
 
+/** Soon shows only tasks without a date, and a schedule gives an undated task its first day: such a task lands elsewhere. */
+function staysIn(column: ListColumn, repeat: RepeatRule | null): boolean {
+	return !(column === "soon" && repeat?.kind === "schedule");
+}
+
 /** The key of a card that stands for a text not yet written: only its level counts. */
 const UNWRITTEN: TaskKey = { section: "now", index: -1, path: [], raw: "" };
 
@@ -312,7 +317,7 @@ export class QuickEntry {
 
 	/**
 	 * The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a
-	 * moment. It leaves the queue, and the places after it move down, in the very drawing that shows its card. Only a task
+	 * moment. It leaves the queue, and the places after it move down (when the card stays in its column), in the very drawing that shows its card. Only a task
 	 * of its own repeats: a subtask and a task on the calendar are written without the rule.
 	 */
 	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
@@ -336,8 +341,9 @@ export class QuickEntry {
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
-				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), place.level === 0 ? line.repeat : null);
-				return this.deps.fresh(shown(() => this.runs.landed(spot.column, place.index)));
+				const repeat = place.level === 0 ? line.repeat : null;
+				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), repeat);
+				return this.deps.fresh(shown(staysIn(spot.column, repeat) ? () => this.runs.landed(spot.column, place.index) : undefined));
 			}
 		}
 	}

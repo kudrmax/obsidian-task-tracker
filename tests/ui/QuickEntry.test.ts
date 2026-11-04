@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type NewTaskPlace, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
+import { type NewTaskPlace, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
 import type { PlacedCard } from "../../src/ui/drag/listPlace";
 import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
 import { WriteQueue } from "../../src/ui/quick/WriteQueue";
@@ -7,6 +7,9 @@ import { WriteQueue } from "../../src/ui/quick/WriteQueue";
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): PlacedCard => ({ key: key(name), level, top: 0, height: 0, group: null });
 const at = (index: number, level = 0): EntrySpot => ({ kind: "list", column: "left", place: { kind: "gap", index, level, group: null } });
+const inSoon = (index: number): EntrySpot => ({ kind: "list", column: "soon", place: { kind: "gap", index, level: 0, group: null } });
+const WEEKLY: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null };
+const AFTER_DONE: RepeatRule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null };
 const SLOT = { date: "2026-11-01", start: 600, end: null };
 
 function item(name: string, subtasks: TaskItem[] = []): TaskItem {
@@ -50,6 +53,8 @@ class FakeTasks {
 	readonly errors: unknown[] = [];
 	gate: Promise<void> = Promise.resolve();
 	failing = new Set<string>();
+	/** The column shows only tasks without a date, as Soon does. */
+	undated = false;
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
 	private written: PlacedCard[] | null = null;
@@ -75,10 +80,11 @@ class FakeTasks {
 				this.written = null;
 				if (beforeShow) this.see(this.lastState);
 			},
-			createInPlace: async (text, priority, place) => {
+			createInPlace: async (text, priority, place, repeat) => {
 				if (this.failing.has(text)) throw new Error(`no ${text}`);
 				this.created.push({ text, priority, place });
-				this.land(text, place);
+				// A schedule gives the task its first day: it leaves a column of tasks without one.
+				if (!(this.undated && repeat?.kind === "schedule")) this.land(text, place);
 			},
 			edit: async (k, draft) => {
 				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
@@ -654,6 +660,40 @@ describe("QuickEntry", () => {
 		await entry.idle();
 		expect(tasks.changes[tasks.changes.length - 1]).toMatchObject({ spot: at(2) });
 		expect(tasks.drawnNext[tasks.drawnNext.length - 1]).toBe(true);
+	});
+
+	it("a field stays where it is when the task written above it takes a day and leaves its column", async () => {
+		const tasks = new FakeTasks(["A"]);
+		tasks.undated = true;
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(inSoon(1));
+		entry.type("X");
+		entry.setRepeat(WEEKLY);
+		entry.blur();
+		entry.open(inSoon(1));
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0"]);
+		expect(entry.state).toMatchObject({ spot: inSoon(1) });
+	});
+
+	it("a field moves down under a task written above it with a repeat that keeps it in its column", async () => {
+		const tasks = new FakeTasks(["A"]);
+		tasks.undated = true;
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(inSoon(1));
+		entry.type("X");
+		entry.setRepeat(AFTER_DONE);
+		entry.blur();
+		entry.open(inSoon(1));
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "X:0"]);
+		expect(entry.state).toMatchObject({ spot: inSoon(2) });
 	});
 
 	it("a field opened above a task still being written stays where it is", async () => {
