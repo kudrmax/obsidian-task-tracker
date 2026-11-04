@@ -1065,7 +1065,6 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel button.tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
 .tc-panel.is-repeat { width: var(--tc-menu-w); padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
 .tc-panel.is-repeat.has-remove { padding-bottom: 0; }
-.tc-panel.is-repeat > .tc-menu-back { width: auto; margin: calc(var(--tc-space-8) * -1) calc(var(--tc-space-8) * -1) 0; }
 .tc-repeat-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-menu-tile-bg); display: flex; }
 .tc-panel button.tc-repeat-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); padding: 0; border-radius: var(--tc-radius-seg-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
 .tc-panel button.tc-repeat-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }

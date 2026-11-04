@@ -9,7 +9,7 @@ import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
-import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
+import { askGroup, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import { plainText } from "../../application/taskText";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
@@ -402,7 +402,6 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		const { item, actions, today } = this.context;
-		backRow(this.panel, "Repeat", () => this.showMenu());
 		repeatPanel(this.panel, {
 			rule: this.repeat,
 			day: item.dueDate ?? today,

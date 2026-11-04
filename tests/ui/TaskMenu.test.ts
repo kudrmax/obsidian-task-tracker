@@ -258,20 +258,11 @@ describe("the menu", () => {
 			row("Repeat").click();
 			expect(panel().classList.contains("is-repeat")).toBe(true);
 			expect(panel().querySelector(".tc-menu-tiles")).toBeNull();
+			expect(panel().querySelector(".tc-menu-back")).toBeNull();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
 			expect(actions.setRepeat).toHaveBeenCalledWith(weekly([0, 2]));
 			expect(closing()).toBe(false);
 			expect(panel().classList.contains("is-repeat")).toBe(true);
-		});
-
-		it("goes back to the menu, which shows the rule as it is now", () => {
-			open(item({ repeat: weekly([0]) }));
-			row("Repeat").click();
-			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
-			panel().querySelector<HTMLButtonElement>(".tc-menu-back")!.click();
-			expect(panel().classList.contains("is-repeat")).toBe(false);
-			const on = [...row("Repeat").querySelectorAll(".tc-menu-weekday")].map((l) => l.classList.contains("is-on"));
-			expect(on).toEqual([true, false, true, false, false, false, false]);
 		});
 
 		it("takes the repeat off from Remove repeat and gives the menu back, Stop gone", () => {
@@ -284,14 +275,14 @@ describe("the menu", () => {
 			expect(row("Repeat").querySelector(".tc-menu-value")).toBeNull();
 		});
 
-		it("offers no Remove repeat for a task without a repeat, and a first change gives it Stop", () => {
+		it("offers no Remove repeat for a task without a repeat; a first change sets one and the page stays", () => {
 			const actions = open(item());
 			row("Repeat").click();
 			expect(row("Remove repeat")).toBeUndefined();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
-			expect(actions.setRepeat).toHaveBeenCalled();
-			panel().querySelector<HTMLButtonElement>(".tc-menu-back")!.click();
-			expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toContain("Stop");
+			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
+			expect(panel().classList.contains("is-repeat")).toBe(true);
+			expect(closing()).toBe(false);
 		});
 
 		it("starts a new rule from the task's due date", () => {
