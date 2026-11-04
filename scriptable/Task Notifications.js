@@ -741,12 +741,12 @@ var TaskDocument = class _TaskDocument {
     const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
     return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
   }
-  /** The entry's child lines with every subtask `[ ]` and without its due date and slot; description lines as they are. */
+  /** The entry's child lines with every subtask `[ ]` and without its due date, slot and repeat; description lines as they are. */
   freshChildren(entry) {
     const first = this.spanOf(entry).line + 1;
     const children = [...entry.task.children];
     const open = (sub) => {
-      const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null };
+      const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, repeat: null };
       children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
       sub.subtasks.forEach(open);
     };

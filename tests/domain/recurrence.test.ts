@@ -110,8 +110,8 @@ describe("recurClosed: Done and Won't do leave the next copy", () => {
 });
 
 describe("freshChildren", () => {
-	it("opens every subtask at every depth and takes its date and slot away; description lines stay", () => {
+	it("opens every subtask at every depth and takes its date, slot and repeat away; description lines stay", () => {
 		const doc = parse(["## Now", "- [x] A", "\tТекст", "\t- [-] B 📅 2026-11-03 🔁 every day", "\t\tПро B", "\t\t- [x] C ⏰ 2026-11-05 10:00-11:00", "\t- [?] D"].join("\n"));
-		expect(doc.freshChildren(doc.tasks("now")[0])).toEqual(["\tТекст", "\t- [ ] B 🔁 every day", "\t\tПро B", "\t\t- [ ] C", "\t- [ ] D"]);
+		expect(doc.freshChildren(doc.tasks("now")[0])).toEqual(["\tТекст", "\t- [ ] B", "\t\tПро B", "\t\t- [ ] C", "\t- [ ] D"]);
 	});
 });

@@ -632,6 +632,17 @@ describe("repeat", () => {
 		expect(setRepeat(d, d.tasks("inbox")[0], weekly([4], 2), TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-06 🔁 every 2 weeks on Fri from 2026-11-06");
 	});
 
+	it("setRepeat of every 2 weeks on an undated task takes the nearest suitable day", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("inbox")[0], weekly([0], 2), TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-09 🔁 every 2 weeks on Mon from 2026-11-09");
+	});
+
+	it("setRepeat of every 2 months on an undated task takes the nearest suitable day", () => {
+		const d = parseR(FILE);
+		const rule = { kind: "schedule" as const, every: 2, unit: "month" as const, days: [], dayOfMonth: 3, from: null };
+		expect(setRepeat(d, d.tasks("inbox")[0], rule, TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-12-03 🔁 every 2 months on the 3rd from 2026-12-03");
+	});
+
 	it("setRepeat afterDone on an undated task gives no date", () => {
 		const d = parseR(FILE);
 		const set = setRepeat(d, d.tasks("inbox")[0], afterDone, TODAY);

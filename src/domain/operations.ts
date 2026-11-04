@@ -97,7 +97,7 @@ export function setRepeat(doc: TaskDocument, entry: TaskEntry, rule: RepeatRule 
 	if (rule === null) return patch(doc, entry, { repeat: null });
 	const day = dayOf(entry.task, boundary);
 	if (day !== null) return patch(doc, entry, { repeat: anchoredRepeat(rule, day) });
-	const first = anchoredRepeat(rule, today).first(today);
+	const first = rule.kind === "schedule" ? Repeat.of({ ...rule, every: 1, from: null }).first(today) : null;
 	if (first === null) return patch(doc, entry, { repeat: Repeat.of(rule) });
 	return patch(doc, entry, { repeat: anchoredRepeat(rule, first), dueDate: first });
 }
