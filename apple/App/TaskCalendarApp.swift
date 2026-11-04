@@ -10,7 +10,6 @@ struct TaskCalendarApp: App {
     init() {
         UserNotifications.registerCategory()
         UNUserNotificationCenter.current().delegate = Self.notifications
-        Refresh.schedule()
     }
 
     var body: some Scene {
