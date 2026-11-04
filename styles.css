@@ -23,10 +23,13 @@ body {
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
-	/* An event that is over: a grey calendar's block, whatever its own colour. */
-	--tc-event-past-bg: rgba(142, 142, 147, 0.22);
-	--tc-event-past-bar: #8E8E93;
-	--tc-event-past-text: #C7C7C9;
+	/* An event that is over, whatever its calendar's colour: the ground barely lifted, the bar and the title faded into it. */
+	--tc-event-past-lift: 1.5%;
+	--tc-event-past-ink: 12.5%;
+	--tc-event-past-lift-light: 1.2%;
+	--tc-event-past-ink-light: 10%;
+	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift));
+	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink));
 	--tc-on-strong: #000000;
 	--tc-now-ink: #FFFFFF;
 	/* Text on the accent: the time pill of a stretched task and of the drop line. */
@@ -557,8 +560,8 @@ body.theme-light {
 	--tc-stack-2: #EFEFF2;
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
-	--tc-event-past-bg: rgba(142, 142, 147, 0.13);
-	--tc-event-past-text: #66666A;
+	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift-light));
+	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink-light));
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
@@ -878,8 +881,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-event .tc-item-title { color: var(--tc-event-text); }
 .tc-event.is-past { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
 .tc-allday.is-past { background: var(--tc-event-past-bg); }
-.is-past > .tc-event-bar { background: var(--tc-event-past-bar); }
-.tc-event.is-past .tc-item-title, .tc-allday.is-past .tc-allday-title { color: var(--tc-event-past-text); }
+.is-past > .tc-event-bar { background: var(--tc-event-past-fg); }
+.tc-event.is-past .tc-item-title, .tc-allday.is-past .tc-allday-title { color: var(--tc-event-past-fg); }
 .tc-item.is-tiny .tc-event-body { padding: 0 var(--tc-space-5); }
 
 /* The now line: the time in a pill, the line to the right edge. */
