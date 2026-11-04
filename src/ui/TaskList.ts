@@ -81,7 +81,7 @@ export class TaskList {
 		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
-		this.rendered = this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
+		this.rendered = this.groupsOf(items);
 		this.withHeaders = showsHeaders(this.rendered);
 		const rows: { node: HTMLElement; level: number }[] = [];
 		let entered = entry === null;
@@ -177,7 +177,17 @@ export class TaskList {
 
 	/** The cards as places in the list see them, with no measuring: each in the section it is drawn in. The same array until the list draws again. */
 	get listCards(): readonly ListCard[] {
-		return (this.drawnCards ??= this.entries.map((entry) => this.listCard(entry)));
+		return (this.drawnCards ??= cardsOf(this.rendered, this.withHeaders));
+	}
+
+	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
+	get comingCards(): readonly ListCard[] {
+		const groups = this.groupsOf(this.deps.items());
+		return cardsOf(groups, showsHeaders(groups));
+	}
+
+	private groupsOf(items: readonly TaskItem[]): ListGroup[] {
+		return this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
 	}
 
 	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */
@@ -211,6 +221,17 @@ export class TaskList {
  * The branch lines of the row at `i` among rows of these `levels`: whether it is the last of its task's subtasks, and for each
  * task above its own whether that one has a later sibling, so its line goes on past the row.
  */
+/** Each task, then its subtasks a level deeper, in the order the sections are drawn; a list without headers puts every card outside any section. */
+function cardsOf(groups: readonly ListGroup[], withHeaders: boolean): ListCard[] {
+	const cards: ListCard[] = [];
+	const add = (item: TaskItem, level: number): void => {
+		cards.push({ key: item.key, level, group: withHeaders ? item.group : null });
+		for (const sub of item.subtasks) add(sub, level + 1);
+	};
+	for (const group of groups) for (const item of group.items) add(item, 0);
+	return cards;
+}
+
 function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {
 	const goesOn = (level: number): boolean => levels.slice(i + 1).find((l) => l <= level) === level;
 	const through = Array.from({ length: levels[i] - 1 }, (_, k) => goesOn(k + 1));

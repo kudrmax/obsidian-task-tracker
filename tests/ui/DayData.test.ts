@@ -275,6 +275,15 @@ describe("DayData", () => {
 		expect(order).toEqual(["before", "tasks"]);
 	});
 
+	it("runs beforeShow once what was read is the data, so it sees the tasks the screen is about to draw", async () => {
+		const { data, tasks } = setup();
+		await data.tasks();
+		await tasks.rename(data.day!.list[0].key, "Renamed");
+		let seen = "";
+		await data.tasks(() => (seen = data.day!.list[0].text));
+		expect(seen).toBe("Renamed");
+	});
+
 	it("runs beforeShow even when the tasks read are the same", async () => {
 		const { data, updates } = setup();
 		await data.tasks();

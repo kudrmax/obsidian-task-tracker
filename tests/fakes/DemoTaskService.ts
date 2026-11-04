@@ -164,8 +164,8 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat: RepeatRule | null = null): Promise<void> {
-		if (!text.trim()) return;
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat: RepeatRule | null = null): Promise<TaskKey | null> {
+		if (!text.trim()) return null;
 		const added = task(text.trim(), { priority, repeat });
 		if (place.kind === "slot") {
 			added.slot = place.slot;
@@ -178,6 +178,15 @@ export class DemoTaskService implements TaskService {
 			list.splice(at, 0, added);
 		}
 		this.changed();
+		return this.keyOf(added);
+	}
+
+	private keyOf(t: DemoTask): TaskKey | null {
+		for (const section of Object.keys(this.sections) as SectionKey[]) {
+			const index = this.sections[section].indexOf(t);
+			if (index >= 0) return this.item(section, index).key;
+		}
+		return null;
 	}
 
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {

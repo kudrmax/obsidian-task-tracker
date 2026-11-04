@@ -90,6 +90,11 @@ function indentWidth(line: string): number {
 }
 
 function sameTask(a: Task, b: Task): boolean {
+	return sameOwnLine(a, b) && sameLines(a.children, b.children);
+}
+
+/** The same task line, whatever lies under it. */
+function sameOwnLine(a: Task, b: Task): boolean {
 	return (
 		a.status === b.status &&
 		a.statusChar === b.statusChar &&
@@ -99,9 +104,13 @@ function sameTask(a: Task, b: Task): boolean {
 		(a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
-		a.slot?.end === b.slot?.end &&
-		sameLines(a.children, b.children)
+		a.slot?.end === b.slot?.end
 	);
+}
+
+/** Every task and subtask, each before its own subtasks. */
+function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
+	return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
 }
 
 function sameLines(a: readonly string[], b: readonly string[]): boolean {
@@ -195,6 +204,19 @@ export class TaskDocument {
 
 	allTasks(): readonly TaskEntry[] {
 		return SECTION_KEYS.flatMap((key) => this.tasks(key));
+	}
+
+	/**
+	 * The task this document holds once more than `before` does, by its own line: the one a change added, wherever the
+	 * rules then moved it. Of twin lines, the later.
+	 */
+	addedSince(before: TaskDocument): TaskEntry | undefined {
+		const left = flatten(before.allTasks());
+		return flatten(this.allTasks()).find((entry) => {
+			const twin = left.findIndex((other) => sameOwnLine(other.task, entry.task));
+			if (twin >= 0) left.splice(twin, 1);
+			return twin < 0;
+		});
 	}
 
 	insert(section: SectionKey, position: InsertPosition, task: Task): TaskDocument {

@@ -55,6 +55,10 @@ class FakeTasks {
 	failing = new Set<string>();
 	/** The column holds only tasks without a date: Soon shows only those, and normalize moves a dated Inbox or Backlog task out. */
 	undated = false;
+	/** The file puts every new task elsewhere than its column, whatever it is: the entry can only learn it. */
+	elsewhere = false;
+	/** The file puts a new task at the end of the column, wherever it was typed. */
+	atEnd = false;
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
 	private written: PlacedCard[] | null = null;
@@ -75,8 +79,9 @@ class FakeTasks {
 			fresh: async (beforeShow) => {
 				await this.gate;
 				if (this.failingReads.has(++this.reads)) throw new Error("no read");
-				beforeShow?.();
-				if (this.written) this.cards = this.written;
+				const coming = this.written ?? this.cards;
+				beforeShow?.(() => coming);
+				this.cards = coming;
 				this.written = null;
 				if (beforeShow) this.see(this.lastState);
 			},
@@ -84,7 +89,8 @@ class FakeTasks {
 				if (this.failing.has(text)) throw new Error(`no ${text}`);
 				this.created.push({ text, priority, place });
 				// A schedule gives the task its first day: it leaves a column of tasks without one.
-				if (!(this.undated && repeat?.kind === "schedule")) this.land(text, place);
+				if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
+				return this.land(text, place);
 			},
 			edit: async (k, draft) => {
 				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
@@ -113,9 +119,10 @@ class FakeTasks {
 		return this.cards.map((c) => `${c.key.raw}:${c.level}`);
 	}
 
-	private land(text: string, place: NewTaskPlace): void {
+	/** The card the lists show for a new task, and its key; none for a slot, which is off the lists. */
+	private land(text: string, place: NewTaskPlace): TaskKey | null {
 		const indexOf = (k: TaskKey) => this.cards.findIndex((c) => c.key.raw === k.raw);
-		if (place.kind === "slot") return;
+		if (place.kind === "slot") return null;
 		let level = 0;
 		let index = this.cards.length;
 		if (place.kind === "subtask") {
@@ -125,10 +132,12 @@ class FakeTasks {
 			while (index < this.cards.length && this.cards[index].level >= level) index++;
 		}
 		if (place.before) index = indexOf(place.before);
+		if (this.atEnd) index = this.cards.length;
 		// A write makes every key read before it stale: the lists hand out new ones.
 		const cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)].map((c) => ({ ...c, key: { ...c.key } }));
 		if (this.lagging) this.written = cards;
 		else this.cards = cards;
+		return cards[index].key;
 	}
 }
 
@@ -714,6 +723,40 @@ describe("QuickEntry", () => {
 		await entry.idle();
 		expect(tasks.names).toEqual(["A:0", "X:0"]);
 		expect(entry.state).toMatchObject({ spot: inSoon(2) });
+	});
+
+	for (const column of ["inbox", "backlog"] as const) {
+		it(`a field in ${column} moves down under a plain task written above it, which stays in the column`, async () => {
+			const tasks = new FakeTasks(["A"]);
+			tasks.undated = true;
+			const entry = tasks.entry();
+			const spot = (index: number): EntrySpot => ({ kind: "list", column, place: { kind: "gap", index, level: 0, group: null } });
+			entry.open(spot(1));
+			typeLines(entry, ["X"]);
+			await entry.idle();
+			expect(tasks.names).toEqual(["A:0", "X:0"]);
+			expect(entry.state).toMatchObject({ spot: spot(2) });
+		});
+	}
+
+	it("a field follows where the file put the task, not where the field guessed: a task put elsewhere leaves it in place", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.elsewhere = true;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		typeLines(entry, ["X"]);
+		await entry.idle();
+		expect([tasks.names, entry.state?.spot]).toEqual([["A:0", "B:0"], at(1)]);
+	});
+
+	it("a field moves only when the task landed at or above it: one the file put further down leaves it in place", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.atEnd = true;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		typeLines(entry, ["X"]);
+		await entry.idle();
+		expect([tasks.names, entry.state?.spot]).toEqual([["A:0", "B:0", "X:0"], at(1)]);
 	});
 
 	it("a field opened above a task still being written stays where it is", async () => {

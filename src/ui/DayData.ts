@@ -38,6 +38,8 @@ export class DayData {
 	private readonly eventReload: Reload<DayEvents>;
 	/** The next fetch is for a day that opens: it asks for the days next to it too. Taken when the fetch starts. */
 	private around = false;
+	/** The `beforeShow` of the tasks being shown: run once they are the data, before the screen is told. */
+	private showing: (() => void)[] = [];
 
 	constructor(private readonly deps: DayDataDeps) {
 		this.taskReload = new Reload(() => this.readTasks(), (state) => this.show(() => (this.state = state)));
@@ -90,9 +92,12 @@ export class DayData {
 		return this.tasks();
 	}
 
-	/** The tasks file read afresh: after a change to it. `beforeShow` runs right before what was read is shown. */
+	/**
+	 * The tasks file read afresh: after a change to it. `beforeShow` runs once what was read is the data and before it
+	 * is shown: what reads the data then reads what the screen is about to draw.
+	 */
 	tasks(beforeShow?: () => void): Promise<void> {
-		return this.taskReload.request(beforeShow);
+		return this.taskReload.request(beforeShow && (() => this.showing.push(beforeShow)));
 	}
 
 	/** The events fetched afresh for the day alone: Refresh now in the sources popover, the polling, a source that changed. */
@@ -136,6 +141,7 @@ export class DayData {
 
 	private show(change: () => void): void {
 		change();
+		for (const hook of this.showing.splice(0)) hook();
 		for (const part of ["tasks", "events"] as const) {
 			const drawn = this.drawnOf(part);
 			if (drawn === this.shown[part]) continue;

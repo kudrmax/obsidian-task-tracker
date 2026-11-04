@@ -503,6 +503,34 @@ describe("createInPlace", () => {
 		expect(store.writes).toBe(2);
 	});
 
+	it("gives the key of the task it created, as the file stands after the write", async () => {
+		const { svc } = setup(TEXT);
+		const [, b] = (await svc.dayView(T)).list;
+		const key = await svc.createInPlace("N", "p1", { kind: "list", list: "now", group: "X", before: b.key });
+		expect(key).toEqual((await svc.dayView(T)).list.find((i) => i.text === "N")!.key);
+	});
+
+	it("gives the key where normalizing moved the task: a schedule typed in Inbox lands in Soon", async () => {
+		const { svc } = setup(TEXT);
+		const key = await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null });
+		const run = (await svc.dayView("2026-11-05")).list.find((i) => i.text === "Run")!;
+		expect([key, (await svc.inboxView()).length]).toEqual([run.key, 0]);
+		expect(key!.section).toBe("soon");
+	});
+
+	it("gives a subtask's key, and the later of two twins typed one after the other", async () => {
+		const TRIP = "## Inbox\n\n## Now\n\n- [ ] Trip\n\t- [ ] Bag\n\n## Soon\n\n## Done\n";
+		const { svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		const key = await svc.createInPlace("Bag", null, { kind: "subtask", parent: trip.key, before: null });
+		expect(key).toEqual((await svc.dayView(T)).list[0].subtasks[1].key);
+	});
+
+	it("gives null when it creates nothing", async () => {
+		const { svc } = setup(TEXT);
+		expect(await svc.createInPlace("  ", null, { kind: "list", list: "now", group: null, before: null })).toBeNull();
+	});
+
 	it("slot is created as createAtTime does", async () => {
 		const a = setup(FULL);
 		const b = setup(FULL);

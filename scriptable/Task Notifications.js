@@ -563,7 +563,13 @@ function indentWidth(line) {
   return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
+  return sameOwnLine(a, b) && sameLines(a.children, b.children);
+}
+function sameOwnLine(a, b) {
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end;
+}
+function flatten(entries) {
+  return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
 }
 function sameLines(a, b) {
   return a.length === b.length && a.every((line, i) => line === b[i]);
@@ -634,6 +640,18 @@ var TaskDocument = class _TaskDocument {
   }
   allTasks() {
     return SECTION_KEYS.flatMap((key) => this.tasks(key));
+  }
+  /**
+   * The task this document holds once more than `before` does, by its own line: the one a change added, wherever the
+   * rules then moved it. Of twin lines, the later.
+   */
+  addedSince(before) {
+    const left = flatten(before.allTasks());
+    return flatten(this.allTasks()).find((entry) => {
+      const twin = left.findIndex((other) => sameOwnLine(other.task, entry.task));
+      if (twin >= 0) left.splice(twin, 1);
+      return twin < 0;
+    });
   }
   insert(section, position, task) {
     const line = this.insertionLine(section, position);

@@ -52,7 +52,7 @@ export interface QuickEntryControllerDeps {
 	turnTo(mode: RightMode): void;
 	/** The day column opens `date`; resolves once its tasks show. */
 	showDay(date: LocalDate): Promise<void>;
-	/** Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it. */
+	/** Resolves once the lists show the file as of the last write; `beforeShow` runs once their data is what was read, right before they draw it. */
 	fresh(beforeShow?: () => void): Promise<void>;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
@@ -550,11 +550,11 @@ export class QuickEntryController {
 	 * The lists read afresh; with `beforeShow`, the entry changes as they draw what was read. A read the same as shown, or
 	 * one a gesture holds back, draws nothing then: the entry's change is drawn here, or waits with the gesture.
 	 */
-	private async fresh(beforeShow?: () => void): Promise<void> {
+	private async fresh(beforeShow?: (coming: (column: ListColumn) => readonly ListCard[]) => void): Promise<void> {
 		if (!beforeShow) return this.deps.fresh();
 		let mark = -1;
 		await this.deps.fresh(() => {
-			beforeShow();
+			beforeShow((column) => this.deps.list(column)?.comingCards ?? []);
 			mark = this.draws;
 		});
 		if (mark === this.draws) this.deps.render();

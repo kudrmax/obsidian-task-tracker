@@ -112,7 +112,10 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		tasks: {
 			createInPlace: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
-				if (drawsOnFresh === "grows") (items.left ??= []).push(item(text, key("now", (items.left ?? []).length)));
+				if (drawsOnFresh !== "grows") return null;
+				const added = item(text, key("now", (items.left ?? []).length));
+				(items.left ??= []).push(added);
+				return added.key;
 			},
 			edit: async (k, draft) => {
 				edits.push({ key: k, draft });
