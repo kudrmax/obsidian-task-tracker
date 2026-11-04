@@ -95,6 +95,7 @@ export class DemoTaskService implements TaskService {
 			status: t.status,
 			dueDate: t.dueDate,
 			slot: t.slot,
+			reminder: "notification",
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			subtasks: [],
 			progress: null,
@@ -230,6 +231,9 @@ export class DemoTaskService implements TaskService {
 		this.find(key).dueDate = date;
 		this.changed();
 	}
+
+	/** The demo keeps no reminder kinds: every task on a time reminds with a notification. */
+	async setReminder(): Promise<void> {}
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		this.find(key).priority = priority;

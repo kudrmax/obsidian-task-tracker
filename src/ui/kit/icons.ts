@@ -38,6 +38,7 @@ const DRAWINGS = {
 	check: { d: "M5 12.5l4.5 4.5L19 7" },
 	google: { d: "M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5H7z" },
 	work: { d: "M9 2.5h6a2.5 2.5 0 0 1 2.5 2.5v14a2.5 2.5 0 0 1-2.5 2.5H9A2.5 2.5 0 0 1 6.5 19V5A2.5 2.5 0 0 1 9 2.5z M11 18.5h2" },
+	reminder: { d: "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z M10 21h4" },
 	refresh: { d: "M20 12a8 8 0 1 1-2.3-5.7 M20 4v4.5h-4.5" },
 } satisfies Record<string, IconSpec>;
 

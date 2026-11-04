@@ -1,4 +1,4 @@
-import type { GroupName, TaskItem } from "../../application/contracts";
+import type { GroupName, ReminderKind, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
@@ -18,7 +18,7 @@ import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 
 export type StatusTileId = "done" | "progress" | "wontdo";
-export type EditRowId = "rename" | "description" | "section" | "subtask";
+export type EditRowId = "rename" | "reminder" | "description" | "section" | "subtask";
 type Asking = "delete" | "wontdo";
 
 export interface StatusTile {
@@ -45,10 +45,19 @@ export function statusTiles(item: TaskItem): readonly StatusTile[] {
 
 export type { SectionChoice } from "./SectionChooser";
 
-/** The edit group: Rename, Add description for a task without one, the section with its name beside it, a subtask. */
+const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", none: "Off" };
+const REMINDER_ORDER: readonly ReminderKind[] = ["notification", "alarm", "none"];
+
+/** A tap on the reminder row: the next kind, round. */
+export function nextReminder(kind: ReminderKind): ReminderKind {
+	return REMINDER_ORDER[(REMINDER_ORDER.indexOf(kind) + 1) % REMINDER_ORDER.length];
+}
+
+/** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
+		...(item.slot === null ? [] : [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const]),
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
@@ -79,6 +88,7 @@ export interface MenuActions {
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
+	setReminder(kind: ReminderKind): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
 	/** The description's screen: to read it, or straight in the editor. */
@@ -292,6 +302,7 @@ export class TaskMenu extends LiftedMenu {
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
+			reminder: this.pick(() => actions.setReminder(nextReminder(item.reminder))),
 			description: this.pick(() => actions.openDescription(true)),
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),

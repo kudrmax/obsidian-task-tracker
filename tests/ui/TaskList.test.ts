@@ -9,6 +9,7 @@ const task = (text: string, index: number): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	reminder: "notification",
 	priority: null,
 	group: null,
 	subtasks: [],

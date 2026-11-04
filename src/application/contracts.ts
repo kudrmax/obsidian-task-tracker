@@ -1,7 +1,7 @@
-import type { GroupName, LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
 import type { PriorityLevel } from "../settings";
 
-export type { GroupName, SectionKey };
+export type { GroupName, ReminderKind, SectionKey };
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
 
@@ -46,6 +46,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** How the phone reminds of the task at its slot's start; a task without a slot keeps the default. */
+	readonly reminder: ReminderKind;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
 	/** The section of its list it sits in; null outside any. */
@@ -173,6 +175,8 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/** How the phone reminds of a task on a time: the marker before its slot. */
+	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes

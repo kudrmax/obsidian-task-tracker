@@ -60,6 +60,7 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
+		reminder: entry.task.reminder,
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 		group: entry.group,
 		subtasks: entry.subtasks.filter(isOpen).map((sub) => toItem(sub, levelOf, entry.task.text)),

@@ -3,7 +3,7 @@ import type { TaskItem } from "../../src/application/contracts";
 import { canRemoveDue, moveTiles } from "../../src/ui/menu/quickMoves";
 
 const TODAY = "2026-11-03";
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
 const ids = (task: TaskItem) => moveTiles(task, TODAY).map((tile) => tile.id);
 
 describe("moveTiles", () => {
