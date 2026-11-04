@@ -3,12 +3,12 @@ import AppIntents
 
 /// The alarm's Snooze: silences it and moves the task by the app's alarm snooze.
 struct SnoozeAlarmIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Отложить задачу"
+    static let title: LocalizedStringResource = "Snooze Task"
     static let isDiscoverable = false
 
-    @Parameter(title: "Напоминание") var reminderID: String
-    @Parameter(title: "Задача") var title: String
-    @Parameter(title: "Дата") var date: String
+    @Parameter(title: "Reminder") var reminderID: String
+    @Parameter(title: "Task") var title: String
+    @Parameter(title: "Date") var date: String
 
     init() {}
 

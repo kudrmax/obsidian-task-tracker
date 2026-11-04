@@ -81,7 +81,7 @@ final class UserNotifications: NotificationScheduling {
         let shown = await Self.center.deliveredNotifications().contains { $0.request.identifier == Self.problem && $0.request.content.body == reason }
         guard !shown else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Напоминания не обновились"
+        content.title = "Reminders Not Updated"
         content.body = reason
         content.sound = nil
         content.interruptionLevel = .active

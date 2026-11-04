@@ -37,7 +37,7 @@ public enum SyncStatus: Equatable, Sendable {
 
 /// Keeps the notifications and alarms equal to the tasks file, and carries out Done and the snoozes.
 public actor ReminderSync {
-    static let actionFailed = "Не получилось — открой Obsidian"
+    static let actionFailed = "Didn't work — open Obsidian"
 
     private enum Operation: Sendable {
         case sync
@@ -102,7 +102,7 @@ public actor ReminderSync {
             let file = try vault.read()
             let reminders = try rules.reminders(text: file.tasks, settingsJSON: file.settingsJSON, now: at)
             if let failure = await apply(reminders, at: at) {
-                status = .failed("Не все напоминания поставлены: \(failure.localizedDescription)")
+                status = .failed("Some reminders weren't set: \(failure.localizedDescription)")
             } else {
                 status = .ok(reminders: Set(reminders.map(\.id)).count, at: at)
             }
@@ -163,10 +163,10 @@ public actor ReminderSync {
 
     private static func message(_ error: Error) -> String {
         switch error {
-        case VaultError.noAccess: "Нет доступа к папке vault: выбери её в приложении"
-        case VaultError.tasksFileMissing(let path): "Нет файла задач «\(path)» в папке vault"
-        case PhoneCoreError.scriptFailed(let reason): "Не удалось разобрать файл задач: \(reason)"
-        default: "Не удалось прочитать файл задач: \(error.localizedDescription)"
+        case VaultError.noAccess: "No access to the vault folder: choose it in the app"
+        case VaultError.tasksFileMissing(let path): "No tasks file “\(path)” in the vault folder"
+        case PhoneCoreError.scriptFailed(let reason): "Couldn't read the tasks: \(reason)"
+        default: "Couldn't read the tasks file: \(error.localizedDescription)"
         }
     }
 }

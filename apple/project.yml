@@ -36,6 +36,6 @@ targets:
         CFBundleDisplayName: Task Calendar
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        NSAlarmKitUsageDescription: Будильники для задач со временем
+        NSAlarmKitUsageDescription: Alarms for tasks set to a time
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]

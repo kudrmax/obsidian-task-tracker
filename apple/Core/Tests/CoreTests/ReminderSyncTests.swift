@@ -146,13 +146,13 @@ actor FakeAlarms: AlarmScheduling {
         let s = sync(vault)
         _ = await s.sync()
         vault.writeFails = true
-        #expect(await s.complete(reminderID: Self.quiet) == .failed("Не получилось — открой Obsidian"))
+        #expect(await s.complete(reminderID: Self.quiet) == .failed("Didn't work — open Obsidian"))
         #expect(await notifications.reminderIDs() == [Self.quiet])
     }
 
     @Test func noAccessIsSaid() async {
         let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks()), rules: rules, notifications: notifications, alarms: alarms, now: { Fixtures.date(4, 9) })
-        #expect(await s.sync() == .failed("Нет доступа к папке vault: выбери её в приложении"))
+        #expect(await s.sync() == .failed("No access to the vault folder: choose it in the app"))
     }
 
     @Test func anActionWaitsForASyncAlreadyRunning() async {
@@ -175,7 +175,7 @@ actor FakeAlarms: AlarmScheduling {
         let status = await sync(FakeVault(Fixtures.file(Self.quiet, Self.alarm))).sync()
         #expect(await alarms.alarms == [Self.alarm: Fixtures.date(4, 12)])
         guard case .failed(let reason) = status else { Issue.record("expected a failure, got \(status)"); return }
-        #expect(reason.hasPrefix("Не все напоминания поставлены"))
+        #expect(reason.hasPrefix("Some reminders weren't set"))
     }
 
     @Test func aFailedSyncIsShownAndAGoodOneTakesItAway() async {
@@ -185,6 +185,6 @@ actor FakeAlarms: AlarmScheduling {
         _ = await s.sync()
         vault.readFails = nil
         _ = await s.sync()
-        #expect(await notifications.problems == ["Нет доступа к папке vault: выбери её в приложении", nil])
+        #expect(await notifications.problems == ["No access to the vault folder: choose it in the app", nil])
     }
 }

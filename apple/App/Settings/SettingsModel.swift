@@ -29,7 +29,7 @@ final class SettingsModel {
             folderName = folder.lastPathComponent
             UserDefaults.standard.set(folderName, forKey: Self.folderKey)
         } catch {
-            status = .failed("Не удалось открыть папку: \(error.localizedDescription)")
+            status = .failed("Couldn't open the folder: \(error.localizedDescription)")
             return
         }
         await refresh()

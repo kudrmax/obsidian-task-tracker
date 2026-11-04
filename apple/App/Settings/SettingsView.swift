@@ -14,28 +14,28 @@ struct SettingsView: View {
             Form {
                 Section {
                     Button { picking = true } label: {
-                        LabeledContent("Папка vault", value: model.folderName ?? "Не выбрана")
+                        LabeledContent("Vault Folder", value: model.folderName ?? "Not Chosen")
                     }
                     status
                 } footer: {
-                    Text("Папка волта Obsidian: On My iPhone → Obsidian → твой волт.")
+                    Text("Your Obsidian vault: On My iPhone → Obsidian → your vault.")
                 }
 
-                Section("Разрешения") {
-                    permission("Уведомления", allowed: model.notifications == .authorized, undecided: model.notifications == .notDetermined) {
+                Section("Permissions") {
+                    permission("Notifications", allowed: model.notifications == .authorized, undecided: model.notifications == .notDetermined) {
                         await model.allowNotifications()
                     }
-                    permission("Будильники", allowed: model.alarms == .authorized, undecided: model.alarms == .notDetermined) {
+                    permission("Alarms", allowed: model.alarms == .authorized, undecided: model.alarms == .notDetermined) {
                         await model.allowAlarms()
                     }
                 }
 
                 Section {
-                    Picker("Отложить будильник на", selection: $model.alarmSnooze) {
-                        ForEach(AppSettings.alarmSnoozeChoices, id: \.self) { Text("\($0) мин").tag($0) }
+                    Picker("Snooze Alarm For", selection: $model.alarmSnooze) {
+                        ForEach(AppSettings.alarmSnoozeChoices, id: \.self) { Text("\($0) min").tag($0) }
                     }
                 } footer: {
-                    Text("Кнопка Snooze на будильнике переносит задачу на это время.")
+                    Text("Snooze on an alarm moves the task this much later.")
                 }
             }
             .navigationTitle("Task Calendar")
@@ -53,13 +53,13 @@ struct SettingsView: View {
     private var status: some View {
         switch model.status {
         case .ok(let reminders, let at):
-            LabeledContent("Напоминаний", value: "\(reminders)")
-            LabeledContent("Обновлено", value: at.formatted(date: .omitted, time: .shortened))
+            LabeledContent("Reminders", value: "\(reminders)")
+            LabeledContent("Updated", value: at.formatted(date: .omitted, time: .shortened))
         case .failed(let reason):
             Label(reason, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
         case nil:
-            Text("Ещё не обновлялось").foregroundStyle(.secondary)
+            Text("Not updated yet").foregroundStyle(.secondary)
         }
     }
 
@@ -68,9 +68,9 @@ struct SettingsView: View {
             if allowed {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             } else if undecided {
-                Button("Разрешить") { Task { await ask() } }
+                Button("Allow") { Task { await ask() } }
             } else {
-                Button("Открыть настройки") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
             }
         }
     }
