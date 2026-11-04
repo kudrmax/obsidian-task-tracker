@@ -10,6 +10,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	reminder: "notification",
 	priority: null,
 	group: null,
 	subtasks: [],

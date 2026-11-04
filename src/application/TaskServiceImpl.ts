@@ -2,7 +2,7 @@ import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate, toItem } from "../domain/queries";
-import type { LocalDate, Slot, TaskStatus } from "../domain/Task";
+import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
@@ -143,6 +143,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
+	}
+
+	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
+		await this.mutate((doc) => ops.setReminder(doc, this.entryOf(doc, key), reminder));
 	}
 
 	async rename(key: TaskKey, text: string): Promise<void> {

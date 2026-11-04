@@ -16,6 +16,7 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		status: "todo",
 		dueDate: null,
 		slot: null,
+		reminder: "notification",
 		priority: { prefix: "!", color: "red" },
 		group: null,
 		subtasks,

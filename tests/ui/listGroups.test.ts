@@ -9,6 +9,7 @@ const item = (text: string, group: GroupName): TaskItem => ({
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	reminder: "notification",
 	priority: null,
 	group,
 	subtasks: [],

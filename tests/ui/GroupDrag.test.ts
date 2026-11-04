@@ -39,6 +39,7 @@ describe("a section carried (block 3)", () => {
 		status: "todo",
 		dueDate: null,
 		slot: null,
+		reminder: "notification",
 		priority: null,
 		group,
 		subtasks: [],

@@ -378,6 +378,13 @@ describe("priority", () => {
 		expect(view.list[1].priority).toBeNull();
 	});
 
+	it("setReminder writes the kind's marker before the time, and the item carries the kind", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-30 10:00\n\n## Soon\n\n## Done\n");
+		await svc.setReminder((await svc.dayView(T)).slotted[0].key, "alarm");
+		expect(store.text).toContain("- [ ] A 🚨 2026-10-30 10:00");
+		expect((await svc.dayView(T)).slotted[0].reminder).toBe("alarm");
+	});
+
 	it("setPriority writes the prefix, null takes it off", async () => {
 		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] p1 A\n\n## Soon\n\n## Done\n");
 		await svc.setPriority((await svc.dayView(T)).list[0].key, "p2");
