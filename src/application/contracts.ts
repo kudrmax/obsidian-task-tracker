@@ -183,8 +183,9 @@ export interface TaskService {
 	/**
 	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
 	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.
+	 * Gives the task's key after the write, wherever the write moved it, so the next change from the same open panel finds it.
 	 */
-	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void>;
+	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<TaskKey>;
 	/** Stops a repeating task: the rule goes and the task is done, with no next copy. */
 	stop(key: TaskKey): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;

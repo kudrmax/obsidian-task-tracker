@@ -239,9 +239,10 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
+	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<TaskKey> {
 		this.find(key).repeat = rule;
 		this.changed();
+		return key;
 	}
 
 	async stop(key: TaskKey): Promise<void> {

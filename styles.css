@@ -1034,7 +1034,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* The quick moves: their icons in the accent, as the drop zones' were. */
 .tc-menu-tiles.is-move .tc-menu-tile > svg { color: var(--tc-accent-ui); }
 .tc-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
-.tc-menu-tiles.is-four .tc-menu-tile-label { padding: 0; }
+.tc-menu-tiles.is-four .tc-menu-tile-label { width: auto; padding: 0; overflow: visible; }
+.tc-menu-tiles.is-four .tc-menu-tile-label.is-long { text-align: center; -webkit-mask-image: none; mask-image: none; }
 .tc-menu-tile-label.is-long { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
 .tc-menu-badge { position: absolute; top: var(--tc-menu-badge-inset); right: var(--tc-menu-badge-inset); width: var(--tc-menu-badge); height: var(--tc-menu-badge); border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); color: var(--tc-menu-badge-ink); display: flex; align-items: center; justify-content: center; }
 .tc-menu-badge svg { width: var(--tc-menu-badge-icon); height: var(--tc-menu-badge-icon); stroke-width: var(--tc-stroke-badge); }

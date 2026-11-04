@@ -120,6 +120,24 @@ describe("repeatPanel", () => {
 		expect(changes).toEqual([]);
 	});
 
+	it("gains Remove repeat with the first change to a task that had no rule", () => {
+		const { panel } = open({ onRemove: () => undefined });
+		expect(panel.querySelector(".tc-repeat-remove")).toBeNull();
+		segment(panel, ".tc-repeat-unit", "days").click();
+		const row = panel.querySelector<HTMLElement>(".tc-repeat-remove");
+		expect([row?.textContent, panel.lastElementChild === row, panel.classList.contains("has-remove")]).toEqual(["Remove repeat", true, true]);
+		segment(panel, ".tc-repeat-unit", "weeks").click();
+		expect(panel.querySelectorAll(".tc-repeat-remove")).toHaveLength(1);
+		expect(panel.lastElementChild).toBe(panel.querySelector(".tc-repeat-remove"));
+	});
+
+	it("drawn again into the same panel for a task without a rule, leaves no room for a Remove row it does not have", () => {
+		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null }, onRemove: () => undefined });
+		panel.replaceChildren();
+		repeatPanel(panel, { rule: null, day: THURSDAY, onChange: () => undefined, onRemove: () => undefined });
+		expect([panel.querySelector(".tc-repeat-remove"), panel.classList.contains("has-remove")]).toEqual([null, false]);
+	});
+
 	it("Remove repeat only with onRemove", () => {
 		expect(open().panel.querySelector(".tc-repeat-remove")).toBeNull();
 		let removed = 0;

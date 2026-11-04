@@ -150,8 +150,17 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
 	}
 
-	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
-		await this.mutate((doc, today, _settings, boundary) => ops.setRepeat(doc, this.entryOf(doc, key), rule, today, boundary));
+	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<TaskKey> {
+		let written: TaskEntry | undefined;
+		await this.mutate((doc, today, _settings, boundary) => {
+			const entry = this.entryOf(doc, key);
+			const result = ops.setRepeat(doc, entry, rule, today, boundary);
+			written = result.find(entry.section, entry.index, entry.path);
+			return result;
+		});
+		const raw = written?.raw;
+		const moved = this.normalized?.doc.allTasks().find((entry) => entry.raw === raw);
+		return moved ? { section: moved.section, index: moved.index, path: moved.path, raw: moved.raw } : key;
 	}
 
 	async stop(key: TaskKey): Promise<void> {

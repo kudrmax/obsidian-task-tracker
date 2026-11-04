@@ -410,14 +410,11 @@ export class TaskMenu extends LiftedMenu {
 				void actions.setRepeat(rule);
 				this.place();
 			},
-			onRemove:
-				this.repeat === null
-					? null
-					: () => {
-							this.repeat = null;
-							void actions.setRepeat(null);
-							this.showMenu();
-						},
+			onRemove: () => {
+				this.repeat = null;
+				void actions.setRepeat(null);
+				this.showMenu();
+			},
 		});
 		this.place();
 	}

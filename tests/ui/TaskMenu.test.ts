@@ -283,6 +283,8 @@ describe("the menu", () => {
 			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
 			expect(panel().classList.contains("is-repeat")).toBe(true);
 			expect(closing()).toBe(false);
+			row("Remove repeat")!.click();
+			expect(actions.setRepeat).toHaveBeenLastCalledWith(null);
 		});
 
 		it("starts a new rule from the task's due date", () => {
