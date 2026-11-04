@@ -40,4 +40,13 @@ import Testing
         #expect(a.first?.identifier == "A#0")
         #expect(Set(b.map(\.identifier)).isSubset(of: Set(a.map(\.identifier))))
     }
+
+    @Test func overdueRepeatsNeverCrowdOutAStart() {
+        let overdue = (1...6).map { reminder("Late\($0)", start: Fixtures.date(4, 6)) }
+        let tomorrow = reminder("Tomorrow", start: Fixtures.date(5, 8), dayEnd: Fixtures.date(6, 5))
+        let plan = RepeatPlan.plan(overdue + [tomorrow], now: Fixtures.date(4, 9))
+        #expect(plan.count == RepeatPlan.budget)
+        #expect(plan.contains { $0.identifier == "Tomorrow#0" })
+        #expect(plan == plan.sorted { $0.fire < $1.fire })
+    }
 }

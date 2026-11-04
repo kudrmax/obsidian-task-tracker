@@ -5,9 +5,13 @@ import Testing
 final class FakeVault: TasksVault, @unchecked Sendable {
     var text: String
     var writeFails = false
+    var readFails: VaultError?
     var changeBeforeWrite: String?
     init(_ text: String) { self.text = text }
-    func read() throws -> (tasks: String, settingsJSON: String) { (text, "") }
+    func read() throws -> (tasks: String, settingsJSON: String) {
+        if let error = readFails { throw error }
+        return (text, "")
+    }
     func write(tasks: String, expecting old: String) throws -> Bool {
         if writeFails { throw CocoaError(.fileWriteNoPermission) }
         if let changed = changeBeforeWrite { text = changed; changeBeforeWrite = nil }
@@ -21,9 +25,27 @@ actor FakeNotifications: NotificationScheduling {
     var pendingIDs: [String: PlannedNotification] = [:]
     var deliveredList: [DeliveredNotification] = []
     var calls = 0
-    func pending() async -> Set<String> { Set(pendingIDs.keys) }
+    var scheduleFails = false
+    var problems: [String?] = []
+    private var holdNext = false
+    private var held: CheckedContinuation<Void, Never>?
+    func pending() async -> Set<String> {
+        if holdNext {
+            holdNext = false
+            await withCheckedContinuation { held = $0 }
+        }
+        return Set(pendingIDs.keys)
+    }
     func delivered() async -> [DeliveredNotification] { deliveredList }
-    func schedule(_ n: PlannedNotification, reminder: Reminder) async throws { calls += 1; pendingIDs[n.identifier] = n }
+    func schedule(_ n: PlannedNotification, reminder: Reminder) async throws {
+        if scheduleFails { throw CocoaError(.featureUnsupported) }
+        calls += 1; pendingIDs[n.identifier] = n
+    }
+    func showProblem(_ reason: String?) async { problems.append(reason) }
+    func holdNextPending() { holdNext = true }
+    func isHolding() -> Bool { held != nil }
+    func release() { held?.resume(); held = nil }
+    func failNextSchedules() { scheduleFails = true }
     func removePending(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { pendingIDs[$0] = nil } }
     func removeDelivered(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; deliveredList.removeAll { ids.contains($0.identifier) } }
     func deliver(_ d: DeliveredNotification) { deliveredList.append(d) }
@@ -131,5 +153,38 @@ actor FakeAlarms: AlarmScheduling {
     @Test func noAccessIsSaid() async {
         let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks()), rules: rules, notifications: notifications, alarms: alarms, now: { Fixtures.date(4, 9) })
         #expect(await s.sync() == .failed("Нет доступа к папке vault: выбери её в приложении"))
+    }
+
+    @Test func anActionWaitsForASyncAlreadyRunning() async {
+        let vault = FakeVault(Fixtures.file(Self.quiet))
+        let s = sync(vault, at: Fixtures.date(4, 10, 1))
+        await notifications.holdNextPending()
+        let running = Task { await s.sync() }
+        while !(await notifications.isHolding()) { await Task.yield() }
+        let done = Task { await s.complete(reminderID: Self.quiet) }
+        for _ in 0..<200 { await Task.yield() }
+        await notifications.release()
+        _ = await running.value
+        _ = await done.value
+        #expect(vault.text.contains("- [x] Call"))
+        #expect(await notifications.pendingIDs.isEmpty)
+    }
+
+    @Test func oneFailedNotificationLeavesTheAlarmsSet() async {
+        await notifications.failNextSchedules()
+        let status = await sync(FakeVault(Fixtures.file(Self.quiet, Self.alarm))).sync()
+        #expect(await alarms.alarms == [Self.alarm: Fixtures.date(4, 12)])
+        guard case .failed(let reason) = status else { Issue.record("expected a failure, got \(status)"); return }
+        #expect(reason.hasPrefix("Не все напоминания поставлены"))
+    }
+
+    @Test func aFailedSyncIsShownAndAGoodOneTakesItAway() async {
+        let vault = FakeVault(Fixtures.file(Self.quiet))
+        vault.readFails = .noAccess
+        let s = sync(vault)
+        _ = await s.sync()
+        vault.readFails = nil
+        _ = await s.sync()
+        #expect(await notifications.problems == ["Нет доступа к папке vault: выбери её в приложении", nil])
     }
 }

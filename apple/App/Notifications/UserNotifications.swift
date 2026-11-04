@@ -4,6 +4,7 @@ import UserNotifications
 /// The reminders' notifications in iOS: silent, with Done and three snoozes.
 final class UserNotifications: NotificationScheduling {
     static let category = "task-reminder"
+    private static let problem = "sync#problem"
 
     enum Action {
         static let done = "done"
@@ -69,6 +70,22 @@ final class UserNotifications: NotificationScheduling {
 
     func removeDelivered(_ ids: [String]) async {
         Self.center.removeDeliveredNotifications(withIdentifiers: ids)
+    }
+
+    /// One notice at most: the same reason already on screen is not shown again on every wake-up.
+    func showProblem(_ reason: String?) async {
+        guard let reason else {
+            Self.center.removeDeliveredNotifications(withIdentifiers: [Self.problem])
+            return
+        }
+        let shown = await Self.center.deliveredNotifications().contains { $0.request.identifier == Self.problem && $0.request.content.body == reason }
+        guard !shown else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Напоминания не обновились"
+        content.body = reason
+        content.sound = nil
+        content.interruptionLevel = .active
+        try? await Self.center.add(UNNotificationRequest(identifier: Self.problem, content: content, trigger: nil))
     }
 
     private static func content(of reminder: ShownReminder) -> UNMutableNotificationContent {

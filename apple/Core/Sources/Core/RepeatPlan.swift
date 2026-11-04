@@ -20,19 +20,28 @@ public enum RepeatPlan {
         return kind == .alarm ? Array(all.dropFirst()) : all
     }
 
+    /// Each reminder's first delivery is kept before any repeat: overdue tasks repeating all evening must not use up
+    /// the budget that tomorrow morning's task needs to be reminded at all.
     public static func plan(_ reminders: [Reminder], now: Date) -> [PlannedNotification] {
-        var planned: [PlannedNotification] = []
+        var firsts: [PlannedNotification] = []
+        var repeats: [PlannedNotification] = []
         var seen = Set<String>()
         // Two identical task lines are one reminder: an action finds the task by its line.
         for reminder in reminders where seen.insert(reminder.id).inserted {
-            for offset in offsets(for: reminder.kind) {
+            let offsets = offsets(for: reminder.kind)
+            for offset in offsets {
                 let fire = reminder.start.addingTimeInterval(Double(offset) * 60)
                 guard fire < reminder.dayEnd else { break }
                 guard fire > now else { continue }
-                planned.append(PlannedNotification(identifier: "\(reminder.id)#\(offset)", reminderID: reminder.id, fire: fire))
+                let planned = PlannedNotification(identifier: "\(reminder.id)#\(offset)", reminderID: reminder.id, fire: fire)
+                if offset == offsets.first { firsts.append(planned) } else { repeats.append(planned) }
             }
         }
-        planned.sort { $0.fire == $1.fire ? $0.identifier < $1.identifier : $0.fire < $1.fire }
-        return Array(planned.prefix(budget))
+        let kept = Array(firsts.sorted(by: nearest).prefix(budget))
+        return (kept + repeats.sorted(by: nearest).prefix(budget - kept.count)).sorted(by: nearest)
+    }
+
+    private static func nearest(_ a: PlannedNotification, _ b: PlannedNotification) -> Bool {
+        a.fire == b.fire ? a.identifier < b.identifier : a.fire < b.fire
     }
 }

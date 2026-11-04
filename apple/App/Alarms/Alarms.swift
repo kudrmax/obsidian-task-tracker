@@ -19,9 +19,6 @@ final class Alarms: AlarmScheduling {
     }
 
     func schedule(_ reminder: Reminder) async throws {
-        if manager.authorizationState == .notDetermined {
-            _ = try await manager.requestAuthorization()
-        }
         let alert = AlarmPresentation.Alert(
             title: LocalizedStringResource(stringLiteral: reminder.title),
             secondaryButton: AlarmButton(text: "Snooze", textColor: .white, systemImageName: "zzz"),
