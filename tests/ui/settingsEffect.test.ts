@@ -35,6 +35,8 @@ describe("settingsEffect", () => {
 
 	it("reloads the tasks for another slot marker", () => {
 		expect(after({ slotMarker: "🕐" })).toEqual({ ...NOTHING, reload: true });
+		expect(after({ alarmSlotMarker: "🔔" })).toEqual({ ...NOTHING, reload: true });
+		expect(after({ silentSlotMarker: "🤫" })).toEqual({ ...NOTHING, reload: true });
 	});
 
 	it("reloads the tasks for another name of No section", () => {

@@ -100,6 +100,15 @@ describe("writing", () => {
 		expect(store.text).toBe("## In\n\n## Today\n\n## Next\n\n- [ ] A due: 2026-11-03\n\n## Finished\n\n## Later\n");
 	});
 
+	it("reads and keeps the alarm marker from settings", async () => {
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, alarmSlotMarker: "alarm:" });
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A alarm: 2026-10-30 10:00\n\n## Soon\n\n## Backlog\n\n## Done\n", settings);
+		const view = await svc.dayView(T);
+		expect(view.slotted.map((s) => s.text)).toEqual(["A"]);
+		await svc.setSlot(view.slotted[0].key, { date: T, start: 660, end: null });
+		expect(store.text).toContain("- [ ] A alarm: 2026-10-30 11:00");
+	});
+
 	it("whitespace-only text creates nothing", async () => {
 		const { store, svc } = setup(FULL);
 		await svc.createInList(T, "   ");
@@ -368,6 +377,13 @@ describe("priority", () => {
 		const view = await svc.dayView(T);
 		expect(view.list[0]).toMatchObject({ text: "A", priority: { prefix: "p1", color: "red" } });
 		expect(view.list[1].priority).toBeNull();
+	});
+
+	it("setReminder writes the kind's marker before the time, and the item carries the kind", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-30 10:00\n\n## Soon\n\n## Done\n");
+		await svc.setReminder((await svc.dayView(T)).slotted[0].key, "alarm");
+		expect(store.text).toContain("- [ ] A 🚨 2026-10-30 10:00");
+		expect((await svc.dayView(T)).slotted[0].reminder).toBe("alarm");
 	});
 
 	it("setPriority writes the prefix, null takes it off", async () => {

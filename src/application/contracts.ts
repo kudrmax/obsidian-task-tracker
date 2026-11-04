@@ -1,8 +1,8 @@
-import type { GroupName, LocalDate, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import type { PriorityLevel } from "../settings";
 
-export type { GroupName, SectionKey };
+export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";
@@ -50,6 +50,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** How the phone reminds of the task at its slot's start; a task without a slot keeps the default. */
+	readonly reminder: ReminderKind;
 	/** The rule after the task's repeat marker; null for a task that does not repeat. */
 	readonly repeat: RepeatRule | null;
 	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
@@ -185,6 +187,8 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/** How the phone reminds of a task on a time: the marker before its slot. */
+	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
 	/**
 	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
 	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.

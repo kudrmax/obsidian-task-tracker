@@ -1,10 +1,10 @@
 {
 	"name": "obsidian-task-tracker",
-	"version": "0.4.100",
+	"version": "0.4.102",
 	"private": true,
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc --noEmit && node esbuild.config.mjs production && node scriptable/build.mjs",
+		"build": "tsc --noEmit && node esbuild.config.mjs production && node phone/build.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"test": "vitest run"

@@ -13,7 +13,7 @@ function parse(text: string): TaskDocument {
 }
 
 function task(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: " ", text, dueDate: null, slot: null, repeat: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: " ", text, dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
 }
 
 describe("TaskDocument.parse", () => {
@@ -119,6 +119,13 @@ describe("TaskDocument operations", () => {
 		const e = d.tasks("now")[0];
 		expect(d.replace(e, e.task).serialize()).toBe("## Now\n-   [ ]   A  \n");
 		expect(d.replace(e, { ...e.task, status: "done", statusChar: "x" }).serialize()).toBe("## Now\n- [x] A\n");
+	});
+
+	it("replace writes a change of the reminder kind alone", () => {
+		const R = { ...M, alarmSlot: "🚨" };
+		const d = TaskDocument.parse("## Now\n- [ ] A ⏰ 2026-10-30 10:00\n", SECTIONS, R);
+		const e = d.tasks("now")[0];
+		expect(d.replace(e, { ...e.task, reminder: "alarm" }).serialize()).toBe("## Now\n- [ ] A 🚨 2026-10-30 10:00\n");
 	});
 
 	it("replace keeps the children and the position", () => {

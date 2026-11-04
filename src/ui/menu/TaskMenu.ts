@@ -1,4 +1,4 @@
-import { type GroupName, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
@@ -20,7 +20,7 @@ import { repeatPanel } from "../repeat/RepeatPanel";
 import { repeatValue } from "../repeat/repeatLabel";
 
 export type StatusTileId = "done" | "progress" | "wontdo" | "stop";
-export type EditRowId = "rename" | "description" | "repeat" | "section" | "subtask";
+export type EditRowId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
 type Asking = "delete" | "wontdo" | "stop";
 
 export interface StatusTile {
@@ -55,10 +55,19 @@ function repeatRow(rule: RepeatRule | null): EditRow {
 
 export type { SectionChoice } from "./SectionChooser";
 
-/** The edit group: Rename, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
+const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", none: "Off" };
+const REMINDER_ORDER: readonly ReminderKind[] = ["notification", "alarm", "none"];
+
+/** A tap on the reminder row: the next kind, round. */
+export function nextReminder(kind: ReminderKind): ReminderKind {
+	return REMINDER_ORDER[(REMINDER_ORDER.indexOf(kind) + 1) % REMINDER_ORDER.length];
+}
+
+/** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
+		...(item.slot === null ? [] : [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const]),
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
 		...(item.repeatable ? [repeatRow(item.repeat)] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
@@ -90,6 +99,7 @@ export interface MenuActions {
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
+	setReminder(kind: ReminderKind): Promise<void>;
 	/** The task repeats by `rule` from now on; null: it repeats no more. */
 	setRepeat(rule: RepeatRule | null): Promise<void>;
 	/** The task that repeats is closed with no next time. */
@@ -310,6 +320,7 @@ export class TaskMenu extends LiftedMenu {
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
+			reminder: this.pick(() => actions.setReminder(nextReminder(item.reminder))),
 			description: this.pick(() => actions.openDescription(true)),
 			repeat: () => this.showRepeat(),
 			section: () => this.showSections(),

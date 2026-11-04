@@ -100,6 +100,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
+		a.reminder === b.reminder &&
 		sameLines(a.children, b.children)
 	);
 }
@@ -368,12 +369,12 @@ export class TaskDocument {
 		return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
 	}
 
-	/** The entry's child lines with every subtask `[ ]` and without its due date, slot and repeat; description lines as they are. */
+	/** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
 	freshChildren(entry: TaskEntry): readonly string[] {
 		const first = this.spanOf(entry).line + 1;
 		const children = [...entry.task.children];
 		const open = (sub: TaskEntry): void => {
-			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, repeat: null };
+			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
 			children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
 			sub.subtasks.forEach(open);
 		};

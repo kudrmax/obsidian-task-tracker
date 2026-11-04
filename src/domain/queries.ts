@@ -65,6 +65,7 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
+		reminder: entry.task.reminder,
 		repeat: entry.task.repeat?.rule ?? null,
 		repeatable: repeatable(entry),
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),

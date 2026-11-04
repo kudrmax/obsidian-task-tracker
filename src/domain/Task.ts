@@ -22,6 +22,9 @@ export interface Slot {
 	readonly end: number | null;
 }
 
+/** What the time of a task does on the phone: a quiet notification, an alarm, or nothing. Read from the marker before the slot. */
+export type ReminderKind = "notification" | "alarm" | "none";
+
 export interface Task {
 	readonly status: TaskStatus;
 	/** The character between the brackets as read, so an unknown one survives a rewrite. */
@@ -30,6 +33,8 @@ export interface Task {
 	readonly text: string;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** Kept without a slot too, so a task put on a time again gets its kind back. */
+	readonly reminder: ReminderKind;
 	/** The rule after the repeat marker; null for a task that does not repeat. */
 	readonly repeat: Repeat | null;
 	/** The prefix of a priority level, the first word of the line's text; null without one. */

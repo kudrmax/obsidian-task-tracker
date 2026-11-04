@@ -3,7 +3,7 @@
 Как настроить плагин и пользоваться им. Это не спеки и не дизайн: те лежат в `docs/superpowers/` и `docs/design/` и описывают, как плагин устроен и почему. Здесь — что сделать руками, чтобы всё работало.
 
 - [Рабочий календарь на iPhone](work-calendar.md) — Scriptable, команда `Export Work Calendar`, автоматизации, проверка и что делать, если не работает.
-- [Уведомления на iPhone](notifications.md) — скрипт Scriptable `Task Notifications` и автоматизация при закрытии Obsidian.
+- [Напоминания на iPhone](notifications.md) — приложение Task Calendar для iPhone: установка из Xcode, доступ к папке, автоматизация при выходе из Obsidian, проверка.
 - [Google Calendar](../../README.md#google-calendar) — проект в Google Cloud, вход, как не дать входу протухнуть.
 - [Файл задач и экран](../../README.md#the-file) — формат файла, секции, жесты.
 

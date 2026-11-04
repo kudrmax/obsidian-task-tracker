@@ -12,6 +12,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	status: "todo",
 	dueDate: null,
 	slot: null,
+	reminder: "notification",
 	repeat: null,
 	repeatable: true,
 	priority: null,

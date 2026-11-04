@@ -2,13 +2,13 @@ import type { EndList, GroupedList, GroupPlace, Placement, TaskDraft } from "../
 import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
 import { Repeat, type RepeatRule } from "./Repeat";
-import { STATUS_CHARS, type GroupName, type LocalDate, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, repeat: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -123,6 +123,10 @@ export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate 
 
 export function setPriority(doc: TaskDocument, entry: TaskEntry, priority: string | null): TaskDocument {
 	return patch(doc, entry, { priority });
+}
+
+export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: ReminderKind): TaskDocument {
+	return patch(doc, entry, { reminder });
 }
 
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
