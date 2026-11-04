@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { NewTaskPlace, Placement, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
+import type { NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
 import type { RightMode } from "../../src/settings";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
@@ -66,7 +66,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	let mode = startMode;
 	let day = startDay;
 	const turned: RightMode[] = [];
-	const created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
+	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void) => boolean>(() => true);
 	/** Each write waits for the lists to catch up; held, the test says when they have. */
@@ -110,8 +110,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			createInPlace: async (text, priority, place) => {
-				created.push({ text, priority, place });
+			createInPlace: async (text, priority, place, repeat) => {
+				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh === "grows") (items.left ??= []).push(item(text, key("now", (items.left ?? []).length)));
 			},
 			edit: async (k, draft) => {
@@ -797,6 +797,91 @@ describe("QuickEntryController", () => {
 		expect(row().querySelector(":scope > .tc-progress-dot")).not.toBeNull();
 		lists.left.render();
 		expect(row().querySelectorAll(":scope > .tc-progress-dot")).toHaveLength(1);
+	});
+
+	describe("the bar's repeat", () => {
+		const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
+		const repeatButton = (root: HTMLElement) => root.querySelector<HTMLElement>(".tc-bar-repeat")!;
+		const weekday = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-repeat-day")].find((b) => b.textContent === label)!;
+		/** Weekly on Thursday from a field whose day is today, a Sunday: Thursday on, Sunday off. */
+		const chooseThursday = (root: HTMLElement) => {
+			repeatButton(root).click();
+			weekday("Thu").click();
+			weekday("Sun").click();
+		};
+
+		it("writes the task typed with the rule chosen, lights the button, and the next field starts without one", async () => {
+			const { controller, root, type, press, created } = setUp();
+			controller.openAtEnd("left");
+			type("Gym");
+			chooseThursday(root);
+			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
+			press("Enter");
+			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "list", list: "now", group: null, before: null }, repeat: WEEKLY_THU }]));
+			expect(repeatButton(root).classList.contains("is-set")).toBe(false);
+		});
+
+		it("Remove repeat takes the chosen rule off before the task is written", async () => {
+			const { controller, root, type, press, created } = setUp();
+			controller.openAtEnd("left");
+			type("Gym");
+			chooseThursday(root);
+			document.querySelector<HTMLElement>(".tc-repeat-remove")!.click();
+			expect(repeatButton(root).classList.contains("is-set")).toBe(false);
+			press("Enter");
+			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
+		});
+
+		it("is not on a subtask's field, and a subtask is written without a rule", async () => {
+			const parent = item("A", key("now", 0));
+			const { controller, root, type, press, created } = setUp({ items: { left: [parent] } });
+			controller.openAtEnd("left");
+			chooseThursday(root);
+			press("Tab");
+			expect(repeatButton(root).hidden).toBe(true);
+			type("Sub");
+			press("Enter");
+			await vi.waitFor(() => expect(created).toHaveLength(1));
+			expect(created[0].repeat).toBeUndefined();
+		});
+
+		it("is not on a field on the calendar", () => {
+			const { controller, root } = setUp();
+			controller.openSlot({ date: TODAY, start: 600, end: null });
+			expect(repeatButton(root).hidden).toBe(true);
+		});
+
+		it("a rename of a task that repeats opens with its rule and leaves it as it is when it is not touched", async () => {
+			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
+			const { controller, root, type, press, edits } = setUp({ items: { left: [a] } });
+			controller.rename(a);
+			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
+			type("A2");
+			press("Enter");
+			await vi.waitFor(() => expect(edits).toHaveLength(1));
+			expect(edits[0].draft).toEqual({ text: "A2", placement: { kind: "now" }, priority: null });
+			expect("repeat" in edits[0].draft && edits[0].draft.repeat !== undefined).toBe(false);
+		});
+
+		it("a rename saves the rule changed in the bar through the edit", async () => {
+			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
+			const { controller, root, press, edits } = setUp({ items: { left: [a] } });
+			controller.rename(a);
+			repeatButton(root).click();
+			weekday("Mon").click();
+			press("Enter");
+			await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A", placement: { kind: "now" }, priority: null, repeat: { ...WEEKLY_THU, days: [0, 3] } } }]));
+		});
+
+		it("a rename saves Remove repeat as the rule taken off", async () => {
+			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
+			const { controller, root, press, edits } = setUp({ items: { left: [a] } });
+			controller.rename(a);
+			repeatButton(root).click();
+			document.querySelector<HTMLElement>(".tc-repeat-remove")!.click();
+			press("Enter");
+			await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A", placement: { kind: "now" }, priority: null, repeat: null } }]));
+		});
 	});
 
 	describe("a rename the bar's place moves to another column", () => {

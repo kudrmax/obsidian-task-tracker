@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Placement } from "../../src/application/contracts";
+import type { Placement, RepeatRule } from "../../src/application/contracts";
 import type { PriorityLevel } from "../../src/settings";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
 
@@ -10,7 +10,9 @@ const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p3", color: "blue" },
 ];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" } };
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" }, repeat: null, repeatable: true };
+
+const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
 function setup(state: Partial<QuickBarState> = {}, desktop = false) {
 	const parent = document.createElement("div");
@@ -18,6 +20,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false) {
 	const indents: (1 | -1)[] = [];
 	const priorities: (string | null)[] = [];
 	const places: Placement[] = [];
+	const repeats: (RepeatRule | null)[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 		levels: () => LEVELS,
@@ -25,9 +28,10 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false) {
 		onIndent: (delta) => indents.push(delta),
 		onPriority: (prefix) => priorities.push(prefix),
 		onPlace: (placement) => places.push(placement),
+		onRepeat: (rule) => repeats.push(rule),
 	});
 	bar.show({ ...STATE, ...state });
-	return { parent, bar, indents, priorities, places };
+	return { parent, bar, indents, priorities, places, repeats };
 }
 
 const q = <T extends Element = HTMLButtonElement>(root: ParentNode, selector: string) => root.querySelector<T>(selector)!;
@@ -42,7 +46,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -146,7 +150,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -229,6 +233,104 @@ describe("the place panel", () => {
 		tiles(parent)[4].click();
 		q(parent, ".tc-day.is-selected").click();
 		expect(places).toEqual([]);
+		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+	});
+});
+
+describe("the repeat button", () => {
+	const segment = (root: ParentNode, label: string) => [...root.querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")].find((b) => b.textContent === label)!;
+	const weekday = (root: ParentNode, label: string) => [...root.querySelectorAll<HTMLButtonElement>(".tc-repeat-day")].find((b) => b.textContent === label)!;
+
+	it("stands between the flag and the place", () => {
+		const { parent } = setup();
+		const buttons = [...parent.querySelectorAll(".tc-quick-bar > button")].map((b) => b.className.match(/tc-bar-(flag|repeat|place)/)?.[1]);
+		expect(buttons).toEqual(["flag", "repeat", "place"]);
+		expect(q(parent, ".tc-bar-repeat").getAttribute("aria-label")).toBe("Repeat");
+	});
+
+	it("is not there for a field that cannot repeat: a subtask, a slot", () => {
+		const { parent, bar } = setup({ repeatable: false });
+		expect(q(parent, ".tc-bar-repeat").hidden).toBe(true);
+		bar.show(STATE);
+		expect(q(parent, ".tc-bar-repeat").hidden).toBe(false);
+	});
+
+	it("lights up once the field has a rule", () => {
+		const { parent, bar } = setup();
+		const button = q(parent, ".tc-bar-repeat");
+		expect(button.classList.contains("is-set")).toBe(false);
+		expect(button.getAttribute("aria-pressed")).toBe("false");
+		bar.show({ ...STATE, repeat: WEEKLY_THU });
+		expect(button.classList.contains("is-set")).toBe(true);
+		expect(button.getAttribute("aria-pressed")).toBe("true");
+	});
+
+	it("opens the repeat panel above the bar, one panel at a time", () => {
+		const { parent } = setup();
+		q(parent, ".tc-bar-flag").click();
+		q(parent, ".tc-bar-repeat").click();
+		expect(parent.querySelectorAll(".tc-quick-panel")).toHaveLength(1);
+		const panel = q<HTMLElement>(parent, ".tc-quick-panel");
+		expect(panel.classList.contains("is-repeat")).toBe(true);
+		expect(panel.classList.contains("is-above")).toBe(true);
+		expect(q<HTMLElement>(parent, ".tc-quick-bar").dataset.panel).toBe("repeat");
+		expect(panel.querySelector(".tc-repeat-remove")).toBeNull();
+		q(parent, ".tc-bar-repeat").click();
+		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+	});
+
+	it("starts a new rule from the field's day: its weekday", () => {
+		const { parent } = setup({ place: { kind: "date", date: "2026-11-05" } });
+		q(parent, ".tc-bar-repeat").click();
+		expect(weekday(parent, "Thu").classList.contains("is-on")).toBe(true);
+	});
+
+	it("starts a new rule from today for a field with no day", () => {
+		const { parent } = setup();
+		q(parent, ".tc-bar-repeat").click();
+		expect(weekday(parent, "Sun").classList.contains("is-on")).toBe(true);
+	});
+
+	it("reports each change at once and stays open", () => {
+		const { parent, bar, repeats } = setup({ repeat: WEEKLY_THU });
+		q(parent, ".tc-bar-repeat").click();
+		weekday(parent, "Mon").click();
+		expect(repeats).toEqual([{ ...WEEKLY_THU, days: [0, 3] }]);
+		bar.show({ ...STATE, repeat: repeats[0] });
+		segment(parent, "days").click();
+		expect(repeats[1]).toEqual({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null });
+		expect(parent.querySelector(".tc-quick-panel")).not.toBeNull();
+	});
+
+	it("is not drawn again for the rule it reported itself", () => {
+		const { parent, bar, repeats } = setup({ repeat: WEEKLY_THU });
+		q(parent, ".tc-bar-repeat").click();
+		const kind = q(parent, ".tc-repeat-seg-btn");
+		weekday(parent, "Mon").click();
+		bar.show({ ...STATE, repeat: repeats[0] });
+		expect(q(parent, ".tc-repeat-seg-btn")).toBe(kind);
+	});
+
+	it("gains Remove repeat once a rule is set", () => {
+		const { parent, bar, repeats } = setup();
+		q(parent, ".tc-bar-repeat").click();
+		weekday(parent, "Mon").click();
+		bar.show({ ...STATE, repeat: repeats[0] });
+		expect(parent.querySelector(".tc-repeat-remove")).not.toBeNull();
+	});
+
+	it("Remove repeat takes the rule off and closes", () => {
+		const { parent, repeats } = setup({ repeat: WEEKLY_THU });
+		q(parent, ".tc-bar-repeat").click();
+		q(parent, ".tc-repeat-remove").click();
+		expect(repeats).toEqual([null]);
+		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+	});
+
+	it("closes when the field can no longer repeat", () => {
+		const { parent, bar } = setup();
+		q(parent, ".tc-bar-repeat").click();
+		bar.show({ ...STATE, repeatable: false });
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 });
@@ -441,6 +543,16 @@ describe("QuickBar on the desktop", () => {
 		expect(el.style.top).toBe(`${443 - 50}px`);
 		expect(readsAfterWrite).toBe(0);
 		observer.disconnect();
+	});
+
+	it("has the repeat button in the capsule, its panel away from the field as the others", () => {
+		const { bar, el } = desk({ repeat: WEEKLY_THU });
+		bar.follow({ field: new DOMRect(120, 300, 350, 35), room: ROOM_BOX, overMenu: null });
+		expect(q(el, ".tc-bar-repeat").hidden).toBe(false);
+		expect(q(el, ".tc-bar-repeat").classList.contains("is-set")).toBe(true);
+		q(el, ".tc-bar-repeat").click();
+		expect(el.dataset.panel).toBe("repeat");
+		expect(q<HTMLElement>(el, ".tc-quick-panel.is-repeat").classList.contains("is-below")).toBe(true);
 	});
 
 	it("names its keys in the buttons' tooltips", () => {

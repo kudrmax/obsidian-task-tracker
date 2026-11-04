@@ -332,8 +332,8 @@ body {
 	--tc-menu-weekday-w: 12px;
 	--tc-menu-week-gap: var(--tc-hairline);
 	/*
-	 * The quick bar over the keyboard, on the view's own ground: the shift buttons in one pill, the priority flag and the
-	 * place button in pills of the wheel's track; its panels use the menu's.
+	 * The quick bar over the keyboard, on the view's own ground: the shift buttons in one pill, the priority flag, the repeat
+	 * and the place button in pills of the wheel's track; its panels use the menu's. The repeat's icon is the flag's size.
 	 */
 	--tc-bar-h: 44px;
 	--tc-bar-btn-w: 44px;
@@ -1086,13 +1086,14 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-bar > button, .tc-bar-shifts, .tc-bar-shift { z-index: var(--tc-layer-bar-button); }
 .tc-bar-shifts { display: flex; flex-shrink: 0; border-radius: var(--tc-radius-bar-btn); background: var(--tc-track-bg); }
 .tc-bar-spacer { flex: 1; }
-.tc-quick-bar .tc-bar-shift, .tc-quick-bar .tc-bar-flag { width: var(--tc-bar-btn-w); }
-.task-calendar .tc-quick-bar:not(.is-desk) .tc-bar-flag, .tc-quick-bar.is-over:not(.is-desk) .tc-bar-flag { background: var(--tc-track-bg); }
+.tc-quick-bar .tc-bar-shift, .tc-quick-bar .tc-bar-flag, .tc-quick-bar .tc-bar-repeat { width: var(--tc-bar-btn-w); }
+.task-calendar .tc-quick-bar:not(.is-desk) :is(.tc-bar-flag, .tc-bar-repeat), .tc-quick-bar.is-over:not(.is-desk) :is(.tc-bar-flag, .tc-bar-repeat) { background: var(--tc-track-bg); }
 .tc-quick-bar .tc-bar-shift:disabled { color: var(--tc-ink-dim); cursor: default; }
 .tc-bar-shift svg { width: var(--tc-bar-icon); height: var(--tc-bar-icon); stroke-width: var(--tc-stroke-bar); }
-.tc-bar-flag svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
+.tc-bar-flag svg, .tc-bar-repeat svg { width: var(--tc-bar-flag); height: var(--tc-bar-flag); stroke-width: var(--tc-stroke-bar); }
 .tc-quick-bar .tc-bar-flag.is-set { color: var(--tc-priority-ink); }
 .tc-bar-flag.is-set svg { fill: var(--tc-priority-ink); }
+.tc-quick-bar .tc-bar-repeat.is-set { color: var(--tc-accent); }
 .tc-quick-bar button.tc-bar-place { width: var(--tc-place-w); box-sizing: border-box; padding: 0 var(--tc-space-12) 0 var(--tc-space-10); background: var(--tc-track-bg); gap: var(--tc-space-6); font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
 .tc-bar-place svg { width: var(--tc-place-icon); height: var(--tc-place-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-seg); }
 .tc-bar-place .tc-btn-label { overflow: hidden; white-space: nowrap; }
@@ -1107,15 +1108,15 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-bar.is-desk.is-away { visibility: hidden; }
 .tc-quick-bar.is-desk .tc-bar-shifts { display: contents; }
 .tc-quick-bar.is-desk::before { border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); }
-.tc-quick-bar.is-desk .tc-bar-shift, .tc-quick-bar.is-desk .tc-bar-flag { width: var(--tc-desk-bar-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); }
+.tc-quick-bar.is-desk .tc-bar-shift, .tc-quick-bar.is-desk .tc-bar-flag, .tc-quick-bar.is-desk .tc-bar-repeat { width: var(--tc-desk-bar-btn-w); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); }
 .tc-quick-bar.is-desk .tc-bar-shift svg { width: var(--tc-desk-bar-icon); height: var(--tc-desk-bar-icon); }
-.tc-quick-bar.is-desk .tc-bar-flag svg { width: var(--tc-desk-bar-flag); height: var(--tc-desk-bar-flag); }
+.tc-quick-bar.is-desk .tc-bar-flag svg, .tc-quick-bar.is-desk .tc-bar-repeat svg { width: var(--tc-desk-bar-flag); height: var(--tc-desk-bar-flag); }
 .tc-quick-bar.is-desk .tc-bar-spacer { flex: none; z-index: var(--tc-layer-bar-button); width: var(--tc-hairline); height: var(--tc-desk-bar-rule); margin: 0 var(--tc-space-2); background: var(--tc-separator); }
 .tc-quick-bar.is-desk .tc-bar-shifts[hidden] ~ .tc-bar-spacer, .tc-quick-bar.is-desk .tc-bar-spacer:not(:has(~ button:not([hidden]))) { display: none; }
 .tc-quick-bar.is-desk .tc-bar-place { width: var(--tc-desk-place-w); height: var(--tc-seg-btn-h); padding: 0 var(--tc-space-10) 0 var(--tc-space-8); border-radius: var(--tc-radius-seg-btn); gap: var(--tc-space-5); font-size: var(--tc-font-desk-place); }
 .task-calendar .tc-quick-bar.is-desk .tc-bar-place, .tc-quick-bar.is-desk.is-over .tc-bar-place { background: var(--tc-desk-place-bg); }
 .task-calendar .tc-quick-bar.is-desk[data-panel="place"] .tc-bar-place, .tc-quick-bar.is-desk.is-over[data-panel="place"] .tc-bar-place { background-color: var(--tc-place-on-bg); }
-.tc-quick-bar.is-desk[data-panel="priority"] .tc-bar-flag { background: var(--tc-hover); }
+.tc-quick-bar.is-desk[data-panel="priority"] .tc-bar-flag, .tc-quick-bar.is-desk[data-panel="repeat"] .tc-bar-repeat { background: var(--tc-hover); }
 .tc-quick-bar.is-desk .tc-bar-place svg { width: var(--tc-desk-place-icon); height: var(--tc-desk-place-icon); }
 .tc-quick-bar.is-desk .tc-quick-panel { right: 0; }
 .tc-quick-bar.is-desk .tc-quick-panel.is-below { top: calc(100% + var(--tc-desk-bar-gap)); bottom: auto; transform-origin: 100% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); }

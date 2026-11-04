@@ -1,4 +1,4 @@
-import type { NewTaskPlace, Placement, TaskItem, TaskKey, TaskService } from "../../application/contracts";
+import type { NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey, TaskService } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import type { ListColumn } from "../drag/DropTarget";
 import { type GapPlace, type ListCard, type PlaceResult, fitLevel, resultOf, shiftLevel } from "../drag/listPlace";
@@ -23,6 +23,8 @@ export interface EntryState {
 	readonly text: string;
 	/** A level's prefix, or none. */
 	readonly priority: string | null;
+	/** The rule the task repeats by, or none. */
+	readonly repeat: RepeatRule | null;
 	/** Texts entered here and not yet written, in order: drawn right before the field. */
 	readonly pending: readonly PendingText[];
 	/** The task whose text the field edits; null for a new one. */
@@ -54,6 +56,7 @@ export interface QuickEntryDeps {
 
 interface Line extends PendingText {
 	readonly priority: string | null;
+	readonly repeat: RepeatRule | null;
 }
 
 /** The key of a card that stands for a text not yet written: only its level counts. */
@@ -123,6 +126,7 @@ interface Field {
 	readonly run: Run;
 	readonly text: string;
 	readonly priority: string | null;
+	readonly repeat: RepeatRule | null;
 	readonly rename: Rename | null;
 }
 
@@ -149,6 +153,7 @@ export class QuickEntry {
 			spot: field.run.spot,
 			text: field.text,
 			priority: field.priority,
+			repeat: field.repeat,
 			pending: field.run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename?.item ?? null,
 			...this.mayShift(field),
@@ -171,7 +176,7 @@ export class QuickEntry {
 	open(spot: EntrySpot, renaming?: TaskItem): void {
 		if (this.field) this.save(this.field);
 		const rename = renaming ? { item: renaming, home: new Run(spot) } : null;
-		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, rename });
+		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, repeat: renaming?.repeat ?? null, rename });
 	}
 
 	type(text: string): void {
@@ -180,6 +185,10 @@ export class QuickEntry {
 
 	setPriority(prefix: string | null): void {
 		if (this.field) this.reset({ ...this.field, priority: prefix }, true);
+	}
+
+	setRepeat(rule: RepeatRule | null): void {
+		if (this.field) this.reset({ ...this.field, repeat: rule }, true);
 	}
 
 	indent(delta: 1 | -1): void {
@@ -227,7 +236,7 @@ export class QuickEntry {
 		if (this.blank(field.text)) this.reset(null);
 		else {
 			this.saveRename(field, rename);
-			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, rename: null } : null);
+			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, repeat: null, rename: null } : null);
 		}
 	}
 
@@ -237,10 +246,10 @@ export class QuickEntry {
 		else this.reset(null);
 	}
 
-	/** The task goes to the queue; the next field opens at once, without a priority. A slot takes one task only. */
+	/** The task goes to the queue; the next field opens at once, without a priority or a repeat. A slot takes one task only. */
 	private enterTask(field: Field): void {
 		this.create(field);
-		this.reset(field.run.spot.kind === "slot" ? null : { ...field, text: "", priority: null });
+		this.reset(field.run.spot.kind === "slot" ? null : { ...field, text: "", priority: null, repeat: null });
 	}
 
 	/**
@@ -262,9 +271,12 @@ export class QuickEntry {
 		else this.create(field);
 	}
 
-	/** Edits once the writes before it show, by the key the lists give the task then: the one read at the open may have gone stale. */
+	/**
+	 * Edits once the writes before it show, by the key the lists give the task then: the one read at the open may have gone
+	 * stale. The task's own rule, untouched in the bar, is left as the file has it.
+	 */
 	private saveRename(field: Field, { item, home }: Rename): void {
-		const draft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority };
+		const draft: TaskDraft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority, ...(field.repeat !== item.repeat && { repeat: field.repeat }) };
 		this.queued(home, async () => {
 			await this.deps.fresh();
 			await this.deps.edit(this.keyAt(home, item), draft);
@@ -281,7 +293,7 @@ export class QuickEntry {
 	/** The field's text, written at its run once the lists show the writes before it: at the level it was entered at, as far as the cards then allow. */
 	private create(field: Field): void {
 		const { run } = field;
-		const line = { text: field.text, priority: field.priority, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
+		const line = { text: field.text, priority: field.priority, repeat: field.repeat, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
 		run.pending.push(line);
 		this.queued(run, async () => {
 			let shown = false;
@@ -300,7 +312,8 @@ export class QuickEntry {
 
 	/**
 	 * The line written, and shown by the lists before it stops waiting under them: it never leaves the screen for a
-	 * moment. It leaves the queue, and the places after it move down, in the very drawing that shows its card.
+	 * moment. It leaves the queue, and the places after it move down, in the very drawing that shows its card. Only a task
+	 * of its own repeats: a subtask and a task on the calendar are written without the rule.
 	 */
 	private async write(run: Run, line: Line, onShown: () => void): Promise<void> {
 		const shown = (landed?: () => void) => () => {
@@ -323,7 +336,7 @@ export class QuickEntry {
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
-				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)));
+				await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), place.level === 0 ? line.repeat : null);
 				return this.deps.fresh(shown(() => this.runs.landed(spot.column, place.index)));
 			}
 		}
