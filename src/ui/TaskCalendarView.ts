@@ -932,6 +932,8 @@ export class TaskCalendarView extends ItemView {
 					if (home) this.askGroupName(item, home);
 				},
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
+				setRepeat: (rule) => this.act(() => tasks.setRepeat(item.key, rule)),
+				stop: () => this.act(() => tasks.stop(item.key)),
 				rename: (menu) => this.quick?.rename(item, menu),
 				openDescription: (editing) => this.descriptionSheet(item, editing),
 				addSubtask: (menu) => this.quick?.addSubtask(item, menu),

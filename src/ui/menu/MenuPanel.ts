@@ -1,3 +1,4 @@
+import type { Weekday } from "../../application/contracts";
 import type { PriorityColor } from "../../settings";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
@@ -13,6 +14,8 @@ export type MenuRowRoot = "tc-menu-row" | "tc-menu-back" | "tc-source-refresh";
 export interface MenuRowSpec {
 	readonly label: string;
 	readonly value?: string;
+	/** In place of a value: the week's seven letters, these days' on. */
+	readonly days?: readonly Weekday[] | null;
 	readonly icon?: IconName;
 	readonly danger?: boolean;
 	readonly onPick: () => void;
@@ -45,10 +48,29 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec): HTMLButtonEleme
 	} else {
 		el(row, "span", "tc-menu-label", spec.label);
 		if (spec.value) el(row, "span", "tc-menu-value", spec.value);
+		if (spec.days) weekLetters(row, spec.days);
 		if (spec.icon) row.appendChild(icon(spec.icon));
 	}
 	row.addEventListener("click", spec.onPick);
 	return row;
+}
+
+const WEEK = [
+	["M", "Mon"],
+	["T", "Tue"],
+	["W", "Wed"],
+	["T", "Thu"],
+	["F", "Fri"],
+	["S", "Sat"],
+	["S", "Sun"],
+] as const;
+
+/** M T W T F S S, the chosen days' letters on; read out as the days' names. */
+function weekLetters(parent: HTMLElement, days: readonly Weekday[]): HTMLElement {
+	const week = el(parent, "span", "tc-menu-week");
+	week.setAttribute("aria-label", WEEK.filter((_, day) => days.includes(day as Weekday)).map(([, name]) => name).join(", "));
+	WEEK.forEach(([letter], day) => el(week, "span", "tc-menu-weekday", letter).classList.toggle("is-on", days.includes(day as Weekday)));
+	return week;
 }
 
 /** A dot of a priority level's colour. */
