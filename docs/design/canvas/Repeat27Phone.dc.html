@@ -28,8 +28,11 @@ body{margin:0}
 <sc-if value="{{r.rep1}}" hint-placeholder-val="{{false}}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{r.meta}}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Repeats" role="img" style="flex-shrink: 0;"><path d="{{icons.repeat}}"></path></svg></sc-if>
 <sc-if value="{{r.showCol}}" hint-placeholder-val="{{false}}">
 <span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;">
-<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">{{r.mon}}</span></sc-if>
+<span style="height: 13px; display: flex; align-items: center; gap: 2px;">
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span></sc-if>
 <sc-if value="{{r.rep2}}" hint-placeholder-val="{{false}}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="{{r.meta}}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Repeats" role="img"><path d="{{icons.repeat}}"></path></svg></sc-if>
+</span>
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}"><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">{{r.mon}}</span></sc-if>
 </span>
 </sc-if>
 </div>
@@ -200,7 +203,7 @@ class Component extends DCLogic {
       { label: 'Won’t do', d: CIRCLE + ' M8 12h8', fd: '' },
       { label: 'Stop', d: icons.stop, fd: '' }
     ];
-    const statusRows = [{ tiles: statusTiles.slice(0, 2) }, { tiles: statusTiles.slice(2) }];
+    const statusRows = [{ tiles: statusTiles }];
     const editRows = [
       { label: 'Rename', d: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4' },
       { label: 'Add description', d: 'M4 6h16 M4 12h16 M4 18h10' },
@@ -211,7 +214,7 @@ class Component extends DCLogic {
     const weekStrip = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((l, i) => ({ l, ink: onDays.includes(i) ? c.text : c.dim }));
 
     const MENU_TOP = 213, VIEW_BOTTOM = 776 - 8;
-    const statusH = view === 'stop' ? 88 : 154;
+    const statusH = view === 'stop' ? 88 : 82;
     const menuFull = statusH + 90 + 90 + 8 + 4 * 44 + 52 + 52;
     const menuH = Math.min(menuFull, VIEW_BOTTOM - MENU_TOP);
 
