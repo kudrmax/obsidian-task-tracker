@@ -70,9 +70,9 @@ The plugin cannot read Apple’s calendars itself. A Scriptable script exports t
 
 The export itself comes with the plugin and updates with it; Scriptable holds only a short script that runs it, pasted once. Setup, step by step, with how to check it: [docs/plugin/work-calendar.md](docs/plugin/work-calendar.md).
 
-## Notifications (iPhone)
+## Reminders (iPhone)
 
-A task put on a time rings on the phone at its start: the task’s title, its time below, a tap opens Obsidian. A Scriptable script reads the tasks file with the plugin’s own parser and keeps one pending notification per unfinished task with a slot in Now and Soon; a task moved, unslotted, done or cancelled loses its old one on the next run. Due dates alone do not notify.
+A task put on a time reminds at its start, on the phone, through the Task Calendar iOS app (`kudrmax/task-calendar-ios`), which reads the tasks file with the plugin's own rules (`phone/task-calendar-phone.js`, built from `src/phone`). The marker before the time picks the kind: `⏰` a quiet notification that repeats until Done or a snooze, `🚨` an alarm, `🔕` none. Due dates alone do not remind.
 
 Setup, step by step: [docs/plugin/notifications.md](docs/plugin/notifications.md).
 
