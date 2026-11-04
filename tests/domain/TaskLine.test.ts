@@ -262,4 +262,14 @@ describe("reminder kind", () => {
 	it("markers without alarm and silent read only the slot marker", () => {
 		expect(parseTaskLine("- [ ] Call 🚨 2026-11-04 10:00", M)!.task).toMatchObject({ slot: null, text: "Call 🚨 2026-11-04 10:00" });
 	});
+
+	it("carries the kind next to a due date and a repeat, the repeat last", () => {
+		const all: Markers = { ...R, repeat: "🔁" };
+		const line = "- [ ] Gym 📅 2026-11-09 🚨 2026-11-09 07:00 🔁 every day";
+		const p = parseTaskLine(line, all)!;
+		expect(p.task).toMatchObject({ text: "Gym", dueDate: "2026-11-09", reminder: "alarm", slot: { date: "2026-11-09", start: 420, end: null } });
+		expect(p.task.repeat!.format()).toBe("every day");
+		expect(formatTaskLine(p, all)).toBe(line);
+		expect(formatTaskLine(parseTaskLine("- [ ] Gym 🔁 every day 🔕 2026-11-09 07:00", all)!, all)).toBe("- [ ] Gym 🔕 2026-11-09 07:00 🔁 every day");
+	});
 });

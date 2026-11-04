@@ -114,4 +114,16 @@ describe("freshChildren", () => {
 		const doc = parse(["## Now", "- [x] A", "\tТекст", "\t- [-] B 📅 2026-11-03 🔁 every day", "\t\tПро B", "\t\t- [x] C ⏰ 2026-11-05 10:00-11:00", "\t- [?] D"].join("\n"));
 		expect(doc.freshChildren(doc.tasks("now")[0])).toEqual(["\tТекст", "\t- [ ] B", "\t\tПро B", "\t\t- [ ] C", "\t- [ ] D"]);
 	});
+
+	it("a subtask's reminder kind goes with its slot", () => {
+		const markers = { ...M, alarmSlot: "🚨", silentSlot: "🔕" };
+		const doc = TaskDocument.parse(["## Now", "- [x] A", "\t- [x] B 🚨 2026-11-05 10:00", "\t- [ ] C 🔕 2026-11-05 11:00"].join("\n"), SECTIONS, markers);
+		expect(doc.freshChildren(doc.tasks("now")[0])).toEqual(["\t- [ ] B", "\t- [ ] C"]);
+	});
+
+	it("the copy of a task with an alarm has no time and so no reminder kind", () => {
+		const markers = { ...M, alarmSlot: "🚨", silentSlot: "🔕" };
+		const doc = normalize(TaskDocument.parse(file({ now: `- [x] Зал 🚨 2026-11-05 07:00 ${ZAL}` }), SECTIONS, markers), T);
+		expect(doc.serialize()).toBe(file({ soon: `- [ ] Зал 📅 2026-11-06 ${ZAL}`, done: "- [x] Зал 🚨 2026-11-05 07:00" }));
+	});
 });
