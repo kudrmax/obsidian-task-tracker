@@ -40,6 +40,7 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	const shownDue = item.dueDate && item.dueDate !== opts.day ? item.dueDate : null;
 	if (!shownDue && !item.repeat) return;
 	const due = el(card, "span", "tc-due");
+	due.classList.toggle("is-repeat-only", !shownDue);
 	const top = item.repeat ? el(due, "span", "tc-due-top") : due;
 	if (shownDue) el(top, "span", "tc-due-day", dayOfMonth(shownDue));
 	if (item.repeat) top.appendChild(icon("repeat")).classList.add("tc-due-repeat");

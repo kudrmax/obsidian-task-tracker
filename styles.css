@@ -953,6 +953,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .is-whole .tc-event .tc-item-title { white-space: normal; overflow-wrap: anywhere; -webkit-mask-image: none; mask-image: none; }
 .tc-lifted.is-whole .tc-meta.is-pair { margin-top: calc((var(--tc-card-h) - var(--tc-leading-count-pair) - var(--tc-meta-gap) - var(--tc-desc-mark-pair)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 .tc-lifted.is-whole .tc-due { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day) - var(--tc-due-gap) - var(--tc-leading-due-mon)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
+.tc-lifted.is-whole .tc-due.is-repeat-only { margin-top: calc((var(--tc-card-h) - var(--tc-leading-due-day)) / 2 - (var(--tc-card-h) - var(--tc-leading-card)) / 2); }
 
 /* The task menu: a blurred dark sheet over everything, the pressed card lifted over it, the panel under the card. */
 .tc-backdrop { position: fixed; inset: 0; z-index: var(--tc-layer-overlay); background: var(--tc-backdrop); -webkit-backdrop-filter: blur(var(--tc-backdrop-blur)); backdrop-filter: blur(var(--tc-backdrop-blur)); opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }

@@ -91,6 +91,7 @@ describe("the repeat mark", () => {
 		expect(top.children[0].textContent).toBe("5");
 		expect(top.children[1].classList.contains("tc-due-repeat")).toBe(true);
 		expect(top.children[1].tagName.toLowerCase()).toBe("svg");
+		expect(due.classList.contains("is-repeat-only")).toBe(false);
 	});
 
 	it("is alone in the column when the card shows no date", () => {
@@ -100,6 +101,7 @@ describe("the repeat mark", () => {
 			expect(due.querySelector(".tc-due-day")).toBeNull();
 			expect(due.querySelector(".tc-due-mon")).toBeNull();
 			expect(due.querySelectorAll(".tc-due-top > .tc-due-repeat")).toHaveLength(1);
+			expect(due.classList.contains("is-repeat-only")).toBe(true);
 		}
 	});
 
