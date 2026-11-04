@@ -1,5 +1,5 @@
 import type { CalendarEvent, DayBoundary, TaskItem, TaskKey } from "../application/contracts";
-import { paintEvent } from "./AllDayRow";
+import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
@@ -42,6 +42,7 @@ type HourMark = GridMark & { readonly label: HTMLElement };
 
 interface PlacedEvent extends PlacedSpan {
 	readonly el: HTMLElement;
+	readonly event: CalendarEvent;
 }
 
 interface PlacedTask {
@@ -346,7 +347,9 @@ export class Timeline {
 			const lift = label?.classList.contains("is-minor") ? DESIGN.minorLift : DESIGN.labelLift;
 			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) < lift + DESIGN.nowPillHeight / 2);
 		}
-		for (const { el, start, end } of this.events) {
+		const now = this.deps.now();
+		for (const { el, event, start, end } of this.events) {
+			markPast(el, event, now);
 			el.style.setProperty(PROPERTY.y, px(this.yOf(start)));
 			el.style.setProperty(PROPERTY.length, px(this.yOf(end) - this.yOf(start)));
 			el.classList.toggle("is-tiny", itemBox(start, end, hourPx).tiny);
@@ -624,7 +627,7 @@ export class Timeline {
 		el(block, "div", "tc-event-bar");
 		el(el(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
 		this.deps.onEvent?.(block, event);
-		return { el: block, ...span, level };
+		return { el: block, event, ...span, level };
 	}
 
 	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */

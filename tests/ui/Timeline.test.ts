@@ -326,6 +326,26 @@ describe("the minute's tick", () => {
 		return { view, clock };
 	}
 
+	it("greys an event the now line has passed and keeps the rest in their colour", () => {
+		const { view, clock } = ticking([]);
+		const block = view.itemsEl.querySelector<HTMLElement>(".tc-event")!;
+		expect(block.classList.contains("is-past")).toBe(true);
+		clock.now = new Date(2026, 9, 31, 9, 30);
+		view.tickNow();
+		expect(block.classList.contains("is-past")).toBe(false);
+	});
+
+	it("greys an event the moment it ends, on the tick", () => {
+		const { view, clock } = ticking([]);
+		const block = view.itemsEl.querySelector<HTMLElement>(".tc-event")!;
+		clock.now = new Date(2026, 9, 31, 9, 59);
+		view.tickNow();
+		expect(block.classList.contains("is-past")).toBe(false);
+		clock.now = new Date(2026, 9, 31, 10, 0);
+		view.tickNow();
+		expect(block.classList.contains("is-past")).toBe(true);
+	});
+
 	it("moves the now line and the pill's time without drawing the items again", () => {
 		const { view, clock } = ticking([task(840)]);
 		const items = [...view.itemsEl.children];
