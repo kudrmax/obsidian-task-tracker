@@ -79,3 +79,19 @@ describe("PhoneReminders actions", () => {
 		expect(result.changed && result.text).toContain("- [ ] B ⏰ 2026-11-05 00:50-01:50");
 	});
 });
+
+describe("PhoneReminders.silence", () => {
+	it("turns the task's reminder off and keeps its time", () => {
+		const id = "- [ ] Wake 🚨 2026-11-04 12:00";
+		const done = phone.silence(file(id), id, at(4, 12, 1));
+		if (!done.changed) throw new Error("expected a change");
+		expect(done.text).toContain("- [ ] Wake 🔕 2026-11-04 12:00");
+		expect(done.text).not.toContain("🚨");
+		expect(phone.reminders(done.text, at(4, 12, 1))).toEqual([]);
+	});
+
+	it("is stale when the task changed", () => {
+		expect(phone.silence(file("- [ ] Wake 🚨 2026-11-04 13:00"), "- [ ] Wake 🚨 2026-11-04 12:00", at(4, 12, 1))).toEqual({ changed: false, reason: "stale" });
+	});
+});
+

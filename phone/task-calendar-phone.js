@@ -728,6 +728,9 @@
   function setDueDate(doc, entry, date) {
     return patch(doc, entry, { dueDate: date });
   }
+  function setReminder(doc, entry, reminder) {
+    return patch(doc, entry, { reminder });
+  }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, SLOT_STEP);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
@@ -1079,6 +1082,10 @@
     complete(text, id, now) {
       return this.act(text, id, now, (doc, entry) => setStatus(doc, entry, "done"));
     }
+    /** The task stays on its time; it no longer reminds. */
+    silence(text, id, now) {
+      return this.act(text, id, now, (doc, entry) => setReminder(doc, entry, "none"));
+    }
     snooze(text, id, minutes, now) {
       return this.act(text, id, now, (doc, entry, today, boundary) => setSlot(doc, entry, this.from(now, minutes, entry.task.slot), today, boundary));
     }
@@ -1126,6 +1133,7 @@
   globalThis.TaskCalendarPhone = {
     reminders: (text, settingsJson, nowMs) => new PhoneReminders(settingsJson).reminders(text, new Date(nowMs)).map(wire),
     complete: (text, settingsJson, id, nowMs) => new PhoneReminders(settingsJson).complete(text, id, new Date(nowMs)),
+    silence: (text, settingsJson, id, nowMs) => new PhoneReminders(settingsJson).silence(text, id, new Date(nowMs)),
     snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminders(settingsJson).snooze(text, id, minutes, new Date(nowMs))
   };
 })();

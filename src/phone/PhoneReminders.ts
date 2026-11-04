@@ -56,6 +56,11 @@ export class PhoneReminders {
 		return this.act(text, id, now, (doc, entry) => ops.setStatus(doc, entry, "done"));
 	}
 
+	/** The task stays on its time; it no longer reminds. */
+	silence(text: string, id: string, now: Date): PhoneAction {
+		return this.act(text, id, now, (doc, entry) => ops.setReminder(doc, entry, "none"));
+	}
+
 	snooze(text: string, id: string, minutes: number, now: Date): PhoneAction {
 		return this.act(text, id, now, (doc, entry, today, boundary) => ops.setSlot(doc, entry, this.from(now, minutes, entry.task.slot!), today, boundary));
 	}

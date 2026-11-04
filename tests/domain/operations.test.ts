@@ -24,6 +24,7 @@ import {
 	rename,
 	setDueDate,
 	setPriority,
+	setReminder,
 	setSlot,
 	setStatus,
 } from "../../src/domain/operations";
@@ -619,4 +620,22 @@ describe("reminder kind through operations", () => {
 		expect(moved.serialize()).toBe("## Now\n- [ ] A 🚨 2026-10-30 12:00-13:00\n");
 		expect(setStatus(moved, moved.tasks("now")[0], "done").serialize()).toContain("- [x] A 🚨 2026-10-30 12:00-13:00");
 	});
+
+	it("a task taken off the time and put back gets the default reminder", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A 🔕 2026-10-30 10:00\n", SECTIONS, R);
+		const listed = clearSlot(d, d.tasks("now")[0]);
+		const back = setSlot(listed, listed.tasks("now")[0], { date: T, start: 900, end: null }, T);
+		expect(back.serialize()).toBe("## Now\n- [ ] A ⏰ 2026-10-30 15:00\n");
+	});
+
+	it("moving along the time keeps a silenced task silent", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A 🔕 2026-10-30 10:00\n", SECTIONS, R);
+		expect(setSlot(d, d.tasks("now")[0], { date: T, start: 900, end: null }, T).serialize()).toBe("## Now\n- [ ] A 🔕 2026-10-30 15:00\n");
+	});
+
+	it("setReminder changes the kind and keeps the time", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A 🚨 2026-10-30 10:00\n", SECTIONS, R);
+		expect(setReminder(d, d.tasks("now")[0], "none").serialize()).toBe("## Now\n- [ ] A 🔕 2026-10-30 10:00\n");
+	});
 });
+
