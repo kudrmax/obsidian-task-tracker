@@ -939,7 +939,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
-.tc-float .tc-due-mon { color: var(--tc-float-month); }
+.tc-float .tc-due-mon, .tc-float .tc-due-repeat { color: var(--tc-float-month); }
 .tc-float-under { height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-under.is-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }
 .tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step-y)) 0 0 calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
@@ -1034,8 +1034,8 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* The quick moves: their icons in the accent, as the drop zones' were. */
 .tc-menu-tiles.is-move .tc-menu-tile > svg { color: var(--tc-accent-ui); }
 .tc-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
-.tc-menu-tiles.is-four .tc-menu-tile-label { width: auto; padding: 0; overflow: visible; }
-.tc-menu-tiles.is-four .tc-menu-tile-label.is-long { text-align: center; -webkit-mask-image: none; mask-image: none; }
+/* Four in a row: a label as wide as the tile and its gap shows whole (In progress); a longer one (Stop progress) fades as in any tile. */
+.tc-menu-tiles.is-four .tc-menu-tile-label:not(.is-long) { width: calc(100% + var(--tc-space-6)); padding: 0; }
 .tc-menu-tile-label.is-long { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); }
 .tc-menu-badge { position: absolute; top: var(--tc-menu-badge-inset); right: var(--tc-menu-badge-inset); width: var(--tc-menu-badge); height: var(--tc-menu-badge); border-radius: var(--tc-radius-circle); background: var(--tc-priority-ink); color: var(--tc-menu-badge-ink); display: flex; align-items: center; justify-content: center; }
 .tc-menu-badge svg { width: var(--tc-menu-badge-icon); height: var(--tc-menu-badge-icon); stroke-width: var(--tc-stroke-badge); }

@@ -375,6 +375,24 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-progress-dot")).toBe("4px");
 	});
 
+	it("tints a dragged card's repeat mark as its month, over the float's own ground", () => {
+		const listed = (d: Declaration, selector: string) => d.selector.split(",").some((part) => part.trim() === selector);
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => listed(d, selector)).map((d) => [d.property, d.value]));
+		expect(of(".tc-float .tc-due-repeat").get("color")).toBe("var(--tc-float-month)");
+		expect(of(".tc-float .tc-due-mon").get("color")).toBe("var(--tc-float-month)");
+		const order = (selector: string) => sheet.rules.findIndex((d) => listed(d, selector));
+		expect(order(".tc-float .tc-due-repeat")).toBeGreaterThan(order("[data-priority] .tc-due-repeat"));
+	});
+
+	it("shows a label of a row of four tiles whole while it fits the tile and its gap; a longer one fades as in any tile", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		const fits = of(".tc-menu-tiles.is-four .tc-menu-tile-label:not(.is-long)");
+		expect([fits.get("width"), fits.get("padding")]).toEqual(["calc(100% + var(--tc-space-6))", "0"]);
+		expect(of(".tc-menu-tile-row").get("gap")).toBe("var(--tc-space-6)");
+		expect(sheet.rules.filter((d) => d.selector.includes("is-four") && d.selector.includes(".is-long") && !d.selector.includes(":not(.is-long)"))).toEqual([]);
+		expect(sheet.rules.filter((d) => d.selector.includes("is-four") && d.property === "overflow")).toEqual([]);
+	});
+
 	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
