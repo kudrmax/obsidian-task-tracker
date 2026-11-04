@@ -518,12 +518,41 @@ describe("createInPlace", () => {
 		expect(key!.section).toBe("soon");
 	});
 
-	it("gives a subtask's key, and the later of two twins typed one after the other", async () => {
+	it("gives a subtask's key", async () => {
 		const TRIP = "## Inbox\n\n## Now\n\n- [ ] Trip\n\t- [ ] Bag\n\n## Soon\n\n## Done\n";
 		const { svc } = setup(TRIP);
 		const [trip] = (await svc.dayView(T)).list;
-		const key = await svc.createInPlace("Bag", null, { kind: "subtask", parent: trip.key, before: null });
+		const key = await svc.createInPlace("Pay", null, { kind: "subtask", parent: trip.key, before: null });
 		expect(key).toEqual((await svc.dayView(T)).list[0].subtasks[1].key);
+	});
+
+	it("gives the new task, not its twin in another section: the headings keep them apart", async () => {
+		const { svc } = setup("## Inbox\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n\n- [ ] Call mom\n");
+		const key = await svc.createInPlace("Call mom", null, { kind: "list", list: "inbox", group: null, before: null });
+		expect(key).toEqual((await svc.inboxView())[0].key);
+	});
+
+	it("gives the new task typed above its twin in the same section", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] X\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const [x] = await svc.inboxView();
+		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: x.key });
+		expect(key).toEqual((await svc.inboxView())[0].key);
+	});
+
+	it("gives the first of twins side by side, whichever was typed: a field at either lands under both", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] X\n- [ ] Y\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const [, y] = await svc.inboxView();
+		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: y.key });
+		const inbox = await svc.inboxView();
+		expect(inbox.map((i) => i.text)).toEqual(["X", "X", "Y"]);
+		expect(key).toEqual(inbox[0].key);
+	});
+
+	it("gives the twin a schedule moved out of Inbox, with an identical task left behind", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] Run\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const key = await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null });
+		const run = (await svc.dayView("2026-11-05")).list.find((i) => i.text === "Run")!;
+		expect(key).toEqual(run.key);
 	});
 
 	it("gives null when it creates nothing", async () => {

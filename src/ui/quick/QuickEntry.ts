@@ -346,7 +346,11 @@ export class QuickEntry {
 		}
 	}
 
-	/** The places at or past the created task's card move down, when `column` is to show it among `cards`. */
+	/**
+	 * The places at or past the created task's card move down, when `column` is to show it among `cards`. A key gone
+	 * stale because another write or a sync landed between the create and this read finds no card: the field then
+	 * stays where it is, as for a task put elsewhere.
+	 */
 	private landed(column: ListColumn, created: TaskKey, cards: readonly ListCard[]): void {
 		const index = cards.findIndex((card) => sameTask(card.key, created) && card.key.raw === created.raw);
 		if (index >= 0) this.runs.landed(column, index);

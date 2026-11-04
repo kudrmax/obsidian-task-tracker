@@ -90,11 +90,6 @@ function indentWidth(line: string): number {
 }
 
 function sameTask(a: Task, b: Task): boolean {
-	return sameOwnLine(a, b) && sameLines(a.children, b.children);
-}
-
-/** The same task line, whatever lies under it. */
-function sameOwnLine(a: Task, b: Task): boolean {
 	return (
 		a.status === b.status &&
 		a.statusChar === b.statusChar &&
@@ -104,8 +99,45 @@ function sameOwnLine(a: Task, b: Task): boolean {
 		(a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
-		a.slot?.end === b.slot?.end
+		a.slot?.end === b.slot?.end &&
+		sameLines(a.children, b.children)
 	);
+}
+
+/**
+ * The lines of `after` an ordered diff from `before` finds inserted (a longest common subsequence of the two), each
+ * moved up past the identical lines right above it.
+ */
+function insertedLines(before: readonly string[], after: readonly string[]): Set<number> {
+	let start = 0;
+	while (start < before.length && start < after.length && before[start] === after[start]) start++;
+	let end = 0;
+	while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+	const a = before.slice(start, before.length - end);
+	const b = after.slice(start, after.length - end);
+	const width = b.length + 1;
+	const common = new Int32Array((a.length + 1) * width);
+	for (let i = a.length - 1; i >= 0; i--) {
+		for (let j = b.length - 1; j >= 0; j--) {
+			common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+		}
+	}
+	const inserted = new Set<number>();
+	for (let i = 0, j = 0; j < b.length; ) {
+		if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
+			i++;
+			j++;
+		} else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
+		else inserted.add(start + j++);
+	}
+	for (const line of [...inserted].sort((x, y) => x - y)) {
+		let at = line;
+		while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
+			inserted.delete(at);
+			inserted.add(--at);
+		}
+	}
+	return inserted;
 }
 
 /** Every task and subtask, each before its own subtasks. */
@@ -207,16 +239,13 @@ export class TaskDocument {
 	}
 
 	/**
-	 * The task this document holds once more than `before` does, by its own line: the one a change added, wherever the
-	 * rules then moved it. Of twin lines, the later.
+	 * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
+	 * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
+	 * it gives the first.
 	 */
-	addedSince(before: TaskDocument): TaskEntry | undefined {
-		const left = flatten(before.allTasks());
-		return flatten(this.allTasks()).find((entry) => {
-			const twin = left.findIndex((other) => sameOwnLine(other.task, entry.task));
-			if (twin >= 0) left.splice(twin, 1);
-			return twin < 0;
-		});
+	insertedSince(before: TaskDocument): TaskEntry | undefined {
+		const inserted = insertedLines(before.lines, this.lines);
+		return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
 	}
 
 	insert(section: SectionKey, position: InsertPosition, task: Task): TaskDocument {

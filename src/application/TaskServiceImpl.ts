@@ -114,7 +114,7 @@ export class TaskServiceImpl implements TaskService {
 	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
 		if (this.blank(text)) return null;
 		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary, repeat));
-		const created = change?.after.addedSince(change.before);
+		const created = change?.after.insertedSince(change.before);
 		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}
 

@@ -563,10 +563,38 @@ function indentWidth(line) {
   return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return sameOwnLine(a, b) && sameLines(a.children, b.children);
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && sameLines(a.children, b.children);
 }
-function sameOwnLine(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end;
+function insertedLines(before, after) {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) start++;
+  let end = 0;
+  while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+  const a = before.slice(start, before.length - end);
+  const b = after.slice(start, after.length - end);
+  const width = b.length + 1;
+  const common = new Int32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+    }
+  }
+  const inserted = /* @__PURE__ */ new Set();
+  for (let i = 0, j = 0; j < b.length; ) {
+    if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
+      i++;
+      j++;
+    } else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
+    else inserted.add(start + j++);
+  }
+  for (const line of [...inserted].sort((x, y) => x - y)) {
+    let at = line;
+    while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
+      inserted.delete(at);
+      inserted.add(--at);
+    }
+  }
+  return inserted;
 }
 function flatten(entries) {
   return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
@@ -642,16 +670,13 @@ var TaskDocument = class _TaskDocument {
     return SECTION_KEYS.flatMap((key) => this.tasks(key));
   }
   /**
-   * The task this document holds once more than `before` does, by its own line: the one a change added, wherever the
-   * rules then moved it. Of twin lines, the later.
+   * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
+   * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
+   * it gives the first.
    */
-  addedSince(before) {
-    const left = flatten(before.allTasks());
-    return flatten(this.allTasks()).find((entry) => {
-      const twin = left.findIndex((other) => sameOwnLine(other.task, entry.task));
-      if (twin >= 0) left.splice(twin, 1);
-      return twin < 0;
-    });
+  insertedSince(before) {
+    const inserted = insertedLines(before.lines, this.lines);
+    return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
   }
   insert(section, position, task) {
     const line = this.insertionLine(section, position);
