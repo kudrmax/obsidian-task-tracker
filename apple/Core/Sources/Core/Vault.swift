@@ -23,8 +23,15 @@ public enum VaultError: Error, Equatable {
     case tasksFileMissing(String)
 }
 
+/// Where the tasks file and the plugin's settings come from.
+public protocol TasksVault: Sendable {
+    func read() throws -> (tasks: String, settingsJSON: String)
+    /// Writes `tasks` only if the file still holds `old`; false when it changed in between.
+    func write(tasks: String, expecting old: String) throws -> Bool
+}
+
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
-public final class Vault: @unchecked Sendable {
+public final class Vault: TasksVault, @unchecked Sendable {
     static let settingsPath = ".obsidian/plugins/task-calendar/data.json"
     static let defaultTasksFile = "TODOs Tasks.md"
 
@@ -54,7 +61,6 @@ public final class Vault: @unchecked Sendable {
         }
     }
 
-    /// Writes `tasks` only if the file still holds `old`; false when it changed in between.
     public func write(tasks: String, expecting old: String) throws -> Bool {
         try withFolder { folder in
             let file = folder.appendingPathComponent(Self.tasksFile(in: (try? Self.coordinatedRead(folder.appendingPathComponent(Self.settingsPath))) ?? ""))
