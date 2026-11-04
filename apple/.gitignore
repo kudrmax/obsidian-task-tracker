@@ -1,0 +1,5 @@
+.superpowers/
+.build/
+*.xcodeproj/
+DerivedData/
+.swiftpm/
