@@ -1,0 +1,75 @@
+import { describe, expect, it } from "vitest";
+import { PhoneReminders } from "../../src/phone/PhoneReminders";
+
+const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m);
+const file = (...now: string[]) => ["## Now", "", ...now, "", "## Soon", "", "## Done", ""].join("\n");
+const phone = new PhoneReminders("");
+
+describe("PhoneReminders.reminders", () => {
+	it("lists open slotted tasks with their kind", () => {
+		const text = file(
+			"- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00",
+			"- [ ] Wake 🚨 2026-11-04 12:00",
+			"- [ ] Quiet 🔕 2026-11-04 13:00",
+			"- [x] Closed ⏰ 2026-11-04 14:00",
+		);
+		const list = phone.reminders(text, at(4, 9));
+		expect(list.map((r) => [r.title, r.body, r.kind, r.date])).toEqual([
+			["Call Mom", "10:00–11:00", "notification", "2026-11-04"],
+			["Wake", "12:00", "alarm", "2026-11-04"],
+		]);
+		expect(list[0].start).toEqual(at(4, 10));
+		expect(list[0].id).toBe("- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00");
+	});
+
+	it("keeps a passed reminder until the end of its day", () => {
+		const text = file("- [ ] A ⏰ 2026-11-04 10:00");
+		expect(phone.reminders(text, at(4, 15))).toHaveLength(1);
+		expect(phone.reminders(text, at(5, 6))).toHaveLength(0);
+	});
+
+	it("dayEnd follows dayStartHour", () => {
+		const r = new PhoneReminders(JSON.stringify({ dayStartHour: 4 })).reminders(file("- [ ] A ⏰ 2026-11-04 23:00"), at(4, 9))[0];
+		expect(r.dayEnd).toEqual(at(5, 4));
+	});
+
+	it("reads custom markers and sections from settings json", () => {
+		const custom = new PhoneReminders(JSON.stringify({ sections: { now: "Today" }, alarmSlotMarker: "ring:" }));
+		const list = custom.reminders("## Today\n\n- [ ] A ring: 2026-11-04 10:00\n", at(4, 9));
+		expect(list.map((r) => [r.title, r.kind])).toEqual([["A", "alarm"]]);
+	});
+
+	it("empty settings json means defaults", () => {
+		expect(new PhoneReminders("").reminders(file("- [ ] A 🚨 2026-11-04 10:00"), at(4, 9))[0].kind).toBe("alarm");
+	});
+});
+
+describe("PhoneReminders actions", () => {
+	const line = "- [ ] A 🚨 2026-11-04 10:00-11:00";
+
+	it("complete marks the task done", () => {
+		const result = phone.complete(file(line), line, at(4, 10, 5));
+		expect(result.changed && result.text).toContain("- [x] A 🚨 2026-11-04 10:00-11:00");
+	});
+
+	it("complete of a changed line is stale", () => {
+		expect(phone.complete(file(line), "- [ ] A 🚨 2026-11-04 09:00", at(4, 10))).toEqual({ changed: false, reason: "stale" });
+	});
+
+	it("two identical lines: complete closes one", () => {
+		const result = phone.complete(file(line, line), line, at(4, 10));
+		if (!result.changed) throw new Error("stale");
+		expect(phone.reminders(result.text, at(4, 10)).map((r) => r.id)).toEqual([line]);
+	});
+
+	it("snooze moves the slot from now keeping the duration", () => {
+		const result = phone.snooze(file(line), line, 30, at(4, 10, 7));
+		expect(result.changed && result.text).toContain("- [ ] A 🚨 2026-11-04 10:37-11:37");
+	});
+
+	it("snooze across midnight", () => {
+		const late = "- [ ] B ⏰ 2026-11-04 23:30-00:30";
+		const result = phone.snooze(file(late), late, 60, at(4, 23, 50));
+		expect(result.changed && result.text).toContain("- [ ] B ⏰ 2026-11-05 00:50-01:50");
+	});
+});
