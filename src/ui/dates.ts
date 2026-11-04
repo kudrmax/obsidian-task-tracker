@@ -80,3 +80,8 @@ export function gridStart(month: LocalDate): LocalDate {
 export function sameMonth(a: LocalDate, b: LocalDate): boolean {
 	return a.slice(0, 7) === b.slice(0, 7);
 }
+
+/** 0 for Monday … 6 for Sunday. */
+export function weekdayOf(date: LocalDate): number {
+	return (parseLocalDate(date).getDay() - MONDAY + DAYS_PER_WEEK) % DAYS_PER_WEEK;
+}

@@ -320,6 +320,16 @@ body {
 	--tc-grid-gap: 2px;
 	--tc-picker-remove-gap: var(--tc-space-6);
 	/*
+	 * The repeat panel (README «Повторы», variant А): its switches are the wheel's track on a tile's ground, its − and + the
+	 * month's arrows, its weekdays the picker's days; Remove repeat stands closer under them than the panel's gap.
+	 */
+	--tc-repeat-step: var(--tc-month-btn);
+	--tc-repeat-step-icon: var(--tc-icon-m);
+	--tc-stroke-repeat-step: var(--tc-stroke-2-4);
+	--tc-repeat-count-w: 28px;
+	--tc-weight-repeat-day: 500;
+	--tc-repeat-remove-gap: var(--tc-space-6);
+	/*
 	 * The quick bar over the keyboard, on the view's own ground: the shift buttons in one pill, the priority flag and the
 	 * place button in pills of the wheel's track; its panels use the menu's.
 	 */
@@ -1047,6 +1057,22 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
 .tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
 .tc-panel button.tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
+.tc-panel.is-repeat { width: var(--tc-menu-w); padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.tc-panel.is-repeat.has-remove { padding-bottom: 0; }
+.tc-repeat-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-menu-tile-bg); display: flex; }
+.tc-panel button.tc-repeat-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); padding: 0; border-radius: var(--tc-radius-seg-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
+.tc-panel button.tc-repeat-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
+.tc-repeat-every { height: var(--tc-seg); flex-shrink: 0; padding-left: var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-4); font-size: var(--tc-font-menu); }
+.tc-repeat-every-label { flex: 1; }
+.tc-panel button.tc-repeat-step { width: var(--tc-repeat-step); height: var(--tc-repeat-step); }
+.tc-panel button.tc-repeat-step.is-off { color: var(--tc-ink-dim); }
+.tc-repeat-step svg { width: var(--tc-repeat-step-icon); height: var(--tc-repeat-step-icon); stroke-width: var(--tc-stroke-repeat-step); }
+.tc-repeat-count { min-width: var(--tc-repeat-count-w); text-align: center; font-weight: var(--tc-weight-semibold); font-variant-numeric: tabular-nums; }
+.tc-repeat-week { display: flex; justify-content: space-between; }
+.tc-panel button.tc-repeat-day { width: var(--tc-day); height: var(--tc-day); padding: 0; border-radius: var(--tc-radius-day); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-repeat-day); }
+.tc-panel button.tc-repeat-day.is-on { background: var(--tc-accent-ui); color: var(--tc-on-accent); font-weight: var(--tc-weight-bold); }
+.tc-repeat-month { height: var(--tc-day); padding-left: var(--tc-space-8); display: flex; align-items: center; font-size: var(--tc-font-menu); }
+.tc-panel button.tc-repeat-remove { margin-top: calc(var(--tc-repeat-remove-gap) - var(--tc-space-8)); padding: 0 var(--tc-space-8); border-top: var(--tc-rule); }
 
 /* The quick bar: at the bottom of the view, which Obsidian shrinks above the phone keyboard. Its panels hang over its right end. */
 .tc-quick-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-bar-bottom); z-index: var(--tc-layer-bar); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); display: flex; align-items: center; gap: var(--tc-space-8); }
