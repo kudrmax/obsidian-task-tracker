@@ -253,19 +253,44 @@ describe("the menu", () => {
 			expect(row("Repeat").querySelector(".tc-menu-value, .tc-menu-week")).toBeNull();
 		});
 
-		it("opens the repeat panel in place of the menu: a change is set at once and the menu stays", () => {
+		const away = () => document.querySelector(".tc-backdrop")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+
+		it("opens the repeat panel in place of the menu: a change shows at once and the menu stays, the file untouched", () => {
 			const actions = open(item({ repeat: weekly([0]) }));
 			row("Repeat").click();
 			expect(panel().classList.contains("is-repeat")).toBe(true);
 			expect(panel().querySelector(".tc-menu-tiles")).toBeNull();
 			expect(panel().querySelector(".tc-menu-back")).toBeNull();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
-			expect(actions.setRepeat).toHaveBeenCalledWith(weekly([0, 2]));
+			expect(panel().querySelectorAll(".tc-repeat-day")[2].getAttribute("aria-pressed")).toBe("true");
+			expect(actions.setRepeat).not.toHaveBeenCalled();
 			expect(closing()).toBe(false);
 			expect(panel().classList.contains("is-repeat")).toBe(true);
 		});
 
-		it("takes the repeat off from Remove repeat and gives the menu back, Stop gone", () => {
+		it("writes the rule once, as it stands, when the menu closes", () => {
+			const actions = open(item({ repeat: weekly([0]) }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[4].click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			away();
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(actions.setRepeat).toHaveBeenCalledWith({ ...weekly([0, 2, 4]), every: 2 });
+		});
+
+		it("writes nothing on close when the rule came back to the one the task has", () => {
+			const actions = open(item({ repeat: { ...weekly([0]), from: "2026-10-26" } }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+		});
+
+		it("takes the repeat off from Remove repeat at once and gives the menu back, Stop gone", () => {
 			const actions = open(item({ repeat: EVERY_3_DAYS }));
 			row("Repeat").click();
 			row("Remove repeat").click();
@@ -273,18 +298,31 @@ describe("the menu", () => {
 			expect(closing()).toBe(false);
 			expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 			expect(row("Repeat").querySelector(".tc-menu-value")).toBeNull();
+			away();
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
 		});
 
-		it("offers no Remove repeat for a task without a repeat; a first change sets one and the page stays", () => {
+		it("offers no Remove repeat for a task without a repeat; a first change offers it, and it drops the change", () => {
 			const actions = open(item());
 			row("Repeat").click();
 			expect(row("Remove repeat")).toBeUndefined();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
-			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
+			expect(actions.setRepeat).not.toHaveBeenCalled();
 			expect(panel().classList.contains("is-repeat")).toBe(true);
 			expect(closing()).toBe(false);
 			row("Remove repeat")!.click();
 			expect(actions.setRepeat).toHaveBeenLastCalledWith(null);
+			away();
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+		});
+
+		it("writes a first rule once, when the menu closes", () => {
+			const actions = open(item());
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
+			away();
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
 		});
 
 		it("starts a new rule from the task's due date", () => {
@@ -292,6 +330,7 @@ describe("the menu", () => {
 			row("Repeat").click();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[0].click();
 			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			away();
 			expect(actions.setRepeat).toHaveBeenCalledWith({ ...weekly([2]), every: 2 });
 		});
 	});
