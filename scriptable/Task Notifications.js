@@ -305,21 +305,36 @@ function statusOf(char) {
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function slotMarkers(markers) {
+  const kinds = /* @__PURE__ */ new Map();
+  for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.silentSlot, "none"]]) {
+    if (marker && !kinds.has(marker)) kinds.set(marker, kind);
+  }
+  return kinds;
+}
+function markerOf(kind, markers) {
+  const own = kind === "alarm" ? markers.alarmSlot : kind === "none" ? markers.silentSlot : markers.slot;
+  return own || markers.slot;
+}
 var FieldSlicer = class {
   constructor(markers) {
-    this.slotRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.slot)}\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
+    this.kinds = slotMarkers(markers);
+    const alternatives = [...this.kinds.keys()].map(escapeRegExp).join("|");
+    this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
     this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
   }
   slice(body) {
     let text = body;
     let dueDate = null;
     let slot = null;
+    let reminder = "notification";
     for (; ; ) {
       const slotMatch = slot === null ? this.slotRe.exec(text) : null;
       if (slotMatch) {
         const parsed = this.slotOf(slotMatch);
         if (!parsed) break;
         slot = parsed;
+        reminder = this.kinds.get(slotMatch[1]) ?? "notification";
         text = text.slice(0, slotMatch.index);
         continue;
       }
@@ -332,21 +347,21 @@ var FieldSlicer = class {
       }
       break;
     }
-    return { text: text.trim(), dueDate, slot };
+    return { text: text.trim(), dueDate, slot, reminder };
   }
   slotOf(m) {
-    const date = m[1];
-    const start = parseHHMM(m[2]);
+    const date = m[2];
+    const start = parseHHMM(m[3]);
     if (!isValidLocalDate(date) || start === null || start >= DAY_MINUTES2) return null;
-    if (m[3] === void 0) return { date, start, end: null };
-    const end = parseHHMM(m[3]);
+    if (m[4] === void 0) return { date, start, end: null };
+    const end = parseHHMM(m[4]);
     if (end === null || start === end) return null;
     return { date, start, end: end < start ? end + DAY_MINUTES2 : end };
   }
 };
 var slicers = /* @__PURE__ */ new Map();
 function fieldSlicerFor(markers) {
-  const key = `${markers.slot}\0${markers.dueDate}`;
+  const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate].join("\0");
   let slicer = slicers.get(key);
   if (!slicer) {
     slicer = new FieldSlicer(markers);
@@ -376,7 +391,7 @@ function formatTaskLine(parsed, markers) {
   if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
   if (task.slot) {
     const { date, start, end } = task.slot;
-    line += ` ${markers.slot} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES2 ? end - DAY_MINUTES2 : end)}`}`;
+    line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES2 ? end - DAY_MINUTES2 : end)}`}`;
   }
   return line;
 }

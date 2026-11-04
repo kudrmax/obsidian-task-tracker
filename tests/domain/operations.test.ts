@@ -42,7 +42,7 @@ function parse(text: string): TaskDocument {
 
 describe("newTask", () => {
 	it("builds a todo task and applies the patch", () => {
-		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, priority: null, children: [] });
+		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "notification", priority: null, children: [] });
 		expect(newTask("A", { dueDate: D }).dueDate).toBe(D);
 	});
 });
@@ -607,5 +607,16 @@ describe("sections of a later day", () => {
 		expect(moveToGroup(d, d.tasks("now")[1], "soon", "Morning", d.tasks("now")[0], T, "2026-10-31").serialize()).toBe(
 			"## Now\n- [ ] N 📅 2026-10-31\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n- [ ] A 📅 2026-10-31\n",
 		);
+	});
+});
+
+describe("reminder kind through operations", () => {
+	const R = { dueDate: "📅", slot: "⏰", alarmSlot: "🚨", silentSlot: "🔕" };
+
+	it("keeps the kind through setSlot and setStatus", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A 🚨 2026-10-30 10:00-11:00\n", SECTIONS, R);
+		const moved = setSlot(d, d.tasks("now")[0], { date: T, start: 720, end: 780 }, T);
+		expect(moved.serialize()).toBe("## Now\n- [ ] A 🚨 2026-10-30 12:00-13:00\n");
+		expect(setStatus(moved, moved.tasks("now")[0], "done").serialize()).toContain("- [x] A 🚨 2026-10-30 12:00-13:00");
 	});
 });

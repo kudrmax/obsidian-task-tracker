@@ -99,6 +99,15 @@ describe("writing", () => {
 		expect(store.text).toBe("## In\n\n## Today\n\n## Next\n\n- [ ] A due: 2026-11-03\n\n## Finished\n\n## Later\n");
 	});
 
+	it("reads and keeps the alarm marker from settings", async () => {
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, alarmSlotMarker: "alarm:" });
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A alarm: 2026-10-30 10:00\n\n## Soon\n\n## Backlog\n\n## Done\n", settings);
+		const view = await svc.dayView(T);
+		expect(view.slotted.map((s) => s.text)).toEqual(["A"]);
+		await svc.setSlot(view.slotted[0].key, { date: T, start: 660, end: null });
+		expect(store.text).toContain("- [ ] A alarm: 2026-10-30 11:00");
+	});
+
 	it("whitespace-only text creates nothing", async () => {
 		const { store, svc } = setup(FULL);
 		await svc.createInList(T, "   ");

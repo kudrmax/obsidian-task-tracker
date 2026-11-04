@@ -6,6 +6,10 @@ describe("settingsFrom", () => {
 		expect(settingsFrom(null)).toEqual(DEFAULT_SETTINGS);
 	});
 
+	it("marks alarms with 🚨 and no reminder with 🔕 unless set", () => {
+		expect(settingsFrom(null)).toMatchObject({ slotMarker: "⏰", alarmSlotMarker: "🚨", silentSlotMarker: "🔕" });
+	});
+
 	it("starts the day at 5 unless set", () => {
 		expect(settingsFrom(null).dayStartHour).toBe(5);
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);

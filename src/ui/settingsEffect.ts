@@ -22,6 +22,8 @@ export function settingsEffect(before: TaskCalendarSettings, after: TaskCalendar
 			!same(before.sections, after.sections) ||
 			before.dueDateMarker !== after.dueDateMarker ||
 			before.slotMarker !== after.slotMarker ||
+			before.alarmSlotMarker !== after.alarmSlotMarker ||
+			before.silentSlotMarker !== after.silentSlotMarker ||
 			before.groups.ungrouped !== after.groups.ungrouped ||
 			!same(before.groups.presets, after.groups.presets) ||
 			!sameLevels(before.priorities, after.priorities),

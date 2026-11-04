@@ -106,6 +106,7 @@ describe("formatTaskLine", () => {
 						text: "A",
 						dueDate: "2026-11-03",
 						slot: { date: "2026-11-02", start: 600, end: 660 },
+						reminder: "notification",
 						children: [],
 					},
 				},
@@ -117,7 +118,7 @@ describe("formatTaskLine", () => {
 	it("formats a slot ending at midnight", () => {
 		expect(
 			formatTaskLine(
-				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, priority: null, children: [] } },
+				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, reminder: "notification", priority: null, children: [] } },
 				M,
 			),
 		).toBe("- [x] A ⏰ 2026-11-02 23:00-24:00");
@@ -170,5 +171,30 @@ describe("fieldSlicerFor", () => {
 		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
 		expect(parseTaskLine(line, { dueDate: "@due", slot: "⏰" })!.task.dueDate).toBe("2026-11-03");
 		expect(parseTaskLine(line, { dueDate: "📅", slot: "⏰" })!.task.dueDate).toBeNull();
+	});
+});
+
+describe("reminder kind", () => {
+	const R: Markers = { dueDate: "📅", slot: "⏰", alarmSlot: "🚨", silentSlot: "🔕" };
+
+	it("parses the reminder kind from the slot marker", () => {
+		const alarm = parseTaskLine("- [ ] Call 🚨 2026-11-04 10:00-11:00", R)!.task;
+		expect(alarm).toMatchObject({ reminder: "alarm", text: "Call", slot: { date: "2026-11-04", start: 600, end: 660 } });
+		expect(parseTaskLine("- [ ] Call 🔕 2026-11-04 10:00", R)!.task.reminder).toBe("none");
+		expect(parseTaskLine("- [ ] Call ⏰ 2026-11-04 10:00", R)!.task.reminder).toBe("notification");
+	});
+
+	it("writes the slot with its kind's marker", () => {
+		for (const line of ["- [ ] Call 🚨 2026-11-04 10:00-11:00", "- [ ] Call 🔕 2026-11-04 10:00", "- [ ] Call 📅 2026-11-05 ⏰ 2026-11-04 10:00"]) {
+			expect(formatTaskLine(parseTaskLine(line, R)!, R)).toBe(line);
+		}
+	});
+
+	it("a task without a slot reads as notification", () => {
+		expect(parseTaskLine("- [ ] Call", R)!.task.reminder).toBe("notification");
+	});
+
+	it("markers without alarm and silent read only the slot marker", () => {
+		expect(parseTaskLine("- [ ] Call 🚨 2026-11-04 10:00", M)!.task).toMatchObject({ slot: null, text: "Call 🚨 2026-11-04 10:00" });
 	});
 });

@@ -7,7 +7,7 @@ import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup,
 const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", priority: null, children: [], ...patch };
 }
 
 /** The lists whose tasks have neither a due date nor a slot: Inbox, not sorted yet, and Backlog, put off to some day. */
