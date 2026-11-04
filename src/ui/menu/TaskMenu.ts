@@ -40,7 +40,8 @@ export interface EditRow {
 
 /** The same rule but for where it is anchored: the file anchors it, the panel never does. */
 function sameRule(a: RepeatRule, b: RepeatRule | null): boolean {
-	return b !== null && a.kind === b.kind && a.every === b.every && a.unit === b.unit && a.dayOfMonth === b.dayOfMonth && a.days.join() === b.days.join();
+	const days = (rule: RepeatRule) => [...rule.days].sort((x, y) => x - y).join();
+	return b !== null && a.kind === b.kind && a.every === b.every && a.unit === b.unit && a.dayOfMonth === b.dayOfMonth && days(a) === days(b);
 }
 
 /** An open task of its own can repeat; a subtask goes with its parent, and a closed task repeats no more. */
@@ -159,6 +160,8 @@ export class TaskMenu extends LiftedMenu {
 	private item: TaskItem;
 	/** The rule the repeat page holds while the menu stays, written once when the menu closes; none untouched. */
 	private repeatDraft: RepeatRule | null = null;
+	/** The rule the file holds as far as the menu knows: the one it opened with, then whatever the menu last wrote. */
+	private writtenRepeat: RepeatRule | null;
 	private confirmAsked: (() => void) | null = null;
 	private readonly onEnter = (e: KeyboardEvent) => {
 		if (e.key !== "Enter" || !this.confirmAsked) return;
@@ -174,6 +177,7 @@ export class TaskMenu extends LiftedMenu {
 	private constructor(private readonly context: TaskMenuContext) {
 		super();
 		this.item = context.item;
+		this.writtenRepeat = context.item.repeat;
 		this.openOver(context.source, () => this.build());
 	}
 
@@ -426,6 +430,7 @@ export class TaskMenu extends LiftedMenu {
 			onRemove: () => {
 				this.repeatDraft = null;
 				this.item = { ...this.item, repeat: null };
+				this.writtenRepeat = null;
 				void actions.setRepeat(null);
 				this.showMenu();
 			},
@@ -433,11 +438,13 @@ export class TaskMenu extends LiftedMenu {
 		this.place();
 	}
 
-	/** The repeat page's rule, once, unless it came back to the one the task has. */
+	/** The repeat page's rule, once, unless it came back to the one the file holds. */
 	private writeRepeat(): void {
 		const draft = this.repeatDraft;
 		this.repeatDraft = null;
-		if (draft && !sameRule(draft, this.context.item.repeat)) void this.context.actions.setRepeat(draft);
+		if (!draft || sameRule(draft, this.writtenRepeat)) return;
+		this.writtenRepeat = draft;
+		void this.context.actions.setRepeat(draft);
 	}
 
 	private showPicker(): void {

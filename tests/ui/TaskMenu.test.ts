@@ -290,6 +290,27 @@ describe("the menu", () => {
 			expect(actions.setRepeat).not.toHaveBeenCalled();
 		});
 
+		it("writes the old rule back when it is set again after Remove repeat: the menu compares with what it last wrote", () => {
+			const actions = open(item({ repeat: EVERY_3_DAYS }));
+			row("Repeat").click();
+			row("Remove repeat").click();
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-unit .tc-repeat-seg-btn")[0].click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			away();
+			expect(actions.setRepeat.mock.calls).toEqual([[null], [EVERY_3_DAYS]]);
+		});
+
+		it("takes the task's weekdays in any order as the same rule", () => {
+			const actions = open(item({ repeat: weekly([4, 0]) }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			away();
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+		});
+
 		it("takes the repeat off from Remove repeat at once and gives the menu back, Stop gone", () => {
 			const actions = open(item({ repeat: EVERY_3_DAYS }));
 			row("Repeat").click();
