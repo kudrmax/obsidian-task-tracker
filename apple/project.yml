@@ -1,0 +1,41 @@
+name: TaskCalendar
+options:
+  bundleIdPrefix: com.kudrmax
+  deploymentTarget:
+    iOS: "26.0"
+packages:
+  Core:
+    path: Core
+targets:
+  TaskCalendar:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - Config/**
+      - path: plugin/phone/task-calendar-phone.js
+        buildPhase: resources
+    dependencies:
+      - package: Core
+    configFiles:
+      Debug: App/Config/Base.xcconfig
+      Release: App/Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kudrmax.taskcalendar
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Task Calendar
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSAlarmKitUsageDescription: Будильники для задач со временем
+        BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
+        UIBackgroundModes: [fetch]

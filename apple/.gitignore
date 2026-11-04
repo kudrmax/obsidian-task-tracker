@@ -3,3 +3,6 @@
 *.xcodeproj/
 DerivedData/
 .swiftpm/
+
+App/Config/Team.xcconfig
+App/Info.plist
