@@ -197,5 +197,14 @@ actor FakeAlarms: AlarmScheduling {
         #expect(await alarms.alarms.isEmpty)
         #expect(await notifications.pendingIDs.isEmpty)
     }
+
+    @Test func alarmsAreSetAgainWhenHowTheyRingChanged() async {
+        let s = sync(FakeVault(Fixtures.file(Self.quiet, Self.alarm)))
+        _ = await s.sync()
+        let before = await alarms.calls
+        #expect(await s.resetAlarms() == .ok(reminders: 2, at: Fixtures.date(4, 9)))
+        #expect(await alarms.calls == before + 2)
+        #expect(await alarms.alarms == [Self.alarm: Fixtures.date(4, 12)])
+    }
 }
 

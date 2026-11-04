@@ -18,6 +18,10 @@ final class AppServices: Sendable {
         LastSync.save(await sync.sync())
     }
 
+    func resetAlarms() async {
+        LastSync.save(await sync.resetAlarms())
+    }
+
     func complete(_ reminder: ShownReminder) async {
         report(await sync.complete(reminderID: reminder.id), for: reminder)
     }

@@ -44,6 +44,7 @@ public actor ReminderSync {
         case complete(String)
         case snooze(String, minutes: Int)
         case silence(String)
+        case resetAlarms
     }
 
     private let vault: TasksVault
@@ -79,6 +80,11 @@ public actor ReminderSync {
         await inTurn(.silence(reminderID))
     }
 
+    /// Every alarm set again from the file: how they ring has changed, and AlarmKit keeps that in each alarm.
+    public func resetAlarms() async -> SyncStatus {
+        await inTurn(.resetAlarms)
+    }
+
     private func inTurn(_ operation: Operation) async -> SyncStatus {
         let previous = turn
         let mine = Task {
@@ -97,6 +103,9 @@ public actor ReminderSync {
             return await act { [rules] text, settings, at in try rules.complete(id: id, text: text, settingsJSON: settings, now: at) }
         case .snooze(let id, let minutes):
             return await act { [rules] text, settings, at in try rules.snooze(id: id, minutes: minutes, text: text, settingsJSON: settings, now: at) }
+        case .resetAlarms:
+            await alarms.cancel(Array(await alarms.scheduled().keys).sorted())
+            return await bringUpToDate()
         case .silence(let id):
             return await act { [rules] text, settings, at in try rules.silence(id: id, text: text, settingsJSON: settings, now: at) }
         }

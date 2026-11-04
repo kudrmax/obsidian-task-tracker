@@ -13,6 +13,13 @@ final class SettingsModel {
     private(set) var notifications = UNAuthorizationStatus.notDetermined
     private(set) var alarms = AlarmManager.AuthorizationState.notDetermined
 
+    var alarmSound = AppSettings.alarmSound {
+        didSet {
+            AppSettings.alarmSound = alarmSound
+            Task { await AppServices.shared.resetAlarms() }
+        }
+    }
+
     var alarmSnooze = AppSettings.alarmSnooze {
         didSet { AppSettings.alarmSnooze = alarmSnooze }
     }

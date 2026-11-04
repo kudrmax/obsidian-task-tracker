@@ -31,11 +31,12 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Alarm Sound", isOn: $model.alarmSound)
                     Picker("Snooze Alarm For", selection: $model.alarmSnooze) {
                         ForEach(AppSettings.alarmSnoozeChoices, id: \.self) { Text("\($0) min").tag($0) }
                     }
                 } footer: {
-                    Text("Snooze on an alarm moves the task this much later.")
+                    Text("Without the sound an alarm still covers the screen. Snooze moves the task this much later.")
                 }
             }
             .navigationTitle("Task Calendar")
