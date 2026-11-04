@@ -376,7 +376,6 @@ export class TaskCalendarView extends ItemView {
 			today: () => this.today(),
 			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
 			chromeTop: () => chrome.statusBarTop(),
-			toolbarTop: () => chrome.toolbarTop(),
 			day: () => this.selectedDate,
 			mode: () => this.mode(),
 			turnTo: (mode) => this.switcher?.show(mode),

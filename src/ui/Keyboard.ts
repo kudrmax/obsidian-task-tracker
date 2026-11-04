@@ -5,18 +5,20 @@ import { type Easing, easingOf } from "./easing";
 export interface Glide {
 	readonly ms: number;
 	readonly ease: Easing;
+	/** How far what stands on the keyboard rises with it: the keyboard's height as it slides in, 0 as it slides out. */
+	readonly rise: number;
 }
 
 /** Obsidian's app says so on the window just before the keyboard starts to slide. */
 const SLIDES = ["keyboardWillShow", "keyboardWillHide"] as const;
 
 /**
- * The phone keyboard as Obsidian moves it. Just before it slides in or out the app says so, and by then the toolbar over
- * it stands where it will stop, though it is still drawn on its way; the view keeps its height until the keyboard stops.
+ * The phone keyboard as Obsidian moves it. Just before it slides in or out the app says so, with the keyboard's height, and
+ * by then the page knows that height; the view keeps its height until the keyboard stops.
  * `onSlide` hears that moment with the keyboard's glide, so what rides on the keyboard goes with it instead of after it.
  */
 export class Keyboard {
-	private readonly slides = () => this.onSlide(this.glide());
+	private readonly slides = (e: Event) => this.onSlide(this.glide(e.type === "keyboardWillShow" ? keyboardHeight(e, this.root.ownerDocument) : 0));
 
 	constructor(private readonly root: HTMLElement, private readonly onSlide: (glide: Glide) => void) {
 		for (const type of SLIDES) root.ownerDocument.defaultView?.addEventListener(type, this.slides);
@@ -26,7 +28,14 @@ export class Keyboard {
 		for (const type of SLIDES) this.root.ownerDocument.defaultView?.removeEventListener(type, this.slides);
 	}
 
-	private glide(): Glide {
-		return { ms: tokenMs(this.root, DURATION.keyboard), ease: easingOf(getComputedStyle(this.root).getPropertyValue(EASING.keyboard)) };
+	private glide(rise: number): Glide {
+		return { ms: tokenMs(this.root, DURATION.keyboard), ease: easingOf(getComputedStyle(this.root).getPropertyValue(EASING.keyboard)), rise };
 	}
+}
+
+/** The height Obsidian's app gives with the slide, else the one it has already put on the page. */
+function keyboardHeight(e: Event, doc: Document): number {
+	const given = (e as Event & { keyboardHeight?: unknown }).keyboardHeight;
+	if (typeof given === "number") return given;
+	return parseFloat(getComputedStyle(doc.documentElement).getPropertyValue("--keyboard-height")) || 0;
 }

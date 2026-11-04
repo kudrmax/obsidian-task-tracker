@@ -45,8 +45,6 @@ export interface QuickEntryControllerDeps {
 	desktop(): boolean;
 	/** Where Obsidian's own chrome starts under the view: the top of its desktop status bar while it shows, else Infinity. */
 	chromeTop(): number;
-	/** The top of Obsidian's toolbar over the phone keyboard while it shows, else null. */
-	toolbarTop(): number | null;
 	/** The day the day column shows. */
 	day(): LocalDate;
 	mode(): RightMode;
@@ -327,8 +325,8 @@ export class QuickEntryController {
 	}
 
 	/**
-	 * The phone keyboard starts to slide in or out, the view still as tall as before: the bar goes to where the keyboard's
-	 * toolbar will stop, and the field followed into sight scrolls over it, both in the keyboard's time and easing.
+	 * The phone keyboard starts to slide in or out, the view still as tall as before: the bar rises on the keyboard to where
+	 * it will stop, and the field followed into sight scrolls over it, both in the keyboard's time and easing.
 	 */
 	keyboardSlides(glide: Glide): void {
 		const state = this.state;
@@ -336,7 +334,7 @@ export class QuickEntryController {
 		this.pass.cancel();
 		this.revealing = false;
 		const { view, box, rect } = this.measure(state);
-		this.followBar(state, rect, view, box, true);
+		this.followBar(state, rect, view, box, glide.rise);
 		if (rect && this.follow) this.bringIntoSight(state, rect, view, box, glide);
 	}
 
@@ -527,14 +525,13 @@ export class QuickEntryController {
 	}
 
 	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */
-	private followBar(state: EntryState, field: DOMRect | null, view: DOMRect, box: DOMRect, glide = false): void {
+	private followBar(state: EntryState, field: DOMRect | null, view: DOMRect, box: DOMRect, rise = 0): void {
 		const anchor = {
 			field,
 			room: this.roomOf(view, box),
 			overMenu: state.spot.kind === "stack" ? view : null,
-			toolbarTop: this.deps.toolbarTop(),
 		};
-		this.bar.follow(anchor, glide);
+		this.bar.follow(anchor, rise);
 	}
 
 	/** What shows of `box`, the field's list or timeline (the view for a menu's stack), down to the top of Obsidian's status bar. */

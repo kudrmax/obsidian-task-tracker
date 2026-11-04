@@ -39,8 +39,6 @@ interface SetUp {
 	slotted?: TaskItem[];
 	/** Obsidian on the desktop, its status bar's top this far down; the phone without. */
 	desktop?: { readonly chromeTop: number };
-	/** Where Obsidian's toolbar over the phone keyboard stops: a function, since the keyboard moves it. */
-	toolbarTop?: () => number | null;
 	/**
 	 * The lists read the file after a write and draw it only when it changed, as the view's do: "grows" lands each write
 	 * as a card at the end of the day column, "same" lands nothing.
@@ -48,7 +46,7 @@ interface SetUp {
 	drawsOnFresh?: "grows" | "same";
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, toolbarTop = () => null, drawsOnFresh }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -135,7 +133,6 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		today: () => TODAY,
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,
-		toolbarTop,
 		day: () => day,
 		mode: () => mode,
 		turnTo: (to) => {
@@ -482,12 +479,12 @@ describe("QuickEntryController", () => {
 	});
 
 	describe("as the phone keyboard slides in", () => {
-		const GLIDE = { ms: 300, ease: (t: number) => t };
+		const GLIDE = { ms: 300, ease: (t: number) => t, rise: 300 };
 
-		/** The field at the end of Inbox, 405 px down the list; the view 500 px tall, the keyboard's toolbar stopping 300 px up once it slides. */
+		/** The field at the end of Inbox, 405 px down the list; the view 500 px tall, the bar standing on the keyboard's top once it slides. */
 		function withKeyboard() {
-			let toolbar: number | null = null;
-			const set = setUp({ toolbarTop: () => toolbar });
+			let keyboard: number | null = null;
+			const set = setUp();
 			vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "setTimeout", "clearTimeout", "performance"] });
 			set.controller.openAtEnd("inbox");
 			set.root.getBoundingClientRect = () => new DOMRect(0, 0, 390, 500);
@@ -496,9 +493,9 @@ describe("QuickEntryController", () => {
 			list.scrollTop = 0;
 			set.field()!.getBoundingClientRect = () => new DOMRect(10, 405 - list.scrollTop, 175, 35);
 			const bar = set.root.querySelector<HTMLElement>(".tc-quick-bar")!;
-			bar.getBoundingClientRect = () => new DOMRect(0, (toolbar ?? 500) - 44, 390, 44);
+			bar.getBoundingClientRect = () => new DOMRect(0, (keyboard ?? 500) - 44, 390, 44);
 			set.render();
-			return { ...set, list, slide: (top: number) => ((toolbar = top), set.controller.keyboardSlides(GLIDE)) };
+			return { ...set, list, slide: (top: number) => ((keyboard = top), set.controller.keyboardSlides(GLIDE)) };
 		}
 
 		afterEach(() => vi.useRealTimers());

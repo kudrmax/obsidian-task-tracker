@@ -208,6 +208,8 @@ body {
 	 * place, never drawn over it first and then dropped.
 	 */
 	--tc-keyboard-room: var(--keyboard-height, 0px);
+	/* While the phone keyboard slides in the view keeps its height, and what stands on the keyboard is lifted by it; 0 once the view has shrunk. */
+	--tc-keyboard-lift: 0px;
 	/* Under a list column: the switch's row, and Obsidian's navigation or status bar under it. */
 	--tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room));
 	/* While a task is typed, the list's end can rise this far: over the bar at the view's bottom, with the field 16 px above it. */
@@ -318,10 +320,8 @@ body {
 	--tc-bar-btn-w: 44px;
 	--tc-bar-btn-h: 36px;
 	--tc-radius-bar-btn: calc(var(--tc-bar-btn-h) / 2);
-	/* How far the top of Obsidian's toolbar over the phone keyboard is over the view's bottom: the code measures it. */
-	--tc-toolbar-room: 0px;
-	/* The bar's buttons stand the cards' gap over that toolbar (over the view's bottom where it does not show). */
-	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-toolbar-room) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
+	/* The bar's buttons stand the cards' gap over the phone keyboard (over the view's bottom where there is none). */
+	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-keyboard-lift) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
 	--tc-bar-icon: var(--tc-icon-xl);
 	--tc-bar-flag: var(--tc-icon-l);
 	--tc-stroke-bar: var(--tc-stroke-1-9);
@@ -593,6 +593,10 @@ body.theme-light {
 
 /* While Obsidian shows its desktop status bar (the view marks the body; it hides it on the phone, and a plugin may hide it), the bottom row stands over it. */
 body:not(.is-mobile).tc-status-bar-shown { --tc-status-room: var(--tc-status-bar); }
+/* Obsidian marks the body while its keyboard slides; sliding in, it has already said how tall the keyboard will stand. */
+body.is-mobile.keyboard-animating { --tc-keyboard-lift: var(--tc-keyboard-room); }
+/* While a task is typed on the phone our bar stands on the keyboard instead of Obsidian's toolbar, which the field, being an Obsidian editor, would bring. */
+body.is-mobile:has(.task-calendar.is-entering) :is(.mobile-toolbar, .mobile-toolbar-spacer) { display: none; }
 
 /* The view fills its leaf and draws everything itself. */
 /* Obsidian paints .mod-root .view-content with its theme; the board's ground must win in every theme, so this selector outranks it. */
