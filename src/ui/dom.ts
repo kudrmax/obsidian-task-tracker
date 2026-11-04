@@ -15,6 +15,20 @@ export function px(value: number): string {
 	return `${value}px`;
 }
 
+/** Which sides of a rectangle an element takes besides its place. */
+export interface PinSize {
+	readonly width?: boolean;
+	readonly height?: boolean;
+}
+
+/** Stands `target` at `rect`'s top left, and at its width and height when asked. */
+export function pinTo(target: HTMLElement, rect: DOMRect, size: PinSize = {}): void {
+	target.style.left = px(rect.left);
+	target.style.top = px(rect.top);
+	if (size.width) target.style.width = px(rect.width);
+	if (size.height) target.style.height = px(rect.height);
+}
+
 /** Pointer capture throws for a pointer the browser is not tracking, as in tests; then nothing is captured. */
 export function capturePointer(target: Element, pointerId: number): void {
 	try {

@@ -1,8 +1,11 @@
 import type { SourceStatus } from "../../application/contracts";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
+import { icon } from "../kit/icons";
+import { LiftedCopy } from "../kit/LiftedCopy";
+import { Panel, Picks } from "../kit/Panel";
+import { menuRow } from "../menu/MenuPanel";
 import { Overlay } from "../menu/Overlay";
-import { sourceIcon } from "./sourceIcons";
 import { sourceText } from "./sourceText";
 
 export interface SourcesPopoverOptions {
@@ -24,31 +27,31 @@ export class SourcesPopover {
 	private constructor(opts: SourcesPopoverOptions) {
 		this.overlay = new Overlay(() => this.close());
 		const rect = opts.anchor.getBoundingClientRect();
-		const copy = this.overlay.add(opts.anchor.cloneNode(true) as HTMLElement);
-		copy.classList.add("tc-seg-copy");
-		copy.style.left = px(rect.left);
-		copy.style.top = px(rect.top);
-		const panel = this.overlay.add(el(null, "div", "tc-popover"));
-		panel.style.left = px(rect.left + rect.width / 2);
-		panel.style.setProperty(PROPERTY.panelY, px(window.innerHeight - rect.top));
-		for (const status of opts.statuses) {
-			const text = sourceText(status, opts.now);
-			const row = el(panel, "div", "tc-source-row");
-			row.appendChild(sourceIcon(status.source));
-			const lines = el(row, "div", "tc-source-lines");
-			el(lines, "span", "tc-source-name", text.name);
-			el(lines, "span", "tc-source-sub", text.sub);
-			const time = el(row, "span", "tc-source-time", text.time);
-			time.classList.toggle("is-stale", text.stale);
-		}
-		const refresh = el(panel, "button", "tc-source-refresh");
-		refresh.appendChild(sourceIcon("refresh"));
-		refresh.appendChild(document.createTextNode("Refresh now"));
-		refresh.addEventListener("click", () => {
-			this.close();
-			void opts.onRefresh();
+		const copy = LiftedCopy.over(this.overlay, opts.anchor.cloneNode(true) as HTMLElement, false);
+		copy.el.classList.add("tc-seg-copy");
+		copy.pin(rect);
+		const panel = Panel.over(this.overlay, { root: "tc-popover", picks: new Picks(() => this.close()), place: (p) => SourcesPopover.over(p, rect) }, false);
+		panel.replace((p) => {
+			for (const status of opts.statuses) SourcesPopover.row(p, sourceText(status, opts.now), status);
+			menuRow(p, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: panel.pick(() => opts.onRefresh()) });
 		});
 		this.overlay.show();
+	}
+
+	/** Over the switch, centred on it. */
+	private static over(panel: HTMLElement, rect: DOMRect): void {
+		panel.style.left = px(rect.left + rect.width / 2);
+		panel.style.setProperty(PROPERTY.panelY, px(window.innerHeight - rect.top));
+	}
+
+	private static row(panel: HTMLElement, text: ReturnType<typeof sourceText>, status: SourceStatus): void {
+		const row = el(panel, "div", "tc-source-row");
+		row.appendChild(icon(status.source));
+		const lines = el(row, "div", "tc-source-lines");
+		el(lines, "span", "tc-source-name", text.name);
+		el(lines, "span", "tc-source-sub", text.sub);
+		const time = el(row, "span", "tc-source-time", text.time);
+		time.classList.toggle("is-stale", text.stale);
 	}
 
 	close(): void {

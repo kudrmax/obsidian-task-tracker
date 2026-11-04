@@ -1,5 +1,7 @@
 import { tokenPx } from "../design";
 import { el, px } from "../dom";
+import { LiftedCopy } from "../kit/LiftedCopy";
+import { Panel, Picks } from "../kit/Panel";
 import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
 import { scrollIntoColumn, shownPart, topInside } from "./inView";
@@ -15,7 +17,9 @@ export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
  */
 export abstract class LiftedMenu {
 	protected readonly overlay: Overlay;
-	protected readonly lifted: HTMLElement;
+	/** Every window of the menu picks through these: one pick closes the menu, then acts. */
+	protected readonly picks = new Picks(() => this.close());
+	private readonly liftedCopy: LiftedCopy;
 	/** Where the copy stands before it is raised. */
 	protected copy = new DOMRect();
 	/** How far the parts over the blur stand above the pressed thing, to keep a field over the keyboard. */
@@ -26,7 +30,11 @@ export abstract class LiftedMenu {
 
 	protected constructor() {
 		this.overlay = new Overlay((how) => this.close(how));
-		this.lifted = this.overlay.add(el(null, "div", "tc-lifted"), true);
+		this.liftedCopy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted"), true);
+	}
+
+	protected get lifted(): HTMLElement {
+		return this.liftedCopy.el;
 	}
 
 	/**
@@ -52,14 +60,13 @@ export abstract class LiftedMenu {
 		const size = showWhole(this.lifted, rect, roomWidth(room));
 		const left = grownStart(rect.left, rect.width, size.width, room.width, room.margin);
 		const top = box ? topInside(rect.top, size.height, box) : grownStart(rect.top, rect.height, size.height, room.height, room.margin);
-		this.lifted.style.left = px(left);
-		this.lifted.style.top = px(top);
-		return (this.copy = new DOMRect(left, top, size.width, size.height));
+		this.copy = this.liftedCopy.pin(new DOMRect(left, top, size.width, size.height)).rect;
+		return this.copy;
 	}
 
 	/** The panel of either menu: the same width and rows. */
-	protected addPanel(cls: string): HTMLElement {
-		return this.overlay.add(el(null, "div", `tc-panel is-menu ${cls}`), true);
+	protected addPanel(cls: string): Panel {
+		return Panel.over(this.overlay, { root: "tc-panel", cls: `is-menu ${cls}`, picks: this.picks });
 	}
 
 	get raised(): number {
@@ -79,10 +86,7 @@ export abstract class LiftedMenu {
 
 	/** A row's action: the menu closes, then the action runs. */
 	protected pick(action: () => void | Promise<void>): () => void {
-		return () => {
-			this.close();
-			void action();
-		};
+		return this.picks.pick(action);
 	}
 
 	/** `how`: Escape, or anything else that closed it. */

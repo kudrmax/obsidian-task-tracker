@@ -49,7 +49,7 @@ export class BulkController {
 	private menu: BulkMenu | null = null;
 
 	constructor(private readonly deps: BulkDeps) {
-		this.ring = new PlusRing(deps.root, "cancel");
+		this.ring = new PlusRing(deps.root, "cross");
 	}
 
 	attach(card: PickedCard): void {

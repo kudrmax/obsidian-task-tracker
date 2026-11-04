@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu, tileRows } from "../../src/ui/menu/TaskMenu";
+import { tileRows } from "../../src/ui/menu/MenuPanel";
+import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
 
@@ -224,10 +225,10 @@ describe("the menu", () => {
 			expect(actions.remove).not.toHaveBeenCalled();
 			expect(closing()).toBe(false);
 			expect(row("Delete")).toBeUndefined();
-			expect(ask()!.classList.contains("is-danger")).toBe(true);
+			expect(askButton(".tc-menu-ask-btn:last-child").classList.contains("is-danger")).toBe(true);
 			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Delete “Call the doctor”?");
-			expect(askButton(".tc-menu-ask-confirm").textContent).toBe("Delete");
-			askButton(".tc-menu-ask-confirm").click();
+			expect(askButton(".tc-menu-ask-btn:last-child").textContent).toBe("Delete");
+			askButton(".tc-menu-ask-btn:last-child").click();
 			expect(actions.remove).toHaveBeenCalled();
 			expect(closing()).toBe(true);
 		});
@@ -237,10 +238,10 @@ describe("the menu", () => {
 			wontDo().click();
 			expect(actions.setStatus).not.toHaveBeenCalled();
 			expect(panel().querySelector(".tc-menu-tiles.is-status")).toBeNull();
-			expect(ask()!.classList.contains("is-danger")).toBe(false);
+			expect(askButton(".tc-menu-ask-btn:last-child").classList.contains("is-danger")).toBe(false);
 			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Won’t do “Call the doctor”?");
 			expect(panel().firstElementChild).toBe(ask());
-			askButton(".tc-menu-ask-confirm").click();
+			askButton(".tc-menu-ask-btn:last-child").click();
 			expect(actions.setStatus).toHaveBeenCalledWith("cancelled");
 			expect(closing()).toBe(true);
 		});
@@ -248,7 +249,7 @@ describe("the menu", () => {
 		it("gives the menu back as it was on Cancel", () => {
 			const actions = open(item());
 			row("Delete").click();
-			askButton(".tc-menu-ask-cancel").click();
+			askButton(".tc-menu-ask-btn:first-child").click();
 			expect(ask()).toBeNull();
 			expect(row("Delete")).toBeDefined();
 			expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
@@ -488,7 +489,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		const { menu } = openOnStackCard();
 		const row = menu.openRename(() => {});
 		expect(panel().hidden).toBe(true);
-		expect(document.querySelector<HTMLElement>(".tc-lifted")!.style.visibility).toBe("hidden");
+		expect(document.querySelector(".tc-lifted")!.classList.contains("tc-invisible")).toBe(true);
 		expect(row.classList.contains("tc-menu-field")).toBe(true);
 		expect(row.classList.contains("tc-quick-row")).toBe(true);
 		expect([row.style.left, row.style.top, row.style.width]).toEqual(["200px", "300px", "150px"]);

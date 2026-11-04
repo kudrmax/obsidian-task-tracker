@@ -1,5 +1,6 @@
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
+import { Button } from "../kit/Button";
 import type { MarkdownEditing, MarkdownSurface } from "../markdown/MarkdownSurface";
 import { fillTitle } from "../TaskTitle";
 
@@ -27,8 +28,8 @@ export function keptDescription(value: string): string {
  */
 export class DescriptionSheet {
 	readonly el: HTMLElement;
-	private readonly left: HTMLButtonElement;
-	private readonly right: HTMLButtonElement;
+	private readonly left: Button;
+	private readonly right: Button;
 	private readonly text: HTMLElement;
 	private editing: MarkdownEditing | null = null;
 	private closed = false;
@@ -40,10 +41,8 @@ export class DescriptionSheet {
 	private constructor(root: HTMLElement, private readonly opts: DescriptionSheetOptions) {
 		this.el = el(root, "div", "tc-sheet tc-desc-sheet");
 		const bar = el(this.el, "div", "tc-sheet-bar");
-		this.left = el(bar, "button", "tc-sheet-cancel");
-		this.left.addEventListener("click", () => this.close());
-		this.right = el(bar, "button", "tc-sheet-submit");
-		this.right.addEventListener("click", () => void (this.editing ? this.save() : this.edit()));
+		this.left = Button.create(bar, { kind: "text", label: "Close", onPress: () => this.close() });
+		this.right = Button.create(bar, { kind: "text", tone: "strong", label: "Edit", onPress: () => void (this.editing ? this.save() : this.edit()) });
 		const body = el(this.el, "div", "tc-desc-body");
 		fillTitle(el(body, "div", "tc-desc-title"), opts.title);
 		this.text = el(body, "div", "tc-desc-text");
@@ -56,14 +55,14 @@ export class DescriptionSheet {
 	}
 
 	private read(): void {
-		this.left.textContent = "Close";
-		this.right.textContent = "Edit";
+		this.left.setText("Close");
+		this.right.setText("Edit");
 		void this.opts.surface.render(this.text, this.opts.markdown ?? "");
 	}
 
 	private edit(): void {
-		this.left.textContent = "Cancel";
-		this.right.textContent = "Save";
+		this.left.setText("Cancel");
+		this.right.setText("Save");
 		clear(this.text);
 		this.text.classList.add("is-editing");
 		this.editing = this.opts.surface.edit(this.text, this.opts.markdown ?? FIRST_POINT, () => this.close());

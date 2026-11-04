@@ -101,6 +101,74 @@ const literalsIn = (value: string): string[] =>
 
 const where = (d: Declaration) => `${d.selector} { ${d.property}: ${d.value} }`;
 
+const TAP = "button.tc-btn.mobile-tap";
+/** The reset and the quieting of Obsidian's hover: the defaults every button's own rules stand over. */
+const DEFAULTS = ["button.tc-btn", ":where(button.tc-btn:hover, button.tc-btn:active)"];
+
+/** A selector list's selectors: commas inside :is(), :where() and the like don't split it. */
+const selectorsOf = (list: string): string[] => {
+	const parts: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (let i = 0; i < list.length; i++) {
+		if (list[i] === "(") depth++;
+		else if (list[i] === ")") depth--;
+		else if (list[i] === "," && depth === 0) {
+			parts.push(list.slice(start, i).trim());
+			start = i + 1;
+		}
+	}
+	return [...parts, list.slice(start).trim()];
+};
+
+type Weight = [number, number, number];
+
+const atLeast = (a: Weight, b: Weight): boolean => a[0] !== b[0] ? a[0] > b[0] : a[1] !== b[1] ? a[1] > b[1] : a[2] >= b[2];
+
+/** A selector's weight as the cascade counts it: :where() weighs nothing, :is(), :not() and :has() their heaviest argument. */
+function specificity(selector: string): Weight {
+	const weight: Weight = [0, 0, 0];
+	let rest = selector;
+	for (let match = /:(where|is|not|has)\(/.exec(rest); match; match = /:(where|is|not|has)\(/.exec(rest)) {
+		let depth = 1;
+		let end = match.index + match[0].length;
+		while (depth > 0) {
+			if (rest[end] === "(") depth++;
+			else if (rest[end] === ")") depth--;
+			end++;
+		}
+		if (match[1] !== "where") {
+			const inner = selectorsOf(rest.slice(match.index + match[0].length, end - 1)).map(specificity);
+			const heaviest = inner.reduce((a, b) => (atLeast(a, b) ? a : b));
+			heaviest.forEach((n, i) => (weight[i] += n));
+		}
+		rest = `${rest.slice(0, match.index)} ${rest.slice(end)}`;
+	}
+	rest = rest.replace(/\[[^\]]*\]/g, () => {
+		weight[1]++;
+		return " ";
+	});
+	weight[0] += (rest.match(/#[\w-]+/g) ?? []).length;
+	weight[1] += (rest.match(/\.[\w-]+/g) ?? []).length + (rest.match(/(?<!:):[\w-]+/g) ?? []).length;
+	weight[2] += (rest.match(/::[\w-]+/g) ?? []).length + (rest.replace(/[.#:]+[\w-]+/g, " ").match(/(?<![\w-])[a-z][\w-]*/gi) ?? []).length;
+	return weight;
+}
+
+/** The classes the code gives its buttons, and none it also gives another element. */
+const BUTTON_CLASSES = (() => {
+	const classes = (pattern: RegExp) => new Set(code.files.flatMap(({ text }) => [...text.matchAll(pattern)].flatMap((m) => m[1].split(/\s+/))).filter((name) => name.startsWith("tc-")));
+	const onButtons = classes(/(?:"button", ["`]|\bcls: ["`])([^"`$]+)/g);
+	const onOthers = classes(/"(?:div|span)", ["`]([^"`$]+)/g);
+	return new Set([...onButtons].filter((name) => !onOthers.has(name)));
+})();
+
+/** The selector draws a button itself, not a part inside it. */
+const buttonSubject = (selector: string): boolean => {
+	const subject = selector.split(/\s*[\s>+~]\s*(?![^(]*\))/).pop() ?? "";
+	if (subject.includes("::")) return false;
+	return [...subject.matchAll(/\.([\w-]+)/g)].some(([, name]) => BUTTON_CLASSES.has(name));
+};
+
 describe("styles.css keeps to its design system", () => {
 	it("writes no number into a rule: sizes, spacing, opacity, layers and timing are tokens", () => {
 		const offenders = sheet.rules.filter((d) => literalsIn(d.value).length > 0).map(where);
@@ -188,6 +256,91 @@ describe("styles.css keeps to its design system", () => {
 		expect(differences).toEqual([]);
 	});
 
+	it("takes icon sizes, type sizes and stroke widths from their scales", () => {
+		const tokens = sheet.tokens;
+		const ref = (name: string, scale: RegExp) => expect(tokens.get(name), name).toMatch(scale);
+		for (const name of tokens.keys()) {
+			if (/^--tc-[\w-]*-(icon|flag)$/.test(name) && !/^--tc-icon-/.test(name)) ref(name, /^var\(--tc-icon-(xs|s|m|l|xl)\)$/);
+			if (/^--tc-font-/.test(name) && !["--tc-font-ui", "--tc-font-inherit"].includes(name) && !/var\(--font-/.test(tokens.get(name)!)) ref(name, /^var\(--tc-(text-\d+|font-[\w-]+)\)$/);
+			if (/^--tc-stroke-/.test(name) && !/^--tc-stroke-\d/.test(name)) ref(name, /^var\(--tc-stroke-\d[\d-]*\)$/);
+		}
+	});
+
+	it("quiets Obsidian's hover on our buttons without touching their own ground", () => {
+		const quiet = sheet.rules.filter((d) => d.property === "background" && /:hover|:active/.test(d.selector) && d.value === "transparent");
+		expect(quiet.length).toBeGreaterThan(0);
+		const selectors = (list: string) => list.split(/,(?![^(]*\))/).map((s) => s.trim());
+		for (const d of quiet) expect(selectors(d.selector).every((s) => s.startsWith(":where(")), d.selector).toBe(true);
+	});
+
+	it("answers Obsidian's phone tap (button:not(.clickable-icon).mobile-tap, weight 0,2,1) at its weight", () => {
+		const tap = sheet.rules.filter((d) => d.selector === TAP);
+		expect(tap.map((d) => `${d.property}: ${d.value}`)).toEqual(["background-color: transparent", "box-shadow: none"]);
+		expect(specificity(TAP)).toEqual([0, 2, 1]);
+	});
+
+	it("writes every .tc-btn rule with button in the selector, never a bare class Obsidian's button rules outweigh", () => {
+		const offenders = sheet.rules.filter((d) => selectorsOf(d.selector).some((part) => /\.tc-btn(?![\w-])/.test(part) && !/(^|[\s(,>+~])button\b/.test(part))).map(where);
+		expect(offenders).toEqual([]);
+	});
+
+	it("resets a button and dims it pressed only on .tc-btn", () => {
+		expect(sheet.rules.filter((d) => d.property === "appearance").map((d) => d.selector)).toEqual(["button.tc-btn"]);
+		const pressed = sheet.rules.filter((d) => d.property === "opacity" && d.value === "var(--tc-pressed)" && d.selector.includes(":active"));
+		expect(pressed.map((d) => d.selector)).toEqual(["button.tc-btn:not(:disabled):active"]);
+	});
+
+	it("gives a button its padding, ground and shadow at Obsidian's iPad and tap weight (0,2,1) or more, after the tap answer", () => {
+		const tapAt = sheet.declarations.findIndex((d) => d.selector === TAP);
+		const offenders = sheet.declarations
+			.map((d, index) => ({ d, index }))
+			.filter(({ d }) => !d.isToken && /^(padding|background|box-shadow)/.test(d.property))
+			.flatMap(({ d, index }) => selectorsOf(d.selector).filter((part) => buttonSubject(part)).map((part) => ({ part, d, index })))
+			.filter(({ d }) => !DEFAULTS.includes(d.selector))
+			.filter(({ part, index }) => index < tapAt || !atLeast(specificity(part), [0, 2, 1]))
+			.map(({ part, d }) => `${part} { ${d.property} }`);
+		expect(BUTTON_CLASSES.size).toBeGreaterThan(10);
+		expect(offenders).toEqual([]);
+	});
+
+	it("lays the hover layer over every button ground: no ground in the shorthand outweighs it", () => {
+		const hover = sheet.rules.find((d) => d.property === "background-image" && d.selector.includes(":hover"))!;
+		const offenders = sheet.rules
+			.filter((d) => d.property === "background")
+			.flatMap((d) => selectorsOf(d.selector).filter((part) => buttonSubject(part) && !part.includes(":where(")).map((part) => ({ part, d })))
+			.filter(({ part }) => atLeast(specificity(part), specificity(hover.selector)) && specificity(part).join() !== specificity(hover.selector).join())
+			.map(({ part }) => part);
+		expect(offenders).toEqual([]);
+	});
+
+	it("casts every shadow from a shadow token, or rings an element with token measures", () => {
+		const parts = (value: string) => value.split(/,(?![^(]*\))/).map((part) => part.trim());
+		const allowed = [/^none$/, /^var\(--tc-(shadow|level|ring)-[\w-]+\)$/, /^(inset )?0 0 0 (var\(--tc-[\w-]+\)|calc\([^)]*var\(--tc-[\w-]+\)\)) var\(--tc-[\w-]+\)$/];
+		const offenders = sheet.rules
+			.filter((d) => d.property === "box-shadow" || d.property === "filter")
+			.filter((d) => !parts(d.value).every((part) => allowed.some((pattern) => pattern.test(part))))
+			.map(where);
+		expect(offenders).toEqual([]);
+	});
+
+	it("gives the bottom row one shadow: the wheel, the round buttons (the plus, the plus under the finger, Undo) and the desktop capsule", () => {
+		const shadowOf = (element: string) =>
+			sheet.rules.filter((d) => d.property === "box-shadow" && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-seg", ":is(button, div).tc-btn.is-round.is-accent", ":is(button, div).tc-btn.is-round.is-plain", ".tc-quick-bar.is-desk::before"])
+			expect(shadowOf(element), element).toEqual(["var(--tc-shadow-control)"]);
+	});
+
+	it("draws the menus, the description's peek and the sources window as one window", () => {
+		const of = (element: string, property: string) =>
+			sheet.rules.filter((d) => d.property === property && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
+		for (const element of [".tc-panel", ".tc-desc-peek", ".tc-popover"]) {
+			expect(of(element, "background"), element).toEqual(["var(--tc-panel-bg)"]);
+			expect(of(element, "box-shadow"), element).toEqual(["var(--tc-shadow-panel)"]);
+		}
+		const numbers = (value: string) => value.match(/\d+(\.\d+)?/g)!.slice(0, 7);
+		for (const tokens of [sheet.tokens, sheet.lightTokens]) expect(numbers(tokens.get("--tc-level-shadow")!)).toEqual(numbers(tokens.get("--tc-shadow-panel")!));
+	});
+
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
@@ -228,9 +381,10 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
+		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
-		expect(plus.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
@@ -268,7 +422,7 @@ describe("styles.css keeps to its design system", () => {
 	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
-		expect(of(".task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
+		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 
 	it("reads the hour only on the canvas", () => {
@@ -283,6 +437,20 @@ describe("styles.css keeps to its design system", () => {
 });
 
 describe("the code keeps to the design system", () => {
+	it("styles no tc- class the code never writes", () => {
+		const written = code.files.map(({ text }) => text).join("\n");
+		const read = new Set(sheet.rules.flatMap((d) => [...d.selector.matchAll(/\.(tc-[\w-]+)/g)].map(([, name]) => name)));
+		expect([...read].filter((name) => !new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(written))).toEqual([]);
+	});
+
+	it("hides by the plugin's own classes, never by an inline style, and calls the DOM helper by its name", () => {
+		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
+		expect(of(".task-calendar > .tc-hidden").get("display")).toBe("none");
+		expect(of(".tc-invisible").get("visibility")).toBe("hidden");
+		const offenders = code.files.flatMap(({ path, text }) => (/\.style\.(display|visibility) =|\bel as \w+/.test(text) ? [path] : []));
+		expect(offenders).toEqual([]);
+	});
+
 	it("writes no size, time or share into a style except as a named constant", () => {
 		const offenders: string[] = [];
 		for (const { path, text } of code.files) {

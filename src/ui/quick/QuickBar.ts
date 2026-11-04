@@ -2,12 +2,11 @@ import type { Placement } from "../../application/contracts";
 import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
-import { clear, el, px, restingTop } from "../dom";
-import { icon } from "../icons";
-import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup } from "../menu/MenuPanel";
-import { menuIcon } from "../menu/menuIcons";
+import { el, px, restingTop } from "../dom";
+import { Button } from "../kit/Button";
+import { Panel, Picks } from "../kit/Panel";
+import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
-import { tileRows } from "../menu/TaskMenu";
 import { placeLabel } from "../placeLabel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
@@ -48,6 +47,7 @@ type PanelKind = "priority" | "place";
 
 interface OpenPanel {
 	readonly kind: PanelKind;
+	readonly window: Panel;
 	readonly el: HTMLElement;
 	/** The place panel shows its month picker in place of the tiles. */
 	picking: boolean;
@@ -86,8 +86,7 @@ export class QuickBar {
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
-	private readonly place: HTMLButtonElement;
-	private readonly placeText: HTMLElement;
+	private readonly place: Button;
 	private state: QuickBarState | null = null;
 	/** The place the place button shows. */
 	private shownPlace: Placement | null = null;
@@ -108,28 +107,15 @@ export class QuickBar {
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		el(this.bar, "span", "tc-bar-spacer");
-		this.flag = el(this.bar, "button", "tc-bar-flag");
-		this.flag.setAttribute("aria-label", "Priority");
-		this.flag.title = "Priority";
-		this.flag.appendChild(menuIcon("priority"));
-		this.flag.addEventListener("click", () => this.toggle("priority"));
-		this.place = el(this.bar, "button", "tc-bar-place");
-		this.place.setAttribute("aria-label", "Place");
-		this.place.title = "Place";
-		this.placeText = el(this.place, "span", "tc-bar-place-label");
-		this.place.addEventListener("click", () => this.toggle("place"));
+		this.flag = Button.create(this.bar, { kind: "bar", label: "Priority", title: "Priority", icon: "priority", cls: "tc-bar-flag", onPress: () => this.toggle("priority") }).el;
+		this.place = Button.create(this.bar, { kind: "bar", label: "Place", title: "Place", icon: "inbox", text: "", cls: "tc-bar-place", onPress: () => this.toggle("place") });
 		this.bar.addEventListener("transitionend", (e) => {
 			if (e.target === this.bar && e.propertyName === "transform") this.bar.classList.remove(GLIDING);
 		});
 	}
 
 	private shiftButton(cls: string, name: "outdent" | "indent", label: string, key: string, delta: 1 | -1): HTMLButtonElement {
-		const button = el(this.shifts, "button", `tc-bar-shift ${cls}`);
-		button.setAttribute("aria-label", label);
-		button.title = `${label} (${key})`;
-		button.appendChild(icon(name));
-		button.addEventListener("click", () => this.deps.onIndent(delta));
-		return button;
+		return Button.create(this.shifts, { kind: "bar", label, title: `${label} (${key})`, icon: name, cls: `tc-bar-shift ${cls}`, onPress: () => this.deps.onIndent(delta) }).el;
 	}
 
 	show(state: QuickBarState): void {
@@ -143,7 +129,7 @@ export class QuickBar {
 		this.flag.classList.toggle("is-set", state.priority !== null);
 		if (state.priority) this.flag.dataset.priority = state.priority.color;
 		else delete this.flag.dataset.priority;
-		this.place.hidden = state.place === null;
+		this.place.el.hidden = state.place === null;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		this.refreshPanel();
 	}
@@ -233,9 +219,8 @@ export class QuickBar {
 
 	private showPlace(place: Placement): void {
 		this.shownPlace = place;
-		this.place.querySelector("svg")?.remove();
-		this.place.prepend(icon(placeIcon(place)));
-		this.placeText.textContent = placeLabel(place);
+		this.place.setIcon(placeIcon(place));
+		this.place.setText(placeLabel(place));
 	}
 
 	private toggle(kind: PanelKind): void {
@@ -245,12 +230,11 @@ export class QuickBar {
 	}
 
 	private openPanel(kind: PanelKind): void {
-		const panel = el(this.bar, "div", "tc-panel tc-quick-panel is-above");
-		this.panel = { kind, el: panel, picking: false, drawn: "" };
+		const panel = Panel.inside(this.bar, { root: "tc-panel", cls: "tc-quick-panel is-above", picks: new Picks(() => this.closePanel()), place: () => this.restand() });
+		this.panel = { kind, window: panel, el: panel.el, picking: false, drawn: "" };
 		this.bar.dataset.panel = kind;
 		this.renderPanel();
-		panel.getBoundingClientRect(); // lays the panel out shrunk, so adding is-shown grows it in
-		panel.classList.add("is-shown");
+		panel.show();
 		this.bar.ownerDocument.addEventListener("pointerdown", this.pressOutside, true);
 	}
 
@@ -281,12 +265,12 @@ export class QuickBar {
 		const panel = this.panel;
 		if (!panel) return;
 		panel.drawn = this.drawnKey(panel.kind);
-		clear(panel.el);
 		panel.el.classList.toggle("is-picker", panel.picking);
-		if (panel.kind === "priority") this.renderLevels(panel.el);
-		else if (panel.picking) this.renderPicker(panel.el);
-		else this.renderPlaces(panel.el);
-		this.restand();
+		panel.window.replace((parent) => {
+			if (panel.kind === "priority") this.renderLevels(parent);
+			else if (panel.picking) this.renderPicker(parent);
+			else this.renderPlaces(parent);
+		});
 	}
 
 	/** A panel opened, closed or changed its height: the desktop capsule takes the side of the field with room for both. */
@@ -295,11 +279,9 @@ export class QuickBar {
 		else this.sidePanel();
 	}
 
+	/** A pick in the open panel: it closes, then `action` runs. */
 	private picked(action: () => void): () => void {
-		return () => {
-			this.closePanel();
-			action();
-		};
+		return this.panel?.window.pick(action) ?? action;
 	}
 
 	private renderLevels(parent: HTMLElement): void {

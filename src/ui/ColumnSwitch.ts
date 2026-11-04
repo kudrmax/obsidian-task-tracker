@@ -3,7 +3,7 @@ import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
-import { icon } from "./icons";
+import { icon } from "./kit/icons";
 import { PLACES } from "./screens";
 
 export interface ColumnSwitchOptions {

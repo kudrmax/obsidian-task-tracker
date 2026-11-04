@@ -1,5 +1,5 @@
 import { LAYOUT } from "./design";
-import { capturePointer, el as make, releasePointer } from "./dom";
+import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
 
@@ -29,18 +29,23 @@ interface Press {
 export class Divider {
 	private press: Press | null = null;
 
+	private readonly el: HTMLElement;
+
 	constructor(
-		private readonly el: HTMLElement,
+		host: HTMLElement,
 		private readonly opts: DividerOptions,
 	) {
-		el.classList.add("tc-divider");
-		make(el, "div", "tc-divider-line");
-		const handle = make(el, "button", "tc-divider-handle");
+		this.el = host;
+		this.el.classList.add("tc-divider");
+		el(this.el, "div", "tc-divider-line");
+		const handle = el(this.el, "span", "tc-divider-handle");
+		handle.setAttribute("role", "separator");
+		handle.setAttribute("aria-orientation", "vertical");
 		handle.setAttribute("aria-label", "Resize columns");
-		el.addEventListener("pointerdown", (e) => this.down(e));
-		el.addEventListener("pointermove", (e) => this.move(e));
-		el.addEventListener("pointerup", (e) => this.up(e));
-		el.addEventListener("pointercancel", (e) => this.up(e));
+		this.el.addEventListener("pointerdown", (e) => this.down(e));
+		this.el.addEventListener("pointermove", (e) => this.move(e));
+		this.el.addEventListener("pointerup", (e) => this.up(e));
+		this.el.addEventListener("pointercancel", (e) => this.up(e));
 	}
 
 	private down(e: PointerEvent): void {

@@ -1,14 +1,17 @@
 import type { GroupName, TaskItem } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { tokenPx } from "../design";
-import { clear, el, px } from "../dom";
+import { el } from "../dom";
+import { LiftedCopy } from "../kit/LiftedCopy";
+import { Panel, Picks } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import type { LocalDate, TaskStatus } from "../types";
-import { backRow, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup } from "./MenuPanel";
-import { MonthPicker } from "./MonthPicker";
+import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
+import { datePage } from "./DatePage";
+import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { canRemoveDue, type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
-import { tileRows, type LevelTile, type SectionChoice } from "./TaskMenu";
+import type { LevelTile, SectionChoice } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -77,7 +80,7 @@ export interface BulkMenuContext {
  */
 export class BulkMenu {
 	private readonly overlay: Overlay;
-	private readonly panel: HTMLElement;
+	private readonly panel: Panel;
 	private readonly anchor: DOMRect;
 
 	static open(context: BulkMenuContext): BulkMenu {
@@ -89,7 +92,7 @@ export class BulkMenu {
 		const rects = context.cards.map((card) => card.getBoundingClientRect());
 		this.anchor = this.besideList(context.source);
 		context.cards.forEach((card, i) => this.lift(card, rects[i]));
-		this.panel = this.overlay.add(el(null, "div", "tc-panel is-task is-bulk"), true);
+		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: "is-task is-bulk", picks: new Picks(() => this.close()), place: (panel) => this.place(panel) });
 		this.showMenu();
 		this.overlay.show();
 	}
@@ -98,12 +101,9 @@ export class BulkMenu {
 	private lift(card: HTMLElement, rect: DOMRect): void {
 		if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
 		const item = this.context.items[this.context.cards.indexOf(card)];
-		const copy = this.overlay.add(el(null, "div", "tc-lifted is-selected"), true);
-		fillCard(copy, item, { day: this.context.day });
-		copy.style.left = px(rect.left);
-		copy.style.top = px(rect.top);
-		copy.style.width = px(rect.width);
-		copy.style.height = px(rect.height);
+		const copy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted is-selected"), true);
+		fillCard(copy.el, item, { day: this.context.day });
+		copy.pin(rect, { width: true, height: true });
 	}
 
 	/** Right of the clicked card's list, its top level with the card. */
@@ -114,60 +114,63 @@ export class BulkMenu {
 		return new DOMRect(column.right + gap, card.top - gap, 0, 0);
 	}
 
-	private place(): void {
-		placePanel(this.panel, this.anchor, tokenPx(this.panel, "--tc-menu-gap"), menuRoom());
+	private place(panel: HTMLElement): void {
+		placePanel(panel, this.anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom());
 	}
 
 	private pick(action: () => Promise<void>): () => void {
-		return () => {
-			this.close();
-			void action();
-		};
+		return this.panel.pick(action);
 	}
 
 	private showMenu(): void {
-		clear(this.panel);
-		this.panel.classList.remove("is-picker");
+		this.panel.el.classList.remove("is-picker");
+		this.panel.replace((panel) => this.buildMenu(panel));
+	}
+
+	private buildMenu(panel: HTMLElement): void {
 		const { items, actions, levels, today } = this.context;
-		el(this.panel, "div", "tc-menu-title", countLabel(items.length));
+		el(panel, "div", "tc-menu-title", countLabel(items.length));
 		const progress = bulkProgress(items);
 		const statuses: MenuTileSpec[] = [
 			{ label: "Done", icon: "done", onPick: this.pick(() => actions.setStatus("done")) },
 			{ label: progress.label, icon: "progress", onPick: this.pick(() => actions.setStatus(progress.status)) },
 			{ label: "Won’t do", icon: "wontdo", onPick: this.pick(() => actions.setStatus("cancelled")) },
 		];
-		tileGroup(this.panel, "is-status", [statuses]);
+		tileGroup(panel, "is-status", [statuses]);
 		const levelTiles = bulkLevelTiles(items, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(bulkNextPriority(items, tile.prefix))) }));
-		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
+		if (levelTiles.length > 0) tileGroup(panel, "is-priority", tileRows(levelTiles));
 		const moves = bulkMoveTiles(items, today).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
-		tileGroup(this.panel, "is-move", [moves]);
-		if (this.context.sections) menuGroup(this.panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
-		menuRow(this.panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, onPick: this.pick(() => actions.remove()) }, "tc-menu-row is-tall is-apart");
-		this.place();
+		tileGroup(panel, "is-move", [moves]);
+		if (this.context.sections) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
+		menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, size: "tall", apart: true, onPick: this.pick(() => actions.remove()) });
 	}
 
 	/** The sections of the tasks' list; the one they all stand in checked. */
 	private showSections(): void {
 		if (!this.context.sections) return;
 		const { choice, shared } = this.context.sections;
-		clear(this.panel);
 		const { actions } = this.context;
-		backRow(this.panel, "Section", () => this.showMenu());
-		const group = menuGroup(this.panel, []);
-		const checked = (name: GroupName) => (shared && name === choice.current ? "check" : undefined);
-		for (const name of choice.names) menuRow(group, { label: name, icon: checked(name), onPick: this.pick(() => actions.toSection(name)) }, "tc-menu-row is-choice");
-		menuRow(group, { label: choice.ungrouped, icon: checked(null), onPick: this.pick(() => actions.toSection(null)) }, "tc-menu-row is-choice is-quiet");
-		this.place();
+		this.panel.replace((panel) =>
+			sectionChooser(panel, {
+				choice,
+				checked: (name) => shared && name === choice.current,
+				onBack: () => this.showMenu(),
+				onPick: (name) => this.pick(() => actions.toSection(name))(),
+			}),
+		);
 	}
 
 	private showPicker(): void {
-		clear(this.panel);
-		this.panel.classList.add("is-picker");
 		const { items, actions, today } = this.context;
 		const shared = items.every((item) => item.dueDate === items[0].dueDate) ? items[0].dueDate : null;
-		new MonthPicker(el(this.panel, "div"), { month: shared ?? today, today, selected: shared, onPick: (date) => this.pick(() => actions.postpone(date))() });
-		if (bulkCanRemoveDue(items, today)) menuRow(this.panel, { label: "Remove due date", icon: "removeDue", onPick: this.pick(() => actions.removeDue()) }, "tc-menu-row tc-picker-remove");
-		this.place();
+		this.panel.replace((panel) =>
+			datePage(panel, {
+				today,
+				selected: shared,
+				onPick: (date) => this.pick(() => actions.postpone(date))(),
+				onRemove: bulkCanRemoveDue(items, today) ? this.pick(() => actions.removeDue()) : undefined,
+			}),
+		);
 	}
 
 	close(): void {
