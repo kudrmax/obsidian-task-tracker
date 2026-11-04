@@ -37,11 +37,13 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
-	if (item.dueDate && item.dueDate !== opts.day) {
-		const due = el(card, "span", "tc-due");
-		el(due, "span", "tc-due-day", dayOfMonth(item.dueDate));
-		el(due, "span", "tc-due-mon", monthAbbreviation(item.dueDate));
-	}
+	const shownDue = item.dueDate && item.dueDate !== opts.day ? item.dueDate : null;
+	if (!shownDue && !item.repeat) return;
+	const due = el(card, "span", "tc-due");
+	const top = item.repeat ? el(due, "span", "tc-due-top") : due;
+	if (shownDue) el(top, "span", "tc-due-day", dayOfMonth(shownDue));
+	if (item.repeat) top.appendChild(icon("repeat")).classList.add("tc-due-repeat");
+	if (shownDue) el(due, "span", "tc-due-mon", monthAbbreviation(shownDue));
 }
 
 /**

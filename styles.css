@@ -232,6 +232,9 @@ body {
 	--tc-card-pad-end: 10px;
 	--tc-due-w: 24px;
 	--tc-due-gap: 1px;
+	--tc-due-repeat-size: 10px;
+	--tc-due-repeat-gap: 2px;
+	--tc-stroke-due-repeat: var(--tc-stroke-2-8);
 	--tc-fade-card: 24px;
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
@@ -829,6 +832,9 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-due { width: var(--tc-due-w); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: var(--tc-due-gap); }
 .tc-due-day { font-size: var(--tc-font-due-day); line-height: var(--tc-leading-due-day); font-weight: var(--tc-weight-bold); color: var(--tc-ink-strong); font-variant-numeric: tabular-nums; }
+.tc-due-top { display: flex; align-items: center; justify-content: center; gap: var(--tc-due-repeat-gap); height: var(--tc-leading-due-day); }
+.tc-due-repeat { display: block; flex-shrink: 0; width: var(--tc-due-repeat-size); height: var(--tc-due-repeat-size); stroke-width: var(--tc-stroke-due-repeat); color: var(--tc-muted); }
+[data-priority] .tc-due-repeat { color: var(--tc-priority-meta); }
 .tc-due-mon { font-size: var(--tc-font-due-mon); line-height: var(--tc-leading-due-mon); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); letter-spacing: var(--tc-tracking-mon); }
 
 /* A new section's name, typed where its header will stand, over the card that starts it. */
