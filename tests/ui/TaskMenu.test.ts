@@ -7,6 +7,7 @@ import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles,
 const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, repeat: null, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
 
 const weekly = (days: RepeatRule["days"]): RepeatRule => ({ kind: "schedule", every: 1, unit: "week", days, dayOfMonth: null, from: null });
+const THURSDAY = "2026-11-05";
 const EVERY_3_DAYS: RepeatRule = { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: null };
 
 const LEVELS = [
@@ -107,10 +108,10 @@ describe("the menu", () => {
 	});
 
 	const surface = { rendered: [] as string[], render: vi.fn(async (el: HTMLElement, markdown: string) => { el.innerHTML = '<p>note <a href="x">link</a></p>'; surface.rendered.push(markdown); }), edit: vi.fn() };
-	const open = (task: TaskItem, sections?: SectionChoice) => {
+	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01") => {
 		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
-		TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface, sections });
+		TaskMenu.open({ item: task, source, today, day: today, levels: LEVELS, actions, markdown: surface, sections });
 		return actions;
 	};
 	const panel = () => document.querySelector(".tc-panel") as HTMLElement;
@@ -290,18 +291,6 @@ describe("the menu", () => {
 			expect(actions.setRepeat).not.toHaveBeenCalled();
 		});
 
-		it("writes the old rule back when it is set again after Remove repeat: the menu compares with what it last wrote", () => {
-			const actions = open(item({ repeat: EVERY_3_DAYS }));
-			row("Repeat").click();
-			row("Remove repeat").click();
-			row("Repeat").click();
-			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-unit .tc-repeat-seg-btn")[0].click();
-			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
-			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
-			away();
-			expect(actions.setRepeat.mock.calls).toEqual([[null], [EVERY_3_DAYS]]);
-		});
-
 		it("takes the task's weekdays in any order as the same rule", () => {
 			const actions = open(item({ repeat: weekly([4, 0]) }));
 			row("Repeat").click();
@@ -311,30 +300,34 @@ describe("the menu", () => {
 			expect(actions.setRepeat).not.toHaveBeenCalled();
 		});
 
-		it("takes the repeat off from Remove repeat at once and gives the menu back, Stop gone", () => {
+		it("takes the repeat off from Remove repeat and closes, as Remove due date does: one write", () => {
 			const actions = open(item({ repeat: EVERY_3_DAYS }));
 			row("Repeat").click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
 			row("Remove repeat").click();
-			expect(actions.setRepeat).toHaveBeenCalledWith(null);
-			expect(closing()).toBe(false);
-			expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
-			expect(row("Repeat").querySelector(".tc-menu-value")).toBeNull();
-			away();
-			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat.mock.calls).toEqual([[null]]);
 		});
 
-		it("offers no Remove repeat for a task without a repeat; a first change offers it, and it drops the change", () => {
+		it("offers no Remove repeat for a task without a repeat, nor after a change: the change is the page's own until it closes", () => {
 			const actions = open(item());
 			row("Repeat").click();
 			expect(row("Remove repeat")).toBeUndefined();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
+			expect(row("Remove repeat")).toBeUndefined();
 			expect(actions.setRepeat).not.toHaveBeenCalled();
-			expect(panel().classList.contains("is-repeat")).toBe(true);
 			expect(closing()).toBe(false);
-			row("Remove repeat")!.click();
-			expect(actions.setRepeat).toHaveBeenLastCalledWith(null);
+		});
+
+		it("writes an Inbox task's weekdays once, as the page leaves them, when the menu closes", () => {
+			const actions = open(item({ key: { section: "inbox", index: 0, path: [], raw: "- [ ] A" } }), undefined, THURSDAY);
+			row("Repeat").click();
+			const day = (name: string) => [...panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")].find((b) => b.textContent === name)!;
+			day("Mon").click();
+			day("Thu").click();
+			expect(actions.setRepeat).not.toHaveBeenCalled();
 			away();
-			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(actions.setRepeat.mock.calls).toEqual([[weekly([0])]]);
 		});
 
 		it("writes a first rule once, when the menu closes", () => {

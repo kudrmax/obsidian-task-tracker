@@ -29,7 +29,6 @@ import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
-import { MenuTask } from "./menu/MenuTask";
 import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
@@ -894,28 +893,25 @@ export class TaskCalendarView extends ItemView {
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
 	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
 
-	/** A task's description on its own screen: to read, or straight in the editor; the save finds the task as its menu last left it. */
-	private descriptionSheet(task: MenuTask, editing: boolean): void {
-		const { item } = task;
+	/** A task's description on its own screen: to read, or straight in the editor. */
+	private descriptionSheet(item: TaskItem, editing: boolean): void {
 		DescriptionSheet.open(this.contentEl, {
 			title: item.text,
 			markdown: item.description,
 			editing,
 			surface: this.markdown,
-			onSave: (markdown) => this.act(() => task.run((current) => this.deps.tasks.setDescription(current.key, markdown))),
+			onSave: (markdown) => this.act(() => this.deps.tasks.setDescription(item.key, markdown)),
 		});
 	}
 
-	/** The task menu; a list card's offers the sections of its list too. Every action finds the task through one holder. */
+	/** The task menu; a list card's offers the sections of its list too. */
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
 		const tasks = this.deps.tasks;
 		const home = this.sectionsHome(item, source);
-		const task = new MenuTask(item);
-		const write = (change: (key: TaskKey) => Promise<TaskKey | void>) => this.act(() => task.run((current) => change(current.key)));
-		const toSection = (key: TaskKey, name: GroupName) => {
+		const toSection = (name: GroupName) => {
 			if (!home) return Promise.resolve();
 			const date = home.date ?? undefined;
-			return name === null ? tasks.moveToGroup(key, home.list, null, null, date) : tasks.createGroup(key, home.list, name, date);
+			return name === null ? tasks.moveToGroup(item.key, home.list, null, null, date) : tasks.createGroup(item.key, home.list, name, date);
 		};
 		return TaskMenu.open({
 			item,
@@ -928,21 +924,21 @@ export class TaskCalendarView extends ItemView {
 			day: this.selectedDate,
 			levels: usableLevels(this.settings.priorities),
 			actions: {
-				setStatus: (status) => write((key) => tasks.setStatus(key, status)),
-				postpone: (date) => write((key) => tasks.postpone(key, date)),
-				removeDue: () => write((key) => tasks.setDueDate(key, null)),
-				toSection: (name) => write((key) => toSection(key, name)),
+				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
+				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
+				removeDue: () => this.act(() => tasks.setDueDate(item.key, null)),
+				toSection: (name) => this.act(() => toSection(name)),
 				newSection: () => {
-					if (home) this.askGroupName(task.item, home);
+					if (home) this.askGroupName(item, home);
 				},
-				setPriority: (prefix) => write((key) => tasks.setPriority(key, prefix)),
-				setRepeat: (rule) => write((key) => tasks.setRepeat(key, rule)),
-				stop: () => write((key) => tasks.stop(key)),
-				rename: (menu) => this.quick?.rename(task.item, menu),
-				openDescription: (editing) => this.descriptionSheet(task, editing),
-				addSubtask: (menu) => this.quick?.addSubtask(task.item, menu),
-				remove: () => write((key) => tasks.remove(key)),
-				openInObsidian: () => void task.run((current) => this.openInObsidian(current)),
+				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
+				setRepeat: (rule) => this.act(() => tasks.setRepeat(item.key, rule)),
+				stop: () => this.act(() => tasks.stop(item.key)),
+				rename: (menu) => this.quick?.rename(item, menu),
+				openDescription: (editing) => this.descriptionSheet(item, editing),
+				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
+				remove: () => this.act(() => tasks.remove(item.key)),
+				openInObsidian: () => void this.openInObsidian(item),
 				openLink: (link) => this.openLink(link),
 			},
 		});

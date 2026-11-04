@@ -156,12 +156,8 @@ export class TaskMenu extends LiftedMenu {
 	private peek: DescriptionPeek | null = null;
 	/** What the menu asks about now, if anything; Enter confirms it, as its button does. */
 	private asking: Asking | null = null;
-	/** The task as the menu shows it now: every part of the menu reads it, and the repeat page changes its rule. */
-	private item: TaskItem;
-	/** The rule the repeat page holds while the menu stays, written once when the menu closes; none untouched. */
+	/** The rule the repeat page holds, written once as the menu closes; none untouched. */
 	private repeatDraft: RepeatRule | null = null;
-	/** The rule the file holds as far as the menu knows: the one it opened with, then whatever the menu last wrote. */
-	private writtenRepeat: RepeatRule | null;
 	private confirmAsked: (() => void) | null = null;
 	private readonly onEnter = (e: KeyboardEvent) => {
 		if (e.key !== "Enter" || !this.confirmAsked) return;
@@ -176,8 +172,6 @@ export class TaskMenu extends LiftedMenu {
 
 	private constructor(private readonly context: TaskMenuContext) {
 		super();
-		this.item = context.item;
-		this.writtenRepeat = context.item.repeat;
 		this.openOver(context.source, () => this.build());
 	}
 
@@ -187,9 +181,9 @@ export class TaskMenu extends LiftedMenu {
 		if (context.source.classList.contains("tc-block")) {
 			this.lifted.classList.add("is-block");
 			this.lifted.appendChild(context.source.cloneNode(true));
-		} else fillCard(this.lifted, this.item, { day: context.day });
+		} else fillCard(this.lifted, context.item, { day: context.day });
 		const copy = this.liftWhole(context.source, showWhole);
-		this.anchor = this.stacks && this.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
+		this.anchor = this.stacks && context.item.subtasks.length > 0 ? this.showSubtasks(copy) : copy;
 		context.lifted?.(this.lifted, () => this.close());
 		this.lifted.addEventListener("click", (e) => this.followLink(e));
 		this.panel = this.addPanel("is-task").el;
@@ -236,7 +230,7 @@ export class TaskMenu extends LiftedMenu {
 		this.lifted.classList.add("tc-invisible");
 		const row = (this.fieldRow ??= this.overlay.add(el(null, "div", "tc-menu-field tc-quick-row"), true));
 		pinTo(row, this.copy, { width: true });
-		showProgressDot(row, this.item);
+		showProgressDot(row, this.context.item);
 		this.raise(this.raisedBy);
 		return row;
 	}
@@ -276,7 +270,7 @@ export class TaskMenu extends LiftedMenu {
 	/** The open subtasks of a timeline card, under its copy at its width; the panel then goes by them. */
 	private showSubtasks(copy: DOMRect): DOMRect {
 		const stack = (this.stack = this.stackUnder(copy));
-		this.fillStack(stack, this.item.subtasks);
+		this.fillStack(stack, this.context.item.subtasks);
 		return new DOMRect(copy.left, copy.top, copy.width, stack.getBoundingClientRect().bottom - copy.top);
 	}
 
@@ -298,8 +292,7 @@ export class TaskMenu extends LiftedMenu {
 
 	/** The start of the description, over the copy; a tap on it reads the whole, a link in it opens as it is. */
 	private peekOf(context: TaskMenuContext): DescriptionPeek | null {
-		const { markdown, actions } = context;
-		const item = this.item;
+		const { item, markdown, actions } = context;
 		if (item.description === null || !markdown) return null;
 		return new DescriptionPeek(this.overlay, this.picks, markdown, item.description, {
 			onRead: () => actions.openDescription(false),
@@ -318,8 +311,7 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
-		const { actions, levels } = this.context;
-		const item = this.item;
+		const { item, actions, levels } = this.context;
 		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
@@ -370,8 +362,7 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	private askGroup(what: Asking): void {
-		const { item } = this;
-		const { actions } = this.context;
+		const { item, actions } = this.context;
 		const questions: Record<Asking, { readonly verb: string; readonly icon: IconName; readonly act: () => Promise<void> }> = {
 			delete: { verb: "Delete", icon: "delete", act: () => actions.remove() },
 			wontdo: { verb: "Won’t do", icon: "wontdo", act: () => actions.setStatus("cancelled") },
@@ -398,8 +389,7 @@ export class TaskMenu extends LiftedMenu {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		const { item } = this;
-		const { actions } = this.context;
+		const { item, actions } = this.context;
 		sectionChooser(this.panel, {
 			choice: sections,
 			checked: (name) => name === sections.current,
@@ -411,48 +401,44 @@ export class TaskMenu extends LiftedMenu {
 	}
 
 	/**
-	 * The repeat panel in place of the menu: a change shows at once and the page stays, the rule written once as the menu
-	 * closes; Remove repeat writes at once and gives the menu back.
+	 * The repeat panel in place of the menu, as Pick a date's: a change shows on the page at once and is written once as
+	 * the menu closes; Remove repeat, for a task that repeats, is a pick that takes the rule off and closes.
 	 */
 	private showRepeat(): void {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		const { actions, today } = this.context;
+		const { item, actions, today } = this.context;
+		const remove = this.pick(() => actions.setRepeat(null));
 		repeatPanel(this.panel, {
-			rule: this.item.repeat,
-			day: this.item.dueDate ?? today,
+			rule: item.repeat,
+			day: item.dueDate ?? today,
 			onChange: (rule) => {
 				this.repeatDraft = rule;
-				this.item = { ...this.item, repeat: rule };
 				this.place();
 			},
-			onRemove: () => {
-				this.repeatDraft = null;
-				this.item = { ...this.item, repeat: null };
-				this.writtenRepeat = null;
-				void actions.setRepeat(null);
-				this.showMenu();
-			},
+			onRemove: item.repeat
+				? () => {
+						this.repeatDraft = null;
+						remove();
+					}
+				: null,
 		});
 		this.place();
 	}
 
-	/** The repeat page's rule, once, unless it came back to the one the file holds. */
+	/** The repeat page's rule, unless it came back to the one the task had. */
 	private writeRepeat(): void {
 		const draft = this.repeatDraft;
 		this.repeatDraft = null;
-		if (!draft || sameRule(draft, this.writtenRepeat)) return;
-		this.writtenRepeat = draft;
-		void this.context.actions.setRepeat(draft);
+		if (draft && !sameRule(draft, this.context.item.repeat)) void this.context.actions.setRepeat(draft);
 	}
 
 	private showPicker(): void {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		const { item } = this;
-		const { actions, today } = this.context;
+		const { item, actions, today } = this.context;
 		datePage(this.panel, {
 			today,
 			selected: item.dueDate,

@@ -11,7 +11,7 @@ export interface RepeatPanelOptions {
 	/** The day new rules start from: the task's due date, else today (weekday and month day defaults). */
 	readonly day: LocalDate;
 	readonly onChange: (rule: RepeatRule) => void;
-	/** Remove repeat, at the bottom once the task has a rule: from the start, or from the first change. */
+	/** Remove repeat, at the bottom: the opener offers it for a task that has a rule. */
 	readonly onRemove: (() => void) | null;
 }
 
@@ -73,7 +73,7 @@ class RepeatEditor {
 	private readonly units: Segments<RepeatUnit>;
 	private readonly fewer: Button;
 	private readonly count: HTMLElement;
-	private removeRow: HTMLElement | null = null;
+	private readonly removeRow: HTMLElement | null;
 	private detail: HTMLElement | null = null;
 
 	constructor(private readonly panel: HTMLElement, private readonly opts: RepeatPanelOptions) {
@@ -92,8 +92,9 @@ class RepeatEditor {
 		this.count = el(row, "span", "tc-repeat-count");
 		Button.create(row, { kind: "icon", tone: "accent", label: "More", icon: "plus", cls: "tc-repeat-step", onPress: () => this.change(() => this.every++) });
 		this.units = new Segments(panel, "tc-repeat-unit", "Unit", UNITS, (unit) => this.change(() => (this.unit = unit), this.unit !== unit));
-		panel.classList.remove("has-remove");
-		if (rule) this.offerRemove();
+		const onRemove = opts.onRemove;
+		this.removeRow = onRemove ? menuRow(panel, { label: "Remove repeat", icon: "removeDue", cls: "tc-repeat-remove", onPick: () => onRemove() }) : null;
+		panel.classList.toggle("has-remove", this.removeRow !== null);
 		this.show();
 	}
 
@@ -114,15 +115,7 @@ class RepeatEditor {
 		if (!changes) return;
 		apply();
 		this.show();
-		this.offerRemove();
 		this.opts.onChange(this.rule);
-	}
-
-	private offerRemove(): void {
-		const onRemove = this.opts.onRemove;
-		if (this.removeRow || !onRemove) return;
-		this.removeRow = menuRow(this.panel, { label: "Remove repeat", icon: "removeDue", cls: "tc-repeat-remove", onPick: () => onRemove() });
-		this.panel.classList.add("has-remove");
 	}
 
 	private toggleDay(day: Weekday): void {

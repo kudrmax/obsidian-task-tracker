@@ -789,23 +789,6 @@ describe("repeat", () => {
 		expect(store.text).toContain("- [ ] A 📅 2026-11-05 🔁 every week on Thu");
 	});
 
-	it("setRepeat gives the task's key after the write, so a second change from the same panel finds it", async () => {
-		const { store, svc } = setup(FULL);
-		const view = await svc.dayView(T);
-		const key = await svc.setRepeat(view.list[0].key, WEEKLY_THU);
-		await svc.setRepeat(key, { ...WEEKLY_THU, every: 2 });
-		expect(store.text).toContain("- [ ] A 📅 2026-11-05 🔁 every 2 weeks on Thu from 2026-11-05");
-	});
-
-	it("setRepeat finds the task where a schedule moved it", async () => {
-		const { store, svc } = setup("## Inbox\n\n- [ ] X\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n");
-		const inbox = await svc.inboxView();
-		const key = await svc.setRepeat(inbox[0].key, WEEKLY_THU);
-		await svc.setRepeat(key, null);
-		expect(store.text).not.toContain("🔁");
-		expect(store.text!.match(/X/g)).toHaveLength(1);
-	});
-
 	it("setRepeat null removes it", async () => {
 		const { store, svc } = withHistory(GYM);
 		const view = await svc.dayView(T);

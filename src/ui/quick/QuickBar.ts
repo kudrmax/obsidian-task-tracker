@@ -325,7 +325,7 @@ export class QuickBar {
 				this.deps.onRepeat(changed);
 				this.restand();
 			},
-			onRemove: this.picked(() => this.deps.onRepeat(null)),
+			onRemove: rule && this.picked(() => this.deps.onRepeat(null)),
 		});
 	}
 

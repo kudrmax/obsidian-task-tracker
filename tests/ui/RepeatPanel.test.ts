@@ -120,21 +120,20 @@ describe("repeatPanel", () => {
 		expect(changes).toEqual([]);
 	});
 
-	it("gains Remove repeat with the first change to a task that had no rule", () => {
+	it("shows Remove repeat from the start when the opener offers it, and a change adds or takes none", () => {
 		const { panel } = open({ onRemove: () => undefined });
-		expect(panel.querySelector(".tc-repeat-remove")).toBeNull();
-		segment(panel, ".tc-repeat-unit", "days").click();
-		const row = panel.querySelector<HTMLElement>(".tc-repeat-remove");
-		expect([row?.textContent, panel.lastElementChild === row, panel.classList.contains("has-remove")]).toEqual(["Remove repeat", true, true]);
-		segment(panel, ".tc-repeat-unit", "weeks").click();
 		expect(panel.querySelectorAll(".tc-repeat-remove")).toHaveLength(1);
-		expect(panel.lastElementChild).toBe(panel.querySelector(".tc-repeat-remove"));
+		segment(panel, ".tc-repeat-unit", "days").click();
+		expect([panel.querySelectorAll(".tc-repeat-remove").length, panel.lastElementChild === panel.querySelector(".tc-repeat-remove")]).toEqual([1, true]);
+		const none = open().panel;
+		segment(none, ".tc-repeat-unit", "days").click();
+		expect([none.querySelector(".tc-repeat-remove"), none.classList.contains("has-remove")]).toEqual([null, false]);
 	});
 
 	it("drawn again into the same panel for a task without a rule, leaves no room for a Remove row it does not have", () => {
 		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null }, onRemove: () => undefined });
 		panel.replaceChildren();
-		repeatPanel(panel, { rule: null, day: THURSDAY, onChange: () => undefined, onRemove: () => undefined });
+		repeatPanel(panel, { rule: null, day: THURSDAY, onChange: () => undefined, onRemove: null });
 		expect([panel.querySelector(".tc-repeat-remove"), panel.classList.contains("has-remove")]).toEqual([null, false]);
 	});
 
