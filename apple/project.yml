@@ -2,7 +2,7 @@ name: TaskCalendar
 options:
   bundleIdPrefix: com.kudrmax
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
 packages:
   Core:
     path: Core
