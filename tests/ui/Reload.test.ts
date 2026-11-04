@@ -46,12 +46,16 @@ describe("Reload", () => {
 		expect(applied).toEqual(["ok"]);
 	});
 
-	it("runs the hooks right before applying the value fetched after them", async () => {
+	it("hands the hooks to apply with the value fetched after them, to run once the value is in place", async () => {
 		const order: string[] = [];
 		let n = 0;
-		const reload = new Reload(async () => ++n, (v) => order.push(`apply:${v}`));
+		const reload = new Reload(async () => ++n, (v, hooks) => {
+			order.push(`apply:${v}`);
+			hooks();
+			order.push("shown");
+		});
 		await reload.request(() => order.push("hook"));
-		expect(order).toEqual(["hook", "apply:1"]);
+		expect(order).toEqual(["apply:1", "hook", "shown"]);
 	});
 
 	it("a hook given during a fetch waits for the fetch after it", async () => {
@@ -60,7 +64,10 @@ describe("Reload", () => {
 		const applied: string[] = [];
 		const seen: string[][] = [];
 		let hooks = 0;
-		const reload = new Reload(() => fetches[n++].promise, (v) => applied.push(v));
+		const reload = new Reload(() => fetches[n++].promise, (v, run) => {
+			run();
+			applied.push(v);
+		});
 		const first = reload.request();
 		const second = reload.request(() => {
 			hooks++;
@@ -81,7 +88,8 @@ describe("Reload", () => {
 		const applied: number[] = [];
 		const order: string[] = [];
 		let late: Promise<void> | null = null;
-		const reload: Reload<number> = new Reload(async () => ++n, (v) => {
+		const reload: Reload<number> = new Reload(async () => ++n, (v, hooks) => {
+			hooks();
 			applied.push(v);
 			late ??= reload.request(() => order.push("late hook"));
 		});
@@ -98,7 +106,10 @@ describe("Reload", () => {
 		const reload = new Reload(async () => {
 			if (fail) throw new Error("boom");
 			return "ok";
-		}, (v) => applied.push(v));
+		}, (v, run) => {
+			run();
+			applied.push(v);
+		});
 		await expect(reload.request(() => hooks++)).rejects.toThrow("boom");
 		expect(hooks).toBe(0);
 		fail = false;

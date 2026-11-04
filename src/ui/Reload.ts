@@ -5,15 +5,15 @@
 export class Reload<T> {
 	private running: Promise<void> | null = null;
 	private requested = false;
-	/** Run right before the value is applied; all belong to the running fetch, and go with it when it fails. */
+	/** Handed to `apply` with the value, to run once it is in place; all belong to the running fetch, and go with it when it fails. */
 	private hooks: (() => void)[] = [];
 
 	constructor(
 		private readonly fetch: () => Promise<T>,
-		private readonly apply: (value: T) => void,
+		private readonly apply: (value: T, hooks: () => void) => void,
 	) {}
 
-	/** Resolves once a value fetched after this call is applied; `beforeApply` runs right before it is. */
+	/** Resolves once a value fetched after this call is applied; `beforeApply` runs as `apply` has it, once the value is in place. */
 	request(beforeApply?: () => void): Promise<void> {
 		this.requested = true;
 		if (beforeApply) this.hooks.push(beforeApply);
@@ -36,7 +36,6 @@ export class Reload<T> {
 		}
 		const hooks = this.hooks.splice(0);
 		this.running = null;
-		hooks.forEach((hook) => hook());
-		this.apply(value);
+		this.apply(value, () => hooks.forEach((hook) => hook()));
 	}
 }
