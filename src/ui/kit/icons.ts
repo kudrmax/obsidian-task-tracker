@@ -23,6 +23,7 @@ const DRAWINGS = {
 	indent: { d: "M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4" },
 	description: { d: "M4 6h16 M4 12h16 M4 18h10" },
 	plus: { d: ["M12 5v14", "M5 12h14"] },
+	minus: { d: "M5 12h14" },
 	cross: { d: "M6 6l12 12 M18 6L6 18" },
 	undo: { d: "M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" },
 	progress: { d: CIRCLE, fill: "M12 3a9 9 0 0 1 0 18z" },
@@ -40,6 +41,8 @@ const DRAWINGS = {
 	work: { d: "M9 2.5h6a2.5 2.5 0 0 1 2.5 2.5v14a2.5 2.5 0 0 1-2.5 2.5H9A2.5 2.5 0 0 1 6.5 19V5A2.5 2.5 0 0 1 9 2.5z M11 18.5h2" },
 	reminder: { d: "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z M10 21h4" },
 	refresh: { d: "M20 12a8 8 0 1 1-2.3-5.7 M20 4v4.5h-4.5" },
+	repeat: { d: "M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13" },
+	stop: { d: `${CIRCLE} M9.5 9.5h5v5h-5z` },
 } satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof DRAWINGS;

@@ -1,4 +1,4 @@
-import type { Placement } from "../../application/contracts";
+import type { Placement, RepeatRule } from "../../application/contracts";
 import { samePlacement } from "../../application/placements";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
@@ -8,6 +8,7 @@ import { Panel, Picks } from "../kit/Panel";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
 import { placeLabel } from "../placeLabel";
+import { repeatPanel } from "../repeat/RepeatPanel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
 
@@ -20,6 +21,9 @@ export interface QuickBarState {
 	readonly priority: PriorityLevel | null;
 	/** Where the field stands; null for a field with no place of its own (a subtask, a slot): no place button. */
 	readonly place: Placement | null;
+	readonly repeat: RepeatRule | null;
+	/** The field may repeat: a subtask's field and one on the calendar may not, and have no repeat button. */
+	readonly repeatable: boolean;
 }
 
 /** Where the field stands, for the bar to stand by it. */
@@ -41,9 +45,11 @@ export interface QuickBarDeps {
 	/** A level's prefix, or null to take the level off. */
 	onPriority(prefix: string | null): void;
 	onPlace(placement: Placement): void;
+	/** A rule set in the repeat panel, or null to take it off. */
+	onRepeat(rule: RepeatRule | null): void;
 }
 
-type PanelKind = "priority" | "place";
+type PanelKind = "priority" | "repeat" | "place";
 
 interface OpenPanel {
 	readonly kind: PanelKind;
@@ -74,7 +80,7 @@ const GLIDING = "is-gliding";
 const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "date" ? "calendar" : placement.kind);
 
 /**
- * The bar of a task being typed: the shift buttons, the priority flag and the place. On the phone it lies over the keyboard,
+ * The bar of a task being typed: the shift buttons, the priority flag, the repeat and the place. On the phone it lies over the keyboard,
  * the shift buttons on the left, the rest on the right, and its panels open above it. On the desktop the same buttons are a
  * capsule right under the field, right edges together, or over the field where there is no room under it; its panels open
  * from it, away from the field. One panel at a time. The bar knows nothing of the entry: it shows the state it is given and
@@ -86,6 +92,7 @@ export class QuickBar {
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
 	private readonly flag: HTMLButtonElement;
+	private readonly repeat: HTMLButtonElement;
 	private readonly place: Button;
 	private state: QuickBarState | null = null;
 	/** The place the place button shows. */
@@ -108,6 +115,7 @@ export class QuickBar {
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
 		el(this.bar, "span", "tc-bar-spacer");
 		this.flag = Button.create(this.bar, { kind: "bar", label: "Priority", title: "Priority", icon: "priority", cls: "tc-bar-flag", onPress: () => this.toggle("priority") }).el;
+		this.repeat = Button.create(this.bar, { kind: "bar", label: "Repeat", title: "Repeat", icon: "repeat", cls: "tc-bar-repeat", onPress: () => this.toggle("repeat") }).el;
 		this.place = Button.create(this.bar, { kind: "bar", label: "Place", title: "Place", icon: "inbox", text: "", cls: "tc-bar-place", onPress: () => this.toggle("place") });
 		this.bar.addEventListener("transitionend", (e) => {
 			if (e.target === this.bar && e.propertyName === "transform") this.bar.classList.remove(GLIDING);
@@ -129,6 +137,9 @@ export class QuickBar {
 		this.flag.classList.toggle("is-set", state.priority !== null);
 		if (state.priority) this.flag.dataset.priority = state.priority.color;
 		else delete this.flag.dataset.priority;
+		this.repeat.hidden = !state.repeatable;
+		this.repeat.classList.toggle("is-set", state.repeat !== null);
+		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
 		this.place.el.hidden = state.place === null;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		this.refreshPanel();
@@ -250,15 +261,25 @@ export class QuickBar {
 	/** The shown state changed under an open panel: it follows, or closes when its button is gone. */
 	private refreshPanel(): void {
 		if (!this.panel) return;
-		const gone = this.panel.kind === "priority" ? this.levels().length === 0 : this.state?.place == null;
+		const gone = this.panel.kind === "priority" ? this.levels().length === 0 : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
 		if (gone) this.closePanel();
 		else if (!this.panel.picking && this.panel.drawn !== this.drawnKey(this.panel.kind)) this.renderPanel();
 	}
 
-	/** What a panel of `kind` shows: the levels and the field's, the places and the field's, and today for the picker. */
+	/**
+	 * What a panel of `kind` shows: the levels and the field's, the places and the field's, and today for the picker. The
+	 * repeat panel shows its own changes itself: it is drawn again only for another day, or once a rule is set or taken off.
+	 */
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
+		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, this.repeatDay()]);
 		return JSON.stringify([kind, this.levels(), state?.priority?.prefix ?? null, state?.place ?? null, this.deps.today()]);
+	}
+
+	/** The day a new rule starts from: the field's own, else today. */
+	private repeatDay(): LocalDate {
+		const place = this.state?.place;
+		return place?.kind === "date" ? place.date : this.deps.today();
 	}
 
 	private renderPanel(): void {
@@ -268,6 +289,7 @@ export class QuickBar {
 		panel.el.classList.toggle("is-picker", panel.picking);
 		panel.window.replace((parent) => {
 			if (panel.kind === "priority") this.renderLevels(parent);
+			else if (panel.kind === "repeat") this.renderRepeat(parent);
 			else if (panel.picking) this.renderPicker(parent);
 			else this.renderPlaces(parent);
 		});
@@ -291,6 +313,20 @@ export class QuickBar {
 			return { label: level.prefix, icon: "priority", color: level.color, on, onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
 		});
 		markLongLabels(tileGroup(parent, "is-priority", tileRows(specs)));
+	}
+
+	/** Every change is reported at once and the panel stays, standing again as it grows or shrinks; Remove repeat is a pick. */
+	private renderRepeat(parent: HTMLElement): void {
+		const rule = this.state?.repeat ?? null;
+		repeatPanel(parent, {
+			rule,
+			day: this.repeatDay(),
+			onChange: (changed) => {
+				this.deps.onRepeat(changed);
+				this.restand();
+			},
+			onRemove: rule && this.picked(() => this.deps.onRepeat(null)),
+		});
 	}
 
 	private renderPlaces(parent: HTMLElement): void {

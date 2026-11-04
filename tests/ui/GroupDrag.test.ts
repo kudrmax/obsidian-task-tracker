@@ -40,6 +40,8 @@ describe("a section carried (block 3)", () => {
 		dueDate: null,
 		slot: null,
 		reminder: "notification",
+		repeat: null,
+		repeatable: true,
 		priority: null,
 		group,
 		subtasks: [],

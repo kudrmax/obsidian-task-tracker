@@ -69,6 +69,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.text(el, "Slot marker", "Precedes the time slot on a task line.", this.settings.slotMarker, (slotMarker) => ({ slotMarker }));
 		this.text(el, "Alarm marker", "Precedes the time slot of a task that rings as an alarm on the phone.", this.settings.alarmSlotMarker, (alarmSlotMarker) => ({ alarmSlotMarker }));
 		this.text(el, "No-reminder marker", "Precedes the time slot of a task the phone does not remind of.", this.settings.silentSlotMarker, (silentSlotMarker) => ({ silentSlotMarker }));
+		this.text(el, "Repeat marker", "Precedes the repeat rule on a task line.", this.settings.repeatMarker, (repeatMarker) => ({ repeatMarker }));
 	}
 
 	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */

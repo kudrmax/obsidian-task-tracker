@@ -1,7 +1,46 @@
 {
- "v": 3,
  "attachments": {},
  "boards": {
+  "Back23Flow1.dc.html": {
+   "h": 1100,
+   "page": "backlog23",
+   "title": "1. Где живёт Backlog",
+   "w": 1458,
+   "x": 0,
+   "y": 0
+  },
+  "Back23Flow2.dc.html": {
+   "h": 1100,
+   "page": "backlog23",
+   "title": "2. Одно правило переноса",
+   "w": 2398,
+   "x": 0,
+   "y": 1220
+  },
+  "Back23Flow3.dc.html": {
+   "h": 1100,
+   "page": "backlog23",
+   "title": "3. Без перетаскивания",
+   "w": 518,
+   "x": 0,
+   "y": 2440
+  },
+  "Back23Screen.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов Backlog (его показывают доски «Backlog #23»)",
+   "w": 390,
+   "x": 2350,
+   "y": 0
+  },
+  "Back23Wheel.dc.html": {
+   "h": 96,
+   "page": "components",
+   "title": "Компонент колёсика с Backlog (его показывают доски «Backlog #23»)",
+   "w": 390,
+   "x": 2820,
+   "y": 0
+  },
   "Cal.dc.html": {
    "h": 844,
    "page": "brainstorm",
@@ -81,6 +120,286 @@
    "w": 860,
    "x": 2720,
    "y": 5720
+  },
+  "Confirm1.dc.html": {
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 1 — На месте",
+   "w": 2188,
+   "x": 0,
+   "y": 0
+  },
+  "Confirm2.dc.html": {
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 2 — Окно у пункта",
+   "w": 2188,
+   "x": 2268,
+   "y": 0
+  },
+  "Confirm3.dc.html": {
+   "h": 2204,
+   "page": "confirmdelete",
+   "title": "Вариант 3 — Как на платформе",
+   "w": 2188,
+   "x": 4536,
+   "y": 0
+  },
+  "ConfirmKit.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент: кадр подтверждения (телефон и Mac)",
+   "w": 390,
+   "x": 8014,
+   "y": 0
+  },
+  "Desc.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов описания (его показывают доски «Описание задачи»)",
+   "w": 390,
+   "x": 3290,
+   "y": 0
+  },
+  "DescFlow1.dc.html": {
+   "h": 1076,
+   "page": "description",
+   "title": "1. Описание в файле и на карточке",
+   "w": 1158,
+   "x": 0,
+   "y": 0
+  },
+  "DescFlow2.dc.html": {
+   "h": 1180,
+   "page": "description",
+   "title": "2. Начало описания над задачей",
+   "w": 1738,
+   "x": 0,
+   "y": 1196
+  },
+  "DescFlow3.dc.html": {
+   "h": 1180,
+   "page": "description",
+   "title": "3. Правка и новое описание",
+   "w": 2288,
+   "x": 0,
+   "y": 2496
+  },
+  "DescFlowLight.dc.html": {
+   "h": 1076,
+   "page": "description",
+   "title": "Светлая тема",
+   "w": 1928,
+   "x": 0,
+   "y": 3796
+  },
+  "DragCover.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов «Зоны при переносе»",
+   "w": 390,
+   "x": 5794,
+   "y": 0
+  },
+  "DragCoverBoard.dc.html": {
+   "h": 2380,
+   "page": "dragcover",
+   "title": "Зоны при переносе: варианты",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "Ev1A.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "A — внахлёст, сдвиг 18 px, как у задач",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "Ev1B.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "B — как A, плюс кромка цвета фона",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "Ev1C.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "C — внахлёст, сдвиг 40 px",
+   "w": 390,
+   "x": 1410,
+   "y": 0
+  },
+  "Ev1Now.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "Сейчас: колонки",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "Ev2A.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "A — внахлёст, сдвиг 18 px, как у задач",
+   "w": 390,
+   "x": 470,
+   "y": 1264
+  },
+  "Ev2B.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "B — как A, плюс кромка цвета фона",
+   "w": 390,
+   "x": 940,
+   "y": 1264
+  },
+  "Ev2C.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "C — внахлёст, сдвиг 40 px",
+   "w": 390,
+   "x": 1410,
+   "y": 1264
+  },
+  "Ev2Now.dc.html": {
+   "h": 844,
+   "page": "events",
+   "title": "Сейчас: колонки",
+   "w": 390,
+   "x": 0,
+   "y": 1264
+  },
+  "Foot.dc.html": {
+   "h": 844,
+   "page": "foot",
+   "title": "Служебное: экран для вариантов низа",
+   "w": 390,
+   "x": 2048,
+   "y": 0
+  },
+  "FootBoard.dc.html": {
+   "h": 2260,
+   "page": "foot",
+   "title": "Низ списков: варианты",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "Headers25BottomCal.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "1. Заголовки сверху, переключатель внизу по центру: Now и календарь",
+   "w": 390,
+   "x": 940,
+   "y": 1084
+  },
+  "Headers25BottomInbox.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "1. Заголовки сверху, переключатель внизу по центру: Inbox и Soon",
+   "w": 390,
+   "x": 0,
+   "y": 1084
+  },
+  "Headers25BottomLong.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "1. Заголовки сверху, переключатель внизу по центру: Soon и Now, длинная дата",
+   "w": 390,
+   "x": 1410,
+   "y": 1084
+  },
+  "Headers25BottomSoon.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "1. Заголовки сверху, переключатель внизу по центру: Soon и Now",
+   "w": 390,
+   "x": 470,
+   "y": 1084
+  },
+  "Headers25NowCal.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Сейчас: Now и календарь",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "Headers25NowInbox.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Сейчас: Inbox и Soon",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "Headers25NowSoon.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Сейчас: Soon и Now",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "Headers25PeekCal.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Было: соседи по краям: Now и календарь",
+   "w": 390,
+   "x": 940,
+   "y": 3252
+  },
+  "Headers25PeekInbox.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Было: соседи по краям: Inbox и Soon",
+   "w": 390,
+   "x": 0,
+   "y": 3252
+  },
+  "Headers25PeekSoon.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "Было: соседи по краям: Soon и Now",
+   "w": 390,
+   "x": 470,
+   "y": 3252
+  },
+  "Headers25WideCal.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Now и календарь",
+   "w": 390,
+   "x": 940,
+   "y": 2168
+  },
+  "Headers25WideInbox.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Inbox и Soon",
+   "w": 390,
+   "x": 0,
+   "y": 2168
+  },
+  "Headers25WideLong.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Soon и Now, длинная дата",
+   "w": 390,
+   "x": 1410,
+   "y": 2168
+  },
+  "Headers25WideSoon.dc.html": {
+   "h": 844,
+   "page": "headers25",
+   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Soon и Now",
+   "w": 390,
+   "x": 470,
+   "y": 2168
   },
   "InProgress.dc.html": {
    "h": 900,
@@ -282,6 +601,30 @@
    "x": 0,
    "y": 0
   },
+  "MassDesk.dc.html": {
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экранов массовых действий на десктопе (его показывают доски «Массовые действия»)",
+   "w": 1200,
+   "x": 6734,
+   "y": 0
+  },
+  "MassFlow.dc.html": {
+   "h": 2276,
+   "page": "bulk",
+   "title": "2. Массовые действия на десктопе",
+   "w": 6448,
+   "x": 0,
+   "y": 1226
+  },
+  "MassLook.dc.html": {
+   "h": 1106,
+   "page": "bulk",
+   "title": "1. Как выглядит выделенная задача",
+   "w": 3888,
+   "x": 0,
+   "y": 0
+  },
   "MenuBar.dc.html": {
    "h": 844,
    "page": "brainstorm",
@@ -297,6 +640,54 @@
    "w": 390,
    "x": 1410,
    "y": 8064
+  },
+  "MenuGroupedLong.dc.html": {
+   "h": 844,
+   "page": "menuorder",
+   "title": "Четыре уровня с длинными именами: два ряда по две, текст гаснет к краю",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "MenuGroupedShort.dc.html": {
+   "h": 844,
+   "page": "menuorder",
+   "title": "Три уровня в ряд; крестик на выбранном снимает приоритет",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "MenuGroupedUnset.dc.html": {
+   "h": 844,
+   "page": "menuorder",
+   "title": "Задача без приоритета: ничего не выбрано, крестика нет",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "MenuMove.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Меню задачи: перенос и секция",
+   "w": 390,
+   "x": 6264,
+   "y": 0
+  },
+  "MenuMoveBoard.dc.html": {
+   "h": 1290,
+   "page": "menumove",
+   "title": "Перенос и секция в меню задачи",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "MenuOrder.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент меню задачи по группам (его показывают доски «Меню задачи»)",
+   "w": 390,
+   "x": 1880,
+   "y": 0
   },
   "MenuPicker.dc.html": {
    "h": 844,
@@ -450,6 +841,358 @@
    "x": 0,
    "y": 1444
   },
+  "Postpone22Calendar.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Сегодня и календарь: задачу несут на Pick a date",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "Postpone22Inbox.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Inbox и Soon: зон нет, сначала в Soon",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "Postpone22Light.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Soon и сегодня, светлая",
+   "w": 390,
+   "x": 1410,
+   "y": 0
+  },
+  "Postpone22OnLater.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Открыт другой день: Today, Tomorrow и Pick a date",
+   "w": 390,
+   "x": 2350,
+   "y": 0
+  },
+  "Postpone22OnTomorrow.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Открыт завтрашний день: вместо Tomorrow — Today",
+   "w": 390,
+   "x": 1880,
+   "y": 0
+  },
+  "Postpone22SoonNow.dc.html": {
+   "h": 844,
+   "page": "postpone22",
+   "title": "Soon и сегодня: задачу из Soon несут на Tomorrow",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "ProgressAlt.dc.html": {
+   "h": 1370,
+   "page": "components",
+   "title": "Задача в процессе: значок, форма, тон",
+   "w": 674,
+   "x": 13086,
+   "y": 0
+  },
+  "ProgressAltCut.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "7.1 Срез: кончик слева отделён полоской фона",
+   "w": 674,
+   "x": 0,
+   "y": 5900
+  },
+  "ProgressAltDeep.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "6.4 Карточка на тон глубже своего цвета",
+   "w": 674,
+   "x": 2262,
+   "y": 4110
+  },
+  "ProgressAltIcon.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "6.1 Значок «в процессе» из меню, цветом подписей",
+   "w": 674,
+   "x": 0,
+   "y": 4110
+  },
+  "ProgressAltIconInk.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "6.2 Тот же значок цветом текста",
+   "w": 674,
+   "x": 754,
+   "y": 4110
+  },
+  "ProgressAltPull.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "7.3 Выдвинута влево, форма та же",
+   "w": 674,
+   "x": 1508,
+   "y": 5900
+  },
+  "ProgressAltRect.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "7.4 Прямоугольник со скруглением среди капсул",
+   "w": 674,
+   "x": 2262,
+   "y": 5900
+  },
+  "ProgressAltShape.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "6.3 Другая форма: левый край прямее",
+   "w": 674,
+   "x": 1508,
+   "y": 4110
+  },
+  "ProgressAltTab.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "7.2 Закладка: левый край прямой и выступает",
+   "w": 674,
+   "x": 754,
+   "y": 5900
+  },
+  "ProgressDotMeta.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "8.2 Точка цвета подписей карточки, посередине поля",
+   "w": 674,
+   "x": 754,
+   "y": 7690
+  },
+  "ProgressDotPriority.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "8.1 Точка цвета приоритета, посередине поля",
+   "w": 674,
+   "x": 0,
+   "y": 7690
+  },
+  "ProgressGlow.dc.html": {
+   "h": 1370,
+   "page": "components",
+   "title": "Задача в процессе: список и приоритеты для градиента",
+   "w": 674,
+   "x": 12332,
+   "y": 0
+  },
+  "ProgressGlowDot.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "5.5 Точка, отодвинута от текста насколько можно",
+   "w": 674,
+   "x": 3016,
+   "y": 2320
+  },
+  "ProgressGlowFull.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "5.3 Цветом карточки, во всю длину",
+   "w": 674,
+   "x": 1508,
+   "y": 2320
+  },
+  "ProgressGlowMeta.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "5.2 Градиент цветом своей карточки",
+   "w": 674,
+   "x": 754,
+   "y": 2320
+  },
+  "ProgressGlowShort.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "5.4 Короткий и плотнее",
+   "w": 674,
+   "x": 2262,
+   "y": 2320
+  },
+  "ProgressGlowSoft.dc.html": {
+   "h": 1370,
+   "page": "progress",
+   "title": "5.1 Мягкий градиент цветом текста",
+   "w": 674,
+   "x": 0,
+   "y": 2320
+  },
+  "ProgressHatchMeta.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3.2 В цвет подписей карточки",
+   "w": 674,
+   "x": 754,
+   "y": 1160
+  },
+  "ProgressHatchMove.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3.5 Полосы медленно бегут",
+   "w": 674,
+   "x": 3016,
+   "y": 1160
+  },
+  "ProgressHatchStrong.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3.1 Сильнее и длиннее",
+   "w": 674,
+   "x": 0,
+   "y": 1160
+  },
+  "ProgressHatchWide.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3.3 Широкие полосы по всей карточке",
+   "w": 674,
+   "x": 1508,
+   "y": 1160
+  },
+  "ProgressHatchWideFade.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3.4 Широкие полосы, гаснут вправо",
+   "w": 674,
+   "x": 2262,
+   "y": 1160
+  },
+  "ProgressMark.dc.html": {
+   "h": 740,
+   "page": "components",
+   "title": "Задача в процессе: список для вариантов",
+   "w": 674,
+   "x": 3760,
+   "y": 0
+  },
+  "ProgressMarkBold.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "2. Название полужирным",
+   "w": 674,
+   "x": 1508,
+   "y": 0
+  },
+  "ProgressMarkCrescent.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "1. Серп по краю капсулы, цветом подписей карточки",
+   "w": 674,
+   "x": 754,
+   "y": 0
+  },
+  "ProgressMarkDot.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "4. Точка в левом поле",
+   "w": 674,
+   "x": 3016,
+   "y": 0
+  },
+  "ProgressMarkHatch.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "3. Штриховка у левого края, гаснет вправо",
+   "w": 674,
+   "x": 2262,
+   "y": 0
+  },
+  "ProgressMarkNow.dc.html": {
+   "h": 740,
+   "page": "progress",
+   "title": "Сейчас: фиолетовая полоса срезана скруглением",
+   "w": 674,
+   "x": 0,
+   "y": 0
+  },
+  "QuickAdd.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов быстрого ввода (его показывают доски «Быстрый ввод»)",
+   "w": 390,
+   "x": 1410,
+   "y": 0
+  },
+  "QuickDesk.dc.html": {
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экранов быстрого ввода на десктопе (его показывает доска «8. Десктоп: панель у поля»)",
+   "w": 1200,
+   "x": 4514,
+   "y": 0
+  },
+  "QuickFlow1.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "1. Пишешь прямо в списке",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "QuickFlow2.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "2. Сдвиг вправо — подзадача",
+   "w": 1928,
+   "x": 0,
+   "y": 1276
+  },
+  "QuickFlow3.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "3. Плюс, который тянут",
+   "w": 3808,
+   "x": 0,
+   "y": 2552
+  },
+  "QuickFlow4.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "4. Где New task, а где плюс",
+   "w": 1458,
+   "x": 0,
+   "y": 3828
+  },
+  "QuickFlow5.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "7. Переименовать на месте, календарь и светлая тема",
+   "w": 2868,
+   "x": 0,
+   "y": 7656
+  },
+  "QuickFlow6.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "5. Полоса над клавиатурой: приоритет и место",
+   "w": 3338,
+   "x": 0,
+   "y": 5104
+  },
+  "QuickFlow7.dc.html": {
+   "h": 1120,
+   "page": "quickadd",
+   "title": "Не выбран: всё прямо в полосе",
+   "w": 1458,
+   "x": 0,
+   "y": 6380
+  },
+  "QuickFlow8.dc.html": {
+   "h": 2040,
+   "page": "quickadd",
+   "title": "8. Десктоп: панель у поля",
+   "w": 6448,
+   "x": 0,
+   "y": 8932
+  },
   "RenameList.dc.html": {
    "h": 844,
    "page": "brainstorm",
@@ -465,6 +1208,86 @@
    "w": 390,
    "x": 470,
    "y": 10352
+  },
+  "Repeat27Desk.dc.html": {
+   "h": 1266,
+   "page": "repeat27",
+   "title": "Десктоп: повтор в капсуле у поля",
+   "w": 2568,
+   "x": 1458,
+   "y": 2860
+  },
+  "Repeat27DeskKit.dc.html": {
+   "h": 800,
+   "page": "repeat27",
+   "title": "Служебное: десктоп с повтором",
+   "w": 1200,
+   "x": 850,
+   "y": 4290
+  },
+  "Repeat27Mark1.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Вариант 1 — значок повтора перед датой",
+   "w": 948,
+   "x": 0,
+   "y": 0
+  },
+  "Repeat27Mark2.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Вариант 2 — значок внутри плашки даты",
+   "w": 948,
+   "x": 1028,
+   "y": 0
+  },
+  "Repeat27Mark3.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Вариант 3 — без метки на карточке",
+   "w": 948,
+   "x": 2056,
+   "y": 0
+  },
+  "Repeat27Menu.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Меню задачи с повтором",
+   "w": 1378,
+   "x": 0,
+   "y": 2860
+  },
+  "Repeat27Panel.dc.html": {
+   "h": 272,
+   "page": "repeat27",
+   "title": "Служебное: панель повтора",
+   "w": 300,
+   "x": 470,
+   "y": 4290
+  },
+  "Repeat27PanelAll.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Вариант А — всё в одной панели",
+   "w": 948,
+   "x": 0,
+   "y": 1430
+  },
+  "Repeat27PanelList.dc.html": {
+   "h": 1310,
+   "page": "repeat27",
+   "title": "Вариант Б — частые сверху",
+   "w": 948,
+   "x": 1028,
+   "y": 1430
+  },
+  "Repeat27Phone.dc.html": {
+   "h": 844,
+   "page": "repeat27",
+   "title": "Служебное: телефон с повторами",
+   "w": 390,
+   "x": 0,
+   "y": 4290
   },
   "Screen.dc.html": {
    "h": 844,
@@ -746,6 +1569,62 @@
    "x": 2720,
    "y": 4968
   },
+  "SecFinal.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов секций (его показывают доски «Секции»)",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "SecFlow1.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "1. Секции в списке",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "SecFlow2.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "2. Завести секцию броском",
+   "w": 2398,
+   "x": 0,
+   "y": 1276
+  },
+  "SecFlow3.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "3. Задачи и секции перетаскиванием",
+   "w": 1458,
+   "x": 0,
+   "y": 2552
+  },
+  "SecFlow4.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "4. Заголовок секции: меню и имя",
+   "w": 1128,
+   "x": 0,
+   "y": 3828
+  },
+  "SecFlowLight.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "Светлая тема",
+   "w": 1458,
+   "x": 0,
+   "y": 5104
+  },
+  "SecSettings.dc.html": {
+   "h": 1076,
+   "page": "sections",
+   "title": "Настройки: раздел Sections",
+   "w": 1128,
+   "x": 0,
+   "y": 6380
+  },
   "SelAccent.dc.html": {
    "h": 844,
    "page": "brainstorm",
@@ -873,6 +1752,62 @@
    "w": 390,
    "x": 1410,
    "y": 11496
+  },
+  "Sub17Final.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов подзадач (его показывают сценарии #17)",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "Sub17Flow1.dc.html": {
+   "h": 1076,
+   "page": "subtasks17final",
+   "title": "1. Подзадачи в списке",
+   "w": 1128,
+   "x": 0,
+   "y": 0
+  },
+  "Sub17Flow2.dc.html": {
+   "h": 1076,
+   "page": "subtasks17final",
+   "title": "2. Добавить подзадачу",
+   "w": 2348,
+   "x": 0,
+   "y": 1276
+  },
+  "Sub17Flow3.dc.html": {
+   "h": 2140,
+   "page": "subtasks17final",
+   "title": "3. Перенести подзадачу",
+   "w": 1738,
+   "x": 0,
+   "y": 2552
+  },
+  "Sub17Flow4.dc.html": {
+   "h": 1076,
+   "page": "subtasks17final",
+   "title": "4. Перенести задачу с подзадачами",
+   "w": 1128,
+   "x": 0,
+   "y": 4892
+  },
+  "Sub17Flow5.dc.html": {
+   "h": 1076,
+   "page": "subtasks17final",
+   "title": "5. Задача с подзадачами на календаре",
+   "w": 1128,
+   "x": 0,
+   "y": 6168
+  },
+  "Sub17FlowLight.dc.html": {
+   "h": 1076,
+   "page": "subtasks17final",
+   "title": "Светлая тема",
+   "w": 1928,
+   "x": 0,
+   "y": 7444
   },
   "TasksAnatomy.dc.html": {
    "h": 970,
@@ -1016,925 +1951,77 @@
    "x": 0,
    "y": 2888
   },
-  "Postpone22SoonNow.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Soon и сегодня: задачу из Soon несут на Tomorrow",
-   "w": 390,
-   "x": 0,
-   "y": 0
-  },
-  "Postpone22Calendar.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Сегодня и календарь: задачу несут на Pick a date",
-   "w": 390,
-   "x": 470,
-   "y": 0
-  },
-  "Postpone22Inbox.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Inbox и Soon: зон нет, сначала в Soon",
-   "w": 390,
-   "x": 940,
-   "y": 0
-  },
-  "Postpone22Light.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Soon и сегодня, светлая",
-   "w": 390,
-   "x": 1410,
-   "y": 0
-  },
-  "Postpone22OnTomorrow.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Открыт завтрашний день: вместо Tomorrow — Today",
-   "w": 390,
-   "x": 1880,
-   "y": 0
-  },
-  "Postpone22OnLater.dc.html": {
-   "h": 844,
-   "page": "postpone22",
-   "title": "Открыт другой день: Today, Tomorrow и Pick a date",
-   "w": 390,
-   "x": 2350,
-   "y": 0
-  },
-  "Headers25NowInbox.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 0,
-   "y": 0,
-   "page": "headers25",
-   "title": "Сейчас: Inbox и Soon"
-  },
-  "Headers25NowSoon.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 470,
-   "y": 0,
-   "page": "headers25",
-   "title": "Сейчас: Soon и Now"
-  },
-  "Headers25NowCal.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 940,
-   "y": 0,
-   "page": "headers25",
-   "title": "Сейчас: Now и календарь"
-  },
-  "Headers25BottomInbox.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 0,
-   "y": 1084,
-   "page": "headers25",
-   "title": "1. Заголовки сверху, переключатель внизу по центру: Inbox и Soon"
-  },
-  "Headers25BottomSoon.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 470,
-   "y": 1084,
-   "page": "headers25",
-   "title": "1. Заголовки сверху, переключатель внизу по центру: Soon и Now"
-  },
-  "Headers25BottomCal.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 940,
-   "y": 1084,
-   "page": "headers25",
-   "title": "1. Заголовки сверху, переключатель внизу по центру: Now и календарь"
-  },
-  "Headers25BottomLong.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 1410,
-   "y": 1084,
-   "page": "headers25",
-   "title": "1. Заголовки сверху, переключатель внизу по центру: Soon и Now, длинная дата"
-  },
-  "Headers25WideInbox.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 0,
-   "y": 2168,
-   "page": "headers25",
-   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Inbox и Soon"
-  },
-  "Headers25WideSoon.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 470,
-   "y": 2168,
-   "page": "headers25",
-   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Soon и Now"
-  },
-  "Headers25WideCal.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 940,
-   "y": 2168,
-   "page": "headers25",
-   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Now и календарь"
-  },
-  "Headers25WideLong.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 1410,
-   "y": 2168,
-   "page": "headers25",
-   "title": "2. Заголовки сверху, переключатель внизу во всю ширину: Soon и Now, длинная дата"
-  },
-  "Headers25PeekInbox.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 0,
-   "y": 3252,
-   "page": "headers25",
-   "title": "Было: соседи по краям: Inbox и Soon"
-  },
-  "Headers25PeekSoon.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 470,
-   "y": 3252,
-   "page": "headers25",
-   "title": "Было: соседи по краям: Soon и Now"
-  },
-  "Headers25PeekCal.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 940,
-   "y": 3252,
-   "page": "headers25",
-   "title": "Было: соседи по краям: Now и календарь"
-  },
-  "Sub17Final.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 0,
-   "y": 0,
-   "page": "components",
-   "title": "Компонент экранов подзадач (его показывают сценарии #17)"
-  },
-  "Sub17Flow1.dc.html": {
-   "h": 1076,
-   "w": 1128,
-   "x": 0,
-   "y": 0,
-   "page": "subtasks17final",
-   "title": "1. Подзадачи в списке"
-  },
-  "Sub17Flow2.dc.html": {
-   "h": 1076,
-   "w": 2348,
-   "x": 0,
-   "y": 1276,
-   "page": "subtasks17final",
-   "title": "2. Добавить подзадачу"
-  },
-  "Sub17Flow3.dc.html": {
-   "h": 2140,
-   "w": 1738,
-   "x": 0,
-   "y": 2552,
-   "page": "subtasks17final",
-   "title": "3. Перенести подзадачу"
-  },
-  "Sub17Flow4.dc.html": {
-   "h": 1076,
-   "w": 1128,
-   "x": 0,
-   "y": 4892,
-   "page": "subtasks17final",
-   "title": "4. Перенести задачу с подзадачами"
-  },
-  "Sub17Flow5.dc.html": {
-   "h": 1076,
-   "w": 1128,
-   "x": 0,
-   "y": 6168,
-   "page": "subtasks17final",
-   "title": "5. Задача с подзадачами на календаре"
-  },
-  "Sub17FlowLight.dc.html": {
-   "h": 1076,
-   "w": 1928,
-   "x": 0,
-   "y": 7444,
-   "page": "subtasks17final",
-   "title": "Светлая тема"
-  },
-  "SecFinal.dc.html": {
-   "h": 844,
-   "w": 390,
-   "x": 470,
-   "y": 0,
-   "page": "components",
-   "title": "Компонент экранов секций (его показывают доски «Секции»)"
-  },
-  "SecFlow1.dc.html": {
-   "h": 1076,
-   "w": 1928,
-   "x": 0,
-   "y": 0,
-   "page": "sections",
-   "title": "1. Секции в списке"
-  },
-  "SecFlow2.dc.html": {
-   "h": 1076,
-   "w": 2398,
-   "x": 0,
-   "y": 1276,
-   "page": "sections",
-   "title": "2. Завести секцию броском"
-  },
-  "SecFlow3.dc.html": {
-   "h": 1076,
-   "w": 1458,
-   "x": 0,
-   "y": 2552,
-   "page": "sections",
-   "title": "3. Задачи и секции перетаскиванием"
-  },
-  "SecFlow4.dc.html": {
-   "h": 1076,
-   "w": 1128,
-   "x": 0,
-   "y": 3828,
-   "page": "sections",
-   "title": "4. Заголовок секции: меню и имя"
-  },
-  "SecFlowLight.dc.html": {
-   "h": 1076,
-   "w": 1458,
-   "x": 0,
-   "y": 5104,
-   "page": "sections",
-   "title": "Светлая тема"
-  },
-  "SecSettings.dc.html": {
-   "h": 1076,
-   "w": 1128,
-   "x": 0,
-   "y": 6380,
-   "page": "sections",
-   "title": "Настройки: раздел Sections"
-  },
-  "Wheel30DrumInbox.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Барабан: Inbox и Soon"
-  },
-  "Wheel30DrumSoon.dc.html": {
-   "x": 470,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Барабан: Soon и Now"
-  },
-  "Wheel30DrumCal.dc.html": {
-   "x": 940,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Барабан: Now и календарь"
-  },
-  "Wheel30DrumDrag.dc.html": {
-   "x": 1410,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Барабан: палец ведёт влево, колесо крутится к календарю"
-  },
-  "Wheel30DrumLight.dc.html": {
-   "x": 1880,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "wheel30",
-   "title": "Барабан, светлая"
-  },
-  "Wheel30.dc.html": {
-   "x": 940,
-   "y": 0,
-   "w": 390,
-   "h": 280,
-   "page": "components",
-   "title": "Компонент колёсика (его показывают доски «Колёсико»)"
-  },
-  "QuickFlow1.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1928,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "1. Пишешь прямо в списке"
-  },
-  "QuickFlow2.dc.html": {
-   "x": 0,
-   "y": 1276,
-   "w": 1928,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "2. Сдвиг вправо — подзадача"
-  },
-  "QuickFlow3.dc.html": {
-   "x": 0,
-   "y": 2552,
-   "w": 3808,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "3. Плюс, который тянут"
-  },
-  "QuickFlow4.dc.html": {
-   "x": 0,
-   "y": 3828,
-   "w": 1458,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "4. Где New task, а где плюс"
-  },
-  "QuickFlow5.dc.html": {
-   "x": 0,
-   "y": 7656,
-   "w": 2868,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "7. Переименовать на месте, календарь и светлая тема"
-  },
-  "QuickAdd.dc.html": {
-   "x": 1410,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент экранов быстрого ввода (его показывают доски «Быстрый ввод»)"
-  },
-  "MenuOrder.dc.html": {
-   "x": 1880,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент меню задачи по группам (его показывают доски «Меню задачи»)"
-  },
-  "QuickFlow6.dc.html": {
-   "x": 0,
-   "y": 5104,
-   "w": 3338,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "5. Полоса над клавиатурой: приоритет и место"
-  },
-  "QuickFlow7.dc.html": {
-   "x": 0,
-   "y": 6380,
-   "w": 1458,
-   "h": 1120,
-   "page": "quickadd",
-   "title": "Не выбран: всё прямо в полосе"
-  },
-  "MenuGroupedShort.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "menuorder",
-   "title": "Три уровня в ряд; крестик на выбранном снимает приоритет"
-  },
-  "MenuGroupedLong.dc.html": {
-   "x": 470,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "menuorder",
-   "title": "Четыре уровня с длинными именами: два ряда по две, текст гаснет к краю"
-  },
-  "MenuGroupedUnset.dc.html": {
-   "x": 940,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "menuorder",
-   "title": "Задача без приоритета: ничего не выбрано, крестика нет"
-  },
-  "Back23Screen.dc.html": {
-   "x": 2350,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент экранов Backlog (его показывают доски «Backlog #23»)"
-  },
-  "Back23Flow1.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1458,
-   "h": 1100,
-   "page": "backlog23",
-   "title": "1. Где живёт Backlog"
-  },
-  "Back23Flow2.dc.html": {
-   "x": 0,
-   "y": 1220,
-   "w": 2398,
-   "h": 1100,
-   "page": "backlog23",
-   "title": "2. Одно правило переноса"
-  },
-  "Back23Flow3.dc.html": {
-   "x": 0,
-   "y": 2440,
-   "w": 518,
-   "h": 1100,
-   "page": "backlog23",
-   "title": "3. Без перетаскивания"
-  },
-  "Back23Wheel.dc.html": {
-   "x": 2820,
-   "y": 0,
-   "w": 390,
-   "h": 96,
-   "page": "components",
-   "title": "Компонент колёсика с Backlog (его показывают доски «Backlog #23»)"
-  },
-  "Desc.dc.html": {
-   "x": 3290,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент экранов описания (его показывают доски «Описание задачи»)"
-  },
-  "DescFlow1.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1158,
-   "h": 1076,
-   "page": "description",
-   "title": "1. Описание в файле и на карточке"
-  },
-  "DescFlow2.dc.html": {
-   "x": 0,
-   "y": 1196,
-   "w": 1738,
-   "h": 1180,
-   "page": "description",
-   "title": "2. Начало описания над задачей"
-  },
-  "DescFlow3.dc.html": {
-   "x": 0,
-   "y": 2496,
-   "w": 2288,
-   "h": 1180,
-   "page": "description",
-   "title": "3. Правка и новое описание"
-  },
-  "ProgressMark.dc.html": {
-   "x": 3760,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "components",
-   "title": "Задача в процессе: список для вариантов"
-  },
-  "ProgressMarkNow.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "Сейчас: фиолетовая полоса срезана скруглением"
-  },
-  "ProgressMarkCrescent.dc.html": {
-   "x": 754,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "1. Серп по краю капсулы, цветом подписей карточки"
-  },
-  "ProgressMarkBold.dc.html": {
-   "x": 1508,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "2. Название полужирным"
-  },
-  "ProgressMarkHatch.dc.html": {
-   "x": 2262,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3. Штриховка у левого края, гаснет вправо"
-  },
-  "ProgressMarkDot.dc.html": {
-   "x": 3016,
-   "y": 0,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "4. Точка в левом поле"
-  },
-  "DescFlowLight.dc.html": {
-   "x": 0,
-   "y": 3796,
-   "w": 1928,
-   "h": 1076,
-   "page": "description",
-   "title": "Светлая тема"
-  },
-  "ProgressHatchStrong.dc.html": {
-   "x": 0,
-   "y": 1160,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3.1 Сильнее и длиннее"
-  },
-  "ProgressHatchMeta.dc.html": {
-   "x": 754,
-   "y": 1160,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3.2 В цвет подписей карточки"
-  },
-  "ProgressHatchWide.dc.html": {
-   "x": 1508,
-   "y": 1160,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3.3 Широкие полосы по всей карточке"
-  },
-  "ProgressHatchWideFade.dc.html": {
-   "x": 2262,
-   "y": 1160,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3.4 Широкие полосы, гаснут вправо"
-  },
-  "ProgressHatchMove.dc.html": {
-   "x": 3016,
-   "y": 1160,
-   "w": 674,
-   "h": 740,
-   "page": "progress",
-   "title": "3.5 Полосы медленно бегут"
-  },
-  "FootBoard.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1928,
-   "h": 2260,
-   "page": "foot",
-   "title": "Низ списков: варианты"
-  },
-  "Foot.dc.html": {
-   "x": 2048,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "foot",
-   "title": "Служебное: экран для вариантов низа"
-  },
-  "QuickDesk.dc.html": {
-   "x": 4514,
-   "y": 0,
-   "w": 1200,
-   "h": 800,
-   "page": "components",
-   "title": "Компонент экранов быстрого ввода на десктопе (его показывает доска «8. Десктоп: панель у поля»)"
-  },
-  "QuickFlow8.dc.html": {
-   "h": 2040,
-   "page": "quickadd",
-   "title": "8. Десктоп: панель у поля",
-   "w": 6448,
-   "x": 0,
-   "y": 8932
-  },
-  "Ev1Now.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "Сейчас: колонки"
-  },
-  "Ev1A.dc.html": {
-   "x": 470,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "A — внахлёст, сдвиг 18 px, как у задач"
-  },
-  "Ev1B.dc.html": {
-   "x": 940,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "B — как A, плюс кромка цвета фона"
-  },
-  "Ev1C.dc.html": {
-   "x": 1410,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "C — внахлёст, сдвиг 40 px"
-  },
-  "Ev2Now.dc.html": {
-   "x": 0,
-   "y": 1264,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "Сейчас: колонки"
-  },
-  "Ev2A.dc.html": {
-   "x": 470,
-   "y": 1264,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "A — внахлёст, сдвиг 18 px, как у задач"
-  },
-  "Ev2B.dc.html": {
-   "x": 940,
-   "y": 1264,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "B — как A, плюс кромка цвета фона"
-  },
-  "Ev2C.dc.html": {
-   "x": 1410,
-   "y": 1264,
-   "w": 390,
-   "h": 844,
-   "page": "events",
-   "title": "C — внахлёст, сдвиг 40 px"
-  },
-  "DragCoverBoard.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1928,
-   "h": 2380,
-   "page": "dragcover",
-   "title": "Зоны при переносе: варианты"
-  },
-  "DragCover.dc.html": {
-   "x": 5794,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент экранов «Зоны при переносе»"
-  },
-  "MenuMoveBoard.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 1928,
-   "h": 1290,
-   "page": "menumove",
-   "title": "Перенос и секция в меню задачи"
-  },
-  "MenuMove.dc.html": {
-   "x": 6264,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Меню задачи: перенос и секция"
-  },
-  "MassLook.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 3888,
-   "h": 1106,
-   "page": "bulk",
-   "title": "1. Как выглядит выделенная задача"
-  },
-  "MassFlow.dc.html": {
-   "x": 0,
-   "y": 1226,
-   "w": 6448,
-   "h": 2276,
-   "page": "bulk",
-   "title": "2. Массовые действия на десктопе"
-  },
-  "MassDesk.dc.html": {
-   "x": 6734,
-   "y": 0,
-   "w": 1200,
-   "h": 800,
-   "page": "components",
-   "title": "Компонент экранов массовых действий на десктопе (его показывают доски «Массовые действия»)"
-  },
-  "ProgressGlow.dc.html": {
-   "x": 12332,
-   "y": 0,
-   "w": 674,
-   "h": 1370,
-   "page": "components",
-   "title": "Задача в процессе: список и приоритеты для градиента"
-  },
-  "ProgressGlowSoft.dc.html": {
-   "x": 0,
-   "y": 2320,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "5.1 Мягкий градиент цветом текста"
-  },
-  "ProgressGlowMeta.dc.html": {
-   "x": 754,
-   "y": 2320,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "5.2 Градиент цветом своей карточки"
-  },
-  "ProgressGlowFull.dc.html": {
-   "x": 1508,
-   "y": 2320,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "5.3 Цветом карточки, во всю длину"
-  },
-  "ProgressGlowShort.dc.html": {
-   "x": 2262,
-   "y": 2320,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "5.4 Короткий и плотнее"
-  },
-  "ProgressGlowDot.dc.html": {
-   "x": 3016,
-   "y": 2320,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "5.5 Точка, отодвинута от текста насколько можно"
-  },
-  "ProgressAlt.dc.html": {
-   "x": 13086,
-   "y": 0,
-   "w": 674,
-   "h": 1370,
-   "page": "components",
-   "title": "Задача в процессе: значок, форма, тон"
-  },
-  "ProgressAltIcon.dc.html": {
-   "x": 0,
-   "y": 4110,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "6.1 Значок «в процессе» из меню, цветом подписей"
-  },
-  "ProgressAltIconInk.dc.html": {
-   "x": 754,
-   "y": 4110,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "6.2 Тот же значок цветом текста"
-  },
-  "ProgressAltShape.dc.html": {
-   "x": 1508,
-   "y": 4110,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "6.3 Другая форма: левый край прямее"
-  },
-  "ProgressAltDeep.dc.html": {
-   "x": 2262,
-   "y": 4110,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "6.4 Карточка на тон глубже своего цвета"
-  },
-  "ProgressAltCut.dc.html": {
-   "x": 0,
-   "y": 5900,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "7.1 Срез: кончик слева отделён полоской фона"
-  },
-  "ProgressAltTab.dc.html": {
-   "x": 754,
-   "y": 5900,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "7.2 Закладка: левый край прямой и выступает"
-  },
-  "ProgressAltPull.dc.html": {
-   "x": 1508,
-   "y": 5900,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "7.3 Выдвинута влево, форма та же"
-  },
-  "ProgressAltRect.dc.html": {
-   "x": 2262,
-   "y": 5900,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "7.4 Прямоугольник со скруглением среди капсул"
-  },
-  "ProgressDotPriority.dc.html": {
-   "x": 0,
-   "y": 7690,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "8.1 Точка цвета приоритета, посередине поля"
-  },
-  "ProgressDotMeta.dc.html": {
-   "x": 754,
-   "y": 7690,
-   "w": 674,
-   "h": 1370,
-   "page": "progress",
-   "title": "8.2 Точка цвета подписей карточки, посередине поля"
-  },
   "UndoBoard.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 6448,
    "h": 3330,
    "page": "undo",
-   "title": "Отмена — итог"
+   "title": "Отмена — итог",
+   "w": 6448,
+   "x": 0,
+   "y": 0
   },
   "UndoKit.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент: кадр отмены (телефон и Mac)",
+   "w": 390,
    "x": 10144,
-   "y": 0,
-   "w": 390,
-   "h": 844,
-   "page": "components",
-   "title": "Компонент: кадр отмены (телефон и Mac)"
+   "y": 0
   },
-  "Confirm1.dc.html": {
+  "UndoToasts.dc.html": {
+   "h": 1184,
+   "page": "undo",
+   "title": "Плашка отмены — варианты",
+   "w": 2828,
    "x": 0,
-   "y": 0,
-   "w": 2188,
-   "h": 2204,
-   "page": "confirmdelete",
-   "title": "Вариант 1 — На месте"
+   "y": 3450
   },
-  "Confirm2.dc.html": {
-   "x": 2268,
-   "y": 0,
-   "w": 2188,
-   "h": 2204,
-   "page": "confirmdelete",
-   "title": "Вариант 2 — Окно у пункта"
-  },
-  "Confirm3.dc.html": {
-   "x": 4536,
-   "y": 0,
-   "w": 2188,
-   "h": 2204,
-   "page": "confirmdelete",
-   "title": "Вариант 3 — Как на платформе"
-  },
-  "ConfirmKit.dc.html": {
-   "x": 8014,
-   "y": 0,
-   "w": 390,
-   "h": 844,
+  "Wheel30.dc.html": {
+   "h": 280,
    "page": "components",
-   "title": "Компонент: кадр подтверждения (телефон и Mac)"
+   "title": "Компонент колёсика (его показывают доски «Колёсико»)",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "Wheel30DrumCal.dc.html": {
+   "h": 280,
+   "page": "wheel30",
+   "title": "Барабан: Now и календарь",
+   "w": 390,
+   "x": 940,
+   "y": 0
+  },
+  "Wheel30DrumDrag.dc.html": {
+   "h": 280,
+   "page": "wheel30",
+   "title": "Барабан: палец ведёт влево, колесо крутится к календарю",
+   "w": 390,
+   "x": 1410,
+   "y": 0
+  },
+  "Wheel30DrumInbox.dc.html": {
+   "h": 280,
+   "page": "wheel30",
+   "title": "Барабан: Inbox и Soon",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "Wheel30DrumLight.dc.html": {
+   "h": 280,
+   "page": "wheel30",
+   "title": "Барабан, светлая",
+   "w": 390,
+   "x": 1880,
+   "y": 0
+  },
+  "Wheel30DrumSoon.dc.html": {
+   "h": 280,
+   "page": "wheel30",
+   "title": "Барабан: Soon и Now",
+   "w": 390,
+   "x": 470,
+   "y": 0
   }
  },
  "createdOnFiles": {
@@ -1981,9 +2068,51 @@
   "progressGlowTitle",
   "progressAltTitle",
   "progressShapeTitle",
-  "progressDotTitle"
+  "progressDotTitle",
+  "repeat27Title"
  ],
  "notes": {
+  "backlog23Title": {
+   "kind": "title1",
+   "maxW": 2398,
+   "page": "backlog23",
+   "text": "Backlog #23: пятая колонка; перенос — всегда бросок в список, половина напротив делится надвое (на обсуждении)",
+   "x": 0,
+   "y": -300
+  },
+  "descriptionTitle": {
+   "kind": "title1",
+   "maxW": 2288,
+   "page": "description",
+   "text": "Описание задачи: строки под задачей без чекбокса (принято 01.11)",
+   "x": 0,
+   "y": -300
+  },
+  "events1Title": {
+   "kind": "title1",
+   "maxW": 1800,
+   "page": "events",
+   "text": "Пересекающиеся события: твой вечер",
+   "x": 0,
+   "y": -300
+  },
+  "events2Title": {
+   "kind": "title1",
+   "maxW": 1800,
+   "page": "events",
+   "text": "Трудные случаи: одно начало, один календарь, задача поверх",
+   "x": 0,
+   "y": 964
+  },
+  "headers25Title": {
+   "kind": "title1",
+   "maxW": 1300,
+   "page": "headers25",
+   "text": "Заголовок у каждой колонки, едет вместе с ней. Выбран ряд 1: переключатель внизу по центру (31.10)",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
   "lightTitle": {
    "kind": "title1",
    "maxW": 5900,
@@ -1999,6 +2128,101 @@
    "page": "prod",
    "text": "Главный экран: список и календарь дня",
    "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "menugroupedTitle": {
+   "kind": "title1",
+   "maxW": 1330,
+   "page": "menuorder",
+   "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
+   "x": 0,
+   "y": -300
+  },
+  "postpone22Title": {
+   "kind": "title1",
+   "maxW": 1800,
+   "page": "postpone22",
+   "text": "Отложить: Tomorrow и Pick a date под колонкой сегодня",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "progressAltTitle": {
+   "kind": "title1",
+   "maxW": 2940,
+   "page": "progress",
+   "text": "Без градиентов: значок, форма, тон",
+   "w": 240,
+   "x": 0,
+   "y": 3810
+  },
+  "progressDotTitle": {
+   "kind": "title1",
+   "maxW": 1430,
+   "page": "progress",
+   "text": "Точка посередине поля",
+   "w": 240,
+   "x": 0,
+   "y": 7390
+  },
+  "progressGlowTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Градиент вместо штриховки, на всех приоритетах",
+   "w": 240,
+   "x": 0,
+   "y": 2020
+  },
+  "progressHatchTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Штриховка: заметнее",
+   "w": 240,
+   "x": 0,
+   "y": 860
+  },
+  "progressShapeTitle": {
+   "kind": "title1",
+   "maxW": 2940,
+   "page": "progress",
+   "text": "Форма карточки вместо пометки",
+   "w": 240,
+   "x": 0,
+   "y": 5600
+  },
+  "progressTitle": {
+   "kind": "title1",
+   "maxW": 3690,
+   "page": "progress",
+   "text": "Задача в процессе: пометка без цвета и без места",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "quickaddTitle": {
+   "kind": "title1",
+   "maxW": 3808,
+   "page": "quickadd",
+   "text": "Быстрый ввод: задачи пишут прямо в списке, Enter — следующая, сдвиг — подзадача (на обсуждении)",
+   "x": 0,
+   "y": -300
+  },
+  "repeat27Title": {
+   "kind": "title1",
+   "maxW": 4026,
+   "page": "repeat27",
+   "text": "Повторяющиеся задачи #27: метка, панель, меню (на обсуждении)",
+   "x": 0,
+   "y": -300
+  },
+  "sectionsTitle": {
+   "kind": "title1",
+   "maxW": 2398,
+   "page": "sections",
+   "text": "Секции внутри списков: заводятся броском, пустых не бывает (принято Максом 31.10)",
    "x": 0,
    "y": -300
   },
@@ -2205,32 +2429,6 @@
    "x": 0,
    "y": 2588
   },
-  "postpone22Title": {
-   "kind": "title1",
-   "maxW": 1800,
-   "page": "postpone22",
-   "text": "Отложить: Tomorrow и Pick a date под колонкой сегодня",
-   "w": 240,
-   "x": 0,
-   "y": -300
-  },
-  "headers25Title": {
-   "kind": "title1",
-   "maxW": 1300,
-   "page": "headers25",
-   "text": "Заголовок у каждой колонки, едет вместе с ней. Выбран ряд 1: переключатель внизу по центру (31.10)",
-   "w": 240,
-   "x": 0,
-   "y": -300
-  },
-  "sectionsTitle": {
-   "kind": "title1",
-   "maxW": 2398,
-   "page": "sections",
-   "text": "Секции внутри списков: заводятся броском, пустых не бывает (принято Максом 31.10)",
-   "x": 0,
-   "y": -300
-  },
   "wheel30Title": {
    "kind": "title1",
    "maxW": 2270,
@@ -2238,108 +2436,6 @@
    "text": "Колёсико: окно стоит в центре экрана, иконки крутятся под пальцем, по бокам — только соседи",
    "x": 0,
    "y": -300
-  },
-  "quickaddTitle": {
-   "kind": "title1",
-   "maxW": 3808,
-   "page": "quickadd",
-   "text": "Быстрый ввод: задачи пишут прямо в списке, Enter — следующая, сдвиг — подзадача (на обсуждении)",
-   "x": 0,
-   "y": -300
-  },
-  "menugroupedTitle": {
-   "kind": "title1",
-   "maxW": 1330,
-   "page": "menuorder",
-   "text": "Меню задачи по группам: статус, приоритет, правка, Delete",
-   "x": 0,
-   "y": -300
-  },
-  "backlog23Title": {
-   "kind": "title1",
-   "maxW": 2398,
-   "page": "backlog23",
-   "text": "Backlog #23: пятая колонка; перенос — всегда бросок в список, половина напротив делится надвое (на обсуждении)",
-   "x": 0,
-   "y": -300
-  },
-  "descriptionTitle": {
-   "kind": "title1",
-   "maxW": 2288,
-   "page": "description",
-   "text": "Описание задачи: строки под задачей без чекбокса (принято 01.11)",
-   "x": 0,
-   "y": -300
-  },
-  "progressTitle": {
-   "kind": "title1",
-   "maxW": 3690,
-   "page": "progress",
-   "text": "Задача в процессе: пометка без цвета и без места",
-   "w": 240,
-   "x": 0,
-   "y": -300
-  },
-  "progressHatchTitle": {
-   "kind": "title1",
-   "maxW": 3690,
-   "page": "progress",
-   "text": "Штриховка: заметнее",
-   "w": 240,
-   "x": 0,
-   "y": 860
-  },
-  "events1Title": {
-   "kind": "title1",
-   "maxW": 1800,
-   "page": "events",
-   "text": "Пересекающиеся события: твой вечер",
-   "x": 0,
-   "y": -300
-  },
-  "events2Title": {
-   "kind": "title1",
-   "maxW": 1800,
-   "page": "events",
-   "text": "Трудные случаи: одно начало, один календарь, задача поверх",
-   "x": 0,
-   "y": 964
-  },
-  "progressGlowTitle": {
-   "kind": "title1",
-   "maxW": 3690,
-   "page": "progress",
-   "text": "Градиент вместо штриховки, на всех приоритетах",
-   "w": 240,
-   "x": 0,
-   "y": 2020
-  },
-  "progressAltTitle": {
-   "kind": "title1",
-   "maxW": 2940,
-   "page": "progress",
-   "text": "Без градиентов: значок, форма, тон",
-   "w": 240,
-   "x": 0,
-   "y": 3810
-  },
-  "progressShapeTitle": {
-   "kind": "title1",
-   "maxW": 2940,
-   "page": "progress",
-   "text": "Форма карточки вместо пометки",
-   "w": 240,
-   "x": 0,
-   "y": 5600
-  },
-  "progressDotTitle": {
-   "kind": "title1",
-   "maxW": 1430,
-   "page": "progress",
-   "text": "Точка посередине поля",
-   "w": 240,
-   "x": 0,
-   "y": 7390
   }
  },
  "order": [
@@ -2584,7 +2680,18 @@
   "Confirm1.dc.html",
   "Confirm2.dc.html",
   "Confirm3.dc.html",
-  "ConfirmKit.dc.html"
+  "ConfirmKit.dc.html",
+  "UndoToasts.dc.html",
+  "Repeat27Mark1.dc.html",
+  "Repeat27Mark2.dc.html",
+  "Repeat27Mark3.dc.html",
+  "Repeat27PanelAll.dc.html",
+  "Repeat27PanelList.dc.html",
+  "Repeat27Menu.dc.html",
+  "Repeat27Desk.dc.html",
+  "Repeat27Phone.dc.html",
+  "Repeat27Panel.dc.html",
+  "Repeat27DeskKit.dc.html"
  ],
  "pages": [
   {
@@ -2674,7 +2781,12 @@
   {
    "id": "undo",
    "name": "Отмена"
+  },
+  {
+   "id": "repeat27",
+   "name": "Повторы #27"
   }
  ],
- "title": "Task Calendar"
+ "title": "Task Calendar",
+ "v": 3
 }

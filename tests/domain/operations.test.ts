@@ -26,7 +26,9 @@ import {
 	setPriority,
 	setReminder,
 	setSlot,
+	setRepeat,
 	setStatus,
+	stop,
 } from "../../src/domain/operations";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { normalize } from "../../src/domain/normalize";
@@ -43,7 +45,7 @@ function parse(text: string): TaskDocument {
 
 describe("newTask", () => {
 	it("builds a todo task and applies the patch", () => {
-		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "notification", priority: null, children: [] });
+		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [] });
 		expect(newTask("A", { dueDate: D }).dueDate).toBe(D);
 	});
 });
@@ -150,6 +152,15 @@ describe("createInPlace", () => {
 		for (const boundary of [DayBoundary.MIDNIGHT, new DayBoundary(4)]) {
 			expect(createInPlace(parseG(BASE), "X", null, place, T, boundary).serialize()).toBe(createAtTime(parseG(BASE), T, T, 990, "X", boundary).serialize());
 		}
+	});
+
+	it("takes a rule for a task of its own only: a subtask goes with its parent, a task on the calendar has its slot", () => {
+		const rule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null } as const;
+		const parseR = (text: string) => TaskDocument.parse(text, G, { ...M, repeat: "🔁" });
+		const d = parseR("## Now\n- [ ] P\n\n## Soon\n");
+		const sub = createInPlace(d, "X", null, { kind: "subtask", parent: d.tasks("now")[0], before: null }, T, DayBoundary.MIDNIGHT, rule);
+		const slot = createInPlace(parseR("## Now\n"), "X", null, { kind: "slot", slot: { date: T, start: 600, end: null } }, T, DayBoundary.MIDNIGHT, rule);
+		expect([sub.serialize(), slot.serialize()]).toEqual(["## Now\n- [ ] P\n\t- [ ] X\n\n## Soon\n", "## Now\n- [ ] X ⏰ 2026-10-30 10:00\n"]);
 	});
 
 	it("writes the priority before the text", () => {
@@ -608,6 +619,74 @@ describe("sections of a later day", () => {
 		expect(moveToGroup(d, d.tasks("now")[1], "soon", "Morning", d.tasks("now")[0], T, "2026-10-31").serialize()).toBe(
 			"## Now\n- [ ] N 📅 2026-10-31\n\n## Soon\n### Morning\n- [ ] M 📅 2026-10-31\n- [ ] A 📅 2026-10-31\n",
 		);
+	});
+});
+
+describe("repeat", () => {
+	const R = { ...M, repeat: "🔁" };
+	const parseR = (text: string) => TaskDocument.parse(text, SECTIONS, R);
+	const TODAY = "2026-11-05";
+	const FILE = "## Inbox\n- [ ] Зал\n\n## Now\n- [ ] Отчёт 📅 2026-11-05\n\n## Soon\n- [ ] Врач 📅 2026-11-12\n- [ ] Встреча ⏰ 2026-11-10 09:00\n\n## Done\n";
+	const weekly = (days: (0 | 1 | 2 | 3 | 4 | 5 | 6)[], every = 1) => ({ kind: "schedule" as const, every, unit: "week" as const, days, dayOfMonth: null, from: null });
+	const afterDone = { kind: "afterDone" as const, every: 3, unit: "week" as const, days: [], dayOfMonth: null, from: null };
+
+	it("setRepeat on an undated Inbox task gives it the first day of the schedule", () => {
+		const d = parseR(FILE);
+		const set = setRepeat(d, d.tasks("inbox")[0], weekly([3]), TODAY);
+		expect(set.tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-05 🔁 every week on Thu");
+		expect(normalize(set, TODAY).tasks("now").map((e) => e.task.text)).toEqual(["Зал", "Отчёт"]);
+	});
+
+	it("setRepeat anchors a schedule of every few weeks at the first day", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("inbox")[0], weekly([4], 2), TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-06 🔁 every 2 weeks on Fri from 2026-11-06");
+	});
+
+	it("setRepeat of every 2 weeks on an undated task takes the nearest suitable day", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("inbox")[0], weekly([0], 2), TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-11-09 🔁 every 2 weeks on Mon from 2026-11-09");
+	});
+
+	it("setRepeat of every 2 months on an undated task takes the nearest suitable day", () => {
+		const d = parseR(FILE);
+		const rule = { kind: "schedule" as const, every: 2, unit: "month" as const, days: [], dayOfMonth: 3, from: null };
+		expect(setRepeat(d, d.tasks("inbox")[0], rule, TODAY).tasks("inbox")[0].raw).toBe("- [ ] Зал 📅 2026-12-03 🔁 every 2 months on the 3rd from 2026-12-03");
+	});
+
+	it("setRepeat afterDone on an undated task gives no date", () => {
+		const d = parseR(FILE);
+		const set = setRepeat(d, d.tasks("inbox")[0], afterDone, TODAY);
+		expect(set.tasks("inbox")[0].raw).toBe("- [ ] Зал 🔁 every 3 weeks when done");
+		expect(normalize(set, TODAY).tasks("inbox").map((e) => e.task.text)).toEqual(["Зал"]);
+	});
+
+	it("setRepeat on a dated task keeps its date and anchors at it", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("soon")[0], weekly([0], 2), TODAY).tasks("soon")[0].raw).toBe("- [ ] Врач 📅 2026-11-12 🔁 every 2 weeks on Mon from 2026-11-12");
+	});
+
+	it("setRepeat on a task with a slot anchors at the slot's day and adds no date", () => {
+		const d = parseR(FILE);
+		expect(setRepeat(d, d.tasks("soon")[1], weekly([1], 2), TODAY).tasks("soon")[1].raw).toBe("- [ ] Встреча ⏰ 2026-11-10 09:00 🔁 every 2 weeks on Tue from 2026-11-10");
+	});
+
+	it("setRepeat replaces the rule", () => {
+		const d = parseR("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every week on Mon, Wed, Fri\n");
+		expect(setRepeat(d, d.tasks("soon")[0], afterDone, TODAY).serialize()).toBe("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every 3 weeks when done\n");
+	});
+
+	it("setRepeat null removes the field", () => {
+		const d = parseR("## Soon\n- [ ] Зал 📅 2026-11-06 🔁 every week on Mon, Wed, Fri\n");
+		expect(setRepeat(d, d.tasks("soon")[0], null, TODAY).serialize()).toBe("## Soon\n- [ ] Зал 📅 2026-11-06\n");
+	});
+
+	it("stop closes the task without the field, and no copy follows", () => {
+		const d = parseR("## Now\n- [/] Зал 📅 2026-11-05 🔁 every week on Mon, Wed, Fri\n\n## Soon\n\n## Done\n");
+		const stopped = stop(d, d.tasks("now")[0]);
+		expect(stopped.tasks("now")[0].raw).toBe("- [x] Зал 📅 2026-11-05");
+		const normalized = normalize(stopped, TODAY);
+		expect(normalized.tasks("soon")).toEqual([]);
+		expect(normalized.tasks("done").map((e) => e.raw)).toEqual(["- [x] Зал 📅 2026-11-05"]);
 	});
 });
 

@@ -13,6 +13,7 @@ export function markersOf(settings: TaskCalendarSettings): Markers {
 		slot: settings.slotMarker,
 		alarmSlot: settings.alarmSlotMarker,
 		silentSlot: settings.silentSlotMarker,
+		repeat: settings.repeatMarker,
 		priorities: usableLevels(settings.priorities).map((l) => l.prefix),
 	};
 }

@@ -46,6 +46,11 @@ function isOpen(entry: TaskEntry): boolean {
 	return entry.task.status === "todo" || entry.task.status === "inProgress";
 }
 
+/** An open task of its own may repeat; a subtask goes with its parent, and a closed task repeats no more. */
+export function repeatable(entry: TaskEntry): boolean {
+	return entry.path.length === 0 && isOpen(entry);
+}
+
 /** Of the task's own subtasks, the done ones out of all but those given up. */
 function progressOf(entry: TaskEntry): SubtaskProgress | null {
 	if (entry.subtasks.length === 0) return null;
@@ -61,6 +66,8 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
 		reminder: entry.task.reminder,
+		repeat: entry.task.repeat?.rule ?? null,
+		repeatable: repeatable(entry),
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 		group: entry.group,
 		subtasks: entry.subtasks.filter(isOpen).map((sub) => toItem(sub, levelOf, entry.task.text)),

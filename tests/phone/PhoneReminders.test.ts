@@ -95,3 +95,18 @@ describe("PhoneReminders.silence", () => {
 	});
 });
 
+describe("PhoneReminders and a repeating task", () => {
+	const line = "- [ ] Gym 🚨 2026-11-04 07:00 🔁 every day";
+
+	it("reminds of it by its name, without the rule", () => {
+		expect(phone.reminders(file(line), at(4, 6)).map((r) => [r.title, r.kind])).toEqual([["Gym", "alarm"]]);
+	});
+
+	it("Done writes the next copy, with no time and no reminder", () => {
+		const result = phone.complete(file(line), line, at(4, 7, 1));
+		if (!result.changed) throw new Error("expected a change");
+		expect(result.text).toContain("- [ ] Gym 📅 2026-11-05 🔁 every day");
+		expect(result.text).toContain("- [x] Gym 🚨 2026-11-04 07:00");
+		expect(phone.reminders(result.text, at(4, 7, 1))).toEqual([]);
+	});
+});

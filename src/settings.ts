@@ -68,6 +68,7 @@ export interface TaskCalendarSettings {
 	readonly alarmSlotMarker: string;
 	/** Precedes the slot of a task that the phone does not remind of. */
 	readonly silentSlotMarker: string;
+	readonly repeatMarker: string;
 	readonly workCalendarFile: string;
 	/** Calendar titles to take from the work file; empty means all. */
 	readonly workCalendarTitles: readonly string[];
@@ -108,6 +109,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	slotMarker: "⏰",
 	alarmSlotMarker: "🚨",
 	silentSlotMarker: "🔕",
+	repeatMarker: "🔁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },

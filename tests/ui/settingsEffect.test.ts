@@ -25,6 +25,10 @@ describe("settingsEffect", () => {
 		}
 	});
 
+	it("reloads the tasks for another repeat marker", () => {
+		expect(after({ repeatMarker: "↻" })).toEqual({ ...NOTHING, reload: true });
+	});
+
 	it("reloads the tasks for another due date marker", () => {
 		expect(after({ dueDateMarker: "🗓" })).toEqual({ ...NOTHING, reload: true });
 	});

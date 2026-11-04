@@ -1,0 +1,83 @@
+import { describe, expect, it } from "vitest";
+import { Repeat, type RepeatRule, sameRule } from "../../src/domain/Repeat";
+
+const cases = [
+	"every week on Mon, Wed, Fri",
+	"every 3 weeks on Fri from 2026-11-06",
+	"every month on the 5th",
+	"every 2 months on the 31st from 2026-10-31",
+	"every 3 days from 2026-11-04",
+	"every day",
+	"every 3 weeks when done",
+	"every month when done",
+];
+
+describe("Repeat", () => {
+	it.each(cases)("round-trips %s", (t) => expect(Repeat.parse(t)!.format()).toBe(t));
+	it.each(["every", "every 0 days", "every week on Funday", "every month on the 32nd", "every 2 weeks on Fri", "weekly", "every week on Fri from 2026-11-06", "every 3 day from 2026-11-04", "every weeks on Mon", "every week on Wed, Mon", "every month on the 2th"])(
+		"rejects %s",
+		(t) => expect(Repeat.parse(t)).toBeNull(),
+	);
+	it("ordinals", () => expect(["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st"].every((o) => Repeat.parse(`every month on the ${o}`))).toBe(true));
+	it("weekly picks the next chosen day", () => expect(Repeat.parse("every week on Mon, Wed, Fri")!.next("2026-11-05", "2026-11-05")).toBe("2026-11-06"));
+	it("every 3 weeks keeps its anchor", () => expect(Repeat.parse("every 3 weeks on Fri from 2026-11-06")!.next("2026-11-06", "2026-11-06")).toBe("2026-11-27"));
+	it("anchor far in the past", () => expect(Repeat.parse("every 3 days from 2020-01-01")!.next(null, "2026-11-05")).toBe("2026-11-07"));
+	it("31st falls on the 30th", () => expect(Repeat.parse("every month on the 31st")!.next("2026-10-31", "2026-10-31")).toBe("2026-11-30"));
+	it("february", () => expect(Repeat.parse("every month on the 30th")!.next("2027-01-30", "2027-01-30")).toBe("2027-02-28"));
+	it("over the year", () => expect(Repeat.parse("every week on Mon")!.next("2026-12-28", "2026-12-28")).toBe("2027-01-04"));
+	it("early done counts from the due date", () => expect(Repeat.parse("every week on Mon")!.next("2026-11-09", "2026-11-08")).toBe("2026-11-16"));
+	it("after done counts from today", () => expect(Repeat.parse("every 3 weeks when done")!.next("2026-11-01", "2026-11-05")).toBe("2026-11-26"));
+	it("after done months clamp", () => expect(Repeat.parse("every month when done")!.next(null, "2027-01-31")).toBe("2027-02-28"));
+	it("first: schedule today or later", () => expect(Repeat.parse("every week on Thu")!.first("2026-11-05")).toBe("2026-11-05"));
+	it("first: after done has none", () => expect(Repeat.parse("every week when done")!.first("2026-11-05")).toBeNull());
+	it("every 2 months skips the off month", () => expect(Repeat.parse("every 2 months on the 31st from 2026-10-31")!.next("2026-10-31", "2026-10-31")).toBe("2026-12-31"));
+	it("anchoredAt sets from only for N > 1", () => {
+		expect(Repeat.parse("every 2 weeks on Fri from 2026-01-02")!.anchoredAt("2026-11-06").format()).toBe("every 2 weeks on Fri from 2026-11-06");
+		expect(Repeat.parse("every week on Fri")!.anchoredAt("2026-11-06").format()).toBe("every week on Fri");
+	});
+});
+
+describe("Repeat.of", () => {
+	const base = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null } as const;
+	const invalid: [string, Partial<RepeatRule>][] = [
+		["every below 1", { every: 0 }],
+		["a fractional every", { every: 1.5 }],
+		["a week without days", { days: [] }],
+		["unsorted days", { days: [2, 0] }],
+		["duplicate days", { days: [1, 1] }],
+		["a month without a day", { unit: "month", days: [], dayOfMonth: null }],
+		["a month day above 31", { unit: "month", days: [], dayOfMonth: 32 }],
+		["a month day below 1", { unit: "month", days: [], dayOfMonth: 0 }],
+		["days on a day rule", { unit: "day" }],
+		["a day of month on a week rule", { dayOfMonth: 5 }],
+		["from on every 1", { from: "2026-11-06" }],
+		["no from for every 2", { every: 2 }],
+		["from on a when-done rule", { kind: "afterDone", unit: "day", days: [], every: 2, from: "2026-11-06" }],
+		["days on a when-done rule", { kind: "afterDone", unit: "day" }],
+	];
+
+	it.each(invalid)("throws for %s", (_, patch) => {
+		expect(() => Repeat.of({ ...base, ...patch })).toThrow(/repeat/i);
+	});
+
+	it("accepts the rules it parses", () => {
+		for (const text of cases) expect(() => Repeat.of(Repeat.parse(text)!.rule)).not.toThrow();
+	});
+});
+
+describe("sameRule", () => {
+	const weekly = (days: RepeatRule["days"], from: string | null = null): RepeatRule => ({ kind: "schedule", every: 2, unit: "week", days, dayOfMonth: null, from });
+
+	it("is the same rule wherever it is anchored, its weekdays in any order", () => {
+		expect(sameRule(weekly([0, 3], "2026-10-26"), weekly([3, 0]))).toBe(true);
+		expect(sameRule(null, null)).toBe(true);
+	});
+
+	it("is another rule for another kind, step, unit, weekday or month day, and against none", () => {
+		expect(sameRule(weekly([0]), weekly([0, 3]))).toBe(false);
+		expect(sameRule(weekly([0]), { ...weekly([0]), every: 1 })).toBe(false);
+		expect(sameRule(weekly([0]), { ...weekly([0]), kind: "afterDone" })).toBe(false);
+		expect(sameRule({ ...weekly([]), unit: "month", dayOfMonth: 5 }, { ...weekly([]), unit: "month", dayOfMonth: 6 })).toBe(false);
+		expect(sameRule(weekly([0]), null)).toBe(false);
+	});
+});

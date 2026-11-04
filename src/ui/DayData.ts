@@ -40,7 +40,7 @@ export class DayData {
 	private around = false;
 
 	constructor(private readonly deps: DayDataDeps) {
-		this.taskReload = new Reload(() => this.readTasks(), (state) => this.show(() => (this.state = state)));
+		this.taskReload = new Reload(() => this.readTasks(), (state, hooks) => this.show(() => (this.state = state), hooks));
 		this.eventReload = new Reload(
 			() => {
 				const date = deps.date();
@@ -48,7 +48,7 @@ export class DayData {
 				this.around = false;
 				return around ? deps.calendars.eventsAround(date) : deps.calendars.eventsOn(date);
 			},
-			(events) => this.show(() => (this.dayEvents = events)),
+			(events, hooks) => this.show(() => (this.dayEvents = events), hooks),
 		);
 	}
 
@@ -90,7 +90,10 @@ export class DayData {
 		return this.tasks();
 	}
 
-	/** The tasks file read afresh: after a change to it. `beforeShow` runs right before what was read is shown. */
+	/**
+	 * The tasks file read afresh: after a change to it. `beforeShow` runs once what was read is the data and before it
+	 * is shown: what reads the data then reads what the screen is about to draw.
+	 */
 	tasks(beforeShow?: () => void): Promise<void> {
 		return this.taskReload.request(beforeShow);
 	}
@@ -134,8 +137,10 @@ export class DayData {
 		}
 	}
 
-	private show(change: () => void): void {
+	/** The data changes, the hooks of the read run on it, and only then is the screen told. */
+	private show(change: () => void, hooks: () => void): void {
 		change();
+		hooks();
 		for (const part of ["tasks", "events"] as const) {
 			const drawn = this.drawnOf(part);
 			if (drawn === this.shown[part]) continue;

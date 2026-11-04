@@ -1,7 +1,11 @@
 import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { RepeatRule } from "../domain/Repeat";
 import type { PriorityLevel } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
+export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
+/** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
+export { sameRule } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
 
@@ -48,6 +52,10 @@ export interface TaskItem {
 	readonly slot: Slot | null;
 	/** How the phone reminds of the task at its slot's start; a task without a slot keeps the default. */
 	readonly reminder: ReminderKind;
+	/** The rule after the task's repeat marker; null for a task that does not repeat. */
+	readonly repeat: RepeatRule | null;
+	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
+	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
 	/** The section of its list it sits in; null outside any. */
@@ -101,6 +109,8 @@ export interface TaskDraft {
 	readonly placement: Placement;
 	/** A level's prefix, or none. */
 	readonly priority: string | null;
+	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off; undefined leaves the task's own (a new task has none). */
+	readonly repeat?: RepeatRule | null;
 }
 
 /** One change `applyAll` makes to a task: each kind does what the single call of that name does. */
@@ -147,9 +157,11 @@ export interface TaskService {
 	 * Quick entry. `list`: in section `group` of the list right before `before` (null: at the end of the section), with the
 	 * due-date rules of `moveToGroup`: Now gets today, Inbox none, Soon `date` (the column's day) or none. `subtask`: among
 	 * `parent`'s subtasks before `before` or last; it has no due date of its own. `slot`: as `createAtTime`. `priority` is a
-	 * level's prefix or null; whitespace-only text creates nothing. One write per call.
+	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write, on a task of its own only: a subtask or a slot takes none.
+	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
+	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null>;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
@@ -177,6 +189,13 @@ export interface TaskService {
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
+	/**
+	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
+	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.
+	 */
+	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void>;
+	/** Stops a repeating task: the rule goes and the task is done, with no next copy. */
+	stop(key: TaskKey): Promise<void>;
 	rename(key: TaskKey, text: string): Promise<void>;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes

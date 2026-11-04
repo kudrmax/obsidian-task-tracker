@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type NewTaskPlace, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
+import { type NewTaskPlace, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
 import type { PlacedCard } from "../../src/ui/drag/listPlace";
 import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
 import { WriteQueue } from "../../src/ui/quick/WriteQueue";
@@ -7,6 +7,9 @@ import { WriteQueue } from "../../src/ui/quick/WriteQueue";
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): PlacedCard => ({ key: key(name), level, top: 0, height: 0, group: null });
 const at = (index: number, level = 0): EntrySpot => ({ kind: "list", column: "left", place: { kind: "gap", index, level, group: null } });
+const inSoon = (index: number): EntrySpot => ({ kind: "list", column: "soon", place: { kind: "gap", index, level: 0, group: null } });
+const WEEKLY: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null };
+const AFTER_DONE: RepeatRule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null };
 const SLOT = { date: "2026-11-01", start: 600, end: null };
 
 function item(name: string, subtasks: TaskItem[] = []): TaskItem {
@@ -17,6 +20,8 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		dueDate: null,
 		slot: null,
 		reminder: "notification",
+		repeat: null,
+		repeatable: true,
 		priority: { prefix: "!", color: "red" },
 		group: null,
 		subtasks,
@@ -50,6 +55,12 @@ class FakeTasks {
 	readonly errors: unknown[] = [];
 	gate: Promise<void> = Promise.resolve();
 	failing = new Set<string>();
+	/** The column holds only tasks without a date: Soon shows only those, and normalize moves a dated Inbox or Backlog task out. */
+	undated = false;
+	/** The file puts every new task elsewhere than its column, whatever it is: the entry can only learn it. */
+	elsewhere = false;
+	/** The file puts a new task at the end of the column, wherever it was typed. */
+	atEnd = false;
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
 	private written: PlacedCard[] | null = null;
@@ -70,15 +81,18 @@ class FakeTasks {
 			fresh: async (beforeShow) => {
 				await this.gate;
 				if (this.failingReads.has(++this.reads)) throw new Error("no read");
-				beforeShow?.();
-				if (this.written) this.cards = this.written;
+				const coming = this.written ?? this.cards;
+				beforeShow?.(() => coming);
+				this.cards = coming;
 				this.written = null;
 				if (beforeShow) this.see(this.lastState);
 			},
-			createInPlace: async (text, priority, place) => {
+			createInPlace: async (text, priority, place, repeat) => {
 				if (this.failing.has(text)) throw new Error(`no ${text}`);
 				this.created.push({ text, priority, place });
-				this.land(text, place);
+				// A schedule gives the task its first day: it leaves a column of tasks without one.
+				if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
+				return this.land(text, place);
 			},
 			edit: async (k, draft) => {
 				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
@@ -107,9 +121,10 @@ class FakeTasks {
 		return this.cards.map((c) => `${c.key.raw}:${c.level}`);
 	}
 
-	private land(text: string, place: NewTaskPlace): void {
+	/** The card the lists show for a new task, and its key; none for a slot, which is off the lists. */
+	private land(text: string, place: NewTaskPlace): TaskKey | null {
 		const indexOf = (k: TaskKey) => this.cards.findIndex((c) => c.key.raw === k.raw);
-		if (place.kind === "slot") return;
+		if (place.kind === "slot") return null;
 		let level = 0;
 		let index = this.cards.length;
 		if (place.kind === "subtask") {
@@ -119,10 +134,12 @@ class FakeTasks {
 			while (index < this.cards.length && this.cards[index].level >= level) index++;
 		}
 		if (place.before) index = indexOf(place.before);
+		if (this.atEnd) index = this.cards.length;
 		// A write makes every key read before it stale: the lists hand out new ones.
 		const cards = [...this.cards.slice(0, index), card(text, level), ...this.cards.slice(index)].map((c) => ({ ...c, key: { ...c.key } }));
 		if (this.lagging) this.written = cards;
 		else this.cards = cards;
+		return cards[index].key;
 	}
 }
 
@@ -435,6 +452,27 @@ describe("QuickEntry", () => {
 		expect(tasks.created).toEqual([]);
 	});
 
+	it("a rename sends no rule when the bar's rule is the task's own: anchored or not, weekdays in any order", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(0), { ...item("A"), repeat: { ...WEEKLY, days: [0, 3], from: "2026-10-26" } });
+		entry.setRepeat({ ...WEEKLY, days: [3, 0] });
+		entry.type("A2");
+		entry.blur();
+		await entry.idle();
+		expect(tasks.edits.map((e) => "repeat" in e.draft)).toEqual([false]);
+	});
+
+	it("a rename sends the bar's rule when it differs from the task's", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(0), { ...item("A"), repeat: WEEKLY });
+		entry.setRepeat(AFTER_DONE);
+		entry.blur();
+		await entry.idle();
+		expect(tasks.edits.map((e) => e.draft.repeat)).toEqual([AFTER_DONE]);
+	});
+
 	it("rename enter on a parent opens the first subtask", () => {
 		const tasks = new FakeTasks(["A", ["A0", 1], "B"]);
 		const entry = tasks.entry();
@@ -654,6 +692,94 @@ describe("QuickEntry", () => {
 		await entry.idle();
 		expect(tasks.changes[tasks.changes.length - 1]).toMatchObject({ spot: at(2) });
 		expect(tasks.drawnNext[tasks.drawnNext.length - 1]).toBe(true);
+	});
+
+	it("a field stays where it is when the task written above it takes a day and leaves its column", async () => {
+		const tasks = new FakeTasks(["A"]);
+		tasks.undated = true;
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(inSoon(1));
+		entry.type("X");
+		entry.setRepeat(WEEKLY);
+		entry.blur();
+		entry.open(inSoon(1));
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0"]);
+		expect(entry.state).toMatchObject({ spot: inSoon(1) });
+	});
+
+	for (const column of ["inbox", "backlog"] as const) {
+		it(`a field in ${column} stays where it is when the task written above it takes a day and goes to Soon or Now`, async () => {
+			const tasks = new FakeTasks(["A"]);
+			tasks.undated = true;
+			const gate = deferred();
+			tasks.gate = gate.promise;
+			const entry = tasks.entry();
+			const spot = (index: number): EntrySpot => ({ kind: "list", column, place: { kind: "gap", index, level: 0, group: null } });
+			entry.open(spot(1));
+			entry.type("X");
+			entry.setRepeat(WEEKLY);
+			entry.blur();
+			entry.open(spot(1));
+			gate.resolve();
+			await entry.idle();
+			expect(tasks.names).toEqual(["A:0"]);
+			expect(entry.state).toMatchObject({ spot: spot(1) });
+		});
+	}
+
+	it("a field moves down under a task written above it with a repeat that keeps it in its column", async () => {
+		const tasks = new FakeTasks(["A"]);
+		tasks.undated = true;
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const entry = tasks.entry();
+		entry.open(inSoon(1));
+		entry.type("X");
+		entry.setRepeat(AFTER_DONE);
+		entry.blur();
+		entry.open(inSoon(1));
+		gate.resolve();
+		await entry.idle();
+		expect(tasks.names).toEqual(["A:0", "X:0"]);
+		expect(entry.state).toMatchObject({ spot: inSoon(2) });
+	});
+
+	for (const column of ["inbox", "backlog"] as const) {
+		it(`a field in ${column} moves down under a plain task written above it, which stays in the column`, async () => {
+			const tasks = new FakeTasks(["A"]);
+			tasks.undated = true;
+			const entry = tasks.entry();
+			const spot = (index: number): EntrySpot => ({ kind: "list", column, place: { kind: "gap", index, level: 0, group: null } });
+			entry.open(spot(1));
+			typeLines(entry, ["X"]);
+			await entry.idle();
+			expect(tasks.names).toEqual(["A:0", "X:0"]);
+			expect(entry.state).toMatchObject({ spot: spot(2) });
+		});
+	}
+
+	it("a field follows where the file put the task, not where the field guessed: a task put elsewhere leaves it in place", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.elsewhere = true;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		typeLines(entry, ["X"]);
+		await entry.idle();
+		expect([tasks.names, entry.state?.spot]).toEqual([["A:0", "B:0"], at(1)]);
+	});
+
+	it("a field moves only when the task landed at or above it: one the file put further down leaves it in place", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.atEnd = true;
+		const entry = tasks.entry();
+		entry.open(at(1));
+		typeLines(entry, ["X"]);
+		await entry.idle();
+		expect([tasks.names, entry.state?.spot]).toEqual([["A:0", "B:0", "X:0"], at(1)]);
 	});
 
 	it("a field opened above a task still being written stays where it is", async () => {

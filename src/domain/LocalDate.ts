@@ -27,6 +27,30 @@ export function addDays(date: LocalDate, n: number): LocalDate {
 	return formatUtc(new Date(utcMs(date) + n * DAY_MS));
 }
 
+/** `n` calendar months on, the day of month kept or, when the month is shorter, its last day. */
+export function addMonths(date: LocalDate, n: number): LocalDate {
+	const { year, month, day } = partsOf(date);
+	const index = year * 12 + (month - 1) + n;
+	const y = Math.floor(index / 12);
+	const m = index - y * 12 + 1;
+	return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
+}
+
+export function daysInMonth(year: number, month: number): number {
+	return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** 0 = Monday … 6 = Sunday. */
+export function weekdayOf(date: LocalDate): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+	return ((new Date(utcMs(date)).getUTCDay() + 6) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}
+
+export function partsOf(date: LocalDate): { year: number; month: number; day: number } {
+	const m = DATE_RE.exec(date);
+	if (!m) throw new Error(`Not a date: ${date}`);
+	return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+}
+
 /** Whole days from `from` to `to`. */
 export function daysBetween(from: LocalDate, to: LocalDate): number {
 	return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);

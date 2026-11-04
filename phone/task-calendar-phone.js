@@ -23,6 +23,24 @@
   function addDays(date, n) {
     return formatUtc(new Date(utcMs(date) + n * DAY_MS));
   }
+  function addMonths(date, n) {
+    const { year, month, day } = partsOf(date);
+    const index = year * 12 + (month - 1) + n;
+    const y = Math.floor(index / 12);
+    const m = index - y * 12 + 1;
+    return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
+  }
+  function daysInMonth(year, month) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+  }
+  function weekdayOf(date) {
+    return (new Date(utcMs(date)).getUTCDay() + 6) % 7;
+  }
+  function partsOf(date) {
+    const m = DATE_RE.exec(date);
+    if (!m) throw new Error(`Not a date: ${date}`);
+    return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+  }
   function daysBetween(from, to) {
     return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);
   }
@@ -111,6 +129,144 @@
     }
   };
 
+  // src/domain/Repeat.ts
+  var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
+  var ORDINAL_RE = /^the (\d{1,2})(?:st|nd|rd|th)$/;
+  function ordinal(n) {
+    const tens = n % 100;
+    if (tens >= 11 && tens <= 13) return `${n}th`;
+    const suffix = { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
+    return `${n}${suffix}`;
+  }
+  function monthIndexOf(date) {
+    const { year, month } = partsOf(date);
+    return year * 12 + month - 1;
+  }
+  function mondayOf(date) {
+    return addDays(date, -weekdayOf(date));
+  }
+  var Repeat = class _Repeat {
+    constructor(rule) {
+      this.rule = rule;
+    }
+    /** Throws for a rule the grammar cannot write: it would loop in `next` or not read back. */
+    static of(rule) {
+      const problem = _Repeat.problemWith(rule);
+      if (problem) throw new Error(`Invalid repeat rule: ${problem}`);
+      return new _Repeat(rule);
+    }
+    static problemWith({ kind, every, unit, days, dayOfMonth, from }) {
+      if (!Number.isInteger(every) || every < 1) return "every must be a whole number from 1";
+      const wantsDays = kind === "schedule" && unit === "week";
+      const wantsDayOfMonth = kind === "schedule" && unit === "month";
+      if (wantsDays && (days.length === 0 || !days.every((d, i) => Number.isInteger(d) && d >= 0 && d <= 6 && (i === 0 || d > days[i - 1])))) {
+        return "days must be Monday to Sunday, in week order, without repeats";
+      }
+      if (!wantsDays && days.length > 0) return "days belong to a weekly schedule only";
+      if (wantsDayOfMonth && !(dayOfMonth !== null && Number.isInteger(dayOfMonth) && dayOfMonth >= 1 && dayOfMonth <= 31)) {
+        return "the day of the month must be from 1 to 31";
+      }
+      if (!wantsDayOfMonth && dayOfMonth !== null) return "a day of the month belongs to a monthly schedule only";
+      const wantsFrom = kind === "schedule" && every > 1;
+      if (wantsFrom && (from === null || !isValidLocalDate(from))) return "a schedule with every above 1 needs a valid from date";
+      if (!wantsFrom && from !== null) return "from belongs to a schedule with every above 1 only";
+      return null;
+    }
+    static parse(text) {
+      const m = RULE_RE.exec(text.trim());
+      if (!m) return null;
+      const [, count, unit, plural, whenDone, on, from] = m;
+      const every = count === void 0 ? 1 : Number(count);
+      if (every < 1 || count !== void 0 && every === 1) return null;
+      if (from !== void 0 && (every === 1 || !isValidLocalDate(from))) return null;
+      if (plural !== void 0 !== every > 1) return null;
+      const rule = { every, unit, days: [], dayOfMonth: null, from: from ?? null };
+      if (whenDone !== void 0) {
+        return from === void 0 ? new _Repeat({ ...rule, kind: "afterDone" }) : null;
+      }
+      if (every > 1 && from === void 0) return null;
+      if (unit === "day") return on === void 0 ? new _Repeat({ ...rule, kind: "schedule" }) : null;
+      if (on === void 0) return null;
+      if (unit === "week") {
+        const days = _Repeat.parseDays(on);
+        return days ? new _Repeat({ ...rule, kind: "schedule", days }) : null;
+      }
+      const dayOfMonth = Number(ORDINAL_RE.exec(on)?.[1]);
+      if (!(dayOfMonth >= 1 && dayOfMonth <= 31) || on !== `the ${ordinal(dayOfMonth)}`) return null;
+      return new _Repeat({ ...rule, kind: "schedule", dayOfMonth });
+    }
+    static parseDays(text) {
+      const days = text.split(", ").map((name) => WEEKDAY_NAMES.indexOf(name));
+      const inWeekOrder = days.every((d, i) => d >= 0 && (i === 0 || d > days[i - 1]));
+      return inWeekOrder ? days : null;
+    }
+    format() {
+      const { kind, every, unit, days, dayOfMonth, from } = this.rule;
+      const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
+      if (kind === "afterDone") return `${head} when done`;
+      const on = unit === "week" ? ` on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : unit === "month" ? ` on the ${ordinal(dayOfMonth ?? 1)}` : "";
+      return `${head}${on}${from ? ` from ${from}` : ""}`;
+    }
+    /** Spec §3.2: strictly after max(today, taskDate); afterDone: today + N. */
+    next(taskDate, today) {
+      const { kind, every, unit } = this.rule;
+      if (kind === "afterDone") {
+        return unit === "month" ? addMonths(today, every) : addDays(today, every * (unit === "week" ? 7 : 1));
+      }
+      const base = taskDate !== null && taskDate > today ? taskDate : today;
+      return this.firstAfter(this.rule.from ?? taskDate ?? today, base);
+    }
+    /** Spec §3.5: first matching day ≥ today for a schedule, null for afterDone. */
+    first(today) {
+      if (this.rule.kind === "afterDone") return null;
+      return this.firstAfter(this.rule.from ?? today, addDays(today, -1));
+    }
+    /** The same rule anchored: `from` set to `date` when every > 1, else unchanged. */
+    anchoredAt(date) {
+      const { kind, every } = this.rule;
+      return kind === "schedule" && every > 1 ? new _Repeat({ ...this.rule, from: date }) : this;
+    }
+    firstAfter(anchor, base) {
+      switch (this.rule.unit) {
+        case "day":
+          return this.firstDayAfter(anchor, base);
+        case "week":
+          return this.firstWeekdayAfter(anchor, base);
+        case "month":
+          return this.firstMonthDayAfter(anchor, base);
+      }
+    }
+    firstDayAfter(anchor, base) {
+      const { every } = this.rule;
+      const cycles = Math.max(0, Math.floor(daysBetween(anchor, base) / every) + 1);
+      return addDays(anchor, cycles * every);
+    }
+    firstWeekdayAfter(anchor, base) {
+      const { every, days } = this.rule;
+      const anchorWeek = mondayOf(anchor);
+      const weeks = Math.floor(daysBetween(anchorWeek, mondayOf(base)) / 7);
+      for (let cycle = Math.max(0, Math.floor(weeks / every)); ; cycle++) {
+        const week = addDays(anchorWeek, cycle * every * 7);
+        const hit = days.map((d) => addDays(week, d)).find((date) => date > base);
+        if (hit) return hit;
+      }
+    }
+    firstMonthDayAfter(anchor, base) {
+      const { every, dayOfMonth } = this.rule;
+      const anchorMonth = monthIndexOf(anchor);
+      const months = monthIndexOf(base) - anchorMonth;
+      for (let cycle = Math.max(0, Math.floor(months / every)); ; cycle++) {
+        const index = anchorMonth + cycle * every;
+        const year = Math.floor(index / 12);
+        const month = index - year * 12 + 1;
+        const day = Math.min(dayOfMonth ?? 1, daysInMonth(year, month));
+        const date = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        if (date > base) return date;
+      }
+    }
+  };
+
   // src/domain/Task.ts
   var STATUS_CHARS = {
     todo: " ",
@@ -183,12 +339,14 @@
       const alternatives = [...this.kinds.keys()].map(escapeRegExp).join("|");
       this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
       this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
+      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
     }
     slice(body) {
       let text = body;
       let dueDate = null;
       let slot = null;
       let reminder = "notification";
+      let repeat = null;
       for (; ; ) {
         const slotMatch = slot === null ? this.slotRe.exec(text) : null;
         if (slotMatch) {
@@ -206,9 +364,17 @@
           text = text.slice(0, dueMatch.index);
           continue;
         }
+        const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
+        if (repeatMatch) {
+          const parsed = Repeat.parse(repeatMatch[1]);
+          if (!parsed) break;
+          repeat = parsed;
+          text = text.slice(0, repeatMatch.index);
+          continue;
+        }
         break;
       }
-      return { text: text.trim(), dueDate, slot, reminder };
+      return { text: text.trim(), dueDate, slot, reminder, repeat };
     }
     slotOf(m) {
       const date = m[2];
@@ -222,7 +388,7 @@
   };
   var slicers = /* @__PURE__ */ new Map();
   function fieldSlicerFor(markers) {
-    const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate].join("\0");
+    const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\0");
     let slicer = slicers.get(key);
     if (!slicer) {
       slicer = new FieldSlicer(markers);
@@ -254,6 +420,7 @@
       const { date, start, end } = task.slot;
       line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES2 ? end - DAY_MINUTES2 : end)}`}`;
     }
+    if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
     return line;
   }
 
@@ -272,7 +439,41 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
+  }
+  function insertedLines(before, after) {
+    let start = 0;
+    while (start < before.length && start < after.length && before[start] === after[start]) start++;
+    let end = 0;
+    while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+    const a = before.slice(start, before.length - end);
+    const b = after.slice(start, after.length - end);
+    const width = b.length + 1;
+    const common = new Int32Array((a.length + 1) * width);
+    for (let i = a.length - 1; i >= 0; i--) {
+      for (let j = b.length - 1; j >= 0; j--) {
+        common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+      }
+    }
+    const inserted = /* @__PURE__ */ new Set();
+    for (let i = 0, j = 0; j < b.length; ) {
+      if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
+        i++;
+        j++;
+      } else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
+      else inserted.add(start + j++);
+    }
+    for (const line of [...inserted].sort((x, y) => x - y)) {
+      let at = line;
+      while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
+        inserted.delete(at);
+        inserted.add(--at);
+      }
+    }
+    return inserted;
+  }
+  function flatten(entries) {
+    return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
   }
   function sameLines(a, b) {
     return a.length === b.length && a.every((line, i) => line === b[i]);
@@ -343,6 +544,15 @@
     }
     allTasks() {
       return SECTION_KEYS.flatMap((key) => this.tasks(key));
+    }
+    /**
+     * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
+     * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
+     * it gives the first.
+     */
+    insertedSince(before) {
+      const inserted = insertedLines(before.lines, this.lines);
+      return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
     }
     insert(section, position, task) {
       const line = this.insertionLine(section, position);
@@ -449,6 +659,18 @@
       const indent = descriptionIndent(entry) ?? this.childIndent(entry);
       const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
       return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
+    }
+    /** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+    freshChildren(entry) {
+      const first = this.spanOf(entry).line + 1;
+      const children = [...entry.task.children];
+      const open = (sub) => {
+        const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+        children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
+        sub.subtasks.forEach(open);
+      };
+      entry.subtasks.forEach(open);
+      return children;
     }
     /** A new subtask of `parent`, right before its subtask `before` or last. */
     insertUnder(parent, task, before = null) {
@@ -700,6 +922,12 @@
 
   // src/domain/operations.ts
   var SLOT_STEP = 5;
+  function newTask(text, patch2 = {}) {
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
+  }
+  function dayOf(task, boundary) {
+    return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
+  }
   function isUndated(section) {
     return section === "inbox" || section === "backlog";
   }
@@ -770,6 +998,34 @@
   var moveToSoon = leavingItsTask(toSoon);
   var postpone = leavingItsTask(putOff);
   var moveToEnd = leavingItsTask(toEnd);
+
+  // src/domain/recurrence.ts
+  var RECURRING = ["inbox", "backlog", "now", "soon"];
+  function closedWithRepeat(entry) {
+    return (entry.task.status === "done" || entry.task.status === "cancelled") && entry.task.repeat !== null;
+  }
+  function recurClosed(doc, today, boundary) {
+    if (!doc.hasSection("soon")) return doc;
+    for (; ; ) {
+      const entry = RECURRING.flatMap((s) => doc.tasks(s)).find(closedWithRepeat);
+      if (!entry) return doc;
+      const { task } = entry;
+      const copy = newTask(task.text, {
+        priority: task.priority,
+        children: doc.freshChildren(entry),
+        dueDate: task.repeat.next(dayOf(task, boundary), today),
+        repeat: task.repeat
+      });
+      doc = intoSoon(doc.replace(entry, { ...task, repeat: null }), entry.group, copy);
+    }
+  }
+  function intoSoon(doc, name, task) {
+    if (name === null) return doc.insert("soon", "end", task);
+    const groups = doc.groups("soon");
+    const index = groups.findIndex((g) => g.index > 0 && g.name === name);
+    if (index >= 0) return doc.insert("soon", { endOf: index }, task);
+    return doc.addGroup("soon", name, groups.length).insert("soon", { endOf: groups.length }, task);
+  }
 
   // src/domain/normalize.ts
   function isOpen(task) {
@@ -890,7 +1146,7 @@
     return placeUngrouped(dropEmptyGroups(mergeDuplicates(misplacedOutOfGroups(doc, today))));
   }
   function normalize(doc, today, boundary = DayBoundary.MIDNIGHT, presets = []) {
-    const listed2 = dueToNow(datedOutOfUndated(closedToDone(pastDatesToToday(erasePastSlots(doc, today, boundary), today))), today, boundary, presets);
+    const listed2 = dueToNow(datedOutOfUndated(closedToDone(recurClosed(pastDatesToToday(erasePastSlots(doc, today, boundary), today), today, boundary))), today, boundary, presets);
     const result = normalizeGroups(listed2, today).spacedHeadings();
     if (result === doc) return doc;
     return result.serialize() === doc.serialize() ? doc : result;
@@ -910,6 +1166,7 @@
     slotMarker: "⏰",
     alarmSlotMarker: "🚨",
     silentSlotMarker: "🔕",
+    repeatMarker: "🔁",
     workCalendarFile: "calendar/work.json",
     workCalendarTitles: [],
     google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
@@ -952,6 +1209,7 @@
       slot: settings.slotMarker,
       alarmSlot: settings.alarmSlotMarker,
       silentSlot: settings.silentSlotMarker,
+      repeat: settings.repeatMarker,
       priorities: usableLevels(settings.priorities).map((l) => l.prefix)
     };
   }

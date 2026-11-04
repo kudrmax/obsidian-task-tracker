@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
+import { UndoHistory } from "../../src/application/UndoHistory";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -518,6 +519,63 @@ describe("createInPlace", () => {
 		expect(store.writes).toBe(2);
 	});
 
+	it("gives the key of the task it created, as the file stands after the write", async () => {
+		const { svc } = setup(TEXT);
+		const [, b] = (await svc.dayView(T)).list;
+		const key = await svc.createInPlace("N", "p1", { kind: "list", list: "now", group: "X", before: b.key });
+		expect(key).toEqual((await svc.dayView(T)).list.find((i) => i.text === "N")!.key);
+	});
+
+	it("gives the key where normalizing moved the task: a schedule typed in Inbox lands in Soon", async () => {
+		const { svc } = setup(TEXT);
+		const key = await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null });
+		const run = (await svc.dayView("2026-11-05")).list.find((i) => i.text === "Run")!;
+		expect([key, (await svc.inboxView()).length]).toEqual([run.key, 0]);
+		expect(key!.section).toBe("soon");
+	});
+
+	it("gives a subtask's key", async () => {
+		const TRIP = "## Inbox\n\n## Now\n\n- [ ] Trip\n\t- [ ] Bag\n\n## Soon\n\n## Done\n";
+		const { svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		const key = await svc.createInPlace("Pay", null, { kind: "subtask", parent: trip.key, before: null });
+		expect(key).toEqual((await svc.dayView(T)).list[0].subtasks[1].key);
+	});
+
+	it("gives the new task, not its twin in another section: the headings keep them apart", async () => {
+		const { svc } = setup("## Inbox\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n\n- [ ] Call mom\n");
+		const key = await svc.createInPlace("Call mom", null, { kind: "list", list: "inbox", group: null, before: null });
+		expect(key).toEqual((await svc.inboxView())[0].key);
+	});
+
+	it("gives the new task typed above its twin in the same section", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] X\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const [x] = await svc.inboxView();
+		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: x.key });
+		expect(key).toEqual((await svc.inboxView())[0].key);
+	});
+
+	it("gives the first of twins side by side, whichever was typed: a field at either lands under both", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] X\n- [ ] Y\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const [, y] = await svc.inboxView();
+		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: y.key });
+		const inbox = await svc.inboxView();
+		expect(inbox.map((i) => i.text)).toEqual(["X", "X", "Y"]);
+		expect(key).toEqual(inbox[0].key);
+	});
+
+	it("gives the twin a schedule moved out of Inbox, with an identical task left behind", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] Run\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		const key = await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null });
+		const run = (await svc.dayView("2026-11-05")).list.find((i) => i.text === "Run")!;
+		expect(key).toEqual(run.key);
+	});
+
+	it("gives null when it creates nothing", async () => {
+		const { svc } = setup(TEXT);
+		expect(await svc.createInPlace("  ", null, { kind: "list", list: "now", group: null, before: null })).toBeNull();
+	});
+
 	it("slot is created as createAtTime does", async () => {
 		const a = setup(FULL);
 		const b = setup(FULL);
@@ -762,5 +820,80 @@ describe("one parse per version of the file", () => {
 		const [, , inbox] = await reload(svc);
 		expect(parse).toHaveBeenCalledTimes(1);
 		expect(inbox.map((i) => i.text)).toEqual(["I", "J"]);
+	});
+});
+
+describe("repeat", () => {
+	const WEEKLY_THU = { kind: "schedule" as const, every: 1, unit: "week" as const, days: [3 as const], dayOfMonth: null, from: null };
+	const GYM = "## Inbox\n\n## Now\n\n- [ ] Gym 📅 2026-10-30 🔁 every week on Fri\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	function withHistory(text: string) {
+		const store = new InMemoryTaskFileStore(text);
+		const history = new UndoHistory(store);
+		return { store, history, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, history) };
+	}
+
+	it("setStatus done on a recurring task is one write and one undo step", async () => {
+		const { store, history, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.setStatus(view.list[0].key, "done");
+		expect(store.writes).toBe(1);
+		expect(store.text).toContain("- [x] Gym 📅 2026-10-30");
+		expect(store.text).toContain("- [ ] Gym 📅 2026-11-06 🔁 every week on Fri");
+		expect(history.canUndo()).toBe(true);
+		await history.undo();
+		expect(store.text).toBe(GYM);
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("stop closes without a copy", async () => {
+		const { store, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.stop(view.list[0].key);
+		expect(store.text).toContain("- [x] Gym 📅 2026-10-30");
+		expect(store.text).not.toContain("🔁");
+		expect(store.text!.match(/Gym/g)).toHaveLength(1);
+	});
+
+	it("setRepeat writes the field", async () => {
+		const { store, svc } = setup(FULL);
+		const view = await svc.dayView(T);
+		await svc.setRepeat(view.list[0].key, WEEKLY_THU);
+		expect(store.text).toContain("- [ ] A 📅 2026-11-05 🔁 every week on Thu");
+	});
+
+	it("setRepeat null removes it", async () => {
+		const { store, svc } = withHistory(GYM);
+		const view = await svc.dayView(T);
+		await svc.setRepeat(view.list[0].key, null);
+		expect(store.text).toContain("- [ ] Gym 📅 2026-10-30\n");
+		expect(store.text).not.toContain("🔁");
+	});
+
+	it("createInPlace with a schedule gives the first day", async () => {
+		const { store, svc } = setup(FULL);
+		await svc.createInPlace("Run", null, { kind: "list", list: "inbox", group: null, before: null }, WEEKLY_THU);
+		const view = await svc.dayView("2026-11-05");
+		expect(view.list.map((i) => i.text)).toContain("Run");
+		expect(store.text).toContain("- [ ] Run 📅 2026-11-05 🔁 every week on Thu");
+	});
+
+	it("create and edit take the draft's rule; undefined leaves it", async () => {
+		const { store, svc } = withHistory(GYM);
+		await svc.create({ text: "Run", placement: { kind: "inbox" }, priority: null, repeat: WEEKLY_THU });
+		expect(store.text).toContain("Run 📅 2026-11-05 🔁 every week on Thu");
+		const view = await svc.dayView(T);
+		await svc.edit(view.list[0].key, { text: "Gym2", placement: { kind: "now" }, priority: null });
+		expect(store.text).toContain("Gym2 📅 2026-10-30 🔁 every week on Fri");
+		const again = await svc.dayView(T);
+		await svc.edit(again.list[0].key, { text: "Gym2", placement: { kind: "now" }, priority: null, repeat: null });
+		expect(store.text).not.toContain("Gym2 📅 2026-10-30 🔁");
+	});
+
+	it("dayView items carry the rule", async () => {
+		const { svc } = setup(GYM);
+		const view = await svc.dayView(T);
+		expect(view.list[0].repeat).toEqual({ kind: "schedule", every: 1, unit: "week", days: [4], dayOfMonth: null, from: null });
+		expect((await svc.dayView(T)).list[0].repeat).not.toBeNull();
 	});
 });

@@ -1,4 +1,4 @@
-import type { GroupName, ReminderKind, TaskItem } from "../../application/contracts";
+import { type GroupName, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
@@ -16,10 +16,12 @@ import { datePage } from "./DatePage";
 import { type SectionChoice, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
+import { repeatPanel } from "../repeat/RepeatPanel";
+import { repeatValue } from "../repeat/repeatLabel";
 
-export type StatusTileId = "done" | "progress" | "wontdo";
-export type EditRowId = "rename" | "reminder" | "description" | "section" | "subtask";
-type Asking = "delete" | "wontdo";
+export type StatusTileId = "done" | "progress" | "wontdo" | "stop";
+export type EditRowId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
+type Asking = "delete" | "wontdo" | "stop";
 
 export interface StatusTile {
 	readonly id: StatusTileId;
@@ -31,16 +33,24 @@ export interface EditRow {
 	readonly id: EditRowId;
 	readonly label: string;
 	readonly value: string;
+	/** Repeat's value for a week: the days its letters show on. */
+	readonly days?: readonly Weekday[] | null;
 	readonly icon: IconName;
 }
 
-/** The status group: Done first, the most used. */
+/** The status group: Done first, the most used; Stop last for a task that repeats. */
 export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	return [
 		{ id: "done", label: "Done", icon: "done" },
 		{ id: "progress", label: item.status === "inProgress" ? "Stop progress" : "In progress", icon: "progress" },
 		{ id: "wontdo", label: "Won’t do", icon: "wontdo" },
+		...(item.repeat !== null && item.repeatable ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
 	];
+}
+
+function repeatRow(rule: RepeatRule | null): EditRow {
+	const weekly = rule !== null && rule.kind === "schedule" && rule.unit === "week";
+	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: weekly ? rule.days : null, icon: "repeat" };
 }
 
 export type { SectionChoice } from "./SectionChooser";
@@ -53,12 +63,13 @@ export function nextReminder(kind: ReminderKind): ReminderKind {
 	return REMINDER_ORDER[(REMINDER_ORDER.indexOf(kind) + 1) % REMINDER_ORDER.length];
 }
 
-/** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, the section with its name beside it, a subtask. */
+/** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
 		...(item.slot === null ? [] : [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const]),
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
+		...(item.repeatable ? [repeatRow(item.repeat)] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
 	];
@@ -89,6 +100,10 @@ export interface MenuActions {
 	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
 	setReminder(kind: ReminderKind): Promise<void>;
+	/** The task repeats by `rule` from now on; null: it repeats no more. */
+	setRepeat(rule: RepeatRule | null): Promise<void>;
+	/** The task that repeats is closed with no next time. */
+	stop(): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
 	/** The description's screen: to read it, or straight in the editor. */
@@ -140,6 +155,8 @@ export class TaskMenu extends LiftedMenu {
 	private peek: DescriptionPeek | null = null;
 	/** What the menu asks about now, if anything; Enter confirms it, as its button does. */
 	private asking: Asking | null = null;
+	/** The rule the repeat page holds, written once as the menu closes; none untouched. */
+	private repeatDraft: RepeatRule | null = null;
 	private confirmAsked: (() => void) | null = null;
 	private readonly onEnter = (e: KeyboardEvent) => {
 		if (e.key !== "Enter" || !this.confirmAsked) return;
@@ -292,23 +309,26 @@ export class TaskMenu extends LiftedMenu {
 	private showMenu(keepAbove?: number): void {
 		clear(this.panel);
 		clear(this.upper);
-		this.panel.classList.remove("is-picker");
+		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
 		const { item, actions, levels } = this.context;
 		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
 			progress: this.pick(() => actions.setStatus(nextStatus)),
 			wontdo: () => this.askFor("wontdo"),
+			stop: () => this.askFor("stop"),
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
 			reminder: this.pick(() => actions.setReminder(nextReminder(item.reminder))),
 			description: this.pick(() => actions.openDescription(true)),
+			repeat: () => this.showRepeat(),
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
-		if (this.asking === "wontdo") this.askGroup("wontdo");
-		else tileGroup(this.panel, "is-status", [statusTiles(item).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
+		const tiles = statusTiles(item);
+		if (this.asking === "wontdo" || this.asking === "stop") this.askGroup(this.asking);
+		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
 		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
@@ -318,7 +338,7 @@ export class TaskMenu extends LiftedMenu {
 		}));
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
 		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
-		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, icon: row.icon, onPick: edits[row.id] })));
+		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
 		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", size: "tall", apart: true, onPick: this.pick(() => actions.openInObsidian()) });
 		if (this.asking === "delete") this.askGroup("delete");
 		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, size: "tall", apart: true, onPick: () => this.askFor("delete") });
@@ -326,7 +346,7 @@ export class TaskMenu extends LiftedMenu {
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}
 
-	/** Delete and Won’t do ask first, in place of what was pressed; the rest of the menu stays as it is. */
+	/** Delete, Won’t do and Stop ask first, in place of what was pressed; the rest of the menu stays as it is. */
 	private askFor(what: Asking | null, show = true): void {
 		this.asking = what;
 		this.confirmAsked = null;
@@ -343,15 +363,20 @@ export class TaskMenu extends LiftedMenu {
 
 	private askGroup(what: Asking): void {
 		const { item, actions } = this.context;
-		const del = what === "delete";
-		const confirm = this.pick(() => (del ? actions.remove() : actions.setStatus("cancelled")));
+		const questions: Record<Asking, { readonly verb: string; readonly icon: IconName; readonly act: () => Promise<void> }> = {
+			delete: { verb: "Delete", icon: "delete", act: () => actions.remove() },
+			wontdo: { verb: "Won’t do", icon: "wontdo", act: () => actions.setStatus("cancelled") },
+			stop: { verb: "Stop", icon: "stop", act: () => actions.stop() },
+		};
+		const { verb, icon, act } = questions[what];
+		const confirm = this.pick(act);
 		this.confirmAsked = confirm;
 		askGroup(this.panel, {
-			verb: del ? "Delete" : "Won’t do",
+			verb,
 			title: plainText(item.text),
-			confirm: del ? "Delete" : "Won’t do",
-			icon: del ? "delete" : "wontdo",
-			danger: del,
+			confirm: verb,
+			icon,
+			danger: what === "delete",
 			onCancel: () => this.askFor(null),
 			onConfirm: confirm,
 		});
@@ -373,6 +398,40 @@ export class TaskMenu extends LiftedMenu {
 			onNew: this.pick(() => actions.newSection()),
 		});
 		this.place();
+	}
+
+	/**
+	 * The repeat panel in place of the menu, as Pick a date's: a change shows on the page at once and is written once as
+	 * the menu closes; Remove repeat, for a task that repeats, is a pick that takes the rule off and closes.
+	 */
+	private showRepeat(): void {
+		this.askFor(null, false);
+		clear(this.panel);
+		clear(this.upper);
+		const { item, actions, today } = this.context;
+		const remove = this.pick(() => actions.setRepeat(null));
+		repeatPanel(this.panel, {
+			rule: item.repeat,
+			day: item.dueDate ?? today,
+			onChange: (rule) => {
+				this.repeatDraft = rule;
+				this.place();
+			},
+			onRemove: item.repeat
+				? () => {
+						this.repeatDraft = null;
+						remove();
+					}
+				: null,
+		});
+		this.place();
+	}
+
+	/** The repeat page's rule, unless it came back to the one the task had. */
+	private writeRepeat(): void {
+		const draft = this.repeatDraft;
+		this.repeatDraft = null;
+		if (draft && !sameRule(draft, this.context.item.repeat)) void this.context.actions.setRepeat(draft);
 	}
 
 	private showPicker(): void {
@@ -412,6 +471,7 @@ export class TaskMenu extends LiftedMenu {
 
 	protected override closed(how: CloseHow): void {
 		document.removeEventListener("keydown", this.onEnter, true);
+		this.writeRepeat();
 		this.fieldClosed?.(how);
 	}
 }

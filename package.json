@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-task-tracker",
-	"version": "0.4.102",
+	"version": "0.4.103",
 	"private": true,
 	"main": "main.js",
 	"scripts": {

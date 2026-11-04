@@ -10,7 +10,7 @@ const T = "2026-11-03";
 let n = 0;
 const item = (extra: Partial<TaskItem> = {}): TaskItem => {
 	const i = n++;
-	return { key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra };
+	return { key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra };
 };
 const LEVELS = [
 	{ prefix: "p1", color: "red" },

@@ -11,6 +11,8 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	dueDate: null,
 	slot: null,
 	reminder: "notification",
+	repeat: null,
+	repeatable: true,
 	priority: null,
 	group: null,
 	subtasks: [],
@@ -76,6 +78,38 @@ describe("renderTaskCard", () => {
 	it("shows a due date on another day than the card's", () => {
 		const card = renderTaskCard(document.createElement("div"), item({ dueDate: "2026-11-03" }), { day: "2026-10-31" });
 		expect(card.querySelector(".tc-due")).not.toBeNull();
+	});
+});
+
+describe("the repeat mark", () => {
+	const weekly = { kind: "schedule", every: 1, unit: "week", days: [], dayOfMonth: null, from: null } as TaskItem["repeat"];
+
+	it("sits right after the day, the month under them", () => {
+		const card = renderTaskCard(document.createElement("div"), item({ dueDate: "2026-11-05", repeat: weekly }), { day: "2026-11-03" });
+		const due = card.querySelector(".tc-due")!;
+		expect([...due.children].map((c) => c.className)).toEqual(["tc-due-top", "tc-due-mon"]);
+		const top = due.querySelector(".tc-due-top")!;
+		expect(top.children[0].className).toBe("tc-due-day");
+		expect(top.children[0].textContent).toBe("5");
+		expect(top.children[1].classList.contains("tc-due-repeat")).toBe(true);
+		expect(top.children[1].tagName.toLowerCase()).toBe("svg");
+		expect(due.classList.contains("is-repeat-only")).toBe(false);
+	});
+
+	it("is alone in the column when the card shows no date", () => {
+		for (const dueDate of ["2026-11-05", null]) {
+			const card = renderTaskCard(document.createElement("div"), item({ dueDate, repeat: weekly }), { day: "2026-11-05" });
+			const due = card.querySelector(".tc-due")!;
+			expect(due.querySelector(".tc-due-day")).toBeNull();
+			expect(due.querySelector(".tc-due-mon")).toBeNull();
+			expect(due.querySelectorAll(".tc-due-top > .tc-due-repeat")).toHaveLength(1);
+			expect(due.classList.contains("is-repeat-only")).toBe(true);
+		}
+	});
+
+	it("leaves a plain task's markup as it is", () => {
+		const card = renderTaskCard(document.createElement("div"), item({ dueDate: "2026-11-05" }), { day: null });
+		expect([...card.querySelector(".tc-due")!.children].map((c) => c.className)).toEqual(["tc-due-day", "tc-due-mon"]);
 	});
 });
 

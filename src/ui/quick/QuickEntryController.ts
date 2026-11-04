@@ -52,7 +52,7 @@ export interface QuickEntryControllerDeps {
 	turnTo(mode: RightMode): void;
 	/** The day column opens `date`; resolves once its tasks show. */
 	showDay(date: LocalDate): Promise<void>;
-	/** Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it. */
+	/** Resolves once the lists show the file as of the last write; `beforeShow` runs once their data is what was read, right before they draw it. */
 	fresh(beforeShow?: () => void): Promise<void>;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
@@ -173,7 +173,7 @@ export class QuickEntryController {
 			cards: (column) => this.cards(column),
 			placeOf: (column, result) => this.placeOf(column, result),
 			fresh: (beforeShow) => this.fresh(beforeShow),
-			createInPlace: (text, priority, place) => deps.tasks.createInPlace(text, priority, place),
+			createInPlace: (text, priority, place, repeat) => deps.tasks.createInPlace(text, priority, place, repeat),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),
 			levels: () => usableLevels(deps.levels()),
@@ -189,6 +189,7 @@ export class QuickEntryController {
 			onIndent: (delta) => this.entry.indent(delta),
 			onPriority: (prefix) => this.choosePriority(prefix),
 			onPlace: (placement) => void this.moveTo(placement),
+			onRepeat: (rule) => this.entry.setRepeat(rule),
 		});
 		document.addEventListener("click", this.tapAway, true);
 		document.addEventListener("pointerdown", this.pressed, true);
@@ -549,11 +550,11 @@ export class QuickEntryController {
 	 * The lists read afresh; with `beforeShow`, the entry changes as they draw what was read. A read the same as shown, or
 	 * one a gesture holds back, draws nothing then: the entry's change is drawn here, or waits with the gesture.
 	 */
-	private async fresh(beforeShow?: () => void): Promise<void> {
+	private async fresh(beforeShow?: (coming: (column: ListColumn) => readonly ListCard[]) => void): Promise<void> {
 		if (!beforeShow) return this.deps.fresh();
 		let mark = -1;
 		await this.deps.fresh(() => {
-			beforeShow();
+			beforeShow((column) => this.deps.list(column)?.comingCards ?? []);
 			mark = this.draws;
 		});
 		if (mark === this.draws) this.deps.render();
@@ -590,7 +591,8 @@ export class QuickEntryController {
 	}
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place: this.shownPlace(state) };
+		const place = this.shownPlace(state);
+		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: place !== null };
 	}
 
 	/** The level chosen in the bar, else the one the text's prefix stands for. */
@@ -608,7 +610,7 @@ export class QuickEntryController {
 		this.entry.setPriority(prefix);
 	}
 
-	/** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
+	/** The place button, and with it the repeat: a subtask's field, new or renamed, has none, nor does one off the lists. */
 	private shownPlace(state: EntryState): Placement | null {
 		const { spot, renaming } = state;
 		if (spot.kind !== "list") return null;

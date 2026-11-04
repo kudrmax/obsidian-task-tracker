@@ -15,6 +15,7 @@ import {
 	type GroupPlace,
 	type NewTaskPlace,
 	type Placement,
+	type RepeatRule,
 	type TaskChange,
 	type TaskDraft,
 	type TaskItem,
@@ -106,14 +107,16 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace): Promise<void> {
-		if (this.blank(text)) return;
-		await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary));
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
+		if (this.blank(text)) return null;
+		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary, repeat));
+		const created = change?.after.insertedSince(change.before);
+		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
 		if (this.blank(draft.text)) return;
-		await this.mutate((doc, today) => ops.placeTask(doc, null, draft, today, slot));
+		await this.mutate((doc, today, _settings, boundary) => ops.placeTask(doc, null, draft, today, slot, boundary));
 	}
 
 	async createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
@@ -123,7 +126,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
 		if (this.blank(draft.text)) return;
-		await this.mutate((doc, today) => ops.placeTask(doc, this.entryOf(doc, key), draft, today));
+		await this.mutate((doc, today, _settings, boundary) => ops.placeTask(doc, this.entryOf(doc, key), draft, today, undefined, boundary));
 	}
 
 	placementOf(item: TaskItem): Placement {
@@ -147,6 +150,14 @@ export class TaskServiceImpl implements TaskService {
 
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
 		await this.mutate((doc) => ops.setReminder(doc, this.entryOf(doc, key), reminder));
+	}
+
+	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
+		await this.mutate((doc, today, _settings, boundary) => ops.setRepeat(doc, this.entryOf(doc, key), rule, today, boundary));
+	}
+
+	async stop(key: TaskKey): Promise<void> {
+		await this.mutate((doc) => ops.stop(doc, this.entryOf(doc, key)));
 	}
 
 	async rename(key: TaskKey, text: string): Promise<void> {
@@ -325,19 +336,22 @@ export class TaskServiceImpl implements TaskService {
 		};
 	}
 
-	/** One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an action). */
-	private async mutate(operation: Operation, record = true): Promise<void> {
+	/**
+	 * One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an
+	 * action). Gives the document as normalized before and after the write; null when it changed nothing.
+	 */
+	private async mutate(operation: Operation, record = true): Promise<{ readonly before: TaskDocument; readonly after: TaskDocument } | null> {
 		const settings = this.settings.get();
 		const boundary = this.boundary(settings);
 		const today = boundary.dayOf(this.clock.now());
 		let failure: unknown = null;
-		let change = null as { before: string; after: string; doc: TaskDocument } | null;
+		let change = null as { before: string; after: string; was: TaskDocument; doc: TaskDocument } | null;
 		await this.store.write((text) => {
 			try {
 				const doc = readDocument(text, settings, today, boundary);
 				const result = normalize(operation(doc, today, settings, boundary), today, boundary, ops.usablePresets(settings.groups.presets));
 				const after = result.serialize();
-				change = { before: text, after, doc: result };
+				change = { before: text, after, was: doc, doc: result };
 				return after;
 			} catch (e) {
 				failure = e;
@@ -345,9 +359,10 @@ export class TaskServiceImpl implements TaskService {
 			}
 		});
 		if (failure !== null) throw failure;
-		if (!change) return;
+		if (!change) return null;
 		this.normalized = { text: change.after, today, reading: this.readingOf(settings), doc: change.doc, changed: false };
 		if (record) this.history?.record(change.before, change.after);
+		return { before: change.was, after: change.doc };
 	}
 
 	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate; boundary: DayBoundary }> {
@@ -374,9 +389,9 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, dayStartHour } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, prefixes, dayStartHour]);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, prefixes, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {

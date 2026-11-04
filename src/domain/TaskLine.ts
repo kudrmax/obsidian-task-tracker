@@ -1,3 +1,4 @@
+import { Repeat } from "./Repeat";
 import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
 
 const DAY_MINUTES = 1440;
@@ -9,6 +10,7 @@ export interface Markers {
 	readonly slot: string;
 	readonly alarmSlot?: string;
 	readonly silentSlot?: string;
+	readonly repeat?: string;
 	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
 	readonly priorities?: readonly string[];
 }
@@ -51,6 +53,7 @@ function markerOf(kind: ReminderKind, markers: Markers): string {
 class FieldSlicer {
 	private readonly slotRe: RegExp;
 	private readonly dueRe: RegExp;
+	private readonly repeatRe: RegExp | null;
 	private readonly kinds: ReadonlyMap<string, ReminderKind>;
 
 	constructor(markers: Markers) {
@@ -58,13 +61,15 @@ class FieldSlicer {
 		const alternatives = [...this.kinds.keys()].map(escapeRegExp).join("|");
 		this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
 		this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
+		this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
 	}
 
-	slice(body: string): { text: string; dueDate: string | null; slot: Slot | null; reminder: ReminderKind } {
+	slice(body: string): { text: string; dueDate: string | null; slot: Slot | null; reminder: ReminderKind; repeat: Repeat | null } {
 		let text = body;
 		let dueDate: string | null = null;
 		let slot: Slot | null = null;
 		let reminder: ReminderKind = "notification";
+		let repeat: Repeat | null = null;
 		for (;;) {
 			const slotMatch: RegExpExecArray | null = slot === null ? this.slotRe.exec(text) : null;
 			if (slotMatch) {
@@ -82,9 +87,17 @@ class FieldSlicer {
 				text = text.slice(0, dueMatch.index);
 				continue;
 			}
+			const repeatMatch: RegExpExecArray | null = repeat === null ? (this.repeatRe?.exec(text) ?? null) : null;
+			if (repeatMatch) {
+				const parsed = Repeat.parse(repeatMatch[1]);
+				if (!parsed) break;
+				repeat = parsed;
+				text = text.slice(0, repeatMatch.index);
+				continue;
+			}
 			break;
 		}
-		return { text: text.trim(), dueDate, slot, reminder };
+		return { text: text.trim(), dueDate, slot, reminder, repeat };
 	}
 
 	private slotOf(m: RegExpExecArray): Slot | null {
@@ -102,7 +115,7 @@ const slicers = new Map<string, FieldSlicer>();
 
 /** The slicer for these markers, compiled once per pair of markers. */
 export function fieldSlicerFor(markers: Markers): FieldSlicer {
-	const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate].join("\u0000");
+	const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\u0000");
 	let slicer = slicers.get(key);
 	if (!slicer) {
 		slicer = new FieldSlicer(markers);
@@ -137,5 +150,6 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 		const { date, start, end } = task.slot;
 		line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES ? end - DAY_MINUTES : end)}`}`;
 	}
+	if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
 	return line;
 }

@@ -1,13 +1,19 @@
 import type { EndList, GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
 import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
+import { Repeat, type RepeatRule } from "./Repeat";
 import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const SLOT_STEP = 5;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
+}
+
+/** The day a task is set for: its due date, else its slot's day. */
+export function dayOf(task: Task, boundary: DayBoundary): LocalDate | null {
+	return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
 }
 
 /** The lists whose tasks have neither a due date nor a slot: Inbox, not sorted yet, and Backlog, put off to some day. */
@@ -76,6 +82,39 @@ export function createAtTime(
 
 export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatus): TaskDocument {
 	return patch(doc, entry, { status, statusChar: STATUS_CHARS[status] });
+}
+
+/** A schedule of every few units counts from `date`; any other rule as it is. */
+function anchoredRepeat(rule: RepeatRule, date: LocalDate): Repeat {
+	return Repeat.of(rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule);
+}
+
+/**
+ * Spec §3.5: sets or replaces the rule; a schedule on an undated task gives it `first(today)` and anchors there; on a dated
+ * task anchors at its due date, else its slot's day. After done leaves an undated task without a date. Null takes the rule away.
+ */
+export function setRepeat(doc: TaskDocument, entry: TaskEntry, rule: RepeatRule | null, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+	return doc.replace(entry, repeated(entry.task, rule, today, boundary));
+}
+
+/** The task with the rule set as `setRepeat` sets it. */
+function repeated(task: Task, rule: RepeatRule | null, today: LocalDate, boundary: DayBoundary): Task {
+	if (rule === null) return { ...task, repeat: null };
+	const day = dayOf(task, boundary);
+	if (day !== null) return { ...task, repeat: anchoredRepeat(rule, day) };
+	const first = rule.kind === "schedule" ? Repeat.of({ ...rule, every: 1, from: null }).first(today) : null;
+	if (first === null) return { ...task, repeat: Repeat.of(rule) };
+	return { ...task, repeat: anchoredRepeat(rule, first), dueDate: first };
+}
+
+/** The draft's rule on the task: none in the draft leaves the task's own. */
+function withDraftRepeat(task: Task, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): Task {
+	return draft.repeat === undefined ? task : repeated(task, draft.repeat, today, boundary);
+}
+
+/** Spec §3.4 Stop: the field goes, the task is done; no copy. */
+export function stop(doc: TaskDocument, entry: TaskEntry): TaskDocument {
+	return patch(doc, entry, { repeat: null, status: "done", statusChar: STATUS_CHARS.done });
 }
 
 export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate | null): TaskDocument {
@@ -176,23 +215,24 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 }
 
 /** Inbox is what is not sorted yet, Backlog what waits for some day: a task placed in either loses its slot as well as its due date. */
-export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot): TaskDocument {
+export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
 	const { priority } = draft;
 	const unsorted = isUndated(section);
-	if (entry === null) return doc.insert(section, "end", newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }));
-	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today);
+	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }), draft, today, boundary));
+	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const edited = patch(doc, entry, { text: draft.text.trim(), priority, ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) });
+	const changed = { ...entry.task, text: draft.text.trim(), priority, ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 
 /** A subtask stays under its task: another placement only gives it a due date of its own, or takes it away. */
-function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
+function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);
 	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-	return patch(doc, entry, { text: draft.text.trim(), priority: draft.priority, dueDate });
+	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), priority: draft.priority, dueDate }, draft, today, boundary));
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */
@@ -270,7 +310,8 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot };
 
-export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary): TaskDocument {
+/** A new task at `place`; `repeat` is set as `setRepeat` sets it on a task of its own, and a subtask or a slot takes none. */
+export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null): TaskDocument {
 	switch (place.kind) {
 		case "subtask":
 			return doc.insertUnder(place.parent, newTask(text, { priority }), place.before);
@@ -280,7 +321,7 @@ export function createInPlace(doc: TaskDocument, text: string, priority: string 
 			const { list, group, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
 			const task = newTask(text, { dueDate, priority });
-			return doc.insert(list, positionIn(doc, list, group, before), task);
+			return doc.insert(list, positionIn(doc, list, group, before), repeat ? repeated(task, repeat, today, boundary) : task);
 		}
 	}
 }

@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
+import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
 import { editRows, nextPriority, nextReminder, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra });
+
+const weekly = (days: RepeatRule["days"]): RepeatRule => ({ kind: "schedule", every: 1, unit: "week", days, dayOfMonth: null, from: null });
+const THURSDAY = "2026-11-05";
+const EVERY_3_DAYS: RepeatRule = { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: null };
 
 const LEVELS = [
 	{ prefix: "p1", color: "red" },
@@ -21,31 +25,56 @@ describe("the status group", () => {
 	it("turns In progress into Stop progress for a task in progress", () => {
 		expect(statusTiles(item({ status: "inProgress" }))[1].label).toBe("Stop progress");
 	});
+
+	it("adds Stop last for a task that repeats", () => {
+		const tiles = statusTiles(item({ repeat: EVERY_3_DAYS }));
+		expect(tiles.map((t) => [t.id, t.label, t.icon])).toEqual([["done", "Done", "done"], ["progress", "In progress", "progress"], ["wontdo", "Won’t do", "wontdo"], ["stop", "Stop", "stop"]]);
+	});
+
+	it("offers no Stop for a task the file says may not repeat", () => {
+		expect(statusTiles(item({ repeat: EVERY_3_DAYS, repeatable: false }))).toHaveLength(3);
+	});
 });
 
 describe("the edit group", () => {
 	const sections: SectionChoice = { names: ["Morning", "Evening"], current: "Morning", ungrouped: "No section" };
 
-	it("holds Rename and Add subtask, with no due date row: the quick moves and their picker set it", () => {
+	it("holds Rename, Repeat and Add subtask, with no due date row: the quick moves and their picker set it", () => {
 		const rows = editRows(item({ dueDate: "2026-11-03", description: "- note" }));
-		expect(rows.map((r) => r.id)).toEqual(["rename", "subtask"]);
+		expect(rows.map((r) => r.id)).toEqual(["rename", "repeat", "subtask"]);
 	});
 
 	it("offers Add description after Rename for a task without one", () => {
 		const rows = editRows(item());
-		expect(rows.map((r) => r.label)).toEqual(["Rename", "Add description", "Add subtask"]);
+		expect(rows.map((r) => r.label)).toEqual(["Rename", "Add description", "Repeat", "Add subtask"]);
 		expect(rows[1].icon).toBe("description");
 	});
 
 	it("offers Section before Add subtask for a list card, its section's name beside it", () => {
 		const rows = editRows(item({ description: "- note", group: "Morning" }), sections);
-		expect(rows.map((r) => [r.label, r.value])).toEqual([["Rename", ""], ["Section", "Morning"], ["Add subtask", ""]]);
+		expect(rows.map((r) => [r.label, r.value])).toEqual([["Rename", ""], ["Repeat", ""], ["Section", "Morning"], ["Add subtask", ""]]);
+	});
+
+	it("offers Repeat after Add description, or after Rename for a task with a description", () => {
+		expect(editRows(item()).map((r) => r.id)).toEqual(["rename", "description", "repeat", "subtask"]);
+		expect(editRows(item({ description: "- note" }), sections).map((r) => r.id)).toEqual(["rename", "repeat", "section", "subtask"]);
+		expect(editRows(item()).find((r) => r.id === "repeat")).toMatchObject({ label: "Repeat", value: "", icon: "repeat" });
+	});
+
+	it("offers no Repeat for a task the file says may not repeat", () => {
+		expect(editRows(item({ repeatable: false })).map((r) => r.id)).not.toContain("repeat");
+	});
+
+	it("shows the rule beside Repeat: a week's days as letters, any other rule in words", () => {
+		const repeatRow = (rule: RepeatRule) => editRows(item({ repeat: rule })).find((r) => r.id === "repeat")!;
+		expect(repeatRow(weekly([0, 2, 4]))).toMatchObject({ value: "", days: [0, 2, 4] });
+		expect(repeatRow(EVERY_3_DAYS)).toMatchObject({ value: "Every 3 days", days: null });
 	});
 
 	it("offers the reminder of a task on a time, its kind beside it, after Rename", () => {
 		const slot = { date: "2026-11-03", start: 600, end: null };
 		const rows = editRows(item({ description: "- note", slot, reminder: "alarm" }));
-		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["subtask", ""]]);
+		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["repeat", ""], ["subtask", ""]]);
 		expect(editRows(item({ description: "- note", slot, reminder: "none" }))[1].value).toBe("Off");
 		expect(editRows(item({ description: "- note", slot }))[1].value).toBe("Notification");
 	});
@@ -59,7 +88,7 @@ describe("the edit group", () => {
 	});
 
 	it("shows no name beside Section for a task outside any", () => {
-		expect(editRows(item({ description: "- note" }), { ...sections, current: null })[1].value).toBe("");
+		expect(editRows(item({ description: "- note" }), { ...sections, current: null }).find((r) => r.id === "section")!.value).toBe("");
 	});
 });
 
@@ -91,10 +120,10 @@ describe("the menu", () => {
 	});
 
 	const surface = { rendered: [] as string[], render: vi.fn(async (el: HTMLElement, markdown: string) => { el.innerHTML = '<p>note <a href="x">link</a></p>'; surface.rendered.push(markdown); }), edit: vi.fn() };
-	const open = (task: TaskItem, sections?: SectionChoice) => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01") => {
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
-		TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface, sections });
+		TaskMenu.open({ item: task, source, today, day: today, levels: LEVELS, actions, markdown: surface, sections });
 		return actions;
 	};
 	const panel = () => document.querySelector(".tc-panel") as HTMLElement;
@@ -177,6 +206,161 @@ describe("the menu", () => {
 		});
 	});
 
+	describe("a task that repeats", () => {
+		const ask = () => panel().querySelector<HTMLElement>(".tc-menu-ask");
+		const statusTile = (label: string) => [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")].find((t) => t.textContent === label)!;
+		const confirmButton = () => ask()!.querySelector<HTMLButtonElement>(".tc-menu-ask-btn:last-child")!;
+
+		it("lays its four status tiles in one row", () => {
+			open(item({ repeat: EVERY_3_DAYS }));
+			const rows = panel().querySelectorAll(".tc-menu-tiles.is-status .tc-menu-tile-row");
+			expect(rows).toHaveLength(1);
+			expect([...rows[0].querySelectorAll(".tc-menu-tile-label")].map((l) => l.textContent)).toEqual(["Done", "In progress", "Won’t do", "Stop"]);
+			expect(panel().querySelector(".tc-menu-tiles.is-status")!.classList.contains("is-four")).toBe(true);
+		});
+
+		it("keeps three status tiles for a task without a repeat", () => {
+			open(item());
+			expect(panel().querySelector(".tc-menu-tiles.is-status")!.classList.contains("is-four")).toBe(false);
+		});
+
+		it("asks before Stop in place of the status tiles, and stops only on Stop", () => {
+			const actions = open(item({ text: "Зал", repeat: EVERY_3_DAYS }));
+			statusTile("Stop").click();
+			expect(actions.stop).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+			expect(panel().firstElementChild).toBe(ask());
+			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Stop “Зал”?");
+			expect(ask()!.querySelector(".tc-menu-ask-btn:first-child")!.textContent).toBe("Cancel");
+			expect(confirmButton().textContent).toBe("Stop");
+			expect(confirmButton().classList.contains("is-danger")).toBe(false);
+			expect(confirmButton().querySelector("svg")).not.toBeNull();
+			confirmButton().click();
+			expect(actions.stop).toHaveBeenCalled();
+			expect(actions.setStatus).not.toHaveBeenCalled();
+			expect(closing()).toBe(true);
+		});
+
+		it("stops on Enter while Stop asks", () => {
+			const actions = open(item({ repeat: EVERY_3_DAYS }));
+			statusTile("Stop").click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+			expect(actions.stop).toHaveBeenCalled();
+		});
+
+		it("shows a week's days beside Repeat, the chosen ones on", () => {
+			open(item({ repeat: weekly([0, 2, 4]) }));
+			const week = row("Repeat").querySelector(".tc-menu-week")!;
+			const letters = [...week.querySelectorAll(".tc-menu-weekday")];
+			expect(letters.map((l) => l.textContent)).toEqual(["M", "T", "W", "T", "F", "S", "S"]);
+			expect(letters.map((l) => l.classList.contains("is-on"))).toEqual([true, false, true, false, true, false, false]);
+			expect(week.getAttribute("aria-label")).toBe("Mon, Wed, Fri");
+			expect(row("Repeat").querySelector(".tc-menu-value")).toBeNull();
+		});
+
+		it("shows any other rule beside Repeat in words, and nothing for a task without one", () => {
+			open(item({ repeat: EVERY_3_DAYS }));
+			expect(row("Repeat").querySelector(".tc-menu-value")!.textContent).toBe("Every 3 days");
+			document.body.innerHTML = "";
+			open(item());
+			expect(row("Repeat").querySelector(".tc-menu-value, .tc-menu-week")).toBeNull();
+		});
+
+		const away = () => document.querySelector(".tc-backdrop")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+
+		it("opens the repeat panel in place of the menu: a change shows at once and the menu stays, the file untouched", () => {
+			const actions = open(item({ repeat: weekly([0]) }));
+			row("Repeat").click();
+			expect(panel().classList.contains("is-repeat")).toBe(true);
+			expect(panel().querySelector(".tc-menu-tiles")).toBeNull();
+			expect(panel().querySelector(".tc-menu-back")).toBeNull();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			expect(panel().querySelectorAll(".tc-repeat-day")[2].getAttribute("aria-pressed")).toBe("true");
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+			expect(panel().classList.contains("is-repeat")).toBe(true);
+		});
+
+		it("writes the rule once, as it stands, when the menu closes", () => {
+			const actions = open(item({ repeat: weekly([0]) }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[4].click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			away();
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(actions.setRepeat).toHaveBeenCalledWith({ ...weekly([0, 2, 4]), every: 2 });
+		});
+
+		it("writes nothing on close when the rule came back to the one the task has", () => {
+			const actions = open(item({ repeat: { ...weekly([0]), from: "2026-10-26" } }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+		});
+
+		it("takes the task's weekdays in any order as the same rule", () => {
+			const actions = open(item({ repeat: weekly([4, 0]) }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")[2].click();
+			away();
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+		});
+
+		it("takes the repeat off from Remove repeat and closes, as Remove due date does: one write", () => {
+			const actions = open(item({ repeat: EVERY_3_DAYS }));
+			row("Repeat").click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			row("Remove repeat").click();
+			expect(closing()).toBe(true);
+			expect(actions.setRepeat.mock.calls).toEqual([[null]]);
+		});
+
+		it("offers no Remove repeat for a task without a repeat, nor after a change: the change is the page's own until it closes", () => {
+			const actions = open(item());
+			row("Repeat").click();
+			expect(row("Remove repeat")).toBeUndefined();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
+			expect(row("Remove repeat")).toBeUndefined();
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+		});
+
+		it("writes an Inbox task's weekdays once, as the page leaves them, when the menu closes", () => {
+			const actions = open(item({ key: { section: "inbox", index: 0, path: [], raw: "- [ ] A" } }), undefined, THURSDAY);
+			row("Repeat").click();
+			const day = (name: string) => [...panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")].find((b) => b.textContent === name)!;
+			day("Mon").click();
+			day("Thu").click();
+			expect(actions.setRepeat).not.toHaveBeenCalled();
+			away();
+			expect(actions.setRepeat.mock.calls).toEqual([[weekly([0])]]);
+		});
+
+		it("writes a first rule once, when the menu closes", () => {
+			const actions = open(item());
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[1].click();
+			away();
+			expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
+		});
+
+		it("starts a new rule from the task's due date", () => {
+			const actions = open(item({ dueDate: "2026-11-04" }));
+			row("Repeat").click();
+			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[0].click();
+			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+			away();
+			expect(actions.setRepeat).toHaveBeenCalledWith({ ...weekly([2]), every: 2 });
+		});
+	});
+
 	it("follows a link from the card's copy and closes", () => {
 		const actions = open(item({ text: "Позвонить [[Люди/Петя|Пете]]" }));
 		(document.querySelector(".tc-lifted .tc-link") as HTMLElement).click();
@@ -196,7 +380,7 @@ describe("the menu", () => {
 		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
 		expect(labels(".tc-menu-tiles.is-move .tc-menu-tile-label")).toEqual(["Tomorrow", "Pick a date"]);
-		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Add subtask", "Open in Obsidian", "Delete"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Add subtask", "Open in Obsidian", "Delete"]);
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
@@ -357,7 +541,7 @@ describe("the menu", () => {
 	});
 
 	it("leaves out the priority group when no level is set up", () => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: [], actions });
 		expect(panel().querySelector(".tc-menu-tiles.is-priority")).toBeNull();
 	});
@@ -372,7 +556,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 
 	const surface = { render: vi.fn(async (el: HTMLElement) => void (el.textContent = "note")), edit: vi.fn() };
 	const openOnBlock = (task: TaskItem) => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";
 		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface });
@@ -433,7 +617,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 		source.className = "tc-block";
 		source.innerHTML = '<div class="tc-block-card"><div class="tc-card-title">A</div><span class="tc-block-meta"></span></div>';
 		const task = item();
-		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() } });
+		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() } });
 		menu.openStack(() => {});
 		const count = () => [...document.querySelectorAll(".tc-lifted .tc-count")].map((c) => c.textContent);
 		menu.showStack({ ...task, subtasks: [sub(0, "A1")], progress: { done: 0, total: 1 } }, []);
@@ -453,7 +637,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 	});
 
 	it("a list card's menu is no stack: Add subtask closes it", () => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const menu = TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
 		expect(menu.stacks).toBe(false);
 		[...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Add subtask"))!.click();
@@ -467,9 +651,9 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 		document.body.innerHTML = "";
 	});
 
-	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress" });
+	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress", parentText: "A", repeatable: false });
 	const openOnStackCard = (description: string | null = null) => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const stack = document.body.appendChild(document.createElement("div"));
 		stack.className = "tc-menu-subtasks";
 		const source = stack.appendChild(document.createElement("div"));
@@ -527,7 +711,7 @@ describe("the parts over the blur, raised over the keyboard", () => {
 	});
 
 	it("stand higher by the amount asked, never lower than the card, and the field's row with them", () => {
-		const actions = { setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";
 		source.getBoundingClientRect = () => new DOMRect(200, 500, 150, 35);

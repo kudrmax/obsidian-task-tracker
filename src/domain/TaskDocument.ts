@@ -1,5 +1,5 @@
 import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
-import type { GroupName, SectionKey, Task } from "./Task";
+import { STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {
@@ -96,12 +96,54 @@ function sameTask(a: Task, b: Task): boolean {
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
 		a.priority === b.priority &&
+		(a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
 		sameLines(a.children, b.children)
 	);
+}
+
+/**
+ * The lines of `after` an ordered diff from `before` finds inserted (a longest common subsequence of the two), each
+ * moved up past the identical lines right above it.
+ */
+function insertedLines(before: readonly string[], after: readonly string[]): Set<number> {
+	let start = 0;
+	while (start < before.length && start < after.length && before[start] === after[start]) start++;
+	let end = 0;
+	while (end < before.length - start && end < after.length - start && before[before.length - 1 - end] === after[after.length - 1 - end]) end++;
+	const a = before.slice(start, before.length - end);
+	const b = after.slice(start, after.length - end);
+	const width = b.length + 1;
+	const common = new Int32Array((a.length + 1) * width);
+	for (let i = a.length - 1; i >= 0; i--) {
+		for (let j = b.length - 1; j >= 0; j--) {
+			common[i * width + j] = a[i] === b[j] ? common[(i + 1) * width + j + 1] + 1 : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
+		}
+	}
+	const inserted = new Set<number>();
+	for (let i = 0, j = 0; j < b.length; ) {
+		if (i < a.length && a[i] === b[j] && common[i * width + j] === common[(i + 1) * width + j + 1] + 1) {
+			i++;
+			j++;
+		} else if (i < a.length && common[(i + 1) * width + j] === common[i * width + j]) i++;
+		else inserted.add(start + j++);
+	}
+	for (const line of [...inserted].sort((x, y) => x - y)) {
+		let at = line;
+		while (at > 0 && !inserted.has(at - 1) && after[at - 1] === after[at]) {
+			inserted.delete(at);
+			inserted.add(--at);
+		}
+	}
+	return inserted;
+}
+
+/** Every task and subtask, each before its own subtasks. */
+function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
+	return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
 }
 
 function sameLines(a: readonly string[], b: readonly string[]): boolean {
@@ -195,6 +237,16 @@ export class TaskDocument {
 
 	allTasks(): readonly TaskEntry[] {
 		return SECTION_KEYS.flatMap((key) => this.tasks(key));
+	}
+
+	/**
+	 * The task a change inserted into `before`, wherever the rules then moved it: the task line an ordered diff of the
+	 * two documents finds only here. The headings keep a twin in another section apart; of identical lines side by side
+	 * it gives the first.
+	 */
+	insertedSince(before: TaskDocument): TaskEntry | undefined {
+		const inserted = insertedLines(before.lines, this.lines);
+		return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
 	}
 
 	insert(section: SectionKey, position: InsertPosition, task: Task): TaskDocument {
@@ -315,6 +367,19 @@ export class TaskDocument {
 		const indent = descriptionIndent(entry) ?? this.childIndent(entry);
 		const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
 		return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
+	}
+
+	/** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+	freshChildren(entry: TaskEntry): readonly string[] {
+		const first = this.spanOf(entry).line + 1;
+		const children = [...entry.task.children];
+		const open = (sub: TaskEntry): void => {
+			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+			children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
+			sub.subtasks.forEach(open);
+		};
+		entry.subtasks.forEach(open);
+		return children;
 	}
 
 	/** A new subtask of `parent`, right before its subtask `before` or last. */
