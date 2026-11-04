@@ -1001,7 +1001,7 @@ export class TaskCalendarView extends ItemView {
 			this.backlogList.render();
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
-		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme());
+		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), this.deps.clock.now());
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {

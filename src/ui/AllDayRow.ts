@@ -10,13 +10,19 @@ export function paintEvent(target: HTMLElement, event: CalendarEvent, theme: The
 	target.style.setProperty(PROPERTY.eventText, colors.text);
 }
 
+/** An event that is over by `now` is drawn grey, whatever its calendar's colour. */
+export function markPast(target: HTMLElement, event: CalendarEvent, now: Date): void {
+	target.classList.toggle("is-past", event.end.getTime() <= now.getTime());
+}
+
 /** The all-day events over the timeline, one row each; the column below learns how many rows beyond the first there are. */
-export function renderAllDayRows(container: HTMLElement, column: HTMLElement, events: readonly CalendarEvent[], theme: Theme): void {
+export function renderAllDayRows(container: HTMLElement, column: HTMLElement, events: readonly CalendarEvent[], theme: Theme, now: Date): void {
 	clear(container);
 	el(container, "div", "tc-allday-backing");
 	for (const event of events) {
 		const row = el(container, "div", "tc-allday");
 		paintEvent(row, event, theme);
+		markPast(row, event, now);
 		el(row, "div", "tc-event-bar");
 		el(row, "div", "tc-allday-title", event.title);
 	}

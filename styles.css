@@ -23,6 +23,10 @@ body {
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
+	/* An event that is over: a grey calendar's block, whatever its own colour. */
+	--tc-event-past-bg: rgba(142, 142, 147, 0.22);
+	--tc-event-past-bar: #8E8E93;
+	--tc-event-past-text: #C7C7C9;
 	--tc-on-strong: #000000;
 	--tc-now-ink: #FFFFFF;
 	/* Text on the accent: the time pill of a stretched task and of the drop line. */
@@ -553,6 +557,8 @@ body.theme-light {
 	--tc-stack-2: #EFEFF2;
 	--tc-float-bg: #FFFFFF;
 	--tc-float-month: #8E8E93;
+	--tc-event-past-bg: rgba(142, 142, 147, 0.13);
+	--tc-event-past-text: #66666A;
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
@@ -870,6 +876,10 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; overflow: clip; }
 .tc-event-body { flex: 1; min-width: 0; align-self: flex-start; position: sticky; top: 0; bottom: 0; padding: var(--tc-space-4) var(--tc-space-6); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
+.tc-event.is-past { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
+.tc-allday.is-past { background: var(--tc-event-past-bg); }
+.is-past > .tc-event-bar { background: var(--tc-event-past-bar); }
+.tc-event.is-past .tc-item-title, .tc-allday.is-past .tc-allday-title { color: var(--tc-event-past-text); }
 .tc-item.is-tiny .tc-event-body { padding: 0 var(--tc-space-5); }
 
 /* The now line: the time in a pill, the line to the right edge. */

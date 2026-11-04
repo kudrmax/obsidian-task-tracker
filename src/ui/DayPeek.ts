@@ -106,7 +106,7 @@ export class DayPeek {
 	private render(): void {
 		if (this.removed) return;
 		this.list.render();
-		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme());
+		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme(), this.deps.now());
 		this.right.style.setProperty(PROPERTY.allDayExtraRows, this.deps.allDayExtraRows());
 		this.timeline.render();
 	}
