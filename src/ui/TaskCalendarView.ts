@@ -46,7 +46,7 @@ import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Shift, stepScreen } from "./screens";
+import { type Place, type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -113,6 +113,10 @@ export class TaskCalendarView extends ItemView {
 	private soonList: TaskList | null = null;
 	private soonDrop: ListDrop | null = null;
 	private inboxEl: HTMLElement | null = null;
+	private doneEl: HTMLElement | null = null;
+	private doneList: TaskList | null = null;
+	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
+	private atDone = false;
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
 	private backlogList: TaskList | null = null;
@@ -246,6 +250,7 @@ export class TaskCalendarView extends ItemView {
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
 			soonName: () => this.settings.sections.soon,
+			doneName: () => this.settings.sections.done,
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -260,6 +265,13 @@ export class TaskCalendarView extends ItemView {
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"), true, () => this.haptics.tap());
+		this.doneEl = el(root, "div", "tc-done");
+		this.doneList = new TaskList(el(this.doneEl, "div"), {
+			items: () => this.data.done,
+			day: () => null,
+			onCard: (card, item) => this.attachDoneCard(card, item),
+		});
+		el(el(root, "div", "tc-divider is-fixed is-done"), "div", "tc-divider-line");
 		this.inboxEl = el(root, "div", "tc-inbox");
 		const inboxPane = el(this.inboxEl, "div", "tc-pane is-inbox");
 		const backlogPane = el(this.inboxEl, "div", "tc-pane is-backlog");
@@ -349,8 +361,8 @@ export class TaskCalendarView extends ItemView {
 		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
 		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
 		const switcher = new ColumnSwitch(root, {
-			value: () => this.mode(),
-			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
+			value: () => this.place(),
+			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
@@ -550,7 +562,7 @@ export class TaskCalendarView extends ItemView {
 		this.landed();
 		const root = this.contentEl;
 		const parts = stripParts(root);
-		const from = { mode: this.mode(), date: this.selectedDate };
+		const from = { mode: this.place(), date: this.selectedDate };
 		const to = stepScreen(from, shift, this.today());
 		if (!to) return new EdgeTrack(parts, root.clientWidth);
 		if (to.mode !== from.mode) {
@@ -560,7 +572,7 @@ export class TaskCalendarView extends ItemView {
 				root,
 				from: from.mode,
 				to: to.mode,
-				showMode: (mode) => this.showMode(mode),
+				showMode: (place) => this.showPlace(place),
 				turnWheel: (position) => this.switcher?.follow(position),
 				onArrive: (mode) => this.arriveAt(mode),
 			});
@@ -606,12 +618,25 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** The strip stands at the place a swipe brought it to: the switch turns there, and the choice is saved. */
-	private arriveAt(mode: RightMode): void {
-		this.shownMode = mode;
-		this.showMode(mode);
-		this.switcher?.show(mode);
-		void this.afterEntry(() => this.setMode(mode, false));
+	/** The strip stands at the place a swipe brought it to: the switch turns there, and the choice is saved. Done is left behind. */
+	private arriveAt(place: Place): void {
+		if (place === "done") return;
+		this.atDone = false;
+		this.shownMode = place;
+		this.showPlace(place);
+		this.switcher?.show(place);
+		void this.afterEntry(() => this.setMode(place, false));
+	}
+
+	/** Where the window stands: Done while the search keeps it there, else the place the settings hold. */
+	private place(): Place {
+		return this.atDone ? "done" : this.mode();
+	}
+
+	/** The wheel turned the screen away: Done goes until the search opens it again. */
+	private leaveDone(mode: RightMode): Promise<void> {
+		this.atDone = false;
+		return this.setMode(mode);
 	}
 
 	/** The screen has drawn the day a swipe brought in: it comes back from aside, and the day drawn over it goes. */
@@ -636,15 +661,25 @@ export class TaskCalendarView extends ItemView {
 			this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
 		}
 		this.shownMode = mode;
-		this.showMode(mode);
+		this.showPlace(this.place());
 		await this.deps.settings.update({ rightMode: mode });
 		if (this.shownMode === mode) this.shownMode = null;
 		this.parts.request("frame");
 	}
 
-	private showMode(mode: RightMode): void {
-		this.contentEl.classList.toggle("is-lists", mode === "soon");
-		this.contentEl.classList.toggle("is-inbox", mode === "inbox");
+	private showPlace(place: Place): void {
+		this.contentEl.classList.toggle("is-lists", place === "soon");
+		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done");
+		this.contentEl.classList.toggle("is-done", place === "done");
+	}
+
+	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
+	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
+		card.addEventListener("click", () => this.showMenu(item, card));
+		card.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.showMenu(item, card);
+		});
 	}
 
 	private openSearch(): void {}
@@ -976,11 +1011,11 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
-		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
+		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.doneEl || !this.doneList || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
 		if (parts.has("frame")) {
 			this.fitListWidth();
 			this.headers.render();
-			this.showMode(this.mode());
+			this.showPlace(this.place());
 		}
 		this.switcher.render();
 		if (parts.has("tasks")) {
@@ -988,13 +1023,14 @@ export class TaskCalendarView extends ItemView {
 			this.list.render();
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.doneEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
 			this.inboxList.render();
 			this.backlogTitle.textContent = this.settings.sections.backlog;
 			this.backlogList.render();
+			this.doneList.render();
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), this.deps.clock.now());

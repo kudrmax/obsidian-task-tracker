@@ -348,7 +348,7 @@ describe("styles.css keeps to its design system", () => {
 
 	it("runs a list to the bottom under its foot and the fade, its end room a row rather than padding, the lists fading as the day does", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
-		expect(of(".tc-left, .tc-soon, .tc-inbox")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
+		expect(of(".tc-left, .tc-soon, .tc-inbox, .tc-done")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
 		const list = of(".tc-list");
 		expect([list.get("flex"), list.get("min-height")]).toEqual(["1 1 0", "0"]);
 		expect([...list.keys()].filter((property) => property.startsWith("padding"))).toEqual([]);

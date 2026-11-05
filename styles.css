@@ -671,6 +671,9 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 /* The column headers: each rides over its column as the strip slides; over Now the arrows round the day's name, across the whole window while the timeline is beside it. */
 .tc-head { position: absolute; top: var(--tc-day-row-top); height: var(--tc-day-row); width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; display: flex; align-items: center; }
 .tc-head.is-inbox { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
+.tc-head.is-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); }
+.task-calendar.is-lists .tc-head.is-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-inbox .tc-head.is-done { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-lists .tc-head.is-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-head.is-inbox { left: 0; }
 .tc-head.is-soon { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
@@ -748,7 +751,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 
 /* The columns on the strip, Inbox, Soon, the list and the right column; the fixed dividers between the halves, and the one with its handle. */
 /* A list column: its list runs to the bottom of the view, under its foot (the switch's row, Obsidian's navigation) and the fade. */
-.tc-left, .tc-soon, .tc-inbox { display: flex; flex-direction: column; }
+.tc-left, .tc-soon, .tc-inbox, .tc-done { display: flex; flex-direction: column; }
 .tc-left { position: absolute; left: 0; top: var(--tc-columns-top); bottom: 0; width: var(--tc-list-width); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
 .task-calendar.is-lists .tc-left { left: calc(var(--tc-half-column) + var(--tc-divider)); width: var(--tc-half-column); padding: var(--tc-column-pad-far); }
 .tc-soon { position: absolute; left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
@@ -758,6 +761,12 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-inbox { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
 .task-calendar.is-lists .tc-inbox { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
 .task-calendar.is-inbox .tc-inbox { left: 0; }
+/* Done stands left of Inbox, reached only from the search: there the whole strip stands one column further right. */
+.tc-done { position: absolute; left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-half-column) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; width: var(--tc-half-column); padding: var(--tc-column-pad-near); box-sizing: border-box; overflow: hidden; }
+.task-calendar.is-lists .tc-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-inbox .tc-done { left: calc(-1 * (var(--tc-half-column) + var(--tc-divider))); }
+.task-calendar.is-done > :is(.tc-done, .tc-inbox, .tc-soon, .tc-left, .tc-right, .tc-divider, .tc-head) { margin-left: calc(var(--tc-half-column) + var(--tc-divider)); }
+.task-calendar.is-done .tc-inbox, .task-calendar.is-done .tc-head.is-inbox { padding: var(--tc-column-pad-far); }
 /* The first column is Inbox over Backlog, half and half; Backlog's title stands in its half under a line, as a column's stands over it. */
 .tc-pane { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 /* The screen's foot (the switch's row, the fade) lies over Backlog's half: the half is that much taller, so both lists show as much. */
@@ -774,12 +783,15 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-divider.is-fixed.is-inbox { left: calc(-1 * (var(--tc-half-column) + 2 * var(--tc-divider))); }
 .task-calendar.is-lists .tc-divider.is-fixed.is-inbox { left: calc(-1 * var(--tc-divider)); }
 .task-calendar.is-inbox .tc-divider.is-fixed.is-inbox { left: var(--tc-half-column); }
+.tc-divider.is-fixed.is-done { left: calc(-1 * 2 * (var(--tc-half-column) + var(--tc-divider)) - var(--tc-divider)); }
+.task-calendar.is-lists .tc-divider.is-fixed.is-done { left: calc(-1 * (var(--tc-half-column) + 2 * var(--tc-divider))); }
+.task-calendar.is-inbox .tc-divider.is-fixed.is-done { left: calc(-1 * var(--tc-divider)); }
 .tc-divider-line { width: var(--tc-hairline); height: 100%; background: var(--tc-line); }
 .task-calendar .tc-divider-handle { position: absolute; top: var(--tc-handle-top); left: var(--tc-handle-left); width: var(--tc-handle-w); height: var(--tc-handle-h); border-radius: var(--tc-radius-handle); background: var(--tc-handle); cursor: col-resize; }
 .tc-right { position: absolute; left: calc(var(--tc-list-width) + var(--tc-divider)); width: calc(100% - var(--tc-list-width) - var(--tc-divider)); top: var(--tc-columns-top); bottom: 0; overflow: hidden; }
 .task-calendar.is-lists .tc-right { left: calc(100% + var(--tc-divider)); }
 .task-calendar.is-inbox .tc-right { left: calc(100% + 2 * var(--tc-divider) + var(--tc-half-column)); }
-.task-calendar.is-switching :is(.tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip), gap 0s linear var(--tc-slide-flip); }
+.task-calendar.is-switching :is(.tc-done, .tc-inbox, .tc-left, .tc-soon, .tc-divider, .tc-right, .tc-head, .tc-day-nav .tc-arrow) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), margin-left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out), padding 0s linear var(--tc-slide-flip), gap 0s linear var(--tc-slide-flip); }
 /* The next day under the screen while a finger draws it in: drawn as the screen draws a day, under the foot, out of reach of the fingers. */
 .tc-peek { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
 /* The hours and the ground under the all-day events are the screen's own, standing still: the next day shows only what is its own. */
