@@ -9,8 +9,10 @@ import type { SectionOffer } from "./sections";
 import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
-/** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
-export { nextProgress, nextReminder } from "../domain/Task";
+/** What In progress or Stop progress sets on tasks of these statuses. */
+export { nextProgress } from "../domain/Task";
+/** The kinds a task's reminder is chosen from, in the order the menu offers them. */
+export { REMINDER_KINDS } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";

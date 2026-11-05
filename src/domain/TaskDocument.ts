@@ -1,5 +1,5 @@
 import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
-import { STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
+import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {
@@ -396,7 +396,7 @@ export class TaskDocument {
 		const first = this.spanOf(entry).line + 1;
 		const children = [...entry.task.children];
 		const open = (sub: TaskEntry): void => {
-			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null };
 			children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
 			sub.subtasks.forEach(open);
 		};

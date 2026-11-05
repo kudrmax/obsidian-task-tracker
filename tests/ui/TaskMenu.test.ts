@@ -421,10 +421,36 @@ describe("the menu", () => {
 		expect(actions.setPriority).toHaveBeenCalledWith("p2");
 	});
 
-	it("sets the next reminder's kind on a tap on Reminder", () => {
-		const actions = open(item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder: "alarm" }));
-		row("Reminder").click();
-		expect(actions.setReminder).toHaveBeenCalledWith("live");
+	describe("Reminder", () => {
+		const onTime = (reminder: TaskItem["reminder"]) => item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder });
+
+		it("lists the kinds in place of the menu, the task's own checked, Off last and quiet", () => {
+			open(onTime("alarm"));
+			row("Reminder").click();
+			expect(panel().querySelector(".tc-menu-back")?.textContent).toBe("Reminder");
+			expect(labels(".tc-menu-group .tc-menu-label")).toEqual(["Live Activity", "Notification", "Alarm", "Off"]);
+			expect(row("Alarm").querySelector("svg")).not.toBeNull();
+			expect(row("Live Activity").querySelector("svg")).toBeNull();
+			expect(row("Off").classList.contains("is-quiet")).toBe(true);
+			expect(closing()).toBe(false);
+		});
+
+		it("sets the kind picked and closes", () => {
+			const actions = open(onTime("alarm"));
+			row("Reminder").click();
+			row("Off").click();
+			expect(actions.setReminder).toHaveBeenCalledWith("none");
+			expect(closing()).toBe(true);
+		});
+
+		it("goes back to the menu without a change", () => {
+			const actions = open(onTime("live"));
+			row("Reminder").click();
+			panel().querySelector<HTMLButtonElement>(".tc-menu-back")!.click();
+			expect(row("Rename")).toBeDefined();
+			expect(actions.setReminder).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+		});
 	});
 
 	it("starts and stops the progress from its tile", () => {

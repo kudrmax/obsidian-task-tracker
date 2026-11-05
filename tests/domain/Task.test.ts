@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRemind, isOpen, nextProgress, nextReminder } from "../../src/domain/Task";
+import { canRemind, DEFAULT_REMINDER, isOpen, nextProgress, REMINDER_KINDS } from "../../src/domain/Task";
 
 describe("an open task", () => {
 	it("is one to do or in progress, not one done or given up", () => {
@@ -20,8 +20,9 @@ describe("In progress and Stop progress", () => {
 });
 
 describe("a reminder", () => {
-	it("goes notification, alarm, off, and round", () => {
-		expect([nextReminder("notification"), nextReminder("alarm"), nextReminder("live"), nextReminder("none")]).toEqual(["alarm", "live", "none", "notification"]);
+	it("is chosen from Live Activity, notification, alarm and none, a Live Activity first", () => {
+		expect(REMINDER_KINDS).toEqual(["live", "notification", "alarm", "none"]);
+		expect(DEFAULT_REMINDER).toBe("live");
 	});
 
 	it("is had only by a task on a time", () => {

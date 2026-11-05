@@ -152,9 +152,9 @@ describe("writing", () => {
 	it("createAtTime puts the task at the time, without a duration", async () => {
 		const { store, svc } = setup(FULL);
 		await svc.createAtTime(T, 600, "Call");
-		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] B\n- [ ] Call ⏰ 2026-10-30 10:00\n");
+		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] B\n- [ ] Call 📌 2026-10-30 10:00\n");
 		await svc.createAtTime(D, 1420, "Late");
-		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40\n");
+		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] Late 📌 2026-11-03 23:40\n");
 	});
 
 	it("normalizes after every write", async () => {
@@ -168,7 +168,7 @@ describe("writing", () => {
 		const { store, svc } = setup(FULL);
 		let view = await svc.dayView(T);
 		await svc.setSlot(view.list[0].key, { date: T, start: 600, end: 660 });
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A 📌 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n");
 		view = await svc.dayView(T);
 		await svc.clearSlot(view.slotted[0].key);
 		expect(store.text).toBe(FULL);
@@ -228,7 +228,7 @@ describe("the task sheet", () => {
 		await svc.create({ text: "D", placement: { kind: "date", date: D }, priority: null }, { date: D, start: 600, end: 660 });
 		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" }, priority: null });
 		expect(store.writes).toBe(4);
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n- [ ] N 📅 2026-10-30\n- [ ] P 📅 2026-10-30\n\n## Soon\n\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 ⏰ 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n- [ ] N 📅 2026-10-30\n- [ ] P 📅 2026-10-30\n\n## Soon\n\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 📌 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("create with blank text writes nothing", async () => {
@@ -362,7 +362,7 @@ describe("a day that starts at 4", () => {
 		const day = await svc.dayView(T);
 		expect(day.slotted.map((i) => i.text)).toEqual(["B"]);
 		await svc.setSlot(day.list[0].key, { date: "2026-10-31", start: 180, end: 300 });
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A 📌 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n\n## Backlog\n");
 	});
 });
 

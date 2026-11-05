@@ -35,13 +35,11 @@ export interface Slot {
 /** What the time of a task does on the phone: a quiet notification, an alarm, a Live Activity on the lock screen, or nothing. Read from the marker before the slot. */
 export type ReminderKind = "notification" | "alarm" | "live" | "none";
 
-/** The order a reminder's kind goes round in. */
-export const REMINDER_KINDS: readonly ReminderKind[] = ["notification", "alarm", "live", "none"];
+/** The kinds a task's reminder is chosen from, in the order they are offered. */
+export const REMINDER_KINDS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
 
-/** The kind after `kind`, round. */
-export function nextReminder(kind: ReminderKind): ReminderKind {
-	return REMINDER_KINDS[(REMINDER_KINDS.indexOf(kind) + 1) % REMINDER_KINDS.length];
-}
+/** The kind of a task put on a time for the first time. */
+export const DEFAULT_REMINDER: ReminderKind = "live";
 
 /** Only a task on a time reminds: one without a slot keeps its kind for when it gets one. */
 export function canRemind(slot: Slot | null): boolean {

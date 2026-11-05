@@ -5,14 +5,14 @@ import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { Repeat, type RepeatRule } from "./Repeat";
-import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */

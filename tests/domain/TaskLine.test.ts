@@ -256,8 +256,8 @@ describe("reminder kind", () => {
 		}
 	});
 
-	it("a task without a slot reads as notification", () => {
-		expect(parseTaskLine("- [ ] Call", R)!.task.reminder).toBe("notification");
+	it("a task without a slot reads as a Live Activity, for when it gets one", () => {
+		expect(parseTaskLine("- [ ] Call", R)!.task.reminder).toBe("live");
 	});
 
 	it("markers without alarm and silent read only the slot marker", () => {
