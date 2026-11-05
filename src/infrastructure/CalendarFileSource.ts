@@ -1,4 +1,4 @@
-import { type CalendarFile, readCalendarFile } from "../application/calendarFile";
+import { type CalendarFile, onlyCalendars, readCalendarFile } from "../application/calendarFile";
 import type { CalendarSource } from "../application/contracts";
 import type { EventFile } from "../application/EventSource";
 import type { PathWatcher } from "./VaultPathWatcher";
@@ -25,7 +25,7 @@ export class CalendarFileSource implements EventFile {
 	}
 
 	async read(): Promise<CalendarFile> {
-		return readCalendarFile(await this.text(this.path()), this.name, this.calendars());
+		return onlyCalendars(readCalendarFile(await this.text(this.path()), this.name), this.calendars());
 	}
 
 	/** Read again only when the file's time or size changed. */

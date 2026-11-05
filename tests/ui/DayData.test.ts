@@ -16,6 +16,8 @@ const event = (title: string): CalendarEvent => ({
 	calendar: "Work",
 	color: "#0A84FF",
 	source: "google",
+	account: null,
+	calendarId: null,
 });
 
 /** A network that answers only when the test lets it. */

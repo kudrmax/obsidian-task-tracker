@@ -84,6 +84,8 @@ describe("CalendarFileSource", () => {
 			calendar: "Work",
 			color: "#FF0000",
 			source: "work",
+			account: null,
+			calendarId: null,
 		});
 		expect(events[1].color).toBe("#0A84FF");
 		expect(events[2]).toMatchObject({ allDay: true, color: "#0A84FF" });

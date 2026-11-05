@@ -441,7 +441,7 @@ export interface UndoService {
 	onChange(listener: () => void): () => void;
 }
 
-export type CalendarSource = "google" | "work";
+export type CalendarSource = "google" | "iphone" | "work";
 
 export interface CalendarEvent {
 	readonly id: string;
@@ -453,6 +453,10 @@ export interface CalendarEvent {
 	/** `#RRGGBB`. The source supplies one; a source without colors falls back to a per-calendar default. */
 	readonly color: string;
 	readonly source: CalendarSource;
+	/** The calendar's account as its writer knows it (an email for Google and Exchange); null when the writer does not say. */
+	readonly account: string | null;
+	/** The writer's own id of the calendar (Google's calendar id, iOS's calendarIdentifier); null when it does not say. */
+	readonly calendarId: string | null;
 }
 
 /** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */

@@ -2,14 +2,14 @@ import type { SourceStatus } from "../../application/contracts";
 import { addDays, dayMonth, formatTime, localDateOf, minutesOf } from "../dates";
 
 export interface SourceText {
-	readonly name: "Google Calendar" | "Work calendar";
-	readonly short: "Google" | "Work";
+	readonly name: "Google Calendar" | "iPhone calendars" | "Work calendar";
+	readonly short: "Google" | "iPhone" | "Work";
 	readonly sub: string;
 	readonly time: string;
 	readonly stale: boolean;
 }
 
-const NAMES = { google: { name: "Google Calendar", short: "Google" }, work: { name: "Work calendar", short: "Work" } } as const;
+const NAMES = { google: { name: "Google Calendar", short: "Google" }, iphone: { name: "iPhone calendars", short: "iPhone" }, work: { name: "Work calendar", short: "Work" } } as const;
 
 /** When a source was last brought up to date, the way the board words it. */
 export function sourceText(status: SourceStatus, now: Date): SourceText {

@@ -108,6 +108,8 @@ export class GoogleCalendarApi {
 				calendar: calendar.summary,
 				color: calendar.backgroundColor ?? DEFAULT_COLOR,
 				source: "google",
+				account: null,
+				calendarId: calendar.id,
 			}));
 	}
 

@@ -9,7 +9,7 @@ import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 const PATH = "calendar/google.json";
 
 function meeting(id: string, hour = 10): CalendarEvent {
-	return { id, title: id, start: new Date(2026, 9, 30, hour), end: new Date(2026, 9, 30, hour + 1), allDay: false, calendar: "Personal", color: "#123456", source: "google" };
+	return { id, title: id, start: new Date(2026, 9, 30, hour), end: new Date(2026, 9, 30, hour + 1), allDay: false, calendar: "Personal", color: "#123456", source: "google", account: null, calendarId: "personal" };
 }
 
 class MemoryAdapter implements FeedAdapter {
@@ -69,7 +69,7 @@ describe("GoogleCalendarFeed", () => {
 		await google.refresh(true);
 		expect(api.asked[0]).toEqual({ start: new Date(2026, 8, 30), end: new Date(2027, 0, 29) });
 		expect(adapter.folders.has("calendar")).toBe(true);
-		expect(written(adapter)).toEqual({ events: [meeting("standup")], exportedAt: new Date(2026, 9, 30, 9), device: "Google" });
+		expect(written(adapter)).toMatchObject({ events: [meeting("standup")], exportedAt: new Date(2026, 9, 30, 9), device: "Google" });
 	});
 
 	it("unforced, it does not ask Google again within the refresh interval", async () => {

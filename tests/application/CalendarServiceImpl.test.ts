@@ -12,7 +12,7 @@ const WRITTEN = new Date(2026, 9, 30, 8, 0);
 const NOW = new Date(2026, 9, 30, 9, 0);
 
 function event(source: CalendarSource, id: string, start: Date, end: Date, allDay = false): CalendarEvent {
-	return { id, title: id, start, end, allDay, calendar: "Cal", color: "#0A84FF", source };
+	return { id, title: id, start, end, allDay, calendar: "Cal", color: "#0A84FF", source, account: null, calendarId: null };
 }
 
 class FakeFile implements EventFile {
@@ -30,7 +30,7 @@ class FakeFile implements EventFile {
 	async read(): Promise<CalendarFile> {
 		this.reads++;
 		if (this.failWith) throw this.failWith;
-		return { events: this.events, exportedAt: this.exportedAt, device: this.device };
+		return { events: this.events, calendars: [], exportedAt: this.exportedAt, device: this.device, from: null, to: null, validUntil: null };
 	}
 
 	onChange(listener: () => void): () => void {

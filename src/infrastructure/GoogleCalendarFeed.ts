@@ -25,7 +25,7 @@ function daysFrom(now: Date, days: number): Date {
 
 /** The events alone, as the file writes them: two lists that give the same text are the same. */
 function eventsText(events: readonly CalendarEvent[]): string {
-	return calendarFileText(events, new Date(0), DEVICE);
+	return JSON.stringify(events);
 }
 
 /**
@@ -76,7 +76,7 @@ export class GoogleCalendarFeed implements EventFeed {
 		if (before && eventsText(before.events) === eventsText(events) && now.getTime() - before.exportedAt.getTime() < FRESH_STEP_MS) return;
 		const folder = this.path.split("/").slice(0, -1).join("/");
 		if (folder !== "" && !(await this.adapter.exists(folder))) await this.adapter.mkdir(folder);
-		await this.adapter.write(this.path, calendarFileText(events, now, DEVICE));
+		await this.adapter.write(this.path, calendarFileText({ events, calendars: [], exportedAt: now, device: DEVICE, from: null, to: null, validUntil: null }));
 	}
 
 	/** The file as it is; one that does not parse counts as none and is written over. */

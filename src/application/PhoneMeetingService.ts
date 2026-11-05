@@ -1,5 +1,5 @@
 import { settingsFrom, type TaskCalendarSettings } from "../settings";
-import { GOOGLE_CALENDAR_FILE, readCalendarFile } from "./calendarFile";
+import { GOOGLE_CALENDAR_FILE, onlyCalendars, readCalendarFile } from "./calendarFile";
 import type { CalendarSource } from "./contracts";
 
 /** A meeting with a time, as the phone sees it: one the calendar on screen shows too. */
@@ -29,7 +29,7 @@ export class PhoneMeetingService {
 				const text = texts[i];
 				if (text === null || text === undefined) return [];
 				try {
-					return readCalendarFile(text, source.name, source.calendars).events;
+					return onlyCalendars(readCalendarFile(text, source.name), source.calendars).events;
 				} catch {
 					return [];
 				}

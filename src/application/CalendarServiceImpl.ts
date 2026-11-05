@@ -19,7 +19,7 @@ import type { EventFeed, EventFile } from "./EventSource";
 import type { Clock, SettingsStore, Timers } from "./ports";
 
 /** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
-const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", work: "exported" };
+const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", iphone: "exported", work: "exported" };
 
 const SECOND_MS = 1000;
 const MINUTE_MS = 60_000;

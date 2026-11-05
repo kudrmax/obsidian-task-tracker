@@ -61,11 +61,11 @@
 
   // src/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
-  var DEFAULT_COLOR = { google: "#4285F4", work: "#0A84FF" };
-  function readCalendarFile(text, source, calendars = []) {
+  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
+  var dateOrNull = (text) => text ? new Date(text) : null;
+  function readCalendarFile(text, source) {
     const content = JSON.parse(text);
-    const wanted = calendars.map((c) => c.trim().toLowerCase()).filter((c) => c !== "");
-    const events = (content.events ?? []).filter((e) => wanted.length === 0 || wanted.includes(e.calendar.toLowerCase())).map((e) => ({
+    const events = (content.events ?? []).map((e) => ({
       id: e.id,
       title: e.title,
       start: new Date(e.start),
@@ -73,9 +73,36 @@
       allDay: e.allDay,
       calendar: e.calendar,
       color: e.color ?? DEFAULT_COLOR[source],
-      source
+      source,
+      account: e.account ?? null,
+      calendarId: e.calendarId ?? null
     }));
-    return { events, exportedAt: new Date(content.exportedAt), device: content.device ?? null };
+    const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
+    return {
+      events,
+      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null })),
+      exportedAt: new Date(content.exportedAt),
+      device: content.device ?? null,
+      from: dateOrNull(content.from),
+      to: dateOrNull(content.to),
+      validUntil: dateOrNull(content.validUntil)
+    };
+  }
+  function eventCalendars(events) {
+    const seen = /* @__PURE__ */ new Map();
+    for (const e of events) {
+      const key = `${e.account ?? ""}
+${e.calendarId ?? ""}
+${e.calendar}`;
+      if (!seen.has(key)) seen.set(key, { calendar: e.calendar, calendarId: e.calendarId ?? null, account: e.account ?? null, color: e.color ?? null });
+    }
+    return [...seen.values()];
+  }
+  function onlyCalendars(file, titles) {
+    const wanted = titles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
+    if (wanted.length === 0) return file;
+    const kept = (title) => wanted.includes(title.toLowerCase());
+    return { ...file, events: file.events.filter((e) => kept(e.calendar)), calendars: file.calendars.filter((c) => kept(c.title)) };
   }
 
   // src/application/PhoneMeetingService.ts
@@ -93,7 +120,7 @@
         const text = texts[i];
         if (text === null || text === void 0) return [];
         try {
-          return readCalendarFile(text, source.name, source.calendars).events;
+          return onlyCalendars(readCalendarFile(text, source.name), source.calendars).events;
         } catch {
           return [];
         }
