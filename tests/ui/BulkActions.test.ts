@@ -5,12 +5,13 @@ import { BulkController, type BulkDeps } from "../../src/ui/BulkController";
 import { bulkCanRemoveDue, bulkLevelTiles, bulkMoveTiles, bulkNextPriority, bulkProgress, countLabel } from "../../src/ui/menu/BulkMenu";
 import { type PickedCard, TaskSelection } from "../../src/ui/TaskSelection";
 import type { TaskDragPayload } from "../../src/ui/drag/DropTarget";
+import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";
 let n = 0;
 const item = (extra: Partial<TaskItem> = {}): TaskItem => {
 	const i = n++;
-	return { key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra };
+	return onDay({ key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, T);
 };
 const LEVELS = [
 	{ prefix: "p1", color: "red" },

@@ -12,13 +12,14 @@ import { Timeline } from "../../src/ui/Timeline";
 import { DayBoundary } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
+import { onDay } from "../fakes/itemOnDay";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
 
 const key = (section: TaskKey["section"], index: number, path: number[] = []): TaskKey => ({ section, index, path, raw: `${section}${index}${path.join("")}` });
 
-const item = (text: string, k: TaskKey, group: string | null = null, subtasks: TaskItem[] = []): TaskItem => ({
+const item = (text: string, k: TaskKey, group: string | null = null, subtasks: TaskItem[] = []): TaskItem => onDay({
 	key: k,
 	text,
 	status: "todo",
@@ -36,7 +37,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	description: null,
 	list: k.section,
 	isSubtask: k.path.length > 0,
-});
+}, TODAY);
 
 interface SetUp {
 	mode?: RightMode;

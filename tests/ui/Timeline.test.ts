@@ -4,6 +4,7 @@ import { DayBoundary } from "../../src/application/contracts";
 import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
 import { DEFAULT_SETTINGS } from "../../src/settings";
+import { onDay } from "../fakes/itemOnDay";
 
 /** One card and one gap: how far down a stack the next card stands. */
 const STACK_STEP = DEFAULT_SETTINGS.cardHeight + DEFAULT_SETTINGS.cardGap;
@@ -28,7 +29,7 @@ function minorLabels(view: Timeline): string[] {
 }
 
 describe("a day that starts at 4", () => {
-	const late: TaskItem = { key: { section: "now", index: 0, path: [], raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false };
+	const late: TaskItem = onDay({ key: { section: "now", index: 0, path: [], raw: "" }, text: "Late", status: "todo", dueDate: null, slot: { date: "2026-10-31", start: 60, end: 120 }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 
 	it("labels the hours from 04 round to 04 the next morning, two digits each", () => {
 		const labels = [...timeline({ hourPx: 56 }, new DayBoundary(4)).canvas.querySelectorAll(".tc-hour-label")].map((l) => l.textContent);
@@ -104,7 +105,7 @@ describe("hour labels by the now line", () => {
 });
 
 describe("task cards", () => {
-	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false });
+	const task = (index: number, start: number, end: number | null): TaskItem => onDay({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 
 	it("stands the cards in the page in the stack's order, so a card over a long one is drawn over it", () => {
 		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [task(0, 900, null), task(1, 840, 960)]);
@@ -145,7 +146,7 @@ describe("task cards", () => {
 });
 
 describe("a field on the timeline", () => {
-	const task = (index: number, start: number, end: number | null): TaskItem => ({ key: { section: "now", index, path: [], raw: `T${index}` }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null, list: "now", isSubtask: false });
+	const task = (index: number, start: number, end: number | null): TaskItem => onDay({ key: { section: "now", index, path: [], raw: `T${index}` }, text: `T${index}`, status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null, list: "now", isSubtask: false }, "2026-10-30");
 	const box = (node: HTMLElement) => ["--tc-y", "--tc-len", "--tc-x"].map((p) => node.style.getPropertyValue(p));
 	const fieldBox = (view: Timeline) => view.itemsEl.querySelector<HTMLElement>(".tc-quick-row")!;
 
@@ -216,7 +217,7 @@ describe("a field on the timeline", () => {
 });
 
 describe("a renamed task in progress on the timeline", () => {
-	const task = (status: TaskItem["status"]): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "T0" }, text: "T0", status, dueDate: null, slot: { date: "2026-10-30", start: 900, end: 960 }, reminder: "notification", repeat: null, open: status === "todo" || status === "inProgress", repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null, list: "now", isSubtask: false });
+	const task = (status: TaskItem["status"]): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "T0" }, text: "T0", status, dueDate: null, slot: { date: "2026-10-30", start: 900, end: 960 }, reminder: "notification", repeat: null, open: status === "todo" || status === "inProgress", repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, group: null, description: null, list: "now", isSubtask: false }, "2026-10-30");
 
 	it("keeps its strip at the field's left, and a task not in progress has none", () => {
 		const doing = task("inProgress");
@@ -234,7 +235,7 @@ describe("a renamed task in progress on the timeline", () => {
 
 describe("tasks the now line has passed", () => {
 	const hourPx = 56;
-	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => ({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, reminder: "notification", repeat: null, open: status === "todo" || status === "inProgress", repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false });
+	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => onDay({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, reminder: "notification", repeat: null, open: status === "todo" || status === "inProgress", repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 
 	function onToday(tasks: TaskItem[], date = "2026-10-31"): HTMLElement[] {
 		const view = new Timeline(document.createElement("div"), {
@@ -307,7 +308,7 @@ describe("tasks the now line has passed", () => {
 
 describe("the minute's tick", () => {
 	const hourPx = 56;
-	const task = (start: number): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-31", start, end: null }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false });
+	const task = (start: number): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-31", start, end: null }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 	const meeting: CalendarEvent = { id: "m", title: "Meeting", start: new Date(2026, 9, 31, 9), end: new Date(2026, 9, 31, 10), allDay: false, calendar: "Work", color: "#0A84FF", source: "google" };
 
 	function ticking(tasks: TaskItem[]) {
@@ -503,7 +504,7 @@ describe("measuring once (block 3)", () => {
 });
 
 describe("a stretched block while its new time is written (block 3)", () => {
-	const task = (start: number, end: number): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false });
+	const task = (start: number, end: number): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-30", start, end }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 	const block = (view: Timeline) => view.itemsEl.querySelector<HTMLElement>(".tc-block")!;
 	const length = (el: HTMLElement) => el.style.getPropertyValue("--tc-len");
 

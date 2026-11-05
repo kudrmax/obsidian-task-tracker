@@ -1,7 +1,8 @@
+import { canPostpone, canRemoveDue, dayOfTask } from "../domain/Days";
 import { descriptionMarkdown } from "../domain/description";
 import type { PriorityLevel } from "../domain/Priority";
 import { repeatable } from "../domain/queries";
-import { isOpen } from "../domain/Task";
+import { isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import type { SubtaskProgress, TaskItem } from "./contracts";
 
@@ -12,7 +13,8 @@ function progressOf(entry: TaskEntry): SubtaskProgress | null {
 	return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
 }
 
-export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null, parentText: string | null = null): TaskItem {
+/** The task as the UI sees it on `today`. */
+export function toItem(entry: TaskEntry, today: LocalDate, levelOf: (prefix: string) => PriorityLevel | null = () => null, parentText: string | null = null): TaskItem {
 	return {
 		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
 		text: entry.task.text,
@@ -27,7 +29,9 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		group: entry.group,
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
-		subtasks: entry.subtasks.filter((sub) => isOpen(sub.task.status)).map((sub) => toItem(sub, levelOf, entry.task.text)),
+		day: dayOfTask(entry.section, entry.task, today),
+		can: { postpone: canPostpone(entry.section), removeDue: canRemoveDue(entry.task.dueDate, today) },
+		subtasks: entry.subtasks.filter((sub) => isOpen(sub.task.status)).map((sub) => toItem(sub, today, levelOf, entry.task.text)),
 		progress: progressOf(entry),
 		description: descriptionMarkdown(entry),
 		parentText,

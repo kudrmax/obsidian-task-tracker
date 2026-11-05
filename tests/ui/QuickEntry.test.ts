@@ -4,6 +4,7 @@ import type { PlacedCard } from "../../src/ui/drag/listPlace";
 import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
 import { WriteQueue } from "../../src/ui/quick/WriteQueue";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
+import { onDay } from "../fakes/itemOnDay";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): PlacedCard => ({ key: key(name), level, top: 0, height: 0, group: null });
@@ -14,7 +15,7 @@ const AFTER_DONE: RepeatRule = { kind: "afterDone", every: 1, unit: "week", days
 const SLOT = { date: "2026-11-01", start: 600, end: null };
 
 function item(name: string, subtasks: TaskItem[] = []): TaskItem {
-	return {
+	return onDay({
 		key: key(name),
 		text: name,
 		status: "todo",
@@ -32,7 +33,7 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		description: null,
 		list: "now",
 		isSubtask: false,
-	} as TaskItem;
+	}, SLOT.date);
 }
 
 function deferred(): { promise: Promise<void>; resolve(): void } {

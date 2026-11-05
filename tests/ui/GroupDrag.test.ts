@@ -4,6 +4,7 @@ import type { GroupName, TaskItem } from "../../src/application/contracts";
 import { GroupDrag, liftedPlace, nearestSlot } from "../../src/ui/drag/GroupDrag";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { TaskList } from "../../src/ui/TaskList";
+import { onDay } from "../fakes/itemOnDay";
 
 const GROUPS = [null, "Morning", "Экскурсия"];
 
@@ -33,7 +34,7 @@ describe("a lifted section", () => {
 });
 
 describe("a section carried (block 3)", () => {
-	const item = (index: number, group: GroupName): TaskItem => ({
+	const item = (index: number, group: GroupName): TaskItem => onDay({
 		key: { section: "soon", index, path: [], raw: `- [ ] T${index}` },
 		text: `T${index}`,
 		status: "todo",
@@ -51,7 +52,7 @@ describe("a section carried (block 3)", () => {
 		description: null,
 		list: "soon",
 		isSubtask: false,
-	});
+	}, "2026-11-01");
 	const pointer = (type: string, x: number, y: number) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 3, isPrimary: true, button: 0, bubbles: true, pointerType: "touch" });
 
 	afterEach(() => {

@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { renderTaskCard } from "../../src/ui/TaskCard";
 import { TaskList } from "../../src/ui/TaskList";
+import { onDay } from "../fakes/itemOnDay";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
+const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({
 	key: { section: "now", index: 0, path: [], raw: "- [ ] Купить билеты" },
 	text: "Купить билеты в Белград",
 	status: "todo",
@@ -20,7 +21,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	progress: null,
 	parentText: null, description: null,
 	list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra,
-});
+}, "2026-11-01");
 
 describe("renderTaskCard", () => {
 	it("puts the subtask counter and the description mark in one column, the mark under the counter", () => {

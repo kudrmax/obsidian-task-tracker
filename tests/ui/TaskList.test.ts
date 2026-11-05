@@ -2,8 +2,9 @@
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { TaskList } from "../../src/ui/TaskList";
+import { onDay } from "../fakes/itemOnDay";
 
-const task = (text: string, index: number): TaskItem => ({
+const task = (text: string, index: number): TaskItem => onDay({
 	key: { section: "now", index, path: [], raw: text },
 	text,
 	status: "todo",
@@ -21,7 +22,7 @@ const task = (text: string, index: number): TaskItem => ({
 	description: null,
 	list: "now",
 	isSubtask: false,
-});
+}, "2026-11-01");
 
 describe("TaskList", () => {
 	it("hands out the same cards until it draws again", () => {

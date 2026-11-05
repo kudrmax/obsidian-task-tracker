@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { canRemoveDue, moveTiles } from "../../src/ui/menu/quickMoves";
+import { onDay } from "../fakes/itemOnDay";
 
 const TODAY = "2026-11-03";
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "soon", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "soon", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, TODAY);
 const ids = (task: TaskItem) => moveTiles(task, TODAY).map((tile) => tile.id);
 
 describe("moveTiles", () => {

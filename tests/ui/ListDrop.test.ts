@@ -5,8 +5,9 @@ import type { DragPayload, ListColumn, NewTaskPayload } from "../../src/ui/drag/
 import { ListDrop } from "../../src/ui/drag/ListDrop";
 import { TaskList } from "../../src/ui/TaskList";
 import { shownCardSize } from "../../src/ui/cardSize";
+import { onDay } from "../fakes/itemOnDay";
 
-const item = (section: SectionKey, index: number, text: string, group: GroupName): TaskItem => ({
+const item = (section: SectionKey, index: number, text: string, group: GroupName): TaskItem => onDay({
 	key: { section, index, path: [], raw: `- [ ] ${text}` },
 	text,
 	status: "todo",
@@ -23,7 +24,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	parentText: null, description: null,
 	list: section,
 	isSubtask: false,
-});
+}, "2026-11-01");
 
 /** How often each node's place was read: a drag measures a card once. */
 const offsetReads = new Map<HTMLElement, number>();

@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
 import { editRows, nextPriority, nextReminder, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
+import { onDay } from "../fakes/itemOnDay";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, "2026-11-01");
 
 const weekly = (days: RepeatRule["days"]): RepeatRule => ({ kind: "schedule", every: 1, unit: "week", days, dayOfMonth: null, from: null });
 const THURSDAY = "2026-11-05";

@@ -261,6 +261,37 @@ describe("the task sheet", () => {
 	});
 });
 
+describe("the day column and the day of a placement", () => {
+	const { svc } = setup(FULL);
+
+	it("today is Now with sections, a later day Soon with that day, a past day Now with that day and no sections", () => {
+		expect(svc.dayColumn(T)).toEqual({ list: "now", date: null, sections: true });
+		expect(svc.dayColumn(D)).toEqual({ list: "soon", date: D, sections: true });
+		expect(svc.dayColumn("2026-10-28")).toEqual({ list: "now", date: "2026-10-28", sections: false });
+	});
+
+	it("a day's placement is Now for today, the day otherwise; Now's day is today", () => {
+		expect(svc.placementOfDay(T)).toEqual({ kind: "now" });
+		expect(svc.placementOfDay(D)).toEqual({ kind: "date", date: D });
+		expect(svc.dayOfPlacement({ kind: "now" })).toBe(T);
+		expect(svc.dayOfPlacement({ kind: "date", date: D })).toBe(D);
+		expect(svc.dayOfPlacement({ kind: "soon" })).toBeNull();
+	});
+
+	it("today follows the hour the day starts at", () => {
+		const night = new TaskServiceImpl(new InMemoryTaskFileStore(FULL), new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 4 }), { now: () => new Date(2026, 9, 31, 2, 0) });
+		expect(night.dayColumn(T)).toEqual({ list: "now", date: null, sections: true });
+		expect(night.placementOfDay("2026-10-31")).toEqual({ kind: "date", date: "2026-10-31" });
+	});
+
+	it("an item read tells its day and what may be done to it on today", async () => {
+		const { svc: read } = setup("## Now\n\n- [ ] A 📅 2026-11-03\n- [ ] B 📅 2026-10-30\n\n## Soon\n\n- [ ] C 📅 2026-11-03\n");
+		const view = await read.dayView(T);
+		expect(view.list.map((i) => [i.day, i.can.removeDue])).toEqual([[T, true], [T, false]]);
+		expect((await read.dayView(D)).list.map((i) => [i.text, i.day, i.can.removeDue])).toEqual([["A", T, true], ["C", D, true]]);
+	});
+});
+
 describe("onChange", () => {
 	it("fires once on a hand edit and once after each own write", async () => {
 		const { store, svc } = setup(FULL);
@@ -275,6 +306,23 @@ describe("onChange", () => {
 		off();
 		store.emitChange();
 		await svc.createInSoon("Y");
+		expect(fired).toBe(2);
+	});
+
+	it("fires when a setting the file is read by changes, not for another one, and no more once unsubscribed", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(FULL, settings);
+		let fired = 0;
+		const off = svc.onChange(() => fired++);
+		await settings.update({ zoom: 112 });
+		await settings.update({ dayStartHour: 3 });
+		expect(fired).toBe(0);
+		await settings.update({ dueDateMarker: "🗓" });
+		expect(fired).toBe(1);
+		await settings.update({ sections: { ...DEFAULT_SETTINGS.sections, soon: "Later" } });
+		expect(fired).toBe(2);
+		off();
+		await settings.update({ tasksFile: "Other.md" });
 		expect(fired).toBe(2);
 	});
 
@@ -538,6 +586,31 @@ describe("createInPlace", () => {
 		const { store, svc } = setup(TEXT);
 		await svc.createInPlace("N", null, { kind: "list", list: "soon", group: null, before: null, date: D });
 		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] N 📅 2026-11-03\n");
+	});
+
+	it("day: today goes in Now with today's due date, before the key, in its section", async () => {
+		const { store, svc } = setup(TEXT);
+		const [, b] = (await svc.dayView(T)).list;
+		await svc.createInPlace("N", null, { kind: "day", date: T, group: "X", before: b.key });
+		expect(store.text).toContain("## Now\n\n- [ ] A\n### X\n- [ ] N 📅 2026-10-30\n- [ ] B\n");
+	});
+
+	it("day: a later day goes in Soon with that due date", async () => {
+		const { store, svc } = setup(TEXT);
+		await svc.createInPlace("N", null, { kind: "day", date: D, group: null, before: null });
+		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] N 📅 2026-11-03\n");
+	});
+
+	it("day: a past day goes in Now, which gives it today's due date", async () => {
+		const { store, svc } = setup(TEXT);
+		await svc.createInPlace("N", null, { kind: "day", date: "2026-10-28", group: null, before: null });
+		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] N 📅 2026-10-30\n### X\n");
+	});
+
+	it("day in a section of its list missing from the file rejects with StaleTaskError", async () => {
+		const { store, svc } = setup(TEXT);
+		await expect(svc.createInPlace("N", null, { kind: "day", date: D, group: "X", before: null })).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(TEXT);
 	});
 
 	it("list with a stale before rejects with StaleTaskError and writes nothing", async () => {
