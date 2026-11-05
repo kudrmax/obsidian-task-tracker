@@ -16,7 +16,7 @@ export interface PhoneReminder {
 	readonly id: string;
 	readonly title: string;
 	readonly body: string;
-	readonly kind: "notification" | "alarm";
+	readonly kind: "notification" | "alarm" | "live";
 	/** The slot's date, `YYYY-MM-DD`. */
 	readonly date: LocalDate;
 	readonly start: Date;
@@ -88,7 +88,7 @@ export class PhoneReminderService {
 			id: entry.raw,
 			title: plainText(entry.task.text),
 			body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
-			kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
+			kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
 			date: slot.date,
 			start: clockOf(slot.date, slot.start),
 			dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES),

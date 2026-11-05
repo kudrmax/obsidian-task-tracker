@@ -240,17 +240,18 @@ describe("the repeat field", () => {
 });
 
 describe("reminder kind", () => {
-	const R: Markers = { dueDate: "📅", slot: "⏰", alarmSlot: "🚨", silentSlot: "🔕" };
+	const R: Markers = { dueDate: "📅", slot: "⏰", alarmSlot: "🚨", liveSlot: "📌", silentSlot: "🔕" };
 
 	it("parses the reminder kind from the slot marker", () => {
 		const alarm = parseTaskLine("- [ ] Call 🚨 2026-11-04 10:00-11:00", R)!.task;
 		expect(alarm).toMatchObject({ reminder: "alarm", text: "Call", slot: { date: "2026-11-04", start: 600, end: 660 } });
 		expect(parseTaskLine("- [ ] Call 🔕 2026-11-04 10:00", R)!.task.reminder).toBe("none");
+		expect(parseTaskLine("- [ ] Call 📌 2026-11-04 10:00", R)!.task.reminder).toBe("live");
 		expect(parseTaskLine("- [ ] Call ⏰ 2026-11-04 10:00", R)!.task.reminder).toBe("notification");
 	});
 
 	it("writes the slot with its kind's marker", () => {
-		for (const line of ["- [ ] Call 🚨 2026-11-04 10:00-11:00", "- [ ] Call 🔕 2026-11-04 10:00", "- [ ] Call 📅 2026-11-05 ⏰ 2026-11-04 10:00"]) {
+		for (const line of ["- [ ] Call 🚨 2026-11-04 10:00-11:00", "- [ ] Call 🔕 2026-11-04 10:00", "- [ ] Call 📌 2026-11-04 10:00", "- [ ] Call 📅 2026-11-05 ⏰ 2026-11-04 10:00"]) {
 			expect(formatTaskLine(parseTaskLine(line, R)!, R)).toBe(line);
 		}
 	});

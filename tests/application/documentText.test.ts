@@ -25,7 +25,7 @@ describe("documentText", () => {
 	});
 
 	it("markersOf and boundaryOf follow the settings", () => {
-		expect(markersOf({ ...DEFAULT_SETTINGS, alarmSlotMarker: "!" })).toMatchObject({ slot: "⏰", alarmSlot: "!", silentSlot: "🔕" });
+		expect(markersOf({ ...DEFAULT_SETTINGS, alarmSlotMarker: "!" })).toMatchObject({ slot: "⏰", alarmSlot: "!", liveSlot: "📌", silentSlot: "🔕" });
 		expect(boundaryOf({ ...DEFAULT_SETTINGS, dayStartHour: 4 }).dayOf(new Date(2026, 9, 30, 3, 0))).toBe("2026-10-29");
 	});
 });

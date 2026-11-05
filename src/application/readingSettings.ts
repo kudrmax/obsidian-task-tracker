@@ -10,6 +10,7 @@ export function readsAnew(before: TaskCalendarSettings, after: TaskCalendarSetti
 		before.dueDateMarker !== after.dueDateMarker ||
 		before.slotMarker !== after.slotMarker ||
 		before.alarmSlotMarker !== after.alarmSlotMarker ||
+		before.liveSlotMarker !== after.liveSlotMarker ||
 		before.silentSlotMarker !== after.silentSlotMarker ||
 		before.repeatMarker !== after.repeatMarker ||
 		before.groups.ungrouped !== after.groups.ungrouped ||

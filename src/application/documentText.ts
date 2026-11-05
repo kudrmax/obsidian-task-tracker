@@ -12,6 +12,7 @@ export function markersOf(settings: TaskCalendarSettings): Markers {
 		dueDate: settings.dueDateMarker,
 		slot: settings.slotMarker,
 		alarmSlot: settings.alarmSlotMarker,
+		liveSlot: settings.liveSlotMarker,
 		silentSlot: settings.silentSlotMarker,
 		repeat: settings.repeatMarker,
 		priorities: usableLevels(settings.priorities).map((l) => l.prefix),

@@ -32,11 +32,11 @@ export interface Slot {
 	readonly end: number | null;
 }
 
-/** What the time of a task does on the phone: a quiet notification, an alarm, or nothing. Read from the marker before the slot. */
-export type ReminderKind = "notification" | "alarm" | "none";
+/** What the time of a task does on the phone: a quiet notification, an alarm, a Live Activity on the lock screen, or nothing. Read from the marker before the slot. */
+export type ReminderKind = "notification" | "alarm" | "live" | "none";
 
 /** The order a reminder's kind goes round in. */
-export const REMINDER_KINDS: readonly ReminderKind[] = ["notification", "alarm", "none"];
+export const REMINDER_KINDS: readonly ReminderKind[] = ["notification", "alarm", "live", "none"];
 
 /** The kind after `kind`, round. */
 export function nextReminder(kind: ReminderKind): ReminderKind {

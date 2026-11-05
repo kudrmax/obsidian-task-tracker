@@ -41,6 +41,8 @@ export interface FileFormatSettings {
 	readonly slotMarker: string;
 	/** Precedes the slot of a task that rings as an alarm on the phone. */
 	readonly alarmSlotMarker: string;
+	/** Precedes the slot of a task that the phone shows as a Live Activity on the lock screen. */
+	readonly liveSlotMarker: string;
 	/** Precedes the slot of a task that the phone does not remind of. */
 	readonly silentSlotMarker: string;
 	readonly repeatMarker: string;
@@ -94,6 +96,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	dueDateMarker: "📅",
 	slotMarker: "⏰",
 	alarmSlotMarker: "🚨",
+	liveSlotMarker: "📌",
 	silentSlotMarker: "🔕",
 	repeatMarker: "🔁",
 	workCalendarFile: "calendar/work.json",

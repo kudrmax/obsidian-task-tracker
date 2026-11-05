@@ -11,6 +11,7 @@ Settings → Task Calendar. Настройки лежат в `data.json` пла�
 | Due date marker | `📅` | Эмодзи срока. |
 | Slot marker | `⏰` | Эмодзи времени (на iPhone — тихое уведомление). |
 | Alarm marker | `🚨` | Эмодзи времени с будильником на iPhone. |
+| Live Activity marker | `📌` | Эмодзи времени с карточкой на экране блокировки iPhone. |
 | No-reminder marker | `🔕` | Эмодзи времени без напоминания. |
 | Repeat marker | `🔁` | Эмодзи повтора. |
 

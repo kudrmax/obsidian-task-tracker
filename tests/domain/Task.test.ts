@@ -21,7 +21,7 @@ describe("In progress and Stop progress", () => {
 
 describe("a reminder", () => {
 	it("goes notification, alarm, off, and round", () => {
-		expect([nextReminder("notification"), nextReminder("alarm"), nextReminder("none")]).toEqual(["alarm", "none", "notification"]);
+		expect([nextReminder("notification"), nextReminder("alarm"), nextReminder("live"), nextReminder("none")]).toEqual(["alarm", "live", "none", "notification"]);
 	});
 
 	it("is had only by a task on a time", () => {

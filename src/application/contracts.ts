@@ -583,7 +583,7 @@ export interface ViewSettingsStore {
 }
 
 /** The marks of a task line the settings tab sets. */
-export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "silentSlotMarker" | "repeatMarker";
+export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "liveSlotMarker" | "silentSlotMarker" | "repeatMarker";
 /** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
 export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
 /** The cards' size, set by a slider. */

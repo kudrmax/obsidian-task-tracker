@@ -7,7 +7,7 @@ describe("settingsFrom", () => {
 	});
 
 	it("marks alarms with 🚨 and no reminder with 🔕 unless set", () => {
-		expect(settingsFrom(null)).toMatchObject({ slotMarker: "⏰", alarmSlotMarker: "🚨", silentSlotMarker: "🔕" });
+		expect(settingsFrom(null)).toMatchObject({ slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕" });
 	});
 
 	it("starts the day at 5 unless set", () => {
