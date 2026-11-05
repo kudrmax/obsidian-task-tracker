@@ -6,7 +6,7 @@
 
 - Волт — `~/Obsidian`, файл — `~/Obsidian/TODOs Tasks.md` (путь — в `~/Obsidian/.obsidian/plugins/task-calendar/data.json`, ключ `tasksFile`; там же имена разделов `sections`, эмодзи и начало дня `dayStartHour`).
 - Файл синхронизируется с телефоном через Obsidian Sync. Правка на Mac появится на iPhone через несколько секунд.
-- Рабочие встречи — `~/Obsidian/calendar/work.json` (только чтение, его перезаписывает телефон). Встреч Google в файлах нет.
+- Встречи — `~/Obsidian/calendar/work.json` (рабочие, его перезаписывает телефон) и `~/Obsidian/calendar/google.json` (Google, его перезаписывает плагин). Оба только для чтения.
 - `data.json` содержит токен Google: не выводи его и никуда не отправляй.
 
 ## Как читать
