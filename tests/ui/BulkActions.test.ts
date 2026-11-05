@@ -123,17 +123,16 @@ describe("bulk actions", () => {
 		expect(bulk.selection.size).toBe(0);
 	});
 
-	it("turns a drop of several cards into one step each, by where each came from", () => {
+	it("lets the picked cards go once several are dropped, keeps them for one carried alone", () => {
 		const bulk = controller();
-		const [a] = cards([item()]);
-		const b = item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] S" } });
-		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0, carried: [{ item: b, from: "soon" }] };
-		const steps = bulk.dropSteps(drag, { kind: "listBefore", before: null, column: "left" });
-		expect(steps).toEqual([
-			{ key: a.item.key, change: { kind: "moveBefore", before: null, date: T } },
-			{ key: b.key, change: { kind: "moveToList", date: T } },
-		]);
-		expect(bulk.dropSteps({ ...drag, carried: [] }, { kind: "listBefore", before: null, column: "left" })).toBeNull();
+		const [a, b] = cards([item(), item()]);
+		bulk.selection.toggle(a);
+		bulk.selection.toggle(b);
+		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0 };
+		bulk.dropping(drag);
+		expect(bulk.selection.size).toBe(2);
+		bulk.dropping({ ...drag, carried: [{ item: b.item, from: "soon" }] });
+		expect(bulk.selection.size).toBe(0);
 	});
 
 	it("offers the cancel ring only while several cards are carried", () => {

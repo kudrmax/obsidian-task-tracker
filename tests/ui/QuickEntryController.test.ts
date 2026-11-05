@@ -315,7 +315,7 @@ describe("QuickEntryController", () => {
 
 		it("carried, starts the drag of a new task over its ring and the lists, hides, and comes back when let go off them", () => {
 			const { controller, plus, beginNew, drops } = setUp({ items });
-			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
+			drops.push(stubDrop("left", { kind: "list", column: "left", before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			expect(beginNew).toHaveBeenCalledOnce();
 			expect(beginNew.mock.calls[0][2]).toHaveLength(2);
@@ -384,7 +384,7 @@ describe("QuickEntryController", () => {
 
 		it("let go on a list, opens the field where the drop showed", () => {
 			const { controller, plus, beginNew, drops, rowsOf } = setUp({ items: { left: [item("A", key("now", 0)), item("B", key("now", 1))] } });
-			const result: DropResult = { kind: "listBefore", before: key("now", 1), column: "left" };
+			const result: DropResult = { kind: "list", column: "left", before: key("now", 1) };
 			drops.push(stubDrop("left", result));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
@@ -939,7 +939,7 @@ describe("QuickEntryController", () => {
 
 		it("the plus let go at the end of the list opens the field there, and Enter writes the task at the end of Now", async () => {
 			const { controller, plus, beginNew, drops, rowsOf, type, press, created } = setUp({ day: PAST, items: { left: work() } });
-			drops.push(stubDrop("left", { kind: "listBefore", before: null, column: "left" }));
+			drops.push(stubDrop("left", { kind: "list", column: "left", before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
 			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult);

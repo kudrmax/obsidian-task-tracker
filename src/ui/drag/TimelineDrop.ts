@@ -2,7 +2,8 @@ import { LAYOUT } from "../design";
 import { AutoScroll } from "./AutoScroll";
 import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
-import { carriesMany, type DragPayload, type DropResult, type DropTarget } from "./DropTarget";
+import { acceptsDrop } from "../../application/contracts";
+import { type DragPayload, type DropResult, type DropTarget, originsOf } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
 export interface TimelineDropOptions {
@@ -27,7 +28,7 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	hitTest(x: number, y: number, drag: DragPayload): boolean {
-		if (carriesMany(drag)) return false;
+		if (!acceptsDrop("timeline", originsOf(drag))) return false;
 		const r = this.timeline.viewBox();
 		return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
 	}

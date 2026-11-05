@@ -1,14 +1,14 @@
-import type { GroupedList, GroupName, TaskItem, TaskKey } from "../../application/contracts";
-import type { LocalDate, Slot } from "../types";
+import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, GroupedList, TaskItem } from "../../application/contracts";
+import type { LocalDate } from "../types";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
-export type ListColumn = "left" | "soon" | "inbox" | "backlog";
+export type ListColumn = DropColumn;
 
 /** Where a task that exists is dragged from. */
-export type TaskOrigin = ListColumn | "timeline";
+export type TaskOrigin = DropFrom;
 
 /** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */
-export type DragOrigin = TaskOrigin | "new";
+export type DragOrigin = DropOrigin;
 
 /** Whose sections a column shows: Inbox's, Backlog's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
 export interface ColumnSections {
@@ -34,9 +34,19 @@ export interface CarriedTask {
 	readonly from: ListColumn;
 }
 
-/** Several tasks carried at once: they go only to the lists, never to the timeline. */
+/** Several tasks carried at once. */
 export function carriesMany(drag: DragPayload): boolean {
 	return drag.from !== "new" && (drag.carried?.length ?? 0) > 0;
+}
+
+/** Where the carried tasks come from, the one under the finger first: what a target is asked whether it takes. */
+export function originsOf(drag: DragPayload): readonly DragOrigin[] {
+	return drag.from === "new" ? ["new"] : [drag.from, ...(drag.carried ?? []).map((carried) => carried.from)];
+}
+
+/** The tasks a drag lets go, the one under the finger first. */
+export function droppedTasks(drag: TaskDragPayload): readonly DroppedTask[] {
+	return [{ key: drag.item.key, from: drag.from }, ...(drag.carried ?? []).map((carried) => ({ key: carried.item.key, from: carried.from }))];
 }
 
 /** The drag of a task that does not exist yet: it has no card in any list and no duration. */
@@ -49,13 +59,8 @@ export interface NewTaskPayload {
 
 export type DragPayload = TaskDragPayload | NewTaskPayload;
 
-export type DropResult =
-	| { readonly kind: "slot"; readonly slot: Slot }
-	| { readonly kind: "listBefore"; readonly before: TaskKey | null; readonly column: ListColumn }
-	/** A gap of a list that shows sections: right before `before`, or at the end of `group`. */
-	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
-	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
-	| { readonly kind: "clearSlot" };
+/** Where the task lands, as the target found it: what it means is the service's (`TaskService.drop`). */
+export type DropResult = DropTo;
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
 export interface DropTarget {

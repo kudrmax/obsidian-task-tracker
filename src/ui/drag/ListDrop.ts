@@ -1,9 +1,9 @@
-import { type GapPlace, placeOfGap } from "../../application/contracts";
+import { type GapPlace, placeOfGap, placesInGap } from "../../application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import type { ListEntry, TaskList } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
-import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
+import { carriesMany, type ColumnSections, type DragOrigin, type DragPayload, type DropResult, type DropTarget, type ListColumn, originsOf } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
 import { type PlacedCard, type PlacedHead, placeAt, sameGap } from "./listPlace";
@@ -58,7 +58,8 @@ export class ListDrop implements DropTarget {
 		private readonly list: TaskList,
 		private readonly area: HTMLElement,
 		readonly column: ListColumn,
-		private readonly accepts: (drag: DragPayload) => boolean,
+		/** Whether the list takes tasks carried from these places, the one under the finger first (`acceptsDrop`). */
+		private readonly accepts: (origins: readonly DragOrigin[]) => boolean,
 		/** Whose sections the column shows; null for a past day's column. */
 		private readonly sections: () => ColumnSections | null = () => null,
 		/** The list's title stands over its area, as a column's does; Backlog's stands in its own area, under Inbox. */
@@ -139,13 +140,13 @@ export class ListDrop implements DropTarget {
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
 		if (!this.takes(drag)) return null;
 		const sections = this.sections();
-		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
+		if (!this.placesAnywhere(drag)) return { kind: "list", column: this.column, before: null };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place || this.isHome(this.place)) return null;
 		const result = placeOfGap(this.placed(readFrame(this.list.el)), this.place);
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
 		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
-		return { kind: "listBefore", before: result.before, column: this.column };
+		return { kind: "list", column: this.column, before: result.before };
 	}
 
 	/** The place the card was lifted from, at its level: let go there, the card only goes back. Several cards carried have none. */
@@ -160,13 +161,12 @@ export class ListDrop implements DropTarget {
 
 	/** The list takes the card under the finger and every card carried along with it. */
 	private takes(drag: DragPayload): boolean {
-		if (!this.accepts(drag)) return false;
-		return drag.from === "new" || (drag.carried ?? []).every((carried) => this.accepts({ ...drag, from: carried.from }));
+		return this.accepts(originsOf(drag));
 	}
 
-	/** A list with sections places a card from anywhere, and any list a new task; another only a card from itself. */
+	/** Whether the gap under the finger is the place, or the list's end is (`placesInGap`). */
 	private placesAnywhere(drag: DragPayload): boolean {
-		return drag.from === "new" || drag.from === this.column || this.sections() !== null;
+		return placesInGap(this.column, drag.from, this.sections() !== null);
 	}
 
 	/** The layout measured for this drag, measured again only once the list is drawn anew or changes its card size or width. */

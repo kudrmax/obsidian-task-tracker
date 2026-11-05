@@ -82,7 +82,7 @@ const LOOK_IN: Readonly<Record<RightMode, readonly ListColumn[]>> = {
 /** What a drop of the plus on a list means for the file; null for a drop elsewhere. */
 function placeResultOf(result: DropResult): ListPlace | null {
 	switch (result.kind) {
-		case "listBefore":
+		case "list":
 			return { kind: "task", group: null, before: result.before };
 		case "group":
 			return { kind: "task", group: result.group, before: result.before };
