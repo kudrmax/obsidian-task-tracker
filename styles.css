@@ -313,7 +313,7 @@ body {
 	--tc-menu-badge-icon: var(--tc-icon-xs);
 	--tc-stroke-badge: var(--tc-stroke-3-6);
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
-	--tc-level-prefix-w: 56px;
+	--tc-level-prefix-w: 48px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
 	--tc-swatch-halo: var(--setting-items-background);
@@ -1182,12 +1182,13 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-sheet-bar > button.tc-btn { height: var(--tc-sheet-bar); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
 
 /* A level keeps its parts in one row, where Obsidian stacks a setting's parts on the phone. */
-.setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-12); }
+/* The gap is the circles' own: with the grip the row still leaves the card room for its title. */
+.setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-8); }
 .tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; margin: 0; }
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
-.tc-preset-grip { touch-action: none; cursor: grab; }
-.tc-preset-row.is-dragging { opacity: var(--tc-pressed); }
-.tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); flex-shrink: 0; }
+.tc-row-grip { touch-action: none; cursor: grab; }
+.tc-level-row.is-dragging { opacity: var(--tc-pressed); }
+.tc-swatches { display: flex; align-items: center; gap: var(--tc-space-6); flex-shrink: 0; }
 .tc-swatch-well { position: relative; width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-swatch-well); display: flex; align-items: center; justify-content: center; }
 .tc-swatch-well.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
 .tc-swatch-well-inner { width: var(--tc-swatch-well-inner); height: var(--tc-swatch-well-inner); border-radius: var(--tc-radius-circle); background: var(--tc-swatch-halo); pointer-events: none; }
@@ -1201,7 +1202,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-level-preview-time { flex-shrink: 0; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-priority-meta); font-variant-numeric: tabular-nums; }
 /* The phone's row is too narrow for all of it: the prefix, the card and the bin; under them the circles across the row; then the code. */
 .is-phone .modal .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }
-.is-phone .tc-level-row :is(.tc-level-preview, .extra-setting-button) { order: 1; }
+.is-phone .tc-level-row :is(.tc-level-preview, .extra-setting-button:not(.tc-row-grip)) { order: 1; }
 .is-phone .tc-level-row .tc-swatches { order: 2; flex-basis: 100%; justify-content: space-between; }
 .is-phone .tc-level-row .tc-level-hex { order: 2; }
 

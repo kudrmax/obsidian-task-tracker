@@ -5,7 +5,7 @@ export class SettingsPage extends Modal {
 	constructor(
 		app: App,
 		private readonly title: string,
-		private readonly build: (el: HTMLElement) => void,
+		private readonly build: (el: HTMLElement, redraw: () => void) => void,
 		private readonly closed: () => void,
 	) {
 		super(app);
@@ -14,7 +14,13 @@ export class SettingsPage extends Modal {
 	override onOpen(): void {
 		this.setTitle(this.title);
 		this.modalEl.addClass("tc-settings-page");
-		this.build(this.contentEl);
+		this.redraw();
+	}
+
+	/** After a change that adds or drops rows, such as logging in. */
+	redraw(): void {
+		this.contentEl.empty();
+		this.build(this.contentEl, () => this.redraw());
 	}
 
 	override onClose(): void {

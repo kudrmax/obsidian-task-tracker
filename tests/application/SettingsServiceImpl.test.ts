@@ -46,6 +46,21 @@ describe("editing the priority levels", () => {
 	});
 });
 
+describe("moving a priority level", () => {
+	it("puts the level at its new place, the others keeping their order", async () => {
+		const levels = [
+			{ prefix: "p1", color: "red" },
+			{ prefix: "p2", color: "orange" },
+			{ prefix: "p3", color: "blue" },
+		] as const;
+		const { svc, now } = service({ priorities: [...levels] });
+		await svc.moveLevel(2, 0);
+		expect(now().priorities).toEqual([levels[2], levels[0], levels[1]]);
+		await svc.moveLevel(0, 2);
+		expect(now().priorities).toEqual([...levels]);
+	});
+});
+
 describe("editing the section presets", () => {
 	const presets = (names: string[]) => ({ groups: { ...DEFAULT_SETTINGS.groups, presets: names } });
 

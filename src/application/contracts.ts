@@ -641,6 +641,8 @@ export interface SettingsService {
 	removeLevel(index: number): Promise<void>;
 	/** The next `p<n>` no level has, in the first colour no level has. */
 	addLevel(): Promise<void>;
+	/** The level at `from` goes to `to`, the others keeping their order. */
+	moveLevel(from: number, to: number): Promise<void>;
 	/** The name trimmed. */
 	renamePreset(index: number, name: string): Promise<void>;
 	removePreset(index: number): Promise<void>;
