@@ -1152,13 +1152,15 @@
     return result.serialize() === doc.serialize() ? doc : result;
   }
 
-  // src/settings.ts
+  // src/domain/Priority.ts
   function usablePrefix(prefix) {
     return /^\S+$/.test(prefix);
   }
   function usableLevels(levels) {
     return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
   }
+
+  // src/settings.ts
   var DEFAULT_SETTINGS = {
     tasksFile: "TODOs Tasks.md",
     sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
