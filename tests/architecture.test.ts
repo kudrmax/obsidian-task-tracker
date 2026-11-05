@@ -9,17 +9,11 @@ const ROOT = resolve(__dirname, "..");
  * none is added. A line that no longer occurs fails too, so the list only shrinks.
  */
 const ALLOWED: readonly string[] = [
-	"src/ui/ColumnSwitch.ts → src/settings.ts",
 	"src/ui/SettingsTab.ts → src/application/ports.ts",
 	"src/ui/SettingsTab.ts → src/settings.ts",
 	"src/ui/TaskCalendarView.ts → src/application/ports.ts",
 	"src/ui/TaskCalendarView.ts → src/settings.ts",
-	"src/ui/cardSize.ts → src/settings.ts",
-	"src/ui/listWidth.ts → src/settings.ts",
-	"src/ui/quick/QuickEntryController.ts → src/settings.ts",
-	"src/ui/screens.ts → src/settings.ts",
 	"src/ui/settingsEffect.ts → src/settings.ts",
-	"src/ui/zoomLevels.ts → src/settings.ts",
 ];
 
 type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";

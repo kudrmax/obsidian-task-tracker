@@ -6,6 +6,7 @@ import type { PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
+import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
@@ -34,7 +35,12 @@ export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
-export type { ZoomLevel } from "../settings";
+export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
+export { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, LIST_WIDTH_MAX, LIST_WIDTH_MIN, sameLevels } from "../settings";
+export type { Clock } from "./ports";
+
+/** A card's height and the gap between cards before the settings are read. */
+export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
 /** A priority level, its colours in the order the settings offer them. */
 export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
