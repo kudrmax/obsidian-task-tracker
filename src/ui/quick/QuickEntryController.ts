@@ -695,6 +695,7 @@ export class QuickEntryController {
 	private key(key: QuickKey): void {
 		if (key === "enter") this.entry.enter();
 		else if (key === "escape") this.entry.escape();
+		else if (key === "altTab") this.entry.toggleSection();
 		else this.entry.indent(key === "tab" ? 1 : -1);
 	}
 

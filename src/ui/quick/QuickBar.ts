@@ -94,7 +94,8 @@ const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "
 export class QuickBar {
 	private readonly bar: HTMLElement;
 	private readonly section: HTMLButtonElement;
-	private readonly sectionRule: HTMLElement;
+	/** On the desktop the section button stands apart, in its own capsule under the field's left edge: it switches the field, it is no part of the task. */
+	private readonly mode: HTMLElement;
 	private readonly spacer: HTMLElement;
 	private readonly shifts: HTMLElement;
 	private readonly outdent: HTMLButtonElement;
@@ -118,8 +119,11 @@ export class QuickBar {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
-		this.section = Button.create(this.bar, { kind: "bar", label: "Section", title: "Section", icon: "section", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
-		this.sectionRule = el(this.bar, "span", "tc-bar-rule");
+		this.section = Button.create(this.bar, { kind: "bar", label: "Section", title: "Section (⌥Tab)", icon: "section", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
+		this.mode = el(null, "div", "tc-quick-mode");
+		parent.insertBefore(this.mode, this.bar);
+		this.mode.hidden = true;
+		for (const type of ["pointerdown", "mousedown"]) this.mode.addEventListener(type, (e) => e.preventDefault());
 		this.shifts = el(this.bar, "span", "tc-bar-shifts");
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
@@ -141,11 +145,15 @@ export class QuickBar {
 		this.bar.hidden = false;
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
 		const section = state.section === true;
+		const desktop = this.deps.desktop();
+		if (desktop && this.section.parentElement !== this.mode) this.mode.appendChild(this.section);
+		if (!desktop && this.section.parentElement !== this.bar) this.bar.prepend(this.section);
+		this.mode.hidden = !desktop || state.section === null;
 		this.section.hidden = state.section === null;
 		this.section.classList.toggle("is-set", section);
 		this.section.setAttribute("aria-pressed", String(section));
-		this.sectionRule.hidden = state.section === null || section || !state.indents;
-		this.spacer.hidden = section && this.deps.desktop();
+		reclass(this.bar, "is-idle", desktop && section);
+		this.spacer.hidden = section && desktop;
 		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents || section;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
@@ -166,6 +174,7 @@ export class QuickBar {
 		this.closePanel();
 		this.stopGlide();
 		this.bar.hidden = true;
+		this.mode.hidden = true;
 		this.follow(null);
 	}
 
@@ -181,6 +190,7 @@ export class QuickBar {
 		reclass(this.bar, "is-over", over !== null);
 		const holder = over ? this.bar.ownerDocument.body : this.parent;
 		if (this.bar.parentElement !== holder) holder.appendChild(this.bar);
+		if (this.mode.nextElementSibling !== this.bar) holder.insertBefore(this.mode, this.bar);
 		const desktop = this.deps.desktop();
 		const desk = desktop ? anchor : null;
 		const view = desk && !desk.overMenu ? this.parent.getBoundingClientRect() : null;
@@ -189,6 +199,7 @@ export class QuickBar {
 		reclass(this.bar, "is-away", desk !== null && spot === null);
 		const origin = desk?.overMenu || !view ? { left: 0, top: 0 } : view;
 		this.position(spot ? { left: px(spot.left - origin.left), top: px(spot.top - origin.top) } : over && !desktop ? this.dock(over) : {});
+		this.standMode(spot && desk?.field ? { left: px(this.modeLeft(desk.field.left, spot.left) - origin.left), top: px(spot.top - origin.top) } : null);
 		if (spot) this.sidePanel();
 		if (rise >= 1 && !this.bar.hidden && !desktop) this.glideFrom(rise);
 	}
@@ -205,6 +216,19 @@ export class QuickBar {
 	private stopGlide(): void {
 		this.bar.classList.remove(GLIDING);
 		this.bar.style.removeProperty("transform");
+	}
+
+	/** Under the field's left edge; for a field too narrow for both capsules, left of the bar so the two never overlap. */
+	private modeLeft(fieldLeft: number, barLeft: number): number {
+		const width = this.mode.getBoundingClientRect().width;
+		return this.bar.classList.contains("is-idle") ? fieldLeft : Math.min(fieldLeft, barLeft - DESIGN.deskBarGap - width);
+	}
+
+	/** The section capsule on the bar's row, its left edge by the field's; out of sight with the bar. */
+	private standMode(at: { readonly left: string; readonly top: string } | null): void {
+		reclass(this.mode, "is-away", at === null);
+		restyle(this.mode, "left", at?.left ?? null);
+		restyle(this.mode, "top", at?.top ?? null);
 	}
 
 	private position(position: BarPosition): void {
