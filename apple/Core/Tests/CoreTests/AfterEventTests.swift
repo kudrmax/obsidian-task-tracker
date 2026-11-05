@@ -2,11 +2,6 @@ import Foundation
 import Testing
 @testable import Core
 
-struct FakeCalendar: CalendarEvents {
-    let list: [CalendarEvent]
-    func events(from: Date, to: Date) async -> [CalendarEvent] { list.filter { $0.end > from && $0.start < to } }
-}
-
 @Suite struct AfterEventTests {
     static let dayEnd = Fixtures.date(5, 5)
 
@@ -70,8 +65,16 @@ struct FakeCalendar: CalendarEvents {
     let rules = try! PhoneCore(script: Fixtures.phoneScript)
     let notifications = FakeNotifications()
 
+    /// The work calendar's file as Scriptable writes it, with `events` in it.
+    static func workFile(_ events: [CalendarEvent]) -> String {
+        let iso = ISO8601DateFormatter()
+        let rows = events.map { #"{"id":"\#($0.title)","title":"\#($0.title)","start":"\#(iso.string(from: $0.start))","end":"\#(iso.string(from: $0.end))","allDay":false,"calendar":"Work"}"# }
+        return #"{"exportedAt":"2026-11-04T08:00:00Z","events":[\#(rows.joined(separator: ","))]}"#
+    }
+
     func sync(_ vault: FakeVault, _ events: [CalendarEvent], at now: Date) -> ReminderSync {
-        ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeCalendar(list: events), now: { now })
+        vault.files["calendar/work.json"] = Self.workFile(events)
+        return ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { now })
     }
 
     @Test func eachDeliveryOffersTheMeetingAsItStandsThen() async {
@@ -93,6 +96,20 @@ struct FakeCalendar: CalendarEvents {
         let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
         #expect(first?.after?.until == Fixtures.date(4, 11, 30))
         #expect(await notifications.pendingIDs.values.filter { $0.fire == Fixtures.date(4, 10) }.count == 1)
+    }
+
+    @Test func googleMeetingsCountAndTheWorkFilterApplies() async {
+        let vault = FakeVault(Fixtures.file(Self.quiet))
+        vault.files["calendar/google.json"] = #"{"exportedAt":"2026-11-04T08:00:00Z","events":[{"id":"g","title":"Lunch","start":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 10, 30)))","end":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 11)))","allDay":false,"calendar":"Personal"}]}"#
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { Fixtures.date(4, 9) }).sync()
+        let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
+        #expect(first?.after?.title == "After Lunch (1 hour)")
+    }
+
+    @Test func noCalendarFilesNoOffer() async {
+        _ = await ReminderSync(vault: FakeVault(Fixtures.file(Self.quiet)), rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { Fixtures.date(4, 9) }).sync()
+        let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
+        #expect(first != nil && first?.after == nil)
     }
 
     @Test func snoozeUntilTheMeetingEndsMovesTheTaskThere() async {

@@ -25,20 +25,13 @@ struct SettingsView: View {
                     Text("Your Obsidian vault: On My iPhone → Obsidian → your vault.")
                 }
 
-                Section {
+                Section("Permissions") {
                     permission("Notifications", allowed: model.notifications == .authorized, undecided: model.notifications == .notDetermined) {
                         await model.allowNotifications()
                     }
                     permission("Alarms", allowed: model.alarms == .authorized, undecided: model.alarms == .notDetermined) {
                         await model.allowAlarms()
                     }
-                    permission("Calendar", allowed: model.calendar == .fullAccess, undecided: model.calendar == .notDetermined) {
-                        await model.allowCalendar()
-                    }
-                } header: {
-                    Text("Permissions")
-                } footer: {
-                    Text("With the calendar a notification offers to snooze the task until your next meeting is over.")
                 }
 
                 Section {

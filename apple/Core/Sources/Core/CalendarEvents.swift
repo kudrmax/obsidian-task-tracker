@@ -1,6 +1,6 @@
 import Foundation
 
-/// A meeting in the phone's calendars.
+/// A meeting with a time, as the plugin's calendar shows it: read from the calendars' files in the vault.
 public struct CalendarEvent: Equatable, Sendable {
     public let title: String
     public let start: Date
@@ -11,17 +11,6 @@ public struct CalendarEvent: Equatable, Sendable {
         self.start = start
         self.end = end
     }
-}
-
-/// The phone's calendars: the meetings with a time that the person goes to.
-public protocol CalendarEvents: Sendable {
-    func events(from: Date, to: Date) async -> [CalendarEvent]
-}
-
-/// No calendar access: no meeting to wait out.
-public struct NoCalendarEvents: CalendarEvents {
-    public init() {}
-    public func events(from: Date, to: Date) async -> [CalendarEvent] { [] }
 }
 
 /// A notification's offer to move the task to the moment a meeting is over.
