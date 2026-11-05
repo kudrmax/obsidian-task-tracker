@@ -1,12 +1,15 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import type { CalendarOption, GoogleAccount, WorkCalendarSetup } from "../application/contracts";
+import { hexColor, isPresetColor, type CalendarOption, type GoogleAccount, type PriorityColor, type WorkCalendarSetup } from "../application/contracts";
 import type { SettingsStore } from "../application/ports";
 import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import type { Theme } from "./eventColors";
+import { inkOf, showPriorityColors } from "./priorityColors";
 import { LevelEdits } from "./priorityLevels";
 import { formatZoomLevels, parseZoomLevels } from "./zoomLevelsText";
 import { PresetEdits } from "./presetEdits";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
+import { el } from "./dom";
 
 export interface SettingsTabDeps {
 	readonly google: GoogleAccount;
@@ -64,13 +67,17 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.text(el, "Repeat marker", "Precedes the repeat rule on a task line.", this.settings.repeatMarker, (repeatMarker) => ({ repeatMarker }));
 	}
 
-	/** A row per level: its prefix, the six colours with the chosen one ringed, a bin; then Add priority. */
-	private prioritiesGroup(el: HTMLElement): void {
-		new Setting(el).setName("Priorities").setHeading();
+	/**
+	 * A row per level: its prefix, the six colours and the circle that picks any other, the chosen one ringed, the colour's
+	 * code, a card in that colour, a bin; then Add priority. The circles are drawn in the shade a card takes, so the colour
+	 * here is the colour on the screen.
+	 */
+	private prioritiesGroup(group: HTMLElement): void {
+		new Setting(group).setName("Priorities").setHeading();
 		const saved = new LevelEdits(() => this.settings.priorities, (priorities) => this.plugin.update({ priorities }));
 		const redrawn = new LevelEdits(() => this.settings.priorities, (priorities) => this.updateLevels(priorities));
 		this.settings.priorities.forEach((level, index) => {
-			const row = el.createDiv("setting-item tc-level-row");
+			const row = group.createDiv("setting-item tc-level-row");
 			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void saved.rename(index, value));
 			prefix.inputEl.addClass("tc-level-prefix");
 			const swatches = row.createDiv("tc-swatches");
@@ -79,11 +86,67 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				swatch.el.dataset.priority = color;
 				swatch.setOn(color === level.color);
 			}
+			const custom = !isPresetColor(level.color);
+			const well = el(swatches, "div", "tc-swatch-well");
+			if (custom) well.dataset.priority = level.color;
+			well.toggleClass("is-on", custom);
+			el(well, "span", "tc-swatch-well-inner");
+			const picker = well.createEl("input", { cls: "tc-swatch-well-input", type: "color", attr: { "aria-label": "Any colour" } });
+			picker.value = inkOf(level.color, this.theme).toLowerCase();
+			const hex = el(row, "div", "tc-level-hex");
+			el(hex, "span", "tc-level-hex-mark", "#");
+			const code = new TextComponent(hex).setValue(inkOf(level.color, this.theme).slice(1));
+			code.inputEl.addClass("tc-level-hex-input");
+			code.inputEl.setAttribute("aria-label", "Colour code");
+			const preview = el(row, "div", "tc-level-preview");
+			preview.dataset.priority = level.color;
+			el(preview, "span", "tc-progress-dot");
+			el(preview, "span", "tc-level-preview-title", "Call mom");
+			el(preview, "span", "tc-level-preview-time", "10:00");
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void redrawn.remove(index));
+			picker.addEventListener("input", () => {
+				const color = this.colorOf(picker.value);
+				if (!color) return;
+				this.previewLevel(index, color, preview, code);
+			});
+			picker.addEventListener("change", () => {
+				const color = this.colorOf(picker.value);
+				if (color) void redrawn.recolour(index, color);
+			});
+			code.onChange((value) => {
+				const color = this.colorOf(value);
+				if (color) this.previewLevel(index, color, preview);
+			});
+			code.inputEl.addEventListener("blur", () => {
+				const color = this.colorOf(code.getValue());
+				if (color && color !== level.color) void redrawn.recolour(index, color);
+				else this.previewLevel(index, level.color, preview, code);
+			});
+			code.inputEl.addEventListener("keydown", (e) => {
+				if (e.key === "Enter") code.inputEl.blur();
+			});
 		});
-		new Setting(el)
-			.setDesc("A task whose text starts with the prefix gets its colour. Levels show in this order in the task menu and in the bar shown while a task is typed.")
+		new Setting(group)
+			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Levels show in this order in the task menu and in the bar shown while a task is typed.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void redrawn.add()));
+	}
+
+	private get theme(): Theme {
+		return document.body.hasClass("theme-light") ? "light" : "dark";
+	}
+
+	/** A code read as a level's colour: a preset's own shade in this theme is that preset, so it keeps its other shade. */
+	private colorOf(text: string): PriorityColor | null {
+		const hex = hexColor(text);
+		if (!hex) return null;
+		return PRIORITY_COLORS.find((preset) => inkOf(preset, this.theme) === hex) ?? hex;
+	}
+
+	/** The colour being picked, on the row's card and everywhere else, before it is saved; with `code`, its code there too. */
+	private previewLevel(index: number, color: PriorityColor, preview: HTMLElement, code?: TextComponent): void {
+		showPriorityColors(this.settings.priorities.map((level, i) => (i === index ? { ...level, color } : level)));
+		preview.dataset.priority = color;
+		code?.setValue(inkOf(color, this.theme).slice(1));
 	}
 
 	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */

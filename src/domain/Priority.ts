@@ -1,11 +1,25 @@
-/** The fixed set of colours a priority level takes; the order the settings offer them in. */
+/** The colours the settings offer first, in their order; each has its own shade in either theme. */
 export const PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"] as const;
-export type PriorityColor = (typeof PRIORITY_COLORS)[number];
+export type PresetColor = (typeof PRIORITY_COLORS)[number];
+/** A level's colour: one of the presets, or any other as `#RRGGBB`, the same in both themes. */
+export type PriorityColor = PresetColor | `#${string}`;
 
 /** A priority level: a task whose text starts with `prefix` gets the tint of `color`. */
 export interface PriorityLevel {
 	readonly prefix: string;
 	readonly color: PriorityColor;
+}
+
+export function isPresetColor(color: string): color is PresetColor {
+	return (PRIORITY_COLORS as readonly string[]).includes(color);
+}
+
+const HEX_RE = /^#?([0-9a-f]{6})$/i;
+
+/** A colour's code as typed or pasted, with or without its `#`: six hex digits make `#RRGGBB`, anything else none. */
+export function hexColor(text: string): `#${string}` | null {
+	const m = HEX_RE.exec(text.trim());
+	return m ? `#${m[1].toUpperCase()}` : null;
 }
 
 /** A prefix marks a task only when it is one word: a line's first word is matched against it. */
