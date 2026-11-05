@@ -37,7 +37,7 @@ interface FakeEvent {
 	endDate: Date;
 	isAllDay: boolean;
 	location: string | null;
-	calendar: { title: string; color: { hex: string } };
+	calendar: { identifier: string; title: string; color: { hex: string } };
 	attendees: { isCurrentUser: boolean; status: string }[] | null;
 }
 
@@ -49,7 +49,7 @@ function event(over: Partial<FakeEvent> = {}): FakeEvent {
 		endDate: new Date(2026, 9, 30, 10, 15),
 		isAllDay: false,
 		location: null,
-		calendar: { title: "Work", color: { hex: "1BADF8" } },
+		calendar: { identifier: "cal-work", title: "Work", color: { hex: "1BADF8" } },
 		attendees: null,
 		...over,
 	};
@@ -74,6 +74,12 @@ function scriptable(files: Map<string, string>, events: FakeEvent[], bookmarks =
 			asked.push({ start, end });
 			return events;
 		},
+	});
+	vi.stubGlobal("Calendar", {
+		forEvents: async () => [
+			{ identifier: "cal-work", title: "Work", color: { hex: "1BADF8" } },
+			{ identifier: "cal-empty", title: "Holidays", color: { hex: "#FF0000" } },
+		],
 	});
 	vi.stubGlobal("Device", { name: () => "iPhone" });
 	vi.stubGlobal("config", { runsInApp: false });
@@ -181,6 +187,20 @@ describe("WorkCalendarExportScript", () => {
 			await runInScriptable(loader);
 			vi.useRealTimers();
 			expect(asked).toEqual([{ start: new Date(2026, 9, 29), end: new Date(2026, 10, 14) }]);
+		});
+
+		it("lists every calendar of the phone with its id, and the days it covers", async () => {
+			const { files, loader } = await setUp([event()]);
+			vi.useFakeTimers({ now: new Date(2026, 9, 30, 2, 30), toFake: ["Date"] });
+			await runInScriptable(loader);
+			vi.useRealTimers();
+			const file = JSON.parse(files.get(`${VAULT}/calendar/work.json`)!) as Record<string, unknown> & { events: { calendarId: string }[] };
+			expect(file.calendars).toEqual([
+				{ calendar: "Work", calendarId: "cal-work", color: "#1BADF8" },
+				{ calendar: "Holidays", calendarId: "cal-empty", color: "#FF0000" },
+			]);
+			expect(file.events[0].calendarId).toBe("cal-work");
+			expect([file.from, file.to]).toEqual([new Date(2026, 9, 29).toISOString(), new Date(2026, 10, 14).toISOString()]);
 		});
 
 		it("gives each occurrence of a repeating event its own id", async () => {

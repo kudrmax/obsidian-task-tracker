@@ -17,9 +17,13 @@ const declinedByMe = (e) => (e.attendees ?? []).some((a) => a.isCurrentUser && a
 const hexColor = (color) => (color.hex.startsWith("#") ? color.hex : "#" + color.hex);
 
 const events = (await CalendarEvent.between(start, end)).filter((e) => !declinedByMe(e));
+const calendars = await Calendar.forEvents();
 const payload = {
 	exportedAt: new Date().toISOString(),
 	device: Device.name(),
+	from: start.toISOString(),
+	to: end.toISOString(),
+	calendars: calendars.map((c) => ({ calendar: c.title, calendarId: c.identifier, color: hexColor(c.color) })),
 	events: events.map((e) => ({
 		id: `${e.identifier}@${e.startDate.toISOString()}`,
 		title: e.title,
@@ -27,6 +31,7 @@ const payload = {
 		end: e.endDate.toISOString(),
 		allDay: e.isAllDay,
 		calendar: e.calendar.title,
+		calendarId: e.calendar.identifier,
 		color: hexColor(e.calendar.color),
 		location: e.location ?? null,
 		source: "apple",
