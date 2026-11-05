@@ -10,6 +10,7 @@ final class FakeVault: TasksVault, @unchecked Sendable {
     var files: [String: String] = [:]
     init(_ text: String) { self.text = text }
     func read(path: String) -> String? { files[path] }
+    func write(path: String, text: String) throws { files[path] = text }
     func read() throws -> (tasks: String, settingsJSON: String) {
         if let error = readFails { throw error }
         return (text, "")

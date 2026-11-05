@@ -1,4 +1,5 @@
 import AlarmKit
+import EventKit
 import Core
 import Foundation
 import UserNotifications
@@ -12,6 +13,7 @@ final class SettingsModel {
     private(set) var folderName = UserDefaults.standard.string(forKey: folderKey)
     private(set) var notifications = UNAuthorizationStatus.notDetermined
     private(set) var alarms = AlarmManager.AuthorizationState.notDetermined
+    private(set) var calendar = EKAuthorizationStatus.notDetermined
 
     var alarmSound = AppSettings.alarmSound {
         didSet {
@@ -52,8 +54,14 @@ final class SettingsModel {
         await refresh()
     }
 
+    func allowCalendar() async {
+        await PhoneCalendarExport.requestAccess()
+        await refresh()
+    }
+
     private func loadPermissions() async {
         notifications = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         alarms = AlarmManager.shared.authorizationState
+        calendar = EKEventStore.authorizationStatus(for: .event)
     }
 }
