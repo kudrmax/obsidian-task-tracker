@@ -1,4 +1,4 @@
-import type { TaskItem } from "../../application/contracts";
+import { MINUTES_PER_DAY, type TaskItem } from "../../application/contracts";
 import { shownCardSize } from "../cardSize";
 import { LAYOUT } from "../design";
 import { stretchedSpan } from "../timelineLayout";
@@ -374,7 +374,7 @@ export class DragController {
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
 			const at = snapMinutes(timeline.minutesAt(ev.clientY), step);
-			if (edge === "end") end = Math.min(LAYOUT.minutesPerDay, Math.max(start, at));
+			if (edge === "end") end = Math.min(MINUTES_PER_DAY, Math.max(start, at));
 			else if (slot.end === null) start = Math.max(0, Math.min(at, slot.start));
 			else start = Math.max(0, Math.min(at, end));
 			if (start === shown.start && end === shown.end) return;

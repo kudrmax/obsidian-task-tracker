@@ -1,4 +1,4 @@
-import type { GroupName, PriorityLevel, TaskItem } from "../../application/contracts";
+import { type GroupName, nextProgress, type PriorityLevel, type TaskItem } from "../../application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -10,17 +10,17 @@ import { datePage } from "./DatePage";
 import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
-import type { LevelTile, SectionChoice } from "./TaskMenu";
+import { type LevelTile, progressLabel, type SectionChoice } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
 	return count === 1 ? "1 task" : `${count} tasks`;
 }
 
-/** In progress, unless every task already is: then Stop progress. */
+/** The progress tile for every task at once: what `nextProgress` sets on them all, and its name. */
 export function bulkProgress(items: readonly TaskItem[]): { readonly label: string; readonly status: TaskStatus } {
-	const all = items.every((item) => item.status === "inProgress");
-	return all ? { label: "Stop progress", status: "todo" } : { label: "In progress", status: "inProgress" };
+	const status = nextProgress(items.map((item) => item.status));
+	return { label: progressLabel(status), status };
 }
 
 /** The levels, the one every task shares on; with mixed levels none is. */

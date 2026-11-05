@@ -1,8 +1,8 @@
+import { MINUTES_PER_DAY } from "../application/contracts";
 import type { LocalDate } from "./types";
 
 const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const MINUTES_PER_HOUR = 60;
-const MINUTES_PER_DAY = 1440;
 
 const two = (n: number) => String(n).padStart(2, "0");
 

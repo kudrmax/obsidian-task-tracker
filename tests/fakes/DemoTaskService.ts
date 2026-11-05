@@ -1,9 +1,11 @@
-import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { hitIn } from "../../src/domain/search";
+import { canRemind } from "../../src/domain/Task";
+import { plainText } from "../../src/domain/TaskText";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
@@ -118,6 +120,7 @@ export class DemoTaskService implements TaskService {
 		return {
 			key: { section, index, path: [], raw: this.raw(t) },
 			text: t.text,
+			title: plainText(t.text),
 			status: t.status,
 			dueDate: t.dueDate,
 			slot: t.slot,
@@ -134,7 +137,7 @@ export class DemoTaskService implements TaskService {
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()) },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot) },
 		};
 	}
 
@@ -348,7 +351,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async setDescription(key: TaskKey, markdown: string): Promise<void> {
-		this.find(key).description = markdown.trim() === "" ? null : markdown;
+		this.find(key).description = markdown.trim() === "" || markdown.trim() === DESCRIPTION_TEMPLATE.trim() ? null : markdown;
 		this.changed();
 	}
 

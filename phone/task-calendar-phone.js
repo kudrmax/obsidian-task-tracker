@@ -111,6 +111,8 @@
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var TIME_RE = /^(\d{2}):(\d{2})$/;
   var DAY_MS = 864e5;
+  var HOUR_MINUTES = 60;
+  var MINUTES_PER_DAY = 1440;
   function pad2(n) {
     return n < 10 ? `0${n}` : String(n);
   }
@@ -164,14 +166,14 @@
     const hours = Number(m[1]);
     const minutes = Number(m[2]);
     if (hours > 24 || minutes > 59) return null;
-    const total = hours * 60 + minutes;
-    return total > 1440 ? null : total;
+    const total = hours * HOUR_MINUTES + minutes;
+    return total > MINUTES_PER_DAY ? null : total;
   }
 
   // src/domain/DayBoundary.ts
-  var DAY_MINUTES = 1440;
-  var HOUR_MINUTES = 60;
-  var DAY_HOURS = 24;
+  var HOUR_MINUTES2 = 60;
+  var DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES2;
+  var MIN_SLOT_MINUTES = 5;
   var DayBoundary = class _DayBoundary {
     static {
       this.MIDNIGHT = new _DayBoundary(0);
@@ -181,17 +183,21 @@
       this.startHour = hour >= 0 && hour < DAY_HOURS ? hour : 0;
     }
     get startMinute() {
-      return this.startHour * HOUR_MINUTES;
+      return this.startHour * HOUR_MINUTES2;
     }
     dayOf(at) {
-      return this.dayOfClock(localDateOf(at), at.getHours() * HOUR_MINUTES + at.getMinutes());
+      return this.dayOfClock(localDateOf(at), at.getHours() * HOUR_MINUTES2 + at.getMinutes());
     }
     dayOfSlot(slot) {
       return this.dayOfClock(slot.date, slot.start);
     }
     /** Minutes from the start of `day` to `at`; negative before it, past 1440 after it. */
     offsetOf(day, at) {
-      return this.offsetOfClock(day, localDateOf(at), at.getHours() * HOUR_MINUTES + at.getMinutes());
+      return this.offsetOfClock(day, localDateOf(at), at.getHours() * HOUR_MINUTES2 + at.getMinutes());
+    }
+    /** Minutes from the start of `day` to `start` and to `end`, cut at the day's edges: an event that began before it or ends after it. */
+    clipToDay(day, start, end) {
+      return { start: Math.max(0, this.offsetOf(day, start)), end: Math.min(MINUTES_PER_DAY, this.offsetOf(day, end)) };
     }
     /** Minutes from the start of `day` to the start and the end of `slot`. */
     spanOf(slot, day) {
@@ -201,8 +207,8 @@
     /** The slot that takes the minutes from `start` to `end` past the start of `day`, at the clock's date and time. */
     slotAt(day, start, end) {
       const clock = this.startMinute + start;
-      const nextDay = clock >= DAY_MINUTES;
-      const slotStart = nextDay ? clock - DAY_MINUTES : clock;
+      const nextDay = clock >= MINUTES_PER_DAY;
+      const slotStart = nextDay ? clock - MINUTES_PER_DAY : clock;
       return { date: nextDay ? addDays(day, 1) : day, start: slotStart, end: end === null ? null : slotStart + end - start };
     }
     /** The clock hour the `index`-th hour line of a day stands at. */
@@ -211,19 +217,19 @@
     }
     /** Minutes from the start of a day to `hour` o'clock in it. */
     offsetOfHour(hour) {
-      return (hour - this.startHour + DAY_HOURS) % DAY_HOURS * HOUR_MINUTES;
+      return (hour - this.startHour + DAY_HOURS) % DAY_HOURS * HOUR_MINUTES2;
     }
     /** The slot moved and cut to lie within its day and last at least `stepMinutes`; one without a duration starts a step before the day ends. */
     clamp(slot, stepMinutes) {
       const day = this.dayOfClock(slot.date, Math.max(0, slot.start));
       const span = this.spanOf(slot, day);
-      if (span.end === null) return this.slotAt(day, Math.max(0, Math.min(span.start, DAY_MINUTES - stepMinutes)), null);
+      if (span.end === null) return this.slotAt(day, Math.max(0, Math.min(span.start, MINUTES_PER_DAY - stepMinutes)), null);
       let { start, end } = span;
       if (start < 0) {
         end -= start;
         start = 0;
       }
-      end = Math.min(Math.max(end, stepMinutes), DAY_MINUTES);
+      end = Math.min(Math.max(end, stepMinutes), MINUTES_PER_DAY);
       start = Math.max(0, Math.min(start, end - stepMinutes));
       return this.slotAt(day, start, end);
     }
@@ -231,7 +237,7 @@
       return minutes < this.startMinute ? addDays(date, -1) : date;
     }
     offsetOfClock(day, date, minutes) {
-      return daysBetween(day, date) * DAY_MINUTES + minutes - this.startMinute;
+      return daysBetween(day, date) * MINUTES_PER_DAY + minutes - this.startMinute;
     }
   };
 
@@ -248,6 +254,7 @@
 
   // src/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
+  var DESCRIPTION_TEMPLATE = "- ";
   function indentOf(line) {
     return INDENT_RE.exec(line)[0];
   }
@@ -275,6 +282,7 @@
     return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
   }
   function markdownLines(markdown) {
+    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
     return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
   }
 
@@ -417,7 +425,6 @@
   };
 
   // src/domain/TaskLine.ts
-  var DAY_MINUTES2 = 1440;
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
   var DATE = "(\\d{4}-\\d{2}-\\d{2})";
   var TIME = "(\\d{2}:\\d{2})";
@@ -487,11 +494,11 @@
     slotOf(m) {
       const date = m[2];
       const start = parseHHMM(m[3]);
-      if (!isValidLocalDate(date) || start === null || start >= DAY_MINUTES2) return null;
+      if (!isValidLocalDate(date) || start === null || start >= MINUTES_PER_DAY) return null;
       if (m[4] === void 0) return { date, start, end: null };
       const end = parseHHMM(m[4]);
       if (end === null || start === end) return null;
-      return { date, start, end: end < start ? end + DAY_MINUTES2 : end };
+      return { date, start, end: end < start ? end + MINUTES_PER_DAY : end };
     }
   };
   var slicers = /* @__PURE__ */ new Map();
@@ -521,7 +528,7 @@
     if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
     if (task.slot) {
       const { date, start, end } = task.slot;
-      line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES2 ? end - DAY_MINUTES2 : end)}`}`;
+      line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > MINUTES_PER_DAY ? end - MINUTES_PER_DAY : end)}`}`;
     }
     if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
     return line;
@@ -772,7 +779,7 @@
     }
     /**
      * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
-     * description has, else its subtasks'. The same text changes nothing; an empty one takes the description away.
+     * description has, else its subtasks'. The same text changes nothing; an empty one, or a lone empty point, takes the description away.
      */
     setDescription(entry, markdown) {
       const lines = markdownLines(markdown);
@@ -1061,8 +1068,7 @@
   }
 
   // src/domain/operations.ts
-  var SLOT_STEP = 5;
-  var HOUR_MINUTES2 = 60;
+  var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
     return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
@@ -1102,14 +1108,14 @@
     return patch(doc, entry, { reminder });
   }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
-    const clamped = boundary.clamp(slot, SLOT_STEP);
+    const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
     const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
     return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
   }
   function snoozedSlot(slot, now, minutes) {
     const at = new Date(now.getTime() + minutes * MINUTE_MS);
-    const start = at.getHours() * HOUR_MINUTES2 + at.getMinutes();
+    const start = at.getHours() * HOUR_MINUTES3 + at.getMinutes();
     return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
   }
   function toList(doc, entry, date, today) {
@@ -1406,8 +1412,7 @@
   }
 
   // src/application/PhoneReminderService.ts
-  var DAY_MINUTES3 = 1440;
-  var HOUR_MINUTES3 = 60;
+  var HOUR_MINUTES4 = 60;
   function clockOf(date, minutes) {
     const [year, month, day] = date.split("-").map(Number);
     return new Date(year, month - 1, day, 0, minutes);
@@ -1454,11 +1459,11 @@
       return {
         id: entry.raw,
         title: plainText(entry.task.text),
-        body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % DAY_MINUTES3)}`,
+        body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
         kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
         date: slot.date,
         start: clockOf(slot.date, slot.start),
-        dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES3)
+        dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES4)
       };
     }
   };

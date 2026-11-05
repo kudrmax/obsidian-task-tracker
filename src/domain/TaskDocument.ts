@@ -378,7 +378,7 @@ export class TaskDocument {
 
 	/**
 	 * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
-	 * description has, else its subtasks'. The same text changes nothing; an empty one takes the description away.
+	 * description has, else its subtasks'. The same text changes nothing; an empty one, or a lone empty point, takes the description away.
 	 */
 	setDescription(entry: TaskEntry, markdown: string): TaskDocument {
 		const lines = markdownLines(markdown);

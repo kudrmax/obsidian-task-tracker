@@ -7,6 +7,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 	return {
 		key: { section: list, index: 0, path: [], raw: `- [ ] ${text}` },
 		text,
+		title: text,
 		status: list === "done" ? "done" : "todo",
 		dueDate: null,
 		slot: null,
@@ -19,7 +20,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 		list,
 		isSubtask: false,
 		day: null,
-		can: { postpone: true, removeDue: false },
+		can: { postpone: true, removeDue: false, remind: false },
 		subtasks: [],
 		progress: null,
 		parentText: null,

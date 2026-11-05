@@ -8,11 +8,17 @@ import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
 
 export type { GroupName, ReminderKind, SectionKey };
+/** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
+export { nextProgress, nextReminder } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
+/** A slot on the timeline moved, as long as it is, to lie within its day. */
+export { clampSlot } from "../domain/DayBoundary";
+/** Minutes in a day: the timeline's length. */
+export { MINUTES_PER_DAY } from "../domain/LocalDate";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */
 export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
@@ -23,8 +29,10 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
 export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
-/** A task's text cut into text and links, or plain, each link by its word. */
-export { plainText, textParts, type TextPart } from "../domain/TaskText";
+/** What a new description starts as in the editor: one empty point, which alone is no description. */
+export { DESCRIPTION_TEMPLATE } from "../domain/description";
+/** A task's text cut into text and links, each link by its word. */
+export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
 export type { ZoomLevel } from "../settings";
 /** A priority level, its colours in the order the settings offer them. */
@@ -74,6 +82,8 @@ export interface SubtaskProgress {
 export interface TaskItem {
 	readonly key: TaskKey;
 	readonly text: string;
+	/** `text` with each link's word in its place: for where a link can't be shown, such as a question about the task. */
+	readonly title: string;
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
@@ -95,8 +105,8 @@ export interface TaskItem {
 	readonly isSubtask: boolean;
 	/** The day the task stands on: its slot's, today for Now, else its due date. */
 	readonly day: LocalDate | null;
-	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's). */
-	readonly can: { readonly postpone: boolean; readonly removeDue: boolean };
+	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task on a time). */
+	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean };
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -306,7 +316,7 @@ export interface TaskService {
 	rename(key: TaskKey, text: string): Promise<void>;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes
-	 * nothing, an empty one takes it away. Blank lines go: they would end the task in the file.
+	 * nothing, an empty one or `DESCRIPTION_TEMPLATE` alone takes it away. Blank lines go: they would end the task in the file.
 	 */
 	setDescription(key: TaskKey, markdown: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;
