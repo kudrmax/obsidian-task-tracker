@@ -8,6 +8,8 @@ import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
 
 export type { GroupName, ReminderKind, SectionKey };
+/** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
+export { nextProgress, nextReminder } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";
@@ -99,8 +101,8 @@ export interface TaskItem {
 	readonly isSubtask: boolean;
 	/** The day the task stands on: its slot's, today for Now, else its due date. */
 	readonly day: LocalDate | null;
-	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's). */
-	readonly can: { readonly postpone: boolean; readonly removeDue: boolean };
+	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task on a time). */
+	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean };
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];

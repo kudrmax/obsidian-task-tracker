@@ -1,4 +1,4 @@
-import { type GroupName, plainText, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, nextProgress, nextReminder, plainText, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -36,11 +36,16 @@ export interface EditRow {
 	readonly icon: IconName;
 }
 
+/** The progress tile's name for the status it sets: back to todo stops the progress. */
+export function progressLabel(next: TaskStatus): string {
+	return next === "todo" ? "Stop progress" : "In progress";
+}
+
 /** The status group: Done first, the most used; Stop last for a task that repeats. */
 export function statusTiles(item: TaskItem): readonly StatusTile[] {
 	return [
 		{ id: "done", label: "Done", icon: "done" },
-		{ id: "progress", label: item.status === "inProgress" ? "Stop progress" : "In progress", icon: "progress" },
+		{ id: "progress", label: progressLabel(nextProgress([item.status])), icon: "progress" },
 		{ id: "wontdo", label: "Won’t do", icon: "wontdo" },
 		...(item.repeat !== null && item.repeatable ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
 	];
@@ -54,18 +59,12 @@ function repeatRow(rule: RepeatRule | null): EditRow {
 export type { SectionChoice } from "./SectionChooser";
 
 const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", none: "Off" };
-const REMINDER_ORDER: readonly ReminderKind[] = ["notification", "alarm", "none"];
-
-/** A tap on the reminder row: the next kind, round. */
-export function nextReminder(kind: ReminderKind): ReminderKind {
-	return REMINDER_ORDER[(REMINDER_ORDER.indexOf(kind) + 1) % REMINDER_ORDER.length];
-}
 
 /** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
-		...(item.slot === null ? [] : [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const]),
+		...(item.can.remind ? [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const] : []),
 		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
 		...(item.repeatable ? [repeatRow(item.repeat)] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
@@ -309,10 +308,9 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.upper);
 		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
 		const { item, actions, levels } = this.context;
-		const nextStatus: TaskStatus = item.status === "inProgress" ? "todo" : "inProgress";
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
-			progress: this.pick(() => actions.setStatus(nextStatus)),
+			progress: this.pick(() => actions.setStatus(nextProgress([item.status]))),
 			wontdo: () => this.askFor("wontdo"),
 			stop: () => this.askFor("stop"),
 		};

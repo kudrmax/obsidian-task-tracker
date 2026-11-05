@@ -4,6 +4,7 @@ import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { hitIn } from "../../src/domain/search";
+import { canRemind } from "../../src/domain/Task";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
@@ -134,7 +135,7 @@ export class DemoTaskService implements TaskService {
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()) },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot) },
 		};
 	}
 

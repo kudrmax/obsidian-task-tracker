@@ -45,7 +45,7 @@ describe("toItem", () => {
 			list: "now",
 			isSubtask: false,
 			day: T,
-			can: { postpone: true, removeDue: false },
+			can: { postpone: true, removeDue: false, remind: true },
 			subtasks: [],
 			progress: null,
 			parentText: null, description: null,
@@ -97,12 +97,16 @@ describe("toItem on a day", () => {
 
 	it("may be put off unless done, and its due date taken off unless it has none or today's", () => {
 		expect(d.tasks("now").map((e) => toItem(e, T).can)).toEqual([
-			{ postpone: true, removeDue: false },
-			{ postpone: true, removeDue: false },
-			{ postpone: true, removeDue: true },
+			{ postpone: true, removeDue: false, remind: false },
+			{ postpone: true, removeDue: false, remind: false },
+			{ postpone: true, removeDue: true, remind: false },
 		]);
-		expect(toItem(d.tasks("soon")[0], T).can).toEqual({ postpone: true, removeDue: false });
-		expect(toItem(d.tasks("done")[0], T).can).toEqual({ postpone: false, removeDue: true });
+		expect(toItem(d.tasks("soon")[0], T).can).toEqual({ postpone: true, removeDue: false, remind: false });
+		expect(toItem(d.tasks("done")[0], T).can).toEqual({ postpone: false, removeDue: true, remind: false });
+	});
+
+	it("reminds only on a time", () => {
+		expect(d.tasks("soon").map((e) => toItem(e, T).can.remind)).toEqual([false, false, true]);
 	});
 });
 

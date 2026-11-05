@@ -19,7 +19,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 		list,
 		isSubtask: false,
 		day: null,
-		can: { postpone: true, removeDue: false },
+		can: { postpone: true, removeDue: false, remind: false },
 		subtasks: [],
 		progress: null,
 		parentText: null,

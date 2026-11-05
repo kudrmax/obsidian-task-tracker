@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
-import { editRows, nextPriority, nextReminder, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
+import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, "2026-11-01");
@@ -84,8 +84,11 @@ describe("the edit group", () => {
 		expect(editRows(item({ description: "- note" })).map((r) => r.id)).not.toContain("reminder");
 	});
 
-	it("a tap on the reminder goes notification, alarm, off, and round", () => {
-		expect([nextReminder("notification"), nextReminder("alarm"), nextReminder("none")]).toEqual(["alarm", "none", "notification"]);
+	it("offers the reminder by what the task may have, not by its slot", () => {
+		const slot = { date: "2026-11-03", start: 600, end: null };
+		const can = { postpone: true, removeDue: false };
+		expect(editRows(item({ description: "- note", slot, can: { ...can, remind: false } })).map((r) => r.id)).not.toContain("reminder");
+		expect(editRows(item({ description: "- note", can: { ...can, remind: true } })).map((r) => r.id)).toContain("reminder");
 	});
 
 	it("shows no name beside Section for a task outside any", () => {
@@ -151,7 +154,7 @@ describe("the menu", () => {
 	});
 
 	it("offers Remove due date in the picker only when the item says its date may go", () => {
-		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false } }));
+		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false, remind: false } }));
 		const tiles = panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile");
 		tiles[tiles.length - 1].click();
 		expect(panel().querySelector(".tc-picker-grid")).not.toBeNull();
@@ -415,6 +418,23 @@ describe("the menu", () => {
 		const actions = open(item());
 		panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")[1].click();
 		expect(actions.setPriority).toHaveBeenCalledWith("p2");
+	});
+
+	it("sets the next reminder's kind on a tap on Reminder", () => {
+		const actions = open(item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder: "alarm" }));
+		row("Reminder").click();
+		expect(actions.setReminder).toHaveBeenCalledWith("none");
+	});
+
+	it("starts and stops the progress from its tile", () => {
+		const tile = () => panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-status .tc-menu-tile")[1];
+		const start = open(item());
+		tile().click();
+		expect(start.setStatus).toHaveBeenCalledWith("inProgress");
+		document.body.innerHTML = "";
+		const stop = open(item({ status: "inProgress" }));
+		tile().click();
+		expect(stop.setStatus).toHaveBeenCalledWith("todo");
 	});
 
 	it("marks the task done from its tile", () => {

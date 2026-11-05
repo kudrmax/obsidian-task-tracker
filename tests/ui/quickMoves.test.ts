@@ -32,7 +32,7 @@ describe("moveTiles", () => {
 	});
 
 	it("puts off nowhere a task the item says may not be put off", () => {
-		expect(ids(item({ can: { postpone: false, removeDue: false } }))).toEqual([]);
+		expect(ids(item({ can: { postpone: false, removeDue: false, remind: false } }))).toEqual([]);
 	});
 
 	it("puts a done task off nowhere", () => {
