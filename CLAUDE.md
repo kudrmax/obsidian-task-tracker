@@ -33,4 +33,8 @@ The release is the task; installing it through BRAT is a try, not a must. If the
 
 ## Files
 
-Delete only with `trash`, never `rm`. Work on branches; `design` holds the docs, `mvp` the implementation.
+Delete only with `trash`, never `rm`.
+
+## Branches
+
+`master` is the only long-lived branch; the main clone stays on it. Every piece of work is a branch from a fresh master in its own worktree under `.worktrees/`. Once Max approves: merge `origin/master` into the branch and run the tests there; then, in the main clone, `git pull --ff-only`, `git merge --no-ff <branch>` and `git push origin master` at once, then the release. No PRs. (`mvp` was removed on 2026-11-05: it only mirrored master.)
