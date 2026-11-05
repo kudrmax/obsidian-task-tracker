@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CalendarEvent, type CalendarService, type DayEvents, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
 import { DayData, type DayPart } from "../../src/ui/DayData";
 import type { LocalDate } from "../../src/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -25,6 +25,13 @@ class SlowCalendars implements CalendarService {
 	private readonly waiting: (() => void)[] = [];
 	readonly last = new Map<LocalDate, DayEvents>();
 
+	/** `asked`: the day alone was fetched; `around`: the day with its neighbours. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.last.get(date) ?? null;
+		if (reason === "peek" && cached) return { cached, fresh: null };
+		return { cached, fresh: () => (reason === "refresh" ? this.eventsOn(date) : this.eventsAround(date)) };
+	}
+
 	eventsOn(date: LocalDate): Promise<DayEvents> {
 		this.asked.push(date);
 		return this.fetch(date);
@@ -45,12 +52,12 @@ class SlowCalendars implements CalendarService {
 		);
 	}
 
-	cached(date: LocalDate): DayEvents | null {
-		return this.last.get(date) ?? null;
-	}
-
 	onChange(): () => void {
 		return () => {};
+	}
+
+	keepFresh(): CalendarPoll {
+		throw new Error("DayData does not poll");
 	}
 
 	answer(): void {
@@ -81,13 +88,13 @@ describe("DayData", () => {
 	it("reads the sections the menus offer with the lists, for the day shown", async () => {
 		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const asked: LocalDate[] = [];
-		const offer = tasks.sectionOffer.bind(tasks);
-		tasks.sectionOffer = (date) => (asked.push(date), offer(date));
+		const screen = tasks.screen.bind(tasks);
+		tasks.screen = (date) => (asked.push(date), screen(date));
 		const { data, setDate } = setup(tasks);
 		setDate(TOMORROW);
 		await data.tasks();
 		expect(asked).toEqual([TOMORROW]);
-		expect(data.offer).toEqual(await offer(TOMORROW));
+		expect(data.offer).toEqual((await screen(TOMORROW)).offer);
 	});
 
 	it("another day asks for it with its neighbours", async () => {
@@ -200,7 +207,7 @@ describe("DayData", () => {
 	});
 
 	it("shows nothing of a missing file, and no events or statuses with it", async () => {
-		const missing = { normalize: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
+		const missing = { screen: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
 		const { data, calendars } = setup(missing);
 		const opened = data.load();
 		calendars.answer();
@@ -217,7 +224,7 @@ describe("DayData", () => {
 		let gone = true;
 		const demo = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const flaky = new Proxy(demo, {
-			get: (target, name, receiver) => (gone && name === "normalize" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
+			get: (target, name, receiver) => (gone && name === "screen" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
 		});
 		const { data, calendars, parts } = setup(flaky);
 		const opened = data.load();
@@ -258,7 +265,7 @@ describe("DayData", () => {
 
 	it("stays silent when a poll brings the same events only fetched later", async () => {
 		const { data, calendars, parts } = setup();
-		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
+		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
 		let at = 0;
 		calendars.eventsOn = async () => later(at++);
 		await data.calendars();

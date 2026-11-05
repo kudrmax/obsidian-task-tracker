@@ -196,6 +196,17 @@ export interface DroppedTask {
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
 
+/** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
+export interface ScreenView {
+	readonly day: DayView;
+	readonly soon: readonly TaskItem[];
+	readonly inbox: readonly TaskItem[];
+	readonly backlog: readonly TaskItem[];
+	readonly done: readonly TaskItem[];
+	readonly sections: Readonly<Record<GroupedList, readonly ListSection[]>>;
+	readonly offer: SectionOffer;
+}
+
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
@@ -211,6 +222,8 @@ export interface TaskService {
 	/** `text` with `prefix` first in place of the one it had; null takes it off. */
 	withPriority(text: string, prefix: string | null): string;
 
+	/** Everything the screen shows of the tasks for `date`, the file normalized first. Rejects with TasksFileMissingError. */
+	screen(date: LocalDate): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;
@@ -432,8 +445,12 @@ export interface CalendarEvent {
 	readonly source: CalendarSource;
 }
 
+/** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */
+export type SourceKind = "synced" | "exported";
+
 export interface SourceStatus {
 	readonly source: CalendarSource;
+	readonly kind: SourceKind;
 	readonly ok: boolean;
 	/** "12 events", "not logged in", "file missing", an error text. */
 	readonly message: string;
@@ -450,19 +467,53 @@ export interface DayEvents {
 	readonly statuses: readonly SourceStatus[];
 }
 
+/**
+ * Why the screen wants a day's events. `open`: the day opens on the screen, its events fetched with the days next to it,
+ * one request per source, so a swipe finds them ready; a source polled over the network that answered for the day less
+ * than the refresh interval ago is not asked again. `peek`: a day drawn in under the finger, fetched as on `open` only
+ * when nothing was ever fetched for it. `refresh`: the polling, Refresh now, a source that changed: both sources afresh
+ * for the day alone.
+ */
+export type EventsReason = "open" | "peek" | "refresh";
+
+/** A day's events as the screen gets them: the last ones at once, the fresh ones when it starts the fetch. */
+export interface DayEventsAsk {
+	/** The events last fetched for the day, staleness counted from now; null when none were. */
+	readonly cached: DayEvents | null;
+	/** Starts the fetch the reason calls for; null when the cached events are enough. */
+	readonly fresh: (() => Promise<DayEvents>) | null;
+}
+
 /** Events of both sources for one day. A failing source keeps its last good events and reports the error. */
 export interface CalendarService {
-	/** Fetches both sources afresh for the day alone: polling, Refresh now, a source that changed. */
-	eventsOn(date: LocalDate): Promise<DayEvents>;
-	/**
-	 * Another day opens: the day and the days next to it, one request per source. A source polled over the network that
-	 * answered for the day less than the refresh interval ago is not asked again: its last answer is shown.
-	 */
-	eventsAround(date: LocalDate): Promise<DayEvents>;
-	/** The last result for `date` without a fetch; null when `eventsOn` was never called for it. */
-	cached(date: LocalDate): DayEvents | null;
+	/** The day's events for `reason`: the cached ones and how to fetch them afresh. Nothing is fetched until `fresh` is called. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk;
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */
+	keepFresh(screen: PolledScreen): CalendarPoll;
+}
+
+/** What the polling asks of the screen. */
+export interface PolledScreen {
+	/** Fetches the shown day's events afresh and shows them. */
+	refresh(): Promise<void>;
+	/** The screen is not on view: the document hidden or its tab behind another. Read at every tick. */
+	hidden(): boolean;
+}
+
+/**
+ * The events kept fresh while the screen is on view: a fetch every interval, and one when the app or the window comes
+ * back unless the last is under half an interval old. A tick missed off screen is fetched when the screen is back.
+ */
+export interface CalendarPoll {
+	/** The window got the focus or the app came to the front. */
+	wake(): void;
+	/** The screen is on view again: the tick it missed is fetched now. */
+	catchUp(): void;
+	/** Refresh now: asks the phone for fresh work events, then fetches at once. */
+	refreshNow(): Promise<void>;
+	stop(): void;
 }
 
 /** A calendar of the Google account, as the settings tab lists it. */

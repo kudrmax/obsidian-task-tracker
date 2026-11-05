@@ -48,6 +48,7 @@ export class MarkdownTitleField implements TitleField {
 				{ key: "Enter", run: key(() => events.onEnter()), shift: key(() => events.onEnter()) },
 				{ key: "Escape", run: key(() => events.onEscape()) },
 				{ key: "Tab", run: key(() => events.onTab(false)), shift: key(() => events.onTab(true)) },
+				{ key: "Alt-Tab", run: key(() => events.onSwitch()) },
 			],
 			onChange: () => {
 				if (!this.quiet) events.onInput();

@@ -1,30 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CalendarPolling, type PollingTimers } from "../../src/ui/CalendarPolling";
-
-class FakeTimers implements PollingTimers {
-	private next = 1;
-	readonly pending = new Map<number, { fn: () => void; ms: number }>();
-
-	set(fn: () => void, ms: number): number {
-		const id = this.next++;
-		this.pending.set(id, { fn, ms });
-		return id;
-	}
-
-	clear(id: number): void {
-		this.pending.delete(id);
-	}
-
-	get delays(): number[] {
-		return [...this.pending.values()].map((t) => t.ms);
-	}
-
-	fire(): void {
-		const [[id, timer]] = this.pending;
-		this.pending.delete(id);
-		timer.fn();
-	}
-}
+import { CalendarPolling } from "../../src/application/CalendarPolling";
+import { FakeTimers } from "../fakes/FakeTimers";
 
 function setup(seconds = 60) {
 	const timers = new FakeTimers();

@@ -2,7 +2,7 @@ import type { PriorityLevel, TaskService } from "../../application/contracts";
 import { markPriority } from "../TaskCard";
 import type { TitleFieldFactory } from "./TitleField";
 
-export type QuickKey = "enter" | "escape" | "tab" | "shiftTab";
+export type QuickKey = "enter" | "escape" | "tab" | "shiftTab" | "altTab";
 
 export interface QuickFieldOptions {
 	readonly value: string;
@@ -62,6 +62,7 @@ export const QuickField = {
 				onEnter: () => opts.onKey("enter"),
 				onEscape: () => opts.onKey("escape"),
 				onTab: (shift) => opts.onKey(shift ? "shiftTab" : "tab"),
+				onSwitch: () => opts.onKey("altTab"),
 				onBlur: () => opts.onBlur(),
 			},
 		});

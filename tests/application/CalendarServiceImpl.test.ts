@@ -6,6 +6,7 @@ import type { EventFeed, EventFile } from "../../src/application/EventSource";
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+import { FakeTimers } from "../fakes/FakeTimers";
 
 const WRITTEN = new Date(2026, 9, 30, 8, 0);
 const NOW = new Date(2026, 9, 30, 9, 0);
@@ -65,9 +66,15 @@ class FakeClock implements Clock {
 	}
 }
 
+const NO_EXPORT = { export: () => undefined };
+const DAY = "2026-10-30";
+
 function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0) {
-	return new CalendarServiceImpl(files, feeds, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }));
+	return new CalendarServiceImpl(files, feeds, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), new FakeTimers(), NO_EXPORT);
 }
+
+const refreshed = (calendars: CalendarServiceImpl, date = DAY) => calendars.events(date, "refresh").fresh!();
+const opened = (calendars: CalendarServiceImpl, date = DAY) => calendars.events(date, "open").fresh!();
 
 describe("CalendarServiceImpl", () => {
 	it("a day that starts at 4 takes the timed events from 4 to 4 and the all-day events of its date", async () => {
@@ -78,7 +85,7 @@ describe("CalendarServiceImpl", () => {
 			event("google", "all day", new Date(2026, 9, 30), new Date(2026, 9, 31), true),
 			event("google", "all next day", new Date(2026, 9, 31), new Date(2026, 10, 1), true),
 		]);
-		const day = await service([google], [], new FakeClock(), 4).eventsOn("2026-10-30");
+		const day = await refreshed(service([google], [], new FakeClock(), 4));
 		expect(day.events.map((e) => e.id)).toEqual(["all day", "evening", "after midnight"]);
 		expect(day.statuses[0].message).toBe("3 events");
 	});
@@ -88,27 +95,27 @@ describe("CalendarServiceImpl", () => {
 		const work = new FakeFile("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
 		work.device = "iPhone";
 		google.device = "Google";
-		const day = await service([google, work], [new FakeFeed("google")]).eventsOn("2026-10-30");
+		const day = await refreshed(service([google, work], [new FakeFeed("google")]));
 		expect(day.events.map((e) => e.id)).toEqual(["w1", "g1"]);
 		expect(day.statuses).toEqual([
-			{ source: "google", ok: true, message: "1 event", updatedAt: WRITTEN, detail: null, stale: false },
-			{ source: "work", ok: true, message: "1 event", updatedAt: WRITTEN, detail: "iPhone", stale: false },
+			{ source: "google", kind: "synced", ok: true, message: "1 event", updatedAt: WRITTEN, detail: null, stale: false },
+			{ source: "work", kind: "exported", ok: true, message: "1 event", updatedAt: WRITTEN, detail: "iPhone", stale: false },
 		]);
 	});
 
-	it("eventsOn refreshes the feeds, forced, before it reads the files", async () => {
+	it("a refresh runs the feeds, forced, before it reads the files", async () => {
 		const file = new FakeFile("google");
 		const feed = new FakeFeed("google", file, [event("google", "new", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
-		const day = await service([file], [feed]).eventsOn("2026-10-30");
+		const day = await refreshed(service([file], [feed]));
 		expect(feed.calls).toEqual([true]);
 		expect(day.events.map((e) => e.id)).toEqual(["new"]);
 	});
 
-	it("eventsAround reads the files at once and leaves the feed to run behind, unforced", async () => {
+	it("an opened day reads the files at once and leaves the feed to run behind, unforced", async () => {
 		const file = new FakeFile("google", [event("google", "old", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
 		const feed = new FakeFeed("google");
 		feed.silent = true;
-		const day = await service([file], [feed]).eventsAround("2026-10-30");
+		const day = await opened(service([file], [feed]));
 		expect(feed.calls).toEqual([false]);
 		expect(day.events.map((e) => e.id)).toEqual(["old"]);
 	});
@@ -117,9 +124,9 @@ describe("CalendarServiceImpl", () => {
 		const file = new FakeFile("google", [event("google", "kept", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
 		const feed = new FakeFeed("google", file);
 		feed.failWith = new Error("Google API 500");
-		const day = await service([file], [feed]).eventsOn("2026-10-30");
+		const day = await refreshed(service([file], [feed]));
 		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-		expect(day.statuses[0]).toEqual({ source: "google", ok: false, message: "Google API 500", updatedAt: WRITTEN, detail: null, stale: true });
+		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", ok: false, message: "Google API 500", updatedAt: WRITTEN, detail: null, stale: true });
 	});
 
 	it("a feed that answers again clears its error", async () => {
@@ -127,9 +134,9 @@ describe("CalendarServiceImpl", () => {
 		const feed = new FakeFeed("google", file);
 		const calendars = service([file], [feed]);
 		feed.failWith = new Error("offline");
-		await calendars.eventsOn("2026-10-30");
+		await refreshed(calendars);
 		feed.failWith = null;
-		expect((await calendars.eventsOn("2026-10-30")).statuses[0].ok).toBe(true);
+		expect((await refreshed(calendars)).statuses[0].ok).toBe(true);
 	});
 
 	it("a feed silent for 15 s is reported and the file is still shown", async () => {
@@ -138,7 +145,7 @@ describe("CalendarServiceImpl", () => {
 			const file = new FakeFile("google", [event("google", "kept", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
 			const feed = new FakeFeed("google", file);
 			feed.silent = true;
-			const pending = service([file], [feed]).eventsOn("2026-10-30");
+			const pending = refreshed(service([file], [feed]));
 			await vi.advanceTimersByTimeAsync(15_000);
 			const day = await pending;
 			expect(day.events.map((e) => e.id)).toEqual(["kept"]);
@@ -151,9 +158,9 @@ describe("CalendarServiceImpl", () => {
 	it("a file that cannot be read keeps what it showed before and says why", async () => {
 		const work = new FakeFile("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
 		const calendars = service([work]);
-		await calendars.eventsOn("2026-10-30");
+		await refreshed(calendars);
 		work.failWith = new Error("file missing");
-		const day = await calendars.eventsOn("2026-10-30");
+		const day = await refreshed(calendars);
 		expect(day.events.map((e) => e.id)).toEqual(["w1"]);
 		expect(day.statuses[0]).toMatchObject({ ok: false, message: "file missing", stale: true });
 	});
@@ -161,23 +168,23 @@ describe("CalendarServiceImpl", () => {
 	it("a file never read reports no events and no time", async () => {
 		const work = new FakeFile("work");
 		work.failWith = new Error("file missing");
-		const day = await service([work]).eventsOn("2026-10-30");
-		expect(day.statuses[0]).toEqual({ source: "work", ok: false, message: "file missing", updatedAt: null, detail: null, stale: true });
+		const day = await refreshed(service([work]));
+		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", ok: false, message: "file missing", updatedAt: null, detail: null, stale: true });
 	});
 
 	it("a file written longer ago than staleAfterMinutes is stale", async () => {
 		const work = new FakeFile("work");
 		work.exportedAt = new Date(NOW.getTime() - (DEFAULT_SETTINGS.staleAfterMinutes + 1) * 60_000);
-		const day = await service([work]).eventsOn("2026-10-30");
+		const day = await refreshed(service([work]));
 		expect(day.statuses[0]).toMatchObject({ ok: true, stale: true });
 	});
 
-	it("cached is null before any read, then any day from the files as last read", async () => {
+	it("nothing is cached before the first read, then any day comes from the files as last read", async () => {
 		const work = new FakeFile("work", [event("work", "next day", new Date(2026, 9, 31, 9), new Date(2026, 9, 31, 10))]);
 		const calendars = service([work]);
-		expect(calendars.cached("2026-10-31")).toBeNull();
-		await calendars.eventsOn("2026-10-30");
-		expect(calendars.cached("2026-10-31")?.events.map((e) => e.id)).toEqual(["next day"]);
+		expect(calendars.events("2026-10-31", "open").cached).toBeNull();
+		await refreshed(calendars);
+		expect(calendars.events("2026-10-31", "open").cached?.events.map((e) => e.id)).toEqual(["next day"]);
 		expect(work.reads).toBe(1);
 	});
 
@@ -190,5 +197,93 @@ describe("CalendarServiceImpl", () => {
 		expect(fired).toBe(2);
 		off();
 		expect(google.listeners.size + work.listeners.size).toBe(0);
+	});
+});
+
+describe("CalendarServiceImpl.events", () => {
+	it("asks nothing until the fresh events are asked for", () => {
+		const file = new FakeFile("google");
+		const feed = new FakeFeed("google");
+		const calendars = service([file], [feed]);
+		for (const reason of ["open", "peek", "refresh"] as const) calendars.events(DAY, reason);
+		expect([file.reads, feed.calls.length]).toEqual([0, 0]);
+	});
+
+	it("a peek at a day once the files were read asks nothing; before that it reads them", async () => {
+		const file = new FakeFile("google", [event("google", "g", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+		const calendars = service([file], [new FakeFeed("google")]);
+		const first = calendars.events(DAY, "peek");
+		expect(first.cached).toBeNull();
+		await first.fresh!();
+		const again = calendars.events("2026-10-31", "peek");
+		expect(again.fresh).toBeNull();
+		expect(calendars.events(DAY, "peek").cached!.events.map((e) => e.id)).toEqual(["g"]);
+		expect(file.reads).toBe(1);
+	});
+
+	it("tells each source's kind, cached and fresh", async () => {
+		const calendars = service([new FakeFile("google"), new FakeFile("work")], [new FakeFeed("google")]);
+		const fresh = await refreshed(calendars);
+		expect(fresh.statuses.map((s) => [s.source, s.kind])).toEqual([["google", "synced"], ["work", "exported"]]);
+		expect(calendars.events(DAY, "open").cached!.statuses.map((s) => s.kind)).toEqual(["synced", "exported"]);
+	});
+});
+
+describe("CalendarServiceImpl.keepFresh", () => {
+	function polled(refreshSeconds = 60) {
+		const timers = new FakeTimers();
+		const clock = new FakeClock();
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
+		const order: string[] = [];
+		let hidden = false;
+		const calendars = new CalendarServiceImpl([], [], clock, settings, timers, { export: () => order.push("export") });
+		const poll = calendars.keepFresh({
+			refresh: async () => {
+				order.push("fetch");
+			},
+			hidden: () => hidden,
+		});
+		return { poll, timers, clock, settings, order, setHidden: (h: boolean) => (hidden = h) };
+	}
+
+	it("starts at once with the refresh interval of the settings, read afresh at every tick", async () => {
+		const t = polled(60);
+		expect(t.timers.delays).toEqual([60_000]);
+		await t.settings.update({ google: { ...DEFAULT_SETTINGS.google, refreshSeconds: 30 } });
+		t.timers.fire();
+		expect(t.order).toEqual(["fetch"]);
+		expect(t.timers.delays).toEqual([30_000]);
+	});
+
+	it("fetches nothing for a screen off view and catches up when it is back", () => {
+		const t = polled();
+		t.setHidden(true);
+		t.timers.fire();
+		expect(t.order).toEqual([]);
+		t.setHidden(false);
+		t.poll.catchUp();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("wakes by the service's clock: under half an interval since the last fetch, nothing", () => {
+		const t = polled(60);
+		t.clock.current = new Date(t.clock.current.getTime() + 29_000);
+		t.poll.wake();
+		expect(t.order).toEqual([]);
+		t.clock.current = new Date(t.clock.current.getTime() + 2_000);
+		t.poll.wake();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("Refresh now asks the phone for work events first, then fetches", async () => {
+		const t = polled();
+		await t.poll.refreshNow();
+		expect(t.order).toEqual(["export", "fetch"]);
+	});
+
+	it("leaves no timer once stopped", () => {
+		const t = polled();
+		t.poll.stop();
+		expect(t.timers.delays).toEqual([]);
 	});
 });

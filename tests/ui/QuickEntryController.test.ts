@@ -47,6 +47,8 @@ interface SetUp {
 	slotted?: TaskItem[];
 	/** Obsidian on the desktop, its status bar's top this far down; the phone without. */
 	desktop?: { readonly chromeTop: number };
+	/** The columns show sections, so the field may write one. */
+	sections?: boolean;
 	/**
 	 * The lists read the file after a write and draw it only when it changed, as the view's do: "grows" lands each write
 	 * as a card at the end of the day column, "same" lands nothing.
@@ -54,7 +56,7 @@ interface SetUp {
 	drawsOnFresh?: "grows" | "same";
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -141,7 +143,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			return made;
 		},
 		list: (column) => lists[column],
-		sectioned: () => false,
+		sectioned: () => sections,
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
 		dropTargets: () => ({ lists: drops, timeline: null }),
@@ -1239,3 +1241,31 @@ function tile(root: HTMLElement, label: string): HTMLElement {
 function stubDrop(column: ListColumn, result: DropResult): ColumnDrop {
 	return { column, hitTest: () => true, preview: () => {}, landing: () => null, leave: () => {}, clear: () => {}, drop: () => result };
 }
+
+describe("QuickEntryController: the field switched to a section", () => {
+	const altTab = (field: HTMLElement) => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", altKey: true, bubbles: true, cancelable: true }));
+	const sectionButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>(".tc-bar-section")!;
+
+	it("Option+Tab switches it and back, the section button pressed with it", () => {
+		const { controller, root, field } = setUp({ sections: true });
+		controller.openAtEnd("left");
+		altTab(field()!);
+		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("true");
+		altTab(field()!);
+		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("on the desktop the section button stands in its own capsule, apart from the task's", () => {
+		const { controller, root } = setUp({ sections: true, desktop: { chromeTop: 476 } });
+		controller.openAtEnd("left");
+		expect(sectionButton(root).closest(".tc-quick-mode")).not.toBeNull();
+		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(false);
+	});
+
+	it("on the phone it stays first in the bar over the keyboard", () => {
+		const { controller, root } = setUp({ sections: true });
+		controller.openAtEnd("left");
+		expect(sectionButton(root).parentElement?.classList.contains("tc-quick-bar")).toBe(true);
+		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(true);
+	});
+});

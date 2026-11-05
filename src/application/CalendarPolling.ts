@@ -1,7 +1,4 @@
-export interface PollingTimers {
-	set(fn: () => void, ms: number): number;
-	clear(id: number): void;
-}
+import type { Timers } from "./ports";
 
 export interface PollingDeps {
 	/** Fetches the events afresh. */
@@ -12,7 +9,7 @@ export interface PollingDeps {
 	readonly hidden: () => boolean;
 	/** Milliseconds, for how long ago the last fetch was. */
 	readonly now: () => number;
-	readonly timers: PollingTimers;
+	readonly timers: Timers;
 }
 
 /**

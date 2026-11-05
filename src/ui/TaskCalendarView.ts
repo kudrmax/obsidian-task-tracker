@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -8,7 +8,6 @@ import { FoundCard } from "./FoundCard";
 import { SearchWindow } from "./search/SearchWindow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
-import { CalendarPolling } from "./CalendarPolling";
 import type { Theme } from "./eventColors";
 import { addDays } from "./dates";
 import { DayData } from "./DayData";
@@ -59,7 +58,6 @@ import type { LocalDate } from "./types";
 export const VIEW_TYPE = "task-calendar";
 
 const MINUTE_MS = 60_000;
-const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
 
@@ -82,8 +80,6 @@ export interface ViewDeps {
 	readonly calendars: CalendarService;
 	readonly settings: SettingsStore;
 	readonly clock: Clock;
-	/** Asks the phone for fresh work calendar events; a refresh the user asks for runs it before reading the sources. */
-	exportWorkCalendar(): void;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
 	/** Temporary: the note the quick entry trace is written to, for a phone with no console. */
@@ -123,8 +119,8 @@ export class TaskCalendarView extends ItemView {
 	private timeline: Timeline | null = null;
 	private hourPx: number = DESIGN.hourPx;
 	private readonly data: DayData;
-	/** Obsidian's desktop status bar over the view's bottom right corner. */
-	private readonly polling: CalendarPolling;
+	/** The events kept fresh while the view is open. */
+	private poll: CalendarPoll | null = null;
 	/** The frame, the tasks and the events, each drawn when it changes; a gesture holds them all. */
 	private readonly parts = new ScreenParts({ busy: () => this.arbiter.busy, draw: (parts) => this.draw(parts) });
 	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
@@ -164,13 +160,6 @@ export class TaskCalendarView extends ItemView {
 		this.seen = this.settings;
 		this.selectedDate = this.today();
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
-		this.polling = new CalendarPolling({
-			refresh: () => this.data.calendars(),
-			intervalMs: () => this.settings.google.refreshSeconds * SECOND_MS,
-			hidden: () => document.hidden || !this.contentEl.isShown(),
-			now: () => Date.now(),
-			timers: { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) },
-		});
 		this.groupDrag = new GroupDrag({
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
@@ -429,13 +418,13 @@ export class TaskCalendarView extends ItemView {
 			this.deps.settings.onChange(() => this.onSettings()),
 			this.deps.days.onDayChange((change) => this.onDayChange(change), () => this.canTick()),
 		);
-		this.registerDomEvent(window, "focus", () => this.polling.wake());
+		this.registerDomEvent(window, "focus", () => this.poll?.wake());
 		this.registerDomEvent(document, "visibilitychange", () => {
 			if (document.hidden) return;
-			this.polling.wake();
+			this.poll?.wake();
 			this.catchUpTick();
 		});
-		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.polling.catchUp()));
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.poll?.catchUp()));
 		this.registerDomEvent(root, "touchmove", (e) => {
 			if (this.arbiter.busy || e.touches.length > 1) e.preventDefault();
 			e.stopPropagation();
@@ -451,7 +440,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.registerEvent(this.app.workspace.on("css-change", () => this.parts.request("events")));
 		this.registerInterval(window.setInterval(() => this.tick(), MINUTE_MS));
-		this.polling.start();
+		this.poll = this.deps.calendars.keepFresh({ refresh: () => this.data.calendars(), hidden: () => document.hidden || !this.contentEl.isShown() });
 		this.render();
 		await this.data.load();
 	}
@@ -493,7 +482,7 @@ export class TaskCalendarView extends ItemView {
 
 	override async onClose(): Promise<void> {
 		this.quick?.close();
-		this.polling.stop();
+		this.poll?.stop();
 		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
@@ -509,7 +498,7 @@ export class TaskCalendarView extends ItemView {
 		this.fitListWidth();
 		this.quick?.reveal();
 		this.catchUpTick();
-		this.polling.catchUp();
+		this.poll?.catchUp();
 	}
 
 	private get settings() {
@@ -948,8 +937,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private refreshNow(): Promise<void> {
-		this.deps.exportWorkCalendar();
-		return this.polling.refresh();
+		return this.poll?.refreshNow() ?? Promise.resolve();
 	}
 
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */

@@ -1,10 +1,27 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import type { LocalDate } from "../domain/Task";
+import { CalendarPolling } from "./CalendarPolling";
 import type { CalendarFile } from "./calendarFile";
-import type { CalendarEvent, CalendarService, CalendarSource, DayEvents, SourceStatus } from "./contracts";
+import type {
+	CalendarEvent,
+	CalendarPoll,
+	CalendarService,
+	CalendarSource,
+	DayEvents,
+	DayEventsAsk,
+	EventsReason,
+	PolledScreen,
+	SourceKind,
+	SourceStatus,
+	WorkCalendarSetup,
+} from "./contracts";
 import type { EventFeed, EventFile } from "./EventSource";
-import type { Clock, SettingsStore } from "./ports";
+import type { Clock, SettingsStore, Timers } from "./ports";
 
+/** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
+const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", work: "exported" };
+
+const SECOND_MS = 1000;
 const MINUTE_MS = 60_000;
 /** A feed silent this long counts as failed: its file keeps what it had, and the next refresh asks afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
@@ -69,29 +86,60 @@ export class CalendarServiceImpl implements CalendarService {
 		private readonly feeds: readonly EventFeed[],
 		private readonly clock: Clock,
 		private readonly settings: SettingsStore,
+		private readonly timers: Timers,
+		/** Refresh now asks the phone for fresh work events before it fetches. */
+		private readonly work: Pick<WorkCalendarSetup, "export">,
 	) {}
 
-	async eventsOn(date: LocalDate): Promise<DayEvents> {
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.cached(date);
+		if (reason === "refresh") return { cached, fresh: () => this.eventsOn(date) };
+		if (reason === "peek" && cached) return { cached, fresh: null };
+		return { cached, fresh: () => this.eventsAround(date) };
+	}
+
+	keepFresh(screen: PolledScreen): CalendarPoll {
+		const polling = new CalendarPolling({
+			refresh: () => screen.refresh(),
+			intervalMs: () => this.settings.get().google.refreshSeconds * SECOND_MS,
+			hidden: () => screen.hidden(),
+			now: () => this.clock.now().getTime(),
+			timers: this.timers,
+		});
+		polling.start();
+		return {
+			wake: () => polling.wake(),
+			catchUp: () => polling.catchUp(),
+			refreshNow: () => {
+				this.work.export();
+				return polling.refresh();
+			},
+			stop: () => polling.stop(),
+		};
+	}
+
+	onChange(listener: () => void): () => void {
+		const offs = this.files.map((f) => f.onChange(listener));
+		return () => offs.forEach((off) => off());
+	}
+
+	/** Refreshes the feeds, forced, then reads the files. */
+	private async eventsOn(date: LocalDate): Promise<DayEvents> {
 		await this.refreshFeeds(true);
 		await this.readFiles();
 		return this.dayOf(date);
 	}
 
 	/** The files as they are; a feed due for a refresh runs behind, and its file's change redraws the day. */
-	async eventsAround(date: LocalDate): Promise<DayEvents> {
+	private async eventsAround(date: LocalDate): Promise<DayEvents> {
 		void this.refreshFeeds(false);
 		await this.readFiles();
 		return this.dayOf(date);
 	}
 
-	/** Staleness counts from now: a file written yesterday shows its orange dot today. */
-	cached(date: LocalDate): DayEvents | null {
+	/** Any day from the files as last read, null before the first read. Staleness counts from now: a file written yesterday shows its orange dot today. */
+	private cached(date: LocalDate): DayEvents | null {
 		return this.lastRead.size === 0 && this.fileProblems.size === 0 ? null : this.dayOf(date);
-	}
-
-	onChange(listener: () => void): () => void {
-		const offs = this.files.map((f) => f.onChange(listener));
-		return () => offs.forEach((off) => off());
 	}
 
 	private refreshFeeds(force: boolean): Promise<void> {
@@ -133,6 +181,7 @@ export class CalendarServiceImpl implements CalendarService {
 		const fed = this.feeds.some((f) => f.name === source);
 		return {
 			source,
+			kind: KINDS[source],
 			ok: problem === null,
 			message: problem ?? countMessage(shown),
 			updatedAt,

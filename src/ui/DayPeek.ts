@@ -73,13 +73,12 @@ export class DayPeek {
 			events: () => this.events,
 			now: () => deps.now(),
 		});
-		const cached = deps.calendars.cached(date);
-		if (cached) this.events = cached.events;
-		else
-			void deps.calendars.eventsAround(date).then((events) => {
-				this.events = events.events;
-				this.render();
-			});
+		const ask = deps.calendars.events(date, "peek");
+		if (ask.cached) this.events = ask.cached.events;
+		void ask.fresh?.().then((events) => {
+			this.events = events.events;
+			this.render();
+		});
 		void deps.tasks.dayView(date).then((day) => {
 			this.day = day;
 			this.render();

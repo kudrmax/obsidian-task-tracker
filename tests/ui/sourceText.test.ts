@@ -3,7 +3,7 @@ import type { SourceStatus } from "../../src/application/contracts";
 import { sourceText } from "../../src/ui/sources/sourceText";
 
 const now = new Date(2026, 9, 30, 14, 20);
-const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", ok: true, message: "7 events", updatedAt: null, detail: null, stale: false, ...extra });
+const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", ok: true, message: "7 events", updatedAt: null, detail: null, stale: false, ...extra });
 
 describe("sourceText", () => {
 	it("says Google was updated today at its time", () => {
@@ -12,7 +12,7 @@ describe("sourceText", () => {
 	});
 
 	it("says the work file was exported from the device, yesterday, and is stale", () => {
-		const t = sourceText(status({ source: "work", updatedAt: new Date(2026, 9, 29, 8, 2), detail: "iPhone", stale: true }), now);
+		const t = sourceText(status({ source: "work", kind: "exported", updatedAt: new Date(2026, 9, 29, 8, 2), detail: "iPhone", stale: true }), now);
 		expect(t).toEqual({ name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: "Yesterday 08:02", stale: true });
 	});
 

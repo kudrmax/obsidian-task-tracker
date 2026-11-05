@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, CalendarSource, DayEvents } from "../../src/application/contracts";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../src/application/contracts";
 import type { LocalDate } from "../../src/ui/types";
 
 const DEMO_DATE = "2026-10-30";
@@ -36,7 +36,7 @@ const WORK_EXPORTED = new Date(2026, 9, 29, 8, 2);
 export class DemoCalendarService implements CalendarService {
 	private readonly last = new Map<LocalDate, DayEvents>();
 
-	async eventsOn(date: LocalDate): Promise<DayEvents> {
+	private async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const events: CalendarEvent[] = date === DEMO_DATE
 			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source }))
 			: [];
@@ -44,23 +44,26 @@ export class DemoCalendarService implements CalendarService {
 		const result: DayEvents = {
 			events,
 			statuses: [
-				{ source: "google", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
-				{ source: "work", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
+				{ source: "google", kind: "synced", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
+				{ source: "work", kind: "exported", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
 		};
 		this.last.set(date, result);
 		return result;
 	}
 
-	eventsAround(date: LocalDate): Promise<DayEvents> {
-		return this.eventsOn(date);
-	}
-
-	cached(date: LocalDate): DayEvents | null {
-		return this.last.get(date) ?? null;
+	/** Every day's events come at once, the board's day only has any; a peek at a day shown before takes them as they were. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.last.get(date) ?? null;
+		return { cached, fresh: reason === "peek" && cached ? null : () => this.eventsOn(date) };
 	}
 
 	onChange(): () => void {
 		return () => {};
+	}
+
+	/** The board's events never change: no timer, Refresh now fetches them again. */
+	keepFresh(screen: PolledScreen): CalendarPoll {
+		return { wake: () => undefined, catchUp: () => undefined, refreshNow: () => screen.refresh(), stop: () => undefined };
 	}
 }
