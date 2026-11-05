@@ -12,7 +12,7 @@
 
 ## Часть 1. Scriptable
 
-1. На iPhone открой Obsidian → Settings → Task Calendar → Work calendar → Scriptable script → **Copy**.
+1. На iPhone открой Obsidian → Settings → Task Calendar → More → Calendar connections → Scriptable script → **Copy**.
 2. Открой Scriptable. Если скрипта `Export Work Calendar` ещё нет, создай его кнопкой **+**. Удали в нём весь старый текст, вставь скопированный, нажми **Done**. Имя скрипта должно быть ровно `Export Work Calendar`.
 3. Scriptable → шестерёнка → **File Bookmarks** → **+** → выбери папку волта (та, где лежат заметки и папка `calendar`) → имя `ObsidianVault`. Если такая закладка уже есть, просто проверь, что она ведёт на папку волта.
 4. Нажми на скрипт в Scriptable, чтобы запустить его один раз. iOS попросит доступ к календарям, разреши. Должно появиться окно «Экспорт готов, N событий → calendar/work.json».
@@ -34,7 +34,7 @@
 12. Вкладка **Automation** → **+** → **App** → выбери Obsidian, отметь **Is Opened**, выбери **Run Immediately**, выключи **Notify When Run** → Next → выбери команду `Export Work Calendar`. События обновляются каждый раз, когда открываешь Obsidian.
 13. Снова **+** → **Time of Day** → 09:00, **Daily**, **Run Immediately** → Next → `Export Work Calendar`. Повтори для каждого часа, в который нужно обновление, например 10:00, 11:00 и дальше до 19:00. «Каждый час» iOS не умеет, поэтому по автоматизации на час.
 
-Если Google Calendar в плагине тоже подключён и рабочие встречи есть в нём, впиши в Settings → Task Calendar → Work calendar → Calendars названия календарей, которые брать из файла: иначе встречи покажутся дважды. Пусто — брать все.
+Если Google Calendar в плагине тоже подключён и рабочие встречи есть в нём, впиши в Settings → Task Calendar → More → Calendar connections → Calendar titles названия календарей, которые брать из файла: иначе встречи покажутся дважды. Пусто — брать все.
 
 ## Обновить вручную
 
