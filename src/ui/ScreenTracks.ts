@@ -10,6 +10,14 @@ export function stripParts(root: HTMLElement): HTMLElement[] {
 	return [...root.querySelectorAll<HTMLElement>(STRIP.map((part) => `:scope > ${part}`).join(", "))];
 }
 
+/** Done's column, title and divider: they wait left of Inbox for the search only, so nothing but the search brings them into sight. */
+const DONE = ".tc-done, .tc-head.is-done, .tc-divider.is-done";
+
+/** What gives past the row's end: the strip, without Done unless Done is the place that stands. */
+export function edgeParts(root: HTMLElement, place: Place): HTMLElement[] {
+	return stripParts(root).filter((part) => place === "done" || !part.matches(DONE));
+}
+
 /** The strip's parts moved sideways together, as one sheet. */
 function shiftParts(parts: readonly HTMLElement[], dx: number): void {
 	for (const part of parts) part.style.transform = dx === 0 ? "" : `translate3d(${dx}px, 0, 0)`;

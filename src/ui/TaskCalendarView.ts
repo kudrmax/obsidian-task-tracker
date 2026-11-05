@@ -48,7 +48,7 @@ import { type Place, type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
-import { type DayLane, DayTrack, EdgeTrack, restore, StripTrack, stripParts } from "./ScreenTracks";
+import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -563,10 +563,9 @@ export class TaskCalendarView extends ItemView {
 	private trackTo(shift: Shift): ScreenTrack {
 		this.landed();
 		const root = this.contentEl;
-		const parts = stripParts(root);
 		const from = { mode: this.place(), date: this.selectedDate };
 		const to = stepScreen(from, shift, this.today());
-		if (!to) return new EdgeTrack(parts, root.clientWidth);
+		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
 			root.classList.remove("is-switching");

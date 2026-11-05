@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScreenPager, type ScreenTrack } from "../../src/ui/ScreenPager";
 import type { Shift } from "../../src/ui/screens";
-import { edgeGive } from "../../src/ui/ScreenTracks";
+import { edgeGive, edgeParts } from "../../src/ui/ScreenTracks";
 
 const WIDTH = 400;
 const SLIDE_MS = 300;
@@ -165,5 +165,32 @@ describe("past the row's end", () => {
 		expect(gives[3]).toBeLessThan(WIDTH);
 		expect(edgeGive(-200, WIDTH)).toBe(-gives[1]);
 		expect(edgeGive(0, WIDTH)).toBe(0);
+	});
+});
+
+describe("the row's end", () => {
+	const strip = () => {
+		const root = document.createElement("div");
+		for (const cls of ["tc-done", "tc-inbox", "tc-soon", "tc-left", "tc-right", "tc-divider", "tc-head is-done", "tc-head is-inbox", "tc-divider is-fixed is-done", "tc-divider is-fixed is-inbox"]) {
+			const part = document.createElement("div");
+			part.className = cls;
+			root.appendChild(part);
+		}
+		return root;
+	};
+	const names = (parts: readonly HTMLElement[]) => parts.map((part) => part.className);
+
+	it("gives without Done, which waits beside Inbox for the search only", () => {
+		const given = names(edgeParts(strip(), "inbox"));
+		expect(given).not.toContain("tc-done");
+		expect(given).not.toContain("tc-head is-done");
+		expect(given).not.toContain("tc-divider is-fixed is-done");
+		expect(given).toContain("tc-divider is-fixed is-inbox");
+		expect(given).toContain("tc-inbox");
+		expect(given).toContain("tc-head is-inbox");
+	});
+
+	it("gives with Done while Done is the place that stands", () => {
+		expect(names(edgeParts(strip(), "done"))).toEqual(expect.arrayContaining(["tc-done", "tc-head is-done", "tc-divider is-fixed is-done"]));
 	});
 });
