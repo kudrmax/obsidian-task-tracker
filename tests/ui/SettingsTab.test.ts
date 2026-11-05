@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
-import type { App } from "obsidian";
+import type { App, Plugin } from "obsidian";
 import type { GoogleAccount, WorkCalendarSetup } from "../../src/application/contracts";
+import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS, sharedOf, type SharedSettings } from "../../src/settings";
 import { TaskCalendarSettingsTab } from "../../src/ui/SettingsTab";
@@ -70,8 +71,7 @@ async function open(file: unknown = START): Promise<void> {
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
-	const plugin = Object.assign(Object.create(null), { get: () => settings.get(), update: (p: never) => settings.update(p), onChange: (l: () => void) => settings.onChange(l) });
-	tab = new TaskCalendarSettingsTab({} as App, plugin, { google: loggedOut, work });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google: loggedOut, work });
 	tab.display();
 }
 

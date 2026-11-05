@@ -2,7 +2,7 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
-import type { PriorityLevel } from "../domain/Priority";
+import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
@@ -580,4 +580,79 @@ export interface ViewSettingsStore {
 	set(patch: Partial<ScreenState>): Promise<void>;
 	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+}
+
+/** The marks of a task line the settings tab sets. */
+export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "silentSlotMarker" | "repeatMarker";
+/** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
+export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
+/** The cards' size, set by a slider. */
+export type CardField = "cardHeight" | "cardGap";
+
+/** The settings tab's fields as it shows them: no secret of Google's among them. */
+export interface SettingsForm {
+	readonly tasksFile: string;
+	readonly sections: SectionNames;
+	readonly markers: Readonly<Record<Marker, string>>;
+	readonly priorities: readonly PriorityLevel[];
+	readonly presets: readonly string[];
+	readonly ungrouped: string;
+	readonly cardHeight: number;
+	readonly cardGap: number;
+	readonly longPressMs: number;
+	readonly dayStartHour: number;
+	readonly scrollToHour: number;
+	/** The hour's heights as the field shows them: `28, 56, 112, 224`. */
+	readonly zoomLevels: string;
+	readonly staleAfterMinutes: number;
+	readonly googleClientId: string;
+	readonly refreshSeconds: number;
+	readonly workCalendarFile: string;
+	/** The work file's calendars to take, comma-separated. */
+	readonly workCalendars: string;
+}
+
+/** A field the service fills with a secret and takes typed text from: the UI never asks for the secret. */
+export interface SecretField {
+	setValue(value: string): void;
+	onChange(listener: (value: string) => void): void;
+}
+
+/**
+ * The settings tab's commands: each checks its value against the settings of this moment, and writes nothing on a bad
+ * one. A level or a preset is changed in the levels or presets as they are saved then, so one edit never undoes the one
+ * before it.
+ */
+export interface SettingsService {
+	form(): SettingsForm;
+	setTasksFile(path: string): Promise<void>;
+	setSection(key: keyof SectionNames, name: string): Promise<void>;
+	setMarker(marker: Marker, text: string): Promise<void>;
+	/** Written when the text reads as a number of zero or more. */
+	setCount(field: CountField, text: string): Promise<void>;
+	setCardSize(field: CardField, px: number): Promise<void>;
+	setDayStartHour(hour: number): Promise<void>;
+	/** Written when the text reads as the hour's heights. */
+	setZoomLevels(text: string): Promise<void>;
+	/** The prefix trimmed. */
+	renameLevel(index: number, prefix: string): Promise<void>;
+	recolourLevel(index: number, color: PriorityColor): Promise<void>;
+	removeLevel(index: number): Promise<void>;
+	/** The next `p<n>` no level has, in the first colour no level has. */
+	addLevel(): Promise<void>;
+	/** The name trimmed. */
+	renamePreset(index: number, name: string): Promise<void>;
+	removePreset(index: number): Promise<void>;
+	/** An empty preset at the end. */
+	addPreset(): Promise<void>;
+	/** The preset at `from` goes to `to`, the others keeping their order. */
+	movePreset(from: number, to: number): Promise<void>;
+	/** The name trimmed; a blank one is the default. */
+	setUngrouped(name: string): Promise<void>;
+	setGoogleClientId(id: string): Promise<void>;
+	/** The saved client secret goes into the field, and what is typed there is saved. */
+	bindClientSecret(field: SecretField): void;
+	setWorkCalendarFile(path: string): Promise<void>;
+	/** The titles between the commas, trimmed, the empty ones dropped. */
+	setWorkCalendars(text: string): Promise<void>;
 }
