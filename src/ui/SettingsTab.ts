@@ -273,7 +273,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				account = calendar.account;
 				new Setting(el).setName(account === "" ? "iPhone" : account).setHeading();
 			}
-			new Setting(el).setName(calendar.title).addToggle((t) =>
+			new Setting(el).setName(calendar.account === "" ? calendar.title.replace(/^iPhone · /, "") : calendar.title).addToggle((t) =>
 				t.setValue(calendar.shown).onChange((shown) => this.deps.calendars.setShown(calendar.account, calendar.title, shown)),
 			);
 		}

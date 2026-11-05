@@ -194,7 +194,9 @@ export class CalendarServiceImpl implements CalendarService {
 
 	/** Once, on the phone, when both Google's and the phone's files are there: the old choice becomes the list of hidden calendars. */
 	private async carryOver(): Promise<void> {
-		if (this.settings.get().calendarsMigrated || !this.migration.canMigrate() || !this.lastRead.has("google") || !this.lastRead.has("iphone")) return;
+		const google = this.lastRead.get("google");
+		const withIds = google !== undefined && google.calendars.some((c) => c.calendarId !== null);
+		if (this.settings.get().calendarsMigrated || !this.migration.canMigrate() || !withIds || !this.lastRead.has("iphone")) return;
 		await this.settings.update({ hiddenCalendars: this.hidden(), calendarsMigrated: true });
 	}
 

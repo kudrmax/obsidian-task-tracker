@@ -25,6 +25,10 @@ describe("migratedHidden", () => {
 		expect(migratedHidden(settings([], ["календарь"]), known, googleIds)).toEqual([{ account: "iCloud", title: "Home" }]);
 	});
 
+	it("a Google file without ids (before phase 2) hides no Google calendar", () => {
+		expect(migratedHidden(settings(["personal-id"], []), known, new Map())).toEqual([]);
+	});
+
 	it("nothing chosen hides nothing", () => {
 		expect(migratedHidden(settings([], []), known, googleIds)).toEqual([]);
 	});

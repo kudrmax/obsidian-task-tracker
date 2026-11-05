@@ -7,7 +7,8 @@ export interface CalendarKey {
 	readonly title: string;
 }
 
-export const keyText = (key: CalendarKey): string => `${key.account}\n${key.title}`;
+/** The same calendar whatever the case its writers spell it in. */
+export const keyText = (key: CalendarKey): string => `${key.account}\n${key.title}`.toLowerCase();
 
 /** A calendar some file lists, once however many list it. `google`: it belongs to the Google account the plugin reads. */
 export interface KnownCalendar {
@@ -38,8 +39,10 @@ interface CalendarRef {
  */
 export class CalendarChoice {
 	private readonly googleEmail: string | null;
-	/** The account the phone files Google's calendars under: the one with a calendar titled with Google's email. */
-	private readonly phoneGoogleAccount: string | null;
+	/** The phone's Google account: the one whose calendar is titled with Google's email, by its id where the phone gives one. */
+	private readonly phoneGoogle: { readonly sourceId: string | null; readonly account: string | null } | null;
+	/** The phone's calendar ids that belong to Google's account. */
+	private readonly phoneGoogleIds: ReadonlySet<string>;
 	private readonly hidden: ReadonlySet<string>;
 
 	constructor(
@@ -49,8 +52,15 @@ export class CalendarChoice {
 		private readonly now: Date,
 	) {
 		this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-		const email = this.googleEmail;
-		this.phoneGoogleAccount = email === null ? null : (files.get("iphone")?.calendars.find((c) => c.title === email)?.account ?? null);
+		const email = this.googleEmail?.toLowerCase() ?? null;
+		const main = email === null ? undefined : files.get("iphone")?.calendars.find((c) => c.title.toLowerCase() === email);
+		this.phoneGoogle = main ? { sourceId: main.sourceId ?? null, account: main.account } : null;
+		const google = this.phoneGoogle;
+		this.phoneGoogleIds = new Set(
+			(files.get("iphone")?.calendars ?? [])
+				.filter((c) => google !== null && (google.sourceId !== null ? c.sourceId === google.sourceId : c.account === google.account))
+				.flatMap((c) => (c.calendarId === null ? [] : [c.calendarId])),
+		);
 		this.hidden = new Set(hidden.map(keyText));
 	}
 
@@ -63,7 +73,9 @@ export class CalendarChoice {
 				if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
 			}
 		}
-		return [...found.values()].sort((a, b) => Number(b.google) - Number(a.google));
+		return [...found.values()].sort(
+			(a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title),
+		);
 	}
 
 	day(start: Date, end: Date): ChosenDay {
@@ -106,7 +118,7 @@ export class CalendarChoice {
 	/** The calendar a file's row or event belongs to, the same across the files. */
 	private keyOf(source: CalendarSource, ref: CalendarRef): CalendarKey {
 		if (source === "work") return this.scriptableKey(ref);
-		if (source === "iphone" && ref.account !== null && ref.account === this.phoneGoogleAccount) return { account: this.googleEmail!, title: ref.title };
+		if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail!, title: ref.title };
 		return { account: ref.account ?? "", title: ref.title };
 	}
 
@@ -125,6 +137,14 @@ export class CalendarChoice {
 		if (titled.size === 1) return [...titled.values()][0];
 		return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
 	}
+}
+
+/** Accounts by name; the calendars no writer gives an account last. */
+function byAccount(a: string, b: string): number {
+	if (a === b) return 0;
+	if (a === "") return 1;
+	if (b === "") return -1;
+	return a.localeCompare(b);
 }
 
 /** The calendar an event sits in, as a file's calendar rows name it. */

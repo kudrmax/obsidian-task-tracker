@@ -63,7 +63,7 @@
 
   // src/application/calendarChoice.ts
   var keyText = (key) => `${key.account}
-${key.title}`;
+${key.title}`.toLowerCase();
   var GOOGLE_ORDER = ["google", "iphone", "work"];
   var OTHER_ORDER = ["iphone", "work"];
   var CalendarChoice = class {
@@ -72,8 +72,13 @@ ${key.title}`;
       this.staleAfterMs = staleAfterMs;
       this.now = now;
       this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-      const email = this.googleEmail;
-      this.phoneGoogleAccount = email === null ? null : files.get("iphone")?.calendars.find((c) => c.title === email)?.account ?? null;
+      const email = this.googleEmail?.toLowerCase() ?? null;
+      const main = email === null ? void 0 : files.get("iphone")?.calendars.find((c) => c.title.toLowerCase() === email);
+      this.phoneGoogle = main ? { sourceId: main.sourceId ?? null, account: main.account } : null;
+      const google = this.phoneGoogle;
+      this.phoneGoogleIds = new Set(
+        (files.get("iphone")?.calendars ?? []).filter((c) => google !== null && (google.sourceId !== null ? c.sourceId === google.sourceId : c.account === google.account)).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
+      );
       this.hidden = new Set(hidden.map(keyText));
     }
     known() {
@@ -85,7 +90,9 @@ ${key.title}`;
           if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
         }
       }
-      return [...found.values()].sort((a, b) => Number(b.google) - Number(a.google));
+      return [...found.values()].sort(
+        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title)
+      );
     }
     day(start, end) {
       const events = [];
@@ -123,7 +130,7 @@ ${key.title}`;
     /** The calendar a file's row or event belongs to, the same across the files. */
     keyOf(source, ref) {
       if (source === "work") return this.scriptableKey(ref);
-      if (source === "iphone" && ref.account !== null && ref.account === this.phoneGoogleAccount) return { account: this.googleEmail, title: ref.title };
+      if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail, title: ref.title };
       return { account: ref.account ?? "", title: ref.title };
     }
     /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
@@ -142,6 +149,12 @@ ${key.title}`;
       return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
     }
   };
+  function byAccount(a, b) {
+    if (a === b) return 0;
+    if (a === "") return 1;
+    if (b === "") return -1;
+    return a.localeCompare(b);
+  }
   function calendarOf(e) {
     return { title: e.calendar, account: e.account, calendarId: e.calendarId };
   }
@@ -176,7 +189,7 @@ ${key.title}`;
     const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
     return {
       events,
-      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null })),
+      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
       exportedAt: new Date(content.exportedAt),
       device: content.device ?? null,
       from: dateOrNull(content.from),
@@ -198,8 +211,9 @@ ${e.calendar}`;
   // src/application/calendarMigration.ts
   function migratedHidden(settings, known, googleIds2) {
     const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
+    const googleChoice = settings.google.calendarIds.length > 0 && googleIds2.size > 0;
     const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
-    return known.filter((c) => c.google ? settings.google.calendarIds.length > 0 && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
+    return known.filter((c) => c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
   }
   function hiddenNow(settings, known, google) {
     return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));

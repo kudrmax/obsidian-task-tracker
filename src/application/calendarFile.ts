@@ -25,6 +25,7 @@ interface FileCalendarRow {
 	calendar: string;
 	calendarId?: string | null;
 	account?: string | null;
+	sourceId?: string | null;
 	color?: string | null;
 }
 
@@ -44,6 +45,8 @@ export interface FileCalendar {
 	readonly account: string | null;
 	readonly calendarId: string | null;
 	readonly color: string | null;
+	/** The phone's own id of the account (two accounts may share a title, «Gmail»); absent elsewhere. */
+	readonly sourceId?: string | null;
 }
 
 /** One writer's file as read: every calendar it saw, their events, and when, where and for which days it was written. */
@@ -82,7 +85,7 @@ export function readCalendarFile(text: string, source: CalendarSource): Calendar
 	const listed = content.calendars ?? eventCalendars(content.events ?? []);
 	return {
 		events,
-		calendars: listed.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null })),
+		calendars: listed.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...(c.sourceId ? { sourceId: c.sourceId } : {}) })),
 		exportedAt: new Date(content.exportedAt),
 		device: content.device ?? null,
 		from: dateOrNull(content.from),
@@ -110,7 +113,7 @@ export function calendarFileText(file: Omit<CalendarFile, "device"> & { readonly
 		from: iso(file.from),
 		to: iso(file.to),
 		validUntil: iso(file.validUntil),
-		calendars: file.calendars.map((c) => ({ calendar: c.title, calendarId: c.calendarId, account: c.account, color: c.color })),
+		calendars: file.calendars.map((c) => ({ calendar: c.title, calendarId: c.calendarId, account: c.account, color: c.color, ...(c.sourceId ? { sourceId: c.sourceId } : {}) })),
 		events: file.events.map((e) => ({
 			id: e.id,
 			title: e.title,

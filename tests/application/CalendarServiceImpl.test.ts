@@ -346,6 +346,14 @@ describe("CalendarServiceImpl, the calendars across the files", () => {
 		return { settings, calendars: service([google, iphone], [], new FakeClock(), 0, settings, onPhone) };
 	}
 
+	it("the phone does not carry over from a Google file written before phase 2", async () => {
+		const phone = migrating(true);
+		const files = (phone.calendars as unknown as { files: FakeFile[] }).files;
+		files[0].calendars = files[0].calendars!.map((c) => ({ ...c, calendarId: null, account: null }));
+		await refreshed(phone.calendars);
+		expect(phone.settings.get().calendarsMigrated).toBe(false);
+	});
+
 	it("before the carry-over the old choice applies, and the phone carries it over once", async () => {
 		const elsewhere = migrating(false);
 		await refreshed(elsewhere.calendars);

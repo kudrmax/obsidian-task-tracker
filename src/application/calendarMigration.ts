@@ -9,9 +9,11 @@ import type { CalendarFile } from "./calendarFile";
  */
 export function migratedHidden(settings: TaskCalendarSettings, known: readonly KnownCalendar[], googleIds: ReadonlyMap<string, string>): CalendarKey[] {
 	const checked = new Set(settings.google.calendarIds.map((id) => googleIds.get(id)).filter((t): t is string => t !== undefined));
+	// Without Google's ids (a file from before they were written) the old checks cannot be read: no Google calendar is hidden.
+	const googleChoice = settings.google.calendarIds.length > 0 && googleIds.size > 0;
 	const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
 	return known
-		.filter((c) => (c.google ? settings.google.calendarIds.length > 0 && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())))
+		.filter((c) => (c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())))
 		.map((c) => c.key);
 }
 

@@ -102,6 +102,31 @@ describe("CalendarChoice", () => {
 		]);
 	});
 
+	it("only the phone's account holding the main calendar is Google's, the email in any case", () => {
+		const other: Cal = { title: "Personal", account: "Gmail", calendarId: "ek-other" };
+		const known = choice({
+			google: file(2, [{ ...MAIN_G, title: "Max@Gmail.com", account: "Max@Gmail.com" }, { ...PERSONAL_G, account: "Max@Gmail.com" }], []),
+			iphone: {
+				...file(5, [MAIN_I, PERSONAL_I, other], []),
+				calendars: [
+					{ title: GMAIL, account: "Gmail", calendarId: "ek-main", color: null, sourceId: "src-1" },
+					{ title: "Personal", account: "Gmail", calendarId: "ek-personal", color: null, sourceId: "src-1" },
+					{ title: "Personal", account: "Gmail", calendarId: "ek-other", color: null, sourceId: "src-2" },
+				],
+			},
+		}).known();
+		expect(known.filter((c) => c.google).map((c) => c.key.title)).toEqual(["Max@Gmail.com", "Personal"]);
+		expect(known.filter((c) => !c.google).map((c) => c.key)).toEqual([{ account: "Gmail", title: "Personal" }]);
+	});
+
+	it("lists the calendars by account, then by title", () => {
+		const a1: Cal = { title: "B", account: "iCloud", calendarId: "1" };
+		const b1: Cal = { title: "Work", account: "Exchange", calendarId: "2" };
+		const a2: Cal = { title: "A", account: "iCloud", calendarId: "3" };
+		const known = choice({ iphone: file(5, [a1, b1, a2], []) }).known();
+		expect(known.map((c) => `${c.key.account}/${c.key.title}`)).toEqual(["Exchange/Work", "iCloud/A", "iCloud/B"]);
+	});
+
 	it("Scriptable's calendar takes the app's account by calendarId", () => {
 		const calendars = choice({ iphone: file(5, [WORK_I], []), work: file(5, [WORK_S], []) }).known();
 		expect(calendars.map((c) => c.key)).toEqual([{ account: "max@company.ru", title: "Календарь" }]);

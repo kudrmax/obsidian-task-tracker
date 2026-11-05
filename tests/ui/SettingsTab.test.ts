@@ -361,6 +361,14 @@ describe("the settings tab: the calendars shown", () => {
 		expect(calendars.asked).toEqual([["max@gmail.com", "Personal", false]]);
 	});
 
+	it("names a calendar under the iPhone heading without repeating iPhone", async () => {
+		calendars.list = [{ account: "", title: "iPhone · Календарь", color: null, shown: true }];
+		await open();
+		await settled();
+		expect(rows("iPhone")).toHaveLength(1);
+		expect(rows("Календарь")).toHaveLength(1);
+	});
+
 	it("no longer asks for titles to take from the work file", async () => {
 		expect(rows("Calendars").filter((row) => row.querySelector("input[type=text]"))).toEqual([]);
 	});
