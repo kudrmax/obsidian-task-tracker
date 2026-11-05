@@ -220,8 +220,8 @@ describe("groups inside a list", () => {
 	});
 
 	it("moves a task to the end of the ungrouped group, out of its group", () => {
-		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
-		expect(d.moveEntry(d.tasks("now")[1], "now", "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n### X\n");
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(d.moveEntry(d.tasks("now")[1], "now", "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] B\n### X\n- [ ] C\n");
 	});
 
 	it("inserts at the end of a group", () => {
@@ -352,5 +352,82 @@ describe("TaskDocument.replaceAll", () => {
 		const a = doc.tasks("now")[0];
 		const other = doc.replace(a, { ...a.task, text: "A2" });
 		expect(() => other.replaceAll([[a, { ...a.task, text: "A3" }]])).toThrow(/Task not found/);
+	});
+});
+
+describe("the last task taken out of a section", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const names = (d: TaskDocument) => d.groups("now").map((g) => g.name);
+
+	it("moveEntry to another section, another list or the end takes the section away, blank lines as deleteGroup leaves them", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n\n### Y\n- [ ] C\n\n## Soon\n- [ ] S\n");
+		expect(d.moveEntry(d.tasks("now")[1], "now", { endOf: 2 }).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n- [ ] B\n\n## Soon\n- [ ] S\n");
+		expect(d.moveEntry(d.tasks("now")[1], "soon", "end").serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n\n## Soon\n- [ ] S\n- [ ] B\n");
+		expect(d.moveEntry(d.tasks("now")[2], "now", "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] C\n### X\n- [ ] B\n\n## Soon\n- [ ] S\n");
+	});
+
+	it("moveEntry within the same section keeps it, its only task too", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n");
+		expect(d.moveEntry(d.tasks("now")[2], "now", 1).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] C\n- [ ] B\n");
+		const only = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(only.moveEntry(only.tasks("now")[1], "now", { endOf: 1 }).serialize()).toBe(only.serialize());
+	});
+
+	it("a subtask taken out of a section keeps it", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n  - [ ] b\n");
+		expect(d.moveEntry(d.find("now", 1, [0])!, "now", "end").serialize()).toBe("## Now\n- [ ] A\n- [ ] b\n### X\n- [ ] B\n");
+	});
+
+	it("removeEntry of the last task takes the section away", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(d.removeEntry(d.tasks("now")[1]).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n");
+		expect(names(d.removeEntry(d.tasks("now")[0]))).toEqual([null, "X", "Y"]);
+	});
+
+	it("nestEntry of the last task under a task of another section takes it away, under one of the same keeps it", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n### Y\n- [ ] C\n");
+		expect(d.nestEntry(d.tasks("now")[1], d.tasks("now")[2], null).serialize()).toBe("## Now\n- [ ] A\n### Y\n- [ ] C\n\t- [ ] B\n");
+		const same = parseG("## Now\n### X\n- [ ] B\n- [ ] C\n");
+		expect(same.nestEntry(same.tasks("now")[1], same.tasks("now")[0], null).serialize()).toBe("## Now\n### X\n- [ ] B\n\t- [ ] C\n");
+	});
+
+	it("a section with text stays when its last task goes", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\nnote\n- [ ] B\n");
+		expect(d.removeEntry(d.tasks("now")[1]).serialize()).toBe("## Now\n- [ ] A\n### X\nnote\n");
+	});
+
+	it("an emptied No section heading is left to rule 8", () => {
+		const d = parseG("## Now\n### X\n- [ ] A\n### No section\n- [ ] B\n");
+		expect(d.moveEntry(d.tasks("now")[1], "now", { endOf: 1 }).serialize()).toBe("## Now\n### X\n- [ ] A\n- [ ] B\n### No section\n");
+	});
+});
+
+describe("splitGroup", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+
+	it("takes the given tasks with their subtasks into a new section right after the group; text and the others stay", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n  - [ ] c\nnote\n- [ ] D\n\n### Y\n- [ ] E\n");
+		const [, b, c, dd] = d.tasks("now");
+		expect(d.splitGroup("now", 1, "Z", [c, dd]).serialize()).toBe("## Now\n- [ ] A\n### X\n- [ ] B\nnote\n### Z\n- [ ] C\n  - [ ] c\n- [ ] D\n\n### Y\n- [ ] E\n");
+		expect(d.splitGroup("now", 1, "Z", [b, c, dd]).serialize()).toBe("## Now\n- [ ] A\n### X\nnote\n### Z\n- [ ] B\n- [ ] C\n  - [ ] c\n- [ ] D\n\n### Y\n- [ ] E\n");
+	});
+
+	it("leaves the group it emptied", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n");
+		expect(d.splitGroup("now", 1, "Z", [d.tasks("now")[1]]).serialize()).toBe("## Now\n- [ ] A\n### X\n### Z\n- [ ] B\n");
+	});
+
+	it("from the top block, the new section is the first heading", () => {
+		const d = parseG("## Now\n- [ ] A\n- [ ] B\n### X\n- [ ] C\n");
+		expect(d.splitGroup("now", 0, "Z", [d.tasks("now")[1]]).serialize()).toBe("## Now\n- [ ] A\n### Z\n- [ ] B\n### X\n- [ ] C\n");
+		expect(d.splitGroup("now", 0, "Z", d.tasks("now").slice(0, 2)).serialize()).toBe("## Now\n### Z\n- [ ] A\n- [ ] B\n### X\n- [ ] C\n");
+	});
+
+	it("with nothing to take is addGroup after the group", () => {
+		const d = parseG("## Now\n- [ ] A\n### X\n- [ ] B\n\n## Soon\n");
+		expect(d.splitGroup("now", 1, "Z", []).serialize()).toBe(d.addGroup("now", "Z", 2).serialize());
+		expect(d.splitGroup("now", 0, "Z", []).serialize()).toBe(d.addGroup("now", "Z", 1).serialize());
 	});
 });

@@ -47,4 +47,35 @@ describe("TaskList", () => {
 		expect(coming).toEqual(list.listCards);
 		expect(coming.map((c) => [c.key.raw, c.level, c.group])).toEqual([["Z", 0, null], ["C", 0, null], ["B", 0, "Morning"], ["A1", 1, "Morning"]]);
 	});
+
+	it("an empty section shows its header over the No tasks plate, which stands among the elements", () => {
+		const root = document.createElement("div");
+		const plates: string[] = [];
+		const list = new TaskList(root, {
+			items: () => [task("A", 0)],
+			day: () => null,
+			grouped: () => true,
+			sections: () => [{ name: null, empty: false }, { name: "Evening", empty: true }],
+			ungroupedName: () => "No section",
+			onPlate: (_plate, group) => plates.push(group.name ?? ""),
+		});
+		list.render();
+		expect(list.elements.map((node) => node.textContent)).toEqual(["No section", "A", "Evening", "No tasks"]);
+		expect(list.plateOf("Evening")?.classList.contains("tc-group-empty")).toBe(true);
+		expect(list.plateOf(null)).toBeNull();
+		expect(plates).toEqual(["Evening"]);
+	});
+
+	it("a field typed into an empty section stands in place of its plate", () => {
+		const list = new TaskList(document.createElement("div"), {
+			items: () => [task("A", 0)],
+			day: () => null,
+			grouped: () => true,
+			sections: () => [{ name: null, empty: false }, { name: "Evening", empty: true }],
+			entry: () => ({ place: { kind: "gap", index: 1, level: 0, group: "Evening" }, pending: [], field: (row) => row }),
+		});
+		list.render();
+		expect(list.plateOf("Evening")).toBeNull();
+		expect([...list.el.children].slice(-1)[0]?.classList.contains("tc-quick-row")).toBe(true);
+	});
 });

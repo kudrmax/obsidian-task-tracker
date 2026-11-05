@@ -1,4 +1,4 @@
-import { type DayView, type DroppedTask, type DropTo, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
@@ -177,6 +177,12 @@ export class DemoTaskService implements TaskService {
 
 	async backlogView(): Promise<readonly TaskItem[]> {
 		return this.items("backlog");
+	}
+
+	/** The demo keeps no sections: a list with tasks is No section alone. */
+	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
+		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ name: null, empty: false }] : []);
+		return { inbox: groups("inbox"), backlog: groups("backlog"), now: groups("now"), soon: groups("soon") };
 	}
 
 	async doneView(): Promise<readonly TaskItem[]> {
@@ -413,6 +419,10 @@ export class DemoTaskService implements TaskService {
 	async renameGroup(): Promise<void> {}
 
 	async removeGroup(): Promise<void> {}
+
+	async createSection(): Promise<null> {
+		return null;
+	}
 	async applyAll(): Promise<void> {}
 
 	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {

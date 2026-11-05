@@ -2022,6 +2022,145 @@
    "w": 390,
    "x": 470,
    "y": 0
+  },
+  "AppIcon1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1000,
+   "h": 640,
+   "title": "1. Листок календаря со списком",
+   "page": "appicon"
+  },
+  "AppIcon2.dc.html": {
+   "x": 1080,
+   "y": 0,
+   "w": 1000,
+   "h": 640,
+   "title": "2. Блокнот со списком и часы",
+   "page": "appicon"
+  },
+  "AppIcon3.dc.html": {
+   "x": 0,
+   "y": 760,
+   "w": 1000,
+   "h": 640,
+   "title": "3. День по часам",
+   "page": "appicon"
+  },
+  "AppIcon4.dc.html": {
+   "x": 1080,
+   "y": 760,
+   "w": 1000,
+   "h": 640,
+   "title": "4. Месяц с отмеченным днём",
+   "page": "appicon"
+  },
+  "IconSheet.dc.html": {
+   "x": 13840,
+   "y": 0,
+   "w": 256,
+   "h": 256,
+   "page": "components"
+  },
+  "IconNotepad.dc.html": {
+   "x": 14176,
+   "y": 0,
+   "w": 256,
+   "h": 256,
+   "page": "components"
+  },
+  "IconDay.dc.html": {
+   "x": 14512,
+   "y": 0,
+   "w": 256,
+   "h": 256,
+   "page": "components"
+  },
+  "IconMonth.dc.html": {
+   "x": 14848,
+   "y": 0,
+   "w": 256,
+   "h": 256,
+   "page": "components"
+  },
+  "AppIcon2b.dc.html": {
+   "x": 2160,
+   "y": 0,
+   "w": 1000,
+   "h": 640,
+   "title": "2б. Блокнот со списком и календарь",
+   "page": "appicon"
+  },
+  "IconNotepadCal.dc.html": {
+   "x": 15184,
+   "y": 0,
+   "w": 256,
+   "h": 256,
+   "page": "components"
+  },
+  "Search29Phone.dc.html": {
+   "x": 15520,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Служебное: телефон с поиском (его показывают доски «Поиск #29»)"
+  },
+  "Search29DeskKit.dc.html": {
+   "x": 15990,
+   "y": 0,
+   "w": 1200,
+   "h": 800,
+   "page": "components",
+   "title": "Служебное: десктоп с поиском (его показывают доски «Поиск #29»)"
+  },
+  "Search29Done.dc.html": {
+   "x": 1458,
+   "y": 1520,
+   "w": 948,
+   "h": 1310,
+   "page": "search29",
+   "title": "После нажатия на найденную задачу"
+  },
+  "Search29DeskA.dc.html": {
+   "x": 0,
+   "y": 2950,
+   "w": 2568,
+   "h": 1266,
+   "page": "search29",
+   "title": "Mac, вариант А — панель поиска сверху по центру"
+  },
+  "Search29PhoneBoard.dc.html": {
+   "x": 0,
+   "y": 1520,
+   "w": 1378,
+   "h": 1310,
+   "page": "search29",
+   "title": "Телефон — лупа после кнопки отмены"
+  },
+  "Search29Row.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 2788,
+   "h": 1400,
+   "page": "search29",
+   "title": "Где лупа внизу — три варианта"
+  },
+  "EmptySecFlow.dc.html": {
+   "h": 1076,
+   "page": "emptysec",
+   "title": "Пустая секция: плашка «No tasks»",
+   "w": 1928,
+   "x": 0,
+   "y": 0
+  },
+  "EmptySec.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент пустой секции (его показывает доска «Пустая секция»)",
+   "w": 390,
+   "x": 17270,
+   "y": 0
   }
  },
  "createdOnFiles": {
@@ -2691,7 +2830,25 @@
   "Repeat27Desk.dc.html",
   "Repeat27Phone.dc.html",
   "Repeat27Panel.dc.html",
-  "Repeat27DeskKit.dc.html"
+  "Repeat27DeskKit.dc.html",
+  "AppIcon1.dc.html",
+  "AppIcon2.dc.html",
+  "AppIcon3.dc.html",
+  "AppIcon4.dc.html",
+  "IconSheet.dc.html",
+  "IconNotepad.dc.html",
+  "IconDay.dc.html",
+  "IconMonth.dc.html",
+  "AppIcon2b.dc.html",
+  "IconNotepadCal.dc.html",
+  "Search29Phone.dc.html",
+  "Search29DeskKit.dc.html",
+  "Search29Done.dc.html",
+  "Search29DeskA.dc.html",
+  "Search29PhoneBoard.dc.html",
+  "Search29Row.dc.html",
+  "EmptySecFlow.dc.html",
+  "EmptySec.dc.html"
  ],
  "pages": [
   {
@@ -2785,6 +2942,18 @@
   {
    "id": "repeat27",
    "name": "Повторы #27"
+  },
+  {
+   "id": "appicon",
+   "name": "Иконка приложения"
+  },
+  {
+   "id": "search29",
+   "name": "Поиск #29"
+  },
+  {
+   "id": "emptysec",
+   "name": "Пустая секция"
   }
  ],
  "title": "Task Calendar",
