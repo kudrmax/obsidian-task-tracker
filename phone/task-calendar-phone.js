@@ -140,6 +140,38 @@
     cancelled: "-"
   };
 
+  // src/domain/description.ts
+  var INDENT_RE = /^[ \t]*/;
+  function indentOf(line) {
+    return INDENT_RE.exec(line)[0];
+  }
+  function descriptionLines(entry) {
+    const lines = [];
+    const children = entry.task.children;
+    let next = 0;
+    for (let i = 0; i < children.length; i++) {
+      const sub = entry.subtasks[next];
+      if (sub && children[i] === sub.raw) {
+        i += sub.task.children.length;
+        next++;
+      } else lines.push(children[i]);
+    }
+    return lines;
+  }
+  function descriptionIndent(entry) {
+    const lines = descriptionLines(entry);
+    if (lines.length === 0) return null;
+    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
+  }
+  function descriptionMarkdown(entry) {
+    const indent = descriptionIndent(entry);
+    if (indent === null) return null;
+    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
+  }
+  function markdownLines(markdown) {
+    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
+  }
+
   // src/domain/Repeat.ts
   var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
@@ -277,38 +309,6 @@
       }
     }
   };
-
-  // src/domain/description.ts
-  var INDENT_RE = /^[ \t]*/;
-  function indentOf(line) {
-    return INDENT_RE.exec(line)[0];
-  }
-  function descriptionLines(entry) {
-    const lines = [];
-    const children = entry.task.children;
-    let next = 0;
-    for (let i = 0; i < children.length; i++) {
-      const sub = entry.subtasks[next];
-      if (sub && children[i] === sub.raw) {
-        i += sub.task.children.length;
-        next++;
-      } else lines.push(children[i]);
-    }
-    return lines;
-  }
-  function descriptionIndent(entry) {
-    const lines = descriptionLines(entry);
-    if (lines.length === 0) return null;
-    return lines.map(indentOf).reduce((a, b) => b.length < a.length ? b : a);
-  }
-  function descriptionMarkdown(entry) {
-    const indent = descriptionIndent(entry);
-    if (indent === null) return null;
-    return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
-  }
-  function markdownLines(markdown) {
-    return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
-  }
 
   // src/domain/Priority.ts
   function usablePrefix(prefix) {
@@ -599,22 +599,40 @@
       }
       return this.withLines(lines);
     }
+    /** The last task taken out of a section takes the section away, unless something but blank lines is left under it. */
     removeEntry(entry) {
       const span = this.spanOf(entry);
-      return this.withLines(this.splice(span.line, span.lineCount, []));
+      return this.leftBy(entry, this.withLines(this.splice(span.line, span.lineCount, [])));
     }
-    /** A subtask moved here leaves its task and becomes a task of `section`. */
+    /** A subtask moved here leaves its task and becomes a task of `section`. The section it leaves empty goes, as with `removeEntry`. */
     moveEntry(entry, section, position) {
       const span = this.spanOf(entry);
       const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
       const without = this.withLines(this.splice(span.line, span.lineCount, []));
       const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
-      return without.withLines(without.splice(target, 0, moved));
+      return this.leftBy(entry, without.withLines(without.splice(target, 0, moved)));
     }
     /** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
     addGroup(section, name, before) {
       if (before < 1) throw new Error("No group goes above the tasks outside any section");
       return this.withLines(this.splice(this.groupStartLine(section, before), 0, [`### ${name}`]));
+    }
+    /**
+     * The `moved` tasks of group `index`, with their subtasks and in their order, go under a new `### name` right after the
+     * group's last line that stays; the rest of the group stays as it is, even when nothing is left in it. Nothing to move is `addGroup` after the group.
+     */
+    splitGroup(section, index, name, moved) {
+      if (moved.length === 0) return this.addGroup(section, name, index + 1);
+      const block = this.blockOf(section, index);
+      const spans = moved.map((entry) => this.spanOf(entry));
+      const inMoved = (line) => spans.some((span) => line >= span.line && line < span.line + span.lineCount);
+      let at = block.end;
+      while (at > block.start && (this.lines[at - 1].trim() === "" || inMoved(at - 1))) at--;
+      if (at === block.start) at = Math.min(...spans.map((span) => span.line));
+      const lines = moved.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
+      const kept = this.lines.filter((_, line) => !inMoved(line));
+      kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, `### ${name}`, ...lines);
+      return this.withLines(kept);
     }
     /** Group `from` goes before group `before`. The top block moved down gets the heading of the tasks outside any section. */
     moveGroup(section, from, before) {
@@ -658,7 +676,7 @@
       const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
       const without = this.splice(span.line, span.lineCount, []);
       without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
-      return this.withLines(without);
+      return this.leftBy(entry, this.withLines(without));
     }
     /**
      * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
@@ -712,6 +730,17 @@
         lines.splice(heading + 1, filled - heading - 1, "");
       }
       return lines ? this.withLines(lines) : this;
+    }
+    /**
+     * `after`, this document once `entry` was taken from its place (and put elsewhere): without the section it was the
+     * last task of, when only blank lines are left under its heading. No section's heading is left to the rules.
+     */
+    leftBy(entry, after) {
+      if (entry.path.length > 0 || entry.group === null) return after;
+      const group = this.groups(entry.section).find((g) => g.entries.some((e) => e.index === entry.index));
+      const left = group && after.groups(entry.section)[group.index];
+      if (!group || !left?.heading || left.name !== group.name || !left.blank) return after;
+      return after.deleteGroup(entry.section, left.index);
     }
     withLines(lines) {
       return new _TaskDocument(lines, this.eol, this.trailingEol, this.names, this.markers);
@@ -931,6 +960,14 @@
     }
   };
 
+  // src/domain/queries.ts
+  function listed(doc) {
+    return [...doc.tasks("now"), ...doc.tasks("soon")];
+  }
+  function openSlotted(doc) {
+    return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
+  }
+
   // src/domain/operations.ts
   var SLOT_STEP = 5;
   var HOUR_MINUTES2 = 60;
@@ -1138,10 +1175,10 @@
     }
     return doc;
   }
-  function dropEmptyGroups(doc) {
+  function dropEmptyUngroupedHeading(doc) {
     for (const section of GROUPED) {
       for (; ; ) {
-        const empty = doc.groups(section).find((g) => g.index > 0 && g.blank);
+        const empty = doc.groups(section).find((g) => g.index > 0 && g.name === null && g.blank);
         if (!empty) break;
         doc = doc.deleteGroup(section, empty.index);
       }
@@ -1158,7 +1195,7 @@
     return doc;
   }
   function normalizeGroups(doc, today) {
-    return placeUngrouped(dropEmptyGroups(mergeDuplicates(misplacedOutOfGroups(doc, today))));
+    return placeUngrouped(dropEmptyUngroupedHeading(mergeDuplicates(misplacedOutOfGroups(doc, today))));
   }
   function normalize(doc, today, boundary = DayBoundary.MIDNIGHT, presets = []) {
     const listed2 = dueToNow(datedOutOfUndated(closedToDone(recurClosed(pastDatesToToday(erasePastSlots(doc, today, boundary), today), today, boundary))), today, boundary, presets);
@@ -1251,14 +1288,6 @@
     const today = boundary.dayOf(now);
     const doc = readDocument(text, settings, today, boundary);
     return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
-  }
-
-  // src/domain/queries.ts
-  function listed(doc) {
-    return [...doc.tasks("now"), ...doc.tasks("soon")];
-  }
-  function openSlotted(doc) {
-    return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
   }
 
   // src/domain/TaskText.ts

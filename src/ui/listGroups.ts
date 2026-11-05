@@ -1,4 +1,4 @@
-import { type GroupName, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GroupName, type ListSection, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 
 /** The cards of one section of a list, in file order. */
 export interface ListGroup {
@@ -27,6 +27,29 @@ export function listGroups(items: readonly TaskItem[]): readonly ListGroup[] {
 		else groups.push({ name: item.group, items: [item] });
 	}
 	return groups;
+}
+
+/**
+ * The groups a column draws: those its tasks are in, and its list's empty sections, each right after the last group drawn
+ * that stands above it in the file (empty sections spec §5).
+ */
+export function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
+	const drawn = [...groups];
+	sections.forEach((section, i) => {
+		if (!section.empty || drawn.some((g) => g.name === section.name)) return;
+		const above = new Set(sections.slice(0, i).map((s) => s.name));
+		let at = 0;
+		drawn.forEach((g, j) => {
+			if (above.has(g.name)) at = j + 1;
+		});
+		drawn.splice(at, 0, { name: section.name, items: [] });
+	});
+	return drawn;
+}
+
+/** A section with no task: its header stands over the No tasks plate. */
+export function isEmptyGroup(group: ListGroup): boolean {
+	return group.name !== null && group.items.length === 0;
 }
 
 /** Headers show once a list has a section; the tasks outside any alone need none (sections spec §5.1). */

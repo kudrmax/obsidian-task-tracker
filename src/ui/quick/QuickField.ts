@@ -27,6 +27,8 @@ export interface QuickFieldHandle {
 	focus(): void;
 	/** The focus given back after a redraw moved the field, the selection as it was. */
 	refocus(): void;
+	/** The field writes a section's name: it looks like the section name field, and its hint says so. */
+	setSection(on: boolean): void;
 	/** A level chosen elsewhere; the field takes its colour. */
 	setPriority(level: PriorityLevel | null): void;
 	/** A text set by the owner: a prefix in it counts as already reported. */
@@ -78,6 +80,11 @@ export const QuickField = {
 			},
 			refocus() {
 				title.focus();
+			},
+			setSection(on) {
+				title.setPlaceholder(on ? "Section name" : "New task");
+				title.el.classList.toggle("is-section", on);
+				markPriority(title.el, on ? null : levelOf(title.text));
 			},
 			setPriority(level) {
 				markPriority(title.el, level);

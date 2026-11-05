@@ -20,9 +20,12 @@ export class MarkdownTitleField implements TitleField {
 	private quiet = true;
 	/** The key down now commits an input method's candidate: it is not the owner's. */
 	private composing = false;
+	/** What shows while the field is empty: the editor's placeholder draws this node, whose text the owner may change. */
+	private readonly hint: HTMLElement;
 
 	constructor(app: App, host: EditorHost, sourcePath: string, parent: HTMLElement, opts: TitleFieldOptions) {
 		this.el = el(parent, "div", "tc-title-field");
+		this.hint = el(null, "span", "", opts.placeholder);
 		const { events } = opts;
 		const key = (run: () => void) => () => {
 			if (this.composing) return false;
@@ -30,7 +33,7 @@ export class MarkdownTitleField implements TitleField {
 		};
 		this.editor = new EmbeddedEditor(app, host, sourcePath, this.el, oneLine(opts.text), {
 			extensions: [
-				placeholder(opts.placeholder),
+				placeholder(() => this.hint),
 				EditorState.transactionFilter.of(oneLineFilter),
 				Prec.highest(
 					EditorView.domEventHandlers({
@@ -54,6 +57,10 @@ export class MarkdownTitleField implements TitleField {
 		content.setAttribute("enterkeyhint", "next");
 		content.addEventListener("blur", () => events.onBlur());
 		this.quiet = false;
+	}
+
+	setPlaceholder(text: string): void {
+		this.hint.textContent = text;
 	}
 
 	get text(): string {

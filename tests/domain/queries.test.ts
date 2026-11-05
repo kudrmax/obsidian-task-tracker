@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxList, dayList, openSlotted, repeatable, slottedOn, soonWithoutDate } from "../../src/domain/queries";
+import { columnGroups, inboxList, dayList, openSlotted, repeatable, slottedOn, soonWithoutDate } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -102,5 +102,61 @@ describe("inboxList", () => {
 	it("keeps Inbox out of the day's list, Soon and the timeline", () => {
 		expect(texts(dayList(withInbox, T, T))).toEqual(["N"]);
 		expect(texts(soonWithoutDate(withInbox))).toEqual(["S"]);
+	});
+});
+
+describe("columnGroups", () => {
+	const G = { ...SECTIONS, backlog: "Backlog", ungrouped: "No section" };
+	const FILE = [
+		"## Inbox",
+		"- [ ] I",
+		"### Пусто",
+		"",
+		"## Now",
+		"- [ ] N",
+		"### Вечер",
+		"- [ ] E",
+		"### Пустая",
+		"### Текст",
+		"note",
+		"",
+		"## Soon",
+		"- [ ] free",
+		"- [ ] n 📅 2026-10-31",
+		"### Завтра",
+		"- [ ] t 📅 2026-10-31",
+		"### Другой день",
+		"- [ ] x 📅 2026-11-03",
+		"### Пустая Soon",
+		"",
+	].join("\n");
+	const d = TaskDocument.parse(FILE, G, M);
+	const shape = (column: Parameters<typeof columnGroups>[1]) => columnGroups(d, column, T).map((g) => [g.list, g.index, g.name, texts(g.entries)]);
+
+	it("an empty section shows in its list's column, one with only text too", () => {
+		expect(shape({ kind: "inbox" })).toEqual([["inbox", 0, null, ["I"]], ["inbox", 1, "Пусто", []]]);
+		expect(shape({ kind: "day", date: T })).toEqual([
+			["now", 0, null, ["N"]],
+			["now", 1, "Вечер", ["E"]],
+			["now", 2, "Пустая", []],
+			["now", 3, "Текст", []],
+		]);
+	});
+
+	it("an empty Soon section shows in Soon and on every later day; one with tasks for another day does not", () => {
+		expect(shape({ kind: "soon" })).toEqual([["soon", 0, null, ["free"]], ["soon", 3, "Пустая Soon", []]]);
+		expect(shape({ kind: "day", date: "2026-10-31" })).toEqual([["soon", 0, null, ["n"]], ["soon", 1, "Завтра", ["t"]], ["soon", 3, "Пустая Soon", []]]);
+		expect(shape({ kind: "day", date: "2026-12-01" })).toEqual([["soon", 3, "Пустая Soon", []]]);
+	});
+
+	it("a later day's No section shows Now's tasks of that day above Soon's", () => {
+		const later = TaskDocument.parse("## Now\n- [ ] keep\n- [ ] a 📅 2026-10-31\n\n## Soon\n- [ ] b 📅 2026-10-31\n", G, M);
+		expect(columnGroups(later, { kind: "day", date: "2026-10-31" }, T).map((g) => [g.name, texts(g.entries)])).toEqual([[null, ["a", "b"]]]);
+	});
+
+	it("No section without tasks is not shown; a past day shows no groups", () => {
+		const bare = TaskDocument.parse("## Now\n### X\n- [ ] A\n", G, M);
+		expect(columnGroups(bare, { kind: "day", date: T }, T).map((g) => g.name)).toEqual(["X"]);
+		expect(columnGroups(d, { kind: "day", date: "2026-10-29" }, T)).toEqual([]);
 	});
 });
