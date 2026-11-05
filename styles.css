@@ -156,16 +156,13 @@ body {
 	--tc-plus-size: 44px;
 	--tc-plus-icon: var(--tc-icon-xl);
 	--tc-capsule-btn: 40px;
-	/* Select tasks: the circle at a card's start, the count where the plus stands. */
+	/* Select tasks: the circle at a card's start. */
 	--tc-pick-size: var(--tc-icon-m);
 	--tc-pick-check: 12px;
 	--tc-pick-ring: var(--tc-select-ring);
 	--tc-stroke-pick: var(--tc-stroke-3-4);
 	--tc-pick-pad-start: 9px;
 	--tc-pick-gap: var(--tc-space-2);
-	--tc-select-count-w: 64px;
-	--tc-select-count-icon: var(--tc-icon-m);
-	--tc-stroke-select-count: var(--tc-stroke-2-6);
 	--tc-search-w: 520px;
 	--tc-search-field-pad: var(--tc-space-10);
 	/* Over the keyboard as the quick bar stands, and over Obsidian's navigation while the keyboard is down. */
@@ -691,15 +688,12 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-capsule button.tc-btn.is-icon.is-off { color: var(--tc-ink-dim); }
 .tc-capsule svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
 .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule { display: none; }
-.tc-capsule .tc-more-open svg { stroke: none; fill: currentColor; }
-/* Select tasks: the cross stands where the capsule stood, the count where the plus stood; while it lasts, and while a stack is carried, the capsule and the plus are gone. */
-.task-calendar:not(.is-selecting) > button.tc-select-btn, .task-calendar.is-dragging > button.tc-select-btn, .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule) { display: none; }
-.task-calendar > button.tc-select-exit { left: var(--tc-space-16); }
-.task-calendar > button.tc-select-exit svg { stroke-width: var(--tc-stroke-ring); }
-.task-calendar > button.tc-select-count { right: var(--tc-space-16); }
-button.tc-btn.tc-select-count { width: auto; min-width: var(--tc-select-count-w); padding: 0 var(--tc-space-12) 0 var(--tc-space-16); flex-direction: row-reverse; gap: var(--tc-space-4); font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
-button.tc-select-count svg { width: var(--tc-select-count-icon); height: var(--tc-select-count-icon); stroke-width: var(--tc-stroke-select-count); }
-button.tc-btn.tc-select-count.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+/* Select tasks: a capsule like Undo + ⋯ holds the cross and how many are picked, a round button like the plus holds «⋯» for the menu; while it lasts, and while a stack is carried, Undo + ⋯ and the plus are gone. */
+.task-calendar:not(.is-selecting) > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-dragging > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule:not(.tc-select-capsule)) { display: none; }
+.task-calendar > button.tc-select-menu { right: var(--tc-space-16); }
+button.tc-select-menu svg, .tc-capsule .tc-more-open svg { stroke: none; fill: currentColor; }
+button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.tc-capsule button.tc-select-num { font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
 .tc-plus svg { stroke-width: var(--tc-stroke-plus); }
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }

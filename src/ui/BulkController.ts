@@ -1,6 +1,7 @@
 import { type GroupName, keyId, type PriorityLevel, type SectionChoice, type TaskChange, type TaskItem, type TaskKey, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
+import { el } from "./dom";
 import { Button } from "./kit/Button";
 import { PlusRing } from "./quick/PlusRing";
 import { type PickedCard, pickMark, TaskSelection } from "./TaskSelection";
@@ -40,8 +41,9 @@ const SELECTING = "is-selecting";
 
 /**
  * Bulk actions (bulk actions spec): on the desktop ⌘-click picks list cards, Shift-click a run of them, a click on a
- * picked card opens one menu for them all. Select tasks (both platforms) puts a circle on every list card: a tap picks,
- * the cross at the bottom left stops, the count where the plus stood opens the same menu. A picked card lifted carries
+ * picked card opens one menu for them all. Select tasks (both platforms) puts a circle on every list card: a tap picks;
+ * the capsule at the bottom left holds the cross that stops and how many are picked, and «⋯» where the plus stood opens
+ * the same menu. A picked card lifted carries
  * the others along. Escape or a click on an empty place lets them go, as does any action done on them, which also ends
  * Select tasks.
  */
@@ -49,6 +51,7 @@ export class BulkController {
 	readonly selection = new TaskSelection(() => this.showCount());
 	private readonly ring: PlusRing;
 	private count: Button | null = null;
+	private menuButton: Button | null = null;
 	private menu: BulkMenu | null = null;
 	private selecting = false;
 
@@ -56,11 +59,12 @@ export class BulkController {
 		this.ring = new PlusRing(deps.root, "cross");
 	}
 
-	/** The view's content is laid out: the cross and the count of Select tasks join it, hidden until it starts. */
+	/** The view's content is laid out: Select tasks' capsule (the cross, how many are picked) and its menu button where the plus stands join it, hidden until it starts. */
 	mount(): void {
-		Button.create(this.deps.root, { kind: "round", label: "Stop selecting", icon: "cross", cls: "tc-select-btn tc-select-exit", onPress: () => this.stop() });
-		const count = Button.create(this.deps.root, { kind: "round", tone: "accent", label: "Actions for selected tasks", icon: "chevronUp", text: "0", cls: "tc-select-btn tc-select-count", onPress: () => this.openMenu(count.el, "over") });
-		this.count = count;
+		const capsule = el(this.deps.root, "div", "tc-capsule tc-select-capsule");
+		Button.create(capsule, { kind: "icon", label: "Stop selecting", icon: "cross", cls: "tc-select-exit", onPress: () => this.stop() });
+		this.count = Button.create(capsule, { kind: "icon", label: "Picked tasks", text: "0", cls: "tc-select-num", onPress: () => this.openMenu("over") });
+		this.menuButton = Button.create(this.deps.root, { kind: "round", tone: "accent", label: "Actions for selected tasks", icon: "more", cls: "tc-select-btn tc-select-menu", onPress: () => this.openMenu("over") });
 		this.showCount();
 	}
 
@@ -100,7 +104,7 @@ export class BulkController {
 			return true;
 		}
 		if (selection.has(card.item) && selection.size > 1) {
-			this.openMenu(card.card, "beside");
+			this.openMenu("beside", card.card);
 			return true;
 		}
 		selection.clear();
@@ -148,16 +152,17 @@ export class BulkController {
 	}
 
 	private showCount(): void {
-		if (!this.count) return;
 		const size = this.selection.size;
-		this.count.setText(String(size));
-		this.count.setOff(size === 0);
+		this.count?.setText(String(size));
+		this.count?.setOff(size === 0);
+		this.menuButton?.setOff(size === 0);
 	}
 
-	/** The menu for the picked tasks: beside the clicked card's list, or over the count. */
-	private openMenu(source: HTMLElement, at: "beside" | "over"): void {
+	/** The menu for the picked tasks: beside the clicked card's list, or over Select tasks' menu button. */
+	private openMenu(at: "beside" | "over", card?: HTMLElement): void {
 		const cards = this.selection.cards;
-		if (cards.length === 0) return;
+		const source = at === "beside" ? card : this.menuButton?.el;
+		if (cards.length === 0 || !source) return;
 		const items = cards.map((card) => card.item);
 		const sections = this.deps.sections(cards);
 		const each = (change: (card: PickedCard) => TaskChange) => {

@@ -62,7 +62,7 @@ export interface BulkMenuContext {
 	readonly items: readonly TaskItem[];
 	/** The picked tasks' cards: each stays over the blur where it stands. */
 	readonly cards: readonly HTMLElement[];
-	/** What opened it: the card clicked, the panel beside its list, level with it; or the count of Select tasks, the panel over it, by its right edge. */
+	/** What opened it: the card clicked, the panel beside its list, level with it; or Select tasks' menu button, the panel over it, by its right edge. */
 	readonly source: HTMLElement;
 	readonly at: "beside" | "over";
 	readonly today: LocalDate;
@@ -117,7 +117,7 @@ export class BulkMenu {
 		return new DOMRect(column.right + gap, card.top - gap, 0, 0);
 	}
 
-	/** Beside the list; or over the count, its right edge on the count's. */
+	/** Beside the list; or over the menu button, its right edge on the button's. */
 	private place(panel: HTMLElement): void {
 		const { source } = this;
 		const anchor = this.context.at === "beside" ? source : new DOMRect(source.right - panel.offsetWidth, source.top, panel.offsetWidth, source.height);

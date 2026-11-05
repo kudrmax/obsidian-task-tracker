@@ -168,7 +168,8 @@ describe("bulk actions", () => {
 });
 
 describe("Select tasks", () => {
-	const count = () => document.querySelector<HTMLButtonElement>(".tc-select-count")!;
+	const count = () => document.querySelector<HTMLButtonElement>(".tc-select-capsule .tc-select-num")!;
+	const menuButton = () => document.querySelector<HTMLButtonElement>(".tc-select-menu")!;
 
 	it("puts a circle on every card and picks with a plain tap, on the phone too", () => {
 		const bulk = controller({ desktop: () => false });
@@ -187,15 +188,15 @@ describe("Select tasks", () => {
 		document.body.replaceChildren();
 	});
 
-	it("counts the picked tasks where the plus stands, dim while none is", () => {
+	it("counts the picked tasks beside the cross; the count and «⋯» are dim while none is", () => {
 		const bulk = controller({ desktop: () => false });
 		const [a] = cards([item()]);
 		bulk.start();
 		expect(count().textContent).toBe("0");
-		expect(count().classList.contains("is-off")).toBe(true);
+		expect([count(), menuButton()].map((b) => b.classList.contains("is-off"))).toEqual([true, true]);
 		bulk.pick(a, new MouseEvent("click"), "tap");
 		expect(count().textContent).toBe("1");
-		expect(count().classList.contains("is-off")).toBe(false);
+		expect([count(), menuButton()].map((b) => b.classList.contains("is-off"))).toEqual([false, false]);
 		bulk.stop();
 		document.body.replaceChildren();
 	});
@@ -214,14 +215,14 @@ describe("Select tasks", () => {
 		document.body.replaceChildren();
 	});
 
-	it("opens the menu for them all from the count, and an action ends Select tasks", async () => {
+	it("opens the menu for them all from «⋯» where the plus stands, and an action ends Select tasks", async () => {
 		const apply = vi.fn(async () => {});
 		const bulk = controller({ desktop: () => false, apply });
 		const [a, b] = cards([item(), item()]);
 		bulk.start();
 		bulk.pick(a, new MouseEvent("click"), "tap");
 		bulk.pick(b, new MouseEvent("click"), "tap");
-		count().click();
+		menuButton().click();
 		expect(document.querySelector(".tc-panel.is-bulk.is-over .tc-menu-title")?.textContent).toBe("2 tasks");
 		document.querySelector<HTMLButtonElement>(".tc-panel.is-bulk .tc-menu-tile")!.click();
 		await Promise.resolve();
