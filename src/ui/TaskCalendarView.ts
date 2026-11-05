@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -13,7 +13,6 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import { sameTask } from "./drag/listPlace";
 import type { ColumnSections, DragPayload, DropResult, ListColumn, TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
@@ -74,7 +73,7 @@ interface NameGroup extends ColumnSections {
 /** The task with `key` among `items` and their subtasks. */
 function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 	for (const item of items) {
-		if (sameTask(item.key, key)) return item;
+		if (samePlace(item.key, key)) return item;
 		const inner = findTask(item.subtasks, key);
 		if (inner) return inner;
 	}
@@ -827,7 +826,7 @@ export class TaskCalendarView extends ItemView {
 	 * on the timeline or in a column without sections.
 	 */
 	private sectionsHome(item: TaskItem, card: HTMLElement): NameGroup | null {
-		const list = item.key.section;
+		const list = item.list;
 		if (item.parentText !== null || list === "done") return null;
 		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
@@ -845,7 +844,7 @@ export class TaskCalendarView extends ItemView {
 			choice: this.sectionChoice(list, cards[0].item),
 			shared: cards.every((card) => card.item.group === cards[0].item.group),
 			change: (card, name) => {
-				const date = (card.item.key.section === "soon" ? card.item.dueDate : null) ?? undefined;
+				const date = (card.item.list === "soon" ? card.item.dueDate : null) ?? undefined;
 				return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
 			},
 		};
@@ -854,7 +853,7 @@ export class TaskCalendarView extends ItemView {
 	/** The sections the list has, in its order, then the presets it lacks, in the settings' order; the No section name is none of them. */
 	private sectionChoice(list: GroupedList, item: TaskItem): SectionChoice {
 		const { presets, ungrouped } = this.settings.groups;
-		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox, ...this.data.backlog].filter((task) => task.key.section === list);
+		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox, ...this.data.backlog].filter((task) => task.list === list);
 		const names = [...tasks.flatMap((task) => (task.group === null ? [] : [task.group])), ...presets.map((preset) => preset.trim())];
 		return { names: [...new Set(names)].filter((name) => name !== "" && name !== ungrouped), current: item.group, ungrouped };
 	}
@@ -867,7 +866,7 @@ export class TaskCalendarView extends ItemView {
 	private unnamed(items: readonly TaskItem[]): readonly TaskItem[] {
 		const naming = this.naming;
 		if (!naming) return items;
-		return items.filter((item) => item.key.section !== naming.item.key.section || item.key.index !== naming.item.key.index);
+		return items.filter((item) => !sameTaskTree(item.key, naming.item.key));
 	}
 
 	private namingIn(column: ListColumn): TaskItem | null {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, type PlacedCard, fitLevel, gapOf, levelRange, placeAt, resultOf, samePlace, shiftLevel } from "../../src/ui/drag/listPlace";
+import { type GapPlace, type PlacedCard, fitLevel, gapOf, levelRange, placeAt, resultOf, sameGap, shiftLevel } from "../../src/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;
@@ -43,8 +43,8 @@ describe("placeAt", () => {
 		});
 
 		it("sees one place in two that differ only by level", () => {
-			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 2, level: 1, group: null })).toBe(true);
-			expect(samePlace({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 3, level: 0, group: null })).toBe(false);
+			expect(sameGap({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 2, level: 1, group: null })).toBe(true);
+			expect(sameGap({ kind: "gap", index: 2, level: 0, group: null }, { kind: "gap", index: 3, level: 0, group: null })).toBe(false);
 		});
 	});
 

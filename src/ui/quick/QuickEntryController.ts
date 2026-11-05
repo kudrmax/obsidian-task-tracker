@@ -1,4 +1,4 @@
-import type { NewTaskPlace, Placement, PriorityLevel, TaskItem, TaskKey, TaskService } from "../../application/contracts";
+import { type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { type DayColumn, dayColumn } from "../dayColumn";
@@ -7,7 +7,7 @@ import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
 import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
-import { gapOf, type ListCard, type PlaceResult, sameTask } from "../drag/listPlace";
+import { gapOf, type ListCard, type PlaceResult } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
@@ -385,7 +385,7 @@ export class QuickEntryController {
 
 	private find(key: TaskKey): { readonly column: ListColumn; readonly index: number } | null {
 		for (const column of LOOK_IN[this.deps.mode()]) {
-			const index = this.cards(column).findIndex((card) => sameTask(card.key, key));
+			const index = this.cards(column).findIndex((card) => samePlace(card.key, key));
 			if (index >= 0) return { column, index };
 		}
 		return null;
@@ -612,7 +612,7 @@ export class QuickEntryController {
 	private shownPlace(state: EntryState): Placement | null {
 		const { spot, renaming } = state;
 		if (spot.kind !== "list") return null;
-		if (renaming) return renaming.key.path.length > 0 ? null : this.placement(spot);
+		if (renaming) return renaming.isSubtask ? null : this.placement(spot);
 		return spot.place.level > 0 ? null : this.columnPlacement(spot.column);
 	}
 
