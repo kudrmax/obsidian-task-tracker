@@ -1,4 +1,4 @@
-import type { RightMode } from "../settings";
+import type { RightMode } from "../application/contracts";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";

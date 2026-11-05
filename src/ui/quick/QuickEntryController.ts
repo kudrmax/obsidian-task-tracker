@@ -1,6 +1,5 @@
+import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { EntryPart } from "./EntryPart";
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
-import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
 import { FramePass } from "../FramePass";
