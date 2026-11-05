@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -16,7 +16,7 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import type { ColumnSections, DragPayload, DropResult, ListColumn, TaskDragPayload } from "./drag/DropTarget";
+import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
 import type { ListGroup } from "./listGroups";
@@ -59,8 +59,6 @@ import type { LocalDate } from "./types";
 
 export const VIEW_TYPE = "task-calendar";
 
-/** Inbox and Backlog take what waits to be sorted or put off: a card from either of them or from Soon, or the plus. */
-const undatedTakes = (drag: DragPayload): boolean => drag.from === "inbox" || drag.from === "backlog" || drag.from === "soon" || drag.from === "new";
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
@@ -268,7 +266,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", () => true, () => this.sectionsOf("left"), true, () => this.haptics.tap());
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", (origins) => acceptsDrop("left", origins), () => this.sectionsOf("left"), true, () => this.haptics.tap());
 		this.doneEl = el(root, "div", "tc-done");
 		this.doneList = new TaskList(el(this.doneEl, "div"), {
 			items: () => this.data.done,
@@ -290,7 +288,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", undatedTakes, () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
+		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
 		this.backlogList = new TaskList(el(backlogPane, "div"), {
 			items: () => this.unnamed(this.data.backlog),
@@ -303,7 +301,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
 		});
-		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", undatedTakes, () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
+		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
@@ -316,7 +314,7 @@ export class TaskCalendarView extends ItemView {
 			ungroupedName: () => this.settings.groups.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (drag) => drag.from !== "timeline", () => this.sectionsOf("soon"), true, () => this.haptics.tap());
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -831,23 +829,10 @@ export class TaskCalendarView extends ItemView {
 		this.drag.attachCard(card, item, column, subtree);
 	}
 
-	/** What a drop means for the file: the table in spec §5.1. */
+	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	private applyDrop(drag: TaskDragPayload, result: DropResult): Promise<void> {
-		const key = drag.item.key;
-		const tasks = this.deps.tasks;
-		const steps = this.bulk.dropSteps(drag, result);
-		if (steps) return this.act(() => tasks.applyAll(steps));
-		return this.act(() => {
-			if (result.kind === "slot") return tasks.setSlot(key, result.slot);
-			if (result.kind === "clearSlot") return tasks.clearSlot(key);
-			if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before, result.date ?? undefined);
-			if (result.kind === "nest") return tasks.nest(key, result.parent, result.before);
-			if (drag.from === "timeline") return tasks.clearSlot(key, { before: result.before, date: this.selectedDate });
-			if (result.column === "left") return drag.from === "left" ? tasks.moveBefore(key, result.before, this.selectedDate) : tasks.moveToList(key, this.selectedDate);
-			if (result.before) return tasks.moveBefore(key, result.before, this.selectedDate);
-			if (drag.from === "left") return tasks.moveToSoon(key, this.selectedDate);
-			return tasks.moveToEnd(key, result.column);
-		});
+		this.bulk.dropping(drag);
+		return this.act(() => this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate));
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */

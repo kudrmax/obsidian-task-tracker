@@ -98,7 +98,7 @@ describe("DragController.beginNew", () => {
 	it("says where the task goes on a target, and the plus is gone once it has shrunk", async () => {
 		const { controller, source, arbiter } = setup();
 		const onDrop = vi.fn();
-		const result: DropResult = { kind: "listBefore", before: null, column: "soon" };
+		const result: DropResult = { kind: "list", column: "soon", before: null };
 		const target = new StubTarget(result);
 		controller.beginNew(source, down(20, 610), [target], onDrop);
 		pointer("pointermove", 150, 300);
@@ -112,7 +112,7 @@ describe("DragController.beginNew", () => {
 	it("says where the task goes as the finger lifts, the screen free and the line gone, while the plus still shrinks", () => {
 		const { controller, source, arbiter } = setup();
 		const onDrop = vi.fn();
-		const result: DropResult = { kind: "listBefore", before: null, column: "soon" };
+		const result: DropResult = { kind: "list", column: "soon", before: null };
 		const target = new StubTarget(result);
 		controller.beginNew(source, down(20, 610), [target], onDrop);
 		pointer("pointermove", 150, 300);

@@ -1,6 +1,5 @@
-import { type NewTaskPlace, type Placement, type RepeatRule, sameLine, samePlace, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { fitLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace, type NewTaskPlace, placeOfGap, shiftLevel, type Placement, type RepeatRule, sameLine, samePlace, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { ListColumn } from "../drag/DropTarget";
-import { type GapPlace, type LevelCard, type ListCard, type PlaceResult, fitLevel, resultOf, shiftLevel } from "../drag/listPlace";
 import type { Slot } from "../types";
 import { WriteQueue } from "./WriteQueue";
 
@@ -34,7 +33,7 @@ export interface EntryState {
 export interface QuickEntryDeps {
 	/** The cards of `column` as it shows the file now. */
 	cards(column: ListColumn): readonly ListCard[];
-	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace;
+	placeOf(column: ListColumn, result: ListPlace): NewTaskPlace;
 	/**
 	 * Resolves once the lists show the file as of the last write; `beforeShow` runs right before they draw it, given
 	 * the cards each column is about to draw.
@@ -334,7 +333,7 @@ export class QuickEntry {
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
-				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, resultOf(cards, place)), line.repeat);
+				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, placeOfGap(cards, place)), line.repeat);
 				return this.deps.fresh(shown({ column: spot.column, key }));
 			}
 		}

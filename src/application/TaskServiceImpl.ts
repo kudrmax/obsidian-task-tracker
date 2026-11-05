@@ -15,6 +15,8 @@ import {
 	TasksFileMissingError,
 	type DayColumn,
 	type DayView,
+	type DroppedTask,
+	type DropTo,
 	type EndList,
 	type GroupedList,
 	type GroupName,
@@ -32,6 +34,7 @@ import {
 	type TitlePart,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
+import { runDrop } from "./drops";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
@@ -354,6 +357,10 @@ export class TaskServiceImpl implements TaskService {
 			}
 			return tags.untag(current);
 		});
+	}
+
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		return runDrop(this, tasks, to, day);
 	}
 
 	/** One step of `applyAll`; `first` and `second` are the tasks its change names, in the order `refsOf` gives them. */
