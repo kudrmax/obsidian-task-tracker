@@ -105,6 +105,8 @@ body {
 	--tc-radius-time-pill: 6px;
 	--tc-radius-seg: calc(var(--tc-seg) / 2);
 	--tc-radius-seg-btn: calc(var(--tc-seg-btn-h) / 2);
+	--tc-radius-wheel: calc(var(--tc-wheel) / 2);
+	--tc-radius-wheel-btn: calc(var(--tc-wheel-btn-h) / 2);
 	--tc-radius-handle: 5px;
 	--tc-radius-pill: 8px;
 	/* A button that is only its text (the day's name, the description screen's Close and Edit): its corners, seen only under the pointer or the keyboard's ring. */
@@ -149,9 +151,13 @@ body {
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
+	/* The wheel is as tall as Undo's capsule and the plus beside it, so the foot reads as one bar in three parts. */
+	--tc-wheel: var(--tc-plus-size);
+	--tc-wheel-pad: var(--tc-space-4);
+	--tc-wheel-btn-h: calc(var(--tc-wheel) - 2 * var(--tc-wheel-pad));
 	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
-	--tc-foot-gap: 12px;
-	--tc-switch-row: calc(var(--tc-seg) + var(--tc-foot-gap));
+	--tc-foot-gap: 6px;
+	--tc-switch-row: calc(var(--tc-wheel) + var(--tc-foot-gap));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
 	--tc-plus-icon: var(--tc-icon-xl);
@@ -356,7 +362,7 @@ body {
 	--tc-place-icon: var(--tc-icon-m);
 	/*
 	 * The quick bar on the desktop (board «8. Десктоп: панель у поля», QuickDesk.dc.html): no keyboard, so the same
-	 * buttons are a capsule in the wheel's track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
+	 * buttons are a capsule in a segmented track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
 	 */
 	--tc-desk-bar-gap: 8px;
 	--tc-desk-bar-btn-w: 32px;
@@ -372,7 +378,9 @@ body {
 
 	/* Sizes: the calendar sources */
 	--tc-dot: 7px;
-	--tc-dot-top: 2px;
+	/* The dot stands as far over the calendar icon's top as it did in the old 28 px cell. */
+	--tc-dot-rise: 3px;
+	--tc-dot-top: calc((var(--tc-wheel-btn-h) - var(--tc-seg-icon)) / 2 - var(--tc-dot-rise));
 	--tc-dot-right: 6px;
 	--tc-popover-w: 268px;
 	--tc-popover-gap: var(--tc-space-12);
@@ -682,10 +690,10 @@ body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-ch
  */
 body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
-.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); height: var(--tc-wheel); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
 .task-calendar > .tc-capsule { left: var(--tc-space-16); }
@@ -706,12 +714,12 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .task-calendar > .tc-plus-ring.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); }
 .task-calendar > .tc-plus-ring.is-cross { color: var(--tc-muted); background: var(--tc-bg); }
 .task-calendar > .tc-plus-ring.is-cross.is-hot { color: var(--tc-accent); background: var(--tc-drop-bg); }
-.tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
+.tc-seg-view { position: absolute; top: var(--tc-wheel-pad); left: var(--tc-wheel-pad); right: var(--tc-wheel-pad); height: var(--tc-wheel-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
-.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }
+.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; }
 .tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-seg-pos)) * var(--tc-seg-btn-w)); display: flex; }
 .tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-pos) * var(--tc-seg-btn-w)); }
-.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
+.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
 .tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
 /* Let go, the wheel rolls on to its place, and the track's ends follow. */

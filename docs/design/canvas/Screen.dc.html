@@ -65,15 +65,15 @@ body{margin:0;background:#000}
 </sc-if>
 
 <sc-if value="{{showWheel}}" hint-placeholder-val="{{true}}">
-<div role="group" aria-label="Columns" style="position: absolute; left: {{wh.left}}px; bottom: {{wh.bottom}}px; width: {{wh.width}}px; height: 32px; box-sizing: border-box; border-radius: 16px; background: {{c.track}}; box-shadow: {{c.plusShadow}}; overflow: hidden; z-index: 5;">
-<div style="position: absolute; left: 2px; right: 2px; top: 2px; height: 28px; overflow: hidden;">
+<div role="group" aria-label="Columns" style="position: absolute; left: {{wh.left}}px; bottom: {{wh.bottom}}px; width: {{wh.width}}px; height: 44px; box-sizing: border-box; border-radius: 22px; background: {{c.track}}; box-shadow: {{c.plusShadow}}; overflow: hidden; z-index: 5;">
+<div style="position: absolute; left: 4px; right: 4px; top: 4px; height: 36px; overflow: hidden;">
 <sc-for list="{{wh.icons}}" as="o" hint-placeholder-count="3">
-<button aria-label="{{o.label}}" style="position: absolute; left: {{o.left}}px; top: 0; width: 38px; height: 28px; border: 0; padding: 0; background: transparent; color: {{c.muted}}; display: flex; align-items: center; justify-content: center; transform: scale({{o.scale}}); opacity: {{o.opacity}};"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 2px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
+<button aria-label="{{o.label}}" style="position: absolute; left: {{o.left}}px; top: 0; width: 38px; height: 36px; border: 0; padding: 0; background: transparent; color: {{c.muted}}; display: flex; align-items: center; justify-content: center; transform: scale({{o.scale}}); opacity: {{o.opacity}};"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg><sc-if value="{{o.dot}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 4px; background: {{c.dot}};"></span></sc-if></button>
 </sc-for>
 </div>
-<div style="position: absolute; left: {{wh.pillLeft}}px; top: 2px; width: 76px; height: 28px; border-radius: 14px; background: {{c.selectedBg}}; overflow: hidden;">
+<div style="position: absolute; left: {{wh.pillLeft}}px; top: 4px; width: 76px; height: 36px; border-radius: 18px; background: {{c.selectedBg}}; overflow: hidden;">
 <sc-for list="{{wh.icons}}" as="o" hint-placeholder-count="3">
-<span style="position: absolute; left: {{o.inPill}}px; top: 0; width: 38px; height: 28px; color: {{c.selectedText}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
+<span style="position: absolute; left: {{o.inPill}}px; top: 0; width: 38px; height: 36px; color: {{c.selectedText}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
 </sc-for>
 </div>
 </div>
@@ -774,12 +774,12 @@ class Component extends DCLogic {
     const k = isInbox ? 0 : 1 + p;
     const before = k > 0 ? 1 : 0;
     const after = k < 2 ? 1 : 0;
-    const wheelW = 76 + (before + after) * 38 + 4;
+    const wheelW = 76 + (before + after) * 38 + 8;
     const wh = {
-      left: SCREEN / 2 - 38 - 2 - before * 38,
-      bottom: VIEW.room + 16,
+      left: SCREEN / 2 - 38 - 4 - before * 38,
+      bottom: VIEW.room + 10,
       width: wheelW,
-      pillLeft: 2 + before * 38,
+      pillLeft: 4 + before * 38,
       icons: chips.map((o, i) => {
         const depth = Math.max(0, Math.abs(i + 0.5 - (k + 1)) - 0.5);
         return { ...o, left: (before - k + i) * 38, inPill: (i - k) * 38, scale: Math.max(0, 1 - depth * 0.14), opacity: Math.max(0, 1 - depth * 0.28) };
