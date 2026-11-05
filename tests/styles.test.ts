@@ -423,6 +423,14 @@ describe("styles.css keeps to its design system", () => {
 		expect(hidden?.value).toBe("none");
 	});
 
+	it("stands the phone's search bar on the keyboard while it is up, over Obsidian's navigation only while it is down", () => {
+		expect(sheet.tokens.get("--tc-search-bottom")).toBe("calc(var(--tc-bar-bottom) + var(--tc-nav-room))");
+		const up = sheet.rules.find((d) => d.property === "--tc-search-bottom");
+		expect(up?.selector).toBe(".task-calendar.is-keyboard-up > .tc-search");
+		expect(up?.value).toBe("var(--tc-bar-bottom)");
+		expect(sheet.rules.find((d) => d.selector === ".tc-search-bar" && d.property === "bottom")?.value).toBe("var(--tc-search-bottom)");
+	});
+
 	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
 		const lifted = sheet.rules
 			.filter((d) => d.property === "z-index" && d.value === "var(--tc-layer-bar-button)")
