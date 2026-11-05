@@ -38,8 +38,6 @@ import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./
 import { clear, el, px } from "./dom";
 import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
-import { EntryTrace } from "./entryTrace";
-import { GestureTrace } from "./gestureTrace";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -81,8 +79,6 @@ export interface ViewDeps {
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
-	/** Temporary: the note the quick entry trace is written to, for a phone with no console. */
-	readonly entryLog: { append(text: string): void };
 }
 
 /**
@@ -395,7 +391,6 @@ export class TaskCalendarView extends ItemView {
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
-		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
 		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() });
 		this.unsubscribe.push(() => capsule.destroy());
@@ -485,16 +480,6 @@ export class TaskCalendarView extends ItemView {
 		this.poll?.stop();
 		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
-	}
-
-	/** Temporary: how quick entry opens and closes on the phone, frame by frame, in «Task Calendar entry log.md». */
-	private traceEntry(root: HTMLElement): void {
-		const trace = new EntryTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) });
-		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
-		this.unsubscribe.push(() => trace.destroy());
-		const gestures = new GestureTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) }, () => this.arbiter.owner);
-		gestures.log(`gestures ${(this.app as unknown as { plugins?: { manifests?: Record<string, { version: string }> } }).plugins?.manifests?.["task-calendar"]?.version ?? "?"}`);
-		this.unsubscribe.push(() => gestures.destroy());
 	}
 
 	override onResize(): void {
