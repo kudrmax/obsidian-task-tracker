@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача на весь экран: компонент десктопа</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<dc-import name="Screen" platform="desk" foot="prod" plus="true" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="1200px,800px"></dc-import>
+
+<div style="position: absolute; left: 44px; top: 41px; right: 0; bottom: 0; background: {{c.bg}}; z-index: 6;"></div>
+
+<div style="position: absolute; left: 292px; top: 48px; height: 44px; display: flex; align-items: center; z-index: 8;">
+<button style="height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: {{c.accent}}; font: inherit; font-size: 17px;">Close</button>
+</div>
+
+<div style="position: absolute; left: 302px; top: 100px; width: 640px; display: flex; flex-direction: column; z-index: 7;">
+<div style="font-size: 22px; line-height: 28px; font-weight: 700;">Собраться утром</div>
+<div style="position: relative; margin-top: 12px; height: {{listH}}px;">
+<svg width="640" height="{{listH}}" viewBox="0 0 640 {{listH}}" style="position: absolute; left: 0; top: 0;" aria-hidden="true"><path d="{{branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.w}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; box-shadow: {{r.hover}}; border-radius: 17.5px; padding: 0 10px 0 9px; display: flex; align-items: center; gap: 8px;">
+<button aria-label="{{r.aria}}" style="width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; padding: 0; border-radius: 9px; border: {{r.ring}}; background: {{r.dot}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center;"><sc-if value="{{r.done}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></sc-if></button>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; color: {{r.ink}}; text-decoration: {{r.deco}};">{{r.title}}</div>
+<sc-if value="{{r.meta}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}};">
+<span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{r.count}}</span>
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="M4 6h16 M4 12h16 M4 18h10"></path></svg>
+</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: 20px; margin-left: -6px; display: flex; flex-direction: column; color: {{md.text}}; font-family: {{md.font}};">
+<sc-for list="{{desc}}" as="it" hint-placeholder-count="5">
+<div style="display: flex; align-items: flex-start;">
+<span style="width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: 4.8px; height: 4.8px; border-radius: 50%; background: {{md.faint}};"></span></span>
+<div style="flex: 1; min-width: 0; font-size: 16px; line-height: 24px;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: 20px; margin-left: 1px; vertical-align: -4px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div role="group" aria-label="Undo and task menu" style="position: absolute; left: 60px; top: 714px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.control}}; display: flex; z-index: 8;">
+<button aria-label="Undo" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg></button>
+<button aria-label="Task menu" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M5 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M19 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z"></path></svg></button>
+</div>
+<button aria-label="Add subtask" style="position: absolute; left: 1140px; top: 714px; width: 44px; height: 44px; border: 0; padding: 0; border-radius: 22px; background: {{c.accent}}; color: #FFFFFF; box-shadow: {{c.control}}; display: flex; align-items: center; justify-content: center; z-index: 8;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', accent: '#8A5CF5', branch: '#C7C7CC', hover: 'rgba(0,0,0,0.06)', control: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', mark: '#FF9500' }
+      : { bg: '#1E1E1E', card: '#373737', text: '#FFFFFF', muted: '#8E8E93', accent: '#9580FF', branch: '#48484A', hover: 'rgba(255,255,255,0.08)', control: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', mark: '#FFD60A' };
+    const md = light
+      ? { font: "Inter, -apple-system, system-ui, sans-serif", text: '#222222', faint: '#ABABAB', link: '#8A5CF5', caret: '#8A5CF5' }
+      : { font: "Inter, -apple-system, system-ui, sans-serif", text: '#DADADA', faint: '#666666', link: '#A88BFA', caret: '#A88BFA' };
+    const STEP = 37, CARD = 35, INDENT = 20;
+    const subs = [
+      { title: 'Собрать рюкзак', level: 0, count: '1/3' },
+      { title: 'Ноутбук и зарядка', level: 1, done: true },
+      { title: 'Пропуск в офис', level: 1, hover: true },
+      { title: 'Наушники', level: 1 },
+      { title: 'Умыться и побриться', level: 0, done: true },
+      { title: 'Душ', level: 0, done: true },
+      { title: 'Погладить рубашку', level: 0 },
+      { title: 'Выпить витамины', level: 0 }
+    ];
+    const rows = subs.map((t, i) => ({
+      ...t,
+      done: !!t.done,
+      meta: !!t.count,
+      left: t.level * INDENT, w: 640 - t.level * INDENT, top: i * STEP,
+      hover: t.hover ? 'inset 0 0 0 999px ' + c.hover : 'none',
+      ring: t.done ? '0' : '1.5px solid ' + (t.hover ? c.accent : c.muted),
+      dot: t.done ? c.accent : 'transparent',
+      ink: t.done ? c.muted : c.text,
+      deco: t.done ? 'line-through' : 'none',
+      aria: (t.done ? 'Mark as open: ' : 'Mark as done: ') + t.title
+    }));
+    const mid = (j) => j * STEP + CARD / 2;
+    const x = INDENT / 2;
+    const branches = 'M' + x + ' ' + mid(0) + 'V' + (mid(3) - 6) + 'Q' + x + ' ' + mid(3) + ' ' + (x + 6) + ' ' + mid(3) + 'H' + INDENT + 'M' + x + ' ' + mid(1) + 'H' + INDENT + 'M' + x + ' ' + mid(2) + 'H' + INDENT;
+    const link = { color: md.link, deco: 'underline' };
+    const part = (t, style) => ({ t, color: md.text, deco: 'none', ...(style ?? {}) });
+    const desc = [
+      { parts: [part('Выйти не позже 8:40')] },
+      { parts: [part('Если опаздываю — '), part('такси', link)] },
+      { parts: [part('Зонт, если по '), part('прогнозу', link), part(' дождь')] },
+      { parts: [part('В пятницу без рубашки, дресс-код свободный')], cursor: true }
+    ];
+    const listH = subs.length * STEP - 2;
+    const marks = [];
+    const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
+    const pos = (left, top) => 'left: ' + left + 'px; top: ' + top + 'px;';
+    const listTop = 100 + 28 + 12;
+    marks.push(ring(292, 54, 64, 32, 8, '← Close или Esc', pos(366, 60)));
+    marks.push(ring(331, listTop + 2 * STEP + 8.5, 18, 18, 9, '← Клик по кружку — сделано', pos(958, listTop + 2 * STEP + 7)));
+    const descTop = listTop + listH + 20;
+    marks.push(ring(296, descTop, 652, 4 * 24, 8, '← Пишешь прямо тут', pos(958, descTop + 38)));
+    marks.push(ring(60, 714, 80, 44, 22, '↑ Отмена и меню задачи', pos(56, 684)));
+    marks.push(ring(1140, 714, 44, 44, 22, '↑ Подзадача', 'right: 10px; top: 684px;'));
+    return {
+      c, md, rows, branches, desc, listH,
+      theme: light ? 'light' : 'dark',
+      marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

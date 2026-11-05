@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача на весь экран — телефон</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2668px; height: 2400px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 2540px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Задача на весь экран — телефон</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">Берёшь одну задачу и остаёшься с ней наедине: подзадачи видно целиком, их вычёркиваешь кружком, описание пишешь прямо тут. Ничего с главного экрана не отвлекает. Пунктиром обведено новое</div>
+</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="12">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="FocusPhone" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2668,"height":2400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const steps = [
+      { view: 'menu', name: '1. Тап по задаче', cap: 'В меню задачи новая строка Open full screen, рядом с Open in Obsidian. Она есть у любой задачи и подзадачи' },
+      { view: 'focus', name: '2. Задача на весь экран', cap: 'Название, все подзадачи деревом, как в списке, под ними описание. Слева у подзадачи кружок, как при выборе задач. Внизу тот же ряд, что на главном: отмена и «⋯» (меню самой задачи: Done, приоритет, перенос), плюс добавляет подзадачу. Close — назад на главный экран, туда же, откуда пришёл' },
+      { view: 'ticked', name: '3. Вычеркнул пункты', cap: 'Тап по кружку — подзадача сделана: кружок заливается, название зачёркнуто, но строка остаётся на месте, чтобы видеть, что уже сделано. Счётчик у «Собрать рюкзак» стал 1/3. Тап ещё раз — вернуть. Промахнулся — отмена слева внизу' },
+      { view: 'typing', name: '4. Пишу в описании', cap: 'Описание — сразу редактор Obsidian, без отдельного экрана и без Edit / Save. Тап в текст ставит курсор, всё пишется в файл само. Справа сверху Done прячет клавиатуру. Пустое описание — одна пустая строка с маркером под подзадачами' },
+      { view: 'submenu', name: '5. Тап по подзадаче', cap: 'Тап по самой подзадаче (не по кружку) открывает её меню, как на главном экране. В нём тоже Open full screen' },
+      { view: 'sub', name: '6. Подзадача на весь экран', cap: 'Над названием — задача, внутри которой она лежит. Тап по ней возвращает на уровень выше. Close сразу на главный экран, сколько бы уровней ни прошёл' }
+    ];
+    const frames = [];
+    steps.forEach((s, i) => {
+      const left = 64 + i * 430;
+      frames.push({ ...s, theme: 'dark', left, top: 330, capTop: 1196 });
+      frames.push({ ...s, theme: 'light', name: s.name + ' — светлая', cap: '', left, top: 1460, capTop: 2326 });
+    });
+    return { frames };
+  }
+}
+</script>
+</body>
+</html>
