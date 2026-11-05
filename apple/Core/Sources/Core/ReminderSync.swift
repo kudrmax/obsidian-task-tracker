@@ -43,6 +43,7 @@ public actor ReminderSync {
         case sync
         case complete(String)
         case snooze(String, minutes: Int)
+        case snoozeUntil(String, Date)
         case silence(String)
         case resetAlarms
     }
@@ -51,16 +52,18 @@ public actor ReminderSync {
     private let rules: TaskRules
     private let notifications: NotificationScheduling
     private let alarms: AlarmScheduling
+    private let calendar: CalendarEvents
     private let now: @Sendable () -> Date
     /// The operation running now: the next one waits for it, so a sync that read the file before a Done was written
     /// never brings the done task's reminders back.
     private var turn: Task<SyncStatus, Never>?
 
-    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, calendar: CalendarEvents = NoCalendarEvents(), now: @escaping @Sendable () -> Date = Date.init) {
         self.vault = vault
         self.rules = rules
         self.notifications = notifications
         self.alarms = alarms
+        self.calendar = calendar
         self.now = now
     }
 
@@ -74,6 +77,11 @@ public actor ReminderSync {
 
     public func snooze(reminderID: String, minutes: Int) async -> SyncStatus {
         await inTurn(.snooze(reminderID, minutes: minutes))
+    }
+
+    /// Moves the task to start once `until` has come: the meeting the notification offered to wait out is over.
+    public func snooze(reminderID: String, until: Date) async -> SyncStatus {
+        await inTurn(.snoozeUntil(reminderID, until))
     }
 
     public func silence(reminderID: String) async -> SyncStatus {
@@ -103,6 +111,9 @@ public actor ReminderSync {
             return await act { [rules] text, settings, at in try rules.complete(id: id, text: text, settingsJSON: settings, now: at) }
         case .snooze(let id, let minutes):
             return await act { [rules] text, settings, at in try rules.snooze(id: id, minutes: minutes, text: text, settingsJSON: settings, now: at) }
+        case .snoozeUntil(let id, let until):
+            let minutes = max(1, Int((until.timeIntervalSince(now()) / 60).rounded(.up)))
+            return await run(.snooze(id, minutes: minutes))
         case .resetAlarms:
             await alarms.cancel(Array(await alarms.scheduled().keys).sorted())
             return await bringUpToDate()
@@ -157,7 +168,7 @@ public actor ReminderSync {
             do { try await alarms.schedule(byID[id]!) } catch { failure = failure ?? error }
         }
 
-        let plan = RepeatPlan.plan(reminders, now: at)
+        let plan = await offeringMeetings(RepeatPlan.plan(reminders, now: at), of: byID)
         let wanted = Set(plan.map(\.identifier))
         let pending = await notifications.pending()
         await notifications.removePending(pending.subtracting(wanted).sorted())
@@ -166,6 +177,15 @@ public actor ReminderSync {
         }
         await notifications.removeDelivered(Self.outdated(await notifications.delivered(), of: Set(byID.keys)))
         return failure
+    }
+
+    /// Each delivery offers to wait out the meeting under way or next when it shows, within the task's day.
+    private func offeringMeetings(_ plan: [PlannedNotification], of reminders: [String: Reminder]) async -> [PlannedNotification] {
+        guard let first = plan.first?.fire, let last = plan.compactMap({ reminders[$0.reminderID]?.dayEnd }).max() else { return plan }
+        let events = await calendar.events(from: first, to: last)
+        return plan.map { planned in
+            planned.offering(AfterEvent.offer(at: planned.fire, before: reminders[planned.reminderID]!.dayEnd, among: events))
+        }
     }
 
     /// Shown notifications to take away: those of reminders that are gone, and all but the latest of each reminder.

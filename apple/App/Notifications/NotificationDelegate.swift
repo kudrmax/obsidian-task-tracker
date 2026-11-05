@@ -11,6 +11,9 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Se
             await services.complete(reminder)
         case let action where UserNotifications.Action.snoozes[action] != nil:
             await services.snooze(reminder, minutes: UserNotifications.Action.snoozes[action]!)
+        case UserNotifications.Action.afterEvent:
+            guard let end = UserNotifications.afterEventEnd(response.notification.request.content) else { return }
+            await services.snooze(reminder, until: end)
         case UNNotificationDefaultActionIdentifier:
             await Self.openCalendar(on: reminder.date)
         case UNNotificationDismissActionIdentifier:

@@ -2,10 +2,25 @@ import Foundation
 
 /// One delivery of a reminder's quiet notification.
 public struct PlannedNotification: Equatable, Hashable, Sendable {
-    /// `"<reminder id>#<minutes after the start>"`: the same delivery keeps it between plans.
+    /// `"<reminder id>#<minutes after the start>"`, and the meeting it offers to wait out: the same delivery keeps it
+    /// between plans, and a meeting moved or gone sets the delivery again.
     public let identifier: String
     public let reminderID: String
     public let fire: Date
+    public let after: AfterEvent?
+
+    init(identifier: String, reminderID: String, fire: Date, after: AfterEvent? = nil) {
+        self.identifier = identifier
+        self.reminderID = reminderID
+        self.fire = fire
+        self.after = after
+    }
+
+    func offering(_ after: AfterEvent?) -> PlannedNotification {
+        guard let after else { return self }
+        let until = Int(after.until.timeIntervalSince1970)
+        return PlannedNotification(identifier: "\(identifier)#after \(until) \(after.title)", reminderID: reminderID, fire: fire, after: after)
+    }
 }
 
 /// When a reminder's notification repeats: iOS keeps at most 64 pending notifications and never wakes the app to
