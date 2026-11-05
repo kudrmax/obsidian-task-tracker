@@ -2,7 +2,7 @@ import type { GroupedList, GroupName, GroupPlace } from "../../application/contr
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
-import type { ListGroup } from "../listGroups";
+import type { ListGroup } from "../../application/contracts";
 import type { TaskList } from "../TaskList";
 import { LongPress } from "./LongPress";
 
@@ -62,7 +62,8 @@ export class GroupDrag {
 		const places = this.places(heads, taskList, lifted);
 		const grab = { dx: e.clientX - head.getBoundingClientRect().left, dy: e.clientY - head.getBoundingClientRect().top };
 		const float = this.float(group);
-		const cards = taskList.cards.filter((entry) => entry.item.group === group.name).map((entry) => entry.card);
+		const plate = taskList.plateOf(group.name);
+		const cards = [...taskList.cards.filter((entry) => entry.item.group === group.name).map((entry) => entry.card), ...(plate ? [plate] : [])];
 		for (const node of [head, ...cards]) node.classList.add(FOLDED);
 		const mark = el(null, "div", "tc-group-drop");
 		let slot = lifted;

@@ -11,7 +11,7 @@ const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p3", color: "blue" },
 ];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" }, repeat: null, repeatable: true };
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
@@ -25,6 +25,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 	const priorities: (string | null)[] = [];
 	const places: Placement[] = [];
 	const repeats: (RepeatRule | null)[] = [];
+	const sections: true[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 		levels: () => LEVELS,
@@ -34,9 +35,10 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 		onPriority: (prefix) => priorities.push(prefix),
 		onPlace: (placement) => places.push(placement),
 		onRepeat: (rule) => repeats.push(rule),
+		onSection: () => sections.push(true),
 	});
 	bar.show({ ...STATE, ...state });
-	return { parent, bar, indents, priorities, places, repeats };
+	return { parent, bar, indents, priorities, places, repeats, sections };
 }
 
 const q = <T extends Element = HTMLButtonElement>(root: ParentNode, selector: string) => root.querySelector<T>(selector)!;
@@ -51,7 +53,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -155,7 +157,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -256,8 +258,8 @@ describe("the repeat button", () => {
 
 	it("stands between the flag and the place", () => {
 		const { parent } = setup();
-		const buttons = [...parent.querySelectorAll(".tc-quick-bar > button")].map((b) => b.className.match(/tc-bar-(flag|repeat|place)/)?.[1]);
-		expect(buttons).toEqual(["flag", "repeat", "place"]);
+		const buttons = [...parent.querySelectorAll(".tc-quick-bar > button")].map((b) => b.className.match(/tc-bar-(section|flag|repeat|place)/)?.[1]);
+		expect(buttons).toEqual(["section", "flag", "repeat", "place"]);
 		expect(q(parent, ".tc-bar-repeat").getAttribute("aria-label")).toBe("Repeat");
 	});
 
@@ -615,5 +617,18 @@ describe("QuickBar on the phone keyboard", () => {
 		bar.follow(anchor);
 		expect(observer.takeRecords()).toEqual([]);
 		observer.disconnect();
+	});
+
+	it("the section button shows where a section may be written; pressed, only it stays", () => {
+		const { parent, sections } = setup({ section: false });
+		const section = q(parent, ".tc-bar-section");
+		expect(section.hidden).toBe(false);
+		expect(section.getAttribute("aria-pressed")).toBe("false");
+		section.click();
+		expect(sections).toHaveLength(1);
+		const on = setup({ section: true });
+		expect(q(on.parent, ".tc-bar-section").getAttribute("aria-pressed")).toBe("true");
+		for (const cls of [".tc-bar-outdent", ".tc-bar-flag", ".tc-bar-repeat", ".tc-bar-place"]) expect(q(on.parent, cls).hidden).toBe(true);
+		expect(q(setup().parent, ".tc-bar-section").hidden).toBe(true);
 	});
 });

@@ -28,6 +28,8 @@ export interface EntryState {
 	readonly renaming: TaskItem | null;
 	readonly canIndent: boolean;
 	readonly canOutdent: boolean;
+	/** The field writes a section's name; null where it cannot (a rename, a slot, a stack, a column without sections). */
+	readonly section: boolean | null;
 }
 
 export interface QuickEntryDeps {
@@ -40,6 +42,9 @@ export interface QuickEntryDeps {
 	 */
 	fresh(beforeShow?: (coming: (column: ListColumn) => readonly ListCard[]) => void): Promise<void>;
 	createInPlace: TaskService["createInPlace"];
+	createSection: TaskService["createSection"];
+	/** The column shows sections, so a section may be written in it. */
+	sectioned(column: ListColumn): boolean;
 	edit: TaskService["edit"];
 	/** The placement a rename at `spot` gives the task. */
 	placement(spot: EntrySpot): Placement;
@@ -125,6 +130,8 @@ interface Field {
 	readonly priority: string | null;
 	readonly repeat: RepeatRule | null;
 	readonly rename: Rename | null;
+	/** The field writes a section's name (empty sections spec §4). */
+	readonly section: boolean;
 }
 
 /**
@@ -154,13 +161,40 @@ export class QuickEntry {
 			pending: field.run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename?.item ?? null,
 			...this.mayShift(field),
+			section: this.maySection(field) ? field.section : null,
 		};
+	}
+
+	private maySection(field: Field): boolean {
+		const { spot } = field.run;
+		return !field.rename && spot.kind === "list" && this.deps.sectioned(spot.column);
+	}
+
+	/**
+	 * The field switches between a task and a section's name. A section stands between tasks of the top level: the field
+	 * goes there, past the subtasks of the task above it.
+	 */
+	toggleSection(): void {
+		const field = this.field;
+		if (!field || !this.maySection(field) || field.run.spot.kind !== "list") return;
+		const section = !field.section;
+		const { spot } = field.run;
+		const run = section && spot.place.level > 0 ? new Run({ ...spot, place: this.topLevelAfter(spot.column, spot.place) }) : field.run;
+		this.reset({ ...field, run, section });
+	}
+
+	/** The gap of the top level at or after `place` in its section: past the subtasks it stands among. */
+	private topLevelAfter(column: ListColumn, place: GapPlace): GapPlace {
+		const cards = this.deps.cards(column);
+		let index = place.index;
+		while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
+		return { ...place, index, level: 0 };
 	}
 
 	/** Whether the field may go a level deeper or shallower: worked out again only for other cards or another spot. */
 	private mayShift(field: Field): { readonly canIndent: boolean; readonly canOutdent: boolean } {
 		const { spot } = field.run;
-		if (field.rename || spot.kind !== "list") return { canIndent: false, canOutdent: false };
+		if (field.rename || field.section || spot.kind !== "list") return { canIndent: false, canOutdent: false };
 		const cards = this.deps.cards(spot.column);
 		const kept = this.shifts;
 		if (kept?.cards === cards && kept.spot === spot) return { canIndent: kept.indent, canOutdent: kept.outdent };
@@ -173,7 +207,7 @@ export class QuickEntry {
 	open(spot: EntrySpot, renaming?: TaskItem): void {
 		if (this.field) this.save(this.field);
 		const rename = renaming ? { item: renaming, home: new Run(spot) } : null;
-		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, repeat: renaming?.repeat ?? null, rename });
+		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, repeat: renaming?.repeat ?? null, rename, section: false });
 	}
 
 	type(text: string): void {
@@ -201,6 +235,7 @@ export class QuickEntry {
 		const field = this.field;
 		if (!field) return;
 		if (field.rename) this.enterRename(field, field.rename);
+		else if (field.section) this.enterSection(field);
 		else if (this.blank(field.text)) this.enterBlank();
 		else this.enterTask(field);
 	}
@@ -233,8 +268,14 @@ export class QuickEntry {
 		if (this.blank(field.text)) this.reset(null);
 		else {
 			this.saveRename(field, rename);
-			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, repeat: null, rename: null } : null);
+			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, repeat: null, rename: null, section: false } : null);
 		}
+	}
+
+	/** The section goes to the queue and the field closes; a blank name writes nothing. */
+	private enterSection(field: Field): void {
+		this.createSection(field);
+		this.reset(null);
 	}
 
 	/** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower. */
@@ -263,6 +304,7 @@ export class QuickEntry {
 	}
 
 	private save(field: Field): void {
+		if (field.section) return this.createSection(field);
 		if (this.blank(field.text)) return;
 		if (field.rename) this.saveRename(field, field.rename);
 		else this.create(field);
@@ -277,6 +319,20 @@ export class QuickEntry {
 		this.queued(home, async () => {
 			await this.deps.fresh();
 			await this.deps.edit(this.keyAt(home, item), draft);
+		});
+	}
+
+	/** `### name` written where the field stands, once the lists show the writes before it. */
+	private createSection(field: Field): void {
+		const { run } = field;
+		const name = field.text.trim();
+		if (name === "" || run.spot.kind !== "list") return;
+		const { column, place } = run.spot;
+		this.queued(run, async () => {
+			await this.deps.fresh();
+			const at = this.deps.placeOf(column, placeOfGap(this.deps.cards(column), { ...place, level: 0 }));
+			if (at.kind === "list" || at.kind === "day") await this.deps.createSection(name, at);
+			await this.deps.fresh();
 		});
 	}
 

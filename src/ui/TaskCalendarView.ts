@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -19,13 +19,12 @@ import { ListDrop } from "./drag/ListDrop";
 import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
-import type { ListGroup } from "./listGroups";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { EventMenu } from "./menu/EventMenu";
-import { type SectionChoice, TaskMenu } from "./menu/TaskMenu";
+import { TaskMenu } from "./menu/TaskMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
@@ -63,11 +62,6 @@ const MINUTE_MS = 60_000;
 const SECOND_MS = 1000;
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
-
-/** A new section asked for from a card's menu: the column the card waits at the end of, and whose sections. */
-interface NameGroup extends ColumnSections {
-	readonly column: ListColumn;
-}
 
 /** The task with `key` among `items` and their subtasks. */
 function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
@@ -149,8 +143,8 @@ export class TaskCalendarView extends ItemView {
 	/** The pinch settled on the whole day: it keeps fitting as the timeline's height changes. */
 	private wholeDay = false;
 	private readonly groupDrag: GroupDrag;
-	/** A card sent to New section, waiting at the end of its list for the section's name. */
-	private naming: { readonly item: TaskItem; readonly asked: NameGroup } | null = null;
+	/** A card sent to New section, waiting at the end of its column for the section's name. */
+	private naming: { readonly item: TaskItem; readonly column: ListColumn } | null = null;
 	private switching = 0;
 	/** The place a swipe has just brought the screen to, until the settings have it. */
 	private shownMode: RightMode | null = null;
@@ -193,6 +187,7 @@ export class TaskCalendarView extends ItemView {
 			levels: () => this.deps.tasks.priorityLevels(),
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
 			sections: (cards) => this.bulkSections(cards),
+			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
 		});
@@ -259,6 +254,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("left") !== null,
+			sections: () => this.listSectionsOf("left"),
+			onPlate: (plate, group) => this.attachPlate(plate, "left", group),
 			pending: () => this.namingIn("left"),
 			entry: () => this.quick?.entryIn("left") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -281,6 +278,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.inbox),
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
+			sections: () => this.listSectionsOf("inbox"),
+			onPlate: (plate, group) => this.attachPlate(plate, "inbox", group),
 			pending: () => this.namingIn("inbox"),
 			entry: () => this.quick?.entryIn("inbox") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -294,6 +293,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.backlog),
 			day: () => null,
 			grouped: () => this.sectionsOf("backlog") !== null,
+			sections: () => this.listSectionsOf("backlog"),
+			onPlate: (plate, group) => this.attachPlate(plate, "backlog", group),
 			pending: () => this.namingIn("backlog"),
 			entry: () => this.quick?.entryIn("backlog") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -307,6 +308,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.soon),
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
+			sections: () => this.listSectionsOf("soon"),
+			onPlate: (plate, group) => this.attachPlate(plate, "soon", group),
 			pending: () => this.namingIn("soon"),
 			entry: () => this.quick?.entryIn("soon") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -382,6 +385,7 @@ export class TaskCalendarView extends ItemView {
 			drag: this.drag,
 			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
 			list: (column) => this.listOf(column),
+			sectioned: (column) => this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
 			task: (key) => findTask(this.data.day?.slotted ?? [], key),
 			dropTargets: () => {
@@ -597,6 +601,10 @@ export class TaskCalendarView extends ItemView {
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
 			grouped: (date) => this.deps.tasks.dayColumn(date).sections,
+			sections: (date) => {
+				const column = this.deps.tasks.dayColumn(date);
+				return column.sections ? this.data.sections[column.list] : [];
+			},
 			ungroupedName: () => this.settings.groups.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
@@ -836,10 +844,10 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */
-	private askGroupName(item: TaskItem, asked: NameGroup): void {
-		this.naming = { item, asked };
+	private askGroupName(item: TaskItem, column: ListColumn): void {
+		this.naming = { item, column };
 		this.render();
-		const slot = this.listOf(asked.column)?.pendingSlot;
+		const slot = this.listOf(column)?.pendingSlot;
 		if (!slot || !this.arbiter.claim(NAMING)) {
 			this.naming = null;
 			this.render();
@@ -850,7 +858,7 @@ export class TaskCalendarView extends ItemView {
 			onDone: (name) => {
 				this.naming = null;
 				this.arbiter.release(NAMING);
-				if (name) void this.act(() => this.deps.tasks.createGroup(item.key, asked.list, name, asked.date ?? undefined));
+				if (name) void this.act(() => this.deps.tasks.toSection([item.key], name));
 				else this.render();
 			},
 		});
@@ -884,6 +892,17 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
+	/** The groups of the list whose sections `column` shows, where its empty sections stand. */
+	private listSectionsOf(column: ListColumn): readonly ListSection[] {
+		const sections = this.sectionsOf(column);
+		return sections ? this.data.sections[sections.list] : [];
+	}
+
+	/** A tap on an empty section's No tasks plate: the field of a new task in that section. */
+	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup): void {
+		plate.addEventListener("click", () => this.quick?.openIn(column, group.name));
+	}
+
 	/**
 	 * Whose sections a column shows (sections spec §5.1): the list its tasks lie in. Inbox and Soon their own; the day
 	 * column Now's for today and Soon's for a later day, whose tasks lie in Soon with that day; a past day's none.
@@ -894,42 +913,19 @@ export class TaskCalendarView extends ItemView {
 		return sections ? { list, date } : null;
 	}
 
-	/**
-	 * Whose sections a task's menu offers: its own list's, a task of Soon keeping its due date, and the list column its
-	 * card stands in, which then shows the task waiting for a new section's name. None for a subtask, a done task, a card
-	 * on the timeline or in a column without sections.
-	 */
-	private sectionsHome(item: TaskItem, card: HTMLElement): NameGroup | null {
-		const list = item.list;
-		if (item.parentText !== null || list === "done") return null;
+	/** The list column a card stands in, when that column shows its sections: there a task's menu offers them, and the task waits for a new section's name. */
+	private sectionColumn(card: HTMLElement): ListColumn | null {
 		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
-		if (!column || !this.sectionsOf(column)) return null;
-		return { column, list, date: list === "soon" ? item.dueDate : null };
+		return column && this.sectionsOf(column) ? column : null;
 	}
 
-	/** The picked tasks' sections: only when they all stand in one list whose column shows its sections. */
+	/** The picked tasks' sections: only when every card stands in a column that shows its sections, and the service offers them some. */
 	private bulkSections(cards: readonly PickedCard[]): BulkSections | null {
-		const homes = cards.map((card) => this.sectionsHome(card.item, card.card));
-		const first = homes[0];
-		if (!first || homes.some((home) => !home || home.list !== first.list)) return null;
-		const list = first.list;
-		return {
-			choice: this.sectionChoice(list, cards[0].item),
-			shared: cards.every((card) => card.item.group === cards[0].item.group),
-			change: (card, name) => {
-				const date = (card.item.list === "soon" ? card.item.dueDate : null) ?? undefined;
-				return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
-			},
-		};
-	}
-
-	/** The sections the list has, in its order, then the presets it lacks, in the settings' order; the No section name is none of them. */
-	private sectionChoice(list: GroupedList, item: TaskItem): SectionChoice {
-		const { presets, ungrouped } = this.settings.groups;
-		const tasks = [...(this.data.day?.list ?? []), ...this.data.soon, ...this.data.inbox, ...this.data.backlog].filter((task) => task.list === list);
-		const names = [...tasks.flatMap((task) => (task.group === null ? [] : [task.group])), ...presets.map((preset) => preset.trim())];
-		return { names: [...new Set(names)].filter((name) => name !== "" && name !== ungrouped), current: item.group, ungrouped };
+		if (cards.some((card) => !this.sectionColumn(card.card))) return null;
+		const items = cards.map((card) => card.item);
+		const choice = sectionChoice(items, this.data.offer);
+		return choice && { choice, shared: items.every((item) => item.group === items[0].group) };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
@@ -944,7 +940,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private namingIn(column: ListColumn): TaskItem | null {
-		return this.naming?.asked.column === column ? this.naming.item : null;
+		return this.naming?.column === column ? this.naming.item : null;
 	}
 
 	private showSources(anchor: HTMLElement): void {
@@ -973,17 +969,13 @@ export class TaskCalendarView extends ItemView {
 	/** The task menu; a list card's offers the sections of its list too. */
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
 		const tasks = this.deps.tasks;
-		const home = this.sectionsHome(item, source);
-		const toSection = (name: GroupName) => {
-			if (!home) return Promise.resolve();
-			const date = home.date ?? undefined;
-			return name === null ? tasks.moveToGroup(item.key, home.list, null, null, date) : tasks.createGroup(item.key, home.list, name, date);
-		};
+		const column = this.sectionColumn(source);
+		const sections = column ? sectionChoice([item], this.data.offer) : null;
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
-			sections: home ? this.sectionChoice(home.list, item) : undefined,
+			sections: sections ?? undefined,
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			markdown: this.markdown,
 			today: this.today(),
@@ -993,9 +985,9 @@ export class TaskCalendarView extends ItemView {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
 				removeDue: () => this.act(() => tasks.setDueDate(item.key, null)),
-				toSection: (name) => this.act(() => toSection(name)),
+				toSection: (name) => this.act(() => tasks.toSection([item.key], name)),
 				newSection: () => {
-					if (home) this.askGroupName(item, home);
+					if (column && sections) this.askGroupName(item, column);
 				},
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
 				setReminder: (kind) => this.act(() => tasks.setReminder(item.key, kind)),

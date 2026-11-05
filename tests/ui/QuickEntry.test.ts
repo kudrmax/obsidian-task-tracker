@@ -66,6 +66,9 @@ class FakeTasks {
 	elsewhere = false;
 	/** The file puts a new task at the end of the column, wherever it was typed. */
 	atEnd = false;
+	/** The column shows sections, so the field may write one. */
+	sectioned = true;
+	readonly sectionsMade: { name: string; place: NewTaskPlace }[] = [];
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
 	private written: PlacedCard[] | null = null;
@@ -99,6 +102,11 @@ class FakeTasks {
 				if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
 				return this.land(text, place);
 			},
+			createSection: async (name, place) => {
+				this.sectionsMade.push({ name, place });
+				return null;
+			},
+			sectioned: () => this.sectioned,
 			edit: async (k, draft) => {
 				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
 				this.edits.push({ key: k, draft });
@@ -859,5 +867,56 @@ describe("WriteQueue", () => {
 		});
 		await queue.idle();
 		expect(log).toEqual(["next"]);
+	});
+
+	it("the field switched to a section writes `### name` where it stands and closes", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const entry = tasks.entry();
+		entry.open(at(1));
+		expect(entry.state?.section).toBe(false);
+		entry.toggleSection();
+		entry.type("  Evening ");
+		expect(entry.state).toMatchObject({ section: true, canIndent: false, canOutdent: false });
+		entry.enter();
+		expect(entry.state).toBeNull();
+		await entry.idle();
+		expect(tasks.sectionsMade).toEqual([{ name: "Evening", place: { kind: "list", list: "now", group: null, before: key("B") } }]);
+		expect(tasks.created).toEqual([]);
+	});
+
+	it("a section's field among subtasks goes past them, to the top level", () => {
+		const tasks = new FakeTasks(["A", ["A1", 1], ["A2", 1], "B"]);
+		const entry = tasks.entry();
+		entry.open(at(2, 1));
+		entry.toggleSection();
+		expect(entry.state?.spot).toEqual(at(3));
+		entry.toggleSection();
+		expect(entry.state?.section).toBe(false);
+	});
+
+	it("a blank section name writes nothing; a column without sections offers none", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.toggleSection();
+		entry.enter();
+		await entry.idle();
+		expect(tasks.sectionsMade).toEqual([]);
+		tasks.sectioned = false;
+		entry.open(at(1));
+		expect(entry.state?.section).toBeNull();
+		entry.toggleSection();
+		expect(entry.state?.section).toBeNull();
+	});
+
+	it("a tap elsewhere keeps the section's name as Enter does", async () => {
+		const tasks = new FakeTasks(["A"]);
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.toggleSection();
+		entry.type("Later");
+		entry.blur();
+		await entry.idle();
+		expect(tasks.sectionsMade.map((s) => s.name)).toEqual(["Later"]);
 	});
 });

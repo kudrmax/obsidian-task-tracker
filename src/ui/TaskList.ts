@@ -1,8 +1,8 @@
-import { type GapPlace, type GroupName, type ListCard, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListSection, type ListView, listView, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
-import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
+import { isEmptyGroup } from "./listGroups";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
@@ -10,6 +10,8 @@ import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard
 export interface ListEntryInput {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
+	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
+	readonly section?: boolean;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -20,6 +22,8 @@ export interface TaskListDeps {
 	day(): LocalDate | null;
 	/** Whether the list shows its sections: Inbox, Soon, and the day column on today. */
 	grouped?(): boolean;
+	/** The groups of the list the column shows, in file order: where its empty sections stand. */
+	sections?(): readonly ListSection[];
 	/** The header over the tasks outside any section. */
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
@@ -34,6 +38,8 @@ export interface TaskListDeps {
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
+	/** The No tasks plate under an empty section's header. */
+	onPlate?(plate: HTMLElement, group: ListGroup): void;
 }
 
 export interface ListEntry {
@@ -41,9 +47,12 @@ export interface ListEntry {
 	readonly item: TaskItem;
 	/** 0 for a task, one more for each task above a subtask. */
 	readonly level: number;
+	/** The section it is drawn in: none in a list that shows no headers. */
+	readonly group: GroupName;
 }
 
 const QUICK_ROW = "tc-quick-row";
+export const PLATE = "tc-group-empty";
 
 /**
  * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
@@ -51,7 +60,7 @@ const QUICK_ROW = "tc-quick-row";
  */
 export class TaskList {
 	private entries: ListEntry[] = [];
-	private rendered: ListGroup[] = [];
+	private rendered: readonly ListGroup[] = [];
 	private nodes: HTMLElement[] = [];
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
@@ -80,8 +89,9 @@ export class TaskList {
 		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
-		this.rendered = this.groupsOf(items);
-		this.withHeaders = showsHeaders(this.rendered);
+		const view = this.viewOf(items);
+		this.rendered = view.groups;
+		this.withHeaders = view.showsHeaders;
 		const rows: { node: HTMLElement; level: number }[] = [];
 		let entered = entry === null;
 		let groupStart = 0;
@@ -100,7 +110,7 @@ export class TaskList {
 			card.style.setProperty(PROPERTY.level, String(level));
 			const renamed = renaming !== null && samePlace(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
-			this.entries.push({ card, item, level });
+			this.entries.push({ card, item, level, group });
 			this.nodes.push(card);
 			if (!renamed) rows.push({ node: card, level });
 		};
@@ -117,6 +127,7 @@ export class TaskList {
 		if (aboveHeaders) enter(null, true);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
+			if (isEmptyGroup(group) && (entry?.place.group !== group.name || entry.section)) this.nodes.push(this.plate(group));
 			groupStart = this.entries.length;
 			for (const row of rowsOf(group.items)) add(row, group.name);
 			subtrees(groupStart);
@@ -160,6 +171,7 @@ export class TaskList {
 		const row = kept ?? el(this.el, "div", QUICK_ROW);
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
+		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.place.level);
 	}
 
@@ -188,18 +200,16 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		const groups = this.groupsOf(this.deps.items());
-		const headers = showsHeaders(groups);
-		return groups.flatMap((group) => rowsOf(group.items)).map(({ item, level }) => cardOf(item, level, headers));
+		return this.viewOf(this.deps.items()).groups.flatMap((group) => rowsOf(group.items).map(({ item, level }) => ({ key: item.key, level, group: group.name })));
 	}
 
-	private groupsOf(items: readonly TaskItem[]): ListGroup[] {
-		return this.deps.grouped?.() ? [...listGroups(items)] : [{ name: null, items }];
+	private viewOf(items: readonly TaskItem[]): ListView {
+		return listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);
 	}
 
-	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */
+	/** A card as places in the list see it: in the section it is drawn in. */
 	listCard(entry: ListEntry): ListCard {
-		return cardOf(entry.item, entry.level, this.withHeaders);
+		return { key: entry.item.key, level: entry.level, group: entry.group };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */
@@ -211,7 +221,12 @@ export class TaskList {
 		return this.withHeaders;
 	}
 
-	/** Headers and cards in the order they stand. */
+	/** The No tasks plate of empty section `name`; null when none is drawn. */
+	plateOf(name: GroupName): HTMLElement | null {
+		return this.nodes.find((node) => node.classList.contains(PLATE) && node.dataset.group === name) ?? null;
+	}
+
+	/** Headers, plates and cards in the order they stand. */
 	get elements(): readonly HTMLElement[] {
 		return this.nodes;
 	}
@@ -221,6 +236,13 @@ export class TaskList {
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
 		this.deps.onHeader?.(head, group);
 		return head;
+	}
+
+	private plate(group: ListGroup): HTMLElement {
+		const plate = el(this.el, "div", PLATE, "No tasks");
+		plate.dataset.group = group.name ?? "";
+		this.deps.onPlate?.(plate, group);
+		return plate;
 	}
 }
 
@@ -237,11 +259,6 @@ interface Row {
 /** A section's tasks in the order the list draws them: each task, then its subtasks a level deeper. */
 function rowsOf(items: readonly TaskItem[], level = 0): Row[] {
 	return items.flatMap((item) => [{ item, level }, ...rowsOf(item.subtasks, level + 1)]);
-}
-
-/** A card as places in the list see it: a list that shows no headers puts every card outside any section. */
-function cardOf(item: TaskItem, level: number, withHeaders: boolean): ListCard {
-	return { key: item.key, level, group: withHeaders ? item.group : null };
 }
 
 function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {

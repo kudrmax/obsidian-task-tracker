@@ -5,6 +5,7 @@ import type { Placement, TaskDraft } from "../domain/Placement";
 import type { PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
+import type { SectionOffer } from "./sections";
 
 export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -18,6 +19,10 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** A list in its sections, and whether it shows their headers. */
+export { listView, type ListGroup, type ListView } from "./sections";
+/** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
+export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
 /** A task's text cut into text and links, or plain, each link by its word. */
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
@@ -49,6 +54,16 @@ export type NewTaskPlace =
 	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "slot"; readonly slot: Slot };
+
+/** Where a section is written from the quick-entry field: a top-level place in a column that shows sections. */
+export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { readonly kind: "day" }>;
+
+/** A group of a list where it stands in the file: a section (`name`) or No section (null). */
+export interface ListSection {
+	readonly name: GroupName;
+	/** A section with no task under its heading: a column of its list shows its heading and the No tasks plate. */
+	readonly empty: boolean;
+}
 
 /** Of a task's own subtasks: how many are done out of those not given up. */
 export interface SubtaskProgress {
@@ -185,6 +200,7 @@ export { acceptsDrop, placesInGap } from "./drops";
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
  */
+/** A call that takes the last task out of a section takes the section away; a section left empty any other way stays. */
 export interface TaskService {
 	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
 	priorityLevels(): readonly PriorityLevel[];
@@ -209,6 +225,14 @@ export interface TaskService {
 	 * Now, Done, each in file order, a task before its open subtasks. A query of spaces finds nothing.
 	 */
 	search(query: string): Promise<readonly SearchHit[]>;
+
+	/**
+	 * Each grouped list's groups in file order, empty sections included (empty sections spec §5). A column draws the
+	 * groups its tasks are in and the empty sections of its list, in this order; No section is never empty here.
+	 */
+	listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>>;
+	/** The sections a task's menu offers in each list, the screen showing `date` (see `SectionOffer`); `sectionChoice` picks a task's. */
+	sectionOffer(date: LocalDate): Promise<SectionOffer>;
 
 	/** Today: end of Now, due today. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
 	createInList(date: LocalDate, text: string): Promise<void>;
@@ -314,12 +338,26 @@ export interface TaskService {
 	 * it among the tasks outside any section. The task enters the list as with `moveToGroup`.
 	 */
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void>;
+	/**
+	 * A menu's section picked, or a new one named: each task into section `name` of its list, null outside any, as
+	 * `createGroup` takes a name; a task of Soon keeps its due date. One task as `moveToGroup` or `createGroup`, several as
+	 * one `applyAll`. The section a task stands in already is no exception: it goes to its end.
+	 */
+	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
 	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */
 	renameGroup(list: GroupedList, group: string, name: string): Promise<void>;
 	/** The heading goes; its tasks, in order, join the end of No section. */
 	removeGroup(list: GroupedList, group: string): Promise<void>;
+	/**
+	 * The field switched to a section, Enter (empty sections spec §4). `### name` goes where the field stands: the tasks the
+	 * column shows below it in its group, in order, go into the new section, written right after that group; the tasks it does
+	 * not show stay. At the end of a group the section is written empty and stays. A blank name or the No section name writes
+	 * nothing; the group's own name writes nothing; a name the list has takes the tasks below to the end of that section.
+	 * One write, one undo step. Gives the section the tasks went to, or null when nothing was written.
+	 */
+	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null>;
 
 	/**
 	 * Several tasks at once (bulk actions spec): every step in one write, in the order the tasks stand in the file, so

@@ -124,6 +124,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 				(items.left ??= []).push(added);
 				return added.key;
 			},
+			createSection: async () => null,
 			edit: async (k, draft) => {
 				edits.push({ key: k, draft });
 			},
@@ -140,6 +141,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			return made;
 		},
 		list: (column) => lists[column],
+		sectioned: () => false,
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
 		dropTargets: () => ({ lists: drops, timeline: null }),

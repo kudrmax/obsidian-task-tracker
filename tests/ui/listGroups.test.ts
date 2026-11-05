@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { GroupName, TaskItem } from "../../src/application/contracts";
-import { gapPlace, listGaps, listGroups, showsHeaders } from "../../src/ui/listGroups";
+import { type GroupName, listView, type TaskItem } from "../../src/application/contracts";
+import { gapPlace, isEmptyGroup, listGaps } from "../../src/ui/listGroups";
+
+/** A list that shows sections, in its sections. */
+const listGroups = (items: readonly TaskItem[]) => listView(items, true).groups;
 import { onDay } from "../fakes/itemOnDay";
 
 let n = 0;
@@ -23,28 +26,23 @@ const item = (text: string, group: GroupName): TaskItem => onDay({
 	isSubtask: false,
 }, "2026-11-01");
 
-describe("listGroups", () => {
-	it("groups consecutive items by their section", () => {
-		const groups = listGroups([item("A", null), item("B", "X"), item("C", "X"), item("D", "Y")]);
-		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["A"]], ["X", ["B", "C"]], ["Y", ["D"]]]);
+describe("an empty section", () => {
+	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+
+	it("is drawn over the No tasks plate; a group with tasks is not", () => {
+		const drawn = listView([item("A", null)], true, sections(["Morning", true], [null, false])).groups;
+		expect(isEmptyGroup(drawn[0])).toBe(true);
+		expect(isEmptyGroup(drawn[1])).toBe(false);
 	});
 
-	it("gathers a section's tasks where it first shows: a later day lists Now's tasks before Soon's", () => {
-		const groups = listGroups([item("N", null), item("A", null), item("M", "Morning"), item("B", null)]);
-		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["N", "A", "B"]], ["Morning", ["M"]]]);
-	});
-
-	it("no headers without a named group", () => {
-		expect(showsHeaders(listGroups([item("A", null), item("B", null)]))).toBe(false);
-		expect(showsHeaders(listGroups([]))).toBe(false);
-	});
-
-	it("no header when the only group is ungrouped", () => {
-		expect(showsHeaders([{ name: null, items: [item("A", null)] }])).toBe(false);
-	});
-
-	it("a header when the only group is a section", () => {
-		expect(showsHeaders(listGroups([item("A", "Экскурсия")]))).toBe(true);
+	it("has one gap, its end", () => {
+		const a = item("A", null);
+		const drawn = listView([a], true, sections([null, false], ["Evening", true])).groups;
+		expect(listGaps(drawn, true).map((g) => g.place)).toEqual([
+			{ group: null, before: a.key },
+			{ group: null, before: null },
+			{ group: "Evening", before: null },
+		]);
 	});
 });
 

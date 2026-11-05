@@ -1,14 +1,7 @@
-import type { GroupName } from "../../application/contracts";
+import type { GroupName, SectionChoice } from "../../application/contracts";
 import { backRow, menuGroup, menuRow } from "./MenuPanel";
 
-/** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */
-export interface SectionChoice {
-	/** The sections the list has, in its order, then the presets it lacks, in the settings' order. */
-	readonly names: readonly string[];
-	readonly current: GroupName;
-	/** The name of the tasks outside any section. */
-	readonly ungrouped: string;
-}
+export type { SectionChoice };
 
 export interface SectionChooserSpec {
 	readonly choice: SectionChoice;

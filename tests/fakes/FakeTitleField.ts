@@ -40,6 +40,10 @@ export class FakeTitleField implements TitleField {
 		this.el.value = text;
 	}
 
+	setPlaceholder(text: string): void {
+		this.el.placeholder = text;
+	}
+
 	focusEnd(): void {
 		this.el.focus();
 		this.el.setSelectionRange(this.el.value.length, this.el.value.length);
