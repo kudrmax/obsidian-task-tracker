@@ -19,7 +19,7 @@
 - **`zoomLevelsText` в UI** импортировал бы `ZoomLevel` из `settings.ts` — новое нарушение, а добавлять строки в список нельзя. Контракты реэкспортируют `type ZoomLevel` (блок 10 всё равно кладёт его туда), `ui/zoomLevelsText.ts` берёт его оттуда.
 - **Тест `samePlacement`** (`tests/application/placements.test.ts`) — тест правила домена: переезжает в `tests/domain/placements.test.ts` и импортирует из `domain/operations.ts`.
 - **Тесты `toItem`** живут в трёх файлах домена: `tests/domain/queries.test.ts` (`describe("toItem")`, `describe("toItem with priority levels")`), `tests/domain/subtasks.test.ts` («shows the open subtasks…», это `progressOf`), `tests/domain/description.test.ts` («reaches the item the view gets»). Все переезжают в `tests/application/taskItems.test.ts` без изменения ожиданий (плюс `open` в ожидании полного объекта).
-- **Нарушения сейчас** (48 строк, все — вне домена, кроме четырёх): `application/services.ts` → инфраструктура и `obsidian` (блок 2), `phone/PhoneReminders.ts` → домен (блок 2), UI → `settings.ts` и `application/ports.ts` (блоки 2, 10), UI → прокладки и `zoomLevelsText` (этот блок), домен → контракты и настройки (этот блок).
+- **Нарушения сейчас** (48 строк, все — вне домена, кроме четырёх; после блока — 40): `application/services.ts` → инфраструктура и `obsidian` (блок 2), `phone/PhoneReminders.ts` → домен (блок 2), UI → `settings.ts` и `application/ports.ts` (блоки 2, 10), UI → прокладки и `zoomLevelsText` (этот блок), домен → контракты и настройки (этот блок).
 
 ## Global Constraints
 
@@ -39,11 +39,11 @@
 **Files:**
 - Create: `tests/architecture.test.ts`
 
-- [ ] Таблица `MAY_IMPORT` по спеке; `src/main.ts`, `src/demo.ts`, `src/compose.ts` — корень, могут всё. Пакеты `obsidian`, `@codemirror/*` разрешены UI; инфраструктуре разрешено всё, кроме `src/ui/**`.
-- [ ] Разбор импортов: `import … from`, `export … from`, `import "…"`, `import("…")` (в том числе `typeof import(…)`), без блочных и строчных комментариев; относительный путь → файл в репозитории (`.ts` или `/index.ts`), `?raw` отрезается.
-- [ ] Тесты: у каждого файла есть слой; разбор видит все формы импорта (известные импорты `contracts.ts`, `main.ts`, `WorkCalendarExportScript.ts`); нет нарушений вне `ALLOWED`; каждая строка `ALLOWED` ещё встречается.
-- [ ] `ALLOWED` — все 48 текущих строк, по алфавиту.
-- [ ] `npm test` — PASS. Commit `Layer guard: a test reads every import and holds the list of those that still cross a layer`.
+- [x] Таблица `MAY_IMPORT` по спеке; `src/main.ts`, `src/demo.ts`, `src/compose.ts` — корень, могут всё. Пакеты `obsidian`, `@codemirror/*` разрешены UI; инфраструктуре разрешено всё, кроме `src/ui/**`.
+- [x] Разбор импортов: `import … from`, `export … from`, `import "…"`, `import("…")` (в том числе `typeof import(…)`), без блочных и строчных комментариев; относительный путь → файл в репозитории (`.ts` или `/index.ts`), `?raw` отрезается.
+- [x] Тесты: у каждого файла есть слой; разбор видит все формы импорта (известные импорты `contracts.ts`, `main.ts`, `WorkCalendarExportScript.ts`); нет нарушений вне `ALLOWED`; каждая строка `ALLOWED` ещё встречается.
+- [x] `ALLOWED` — все 48 текущих строк, по алфавиту.
+- [x] `npm test` — PASS. Commit `Layer guard: a test reads every import and holds the list of those that still cross a layer`.
 
 ### Task 2: Типы домена — в домен
 
@@ -51,10 +51,10 @@
 - Create: `src/domain/Placement.ts` (`Placement`, `TaskDraft`), `src/domain/Lists.ts` (`GroupedList`, `EndList`, `GroupPlace`), `src/domain/Groups.ts` (`GroupSettings`), `src/domain/Priority.ts` (`PRIORITY_COLORS`, `PriorityColor`, `PriorityLevel`, `usablePrefix`, `sameLevels`, `usableLevels`)
 - Modify: `src/domain/operations.ts`, `src/application/contracts.ts`, `src/settings.ts`, `tests/architecture.test.ts`
 
-- [ ] Перенести объявления дословно, с их комментариями. Контракты: `export type { … } from "../domain/…"`, `PriorityLevel` — из домена. `settings.ts`: `import type` для своих полей и реэкспорт того же набора имён (значения — `export { … } from`).
-- [ ] `operations.ts` импортирует из `./Placement`, `./Lists`, `./Groups`.
-- [ ] Вычеркнуть `src/domain/operations.ts → …` (2 строки) из `ALLOWED`.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit `Domain owns its types: placement, lists, sections and priority levels; contracts and settings re-export them`.
+- [x] Перенести объявления дословно, с их комментариями. Контракты: `export type { … } from "../domain/…"`, `PriorityLevel` — из домена. `settings.ts`: `import type` для своих полей и реэкспорт того же набора имён (значения — `export { … } from`).
+- [x] `operations.ts` импортирует из `./Placement`, `./Lists`, `./Groups`.
+- [x] Вычеркнуть `src/domain/operations.ts → …` (2 строки) из `ALLOWED`.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit `Domain owns its types: placement, lists, sections and priority levels; contracts and settings re-export them`.
 
 ### Task 3: `isOpen` в домене, `toItem` в application, `TaskItem.open`
 
@@ -67,10 +67,10 @@
 - `TaskItem.open: boolean` — «Not done and not given up: todo or in progress.»; `toItem` ставит `isOpen(entry.task.status)`.
 - `Timeline.ts`: своя `isOpen` удаляется, читается `item.open`.
 
-- [ ] Тест `isOpen` в домене (четыре статуса). Тесты `toItem` переезжают в `tests/application/taskItems.test.ts`; в полном ожидании добавлено `open: true`; новый тест «tells whether the task is open» на `[ ]`, `[/]`, `[x]`, `[-]`.
-- [ ] Литералы `TaskItem` в тестах UI получают `open`; где статус — параметр (`Timeline.test.ts`), `open` следует статусу.
-- [ ] Вычеркнуть `src/domain/queries.ts → …` (2 строки).
-- [ ] `npm test` — PASS. Commit `One rule of an open task in the domain; the item for the view is built in application and carries it`.
+- [x] Тест `isOpen` в домене (четыре статуса). Тесты `toItem` переезжают в `tests/application/taskItems.test.ts`; в полном ожидании добавлено `open: true`; новый тест «tells whether the task is open» на `[ ]`, `[/]`, `[x]`, `[-]`.
+- [x] Литералы `TaskItem` в тестах UI получают `open`; где статус — параметр (`Timeline.test.ts`), `open` следует статусу.
+- [x] Вычеркнуть `src/domain/queries.ts → …` (2 строки).
+- [x] `npm test` — PASS. Commit `One rule of an open task in the domain; the item for the view is built in application and carries it`.
 
 ### Task 4: Прокладки и текст уровней масштаба
 
@@ -79,12 +79,12 @@
 - Move (`git mv`): `src/application/zoomLevelsText.ts` → `src/ui/zoomLevelsText.ts`, `tests/application/zoomLevelsText.test.ts` → `tests/ui/zoomLevelsText.test.ts`, `tests/application/placements.test.ts` → `tests/domain/placements.test.ts`
 - Modify: `src/application/contracts.ts` (реэкспорт `samePlacement`, `plainText`, `textParts`, `TextPart`, `ZoomLevel`), `src/ui/quick/QuickBar.ts`, `src/ui/menu/TaskMenu.ts`, `src/ui/TaskTitle.ts`, `src/ui/SettingsTab.ts`, `tests/architecture.test.ts`
 
-- [ ] Импорты UI — на контракты; `ui/zoomLevelsText.ts` берёт `ZoomLevel` из контрактов.
-- [ ] Вычеркнуть 4 строки (прокладки и `zoomLevelsText`).
-- [ ] `grep -rn "\.\./application\|\.\./settings" src/domain` — пусто.
-- [ ] `npm test`, `npm run build`, `npm run build:demo` — PASS. Commit `Contracts give the UI the placement and text rules; the shims go, the zoom levels' text is the settings tab's`.
+- [x] Импорты UI — на контракты; `ui/zoomLevelsText.ts` берёт `ZoomLevel` из контрактов.
+- [x] Вычеркнуть 4 строки (прокладки и `zoomLevelsText`).
+- [x] `grep -rn "\.\./application\|\.\./settings" src/domain` — пусто.
+- [x] `npm test`, `npm run build`, `npm run build:demo` — PASS. Commit `Contracts give the UI the placement and text rules; the shims go, the zoom levels' text is the settings tab's`.
 
 ### Task 5: Проверка в тестовом Obsidian и ход работы
 
-- [ ] Свой тестовый Obsidian (свободный порт, свой профиль и vault в scratchpad), сборка ветки, файл задач с секциями Inbox/Now/Soon/Backlog/Done, датой 📅 и слотом ⏰. По CDP: `basePath` — свой vault; вид открыт; снимки Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная; в консоли нет ошибок плагина; задачи и таймлайн на месте (в том числе карточка со слотом — она читает `open`).
-- [ ] Строка 1 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 1 planned, done and checked in Obsidian`.
+- [x] Свой тестовый Obsidian (свободный порт, свой профиль и vault в scratchpad), сборка ветки, файл задач с секциями Inbox/Now/Soon/Backlog/Done, датой 📅 и слотом ⏰. По CDP: `basePath` — свой vault; вид открыт; снимки Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная; в консоли нет ошибок плагина; задачи и таймлайн на месте (в том числе карточка со слотом — она читает `open`).
+- [x] Строка 1 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 1 planned, done and checked in Obsidian`.
