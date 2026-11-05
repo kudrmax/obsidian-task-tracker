@@ -99,10 +99,6 @@ const MINUTES_PER_HOUR = 60;
 /** What ends the hold on the minute a timeline was put on: a finger anywhere on the page. */
 const TOUCHES = ["pointerdown", "touchstart"] as const;
 
-function isOpen(item: TaskItem): boolean {
-	return item.status === "todo" || item.status === "inProgress";
-}
-
 /**
  * A day of hours that scrolls: the hour lines and labels, finer ones as it zooms in, the events, the task cards over them,
  * the now line. It runs from the hour the day begins to the same hour the next morning, both labelled; positions are minutes
@@ -216,7 +212,7 @@ export class Timeline {
 	shownSpan(item: TaskItem): TaskSpan {
 		const span = this.spanOf(item.slot!);
 		const now = this.nowMinutes();
-		return now !== null && isOpen(item) ? followNow(span, now) : span;
+		return now !== null && item.open ? followNow(span, now) : span;
 	}
 
 	/** The hour's height at which the day, from its first hour's label to its closing one, fills the visible height; null before the timeline is laid out. */

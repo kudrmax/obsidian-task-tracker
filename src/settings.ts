@@ -1,3 +1,9 @@
+import type { GroupSettings } from "./domain/Groups";
+import type { PriorityLevel } from "./domain/Priority";
+
+export type { GroupSettings } from "./domain/Groups";
+export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "./domain/Priority";
+
 /** Which pair of neighbouring columns the window shows: Inbox and Soon, Soon and Now, or Now and the calendar. */
 export type RightMode = "calendar" | "soon" | "inbox";
 
@@ -18,14 +24,6 @@ export interface SectionNames {
 	readonly done: string;
 }
 
-/** The `###` sections inside a list: the names a drag offers to start one with, and the name of the tasks outside any. */
-export interface GroupSettings {
-	/** In the order the zones under a dragged card offer them. */
-	readonly presets: readonly string[];
-	/** The heading over the tasks outside any section, once a list has sections; `### <this>` in the file is that group. */
-	readonly ungrouped: string;
-}
-
 export interface GoogleSettings {
 	readonly clientId: string;
 	readonly clientSecret: string;
@@ -33,30 +31,6 @@ export interface GoogleSettings {
 	/** Calendar ids to show; empty means every calendar selected in Google. */
 	readonly calendarIds: readonly string[];
 	readonly refreshSeconds: number;
-}
-
-/** The fixed set of colours a priority level takes; the order the settings offer them in. */
-export const PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"] as const;
-export type PriorityColor = (typeof PRIORITY_COLORS)[number];
-
-/** A priority level: a task whose text starts with `prefix` gets the tint of `color`. */
-export interface PriorityLevel {
-	readonly prefix: string;
-	readonly color: PriorityColor;
-}
-
-/** A prefix marks a task only when it is one word: a line's first word is matched against it. */
-export function usablePrefix(prefix: string): boolean {
-	return /^\S+$/.test(prefix);
-}
-
-export function sameLevels(a: readonly PriorityLevel[], b: readonly PriorityLevel[]): boolean {
-	return a.length === b.length && a.every((level, i) => level.prefix === b[i].prefix && level.color === b[i].color);
-}
-
-/** The levels that mark tasks: a one-word prefix, the first of two with the same one. */
-export function usableLevels(levels: readonly PriorityLevel[]): readonly PriorityLevel[] {
-	return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
 }
 
 export interface TaskCalendarSettings {

@@ -1,8 +1,8 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import type { SettingsStore } from "../application/ports";
-import { formatZoomLevels, parseZoomLevels } from "../application/zoomLevelsText";
 import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import { LevelEdits } from "./priorityLevels";
+import { formatZoomLevels, parseZoomLevels } from "./zoomLevelsText";
 import { PresetEdits } from "./presetEdits";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";

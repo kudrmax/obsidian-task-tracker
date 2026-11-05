@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../src/ui/drag/DragSession";
 
-const item: TaskItem = { key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null };
-const payload: DragPayload = { item, from: "left", durationMin: null, grabPx: 20, grabX: 20 };
+const item: TaskItem = { key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null };
+const payload: DragPayload = { item, from: "left", durationMin: null, grabPx: 20 };
 const rect = (x: number, y: number) => ({ x, y, width: 100, height: 40, top: y, left: x, right: x + 100, bottom: y + 40, toJSON: () => "" }) as DOMRect;
 
 class FakeTarget implements DropTarget {
@@ -155,7 +155,7 @@ describe("DragSession", () => {
 	});
 
 	describe("carrying a new task", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20, grabX: 20 };
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20 };
 
 		it("hands the new task to the target under the pointer and reports where it landed", async () => {
 			const slot: DropResult = { kind: "slot", slot: { date: "2026-10-30", start: 990, end: null } };

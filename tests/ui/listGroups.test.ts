@@ -11,6 +11,7 @@ const item = (text: string, group: GroupName): TaskItem => ({
 	slot: null,
 	reminder: "notification",
 	repeat: null,
+	open: true,
 	repeatable: true,
 	priority: null,
 	group,

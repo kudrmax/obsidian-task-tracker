@@ -10,7 +10,7 @@ const T = "2026-11-03";
 let n = 0;
 const item = (extra: Partial<TaskItem> = {}): TaskItem => {
 	const i = n++;
-	return { key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra };
+	return { key: { section: "now", index: i, path: [], raw: `- [ ] T${i}` }, text: `T${i}`, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, ...extra };
 };
 const LEVELS = [
 	{ prefix: "p1", color: "red" },
@@ -125,7 +125,7 @@ describe("bulk actions", () => {
 		const bulk = controller();
 		const [a] = cards([item()]);
 		const b = item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] S" } });
-		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0, grabX: 0, carried: [{ item: b, from: "soon" }] };
+		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0, carried: [{ item: b, from: "soon" }] };
 		const steps = bulk.dropSteps(drag, { kind: "listBefore", before: null, column: "left" });
 		expect(steps).toEqual([
 			{ key: a.item.key, change: { kind: "moveBefore", before: null, date: T } },
@@ -137,7 +137,7 @@ describe("bulk actions", () => {
 	it("offers the cancel ring only while several cards are carried", () => {
 		const bulk = controller();
 		const [a] = cards([item()]);
-		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0, grabX: 0 };
+		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0 };
 		expect(bulk.targets(drag)).toEqual([]);
 		expect(bulk.targets({ ...drag, carried: [{ item: item(), from: "left" }] })).toHaveLength(1);
 		bulk.settled();

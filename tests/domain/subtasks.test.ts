@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalize } from "../../src/domain/normalize";
 import { createSubtask, moveBefore, newTask, moveToList, moveToSoon, nest, placeTask, postpone, remove, setSlot, setStatus } from "../../src/domain/operations";
-import { toItem } from "../../src/domain/queries";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -33,13 +32,6 @@ describe("the subtask tree", () => {
 
 	it("keeps the notes under a subtask with it", () => {
 		expect(trip.subtasks[1].task.children).toEqual(["\t\t- [ ] Window", "\t\tnote"]);
-	});
-
-	it("shows the open subtasks and counts the done ones among those not given up", () => {
-		const item = toItem(parse("## Now\n- [ ] A\n  - [x] B\n  - [-] C\n  - [ ] D\n").tasks("now")[0]);
-		expect(item.progress).toEqual({ done: 1, total: 2 });
-		expect(item.subtasks.map((s) => [s.text, s.parentText, s.key.path])).toEqual([["D", "A", [2]]]);
-		expect(toItem(doc.tasks("now")[1]).progress).toBeNull();
 	});
 });
 

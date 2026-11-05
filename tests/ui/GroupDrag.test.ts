@@ -41,6 +41,7 @@ describe("a section carried (block 3)", () => {
 		slot: null,
 		reminder: "notification",
 		repeat: null,
+		open: true,
 		repeatable: true,
 		priority: null,
 		group,

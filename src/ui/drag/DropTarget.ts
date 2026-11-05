@@ -24,8 +24,6 @@ export interface TaskDragPayload {
 	readonly durationMin: number | null;
 	/** How far under the card's top the finger holds it: a timeline card keeps its grip, a list card hangs by its middle. */
 	readonly grabPx: number;
-	/** How far right of the card's left edge the finger holds it: in its own list, the card's left edge picks the level it lands on. */
-	readonly grabX: number;
 	/** The other picked tasks that go along (bulk actions spec); none for a task carried alone. */
 	readonly carried?: readonly CarriedTask[];
 }
@@ -47,7 +45,6 @@ export interface NewTaskPayload {
 	readonly item: null;
 	readonly durationMin: null;
 	readonly grabPx: number;
-	readonly grabX: number;
 }
 
 export type DragPayload = TaskDragPayload | NewTaskPayload;

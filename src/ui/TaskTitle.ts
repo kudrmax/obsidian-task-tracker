@@ -1,4 +1,4 @@
-import { textParts } from "../application/taskText";
+import { textParts } from "../application/contracts";
 import { el } from "./dom";
 
 /** Where a link in a title goes: a note by the link text Obsidian resolves, or an address. */

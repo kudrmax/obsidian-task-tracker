@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { descriptionMarkdown } from "../../src/domain/description";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { createInPlace, placeTask, setDescription } from "../../src/domain/operations";
-import { toItem } from "../../src/domain/queries";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -51,12 +50,6 @@ describe("a task's description", () => {
 	it("keeps the depth of its nested lines below its first level", () => {
 		const nested = parse("## Now\n- [ ] Trip\n\t- Багаж\n\t\t- чемодан\n\t\t\t> цитата\n");
 		expect(descriptionMarkdown(nested.tasks("now")[0])).toBe("- Багаж\n\t- чемодан\n\t\t> цитата");
-	});
-
-	it("reaches the item the view gets", () => {
-		expect(toItem(task).description).toBe("- Описание её\n- Ещё её описание\n- Снова описание задачи 1");
-		expect(toItem(task).subtasks[0].description).toBe("- Описание подзадачи");
-		expect(toItem(doc.tasks("now")[1]).description).toBeNull();
 	});
 
 	it("is written as one block right under the task, before its subtasks, which keep their own lines", () => {

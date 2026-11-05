@@ -14,6 +14,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	slot: null,
 	reminder: "notification",
 	repeat: null,
+	open: true,
 	repeatable: true,
 	priority: null,
 	group,
@@ -61,7 +62,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	return { list, drop };
 }
 
-const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17, grabX: 17 });
+const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17 });
 
 /** The finger holding a carried card by 17 px so that the card picks the place at `y`: its middle. */
 const picking = (y: number) => y + 17 - shownCardSize().height / 2;
@@ -131,7 +132,7 @@ describe("ListDrop", () => {
 	});
 
 	describe("the left column of a past day, its tasks in sections it does not show", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17 };
 		const two = () => [item("now", 0, "A", "Work"), item("now", 1, "B", "Home")];
 
 		it("a new task let go between cards of two sections goes before the one under it", () => {
@@ -153,7 +154,7 @@ describe("ListDrop", () => {
 	});
 
 	describe("a new task", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17, grabX: 17 };
+		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17 };
 		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null)];
 		const indented = <T extends { list: TaskList }>(made: T): T => {
 			made.list.el.style.setProperty("--tc-subtask-indent", "20px");
@@ -303,20 +304,28 @@ describe("ListDrop", () => {
 			expect(drop.drop(27, picking(100 + 2 * STEP + 26), from)).toEqual({ kind: "listBefore", before: items[3].key, column: "left" });
 		});
 
+		it("takes its level from the list's middle (97.5), as a new task does, wherever the card is held", () => {
+			const { drop, items, from } = lifted(3);
+			const y = picking(100 + 2 * STEP + 2);
+			expect(drop.drop(90, y, from)).toEqual({ kind: "listBefore", before: items[2].key, column: "left" });
+			drop.clear();
+			expect(drop.drop(118, y, from)).toEqual({ kind: "nest", parent: items[1].key, before: null });
+		});
+
 		it("at its own place a level deeper, the line stands in the gap over the dashed place, never on it", () => {
 			const { list, drop, items, from } = lifted(1);
-			drop.preview(27 + 20, picking(100 + STEP + 17), from);
+			drop.preview(118, picking(100 + STEP + 17), from);
 			const [, right, y] = /translate3d\(([\d.]+)px, ([\d.]+)px, 0\)/.exec(lineEl()!.style.transform)!.map(Number);
 			expect(y).toBe(STEP - (STEP - 35) / 2);
 			expect(right - parseFloat(list.el.querySelector<HTMLElement>(".tc-list-drop-bar")!.style.width)).toBe(20);
-			expect(drop.drop(27 + 20, picking(100 + STEP + 17), from)).toEqual({ kind: "nest", parent: items[0].key, before: null });
+			expect(drop.drop(118, picking(100 + STEP + 17), from)).toEqual({ kind: "nest", parent: items[0].key, before: null });
 		});
 
 		it("a new level moves the line's left end only: its right end, where it hangs, stays", () => {
 			const { drop, from } = lifted(1);
 			drop.preview(27, picking(100 + 3 * STEP + 2), from);
 			const before = lineEl()!.style.transform;
-			drop.preview(27 + 20, picking(100 + 3 * STEP + 2), from);
+			drop.preview(118, picking(100 + 3 * STEP + 2), from);
 			expect(lineEl()!.style.transform).toBe(before);
 		});
 
@@ -335,7 +344,7 @@ describe("ListDrop", () => {
 		it("several cards carried: let go at the place of one of them, they still move there", () => {
 			const { list, drop, items } = lifted(1);
 			list.elements[3].classList.add("is-lifted", "is-waiting");
-			const many: DragPayload = { item: items[1], from: "left", durationMin: null, grabPx: 17, grabX: 17, carried: [{ item: items[3], from: "left" }] };
+			const many: DragPayload = { item: items[1], from: "left", durationMin: null, grabPx: 17, carried: [{ item: items[3], from: "left" }] };
 			drop.preview(27, picking(100 + STEP + 17), many);
 			expect(lineEl()).not.toBeNull();
 			expect(drop.drop(27, picking(100 + STEP + 17), many)).toEqual({ kind: "listBefore", before: items[2].key, column: "left" });

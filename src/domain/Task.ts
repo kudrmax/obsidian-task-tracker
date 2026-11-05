@@ -12,6 +12,11 @@ export type GroupName = string | null;
 /** `[ ]`, `[/]`, `[x]`, `[-]`. Any other character reads as todo and is written back unchanged. */
 export type TaskStatus = "todo" | "inProgress" | "done" | "cancelled";
 
+/** Not done and not given up: todo or in progress. */
+export function isOpen(status: TaskStatus): boolean {
+	return status === "todo" || status === "inProgress";
+}
+
 /**
  * Minutes of the day on `date`'s clock, `start` below 1440. `end` may equal 1440 (midnight) or pass it: the slot runs
  * into the next date. A null `end` is a task at a time, without a duration.

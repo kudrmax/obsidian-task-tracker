@@ -1,12 +1,8 @@
 import { DayBoundary } from "./DayBoundary";
-import type { LocalDate, SectionKey, Task } from "./Task";
+import { isOpen, type LocalDate, type SectionKey, type Task } from "./Task";
 import { presetPlace } from "./operations";
 import { recurClosed } from "./recurrence";
 import { type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
-
-function isOpen(task: Task): boolean {
-	return task.status === "todo" || task.status === "inProgress";
-}
 
 /** A rewritten line can show another date or slot that was text before it: the rule runs again until nothing changes. */
 function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocument): TaskDocument {
@@ -20,7 +16,7 @@ function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocume
 /** A slot of a past day goes; a task left without a date keeps that day as its due date, for `pastDatesToToday`. */
 function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	return untilSettled(doc, (d) => {
-		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
+		const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
 		return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot!) }] as const));
 	});
 }
@@ -28,7 +24,7 @@ function erasePastSlots(doc: TaskDocument, today: LocalDate, boundary: DayBounda
 /** What was left undone stays for today: a past due date becomes today's. */
 function pastDatesToToday(doc: TaskDocument, today: LocalDate): TaskDocument {
 	return untilSettled(doc, (d) => {
-		const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
+		const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.dueDate !== null && e.task.dueDate < today);
 		return d.replaceAll(past.map((e) => [e, { ...e.task, dueDate: today }] as const));
 	});
 }
@@ -51,14 +47,14 @@ function gatherAtStart(
 }
 
 function closedToDone(doc: TaskDocument): TaskDocument {
-	return gatherAtStart(doc, "done", (e) => !isOpen(e.task));
+	return gatherAtStart(doc, "done", (e) => !isOpen(e.task.status));
 }
 
 /** An Inbox or Backlog task that got a due date or a slot has its day: it goes to Soon, and from there `dueToNow` takes today's on. */
 function datedOutOfUndated(doc: TaskDocument): TaskDocument {
 	if (!doc.hasSection("soon")) return doc;
 	for (;;) {
-		const entry = [...doc.tasks("inbox"), ...doc.tasks("backlog")].find((e) => isOpen(e.task) && (e.task.dueDate !== null || e.task.slot !== null));
+		const entry = [...doc.tasks("inbox"), ...doc.tasks("backlog")].find((e) => isOpen(e.task.status) && (e.task.dueDate !== null || e.task.slot !== null));
 		if (!entry) return doc;
 		doc = doc.moveEntry(entry, "soon", "end");
 	}
@@ -70,7 +66,7 @@ function datedOutOfUndated(doc: TaskDocument): TaskDocument {
  */
 function dueToNow(doc: TaskDocument, today: LocalDate, boundary: DayBoundary, presets: readonly string[]): TaskDocument {
 	const came = (e: TaskEntry): boolean => {
-		if (e.section !== "soon" || !isOpen(e.task)) return false;
+		if (e.section !== "soon" || !isOpen(e.task.status)) return false;
 		const due = e.task.dueDate !== null && e.task.dueDate <= today;
 		const slotted = e.task.slot !== null && boundary.dayOfSlot(e.task.slot) <= today;
 		return due || slotted;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatZoomLevels, parseZoomLevels } from "../../src/application/zoomLevelsText";
+import { formatZoomLevels, parseZoomLevels } from "../../src/ui/zoomLevelsText";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 
 describe("zoom levels text", () => {

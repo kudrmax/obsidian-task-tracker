@@ -1,6 +1,7 @@
-import type { EndList, GroupedList, GroupPlace, Placement, TaskDraft } from "../application/contracts";
-import type { GroupSettings } from "../settings";
 import { DayBoundary } from "./DayBoundary";
+import type { GroupSettings } from "./Groups";
+import type { EndList, GroupedList, GroupPlace } from "./Lists";
+import type { Placement, TaskDraft } from "./Placement";
 import { Repeat, type RepeatRule } from "./Repeat";
 import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
