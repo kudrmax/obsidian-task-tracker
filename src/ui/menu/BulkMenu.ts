@@ -4,6 +4,7 @@ import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
+import { pickMark } from "../TaskSelection";
 import type { LocalDate, TaskStatus } from "../types";
 import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
 import { datePage } from "./DatePage";
@@ -61,8 +62,9 @@ export interface BulkMenuContext {
 	readonly items: readonly TaskItem[];
 	/** The picked tasks' cards: each stays over the blur where it stands. */
 	readonly cards: readonly HTMLElement[];
-	/** The card clicked: the panel stands beside the list, level with it. */
+	/** What opened it: the card clicked, the panel beside its list, level with it; or Select tasks' menu button, the panel over it, by its right edge. */
 	readonly source: HTMLElement;
+	readonly at: "beside" | "over";
 	readonly today: LocalDate;
 	readonly day: LocalDate;
 	readonly levels: readonly PriorityLevel[];
@@ -80,7 +82,7 @@ export interface BulkMenuContext {
 export class BulkMenu {
 	private readonly overlay: Overlay;
 	private readonly panel: Panel;
-	private readonly anchor: DOMRect;
+	private readonly source: DOMRect;
 
 	static open(context: BulkMenuContext): BulkMenu {
 		return new BulkMenu(context);
@@ -89,9 +91,10 @@ export class BulkMenu {
 	private constructor(private readonly context: BulkMenuContext) {
 		this.overlay = new Overlay(() => this.close());
 		const rects = context.cards.map((card) => card.getBoundingClientRect());
-		this.anchor = this.besideList(context.source);
+		this.source = context.at === "beside" ? this.besideList(context.source) : context.source.getBoundingClientRect();
 		context.cards.forEach((card, i) => this.lift(card, rects[i]));
-		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: "is-task is-bulk", picks: new Picks(() => this.close()), place: (panel) => this.place(panel) });
+		if (context.at === "over") LiftedCopy.over(this.overlay, context.source.cloneNode(true) as HTMLElement, false).pin(this.source).el.classList.add("tc-control-copy");
+		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, picks: new Picks(() => this.close()), place: (panel) => this.place(panel) });
 		this.showMenu();
 		this.overlay.show();
 	}
@@ -102,6 +105,7 @@ export class BulkMenu {
 		const item = this.context.items[this.context.cards.indexOf(card)];
 		const copy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted is-selected"), true);
 		fillCard(copy.el, item, { day: this.context.day });
+		if (this.context.at === "over") pickMark(copy.el);
 		copy.pin(rect, { width: true, height: true });
 	}
 
@@ -113,8 +117,11 @@ export class BulkMenu {
 		return new DOMRect(column.right + gap, card.top - gap, 0, 0);
 	}
 
+	/** Beside the list; or over the menu button, its right edge on the button's. */
 	private place(panel: HTMLElement): void {
-		placePanel(panel, this.anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom());
+		const { source } = this;
+		const anchor = this.context.at === "beside" ? source : new DOMRect(source.right - panel.offsetWidth, source.top, panel.offsetWidth, source.height);
+		placePanel(panel, anchor, tokenPx(panel, "--tc-menu-gap"), menuRoom());
 	}
 
 	private pick(action: () => Promise<void>): () => void {

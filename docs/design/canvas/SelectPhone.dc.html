@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Выбор задач на телефоне: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<dc-import name="Screen" foot="prod" plus="true" theme="{{theme}}" right-mode="inbox" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<div style="position: absolute; left: 0; top: 722px; width: 120px; height: 52px; background: {{c.bg}}; z-index: 6;"></div>
+<div style="position: absolute; left: 300px; top: 716px; width: 90px; height: 58px; background: {{c.bg}}; z-index: 6;"></div>
+
+<sc-if value="{{selecting}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 160px; width: 390px; height: 556px; background: {{c.bg}}; z-index: 6;"></div>
+<sc-for list="{{cards}}" as="k" hint-placeholder-count="14">
+<div style="position: absolute; left: {{k.left}}px; top: {{k.top}}px; width: 175px; height: 35px; box-sizing: border-box; overflow: hidden; border-radius: 17.5px; background: {{k.bg}}; padding: 0 10px 0 9px; display: flex; align-items: center; gap: 8px; z-index: {{k.z}};">
+<span style="width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; border-radius: 9px; border: {{k.ring}}; background: {{k.dot}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center;"><sc-if value="{{k.on}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></sc-if></span>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{k.title}}</div>
+</div>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{normal}}" hint-placeholder-val="{{true}}">
+<div role="group" aria-label="Undo and more" style="position: absolute; left: 16px; top: 722px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.control}}; display: flex; z-index: {{capsuleZ}};">
+<button aria-label="Undo" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.undo}}"></path></svg></button>
+<button aria-label="More" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="{{icons.more}}"></path></svg></button>
+</div>
+<button aria-label="New task" style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; border: 0; padding: 0; border-radius: 22px; background: {{c.accent}}; color: #FFFFFF; box-shadow: {{c.control}}; display: flex; align-items: center; justify-content: center; z-index: 7;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+</sc-if>
+
+<sc-if value="{{selecting}}" hint-placeholder-val="{{false}}">
+<sc-for list="{{rowBtns}}" as="b" hint-placeholder-count="2">
+<button aria-label="{{b.label}}" style="position: absolute; left: {{b.left}}px; top: 722px; width: {{b.w}}px; height: 44px; box-sizing: border-box; border: 0; padding: 0; border-radius: {{b.r}}px; background: {{b.bg}}; color: {{b.ink}}; box-shadow: {{b.shadow}}; display: flex; align-items: center; justify-content: center; font: inherit; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; z-index: 12;"><sc-if value="{{b.hasIcon}}" hint-placeholder-val="{{true}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{b.fill}}" stroke="{{b.stroke}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{b.d}}"></path></svg></sc-if><sc-if value="{{b.hasText}}" hint-placeholder-val="{{false}}"><span>{{b.text}}</span></sc-if></button>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{dim}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 9;"></div>
+</sc-if>
+
+<sc-if value="{{more}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 16px; top: 606px; width: 268px; border-radius: 14px; overflow: hidden; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: 0.5px solid {{c.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Search</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="{{icons.search}}"></path></svg></button>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Select tasks</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.circle}} M8 12.5l2.8 2.8L16 9.8"></path></svg></button>
+</div>
+<div role="group" aria-label="Undo and more" style="position: absolute; left: 16px; top: 722px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.control}}; display: flex; z-index: 12;">
+<span style="width: 40px; height: 44px; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.undo}}"></path></svg></span>
+<span style="width: 40px; height: 44px; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="{{icons.more}}"></path></svg></span>
+</div>
+</sc-if>
+
+<sc-if value="{{menu}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 74px; top: 340px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<div style="height: 40px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; font-size: 15px; font-weight: 600;">3 tasks</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{moveTiles}}" as="m" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.accent}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.d}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap;">{{m.label}}</span>
+</button>
+</sc-for>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete 3 tasks</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.del}}"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"normal","options":["normal","more","empty","picked","menu"]},"row":{"editor":"enum","default":"v1","options":["v1","v2","v3"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'normal';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', dim: '#C7C7CC', accent: '#8A5CF5', sel: '#E5DBFD', backdrop: 'rgba(0,0,0,0.22)', menu: 'rgba(250,250,252,0.97)', menuTile: 'rgba(0,0,0,0.05)', gap: '#E5E5EA', sep: '#D1D1D6', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', control: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', danger: '#FF3B30', p1: '#FF3B30', p2: '#FF9500', p3: '#FFCC00', mark: '#FF9500' }
+      : { bg: '#000000', card: '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', dim: '#636366', accent: '#9580FF', sel: '#302952', backdrop: 'rgba(0,0,0,0.55)', menu: 'rgba(44,44,46,0.96)', menuTile: 'rgba(255,255,255,0.08)', gap: '#1C1C1E', sep: '#48484A', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', control: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', danger: '#FF453A', p1: '#FF453A', p2: '#FF9F0A', p3: '#FFD60A', mark: '#FFD60A' };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      undo: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+      more: 'M5 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M19 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z',
+      search: 'M11 4a7 7 0 1 1 0 14a7 7 0 1 1 0-14z M16.5 16.5L21 21',
+      circle: CIRCLE,
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13'
+    };
+    const selecting = view === 'empty' || view === 'picked' || view === 'menu';
+    const inbox = ['Узнать про курсы итальянского', 'Идея подарка на Новый год', 'Ответить Лёше про поход', 'Посмотреть «Дюну 2»', 'Почитать про налоговое резидентство', 'Сменить тариф мобильной связи'];
+    const soon = ['Продлить страховку', 'Купить подарок Ане', 'Разобрать фото с поездки', 'Записаться к стоматологу', 'Починить велосипед', 'Прочитать Deep Work', 'Заменить фильтр для воды', 'Настроить бэкап ноутбука'];
+    const picked = view === 'empty' ? [] : ['i0', 'i2', 's1'];
+    const card = (title, id, left, i) => {
+      const on = picked.includes(id);
+      return { title, left, top: 166 + i * 37, on, bg: on ? c.sel : c.card, dot: on ? c.accent : 'transparent', ring: on ? '0' : '1.5px solid ' + c.muted, z: on && view === 'menu' ? 10 : 7 };
+    };
+    const cards = [...inbox.map((t, i) => card(t, 'i' + i, 10, i)), ...soon.map((t, i) => card(t, 's' + i, 205, i))];
+    const n = picked.length;
+    const row = this.props.row ?? 'v1';
+    const CROSS = 'M6 6l12 12 M18 6L6 18';
+    const btn = (label, left, w, bg, ink, shadow, d, text, fill) => ({ label, left, w, r: 22, bg, ink, shadow, d: d ?? '', hasIcon: !!d, text: text ?? '', hasText: text !== undefined, fill: fill ? 'currentColor' : 'none', stroke: fill ? 'none' : 'currentColor' });
+    const lit = n > 0;
+    const circleRight = (d, text, fill) => btn('Actions for selected tasks', 330, 44, lit ? c.accent : c.card, lit ? '#FFFFFF' : c.dim, c.control, d, text, fill);
+    const roundCross = btn('Stop selecting', 16, 44, c.card, c.text, c.control, CROSS);
+    const rowBtns = {
+      v1: [roundCross, circleRight(undefined, String(n))],
+      v2: [btn('', 16, 80, c.card, c.text, c.control), btn('Stop selecting', 16, 40, 'transparent', c.text, 'none', CROSS), btn('Selected', 56, 40, 'transparent', lit ? c.text : c.dim, 'none', undefined, String(n)), circleRight(icons.more, undefined, true)],
+      v3: [roundCross, circleRight(icons.more, undefined, true)]
+    }[row];
+
+    const marks = [];
+    const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
+    const pos = (left, top) => 'left: ' + left + 'px; top: ' + top + 'px;';
+    const rpos = (right, top) => 'right: ' + right + 'px; top: ' + top + 'px;';
+    if (view === 'normal') marks.push(ring(56, 722, 40, 44, 20, '↓ Вместо лупы', pos(40, 692)));
+    if (view === 'more') marks.push(ring(16, 606, 268, 104, 14, '↑ Поиск и выбор', pos(150, 714)));
+    if (view === 'empty') {
+      marks.push(ring(10, 166, 175, 35, 17.5, '↓ Кружки на задачах', pos(80, 126)));
+      marks.push(row === 'v2' ? ring(16, 722, 80, 44, 22, '↓ Выйти и сколько', pos(12, 692)) : ring(16, 722, 44, 44, 22, '↓ Выйти', pos(12, 692)));
+      marks.push(ring(330, 722, 44, 44, 22, '↓ Пока ничего', rpos(14, 692)));
+    }
+    if (view === 'picked') {
+      if (row === 'v2') marks.push(ring(16, 722, 80, 44, 22, '↓ Выйти и сколько', pos(12, 692)));
+      marks.push(ring(330, 722, 44, 44, 22, row === 'v1' ? '↓ Выбрано 3' : '↓ Меню на выбранные', rpos(14, 692)));
+    }
+    if (view === 'menu') marks.push(ring(74, 340, 300, 370, 14, '↑ Меню на все три', rpos(14, 316)));
+
+    return {
+      c, icons, cards, rowBtns,
+      theme: light ? 'light' : 'dark',
+      normal: view === 'normal',
+      more: view === 'more',
+      menu: view === 'menu',
+      dim: view === 'more' || view === 'menu',
+      selecting,
+      capsuleZ: 7,
+      levels: [{ name: 'p1', c: c.p1 }, { name: 'p2', c: c.p2 }, { name: 'p3', c: c.p3 }],
+      statusTiles: [
+        { label: 'Done', d: CIRCLE, fd: CIRCLE },
+        { label: 'In progress', d: CIRCLE, fd: 'M12 3a9 9 0 0 1 0 18z' },
+        { label: 'Won’t do', d: CIRCLE + ' M8 12h8', fd: '' }
+      ],
+      moveTiles: [
+        { label: 'Today', d: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4' },
+        { label: 'Tomorrow', d: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14' },
+        { label: 'Pick a date', d: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5' }
+      ],
+      marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

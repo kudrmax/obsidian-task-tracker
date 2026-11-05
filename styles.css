@@ -95,6 +95,7 @@ body {
 	--tc-stroke-2-4: 2.4px;
 	--tc-stroke-2-6: 2.6px;
 	--tc-stroke-2-8: 2.8px;
+	--tc-stroke-3-4: 3.4px;
 	--tc-stroke-3-6: 3.6px;
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
@@ -155,6 +156,13 @@ body {
 	--tc-plus-size: 44px;
 	--tc-plus-icon: var(--tc-icon-xl);
 	--tc-capsule-btn: 40px;
+	/* Select tasks: the circle at a card's start. */
+	--tc-pick-size: var(--tc-icon-m);
+	--tc-pick-check: 12px;
+	--tc-pick-ring: var(--tc-select-ring);
+	--tc-stroke-pick: var(--tc-stroke-3-4);
+	--tc-pick-pad-start: 9px;
+	--tc-pick-gap: var(--tc-space-2);
 	--tc-search-w: 520px;
 	--tc-search-field-pad: var(--tc-space-10);
 	/* Over the keyboard as the quick bar stands, and over Obsidian's navigation while the keyboard is down. */
@@ -677,14 +685,21 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > .tc-capsule { left: var(--tc-space-16); height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
+.task-calendar > .tc-capsule { left: var(--tc-space-16); }
+.tc-capsule { height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
 .tc-capsule button.tc-btn.is-icon { width: var(--tc-capsule-btn); height: 100%; border-radius: 0; color: var(--tc-text); }
 .tc-capsule button.tc-btn.is-icon.is-off { color: var(--tc-ink-dim); }
 .tc-capsule svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
 .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule { display: none; }
+/* Select tasks: a capsule like Undo + ⋯ holds the cross and how many are picked, a round button like the plus holds «⋯» for the menu; while it lasts, and while a stack is carried, Undo + ⋯ and the plus are gone. */
+.task-calendar:not(.is-selecting) > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-dragging > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule:not(.tc-select-capsule)) { display: none; }
+.task-calendar > button.tc-select-menu { right: var(--tc-space-16); }
+button.tc-select-menu svg, .tc-capsule .tc-more-open svg { stroke: none; fill: currentColor; }
+button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.tc-capsule button.tc-select-num { font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
 .tc-plus svg { stroke-width: var(--tc-stroke-plus); }
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }
@@ -707,7 +722,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-dot.is-shown { display: block; }
 
 /* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */
-.tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
+.tc-seg-copy, .tc-control-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
 .tc-popover, .tc-panel, .tc-float, .tc-section-float, .tc-lifted, .tc-menu-subtasks, .tc-quick-bar.is-over, .tc-drop, .tc-menu-field { font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-panel, .tc-popover, .tc-desc-peek { border-radius: var(--tc-radius-panel); overflow: hidden; }
 /* One window over the screen: the menus, the description's peek and the sources window share its ground and its shadow. */
@@ -978,11 +993,22 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* Closing, the copy fades with the sheet and the panel: they go together. */
 /* A timeline card's subtasks, between its copy and the menu. */
 .tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-size: var(--tc-font-body); }
-.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-control-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. The shades come per colour from src/ui/priorityColors.ts; a field's row takes its field's, for the dot of the task it renames. */
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
 .tc-card.is-selected, .tc-lifted.is-selected { background: var(--tc-select-bg); }
+/* Select tasks: every list card leads with a circle, which the accent fills with a check once the task is picked; the in-progress dot gives it its place. */
+.tc-pick { display: none; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: var(--tc-pick-gap); border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; }
+.tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
+.task-calendar.is-selecting .tc-card > .tc-pick, .tc-lifted > .tc-pick { display: flex; }
+.task-calendar.is-selecting .tc-card, .tc-lifted:has(> .tc-pick) { padding-left: var(--tc-pick-pad-start); }
+.task-calendar.is-selecting .tc-card > .tc-progress-dot, .tc-lifted:has(> .tc-pick) > .tc-progress-dot { display: none; }
+:is(.tc-card, .tc-lifted).is-selected > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+:is(.tc-card, .tc-lifted).is-selected > .tc-pick svg { visibility: visible; }
+/* The menu over the count grows out of it, from its right edge; «⋯»'s grows out of the capsule. */
+.tc-panel.is-bulk.is-over.is-above { transform-origin: 100% 100%; }
+.tc-panel.is-more { width: var(--tc-popover-w); }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
 .tc-card.is-waiting > * { visibility: hidden; }
 .tc-float-count { min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
