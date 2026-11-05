@@ -2,6 +2,8 @@
 
 A task list next to a day timeline, inside Obsidian. One markdown file is the only truth: the plugin reads it on every change and writes it back line by line, so editing the file by hand is always fine. Drag a task onto a time, see your Google and work calendars beside it. Built for the iPhone first.
 
+**Full documentation (in Russian): [docs/plugin/README.md](docs/plugin/README.md)** — what makes this task manager different, how a day goes with it, the file, the screen, every action, settings, and how an agent should edit the tasks file. This README keeps the short English overview and the Google setup.
+
 ## The file
 
 Default path `TODOs Tasks.md` (Settings → Tasks file). Second-level headings are the sections; the plugin uses three of them and leaves everything else untouched:
@@ -38,8 +40,8 @@ Left: the tasks of the selected day (today: everything in Now that has no slot t
 - Drag a task from the list onto the timeline to give it a time; drag it back to remove the time; drag inside the timeline to move it, pull the handle to resize it.
 - Drag between the Soon list and the day list to move a task between Soon and Now (on another day: to set or remove its due date).
 - **Sections.** A column shows the sections of the list its tasks are in: Inbox and Soon their own, the day column Now’s for today and Soon’s for a later day. So you can open tomorrow in the evening and sort its tasks into Morning, Evening and so on; in the morning they are in Now in the same sections. While a task is dragged, zones show under Inbox, Soon and the day column (today or later): the preset sections that list doesn’t have yet (Settings → Sections) and “New section”. Drop a task on a preset to start that section with it. Drop it on “New section” and type the name: Enter makes the section, an empty name or a tap elsewhere puts the task back. Once a list has a section, the tasks outside any get a “No section” header of their own. Drag a task into a gap to put it in that section. A section that empties goes away, its header too.
-- Long press a task for its menu: In progress, Done, Won’t do, Due date, Rename, Delete.
-- “New task” opens the task screen: a title and three tiles, Soon / Now / Date. A long press on an empty spot of the timeline creates a task at that time.
+- Tap a task for its menu: status, priority, Today / Tomorrow / Pick a date, Rename, Reminder, description, Repeat, Section, Add subtask, Open in Obsidian, Delete. A long press lifts it for a drag.
+- The plus adds a task right in the list: tap it, or drag it between cards or onto the timeline; Enter saves and opens the next field. A long press on an empty spot of the timeline adds a task at that time.
 - Pinch to zoom the timeline; the drag step follows the grid.
 - The calendar button in the switch gets an orange dot when a source is stale; with the calendar shown, a long press on the switch opens the sources window: when each was last updated, and Refresh now.
 
