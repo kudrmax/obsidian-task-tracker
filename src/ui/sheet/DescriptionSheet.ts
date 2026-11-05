@@ -1,3 +1,4 @@
+import { DESCRIPTION_TEMPLATE } from "../../application/contracts";
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
@@ -12,14 +13,6 @@ export interface DescriptionSheetOptions {
 	readonly editing: boolean;
 	readonly surface: MarkdownSurface;
 	onSave(markdown: string): Promise<void>;
-}
-
-/** A new description starts as one empty point. */
-const FIRST_POINT = "- ";
-
-/** What the editor holds, as the description to keep: a lone empty point is none. */
-export function keptDescription(value: string): string {
-	return value.trim() === "-" ? "" : value;
 }
 
 /**
@@ -65,13 +58,13 @@ export class DescriptionSheet {
 		this.right.setText("Save");
 		clear(this.text);
 		this.text.classList.add("is-editing");
-		this.editing = this.opts.surface.edit(this.text, this.opts.markdown ?? FIRST_POINT, () => this.close());
+		this.editing = this.opts.surface.edit(this.text, this.opts.markdown ?? DESCRIPTION_TEMPLATE, () => this.close());
 		this.editing.focus();
 	}
 
 	private async save(): Promise<void> {
 		if (!this.editing || this.closed) return;
-		const markdown = keptDescription(this.editing.value);
+		const markdown = this.editing.value;
 		this.close();
 		await this.opts.onSave(markdown);
 	}

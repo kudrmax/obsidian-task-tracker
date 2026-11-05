@@ -29,6 +29,8 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
 export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
+/** What a new description starts as in the editor: one empty point, which alone is no description. */
+export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
@@ -314,7 +316,7 @@ export interface TaskService {
 	rename(key: TaskKey, text: string): Promise<void>;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes
-	 * nothing, an empty one takes it away. Blank lines go: they would end the task in the file.
+	 * nothing, an empty one or `DESCRIPTION_TEMPLATE` alone takes it away. Blank lines go: they would end the task in the file.
 	 */
 	setDescription(key: TaskKey, markdown: string): Promise<void>;
 	remove(key: TaskKey): Promise<void>;

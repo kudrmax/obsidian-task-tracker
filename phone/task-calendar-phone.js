@@ -148,6 +148,7 @@
 
   // src/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
+  var DESCRIPTION_TEMPLATE = "- ";
   function indentOf(line) {
     return INDENT_RE.exec(line)[0];
   }
@@ -175,6 +176,7 @@
     return descriptionLines(entry).map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.trimStart()).join("\n");
   }
   function markdownLines(markdown) {
+    if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
     return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
   }
 
@@ -685,7 +687,7 @@
     }
     /**
      * The task's description from Markdown, as one block right under its line and before its subtasks, at the indent its
-     * description has, else its subtasks'. The same text changes nothing; an empty one takes the description away.
+     * description has, else its subtasks'. The same text changes nothing; an empty one, or a lone empty point, takes the description away.
      */
     setDescription(entry, markdown) {
       const lines = markdownLines(markdown);

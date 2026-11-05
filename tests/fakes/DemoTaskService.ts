@@ -1,4 +1,4 @@
-import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
@@ -351,7 +351,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async setDescription(key: TaskKey, markdown: string): Promise<void> {
-		this.find(key).description = markdown.trim() === "" ? null : markdown;
+		this.find(key).description = markdown.trim() === "" || markdown.trim() === DESCRIPTION_TEMPLATE.trim() ? null : markdown;
 		this.changed();
 	}
 

@@ -2,6 +2,9 @@ import type { TaskEntry } from "./TaskDocument";
 
 const INDENT_RE = /^[ \t]*/;
 
+/** A new description starts as one empty point; the point alone is no description. */
+export const DESCRIPTION_TEMPLATE = "- ";
+
 function indentOf(line: string): string {
 	return INDENT_RE.exec(line)![0];
 }
@@ -37,7 +40,8 @@ export function descriptionMarkdown(entry: TaskEntry): string | null {
 		.join("\n");
 }
 
-/** The lines Markdown makes in a task: blank ones would end the task in the file, so they go. */
+/** The lines Markdown makes in a task: blank ones would end the task in the file, so they go; a lone empty point makes none. */
 export function markdownLines(markdown: string): readonly string[] {
+	if (markdown.trim() === DESCRIPTION_TEMPLATE.trim()) return [];
 	return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { UndoHistory } from "../../src/application/UndoHistory";
@@ -130,6 +130,16 @@ describe("writing", () => {
 		expect(store.text).toBe(before);
 		await svc.setDescription(b.key, "- first\n\t- deeper");
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n\t- note\n- [ ] B\n\t- first\n\t\t- deeper\n\n## Soon\n\n## Backlog\n\n## Done\n");
+	});
+
+	it("takes a lone empty point, as the editor starts, for no description", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n\t- note\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		const before = store.text;
+		await svc.setDescription(b.key, DESCRIPTION_TEMPLATE);
+		expect(store.text).toBe(before);
+		await svc.setDescription(a.key, "  -  \n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("rejects a description for a task that changed in the file", async () => {
