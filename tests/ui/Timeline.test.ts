@@ -560,3 +560,35 @@ describe("a timeline beside another day's", () => {
 		expect(view.el.scrollTop).toBe(400);
 	});
 });
+
+describe("an event at the day's edges", () => {
+	const event = (start: Date, end: Date): CalendarEvent => ({ id: "e", title: "E", start, end, allDay: false, calendar: "Work", color: "#0A84FF", source: "google" });
+
+	function spans(boundary: DayBoundary, events: CalendarEvent[]): { start: number; end: number }[] {
+		const view = new Timeline(document.createElement("div"), {
+			theme: () => "dark",
+			date: () => "2026-10-30",
+			today: () => "2026-10-31",
+			boundary: () => boundary,
+			hourPx: () => 56,
+			tasks: () => [],
+			events: () => events,
+			now: () => new Date(2026, 9, 31, 12, 0),
+		});
+		view.render();
+		return (view as unknown as { events: { start: number; end: number }[] }).events.map(({ start, end }) => ({ start, end }));
+	}
+
+	it("is cut where the day begins and ends", () => {
+		expect(spans(DayBoundary.MIDNIGHT, [event(new Date(2026, 9, 29, 22), new Date(2026, 9, 31, 2))])).toEqual([{ start: 0, end: 1440 }]);
+	});
+
+	it("is cut at the edges of a day that starts at four", () => {
+		expect(spans(new DayBoundary(4), [event(new Date(2026, 9, 30, 3), new Date(2026, 9, 31, 5))])).toEqual([{ start: 0, end: 1440 }]);
+		expect(spans(new DayBoundary(4), [event(new Date(2026, 9, 31, 1), new Date(2026, 9, 31, 3))])).toEqual([{ start: 1260, end: 1380 }]);
+	});
+
+	it("stands as it is inside the day", () => {
+		expect(spans(DayBoundary.MIDNIGHT, [event(new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10, 30))])).toEqual([{ start: 540, end: 630 }]);
+	});
+});
