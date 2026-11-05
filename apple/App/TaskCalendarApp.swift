@@ -1,3 +1,4 @@
+import Core
 import SwiftUI
 import UserNotifications
 
@@ -15,6 +16,13 @@ struct TaskCalendarApp: App {
     var body: some Scene {
         WindowGroup {
             SettingsView()
+                .onOpenURL { url in
+                    guard let back = RefreshLink.back(from: url) else { return }
+                    Task {
+                        await AppServices.shared.refresh()
+                        await UIApplication.shared.open(back)
+                    }
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { Refresh.schedule() }

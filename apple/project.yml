@@ -40,3 +40,7 @@ targets:
         NSCalendarsFullAccessUsageDescription: Writes this iPhone's calendars to your vault for Task Calendar
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kudrmax.taskcalendar.refresh
+            CFBundleURLSchemes: [taskcalendar]
+        LSApplicationQueriesSchemes: [obsidian]
