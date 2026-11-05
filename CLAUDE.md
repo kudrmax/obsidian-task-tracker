@@ -10,7 +10,7 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 ## Documentation
 
-`docs/plugin/` is the plugin's documentation: what Max sets up by hand (Scriptable, Shortcuts, Google) and how to check it, in Russian. Not the spec and not the design. A change to anything set up by hand (steps, names, buttons, files) updates these pages in the same branch.
+`docs/plugin/` is the plugin's user documentation, in Russian: `README.md` is the core (what makes this task manager different and how a day goes with it), the inner pages hold the file format, the screen, the actions, calendars, settings, how an agent edits the tasks file, and what Max sets up by hand (Scriptable, Shortcuts, Google) and how to check it. Not the spec and not the design. To learn how the plugin behaves, read these pages, not the code. A change to behaviour a user sees or to anything set up by hand (steps, names, buttons, files) updates these pages in the same branch.
 
 ## Layers
 
