@@ -1,4 +1,4 @@
-import { type CalendarEvent, type DayBoundary, MINUTES_PER_DAY, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
+import { type CalendarEvent, type DayBoundary, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
@@ -607,12 +607,7 @@ export class Timeline {
 
 	/** An event that began before the day or ends after it is cut at the day's edges. */
 	private eventSpan(event: CalendarEvent): Span {
-		const boundary = this.deps.boundary();
-		const date = this.deps.date();
-		return {
-			start: Math.max(0, boundary.offsetOf(date, event.start)),
-			end: Math.min(MINUTES_PER_DAY, boundary.offsetOf(date, event.end)),
-		};
+		return this.deps.boundary().clipToDay(this.deps.date(), event.start, event.end);
 	}
 
 	private placeEvent(event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {

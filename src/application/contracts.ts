@@ -13,6 +13,8 @@ export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 export { sameRule } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
+/** A slot on the timeline moved, as long as it is, to lie within its day. */
+export { clampSlot } from "../domain/DayBoundary";
 /** Minutes in a day: the timeline's length. */
 export { MINUTES_PER_DAY } from "../domain/LocalDate";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */

@@ -10,6 +10,17 @@ export interface Span {
 	readonly end: number | null;
 }
 
+/** The fewest minutes a slot lasts, and a task at a time keeps before its day ends. */
+export const MIN_SLOT_MINUTES = 5;
+
+/** The span moved, as long as it is, to lie within its day; one without a duration starts MIN_SLOT_MINUTES before the day ends at the latest. */
+export function clampSlot(start: number, end: number | null): Span {
+	const duration = end === null ? null : end - start;
+	const latest = MINUTES_PER_DAY - (duration ?? MIN_SLOT_MINUTES);
+	const moved = Math.min(latest, Math.max(0, start));
+	return { start: moved, end: duration === null ? null : moved + duration };
+}
+
 /**
  * Where one day ends and the next begins: at `startHour` o'clock, midnight by default. A day is named by the date it
  * starts on, so with the day starting at 4, 1:30 on the 31st still belongs to the 30th. Slots keep the clock's own date
@@ -40,6 +51,11 @@ export class DayBoundary {
 	/** Minutes from the start of `day` to `at`; negative before it, past 1440 after it. */
 	offsetOf(day: LocalDate, at: Date): number {
 		return this.offsetOfClock(day, localDateOf(at), at.getHours() * HOUR_MINUTES + at.getMinutes());
+	}
+
+	/** Minutes from the start of `day` to `start` and to `end`, cut at the day's edges: an event that began before it or ends after it. */
+	clipToDay(day: LocalDate, start: Date, end: Date): { readonly start: number; readonly end: number } {
+		return { start: Math.max(0, this.offsetOf(day, start)), end: Math.min(MINUTES_PER_DAY, this.offsetOf(day, end)) };
 	}
 
 	/** Minutes from the start of `day` to the start and the end of `slot`. */

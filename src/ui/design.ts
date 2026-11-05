@@ -141,8 +141,6 @@ export const LAYOUT = {
 	 * would otherwise flip between its two sides with every tremor of the finger.
 	 */
 	dropHysteresis: 6,
-	/** The fewest minutes a slot dropped near midnight keeps before it. */
-	minSlotMinutes: 5,
 	/** How far in a task card lies over a long task's body or an event. */
 	overlayInset: 18,
 	/** The steps a drag, a drop and a stretch snap to, finest first: 10 is left out, since tasks start at :15 and :45 more than at :10. */

@@ -67,6 +67,7 @@
   // src/domain/DayBoundary.ts
   var HOUR_MINUTES2 = 60;
   var DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES2;
+  var MIN_SLOT_MINUTES = 5;
   var DayBoundary = class _DayBoundary {
     static {
       this.MIDNIGHT = new _DayBoundary(0);
@@ -87,6 +88,10 @@
     /** Minutes from the start of `day` to `at`; negative before it, past 1440 after it. */
     offsetOf(day, at) {
       return this.offsetOfClock(day, localDateOf(at), at.getHours() * HOUR_MINUTES2 + at.getMinutes());
+    }
+    /** Minutes from the start of `day` to `start` and to `end`, cut at the day's edges: an event that began before it or ends after it. */
+    clipToDay(day, start, end) {
+      return { start: Math.max(0, this.offsetOf(day, start)), end: Math.min(MINUTES_PER_DAY, this.offsetOf(day, end)) };
     }
     /** Minutes from the start of `day` to the start and the end of `slot`. */
     spanOf(slot, day) {
@@ -969,7 +974,6 @@
   }
 
   // src/domain/operations.ts
-  var SLOT_STEP = 5;
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
@@ -1010,7 +1014,7 @@
     return patch(doc, entry, { reminder });
   }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
-    const clamped = boundary.clamp(slot, SLOT_STEP);
+    const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
     const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
     return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");

@@ -1,4 +1,4 @@
-import { DayBoundary } from "./DayBoundary";
+import { DayBoundary, MIN_SLOT_MINUTES } from "./DayBoundary";
 import { localDateOf } from "./LocalDate";
 import type { GroupSettings } from "./Groups";
 import type { EndList, GroupedList, GroupPlace } from "./Lists";
@@ -8,7 +8,6 @@ import { Repeat, type RepeatRule } from "./Repeat";
 import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
-const SLOT_STEP = 5;
 const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
@@ -70,7 +69,7 @@ export function createInSoon(doc: TaskDocument, text: string): TaskDocument {
 }
 
 function createInSlot(doc: TaskDocument, slot: Slot, text: string, priority: string | null, today: LocalDate, boundary: DayBoundary): TaskDocument {
-	const clamped = boundary.clamp(slot, SLOT_STEP);
+	const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
 	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, priority }));
 }
 
@@ -178,7 +177,7 @@ export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskD
 }
 
 function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
-	const clamped = boundary.clamp(slot, SLOT_STEP);
+	const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
 	if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
 	const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
 	return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
