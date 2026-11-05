@@ -20,6 +20,6 @@ export function sourceText(status: SourceStatus, now: Date): SourceText {
 	const relative = day === today ? "today" : day === addDays(today, -1) ? "yesterday" : day ? dayMonth(day) : "";
 	const clock = at ? formatTime(minutesOf(at)) : "";
 	const time = !at ? "" : day === today ? clock : day === addDays(today, -1) ? `Yesterday ${clock}` : `${dayMonth(day!)} ${clock}`;
-	const sub = !status.ok ? status.message : status.source === "work" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
+	const sub = !status.ok ? status.message : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
 	return { name: names.name, short: names.short, sub, time, stale: status.stale };
 }

@@ -1,15 +1,20 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { addDays } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
-import type { CalendarEvent, CalendarService, CalendarSource, DayEvents, SourceStatus } from "./contracts";
+import { CalendarPolling } from "./CalendarPolling";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen, SourceKind, WorkCalendarSetup } from "./contracts";
 import type { EventBatch, EventSource } from "./EventSource";
-import type { Clock, EventCache, SettingsStore } from "./ports";
+import type { Clock, EventCache, KeptDay, KeptStatus, SettingsStore, Timers } from "./ports";
 
 interface SourceResult {
-	readonly status: SourceStatus;
+	readonly status: KeptStatus;
 	readonly events: readonly CalendarEvent[];
 }
 
+/** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
+const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", work: "exported" };
+
+const SECOND_MS = 1000;
 const MINUTE_MS = 60_000;
 /** A source silent this long counts as failed: its last events stay, marked stale, and the next fetch asks it afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
@@ -78,9 +83,9 @@ type Answer =
 
 export class CalendarServiceImpl implements CalendarService {
 	private readonly lastGood = new Map<CalendarSource, EventBatch>();
-	private days: Map<LocalDate, DayEvents> | null = null;
+	private days: Map<LocalDate, KeptDay> | null = null;
 	/** What the device cache holds since its last write (or its first read): a day is written again only for news. */
-	private written = new Map<LocalDate, DayEvents>();
+	private written = new Map<LocalDate, KeptDay>();
 	/** `${source}|${date}`: when a source polled over the network last answered for the day, and under which settings. */
 	private readonly answered = new Map<string, { readonly at: number; readonly key: string }>();
 
@@ -89,9 +94,27 @@ export class CalendarServiceImpl implements CalendarService {
 		private readonly clock: Clock,
 		private readonly settings: SettingsStore,
 		private readonly cache: EventCache,
+		private readonly timers: Timers,
+		/** Refresh now asks the phone for fresh work events before it fetches. */
+		private readonly work: Pick<WorkCalendarSetup, "export">,
 	) {}
 
-	async eventsOn(date: LocalDate): Promise<DayEvents> {
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.cached(date);
+		const shown = cached && this.withKinds(cached);
+		const fresh = (fetch: () => Promise<KeptDay>) => () => fetch().then((day) => this.withKinds(day));
+		if (reason === "refresh") return { cached: shown, fresh: fresh(() => this.eventsOn(date)) };
+		if (reason === "peek" && cached) return { cached: shown, fresh: null };
+		return { cached: shown, fresh: fresh(() => this.eventsAround(date)) };
+	}
+
+	/** Each source's kind, which the kept statuses leave out: the device cache stays as it was. */
+	private withKinds(day: KeptDay): DayEvents {
+		return { events: day.events, statuses: day.statuses.map((status) => ({ ...status, kind: KINDS[status.source] })) };
+	}
+
+	/** Fetches both sources afresh for the day alone. */
+	async eventsOn(date: LocalDate): Promise<KeptDay> {
 		const key = this.answerKey();
 		const window = this.windowOf(date);
 		const answers = await Promise.all(this.sources.map((s) => this.ask(s, window.fetchStart, window.fetchEnd)));
@@ -101,7 +124,11 @@ export class CalendarServiceImpl implements CalendarService {
 		return day;
 	}
 
-	async eventsAround(date: LocalDate): Promise<DayEvents> {
+	/**
+	 * The day and the days next to it, one request per source. A source polled over the network that answered for the
+	 * day less than the refresh interval ago is not asked again: its last answer is shown.
+	 */
+	async eventsAround(date: LocalDate): Promise<KeptDay> {
 		const key = this.answerKey();
 		const dates = [-AROUND_DAYS, 0, AROUND_DAYS].map((n) => addDays(date, n));
 		const windows = dates.map((d) => this.windowOf(d));
@@ -111,14 +138,14 @@ export class CalendarServiceImpl implements CalendarService {
 			this.sources.map((s, i) => (asked[i] ? this.ask(s, windows[0].fetchStart, windows[windows.length - 1].fetchEnd) : Promise.resolve(null))),
 		);
 		const failed = answers.some((a) => a !== null && !a.ok);
-		const dayAt = (n: number): DayEvents | null => {
+		const dayAt = (n: number): KeptDay | null => {
 			const results = answers.map((answer, i) =>
 				answer ? this.shownBy(this.sources[i], dates[n], windows[n], answer) : this.keptResult(this.sources[i].name, dates[n]),
 			);
 			return results.every((r): r is SourceResult => r !== null) ? this.dayOf(windows[n], results) : null;
 		};
 		// A neighbour is kept only when every source answered for it; the day opened goes last, so it is evicted last.
-		const kept: (readonly [LocalDate, DayEvents])[] = [];
+		const kept: (readonly [LocalDate, KeptDay])[] = [];
 		dates.forEach((d, n) => {
 			const day = d === date || failed ? null : dayAt(n);
 			if (day) kept.push([d, day]);
@@ -131,8 +158,8 @@ export class CalendarServiceImpl implements CalendarService {
 		return opened;
 	}
 
-	/** Staleness counts from now: a day cached yesterday shows its orange dot today. */
-	cached(date: LocalDate): DayEvents | null {
+	/** The last result for `date` without a fetch; null when none was kept. Staleness counts from now: a day cached yesterday shows its orange dot today. */
+	cached(date: LocalDate): KeptDay | null {
 		const day = this.lastDay.get(date);
 		if (!day) return null;
 		return { events: day.events, statuses: day.statuses.map((s) => ({ ...s, stale: !s.ok || this.isOld(s.updatedAt) })) };
@@ -143,8 +170,28 @@ export class CalendarServiceImpl implements CalendarService {
 		return () => offs.forEach((off) => off());
 	}
 
+	keepFresh(screen: PolledScreen): CalendarPoll {
+		const polling = new CalendarPolling({
+			refresh: () => screen.refresh(),
+			intervalMs: () => this.settings.get().google.refreshSeconds * SECOND_MS,
+			hidden: () => screen.hidden(),
+			now: () => this.clock.now().getTime(),
+			timers: this.timers,
+		});
+		polling.start();
+		return {
+			wake: () => polling.wake(),
+			catchUp: () => polling.catchUp(),
+			refreshNow: () => {
+				this.work.export();
+				return polling.refresh();
+			},
+			stop: () => polling.stop(),
+		};
+	}
+
 	/** The device cache, read on first use: a start with the view closed reads nothing. */
-	private get lastDay(): Map<LocalDate, DayEvents> {
+	private get lastDay(): Map<LocalDate, KeptDay> {
 		if (!this.days) {
 			this.days = new Map(this.cache.read());
 			this.written = new Map(this.days);
@@ -184,7 +231,7 @@ export class CalendarServiceImpl implements CalendarService {
 		return { events: kept.events, status };
 	}
 
-	private dayOf(window: DayWindow, results: readonly SourceResult[]): DayEvents {
+	private dayOf(window: DayWindow, results: readonly SourceResult[]): KeptDay {
 		const events = results
 			.flatMap((r) => r.events)
 			.filter((e) => window.shows(e))
@@ -229,7 +276,7 @@ export class CalendarServiceImpl implements CalendarService {
 	}
 
 	/** Kept in memory always; written to the device only when a day is new, moved, gone or shows something else. */
-	private remember(days: readonly (readonly [LocalDate, DayEvents])[]): void {
+	private remember(days: readonly (readonly [LocalDate, KeptDay])[]): void {
 		const lastDay = this.lastDay;
 		for (const [date, day] of days) {
 			lastDay.delete(date);
@@ -244,7 +291,7 @@ export class CalendarServiceImpl implements CalendarService {
 		this.written = new Map(lastDay);
 	}
 
-	private worthWriting(days: ReadonlyMap<LocalDate, DayEvents>): boolean {
+	private worthWriting(days: ReadonlyMap<LocalDate, KeptDay>): boolean {
 		if (JSON.stringify([...days.keys()]) !== JSON.stringify([...this.written.keys()])) return true;
 		for (const [date, day] of days) {
 			const written = this.written.get(date);
@@ -253,7 +300,7 @@ export class CalendarServiceImpl implements CalendarService {
 		return false;
 	}
 
-	private status(source: CalendarSource, ok: boolean, message: string, batch: EventBatch | undefined): SourceStatus {
+	private status(source: CalendarSource, ok: boolean, message: string, batch: EventBatch | undefined): KeptStatus {
 		const updatedAt = batch?.updatedAt ?? null;
 		return { source, ok, message, updatedAt, detail: batch?.detail ?? null, stale: !ok || this.isOld(updatedAt) };
 	}
@@ -265,9 +312,9 @@ export class CalendarServiceImpl implements CalendarService {
 }
 
 /** Other events or statuses, or a source's update time moved on by more than a step: a fetch that brought only a new time is not written. */
-function newsIn(written: DayEvents, day: DayEvents): boolean {
+function newsIn(written: KeptDay, day: KeptDay): boolean {
 	if (JSON.stringify(written.events) !== JSON.stringify(day.events)) return true;
-	const withoutTimes = (d: DayEvents) => JSON.stringify(d.statuses.map(({ updatedAt: _u, stale: _s, ...rest }) => rest));
+	const withoutTimes = (d: KeptDay) => JSON.stringify(d.statuses.map(({ updatedAt: _u, stale: _s, ...rest }) => rest));
 	if (withoutTimes(written) !== withoutTimes(day)) return true;
 	return day.statuses.some((status, i) => {
 		const before = written.statuses[i]?.updatedAt ?? null;

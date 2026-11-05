@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DayEvents } from "../../src/application/contracts";
+import type { KeptDay } from "../../src/application/ports";
 import { type DeviceStorage, DeviceEventCache } from "../../src/infrastructure/DeviceEventCache";
 
 class FakeStorage implements DeviceStorage {
@@ -14,7 +14,7 @@ class FakeStorage implements DeviceStorage {
 	}
 }
 
-const DAY: DayEvents = {
+const DAY: KeptDay = {
 	events: [
 		{ id: "1", title: "Standup", start: new Date(2026, 9, 30, 9), end: new Date(2026, 9, 30, 9, 15), allDay: false, calendar: "Work", color: "#0A84FF", source: "work" },
 	],

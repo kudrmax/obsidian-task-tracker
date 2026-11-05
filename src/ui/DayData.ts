@@ -34,6 +34,8 @@ const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 /** No sections to offer: no file, or nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
+const NO_EVENTS: DayEvents = { events: [], statuses: [] };
+
 const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: true } as const;
 
 /**
@@ -43,7 +45,7 @@ const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], section
  */
 export class DayData {
 	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false };
-	private dayEvents: DayEvents = { events: [], statuses: [] };
+	private dayEvents: DayEvents = NO_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
 	private readonly taskReload: Reload<TasksState>;
@@ -55,10 +57,9 @@ export class DayData {
 		this.taskReload = new Reload(() => this.readTasks(), (state, hooks) => this.show(() => (this.state = state), hooks));
 		this.eventReload = new Reload(
 			() => {
-				const date = deps.date();
-				const around = this.around;
+				const ask = deps.calendars.events(deps.date(), this.around ? "open" : "refresh");
 				this.around = false;
-				return around ? deps.calendars.eventsAround(date) : deps.calendars.eventsOn(date);
+				return ask.fresh?.() ?? Promise.resolve(ask.cached ?? NO_EVENTS);
 			},
 			(events, hooks) => this.show(() => (this.dayEvents = events), hooks),
 		);
@@ -136,7 +137,7 @@ export class DayData {
 	}
 
 	private showCached(otherwise: DayEvents): void {
-		this.dayEvents = this.deps.calendars.cached(this.deps.date()) ?? otherwise;
+		this.dayEvents = this.deps.calendars.events(this.deps.date(), "open").cached ?? otherwise;
 	}
 
 	private fetchBoth(): Promise<void> {
@@ -150,12 +151,9 @@ export class DayData {
 	}
 
 	private async readTasks(): Promise<TasksState> {
-		const tasks = this.deps.tasks;
 		const date = this.deps.date();
 		try {
-			await tasks.normalize();
-			const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView(), tasks.doneView(), tasks.listSections(), tasks.sectionOffer(date)]);
-			return { date, day, soon, inbox, backlog, done, sections, offer, missing: false };
+			return { date, ...(await this.deps.tasks.screen(date)), missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;

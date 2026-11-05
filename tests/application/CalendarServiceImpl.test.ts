@@ -5,6 +5,7 @@ import type { EventBatch, EventSource } from "../../src/application/EventSource"
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+import { FakeTimers } from "../fakes/FakeTimers";
 import { MemoryEventCache } from "../fakes/MemoryEventCache";
 
 const FETCHED = new Date(2026, 9, 30, 8, 0);
@@ -44,8 +45,10 @@ class FakeClock implements Clock {
 	}
 }
 
+const NO_EXPORT = { export: () => undefined };
+
 function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes, cache = new MemoryEventCache(), dayStartHour = 0) {
-	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes, dayStartHour }), cache);
+	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes, dayStartHour }), cache, new FakeTimers(), NO_EXPORT);
 }
 
 describe("CalendarServiceImpl", () => {
@@ -267,7 +270,7 @@ describe("CalendarServiceImpl.eventsAround", () => {
 	function around(sources: EventSource[], refreshSeconds = 60, cache = new MemoryEventCache()) {
 		const clock = new FakeClock();
 		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 5, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
-		const svc = new CalendarServiceImpl(sources, clock, settings, cache);
+		const svc = new CalendarServiceImpl(sources, clock, settings, cache, new FakeTimers(), NO_EXPORT);
 		const pass = (ms: number) => (clock.current = new Date(clock.current.getTime() + ms));
 		return { svc, clock, settings, cache, pass };
 	}
@@ -458,5 +461,113 @@ describe("CalendarServiceImpl.eventsAround", () => {
 		expect(cache.reads).toBe(1);
 		svc.cached(D);
 		expect(cache.reads).toBe(1);
+	});
+});
+
+describe("CalendarServiceImpl.keepFresh", () => {
+	function polled(refreshSeconds = 60) {
+		const timers = new FakeTimers();
+		const clock = new FakeClock();
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
+		const order: string[] = [];
+		let hidden = false;
+		const svc = new CalendarServiceImpl([], clock, settings, new MemoryEventCache(), timers, { export: () => order.push("export") });
+		const poll = svc.keepFresh({
+			refresh: async () => {
+				order.push("fetch");
+			},
+			hidden: () => hidden,
+		});
+		return { poll, timers, clock, settings, order, setHidden: (h: boolean) => (hidden = h) };
+	}
+
+	it("starts at once with the refresh interval of the settings, read afresh at every tick", async () => {
+		const t = polled(60);
+		expect(t.timers.delays).toEqual([60_000]);
+		await t.settings.update({ google: { ...DEFAULT_SETTINGS.google, refreshSeconds: 30 } });
+		t.timers.fire();
+		expect(t.order).toEqual(["fetch"]);
+		expect(t.timers.delays).toEqual([30_000]);
+	});
+
+	it("fetches nothing for a screen off view and catches up when it is back", () => {
+		const t = polled();
+		t.setHidden(true);
+		t.timers.fire();
+		expect(t.order).toEqual([]);
+		t.setHidden(false);
+		t.poll.catchUp();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("wakes by the service's clock: under half an interval since the last fetch, nothing", () => {
+		const t = polled(60);
+		t.clock.current = new Date(t.clock.current.getTime() + 29_000);
+		t.poll.wake();
+		expect(t.order).toEqual([]);
+		t.clock.current = new Date(t.clock.current.getTime() + 2_000);
+		t.poll.wake();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("Refresh now asks the phone for work events first, then fetches", async () => {
+		const t = polled();
+		await t.poll.refreshNow();
+		expect(t.order).toEqual(["export", "fetch"]);
+	});
+
+	it("leaves no timer once stopped", () => {
+		const t = polled();
+		t.poll.stop();
+		expect(t.timers.delays).toEqual([]);
+	});
+});
+
+describe("CalendarServiceImpl.events", () => {
+	const DAY = "2026-10-30";
+
+	function counted() {
+		const google = new FakeSource("google", [event("google", "g", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+		const svc = service([google]);
+		return { google, svc };
+	}
+
+	it("asks nothing until the fresh events are asked for", () => {
+		const { google, svc } = counted();
+		for (const reason of ["open", "peek", "refresh"] as const) svc.events(DAY, reason);
+		expect(google.calls).toEqual([]);
+	});
+
+	it("opens a day with the days next to it, and refreshes the day alone", async () => {
+		const { google, svc } = counted();
+		await svc.events(DAY, "open").fresh!();
+		expect(google.calls).toEqual([{ start: new Date(2026, 9, 29), end: new Date(2026, 10, 1) }]);
+		google.calls = [];
+		await svc.events(DAY, "refresh").fresh!();
+		expect(google.calls).toEqual([{ start: new Date(2026, 9, 30), end: new Date(2026, 9, 31) }]);
+	});
+
+	it("gives the cached events at once, and a peek at a day fetched before asks nothing", async () => {
+		const { google, svc } = counted();
+		const first = svc.events(DAY, "peek");
+		expect(first.cached).toBeNull();
+		await first.fresh!();
+		google.calls = [];
+		const again = svc.events(DAY, "peek");
+		expect(again.fresh).toBeNull();
+		expect(again.cached!.events.map((e) => e.id)).toEqual(["g"]);
+		expect(svc.events(DAY, "open").cached!.events).toEqual(svc.cached(DAY)!.events);
+		expect(google.calls).toEqual([]);
+	});
+
+	it("tells each source's kind, cached and fresh, and keeps it out of the device cache", async () => {
+		const google = new FakeSource("google");
+		const work = new FakeSource("work");
+		const cache = new MemoryEventCache();
+		const svc = service([google, work], new FakeClock(), DEFAULT_SETTINGS.staleAfterMinutes, cache);
+		const fresh = await svc.events(DAY, "refresh").fresh!();
+		expect(fresh.statuses.map((s) => [s.source, s.kind])).toEqual([["google", "synced"], ["work", "exported"]]);
+		expect(svc.events(DAY, "open").cached!.statuses.map((s) => s.kind)).toEqual(["synced", "exported"]);
+		expect(cache.days.get(DAY)!.statuses.every((s) => !("kind" in s))).toBe(true);
 	});
 });

@@ -25,6 +25,7 @@ import {
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
+	type ScreenView,
 	type SectionPlace,
 	type SearchHit,
 	type TaskChange,
@@ -128,6 +129,12 @@ export class TaskServiceImpl implements TaskService {
 
 	withPriority(text: string, prefix: string | null): string {
 		return withPriority(text, prefix, this.prefixes());
+	}
+
+	async screen(date: LocalDate): Promise<ScreenView> {
+		await this.normalize();
+		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer(date)]);
+		return { day, soon, inbox, backlog, done, sections, offer };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {

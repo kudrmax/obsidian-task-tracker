@@ -20,7 +20,6 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			calendars: new DemoCalendarService(),
 			settings: this,
 			clock,
-			exportWorkCalendar: () => undefined,
 			openInCalendar: () => undefined,
 			entryLog: vaultEntryLog(this.app.vault.adapter),
 		};
