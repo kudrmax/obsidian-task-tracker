@@ -4,7 +4,7 @@ import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
-import { createServices, type Services, type ServicesHost } from "./application/services";
+import { createServices, type Services, type ServicesHost } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
@@ -46,21 +46,16 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	protected createDeps(clock: Clock = systemClock): ViewDeps {
 		const services = createServices(this.app, this.servicesHost(), this, clock);
 		this.services = services;
-		this.app.workspace.onLayoutReady(() => this.register(services.workExport.keepInstalled()));
+		this.app.workspace.onLayoutReady(() => this.register(services.keepWorkExportInstalled()));
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
-			services.login.receive(params).then(
+			services.receiveLogin(params).then(
 				() => new Notice("Google Calendar: logged in"),
 				(e: unknown) => new Notice(`Google Calendar: ${e instanceof Error ? e.message : String(e)}`),
 			);
 		});
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.addSettingTab(
-			new TaskCalendarSettingsTab(this.app, this, {
-				login: () => services.google.login(),
-				logout: () => services.google.logout(),
-				listCalendars: () => services.googleSource.listCalendars(),
-				scriptableLoader: () => services.workExport.loader,
-			}),
+			new TaskCalendarSettingsTab(this.app, this, { google: services.google, work: services.work }),
 		);
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => window.open(url), runScript: runAppleScript });
 		return {
@@ -69,7 +64,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			calendars: services.calendars,
 			settings: this,
 			clock,
-			exportWorkCalendar: () => services.workShortcut.run(),
+			exportWorkCalendar: () => services.work.export(),
 			openInCalendar: (event) => calendarApp.open(event),
 		};
 	}

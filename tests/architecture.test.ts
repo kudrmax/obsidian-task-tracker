@@ -9,18 +9,6 @@ const ROOT = resolve(__dirname, "..");
  * none is added. A line that no longer occurs fails too, so the list only shrinks.
  */
 const ALLOWED: readonly string[] = [
-	"src/application/services.ts → obsidian",
-	"src/application/services.ts → src/infrastructure/DeviceEventCache.ts",
-	"src/application/services.ts → src/infrastructure/GoogleAuth.ts",
-	"src/application/services.ts → src/infrastructure/GoogleCalendarSource.ts",
-	"src/application/services.ts → src/infrastructure/GoogleRedirectLogin.ts",
-	"src/application/services.ts → src/infrastructure/GoogleToken.ts",
-	"src/application/services.ts → src/infrastructure/ObsidianHttp.ts",
-	"src/application/services.ts → src/infrastructure/VaultPathWatcher.ts",
-	"src/application/services.ts → src/infrastructure/VaultTaskFileStore.ts",
-	"src/application/services.ts → src/infrastructure/WorkCalendarExportScript.ts",
-	"src/application/services.ts → src/infrastructure/WorkCalendarFileSource.ts",
-	"src/application/services.ts → src/infrastructure/WorkCalendarShortcut.ts",
 	"src/phone/PhoneReminders.ts → src/domain/DayBoundary.ts",
 	"src/phone/PhoneReminders.ts → src/domain/LocalDate.ts",
 	"src/phone/PhoneReminders.ts → src/domain/Task.ts",
