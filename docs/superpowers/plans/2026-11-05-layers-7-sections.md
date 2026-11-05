@@ -39,10 +39,10 @@
 **Files:**
 - Create: `tests/application/sections.test.ts`
 
-- [ ] Файл: Inbox (вне секций и секция), Now (подзадача, секции, секция только с задачей на сегодняшнем слоте — нормализация её убирает, две задачи в одной секции), Soon (без даты, с датой позднего дня D, секция только с задачами дня D, секция-заготовка), Backlog (секция), Done. Заготовки с пробелами, пустой и именем «No section».
-- [ ] Выбор: задача Now сегодня, задача в секции, Soon без даты на сегодня и на день D (секция дня D первой), задача Soon с датой D, Inbox, Backlog, подзадача, задача Done — `null`; групповой: две Now (`current` первой, `shared`), две в одной секции, Soon с датой и без на D, Inbox + Soon и задача со своей подзадачей — `null`.
-- [ ] Запись: одна — в существующую, в «No section», в заготовку, где только задача на слоте, в новую заготовку и новое имя, имя «No section» строкой (новая секция), своя секция (новая секция с тем же именем), Soon с датой — дата остаётся, Inbox, Backlog; несколько — в секцию, в свою общую секцию, в «No section» Soon с датой, новую заготовку в Inbox, новое имя.
-- [ ] `npm test` — PASS. Commit.
+- [x] Файл: Inbox (вне секций и секция), Now (подзадача, секции, секция только с задачей на сегодняшнем слоте — нормализация её убирает, две задачи в одной секции), Soon (без даты, с датой позднего дня D, секция только с задачами дня D, секция-заготовка), Backlog (секция), Done. Заготовки с пробелами, пустой и именем «No section».
+- [x] Выбор: задача Now сегодня, задача в секции, Soon без даты на сегодня и на день D (секция дня D первой), задача Soon с датой D, Inbox, Backlog, подзадача, задача Done — `null`; групповой: две Now (`current` первой, `shared`), две в одной секции, Soon с датой и без на D, Inbox + Soon и задача со своей подзадачей — `null`.
+- [x] Запись: одна — в существующую, в «No section», в заготовку, где только задача на слоте, в новую заготовку и новое имя, имя «No section» строкой (новая секция), своя секция (новая секция с тем же именем), Soon с датой — дата остаётся, Inbox, Backlog; несколько — в секцию, в свою общую секцию, в «No section» Soon с датой, новую заготовку в Inbox, новое имя.
+- [x] `npm test` — PASS. Commit.
 
 ### Task 2: Группы списка в `application`
 
@@ -58,9 +58,9 @@ export interface ListView { readonly showsHeaders: boolean; readonly groups: rea
 export function listView(items: readonly TaskItem[], sections: boolean): ListView;
 ```
 
-- [ ] `TaskList` берёт группы и заголовки из `listView`; карточка — секцию своей группы. `listGroups.ts` — только зазоры.
-- [ ] Тесты `listGroups`/`showsHeaders` → `listView` в `tests/application/sections.test.ts`, те же ожидания; плюс список без секций — одна группа, и пустой тоже.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `TaskList` берёт группы и заголовки из `listView`; карточка — секцию своей группы. `listGroups.ts` — только зазоры.
+- [x] Тесты `listGroups`/`showsHeaders` → `listView` в `tests/application/sections.test.ts`, те же ожидания; плюс список без секций — одна группа, и пустой тоже.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 3: Выбор секций и `toSection` в `application`
 
@@ -81,26 +81,26 @@ interface TaskService {
 export function sectionChoice(tasks: readonly TaskItem[], offer: SectionOffer): SectionChoice | null;
 ```
 
-- [ ] `sectionOffer`: `dayList(date)`, Soon без даты, Inbox, Backlog одного документа; для каждого списка — секции его задач в порядке появления, потом заготовки (обрезанные), без повторов, пустых и «No section».
-- [ ] `toSection`: задача по ключу из файла (устаревший ключ — `StaleTaskError`), список — её, дата — её срок для Soon.
-- [ ] Демо: `sectionOffer` — заготовки по умолчанию, `toSection` — ничего.
-- [ ] Характеризующие тесты бегут через `sectionOffer` + `sectionChoice` и `svc.toSection` (копия вида уходит), ожидания те же.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `sectionOffer`: `dayList(date)`, Soon без даты, Inbox, Backlog одного документа; для каждого списка — секции его задач в порядке появления, потом заготовки (обрезанные), без повторов, пустых и «No section».
+- [x] `toSection`: задача по ключу из файла (устаревший ключ — `StaleTaskError`), список — её, дата — её срок для Soon.
+- [x] Демо: `sectionOffer` — заготовки по умолчанию, `toSection` — ничего.
+- [x] Характеризующие тесты бегут через `sectionOffer` + `sectionChoice` и `svc.toSection` (копия вида уходит), ожидания те же.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 4: Вид спрашивает сервис
 
 **Files:**
 - Modify: `src/ui/DayData.ts`, `src/ui/TaskCalendarView.ts`, `src/ui/BulkController.ts`, `src/ui/menu/SectionChooser.ts`, `tests/ui/BulkActions.test.ts`, `tests/ui/DayData.test.ts`
 
-- [ ] `DayData` читает `sectionOffer(date)` вместе со списками, отдаёт `sections`.
-- [ ] Вид: `sectionChoice`, `bulkSections` с `change`, правило дат Soon и список/дата в `sectionsHome` уходят; остаётся `sectionColumn(card)` — колонка карточки, если она показывает секции. Меню: `sectionChoice([item], data.sections)`; «в секцию» и новая секция — `tasks.toSection([item.key], name)`. Групповое: все карточки в колонках с секциями → `sectionChoice(items, …)`, `shared` — по задачам; запись — `toSection(keys, name)`.
-- [ ] `BulkSections` — `{ choice, shared }`; `BulkController` отдаёт `toSection(keys, name)` и отпускает выбор, как сейчас.
-- [ ] `SectionChoice` — тип из контрактов.
-- [ ] `grep -nE "createGroup|moveToGroup|presets|dueDate" src/ui/TaskCalendarView.ts` — секций больше нет; страж — `ALLOWED` по факту.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `DayData` читает `sectionOffer(date)` вместе со списками, отдаёт `sections`.
+- [x] Вид: `sectionChoice`, `bulkSections` с `change`, правило дат Soon и список/дата в `sectionsHome` уходят; остаётся `sectionColumn(card)` — колонка карточки, если она показывает секции. Меню: `sectionChoice([item], data.sections)`; «в секцию» и новая секция — `tasks.toSection([item.key], name)`. Групповое: все карточки в колонках с секциями → `sectionChoice(items, …)`, `shared` — по задачам; запись — `toSection(keys, name)`.
+- [x] `BulkSections` — `{ choice, shared }`; `BulkController` отдаёт `toSection(keys, name)` и отпускает выбор, как сейчас.
+- [x] `SectionChoice` — тип из контрактов.
+- [x] `grep -nE "createGroup|moveToGroup|presets|dueDate" src/ui/TaskCalendarView.ts` — секций больше нет; страж — `ALLOWED` по факту.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 5: Сборки, проверка в тестовом Obsidian, ход работы
 
-- [ ] `npm test`, `npm run build:demo`, `npm run build` — PASS.
-- [ ] Тестовый Obsidian (порт 9371, свой профиль и vault в scratchpad; `basePath` — свой vault): сборка ветки, плагин перезагружен; Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная: меню задачи → секция (те же имена), в секцию, новая секция из меню; на Mac две выбранные → групповое «в секцию»; переименование и удаление секции из её заголовка. Файл после каждого; ошибок плагина в консоли нет; файл задач восстановлен.
-- [ ] Строка 7 в «Ход работы» обзора. Commit.
+- [x] `npm test`, `npm run build:demo`, `npm run build` — PASS.
+- [x] Тестовый Obsidian (порт 9371, свой профиль и vault в scratchpad; `basePath` — свой vault): сборка ветки, плагин перезагружен; Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная: меню задачи → секция (те же имена), в секцию, новая секция из меню; на Mac две выбранные → групповое «в секцию»; переименование и удаление секции из её заголовка. Файл после каждого; ошибок плагина в консоли нет; файл задач восстановлен.
+- [x] Строка 7 в «Ход работы» обзора. Commit.
