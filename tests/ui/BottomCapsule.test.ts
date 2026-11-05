@@ -20,17 +20,19 @@ function service(steps: number) {
 	return undo satisfies UndoService;
 }
 
-const actions = () => ({ onUndo: vi.fn(), onSearch: vi.fn() });
+const actions = () => ({ onUndo: vi.fn(), onSearch: vi.fn(), onSelect: vi.fn() });
 
 describe("BottomCapsule", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 	});
 
-	it("holds Undo and the magnifier in one capsule", () => {
+	const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-panel.is-more .tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
+
+	it("holds Undo and «⋯» in one capsule", () => {
 		new BottomCapsule(document.body, service(0), actions());
 		const capsule = document.querySelector(".tc-capsule")!;
-		expect([...capsule.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Undo", "Search"]);
+		expect([...capsule.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual(["Undo", "More"]);
 	});
 
 	it("Undo stays dim and does nothing while there is nothing to take back", () => {
@@ -54,10 +56,21 @@ describe("BottomCapsule", () => {
 		expect(on.onUndo).toHaveBeenCalledOnce();
 	});
 
-	it("the magnifier opens the search, with or without a step to take back", () => {
+	it("«⋯» opens Search and Select tasks; Search opens the search", () => {
 		const on = actions();
 		new BottomCapsule(document.body, service(0), on);
-		document.querySelector<HTMLButtonElement>(".tc-search-open")!.click();
+		document.querySelector<HTMLButtonElement>(".tc-more-open")!.click();
+		expect([...document.querySelectorAll(".tc-panel.is-more .tc-menu-row")].map((r) => r.textContent?.trim())).toEqual(["Search", "Select tasks"]);
+		row("Search").click();
 		expect(on.onSearch).toHaveBeenCalledOnce();
+		expect(on.onSelect).not.toHaveBeenCalled();
+	});
+
+	it("Select tasks starts picking", () => {
+		const on = actions();
+		new BottomCapsule(document.body, service(0), on);
+		document.querySelector<HTMLButtonElement>(".tc-more-open")!.click();
+		row("Select tasks").click();
+		expect(on.onSelect).toHaveBeenCalledOnce();
 	});
 });

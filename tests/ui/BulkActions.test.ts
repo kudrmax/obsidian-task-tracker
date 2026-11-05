@@ -165,6 +165,78 @@ describe("bulk actions", () => {
 	});
 });
 
+describe("Select tasks", () => {
+	const count = () => document.querySelector<HTMLButtonElement>(".tc-select-count")!;
+
+	it("puts a circle on every card and picks with a plain tap, on the phone too", () => {
+		const bulk = controller({ desktop: () => false });
+		const [a, b] = cards([item(), item()]);
+		bulk.attach(a);
+		expect(a.card.querySelector(".tc-pick")).not.toBeNull();
+		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(false);
+		bulk.start();
+		expect(document.body.classList.contains("is-selecting")).toBe(true);
+		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(true);
+		expect(bulk.pick(b, new MouseEvent("click"), "tap")).toBe(true);
+		expect(bulk.selection.size).toBe(2);
+		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(true);
+		expect(bulk.selection.cards.map((c) => c.item)).toEqual([b.item]);
+		bulk.stop();
+		document.body.replaceChildren();
+	});
+
+	it("counts the picked tasks where the plus stands, dim while none is", () => {
+		const bulk = controller({ desktop: () => false });
+		const [a] = cards([item()]);
+		bulk.start();
+		expect(count().textContent).toBe("0");
+		expect(count().classList.contains("is-off")).toBe(true);
+		bulk.pick(a, new MouseEvent("click"), "tap");
+		expect(count().textContent).toBe("1");
+		expect(count().classList.contains("is-off")).toBe(false);
+		bulk.stop();
+		document.body.replaceChildren();
+	});
+
+	it("keeps the picks on a press elsewhere and on lifting a card not picked; the cross lets them go and stops", () => {
+		const bulk = controller({ desktop: () => false });
+		const [a, b] = cards([item(), item()]);
+		bulk.start();
+		bulk.pick(a, new MouseEvent("click"), "tap");
+		bulk.onPress(document.body);
+		expect(bulk.carried(b.item)).toEqual([]);
+		expect(bulk.selection.size).toBe(1);
+		document.querySelector<HTMLButtonElement>(".tc-select-exit")!.click();
+		expect(bulk.selection.size).toBe(0);
+		expect(document.body.classList.contains("is-selecting")).toBe(false);
+		document.body.replaceChildren();
+	});
+
+	it("opens the menu for them all from the count, and an action ends Select tasks", async () => {
+		const apply = vi.fn(async () => {});
+		const bulk = controller({ desktop: () => false, apply });
+		const [a, b] = cards([item(), item()]);
+		bulk.start();
+		bulk.pick(a, new MouseEvent("click"), "tap");
+		bulk.pick(b, new MouseEvent("click"), "tap");
+		count().click();
+		expect(document.querySelector(".tc-panel.is-bulk.is-over .tc-menu-title")?.textContent).toBe("2 tasks");
+		document.querySelector<HTMLButtonElement>(".tc-panel.is-bulk .tc-menu-tile")!.click();
+		await Promise.resolve();
+		expect(apply).toHaveBeenCalledWith([a, b].map((c) => ({ key: c.item.key, change: { kind: "status", status: "done" } })));
+		expect(bulk.selection.size).toBe(0);
+		expect(document.body.classList.contains("is-selecting")).toBe(false);
+		document.body.replaceChildren();
+	});
+
+	it("ends with Escape", () => {
+		const bulk = controller({ desktop: () => false });
+		bulk.start();
+		bulk.onKey(new KeyboardEvent("keydown", { key: "Escape" }));
+		expect(document.body.classList.contains("is-selecting")).toBe(false);
+	});
+});
+
 describe("the selection across redraws", () => {
 	it("forgets the cards a redraw took away, and keeps the task picked on its new card", () => {
 		const selection = new TaskSelection();
