@@ -1,10 +1,4 @@
-import { type GroupName, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
-
-/** The cards of one section of a list, in file order. */
-export interface ListGroup {
-	readonly name: GroupName;
-	readonly items: readonly TaskItem[];
-}
+import { type GroupName, type ListGroup, samePlace, type TaskKey } from "../application/contracts";
 
 /** Where a card dropped into a gap lands: right before a task, or at the end of a section. */
 export interface GapPlace {
@@ -16,22 +10,6 @@ export interface GapPlace {
 export interface ListGap {
 	readonly place: GapPlace;
 	readonly at: number;
-}
-
-/** The items of each section, the sections in the order they first show; a later day's column lists Now's tasks before Soon's, so a section may show twice. */
-export function listGroups(items: readonly TaskItem[]): readonly ListGroup[] {
-	const groups: { name: GroupName; items: TaskItem[] }[] = [];
-	for (const item of items) {
-		const group = groups.find((g) => g.name === item.group);
-		if (group) group.items.push(item);
-		else groups.push({ name: item.group, items: [item] });
-	}
-	return groups;
-}
-
-/** Headers show once a list has a section; the tasks outside any alone need none (sections spec §5.1). */
-export function showsHeaders(groups: readonly ListGroup[]): boolean {
-	return groups.some((g) => g.name !== null);
 }
 
 /**

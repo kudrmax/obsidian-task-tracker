@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { GroupedList, GroupName, TaskChange, TaskItem, TaskKey } from "../../src/application/contracts";
+import { type GroupedList, type GroupName, listView, type TaskChange, type TaskItem, type TaskKey } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
+import { onDay } from "../fakes/itemOnDay";
 
 /** Today, a later day. */
 const T = "2026-10-30";
@@ -883,5 +884,57 @@ describe("to a section", () => {
 			- [x] X1
 			"
 		`);
+	});
+});
+
+let n = 0;
+const item = (text: string, group: GroupName): TaskItem => onDay({
+	key: { section: "now", index: n++, path: [], raw: `- [ ] ${text}` },
+	text,
+	status: "todo",
+	dueDate: null,
+	slot: null,
+	reminder: "notification",
+	repeat: null,
+	open: true,
+	repeatable: true,
+	priority: null,
+	group,
+	subtasks: [],
+	progress: null,
+	parentText: null, description: null,
+	list: "now",
+	isSubtask: false,
+}, "2026-11-01");
+const grouped = (items: readonly TaskItem[]) => listView(items, true).groups;
+
+describe("listView", () => {
+	it("groups consecutive items by their section", () => {
+		const groups = grouped([item("A", null), item("B", "X"), item("C", "X"), item("D", "Y")]);
+		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["A"]], ["X", ["B", "C"]], ["Y", ["D"]]]);
+	});
+
+	it("gathers a section's tasks where it first shows: a later day lists Now's tasks before Soon's", () => {
+		const groups = grouped([item("N", null), item("A", null), item("M", "Morning"), item("B", null)]);
+		expect(groups.map((g) => [g.name, g.items.map((i) => i.text)])).toEqual([[null, ["N", "A", "B"]], ["Morning", ["M"]]]);
+	});
+
+	it("no headers without a named group", () => {
+		expect(listView([item("A", null), item("B", null)], true).showsHeaders).toBe(false);
+		expect(listView([], true).showsHeaders).toBe(false);
+	});
+
+	it("no header when the only group is ungrouped", () => {
+		expect(listView([item("A", null)], true)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" })] }] });
+	});
+
+	it("a header when the only group is a section", () => {
+		expect(listView([item("A", "Экскурсия")], true).showsHeaders).toBe(true);
+	});
+
+	it("a list that shows no sections: all its tasks outside any, without headers, an empty one too", () => {
+		expect(listView([item("A", null), item("B", "X")], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" }), expect.objectContaining({ text: "B" })] }] });
+		expect(listView([], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [] }] });
+		expect(listView([], true)).toEqual({ showsHeaders: false, groups: [] });
 	});
 });

@@ -18,6 +18,8 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** A list in its sections, and whether it shows their headers. */
+export { listView, type ListGroup, type ListView } from "./sections";
 /** A task's text cut into text and links, or plain, each link by its word. */
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
