@@ -11,6 +11,27 @@ function service(start: Partial<TaskCalendarSettings> = {}) {
 	return { svc: new SettingsServiceImpl(store), now: () => store.get(), writes: () => writes };
 }
 
+describe("editing the labels", () => {
+	it("writes a name typed with spaces as one word of a tag, adds one in a colour no label has", async () => {
+		const { svc, now } = service({ labels: [{ name: "Важное", color: "red" }] });
+		await svc.renameLabel(0, " Важное и срочное ");
+		await svc.addLabel();
+		expect(now().labels).toEqual([{ name: "Важное_и_срочное", color: "red" }, { name: "Label_2", color: "orange" }]);
+		await svc.moveLabel(1, 0);
+		await svc.recolourLabel(0, "#123456");
+		await svc.removeLabel(1);
+		expect(now().labels).toEqual([{ name: "Label_2", color: "#123456" }]);
+	});
+
+	it("writes a tag folder of one word only, and the paint", async () => {
+		const { svc, now } = service();
+		await svc.setLabelTag(" tags ");
+		await svc.setLabelTag("two words");
+		await svc.setLabelPaint("blend");
+		expect([now().labelTag, now().labelPaint]).toEqual(["tags", "blend"]);
+	});
+});
+
 describe("editing the priority levels", () => {
 	const DEFAULT: readonly PriorityLevel[] = [
 		{ prefix: "p1", color: "red" },

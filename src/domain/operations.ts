@@ -12,7 +12,7 @@ const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -130,8 +130,16 @@ export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate 
 	return patch(doc, entry, { dueDate: date });
 }
 
+/** A task has a priority or labels, never both: a priority for a task with labels is not set. */
 export function setPriority(doc: TaskDocument, entry: TaskEntry, priority: string | null): TaskDocument {
+	if (priority !== null && entry.task.labels.length > 0) return doc;
 	return patch(doc, entry, { priority });
+}
+
+/** The task's labels become `labels`; a task with a priority gets none. */
+export function setLabels(doc: TaskDocument, entry: TaskEntry, labels: readonly string[]): TaskDocument {
+	if (labels.length > 0 && entry.task.priority !== null) return doc;
+	return patch(doc, entry, { labels });
 }
 
 export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: ReminderKind): TaskDocument {
@@ -238,7 +246,7 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }), draft, today, boundary));
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, text: draft.text.trim(), priority, ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const changed = { ...entry.task, text: draft.text.trim(), priority: exclusivePriority(entry.task, priority), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -248,7 +256,12 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);
 	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), priority: draft.priority, dueDate }, draft, today, boundary));
+	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), priority: exclusivePriority(entry.task, draft.priority), dueDate }, draft, today, boundary));
+}
+
+/** The priority an edit gives a task: none while it has labels. */
+function exclusivePriority(task: Task, priority: string | null): string | null {
+	return task.labels.length > 0 ? null : priority;
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */

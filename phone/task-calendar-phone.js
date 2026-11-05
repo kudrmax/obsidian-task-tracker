@@ -1,6 +1,33 @@
 // Task Calendar: built from src/phone by `node phone/build.mjs`. Do not edit.
 "use strict";
 (() => {
+  // src/domain/Label.ts
+  function usableLabelName(name) {
+    return /^[^\s#]+$/.test(name);
+  }
+  function usableLabels(labels) {
+    return labels.filter((label, i) => usableLabelName(label.name) && labels.findIndex((l) => l.name === label.name) === i);
+  }
+  function usableLabelTag(tag) {
+    return /^[^\s#/]+$/.test(tag);
+  }
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function labelsOfText(text, tag, names) {
+    if (!usableLabelTag(tag) || names.length === 0) return { labels: [], text };
+    const labels = [];
+    const rest = text.replace(new RegExp(`(^|\\s)#${escapeRegExp(tag)}/(\\S+)(?=\\s|$)`, "g"), (whole, space, name) => {
+      if (!names.includes(name)) return whole;
+      if (!labels.includes(name)) labels.push(name);
+      return space;
+    });
+    return labels.length === 0 ? { labels, text } : { labels, text: rest.replace(/\s{2,}/g, " ").trim() };
+  }
+  function labelTags(tag, labels) {
+    return labels.map((name) => ` #${tag}/${name}`).join("");
+  }
+
   // src/domain/Priority.ts
   function usablePrefix(prefix) {
     return /^\S+$/.test(prefix);
@@ -45,6 +72,9 @@
       { prefix: "p1", color: "red" },
       { prefix: "p2", color: "orange" }
     ],
+    labelTag: "label",
+    labels: [],
+    labelPaint: "stripes",
     groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
     cardHeight: 35,
     cardGap: 2
@@ -436,7 +466,7 @@
     }
     return "todo";
   }
-  function escapeRegExp(s) {
+  function escapeRegExp2(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function slotMarkers(markers) {
@@ -453,10 +483,10 @@
   var FieldSlicer = class {
     constructor(markers) {
       this.kinds = slotMarkers(markers);
-      const alternatives = [...this.kinds.keys()].map(escapeRegExp).join("|");
+      const alternatives = [...this.kinds.keys()].map(escapeRegExp2).join("|");
       this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
-      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
-      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
+      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.dueDate)}\\s+${DATE}$`);
+      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
     }
     slice(body) {
       let text = body;
@@ -517,16 +547,18 @@
     const m = LINE_RE.exec(line);
     if (!m) return null;
     const statusChar = m[3];
-    const fields = fieldSlicerFor(markers).slice(m[4]);
+    const tagged = labelsOfText(m[4], markers.labelTag ?? "", markers.labels ?? []);
+    const fields = fieldSlicerFor(markers).slice(tagged.text);
     return {
       indent: m[1],
       bullet: m[2],
-      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), children: [] }
+      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, children: [] }
     };
   }
   function formatTaskLine(parsed, markers) {
     const { indent, bullet, task } = parsed;
     let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+    if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
     if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
     if (task.slot) {
       const { date, start, end } = task.slot;
@@ -551,7 +583,7 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
   }
   function insertedLines(before, after) {
     let start = 0;
@@ -1076,7 +1108,7 @@
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1316,7 +1348,9 @@
       liveSlot: settings.liveSlotMarker,
       silentSlot: settings.silentSlotMarker,
       repeat: settings.repeatMarker,
-      priorities: usableLevels(settings.priorities).map((l) => l.prefix)
+      priorities: usableLevels(settings.priorities).map((l) => l.prefix),
+      labelTag: settings.labelTag,
+      labels: usableLabels(settings.labels).map((l) => l.name)
     };
   }
   function boundaryOf(settings) {

@@ -96,6 +96,8 @@ function sameTask(a: Task, b: Task): boolean {
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
 		a.priority === b.priority &&
+		a.labels.length === b.labels.length &&
+		a.labels.every((label, i) => label === b.labels[i]) &&
 		(a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&

@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { labelNameOf, usableLabelTag } from "../domain/Label";
+import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CardField, CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 import { formatZoomLevels, parseZoomLevels } from "./zoomLevelsText";
@@ -27,6 +28,9 @@ export class SettingsServiceImpl implements SettingsService {
 				repeatMarker: s.repeatMarker,
 			},
 			priorities: s.priorities,
+			labelTag: s.labelTag,
+			labels: s.labels,
+			labelPaint: s.labelPaint,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
 			cardHeight: s.cardHeight,
@@ -98,6 +102,39 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.saveLevels(moved(this.settings.priorities, from, to));
 	}
 
+	async setLabelTag(tag: string): Promise<void> {
+		const labelTag = tag.trim();
+		if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+	}
+
+	renameLabel(index: number, title: string): Promise<void> {
+		return this.patchLabel(index, { name: labelNameOf(title) });
+	}
+
+	recolourLabel(index: number, color: PriorityColor): Promise<void> {
+		return this.patchLabel(index, { color });
+	}
+
+	removeLabel(index: number): Promise<void> {
+		return this.saveLabels(this.settings.labels.filter((_, i) => i !== index));
+	}
+
+	addLabel(): Promise<void> {
+		const labels = this.settings.labels;
+		let n = labels.length + 1;
+		while (labels.some((l) => l.name === `Label_${n}`)) n++;
+		const color = PRIORITY_COLORS.find((c) => !labels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+		return this.saveLabels([...labels, { name: `Label_${n}`, color }]);
+	}
+
+	moveLabel(from: number, to: number): Promise<void> {
+		return this.saveLabels(moved(this.settings.labels, from, to));
+	}
+
+	setLabelPaint(labelPaint: LabelPaint): Promise<void> {
+		return this.store.update({ labelPaint });
+	}
+
 	renamePreset(index: number, name: string): Promise<void> {
 		return this.savePresets(this.presets.map((preset, i) => (i === index ? name.trim() : preset)));
 	}
@@ -149,6 +186,14 @@ export class SettingsServiceImpl implements SettingsService {
 
 	private saveLevels(priorities: readonly PriorityLevel[]): Promise<void> {
 		return this.store.update({ priorities });
+	}
+
+	private patchLabel(index: number, patch: Partial<LabelLevel>): Promise<void> {
+		return this.saveLabels(this.settings.labels.map((label, i) => (i === index ? { ...label, ...patch } : label)));
+	}
+
+	private saveLabels(labels: readonly LabelLevel[]): Promise<void> {
+		return this.store.update({ labels });
 	}
 
 	private savePresets(presets: readonly string[]): Promise<void> {

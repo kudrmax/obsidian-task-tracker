@@ -1,5 +1,6 @@
 import { Repeat } from "./Repeat";
 import { isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, parseHHMM } from "./LocalDate";
+import { labelsOfText, labelTags } from "./Label";
 import { priorityOfText } from "./Priority";
 
 import { DEFAULT_REMINDER, STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
@@ -14,6 +15,10 @@ export interface Markers {
 	readonly repeat?: string;
 	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
 	readonly priorities?: readonly string[];
+	/** The tag folder of the labels: `label` for `#label/<name>`. */
+	readonly labelTag?: string;
+	/** Names of the labels: a tag `#<labelTag>/<name>` anywhere in the text is that label. */
+	readonly labels?: readonly string[];
 }
 
 export interface ParsedTaskLine {
@@ -128,17 +133,19 @@ export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | 
 	const m = LINE_RE.exec(line);
 	if (!m) return null;
 	const statusChar = m[3];
-	const fields = fieldSlicerFor(markers).slice(m[4]);
+	const tagged = labelsOfText(m[4], markers.labelTag ?? "", markers.labels ?? []);
+	const fields = fieldSlicerFor(markers).slice(tagged.text);
 	return {
 		indent: m[1],
 		bullet: m[2],
-		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), children: [] },
+		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, children: [] },
 	};
 }
 
 export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string {
 	const { indent, bullet, task } = parsed;
 	let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+	if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
 		const { date, start, end } = task.slot;

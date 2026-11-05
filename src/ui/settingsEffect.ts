@@ -1,4 +1,4 @@
-import { sameLevels, type ScreenSettings } from "../application/contracts";
+import { sameLabels, sameLevels, type ScreenSettings } from "../application/contracts";
 
 /** What a change of the settings asks of the screen. */
 export interface SettingsEffect {
@@ -6,7 +6,7 @@ export interface SettingsEffect {
 	readonly restack: boolean;
 	/** The columns shown or their width changed: another view of the calendar set them. */
 	readonly frame: boolean;
-	/** What the screen draws straight from the settings changed: a list's name, No section's, the tasks file's path, the levels. */
+	/** What the screen draws straight from the settings changed: a list's name, No section's, the tasks file's path, the levels, the labels and how a card of several is painted. */
 	readonly drawn: boolean;
 }
 
@@ -20,6 +20,8 @@ export function settingsEffect(before: ScreenSettings, after: ScreenSettings): S
 			before.tasksFile !== after.tasksFile ||
 			!same(before.sections, after.sections) ||
 			before.ungrouped !== after.ungrouped ||
-			!sameLevels(before.priorities, after.priorities),
+			!sameLevels(before.priorities, after.priorities) ||
+			!sameLabels(before.labels, after.labels) ||
+			before.labelPaint !== after.labelPaint,
 	};
 }
