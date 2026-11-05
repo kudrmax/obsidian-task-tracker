@@ -10,7 +10,7 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 ## Documentation
 
-`docs/plugin/` is the plugin's documentation: what Max sets up by hand (Scriptable, Shortcuts, Google) and how to check it, in Russian. Not the spec and not the design. A change to anything set up by hand (steps, names, buttons, files) updates these pages in the same branch.
+`docs/plugin/` is the plugin's user documentation, in Russian: `README.md` is the core (what makes this task manager different and how a day goes with it), the inner pages hold the file format, the screen, the actions, calendars, settings, how an agent edits the tasks file, and what Max sets up by hand (Scriptable, Shortcuts, Google) and how to check it. Not the spec and not the design. To learn how the plugin behaves, read these pages, not the code. A change to behaviour a user sees or to anything set up by hand (steps, names, buttons, files) updates these pages in the same branch.
 
 ## Layers
 
@@ -33,4 +33,8 @@ The release is the task; installing it through BRAT is a try, not a must. If the
 
 ## Files
 
-Delete only with `trash`, never `rm`. Work on branches; `design` holds the docs, `mvp` the implementation.
+Delete only with `trash`, never `rm`.
+
+## Branches
+
+`master` is the only long-lived branch; the main clone stays on it. Every piece of work is a branch from a fresh master in its own worktree under `.worktrees/`. Once Max approves: merge `origin/master` into the branch and run the tests there; then, in the main clone, `git pull --ff-only`, `git merge --no-ff <branch>` and `git push origin master` at once, then the release. No PRs. (`mvp` was removed on 2026-11-05: it only mirrored master.)
