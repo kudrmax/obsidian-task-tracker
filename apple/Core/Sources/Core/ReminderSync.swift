@@ -35,7 +35,8 @@ public protocol CardScheduling: Sendable {
     func shown() async -> [String: Date]
     /// Cards iOS ended or the person swiped away that may still stand on the lock screen.
     func lingering() async -> [String]
-    func show(_ reminder: Reminder) async throws
+    /// `meeting`: the meeting the card offers to wait out, as a notification at the task's start would.
+    func show(_ reminder: Reminder, meeting: AfterEvent?) async throws
     func remove(_ reminderIDs: [String]) async
 }
 
@@ -204,7 +205,7 @@ public actor ReminderSync {
         for reminder in carded where !onCards.contains(reminder.id) {
             // A card iOS refuses is not a failure: the task is told of by a notification instead.
             do {
-                try await cards.show(reminder)
+                try await cards.show(reminder, meeting: AfterEvent.offer(at: max(reminder.start, at), before: reminder.dayEnd, among: meetings))
                 onCards.insert(reminder.id)
             } catch {
                 refusedCard = refusedCard ?? error

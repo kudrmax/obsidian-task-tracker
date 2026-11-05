@@ -17,8 +17,9 @@ final class Cards: CardScheduling {
         Activity<TaskCardAttributes>.activities.filter { [.ended, .dismissed].contains($0.activityState) }.map(\.attributes.reminderID)
     }
 
-    func show(_ reminder: Reminder) async throws {
-        let attributes = TaskCardAttributes(reminderID: reminder.id, title: reminder.title, time: reminder.body, date: reminder.date, start: reminder.start)
+    func show(_ reminder: Reminder, meeting: AfterEvent?) async throws {
+        let offer = meeting.map { TaskCardAttributes.Meeting(name: $0.meeting, left: $0.left, until: $0.until) }
+        let attributes = TaskCardAttributes(reminderID: reminder.id, title: reminder.title, time: reminder.body, date: reminder.date, start: reminder.start, meeting: offer)
         let content = ActivityContent(state: TaskCardAttributes.ContentState(), staleDate: reminder.dayEnd)
         guard reminder.start > Date() else {
             _ = try Activity.request(attributes: attributes, content: content)
@@ -26,6 +27,13 @@ final class Cards: CardScheduling {
         }
         let alert = AlertConfiguration(title: LocalizedStringResource(stringLiteral: reminder.title), body: LocalizedStringResource(stringLiteral: reminder.body), sound: .named("silence.caf"))
         _ = try Activity.request(attributes: attributes, content: content, style: .standard, alertConfiguration: alert, start: reminder.start)
+    }
+
+    /// Done asks first: the card turns into the question, or back from it.
+    static func confirm(_ reminderID: String, asking: Bool) async {
+        for card in Activity<TaskCardAttributes>.activities where card.attributes.reminderID == reminderID {
+            await card.update(ActivityContent(state: TaskCardAttributes.ContentState(confirming: asking), staleDate: card.content.staleDate))
+        }
     }
 
     func remove(_ reminderIDs: [String]) async {

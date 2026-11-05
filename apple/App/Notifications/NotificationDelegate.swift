@@ -6,12 +6,15 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Se
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         guard let reminder = UserNotifications.shownReminder(response.notification.request.content) else { return }
         let services = AppServices.shared
+        if let button = ReminderButton(identifier: response.actionIdentifier) {
+            switch button {
+            case .done: await services.complete(reminder)
+            case .snooze(let minutes): await services.snooze(reminder, minutes: minutes)
+            }
+            return
+        }
         switch response.actionIdentifier {
-        case UserNotifications.Action.done:
-            await services.complete(reminder)
-        case let action where UserNotifications.Action.snoozes[action] != nil:
-            await services.snooze(reminder, minutes: UserNotifications.Action.snoozes[action]!)
-        case UserNotifications.Action.afterEvent:
+        case UserNotifications.afterEvent:
             guard let end = UserNotifications.afterEventEnd(response.notification.request.content) else { return }
             await services.snooze(reminder, until: end)
         case UNNotificationDefaultActionIdentifier:

@@ -69,7 +69,9 @@ actor FakeCards: CardScheduling {
     var ended: [String] = []
     func shown() async -> [String: Date] { cards }
     func lingering() async -> [String] { ended }
-    func show(_ reminder: Reminder) async throws {
+    var meetings: [String: AfterEvent] = [:]
+    func show(_ reminder: Reminder, meeting: AfterEvent?) async throws {
+        meetings[reminder.id] = meeting
         if refuse { throw CocoaError(.featureUnsupported) }
         calls += 1; cards[reminder.id] = reminder.start
     }

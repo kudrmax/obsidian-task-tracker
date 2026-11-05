@@ -17,17 +17,28 @@ public struct CalendarEvent: Equatable, Sendable {
 public struct AfterEvent: Equatable, Hashable, Sendable {
     /// The button's text: the meeting and how long until it ends, from the moment the notification shows.
     public let title: String
+    /// The meeting's name, shortened as the button shows it.
+    public let meeting: String
+    /// How long until the meeting is over, from the moment the notification shows: `1 h 28 min`.
+    public let left: String
     public let until: Date
+
+    init(meeting: String, left: String, until: Date) {
+        self.title = "After \(meeting) (\(left))"
+        self.meeting = meeting
+        self.left = left
+        self.until = until
+    }
 
     static let longestName = 24
 
     /// The meeting under way at `fire`, or else the next to begin; one that ends after `dayEnd` is not offered:
     /// waiting it out would carry the task into the next day.
-    static func offer(at fire: Date, before dayEnd: Date, among events: [CalendarEvent]) -> AfterEvent? {
+    public static func offer(at fire: Date, before dayEnd: Date, among events: [CalendarEvent]) -> AfterEvent? {
         let next = events
             .filter { $0.end > fire && $0.end <= dayEnd }
             .min { ($0.start, $0.end) < ($1.start, $1.end) }
-        return next.map { AfterEvent(title: "After \(name($0.title)) (\(duration(from: fire, to: $0.end)))", until: $0.end) }
+        return next.map { AfterEvent(meeting: name($0.title), left: duration(from: fire, to: $0.end), until: $0.end) }
     }
 
     private static func name(_ title: String) -> String {
