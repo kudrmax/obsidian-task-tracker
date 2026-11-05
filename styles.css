@@ -1234,3 +1234,8 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-hit-desc { white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-hit-card.is-picked, .tc-card.is-found, .tc-block.is-found .tc-block-card { box-shadow: var(--tc-ring-selected); }
 
+
+/* A row of More opens its page: the whole row answers, like Obsidian's own rows that lead on. */
+.setting-item.tc-settings-link { cursor: pointer; }
+/* On its page the rows stand flat, not in Obsidian's cards: a heading starts on their edge. */
+.tc-settings-page .setting-item-heading { padding-inline: 0; }

@@ -68,6 +68,7 @@ async function settled(): Promise<void> {
 }
 
 async function open(file: unknown = START): Promise<void> {
+	document.body.replaceChildren();
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
@@ -75,8 +76,16 @@ async function open(file: unknown = START): Promise<void> {
 	tab.display();
 }
 
+/** The tab's rows, then those of the page open over it. */
 function rows(name: string): HTMLElement[] {
-	return [...tab.containerEl.querySelectorAll<HTMLElement>(".setting-item")].filter((row) => row.querySelector(".setting-item-name")?.textContent === name);
+	return [tab.containerEl, ...document.querySelectorAll<HTMLElement>(".modal")]
+		.flatMap((root) => [...root.querySelectorAll<HTMLElement>(".setting-item")]).filter((row) => row.querySelector(".setting-item-name")?.textContent === name);
+}
+
+/** Opens the page a row of More leads to. */
+function page(name: string): HTMLElement {
+	rows(name)[0].click();
+	return document.querySelector<HTMLElement>(".modal")!;
 }
 
 function input(name: string, nth = 0): HTMLInputElement {
@@ -133,15 +142,18 @@ beforeEach(async () => {
 
 describe("the settings tab: the tasks file", () => {
 	it("writes the path as typed, empty too", async () => {
+		page("Tasks file");
 		await writes(() => type(input("File path"), " Other.md "), { tasksFile: " Other.md " });
 		await writes(() => type(input("File path"), ""), { tasksFile: "" });
 	});
 
 	it("writes a section's name as typed, empty too, keeping the other names", async () => {
-		await writes(() => type(input("Now section"), " Today "), { sections: { ...START.sections, now: " Today " } });
-		await writes(() => type(input("Done section"), ""), { sections: { ...START.sections, now: " Today ", done: "" } });
-		for (const [label, key] of [["Inbox section", "inbox"], ["Soon section", "soon"], ["Backlog section", "backlog"]] as const) {
+		page("Tasks file");
+		await writes(() => type(input("Now"), " Today "), { sections: { ...START.sections, now: " Today " } });
+		await writes(() => type(input("Done"), ""), { sections: { ...START.sections, now: " Today ", done: "" } });
+		for (const [label, key] of [["Inbox", "inbox"], ["Soon", "soon"], ["Backlog", "backlog"]] as const) {
 			await open();
+			page("Tasks file");
 			await writes(() => type(input(label), "X"), { sections: { ...START.sections, [key]: "X" } });
 		}
 	});
@@ -157,6 +169,7 @@ describe("the settings tab: the tasks file", () => {
 		] as const;
 		for (const [label, key] of markers) {
 			await open();
+			page("Tasks file");
 			expect(input(label).value).toBe(START[key]);
 			await writes(() => type(input(label), " ✱"), { [key]: " ✱" });
 		}
@@ -272,19 +285,25 @@ describe("the settings tab: the cards and the timeline", () => {
 	});
 
 	it("writes a count of zero or more, and nothing for anything else", async () => {
-		for (const label of ["Long press delay", "Scroll to hour", "Stale after"] as const) {
+		const pages = { "Long press delay": "Touch and zoom", "Scroll to hour": null, "Stale after": "Calendar connections" } as const;
+		const opened = async (label: keyof typeof pages) => {
+			await open();
+			const name = pages[label];
+			if (name) page(name);
+		};
+		for (const label of Object.keys(pages) as (keyof typeof pages)[]) {
 			for (const bad of ["", "  ", "-1", "abc", "Infinity", "1,5"]) {
-				await open();
+				await opened(label);
 				await rejects(() => type(input(label), bad));
 			}
 		}
-		await open();
+		await opened("Long press delay");
 		await writes(() => type(input("Long press delay"), " 300 "), { longPressMs: 300 });
-		await open();
+		await opened("Scroll to hour");
 		await writes(() => type(input("Scroll to hour"), "0"), { scrollToHour: 0 });
-		await open();
+		await opened("Stale after");
 		await writes(() => type(input("Stale after"), "2.5"), { staleAfterMinutes: 2.5 });
-		await open();
+		await opened("Stale after");
 		await writes(() => type(input("Stale after"), "1e3"), { staleAfterMinutes: 1000 });
 	});
 
@@ -295,18 +314,25 @@ describe("the settings tab: the cards and the timeline", () => {
 	});
 
 	it("writes zoom levels that read, the old text with steps too, and nothing for the rest", async () => {
+		page("Touch and zoom");
 		expect(input("Zoom levels").value).toBe("28, 56, 112, 224");
 		for (const bad of ["", "28, x", "0", "28:", "28,,56"]) {
 			await open();
+			page("Touch and zoom");
 			await rejects(() => type(input("Zoom levels"), bad));
 		}
 		await open();
+		page("Touch and zoom");
 		await writes(() => type(input("Zoom levels"), " 40 , 80"), { zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] });
 		await writes(() => type(input("Zoom levels"), "28:60, 56:30"), { zoomLevels: [{ hourPx: 28 }, { hourPx: 56 }] });
 	});
 });
 
 describe("the settings tab: the calendar sources", () => {
+	beforeEach(() => {
+		page("Calendar connections");
+	});
+
 	it("writes Google's client id and keeps the secret and the token", async () => {
 		expect(input("Client id").value).toBe("id");
 		await writes(() => type(input("Client id"), " other "), { google: { ...START.google, clientId: " other " } });
@@ -325,9 +351,38 @@ describe("the settings tab: the calendar sources", () => {
 	});
 
 	it("writes the work calendar's path as typed and its calendars split at the commas", async () => {
-		await writes(() => type(input("File path", 1), "cal.json"), { workCalendarFile: "cal.json" });
-		await writes(() => type(input("Calendars"), " Work ,, Team ,"), { workCalendarFile: "cal.json", workCalendarTitles: ["Work", "Team"] });
+		await writes(() => type(input("File path"), "cal.json"), { workCalendarFile: "cal.json" });
+		await writes(() => type(input("Calendar titles"), " Work ,, Team ,"), { workCalendarFile: "cal.json", workCalendarTitles: ["Work", "Team"] });
 		await open({ ...START, workCalendarTitles: ["A", "B"] });
-		expect(input("Calendars").value).toBe("A, B");
+		page("Calendar connections");
+		expect(input("Calendar titles").value).toBe("A, B");
+	});
+});
+
+describe("the settings tab: the order", () => {
+	function headings(root: HTMLElement): (string | null)[] {
+		return [...root.querySelectorAll(".setting-item-heading > .setting-item-info > .setting-item-name")].map((name) => name.textContent);
+	}
+
+	it("puts what is changed often first and the set-up-once part on pages under More", () => {
+		expect(headings(tab.containerEl)).toEqual(["Calendars", "Priorities", "Sections", "Display", "More"]);
+		for (const name of ["Tasks file", "Calendar connections", "Touch and zoom"]) expect(rows(name)).toHaveLength(1);
+		for (const name of ["Client id", "Due date marker", "Long press delay", "Zoom levels", "Stale after"]) expect(rows(name)).toHaveLength(0);
+	});
+
+	it("opens a page over the tab with its title, and draws the tab anew once it closes", async () => {
+		const opened = page("Tasks file");
+		expect(opened.querySelector(".modal-title")!.textContent).toBe("Tasks file");
+		await writes(() => type(input("File path"), "Other.md"), { tasksFile: "Other.md" });
+		expect(rows("Tasks file")[0].querySelector(".setting-item-description")!.textContent).toBe(START.tasksFile);
+		opened.querySelector<HTMLElement>(".modal-content")!.parentElement!.remove();
+		expect(rows("Client id")).toHaveLength(0);
+	});
+
+	it("tells where to set the OAuth client up while there is none", async () => {
+		const description = () => rows("Google Calendar")[0].querySelector(".setting-item-description")!.textContent;
+		expect(description()).toContain("Opens the browser");
+		await open({ ...START, google: { ...START.google, clientId: "" } });
+		expect(description()).toContain("Calendar connections");
 	});
 });
