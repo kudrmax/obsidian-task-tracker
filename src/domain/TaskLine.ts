@@ -1,8 +1,7 @@
 import { Repeat } from "./Repeat";
-import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
+import { isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, parseHHMM } from "./LocalDate";
 import { priorityOfText } from "./Priority";
 
-const DAY_MINUTES = 1440;
 import { STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
 
 export interface Markers {
@@ -103,11 +102,11 @@ class FieldSlicer {
 	private slotOf(m: RegExpExecArray): Slot | null {
 		const date = m[2];
 		const start = parseHHMM(m[3]);
-		if (!isValidLocalDate(date) || start === null || start >= DAY_MINUTES) return null;
+		if (!isValidLocalDate(date) || start === null || start >= MINUTES_PER_DAY) return null;
 		if (m[4] === undefined) return { date, start, end: null };
 		const end = parseHHMM(m[4]);
 		if (end === null || start === end) return null;
-		return { date, start, end: end < start ? end + DAY_MINUTES : end };
+		return { date, start, end: end < start ? end + MINUTES_PER_DAY : end };
 	}
 }
 
@@ -142,7 +141,7 @@ export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string
 	if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
 	if (task.slot) {
 		const { date, start, end } = task.slot;
-		line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > DAY_MINUTES ? end - DAY_MINUTES : end)}`}`;
+		line += ` ${markerOf(task.reminder, markers)} ${date} ${minutesToHHMM(start)}${end === null ? "" : `-${minutesToHHMM(end > MINUTES_PER_DAY ? end - MINUTES_PER_DAY : end)}`}`;
 	}
 	if (task.repeat && markers.repeat) line += ` ${markers.repeat} ${task.repeat.format()}`;
 	return line;

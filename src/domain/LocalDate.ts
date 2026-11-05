@@ -3,6 +3,10 @@ import type { LocalDate } from "./Task";
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_RE = /^(\d{2}):(\d{2})$/;
 const DAY_MS = 86_400_000;
+const HOUR_MINUTES = 60;
+
+/** Minutes in a day: the length of the timeline, and the latest a time of day reads. */
+export const MINUTES_PER_DAY = 1440;
 
 function pad2(n: number): string {
 	return n < 10 ? `0${n}` : String(n);
@@ -72,6 +76,6 @@ export function parseHHMM(s: string): number | null {
 	const hours = Number(m[1]);
 	const minutes = Number(m[2]);
 	if (hours > 24 || minutes > 59) return null;
-	const total = hours * 60 + minutes;
-	return total > 1440 ? null : total;
+	const total = hours * HOUR_MINUTES + minutes;
+	return total > MINUTES_PER_DAY ? null : total;
 }

@@ -1,8 +1,8 @@
-import { type CalendarEvent, type DayBoundary, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
+import { type CalendarEvent, type DayBoundary, MINUTES_PER_DAY, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
-import { DESIGN, LAYOUT, PROPERTY } from "./design";
+import { DESIGN, PROPERTY } from "./design";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
 import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
@@ -611,7 +611,7 @@ export class Timeline {
 		const date = this.deps.date();
 		return {
 			start: Math.max(0, boundary.offsetOf(date, event.start)),
-			end: Math.min(LAYOUT.minutesPerDay, boundary.offsetOf(date, event.end)),
+			end: Math.min(MINUTES_PER_DAY, boundary.offsetOf(date, event.end)),
 		};
 	}
 

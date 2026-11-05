@@ -149,7 +149,6 @@ export const LAYOUT = {
 	snapSteps: [5, 15, 30, 60],
 	/** The least a finger moves for one step: under this the snapped time would flicker between neighbours. */
 	snapStepPx: 9,
-	minutesPerDay: 1440,
 	/** A finger let go this fast, px per ms, sends the screen the way it went, however little of the way it was drawn. */
 	swipeFlickSpeed: 0.3,
 	/** Two fingers swept this far on a trackpad within a moment send the screen on at once, as a flick does. */

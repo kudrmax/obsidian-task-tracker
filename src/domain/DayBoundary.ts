@@ -1,9 +1,8 @@
-import { addDays, daysBetween, localDateOf } from "./LocalDate";
+import { addDays, daysBetween, localDateOf, MINUTES_PER_DAY } from "./LocalDate";
 import type { LocalDate, Slot } from "./Task";
 
-const DAY_MINUTES = 1440;
 const HOUR_MINUTES = 60;
-const DAY_HOURS = 24;
+const DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES;
 
 /** Minutes from the start of a day; a null `end` is a task at a time, without a duration. */
 export interface Span {
@@ -52,8 +51,8 @@ export class DayBoundary {
 	/** The slot that takes the minutes from `start` to `end` past the start of `day`, at the clock's date and time. */
 	slotAt(day: LocalDate, start: number, end: number | null): Slot {
 		const clock = this.startMinute + start;
-		const nextDay = clock >= DAY_MINUTES;
-		const slotStart = nextDay ? clock - DAY_MINUTES : clock;
+		const nextDay = clock >= MINUTES_PER_DAY;
+		const slotStart = nextDay ? clock - MINUTES_PER_DAY : clock;
 		return { date: nextDay ? addDays(day, 1) : day, start: slotStart, end: end === null ? null : slotStart + end - start };
 	}
 
@@ -71,13 +70,13 @@ export class DayBoundary {
 	clamp(slot: Slot, stepMinutes: number): Slot {
 		const day = this.dayOfClock(slot.date, Math.max(0, slot.start));
 		const span = this.spanOf(slot, day);
-		if (span.end === null) return this.slotAt(day, Math.max(0, Math.min(span.start, DAY_MINUTES - stepMinutes)), null);
+		if (span.end === null) return this.slotAt(day, Math.max(0, Math.min(span.start, MINUTES_PER_DAY - stepMinutes)), null);
 		let { start, end } = span;
 		if (start < 0) {
 			end -= start;
 			start = 0;
 		}
-		end = Math.min(Math.max(end, stepMinutes), DAY_MINUTES);
+		end = Math.min(Math.max(end, stepMinutes), MINUTES_PER_DAY);
 		start = Math.max(0, Math.min(start, end - stepMinutes));
 		return this.slotAt(day, start, end);
 	}
@@ -87,6 +86,6 @@ export class DayBoundary {
 	}
 
 	private offsetOfClock(day: LocalDate, date: LocalDate, minutes: number): number {
-		return daysBetween(day, date) * DAY_MINUTES + minutes - this.startMinute;
+		return daysBetween(day, date) * MINUTES_PER_DAY + minutes - this.startMinute;
 	}
 }

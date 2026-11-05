@@ -2,7 +2,7 @@ import { LAYOUT } from "../design";
 import { AutoScroll } from "./AutoScroll";
 import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
-import { acceptsDrop } from "../../application/contracts";
+import { acceptsDrop, MINUTES_PER_DAY } from "../../application/contracts";
 import { type DragPayload, type DropResult, type DropTarget, originsOf } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
@@ -54,7 +54,7 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	private show(wanted: number, duration: number | null): void {
-		const latest = LAYOUT.minutesPerDay - (duration ?? LAYOUT.minSlotMinutes);
+		const latest = MINUTES_PER_DAY - (duration ?? LAYOUT.minSlotMinutes);
 		const start = Math.min(latest, Math.max(0, snapMinutes(wanted, this.opts.step())));
 		this.duration = duration;
 		this.start = start;

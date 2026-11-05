@@ -1,6 +1,6 @@
 import { applyOperation, applyOperationAsRead, boundaryOf, readDocument } from "./documentText";
 import type { DayBoundary } from "../domain/DayBoundary";
-import { addDays, minutesToHHMM } from "../domain/LocalDate";
+import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import * as ops from "../domain/operations";
 import { openSlotted } from "../domain/queries";
 import type { LocalDate, Slot } from "../domain/Task";
@@ -8,7 +8,6 @@ import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import { settingsFrom, type TaskCalendarSettings } from "../settings";
 
-const DAY_MINUTES = 1440;
 const HOUR_MINUTES = 60;
 
 /** A task on a time, as the phone reminds of it: from its start until its day ends. */
@@ -88,7 +87,7 @@ export class PhoneReminderService {
 		return {
 			id: entry.raw,
 			title: plainText(entry.task.text),
-			body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % DAY_MINUTES)}`,
+			body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
 			kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
 			date: slot.date,
 			start: clockOf(slot.date, slot.start),
