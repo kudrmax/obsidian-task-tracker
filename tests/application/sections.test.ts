@@ -118,25 +118,26 @@ async function written(day: string, texts: readonly string[], name: GroupName): 
 
 describe("the sections a task's menu offers", () => {
 	it("a task of Now today: the sections its list shows today, then the presets it lacks", async () => {
-		expect(await choice(setup().svc, T, ["N1"])).toEqual({ names: ["Work", "Работа", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: true });
+		expect(await choice(setup().svc, T, ["N1"])).toEqual({ names: ["Work", "Работа", "Пусто", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: true });
 	});
 
-	it("an empty section is offered by none of the menus: they offer the sections of the tasks on the screen", async () => {
-		expect((await choice(setup().svc, T, ["N3"]))?.names).not.toContain("Пусто");
-		expect((await choice(setup().svc, T, ["S1"]))?.names).not.toContain("Empty");
+	it("an empty section is offered too, where its column draws it", async () => {
+		expect((await choice(setup().svc, T, ["N3"]))?.names).toEqual(["Work", "Работа", "Пусто", "Morning", "Afternoon", "Evening"]);
+		expect((await choice(setup().svc, T, ["S1"]))?.names).toEqual(["Later", "Morning", "Empty", "Afternoon", "Evening"]);
+		expect((await choice(setup().svc, D, ["S1"]))?.names).toEqual(["Trip", "Later", "Morning", "Empty", "Afternoon", "Evening"]);
 	});
 
 	it("a task in a section: that one is current", async () => {
 		expect((await choice(setup().svc, T, ["N3"]))?.current).toBe("Work");
 	});
 
-	it("a task of Soon today: the sections of Soon without a date; one with only another day's tasks is none of them", async () => {
-		expect(await choice(setup().svc, T, ["S1"])).toEqual({ names: ["Later", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: true });
+	it("a task of Soon today: the sections of Soon without a date; one with only another day's tasks is none of them, an empty one is", async () => {
+		expect(await choice(setup().svc, T, ["S1"])).toEqual({ names: ["Later", "Morning", "Empty", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: true });
 	});
 
 	it("a task of Soon on a later day: that day's sections first, then those of Soon without a date", async () => {
-		expect((await choice(setup().svc, D, ["S1"]))?.names).toEqual(["Trip", "Later", "Morning", "Afternoon", "Evening"]);
-		expect((await choice(setup().svc, D, ["SD"]))?.names).toEqual(["Trip", "Later", "Morning", "Afternoon", "Evening"]);
+		expect((await choice(setup().svc, D, ["S1"]))?.names).toEqual(["Trip", "Later", "Morning", "Empty", "Afternoon", "Evening"]);
+		expect((await choice(setup().svc, D, ["SD"]))?.names).toEqual(["Trip", "Later", "Morning", "Empty", "Afternoon", "Evening"]);
 		expect((await choice(setup().svc, D, ["ST"]))?.current).toBe("Trip");
 	});
 
@@ -151,9 +152,9 @@ describe("the sections a task's menu offers", () => {
 	});
 
 	it("several: the first one's section current, shared when all stand in it", async () => {
-		expect(await choice(setup().svc, T, ["N1", "N3"])).toEqual({ names: ["Work", "Работа", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: false });
+		expect(await choice(setup().svc, T, ["N1", "N3"])).toEqual({ names: ["Work", "Работа", "Пусто", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: false });
 		expect(await choice(setup().svc, T, ["N3", "N3b"])).toMatchObject({ current: "Work", shared: true });
-		expect(await choice(setup().svc, D, ["SD", "S1"])).toMatchObject({ names: ["Trip", "Later", "Morning", "Afternoon", "Evening"], current: null, shared: true });
+		expect(await choice(setup().svc, D, ["SD", "S1"])).toMatchObject({ names: ["Trip", "Later", "Morning", "Empty", "Afternoon", "Evening"], current: null, shared: true });
 	});
 
 	it("several: none across lists, with a subtask or a done task", async () => {
@@ -256,50 +257,8 @@ describe("to a section", () => {
 		`);
 	});
 
-	it("one task into its own section, as New section with its name: at the end of it", async () => {
-		expect(await written(T, ["N3"], "Work")).toMatchInlineSnapshot(`
-			"## Inbox
-
-			- [ ] I1
-			- [ ] I2
-			### Ideas
-			- [ ] I3
-
-			## Now
-
-			- [ ] N1
-				- [ ] N1a
-			- [ ] NE ⏰ 2026-10-30 19:00-20:00
-			### Work
-			- [ ] N3b
-			- [ ] N3 📅 2026-10-30
-			### Работа
-			- [ ] N4
-			### Пусто
-
-			## Soon
-
-			- [ ] S1
-			- [ ] SD 📅 2026-11-03
-			### Later
-			- [ ] S2
-			### Trip
-			- [ ] ST 📅 2026-11-03
-			### Morning
-			- [ ] SM
-			### Empty
-
-			## Backlog
-
-			- [ ] B1
-			### Someday
-			- [ ] B2
-
-			## Done
-
-			- [x] X1
-			"
-		`);
+	it("one task into its own section, as New section with its name: nothing written", async () => {
+		expect(await written(T, ["N3"], "Work")).toBe(FILE);
 	});
 
 	it("one task into a preset whose heading held only a task on the timeline, which the file puts outside any section", async () => {
@@ -889,50 +848,13 @@ describe("to a section", () => {
 		`);
 	});
 
-	it("several into the section they share", async () => {
-		expect(await written(T, ["N3b", "N3"], "Work")).toMatchInlineSnapshot(`
-			"## Inbox
+	it("several into the section they share: nothing written", async () => {
+		expect(await written(T, ["N3b", "N3"], "Work")).toBe(FILE);
+	});
 
-			- [ ] I1
-			- [ ] I2
-			### Ideas
-			- [ ] I3
-
-			## Now
-
-			- [ ] N1
-				- [ ] N1a
-			- [ ] NE ⏰ 2026-10-30 19:00-20:00
-			### Work
-			- [ ] N3 📅 2026-10-30
-			- [ ] N3b 📅 2026-10-30
-			### Работа
-			- [ ] N4
-			### Пусто
-
-			## Soon
-
-			- [ ] S1
-			- [ ] SD 📅 2026-11-03
-			### Later
-			- [ ] S2
-			### Trip
-			- [ ] ST 📅 2026-11-03
-			### Morning
-			- [ ] SM
-			### Empty
-
-			## Backlog
-
-			- [ ] B1
-			### Someday
-			- [ ] B2
-
-			## Done
-
-			- [x] X1
-			"
-		`);
+	it("several, some already in the section: only the others move, the rest stay where they are", async () => {
+		const text = await written(T, ["N3", "N4"], "Work");
+		expect(text).toContain(["### Work", "- [ ] N3", "- [ ] N3b", "- [ ] N4 📅 2026-10-30", "### Пусто"].join("\n"));
 	});
 
 	it("several of Soon out of their sections, each keeping its due date", async () => {

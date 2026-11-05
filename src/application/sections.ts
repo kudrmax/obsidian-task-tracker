@@ -54,6 +54,12 @@ function withEmptySections(groups: readonly ListGroup[], sections: readonly List
 	return drawn;
 }
 
+/** The sections of tasks on a screen, in the order they show, with the list's empty sections where its column draws them. */
+export function shownSections(groups: readonly GroupName[], sections: readonly ListSection[]): readonly GroupName[] {
+	const shown = groups.reduce<ListGroup[]>((all, name) => (all.some((g) => g.name === name) ? all : [...all, { name, items: [] }]), []);
+	return withEmptySections(shown, sections).map((g) => g.name);
+}
+
 /** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */
 export interface SectionChoice {
 	/** The sections the list has, in its order, then the presets it lacks, in the settings' order. */
@@ -65,7 +71,8 @@ export interface SectionChoice {
 
 /**
  * The sections a task's menu offers in each list, read with the screen of a day: those the list's tasks on the screen stand
- * in, in the order they show (the day column first, then Soon, Inbox and Backlog), then the presets it lacks.
+ * in, in the order they show (the day column first, then Soon, Inbox and Backlog), the list's empty sections where they
+ * show, then the presets it lacks.
  */
 export interface SectionOffer {
 	readonly lists: Readonly<Record<GroupedList, readonly string[]>>;
