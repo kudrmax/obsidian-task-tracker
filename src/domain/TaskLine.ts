@@ -9,6 +9,7 @@ export interface Markers {
 	/** Precedes a slot that rings as a notification; also the marker written when a kind has none of its own. */
 	readonly slot: string;
 	readonly alarmSlot?: string;
+	readonly liveSlot?: string;
 	readonly silentSlot?: string;
 	readonly repeat?: string;
 	/** Prefixes of the priority levels: a line whose text starts with one of them, then more text, has that priority. */
@@ -38,14 +39,14 @@ function escapeRegExp(s: string): string {
 
 function slotMarkers(markers: Markers): ReadonlyMap<string, ReminderKind> {
 	const kinds = new Map<string, ReminderKind>();
-	for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.silentSlot, "none"]] as const) {
+	for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.liveSlot, "live"], [markers.silentSlot, "none"]] as const) {
 		if (marker && !kinds.has(marker)) kinds.set(marker, kind);
 	}
 	return kinds;
 }
 
 function markerOf(kind: ReminderKind, markers: Markers): string {
-	const own = kind === "alarm" ? markers.alarmSlot : kind === "none" ? markers.silentSlot : markers.slot;
+	const own = { notification: markers.slot, alarm: markers.alarmSlot, live: markers.liveSlot, none: markers.silentSlot }[kind];
 	return own || markers.slot;
 }
 
@@ -114,7 +115,7 @@ const slicers = new Map<string, FieldSlicer>();
 
 /** The slicer for these markers, compiled once per pair of markers. */
 export function fieldSlicerFor(markers: Markers): FieldSlicer {
-	const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\u0000");
+	const key = [markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\u0000");
 	let slicer = slicers.get(key);
 	if (!slicer) {
 		slicer = new FieldSlicer(markers);

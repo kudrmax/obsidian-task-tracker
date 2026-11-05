@@ -35,7 +35,7 @@ describe("settingsEffect", () => {
 	});
 
 	it("nothing for the marks and the presets, which only read the tasks anew, nor for the hour the day starts at: the services tell", () => {
-		for (const patch of [{ repeatMarker: "↻" }, { dueDateMarker: "🗓" }, { slotMarker: "🕐" }, { alarmSlotMarker: "🔔" }, { silentSlotMarker: "🤫" }, { groups: { ...before.groups, presets: ["Night"] } }, { dayStartHour: 3 }]) {
+		for (const patch of [{ repeatMarker: "↻" }, { dueDateMarker: "🗓" }, { slotMarker: "🕐" }, { alarmSlotMarker: "🔔" }, { liveSlotMarker: "🪧" }, { silentSlotMarker: "🤫" }, { groups: { ...before.groups, presets: ["Night"] } }, { dayStartHour: 3 }]) {
 			expect(after(patch)).toEqual(NOTHING);
 		}
 	});

@@ -58,7 +58,7 @@ function repeatRow(rule: RepeatRule | null): EditRow {
 
 export type { SectionChoice } from "./SectionChooser";
 
-const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", none: "Off" };
+const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", live: "Live Activity", none: "Off" };
 
 /** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
 export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {

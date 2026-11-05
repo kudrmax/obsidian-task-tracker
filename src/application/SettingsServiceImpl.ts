@@ -22,6 +22,7 @@ export class SettingsServiceImpl implements SettingsService {
 				dueDateMarker: s.dueDateMarker,
 				slotMarker: s.slotMarker,
 				alarmSlotMarker: s.alarmSlotMarker,
+				liveSlotMarker: s.liveSlotMarker,
 				silentSlotMarker: s.silentSlotMarker,
 				repeatMarker: s.repeatMarker,
 			},

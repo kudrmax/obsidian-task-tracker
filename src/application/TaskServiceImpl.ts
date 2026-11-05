@@ -557,9 +557,9 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, dayStartHour } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, prefixes, dayStartHour]);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, prefixes, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {

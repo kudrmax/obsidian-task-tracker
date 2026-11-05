@@ -11,12 +11,14 @@ describe("PhoneReminderService.reminders", () => {
 			"- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00",
 			"- [ ] Wake 🚨 2026-11-04 12:00",
 			"- [ ] Quiet 🔕 2026-11-04 13:00",
+			"- [ ] Pinned 📌 2026-11-04 13:30",
 			"- [x] Closed ⏰ 2026-11-04 14:00",
 		);
 		const list = phone.reminders(text, at(4, 9));
 		expect(list.map((r) => [r.title, r.body, r.kind, r.date])).toEqual([
 			["Call Mom", "10:00–11:00", "notification", "2026-11-04"],
 			["Wake", "12:00", "alarm", "2026-11-04"],
+			["Pinned", "13:30", "live", "2026-11-04"],
 		]);
 		expect(list[0].start).toEqual(at(4, 10));
 		expect(list[0].id).toBe("- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00");

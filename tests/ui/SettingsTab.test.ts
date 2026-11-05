@@ -151,6 +151,7 @@ describe("the settings tab: the tasks file", () => {
 			["Due date marker", "dueDateMarker"],
 			["Slot marker", "slotMarker"],
 			["Alarm marker", "alarmSlotMarker"],
+			["Live Activity marker", "liveSlotMarker"],
 			["No-reminder marker", "silentSlotMarker"],
 			["Repeat marker", "repeatMarker"],
 		] as const;

@@ -22,6 +22,7 @@
     dueDateMarker: "📅",
     slotMarker: "⏰",
     alarmSlotMarker: "🚨",
+    liveSlotMarker: "📌",
     silentSlotMarker: "🔕",
     repeatMarker: "🔁",
     workCalendarFile: "calendar/work.json",
@@ -439,13 +440,13 @@
   }
   function slotMarkers(markers) {
     const kinds = /* @__PURE__ */ new Map();
-    for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.silentSlot, "none"]]) {
+    for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.liveSlot, "live"], [markers.silentSlot, "none"]]) {
       if (marker && !kinds.has(marker)) kinds.set(marker, kind);
     }
     return kinds;
   }
   function markerOf(kind, markers) {
-    const own = kind === "alarm" ? markers.alarmSlot : kind === "none" ? markers.silentSlot : markers.slot;
+    const own = { notification: markers.slot, alarm: markers.alarmSlot, live: markers.liveSlot, none: markers.silentSlot }[kind];
     return own || markers.slot;
   }
   var FieldSlicer = class {
@@ -503,7 +504,7 @@
   };
   var slicers = /* @__PURE__ */ new Map();
   function fieldSlicerFor(markers) {
-    const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\0");
+    const key = [markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\0");
     let slicer = slicers.get(key);
     if (!slicer) {
       slicer = new FieldSlicer(markers);
@@ -1308,6 +1309,7 @@
       dueDate: settings.dueDateMarker,
       slot: settings.slotMarker,
       alarmSlot: settings.alarmSlotMarker,
+      liveSlot: settings.liveSlotMarker,
       silentSlot: settings.silentSlotMarker,
       repeat: settings.repeatMarker,
       priorities: usableLevels(settings.priorities).map((l) => l.prefix)
@@ -1460,7 +1462,7 @@
         id: entry.raw,
         title: plainText(entry.task.text),
         body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
-        kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
+        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
         date: slot.date,
         start: clockOf(slot.date, slot.start),
         dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES4)

@@ -77,6 +77,7 @@ describe("the edit group", () => {
 		const rows = editRows(item({ description: "- note", slot, reminder: "alarm" }));
 		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["repeat", ""], ["subtask", ""]]);
 		expect(editRows(item({ description: "- note", slot, reminder: "none" }))[1].value).toBe("Off");
+		expect(editRows(item({ description: "- note", slot, reminder: "live" }))[1].value).toBe("Live Activity");
 		expect(editRows(item({ description: "- note", slot }))[1].value).toBe("Notification");
 	});
 
@@ -423,7 +424,7 @@ describe("the menu", () => {
 	it("sets the next reminder's kind on a tap on Reminder", () => {
 		const actions = open(item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder: "alarm" }));
 		row("Reminder").click();
-		expect(actions.setReminder).toHaveBeenCalledWith("none");
+		expect(actions.setReminder).toHaveBeenCalledWith("live");
 	});
 
 	it("starts and stops the progress from its tile", () => {

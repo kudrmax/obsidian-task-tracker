@@ -19,6 +19,7 @@ const MARKERS: readonly (readonly [Marker, string, string])[] = [
 	["dueDateMarker", "Due date marker", "Precedes the due date on a task line."],
 	["slotMarker", "Slot marker", "Precedes the time slot on a task line."],
 	["alarmSlotMarker", "Alarm marker", "Precedes the time slot of a task that rings as an alarm on the phone."],
+	["liveSlotMarker", "Live Activity marker", "Precedes the time slot of a task the phone shows as a Live Activity on the lock screen."],
 	["silentSlotMarker", "No-reminder marker", "Precedes the time slot of a task the phone does not remind of."],
 	["repeatMarker", "Repeat marker", "Precedes the repeat rule on a task line."],
 ];

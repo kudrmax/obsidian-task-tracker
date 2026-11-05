@@ -81,7 +81,7 @@ describe("SettingsServiceImpl", () => {
 		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
 		const form = service({ google, workCalendarTitles: ["A", "B"] }).svc.form();
 		expect(form).toMatchObject({ zoomLevels: "28, 56, 112, 224", workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
-		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", silentSlotMarker: "🔕", repeatMarker: "🔁" });
+		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕", repeatMarker: "🔁" });
 		expect(JSON.stringify(form)).not.toMatch(/secret|token/);
 	});
 
