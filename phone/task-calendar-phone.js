@@ -1,6 +1,112 @@
 // Task Calendar: built from src/phone by `node phone/build.mjs`. Do not edit.
 "use strict";
 (() => {
+  // src/domain/Priority.ts
+  function usablePrefix(prefix) {
+    return /^\S+$/.test(prefix);
+  }
+  function usableLevels(levels) {
+    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+  }
+  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+  function priorityOfText(text, prefixes) {
+    const m = FIRST_WORD_RE.exec(text);
+    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+    return { priority: m[1], text: m[2] };
+  }
+
+  // src/settings.ts
+  var DEFAULT_SETTINGS = {
+    tasksFile: "TODOs Tasks.md",
+    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
+    dueDateMarker: "📅",
+    slotMarker: "⏰",
+    alarmSlotMarker: "🚨",
+    silentSlotMarker: "🔕",
+    repeatMarker: "🔁",
+    workCalendarFile: "calendar/work.json",
+    workCalendarTitles: [],
+    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
+    longPressMs: 250,
+    zoom: 56,
+    zoomLevels: [
+      { hourPx: 28 },
+      { hourPx: 56 },
+      { hourPx: 112 },
+      { hourPx: 224 }
+    ],
+    scrollToHour: 9,
+    dayStartHour: 5,
+    listShare: 0.5,
+    rightMode: "calendar",
+    staleAfterMinutes: 180,
+    priorities: [
+      { prefix: "p1", color: "red" },
+      { prefix: "p2", color: "orange" }
+    ],
+    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
+    cardHeight: 35,
+    cardGap: 2
+  };
+  function settingsFrom(saved) {
+    const s = saved ?? {};
+    return {
+      ...DEFAULT_SETTINGS,
+      ...s,
+      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
+      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
+      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
+    };
+  }
+
+  // src/application/calendarFile.ts
+  var GOOGLE_CALENDAR_FILE = "calendar/google.json";
+  var DEFAULT_COLOR = { google: "#4285F4", work: "#0A84FF" };
+  function readCalendarFile(text, source, calendars = []) {
+    const content = JSON.parse(text);
+    const wanted = calendars.map((c) => c.trim().toLowerCase()).filter((c) => c !== "");
+    const events = (content.events ?? []).filter((e) => wanted.length === 0 || wanted.includes(e.calendar.toLowerCase())).map((e) => ({
+      id: e.id,
+      title: e.title,
+      start: new Date(e.start),
+      end: new Date(e.end),
+      allDay: e.allDay,
+      calendar: e.calendar,
+      color: e.color ?? DEFAULT_COLOR[source],
+      source
+    }));
+    return { events, exportedAt: new Date(content.exportedAt), device: content.device ?? null };
+  }
+
+  // src/application/PhoneMeetingService.ts
+  var PhoneMeetingService = class {
+    constructor(settingsJson) {
+      this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
+    }
+    /** The files' paths in the vault, in the order `between` takes their texts. */
+    files() {
+      return this.sources().map((s) => s.path);
+    }
+    /** The timed meetings that overlap `from`–`to`; a file missing (`null`) or unreadable adds none. */
+    between(texts, from, to) {
+      return this.sources().flatMap((source, i) => {
+        const text = texts[i];
+        if (text === null || text === void 0) return [];
+        try {
+          return readCalendarFile(text, source.name, source.calendars).events;
+        } catch {
+          return [];
+        }
+      }).filter((e) => !e.allDay && e.start < to && e.end > from).sort((a, b) => a.start.getTime() - b.start.getTime()).map((e) => ({ title: e.title, start: e.start, end: e.end }));
+    }
+    sources() {
+      return [
+        { name: "google", path: GOOGLE_CALENDAR_FILE, calendars: [] },
+        { name: "work", path: this.settings.workCalendarFile, calendars: this.settings.workCalendarTitles }
+      ];
+    }
+  };
+
   // src/domain/LocalDate.ts
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var TIME_RE = /^(\d{2}):(\d{2})$/;
@@ -317,20 +423,6 @@
       }
     }
   };
-
-  // src/domain/Priority.ts
-  function usablePrefix(prefix) {
-    return /^\S+$/.test(prefix);
-  }
-  function usableLevels(levels) {
-    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
-  }
-  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
-  function priorityOfText(text, prefixes) {
-    const m = FIRST_WORD_RE.exec(text);
-    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
-    return { priority: m[1], text: m[2] };
-  }
 
   // src/domain/TaskLine.ts
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
@@ -1210,50 +1302,6 @@
     return result.serialize() === doc.serialize() ? doc : result;
   }
 
-  // src/settings.ts
-  var DEFAULT_SETTINGS = {
-    tasksFile: "TODOs Tasks.md",
-    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
-    dueDateMarker: "📅",
-    slotMarker: "⏰",
-    alarmSlotMarker: "🚨",
-    silentSlotMarker: "🔕",
-    repeatMarker: "🔁",
-    workCalendarFile: "calendar/work.json",
-    workCalendarTitles: [],
-    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
-    longPressMs: 250,
-    zoom: 56,
-    zoomLevels: [
-      { hourPx: 28 },
-      { hourPx: 56 },
-      { hourPx: 112 },
-      { hourPx: 224 }
-    ],
-    scrollToHour: 9,
-    dayStartHour: 5,
-    listShare: 0.5,
-    rightMode: "calendar",
-    staleAfterMinutes: 180,
-    priorities: [
-      { prefix: "p1", color: "red" },
-      { prefix: "p2", color: "orange" }
-    ],
-    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-    cardHeight: 35,
-    cardGap: 2
-  };
-  function settingsFrom(saved) {
-    const s = saved ?? {};
-    return {
-      ...DEFAULT_SETTINGS,
-      ...s,
-      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
-      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
-      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
-    };
-  }
-
   // src/application/documentText.ts
   function markersOf(settings) {
     return {
@@ -1425,10 +1473,15 @@
     const { start, dayEnd, ...rest } = r;
     return { ...rest, startMs: start.getTime(), dayEndMs: dayEnd.getTime() };
   }
+  function wireMeeting(m) {
+    return { title: m.title, startMs: m.start.getTime(), endMs: m.end.getTime() };
+  }
   globalThis.TaskCalendarPhone = {
     reminders: (text, settingsJson, nowMs) => new PhoneReminderService(settingsJson).reminders(text, new Date(nowMs)).map(wire),
     complete: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).complete(text, id, new Date(nowMs)),
     silence: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).silence(text, id, new Date(nowMs)),
-    snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs))
+    snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs)),
+    calendarFiles: (settingsJson) => new PhoneMeetingService(settingsJson).files(),
+    meetings: (settingsJson, texts, fromMs, toMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs)).map(wireMeeting)
   };
 })();
