@@ -1,5 +1,6 @@
 import { type DayView, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
+import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
@@ -130,6 +131,8 @@ export class DemoTaskService implements TaskService {
 			group: null,
 			list: section,
 			isSubtask: false,
+			day: dayOfTask(section, t, this.today()),
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()) },
 		};
 	}
 
@@ -197,15 +200,21 @@ export class DemoTaskService implements TaskService {
 		if (place.kind === "slot") {
 			added.slot = place.slot;
 			this.sections[place.slot.date === this.today() ? "now" : "soon"].push(added);
-		} else if (place.kind === "list") {
-			if (place.list === "now") added.dueDate = place.date ?? this.today();
-			else if (place.list === "soon" && place.date && place.date > this.today()) added.dueDate = place.date;
-			const list = this.sections[place.list];
-			const at = place.before && place.before.section === place.list ? place.before.index : list.length;
+		} else if (place.kind === "list" || place.kind === "day") {
+			const { list: target, date } = place.kind === "day" ? this.listOfDay(place.date) : { list: place.list, date: place.date };
+			if (target === "now") added.dueDate = date ?? this.today();
+			else if (target === "soon" && date && date > this.today()) added.dueDate = date;
+			const list = this.sections[target];
+			const at = place.before && place.before.section === target ? place.before.index : list.length;
 			list.splice(at, 0, added);
 		}
 		this.changed();
 		return this.keyOf(added);
+	}
+
+	private listOfDay(day: LocalDate): { readonly list: "now" | "soon"; readonly date: LocalDate | undefined } {
+		const { list, date } = this.dayColumn(day);
+		return { list, date: date ?? undefined };
 	}
 
 	private keyOf(t: DemoTask): TaskKey | null {
@@ -220,6 +229,18 @@ export class DemoTaskService implements TaskService {
 		if (!text.trim()) return;
 		this.sections[date === this.today() ? "now" : "soon"].push(task(text.trim(), { slot: { date, start, end: null } }));
 		this.changed();
+	}
+
+	dayColumn(date: LocalDate): DayColumn {
+		return dayColumn(date, this.today());
+	}
+
+	placementOfDay(date: LocalDate): Placement {
+		return placementOfDay(date, this.today());
+	}
+
+	dayOfPlacement(placement: Placement): LocalDate | null {
+		return dayOfPlacement(placement, this.today());
 	}
 
 	placementOf(item: TaskItem): Placement {

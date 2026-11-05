@@ -1,4 +1,5 @@
 import { DemoCalendarService } from "../tests/fakes/DemoCalendarService";
+import { DemoDayService } from "../tests/fakes/DemoDayService";
 import { DEMO_NOW, FixedClock } from "../tests/fakes/DemoClock";
 import { DemoTaskService } from "../tests/fakes/DemoTaskService";
 import { vaultEntryLog } from "./compose";
@@ -14,6 +15,7 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 		const clock = new FixedClock(DEMO_NOW);
 		return {
 			tasks: new DemoTaskService(clock),
+			days: new DemoDayService(clock, this),
 			undo: NO_UNDO,
 			calendars: new DemoCalendarService(),
 			settings: this,

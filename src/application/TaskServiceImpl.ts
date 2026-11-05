@@ -1,4 +1,5 @@
 import { DayBoundary } from "../domain/DayBoundary";
+import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
@@ -9,6 +10,7 @@ import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../
 import {
 	StaleTaskError,
 	TasksFileMissingError,
+	type DayColumn,
 	type DayView,
 	type EndList,
 	type GroupedList,
@@ -27,6 +29,7 @@ import {
 import { EntryTags } from "../domain/EntryTags";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
+import { readsAnew } from "./readingSettings";
 import { toItem } from "./taskItems";
 import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
@@ -66,6 +69,7 @@ function isAncestor(a: TaskKey, b: TaskKey): boolean {
 export class TaskServiceImpl implements TaskService {
 	private readonly listeners = new Set<() => void>();
 	private unsubscribeStore: (() => void) | null = null;
+	private unsubscribeSettings: (() => void) | null = null;
 	private normalized: Normalized | null = null;
 
 	constructor(
@@ -95,23 +99,23 @@ export class TaskServiceImpl implements TaskService {
 
 	async dayView(date: LocalDate): Promise<DayView> {
 		const { doc, today, boundary } = await this.readNormalized();
-		const item = this.itemOf();
+		const item = this.itemOf(today);
 		return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
 	}
 
 	async soonWithoutDateView(): Promise<readonly TaskItem[]> {
-		const { doc } = await this.readNormalized();
-		return soonWithoutDate(doc).map(this.itemOf());
+		const { doc, today } = await this.readNormalized();
+		return soonWithoutDate(doc).map(this.itemOf(today));
 	}
 
 	async inboxView(): Promise<readonly TaskItem[]> {
-		const { doc } = await this.readNormalized();
-		return inboxList(doc).map(this.itemOf());
+		const { doc, today } = await this.readNormalized();
+		return inboxList(doc).map(this.itemOf(today));
 	}
 
 	async backlogView(): Promise<readonly TaskItem[]> {
-		const { doc } = await this.readNormalized();
-		return backlogList(doc).map(this.itemOf());
+		const { doc, today } = await this.readNormalized();
+		return backlogList(doc).map(this.itemOf(today));
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -131,7 +135,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
 		if (this.isBlank(text)) return null;
-		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary, repeat));
+		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat));
 		const created = change?.after.insertedSince(change.before);
 		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}
@@ -152,10 +156,22 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	placementOf(item: TaskItem): Placement {
-		if (item.dueDate === this.boundary(this.settings.get()).dayOf(this.clock.now())) return { kind: "now" };
+		if (item.dueDate === this.today()) return { kind: "now" };
 		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
 		if (item.key.section === "inbox" || item.key.section === "backlog") return { kind: item.key.section };
 		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
+	}
+
+	dayColumn(date: LocalDate): DayColumn {
+		return dayColumn(date, this.today());
+	}
+
+	placementOfDay(date: LocalDate): Placement {
+		return placementOfDay(date, this.today());
+	}
+
+	dayOfPlacement(placement: Placement): LocalDate | null {
+		return dayOfPlacement(placement, this.today());
 	}
 
 	async setStatus(key: TaskKey, status: TaskStatus): Promise<void> {
@@ -349,13 +365,27 @@ export class TaskServiceImpl implements TaskService {
 	onChange(listener: () => void): () => void {
 		this.listeners.add(listener);
 		this.unsubscribeStore ??= this.store.onChange(() => this.emit());
+		this.unsubscribeSettings ??= this.watchReading();
 		return () => {
 			this.listeners.delete(listener);
 			if (this.listeners.size === 0) {
 				this.unsubscribeStore?.();
 				this.unsubscribeStore = null;
+				this.unsubscribeSettings?.();
+				this.unsubscribeSettings = null;
 			}
 		};
+	}
+
+	/** Settings that change how the file reads change what it says: the listeners read it anew. */
+	private watchReading(): () => void {
+		let seen = this.settings.get();
+		return this.settings.onChange(() => {
+			const now = this.settings.get();
+			const anew = readsAnew(seen, now);
+			seen = now;
+			if (anew) this.emit();
+		});
 	}
 
 	/**
@@ -424,9 +454,9 @@ export class TaskServiceImpl implements TaskService {
 		return this.priorityLevels().map((l) => l.prefix);
 	}
 
-	private itemOf(): (entry: TaskEntry) => TaskItem {
+	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
 		const levels = this.levels(this.settings.get());
-		return (entry) => toItem(entry, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
+		return (entry) => toItem(entry, today, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
 	}
 
 	/** A section the UI names must still be in the file, as a task must. */
@@ -436,12 +466,17 @@ export class TaskServiceImpl implements TaskService {
 		return index;
 	}
 
-	private resolve(doc: TaskDocument, place: NewTaskPlace): ops.CreatePlace {
+	private resolve(doc: TaskDocument, place: NewTaskPlace, today: LocalDate): ops.CreatePlace {
 		const before = (key: TaskKey | null) => (key ? this.entryOf(doc, key) : null);
 		switch (place.kind) {
 			case "list":
 				this.groupOf(doc, place.list, place.group);
 				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null };
+			case "day": {
+				const { list, date } = dayColumn(place.date, today);
+				this.groupOf(doc, list, place.group);
+				return { kind: "list", list, group: place.group, before: before(place.before), date };
+			}
 			case "subtask":
 				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };
 			case "slot":
@@ -453,6 +488,10 @@ export class TaskServiceImpl implements TaskService {
 		const entry = doc.find(key.section, key.index, key.path);
 		if (!entry || entry.raw !== key.raw) throw new StaleTaskError();
 		return entry;
+	}
+
+	private today(): LocalDate {
+		return this.boundary(this.settings.get()).dayOf(this.clock.now());
 	}
 
 	private boundary(settings: TaskCalendarSettings): DayBoundary {

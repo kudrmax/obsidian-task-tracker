@@ -6,19 +6,20 @@ import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
 import { TaskMenu } from "../../src/ui/menu/TaskMenu";
-import { dayColumn } from "../../src/ui/dayColumn";
+import { dayColumn, dayOfPlacement, placementOfDay } from "../../src/domain/Days";
 import { TaskList } from "../../src/ui/TaskList";
 import { Timeline } from "../../src/ui/Timeline";
 import { DayBoundary } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
+import { onDay } from "../fakes/itemOnDay";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
 
 const key = (section: TaskKey["section"], index: number, path: number[] = []): TaskKey => ({ section, index, path, raw: `${section}${index}${path.join("")}` });
 
-const item = (text: string, k: TaskKey, group: string | null = null, subtasks: TaskItem[] = []): TaskItem => ({
+const item = (text: string, k: TaskKey, group: string | null = null, subtasks: TaskItem[] = []): TaskItem => onDay({
 	key: k,
 	text,
 	status: "todo",
@@ -36,7 +37,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	description: null,
 	list: k.section,
 	isSubtask: k.path.length > 0,
-});
+}, TODAY);
 
 interface SetUp {
 	mode?: RightMode;
@@ -127,6 +128,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 				edits.push({ key: k, draft });
 			},
 			placementOf: (): Placement => ({ kind: "now" }),
+			placementOfDay: (date) => placementOfDay(date, TODAY),
+			dayOfPlacement: (placement) => dayOfPlacement(placement, TODAY),
 			...priorityTitles([{ prefix: "p1", color: "red" }]),
 		},
 		arbiter: new GestureArbiter(),
@@ -233,16 +236,10 @@ describe("QuickEntryController", () => {
 	describe("where a task written in a column goes", () => {
 		const task = { kind: "task", group: "Work", before: key("now", 2) } as const;
 
-		it("the day column of today: Now", () => {
-			expect(setUp().controller.placeOf("left", task)).toEqual({ kind: "list", list: "now", group: "Work", before: key("now", 2) });
-		});
-
-		it("the day column of a later day: Soon with that day", () => {
-			expect(setUp({ day: "2026-11-05" }).controller.placeOf("left", task)).toEqual({ kind: "list", list: "soon", group: "Work", before: key("now", 2), date: "2026-11-05" });
-		});
-
-		it("the day column of a past day: Now with that day", () => {
-			expect(setUp({ day: "2026-10-28" }).controller.placeOf("left", task)).toEqual({ kind: "list", list: "now", group: "Work", before: key("now", 2), date: "2026-10-28" });
+		it("the day column: the day it shows, today, a later or a past one; the service gives its list and due date", () => {
+			expect(setUp().controller.placeOf("left", task)).toEqual({ kind: "day", date: TODAY, group: "Work", before: key("now", 2) });
+			expect(setUp({ day: "2026-11-05" }).controller.placeOf("left", task)).toEqual({ kind: "day", date: "2026-11-05", group: "Work", before: key("now", 2) });
+			expect(setUp({ day: "2026-10-28" }).controller.placeOf("left", task)).toEqual({ kind: "day", date: "2026-10-28", group: "Work", before: key("now", 2) });
 		});
 
 		it("Soon and Inbox: their own lists", () => {
@@ -415,7 +412,7 @@ describe("QuickEntryController", () => {
 		type("Buy milk");
 		press("Enter");
 		expect(rowsOf("left")).toEqual(["A", "Buy milk", "field"]);
-		await vi.waitFor(() => expect(created).toEqual([{ text: "Buy milk", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
+		await vi.waitFor(() => expect(created).toEqual([{ text: "Buy milk", priority: null, place: { kind: "day", date: TODAY, group: null, before: null } }]));
 	});
 
 	it("keeps its one title field, focused, across Enter and the redraws, and lets it go when the entry ends", () => {
@@ -747,7 +744,7 @@ describe("QuickEntryController", () => {
 			expect(day()).toBe(later);
 			releaseWrites();
 			await switched;
-			expect(created).toEqual([{ text: "Call", priority: null, place: { kind: "list", list: "soon", group: null, before: null, date: later } }]);
+			expect(created).toEqual([{ text: "Call", priority: null, place: { kind: "day", date: later, group: null, before: null } }]);
 			expect(day()).toBe("2026-11-04");
 		});
 
@@ -826,7 +823,7 @@ describe("QuickEntryController", () => {
 			chooseThursday(root);
 			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
 			press("Enter");
-			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "list", list: "now", group: null, before: null }, repeat: WEEKLY_THU }]));
+			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "day", date: TODAY, group: null, before: null }, repeat: WEEKLY_THU }]));
 			expect(repeatButton(root).classList.contains("is-set")).toBe(false);
 		});
 
@@ -838,7 +835,7 @@ describe("QuickEntryController", () => {
 			document.querySelector<HTMLElement>(".tc-repeat-remove")!.click();
 			expect(repeatButton(root).classList.contains("is-set")).toBe(false);
 			press("Enter");
-			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "list", list: "now", group: null, before: null } }]));
+			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "day", date: TODAY, group: null, before: null } }]));
 		});
 
 		it("is not on a subtask's field; the write is a subtask's, whose rule the file drops", async () => {
@@ -949,7 +946,7 @@ describe("QuickEntryController", () => {
 			expect(rowsOf("left")).toEqual(["A", "B", "field"]);
 			type("C");
 			press("Enter");
-			await vi.waitFor(() => expect(created).toEqual([{ text: "C", priority: null, place: { kind: "list", list: "now", group: null, before: null, date: PAST } }]));
+			await vi.waitFor(() => expect(created).toEqual([{ text: "C", priority: null, place: { kind: "day", date: PAST, group: null, before: null } }]));
 		});
 	});
 

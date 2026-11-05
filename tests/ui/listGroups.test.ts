@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GroupName, TaskItem } from "../../src/application/contracts";
 import { gapPlace, listGaps, listGroups, showsHeaders } from "../../src/ui/listGroups";
+import { onDay } from "../fakes/itemOnDay";
 
 let n = 0;
-const item = (text: string, group: GroupName): TaskItem => ({
+const item = (text: string, group: GroupName): TaskItem => onDay({
 	key: { section: "now", index: n++, path: [], raw: `- [ ] ${text}` },
 	text,
 	status: "todo",
@@ -20,7 +21,7 @@ const item = (text: string, group: GroupName): TaskItem => ({
 	parentText: null, description: null,
 	list: "now",
 	isSubtask: false,
-});
+}, "2026-11-01");
 
 describe("listGroups", () => {
 	it("groups consecutive items by their section", () => {

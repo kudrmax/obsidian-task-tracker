@@ -3,6 +3,8 @@ import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import type { PriorityLevel } from "../domain/Priority";
+import type { DayColumn } from "../domain/Days";
+import type { DayBoundary } from "../domain/DayBoundary";
 
 export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -20,7 +22,7 @@ export { plainText, textParts, type TextPart } from "../domain/TaskText";
 export type { ZoomLevel } from "../settings";
 /** A priority level, its colours in the order the settings offer them. */
 export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel } from "../domain/Priority";
-export type { EndList, GroupedList, GroupPlace, Placement, TaskDraft };
+export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the
@@ -36,9 +38,13 @@ export interface TaskKey {
 	readonly raw: string;
 }
 
-/** Where to create a task: a place in a list, a place among subtasks, or a slot on the calendar. */
+/**
+ * Where to create a task: a place in a list, a place in the day column on `date` (its list and day are the column's,
+ * see `dayColumn`), a place among subtasks, or a slot on the calendar.
+ */
 export type NewTaskPlace =
 	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
+	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "slot"; readonly slot: Slot };
 
@@ -70,6 +76,10 @@ export interface TaskItem {
 	readonly list: SectionKey;
 	/** It sits under another task. */
 	readonly isSubtask: boolean;
+	/** The day the task stands on: its slot's, today for Now, else its due date. */
+	readonly day: LocalDate | null;
+	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's). */
+	readonly can: { readonly postpone: boolean; readonly removeDue: boolean };
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -181,6 +191,12 @@ export interface TaskService {
 	edit(key: TaskKey, draft: TaskDraft): Promise<void>;
 	/** The placement the sheet shows for a task: `now` when it is due today, `date` when it has another due date, else its section (a subtask's is its task's). */
 	placementOf(item: TaskItem): Placement;
+	/** What the day column stands for on `date`: today is Now with its sections, a later day Soon with that day, a past day Now with that day and no sections. */
+	dayColumn(date: LocalDate): DayColumn;
+	/** The placement of a task for `date`: `now` for today, else `date`. */
+	placementOfDay(date: LocalDate): Placement;
+	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
+	dayOfPlacement(placement: Placement): LocalDate | null;
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
@@ -265,6 +281,25 @@ export interface TaskService {
 
 	/** Fires after the file changed, by the plugin or by hand. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+}
+
+/** How today changed: `passed`, the clock passed the hour the day starts at; `moved`, the setting moved that hour. */
+export type DayChange = "passed" | "moved";
+
+/** Which day today is and where it begins, by the clock and the hour the settings start the day at. */
+export interface DayService {
+	today(): LocalDate;
+	/** Where a day begins: the timeline places slots, events and now by it. */
+	boundary(): DayBoundary;
+	/**
+	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
+	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
+	 * `catchUp`. `moved` fires at once on another hour for the day's start, even when the date stays: the day's hours moved.
+	 * Returns the unsubscribe; the last one stops the minute's check.
+	 */
+	onDayChange(listener: (change: DayChange) => void, ready?: () => boolean): () => void;
+	/** A minute's check that waited for a listener to be ready runs now; without one waiting, nothing happens. */
+	catchUp(): void;
 }
 
 /** What a step back or forward did: changed the file, found nothing to do, or found its lines edited since and left the file as it is. */

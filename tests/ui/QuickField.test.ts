@@ -7,6 +7,7 @@ import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { fakeTitleField } from "../fakes/FakeTitleField";
+import { onDay } from "../fakes/itemOnDay";
 
 const URGENT: PriorityLevel = { prefix: "p1", color: "red" };
 const LATER: PriorityLevel = { prefix: "p2", color: "blue" };
@@ -167,7 +168,7 @@ describe("QuickField", () => {
 	});
 });
 
-const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
+const item = (text: string, subtasks: TaskItem[] = []): TaskItem => onDay({
 	key: { section: "now", index: 0, path: [], raw: `- [ ] ${text}` },
 	text,
 	status: "todo",
@@ -185,7 +186,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 	description: null,
 	list: "now",
 	isSubtask: false,
-});
+}, "2026-11-01");
 
 describe("TaskList with a task being typed", () => {
 	const list = (items: TaskItem[], index: number, level: number, pending: PendingText[] = [{ text: "Milk", level }]) => {

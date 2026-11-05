@@ -2,8 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { BulkMenu, type BulkActions } from "../../src/ui/menu/BulkMenu";
+import { onDay } from "../fakes/itemOnDay";
 
-const item = (index: number): TaskItem => ({
+const item = (index: number): TaskItem => onDay({
 	key: { section: "now", index, path: [], raw: `- [ ] T${index}` },
 	text: `T${index}`,
 	status: "todo",
@@ -21,7 +22,7 @@ const item = (index: number): TaskItem => ({
 	description: null,
 	list: "now",
 	isSubtask: false,
-});
+}, "2026-11-04");
 
 describe("BulkMenu (block 3)", () => {
 	afterEach(() => {

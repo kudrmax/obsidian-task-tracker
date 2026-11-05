@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
 import { editRows, nextPriority, nextReminder, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
+import { onDay } from "../fakes/itemOnDay";
 
-const item = (extra: Partial<TaskItem> = {}): TaskItem => ({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra });
+const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, "2026-11-01");
 
 const weekly = (days: RepeatRule["days"]): RepeatRule => ({ kind: "schedule", every: 1, unit: "week", days, dayOfMonth: null, from: null });
 const THURSDAY = "2026-11-05";
@@ -147,6 +148,14 @@ describe("the menu", () => {
 		row("Remove due date").click();
 		expect(actions.removeDue).toHaveBeenCalled();
 		expect(actions.postpone).not.toHaveBeenCalled();
+	});
+
+	it("offers Remove due date in the picker only when the item says its date may go", () => {
+		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false } }));
+		const tiles = panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile");
+		tiles[tiles.length - 1].click();
+		expect(panel().querySelector(".tc-picker-grid")).not.toBeNull();
+		expect(row("Remove due date")).toBeUndefined();
 	});
 
 	describe("Section", () => {

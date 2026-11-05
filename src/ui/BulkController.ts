@@ -1,7 +1,6 @@
 import { type GroupName, keyId, type PriorityLevel, type TaskChange, type TaskItem, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropResult, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
-import { canRemoveDue } from "./menu/quickMoves";
 import type { SectionChoice } from "./menu/TaskMenu";
 import { PlusRing } from "./quick/PlusRing";
 import { type PickedCard, TaskSelection } from "./TaskSelection";
@@ -159,10 +158,7 @@ export class BulkController {
 				setStatus: (status) => each(() => ({ kind: "status", status })),
 				setPriority: (priority) => each(() => ({ kind: "priority", priority })),
 				postpone: (date) => each(() => ({ kind: "postpone", date })),
-				removeDue: () => {
-					const today = this.deps.today();
-					return each((card) => (canRemoveDue(today, card.item.dueDate) ? { kind: "dueDate", date: null } : { kind: "dueDate", date: card.item.dueDate }));
-				},
+				removeDue: () => each((card) => (card.item.can.removeDue ? { kind: "dueDate", date: null } : { kind: "dueDate", date: card.item.dueDate })),
 				toSection: (name) => each((card) => sections!.change(card, name)),
 				remove: () => each(() => ({ kind: "remove" })),
 			},
