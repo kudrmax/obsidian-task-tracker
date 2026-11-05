@@ -2,7 +2,7 @@ import { Repeat } from "./Repeat";
 import { isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, parseHHMM } from "./LocalDate";
 import { priorityOfText } from "./Priority";
 
-import { STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
+import { DEFAULT_REMINDER, STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
 
 export interface Markers {
 	readonly dueDate: string;
@@ -68,7 +68,7 @@ class FieldSlicer {
 		let text = body;
 		let dueDate: string | null = null;
 		let slot: Slot | null = null;
-		let reminder: ReminderKind = "notification";
+		let reminder: ReminderKind = DEFAULT_REMINDER;
 		let repeat: Repeat | null = null;
 		for (;;) {
 			const slotMatch: RegExpExecArray | null = slot === null ? this.slotRe.exec(text) : null;

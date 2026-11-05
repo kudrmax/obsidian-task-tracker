@@ -47,7 +47,7 @@ function parse(text: string): TaskDocument {
 
 describe("newTask", () => {
 	it("builds a todo task and applies the patch", () => {
-		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [] });
+		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "live", repeat: null, priority: null, children: [] });
 		expect(newTask("A", { dueDate: D }).dueDate).toBe(D);
 	});
 });

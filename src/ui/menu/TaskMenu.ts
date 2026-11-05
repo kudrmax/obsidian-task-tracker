@@ -1,4 +1,4 @@
-import { type GroupName, nextProgress, nextReminder, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -8,7 +8,7 @@ import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { moveTiles } from "./quickMoves";
-import { askGroup, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
+import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
 import { type SectionChoice, sectionChooser } from "./SectionChooser";
@@ -316,7 +316,7 @@ export class TaskMenu extends LiftedMenu {
 		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
-			reminder: this.pick(() => actions.setReminder(nextReminder(item.reminder))),
+			reminder: () => this.showReminders(),
 			description: this.pick(() => actions.openDescription(true)),
 			repeat: () => this.showRepeat(),
 			section: () => this.showSections(),
@@ -393,6 +393,19 @@ export class TaskMenu extends LiftedMenu {
 			onPick: (name) => this.pick(() => actions.toSection(name))(),
 			onNew: this.pick(() => actions.newSection()),
 		});
+		this.place();
+	}
+
+	/** The Reminder submenu in place of the menu: the way back, the kinds, the task's own checked, Off last; a pick sets it and closes. */
+	private showReminders(): void {
+		this.askFor(null, false);
+		clear(this.panel);
+		clear(this.upper);
+		const { item, actions } = this.context;
+		backRow(this.panel, "Reminder", () => this.showMenu());
+		const group = menuGroup(this.panel, []);
+		for (const kind of REMINDER_KINDS)
+			menuRow(group, { label: REMINDER_NAMES[kind], icon: kind === item.reminder ? "check" : undefined, choice: true, quiet: kind === "none", onPick: this.pick(() => actions.setReminder(kind)) });
 		this.place();
 	}
 

@@ -246,6 +246,7 @@
   function isOpen(status) {
     return status === "todo" || status === "inProgress";
   }
+  var DEFAULT_REMINDER = "live";
   var STATUS_CHARS = {
     todo: " ",
     inProgress: "/",
@@ -461,7 +462,7 @@
       let text = body;
       let dueDate = null;
       let slot = null;
-      let reminder = "notification";
+      let reminder = DEFAULT_REMINDER;
       let repeat = null;
       for (; ; ) {
         const slotMatch = slot === null ? this.slotRe.exec(text) : null;
@@ -797,7 +798,7 @@
       const first = this.spanOf(entry).line + 1;
       const children = [...entry.task.children];
       const open = (sub) => {
-        const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+        const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null };
         children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
         sub.subtasks.forEach(open);
       };
@@ -1075,7 +1076,7 @@
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
