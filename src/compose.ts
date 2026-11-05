@@ -1,4 +1,4 @@
-import type { App, DataAdapter } from "obsidian";
+import type { App } from "obsidian";
 import { CalendarServiceImpl } from "./application/CalendarServiceImpl";
 import type { CalendarService, DayService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
 import { DayServiceImpl } from "./application/DayServiceImpl";
@@ -74,15 +74,3 @@ const windowTicker: Ticker = {
 
 /** The window's one-shot timers. */
 const windowTimers: Timers = { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) };
-
-/** Temporary: the quick entry trace's note in the vault, appended to; a failed write only goes to the console. */
-export function vaultEntryLog(adapter: DataAdapter): { append(text: string): void } {
-	const path = "Task Calendar entry log.md";
-	return {
-		append: (text) =>
-			void adapter
-				.exists(path)
-				.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
-				.catch((error) => console.error(error)),
-	};
-}

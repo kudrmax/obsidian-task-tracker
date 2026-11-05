@@ -3,11 +3,6 @@ export class GestureArbiter {
 	private holder: string | null = null;
 	private readonly idleListeners: (() => void)[] = [];
 
-	/** Temporary, for the gesture trace: which gesture holds the screen. */
-	get owner(): string | null {
-		return this.holder;
-	}
-
 	get busy(): boolean {
 		return this.holder !== null;
 	}

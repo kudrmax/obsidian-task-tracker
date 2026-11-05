@@ -6,7 +6,7 @@ import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { SettingsServiceImpl } from "./application/SettingsServiceImpl";
 import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
-import { createServices, type Services, type ServicesHost, vaultEntryLog } from "./compose";
+import { createServices, type Services, type ServicesHost } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showPriorityColors } from "./ui/priorityColors";
@@ -73,7 +73,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			settings: new ViewSettingsImpl(this),
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
-			entryLog: vaultEntryLog(this.app.vault.adapter),
 		};
 	}
 

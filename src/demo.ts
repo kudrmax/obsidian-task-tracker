@@ -2,7 +2,6 @@ import { DemoCalendarService } from "../tests/fakes/DemoCalendarService";
 import { DemoDayService } from "../tests/fakes/DemoDayService";
 import { DEMO_NOW, FixedClock } from "../tests/fakes/DemoClock";
 import { DemoTaskService } from "../tests/fakes/DemoTaskService";
-import { vaultEntryLog } from "./compose";
 import TaskCalendarPlugin from "./main";
 import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
 import type { UndoService } from "./application/contracts";
@@ -22,7 +21,6 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			settings: new ViewSettingsImpl(this),
 			clock,
 			openInCalendar: () => undefined,
-			entryLog: vaultEntryLog(this.app.vault.adapter),
 		};
 	}
 }
