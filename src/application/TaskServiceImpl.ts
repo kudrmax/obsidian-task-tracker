@@ -1,4 +1,5 @@
 import { DayBoundary } from "../domain/DayBoundary";
+import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
@@ -72,6 +73,24 @@ export class TaskServiceImpl implements TaskService {
 		private readonly history: UndoHistory | null = null,
 	) {}
 
+	priorityLevels(): readonly PriorityLevel[] {
+		return this.levels(this.settings.get());
+	}
+
+	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
+		const levels = this.priorityLevels();
+		const parsed = priorityOfText(text, levels.map((l) => l.prefix));
+		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
+	}
+
+	isBlank(text: string): boolean {
+		return isBlankTitle(text, this.prefixes());
+	}
+
+	withPriority(text: string, prefix: string | null): string {
+		return withPriority(text, prefix, this.prefixes());
+	}
+
 	async dayView(date: LocalDate): Promise<DayView> {
 		const { doc, today, boundary } = await this.readNormalized();
 		const item = this.itemOf();
@@ -94,34 +113,34 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
-		if (this.blank(text)) return;
+		if (this.isBlank(text)) return;
 		await this.mutate((doc, today) => ops.createInList(doc, date, today, text));
 	}
 
 	async createInSoon(text: string): Promise<void> {
-		if (this.blank(text)) return;
+		if (this.isBlank(text)) return;
 		await this.mutate((doc) => ops.createInSoon(doc, text));
 	}
 
 	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
-		if (this.blank(text)) return;
+		if (this.isBlank(text)) return;
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
 	}
 
 	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
-		if (this.blank(text)) return null;
+		if (this.isBlank(text)) return null;
 		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place), today, boundary, repeat));
 		const created = change?.after.insertedSince(change.before);
 		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}
 
 	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
-		if (this.blank(draft.text)) return;
+		if (this.isBlank(draft.text)) return;
 		await this.mutate((doc, today, _settings, boundary) => ops.placeTask(doc, null, draft, today, slot, boundary));
 	}
 
 	async createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
-		if (this.blank(draft.text)) return;
+		if (this.isBlank(draft.text)) return;
 		await this.mutate((doc, today) => ops.createSubtask(doc, this.entryOf(doc, parent), draft, today));
 	}
 
@@ -397,6 +416,10 @@ export class TaskServiceImpl implements TaskService {
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
 		return usableLevels(settings.priorities);
+	}
+
+	private prefixes(): readonly string[] {
+		return this.priorityLevels().map((l) => l.prefix);
 	}
 
 	private itemOf(): (entry: TaskEntry) => TaskItem {

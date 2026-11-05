@@ -1,6 +1,7 @@
 import { type DayView, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
+import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
 interface DemoTask {
@@ -70,6 +71,27 @@ export class DemoTaskService implements TaskService {
 	private readonly listeners = new Set<() => void>();
 
 	constructor(private readonly clock: Clock) {}
+
+	priorityLevels(): readonly PriorityLevel[] {
+		return usableLevels(DEFAULT_SETTINGS.priorities);
+	}
+
+	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
+		const parsed = priorityOfText(text, this.prefixes());
+		return { text: parsed.text, priority: this.priorityLevels().find((l) => l.prefix === parsed.priority) ?? null };
+	}
+
+	isBlank(text: string): boolean {
+		return isBlankTitle(text, this.prefixes());
+	}
+
+	withPriority(text: string, prefix: string | null): string {
+		return withPriority(text, prefix, this.prefixes());
+	}
+
+	private prefixes(): readonly string[] {
+		return this.priorityLevels().map((l) => l.prefix);
+	}
 
 	/** The timeline boards lay tasks of their own on the day; the pixel comparison swaps them in, and null brings the day's back. */
 	showTimeline(tasks: readonly { text: string; start: number; end: number | null; inProgress?: boolean }[] | null): void {

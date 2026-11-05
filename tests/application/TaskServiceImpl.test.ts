@@ -414,6 +414,61 @@ describe("priority", () => {
 	});
 });
 
+describe("priority in a typed title", () => {
+	const LEVELS = [
+		{ prefix: "p1", color: "red" },
+		{ prefix: "", color: "green" },
+		{ prefix: "x y", color: "teal" },
+		{ prefix: "p1", color: "blue" },
+		{ prefix: "p2", color: "orange" },
+	] as const;
+	const withLevels = () => new FakeSettingsStore({ ...DEFAULT_SETTINGS, priorities: LEVELS });
+	const EMPTY = "## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n";
+	const NOW = { kind: "list", list: "now", group: null, before: null } as const;
+
+	it("offers the levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike", () => {
+		const { svc } = setup(EMPTY, withLevels());
+		expect(svc.priorityLevels()).toEqual([
+			{ prefix: "p1", color: "red" },
+			{ prefix: "p2", color: "orange" },
+		]);
+	});
+
+	it("reads a typed title's level with its colour, and the title without the prefix", () => {
+		const { svc } = setup(EMPTY, withLevels());
+		expect(svc.parseTitle("p2 Call")).toEqual({ priority: { prefix: "p2", color: "orange" }, text: "Call" });
+		expect(svc.parseTitle("x y Call")).toEqual({ priority: null, text: "x y Call" });
+	});
+
+	it("puts a level first in place of the typed one, or takes it off", () => {
+		const { svc } = setup(EMPTY, withLevels());
+		expect(svc.withPriority("p1 Call", "p2")).toBe("p2 Call");
+		expect(svc.withPriority("p1 Call", null)).toBe("Call");
+	});
+
+	it("creates nothing from a level's prefix alone, but a prefix without its space is a task", async () => {
+		const { store, svc } = setup(EMPTY, withLevels());
+		expect(await svc.createInPlace("p1 ", null, NOW)).toBeNull();
+		await svc.create({ text: "p2 ", placement: { kind: "now" }, priority: null });
+		await svc.createInSoon("p1\t");
+		expect(store.writes).toBe(0);
+		await svc.createInPlace("p1", null, NOW);
+		expect((await svc.dayView(T)).list.map((i) => [i.text, i.priority])).toEqual([["p1", null]]);
+	});
+
+	it("answers for the field as the file reads what it writes", async () => {
+		for (const typed of ["p1 x", "p1\tx", "p1  x", "p1 ", "p1", "p1x", "x"]) {
+			const { store, svc } = setup(EMPTY, withLevels());
+			const field = { ...svc.parseTitle(typed), blank: svc.isBlank(typed) };
+			await svc.createInPlace(typed, null, NOW);
+			const written = (await svc.dayView(T)).list[0];
+			const file = written ? { priority: written.priority, text: written.text, blank: false } : { blank: store.writes === 0 };
+			expect(field.blank, typed).toBe(file.blank);
+			if (!field.blank) expect({ priority: field.priority, text: field.text }, typed).toEqual({ priority: file.priority, text: file.text });
+		}
+	});
+});
+
 describe("postpone", () => {
 	it("takes a task off today: the due date, no time, the end of Soon", async () => {
 		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n");
