@@ -216,6 +216,82 @@ describe("DragController: a drop that changes nothing", () => {
 	});
 });
 
+describe("DragController: a finger held on a timeline block", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function held() {
+		vi.useFakeTimers();
+		const arbiter = new GestureArbiter();
+		const menu = { close: vi.fn(), onClickedAgain: vi.fn() };
+		const deps = {
+			longPressMs: () => 300,
+			day: () => "2026-11-01",
+			step: () => 15,
+			timeline: () => null,
+			targets: () => [],
+			haptics: { tap: () => {} },
+			arbiter,
+			onDragging: () => {},
+			onResult: async () => {},
+			onMenu: () => menu,
+		} as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		block.getBoundingClientRect = () => rect(10, 600);
+		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
+		new DragController(deps).attachBlock(block, item as never);
+		block.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
+		vi.advanceTimersByTime(300);
+		return { arbiter, menu, block };
+	}
+
+	it("holds the screen from the moment the menu opens: no swipe or scroll takes the finger before it moves on", () => {
+		const { arbiter, menu } = held();
+		expect(menu.close).not.toHaveBeenCalled();
+		expect(arbiter.busy).toBe(true);
+		expect(arbiter.claim("swipe")).toBe(false);
+	});
+
+	it("passes the screen to the drag as the finger moves on, with no free moment between", () => {
+		const { arbiter, menu, block } = held();
+		const idle = vi.fn();
+		arbiter.onIdle(idle);
+		pointer("pointermove", 20, 660);
+		expect(menu.close).toHaveBeenCalled();
+		expect(block.classList.contains("is-lifted")).toBe(true);
+		expect(arbiter.busy).toBe(true);
+		expect(idle).not.toHaveBeenCalled();
+		pointer("pointercancel", 20, 660);
+	});
+
+	it("frees the screen when the finger lifts with the menu open", () => {
+		const { arbiter, block } = held();
+		pointer("pointerup", 20, 610);
+		expect(arbiter.busy).toBe(false);
+		expect(block.classList.contains("is-lifted")).toBe(false);
+	});
+});
+
+describe("DragController: a finger held on a calendar event", () => {
+	it("keeps the screen until it lifts, so the menu opened stays over a day no swipe or scroll moves", () => {
+		vi.useFakeTimers();
+		const arbiter = new GestureArbiter();
+		const onMenu = vi.fn();
+		const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter } as unknown as DragControllerDeps;
+		const block = document.body.appendChild(document.createElement("div"));
+		new DragController(deps).attachEvent(block, onMenu);
+		block.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
+		vi.advanceTimersByTime(300);
+		expect(onMenu).toHaveBeenCalledTimes(1);
+		pointer("pointermove", 200, 610);
+		expect(arbiter.busy).toBe(true);
+		pointer("pointerup", 200, 610);
+		expect(arbiter.busy).toBe(false);
+		vi.useRealTimers();
+	});
+});
+
 describe("DragController: stretching a block (block 3)", () => {
 	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
 

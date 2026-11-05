@@ -58,6 +58,7 @@ export interface OpenMenu {
 }
 
 const DRAG = "drag";
+const HOLD = "hold";
 const RESIZE = "resize";
 const NEW_SLOT = "newslot";
 
@@ -114,7 +115,7 @@ export class DragController {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {
-				if (e.pointerType !== "mouse") onMenu();
+				if (e.pointerType !== "mouse" && this.holdFinger(block, e)) onMenu();
 			},
 			onTap: onMenu,
 			onLongTap: onMenu,
@@ -147,29 +148,46 @@ export class DragController {
 
 	/** A finger held on a timeline card: selected, the menu open; moving on closes the menu and drags the card. */
 	private hold(block: HTMLElement, item: TaskItem, e: PointerEvent): void {
+		const held = this.holdFinger(block, e, (ev) => {
+			menu.close();
+			this.deps.timeline()?.select(null);
+			if (this.deps.arbiter.pass(HOLD, DRAG)) this.lift(block, this.payload(block, item, "timeline", e), ev);
+		});
+		if (!held) return;
 		this.deps.haptics.tap();
 		const menu = this.selectWithMenu(block, item);
-		capturePointer(block, e.pointerId);
+	}
+
+	/**
+	 * A long press that opened a menu keeps its finger until it lifts: the screen is the finger's, so neither a swipe
+	 * nor a scroll takes it under the menu. `moveOn` hears the finger leave its place, and the screen is then its to pass on.
+	 */
+	private holdFinger(source: HTMLElement, e: PointerEvent, moveOn?: (ev: PointerEvent) => void): boolean {
+		if (!this.deps.arbiter.claim(HOLD)) return false;
+		capturePointer(source, e.pointerId);
 		const detach = () => {
+			lost();
 			document.removeEventListener("pointermove", move);
 			document.removeEventListener("pointerup", end);
 			document.removeEventListener("pointercancel", end);
+			releasePointer(source, e.pointerId);
 		};
 		const move = (ev: PointerEvent) => {
-			if (ev.pointerId !== e.pointerId || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= LAYOUT.pressTolerance) return;
+			if (!moveOn || ev.pointerId !== e.pointerId || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= LAYOUT.pressTolerance) return;
 			detach();
-			menu.close();
-			this.deps.timeline()?.select(null);
-			this.begin(block, this.payload(block, item, "timeline", e), ev);
+			moveOn(ev);
+			this.deps.arbiter.release(HOLD);
 		};
 		const end = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
 			detach();
-			releasePointer(block, e.pointerId);
+			this.deps.arbiter.release(HOLD);
 		};
+		const lost = onLostLift(e.pointerId, () => end(e));
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", end);
 		document.addEventListener("pointercancel", end);
+		return true;
 	}
 
 	/** The dots on the copy of the card over the menu's blur stretch the card itself; a dot taken closes the menu. */
@@ -227,7 +245,11 @@ export class DragController {
 
 	/** `carried`: the other picked cards, lifted with this one; each waits as a dashed place where it stood. */
 	private begin(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
-		if (!this.deps.arbiter.claim(DRAG)) return;
+		if (this.deps.arbiter.claim(DRAG)) this.lift(source, payload, e, subtree, carried);
+	}
+
+	/** The card leaves its place and follows the finger; the screen is already the drag's. */
+	private lift(source: HTMLElement, payload: TaskDragPayload, e: PointerEvent, subtree: readonly HTMLElement[] = [], carried: readonly PickedCard[] = []): void {
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
 		const float = new FloatingCard(payload.item, { dx: e.clientX - origin.left, dy: e.clientY - origin.top }, this.deps.day(), 1 + carried.length);

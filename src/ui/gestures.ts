@@ -13,6 +13,13 @@ export class GestureArbiter {
 		return true;
 	}
 
+	/** `from` hands the screen straight to `to`: no moment in between when it is free and what waits runs. */
+	pass(from: string, to: string): boolean {
+		if (this.holder !== from) return false;
+		this.holder = to;
+		return true;
+	}
+
 	release(name: string): void {
 		if (this.holder !== name) return;
 		this.holder = null;
