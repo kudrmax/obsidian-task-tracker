@@ -19,7 +19,7 @@ export class FakeTitleField implements TitleField {
 		});
 		this.el.addEventListener("keydown", (e) => {
 			if (composingKey(e)) return;
-			const run = { Enter: () => events.onEnter(), Escape: () => events.onEscape(), Tab: () => events.onTab(e.shiftKey) }[e.key];
+			const run = { Enter: () => events.onEnter(), Escape: () => events.onEscape(), Tab: () => (e.altKey ? events.onSwitch() : events.onTab(e.shiftKey)) }[e.key];
 			if (!run) return;
 			e.preventDefault();
 			e.stopPropagation();

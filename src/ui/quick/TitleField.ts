@@ -5,6 +5,8 @@ export interface TitleFieldEvents {
 	onEscape(): void;
 	/** Tab; with `shift`, Shift+Tab. */
 	onTab(shift: boolean): void;
+	/** Option+Tab (Alt+Tab): the field switches between a task and a section's name. */
+	onSwitch(): void;
 	onBlur(): void;
 }
 
