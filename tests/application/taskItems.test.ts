@@ -33,6 +33,7 @@ describe("toItem", () => {
 		expect(toItem(queried.tasks("now")[1], T)).toEqual({
 			key: { section: "now", index: 1, path: [], raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00" },
 			text: "Slotted today",
+			title: "Slotted today",
 			status: "inProgress",
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
@@ -103,6 +104,11 @@ describe("toItem on a day", () => {
 		]);
 		expect(toItem(d.tasks("soon")[0], T).can).toEqual({ postpone: true, removeDue: false, remind: false });
 		expect(toItem(d.tasks("done")[0], T).can).toEqual({ postpone: false, removeDue: true, remind: false });
+	});
+
+	it("has a title with each link's word in its place", () => {
+		const linked = parse("## Now\n- [ ] Позвонить [[Люди/Петя|Пете]] про [договор](https://x.ru)\n\n## Soon\n\n## Done\n");
+		expect(toItem(linked.tasks("now")[0], T).title).toBe("Позвонить Пете про договор");
 	});
 
 	it("reminds only on a time", () => {

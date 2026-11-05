@@ -5,6 +5,7 @@ import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, d
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { hitIn } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
+import { plainText } from "../../src/domain/TaskText";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
@@ -119,6 +120,7 @@ export class DemoTaskService implements TaskService {
 		return {
 			key: { section, index, path: [], raw: this.raw(t) },
 			text: t.text,
+			title: plainText(t.text),
 			status: t.status,
 			dueDate: t.dueDate,
 			slot: t.slot,

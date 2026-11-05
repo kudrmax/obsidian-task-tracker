@@ -462,6 +462,12 @@ describe("the menu", () => {
 			expect(closing()).toBe(true);
 		});
 
+		it("names the task in the question by the title the service gives", () => {
+			open(item({ text: "Call [[People/Doctor|the doctor]]", title: "Call the doctor" }));
+			row("Delete").click();
+			expect(ask()!.querySelector(".tc-menu-ask-question")!.textContent).toBe("Delete “Call the doctor”?");
+		});
+
 		it("turns the status tiles into the question for Won’t do, and marks it only on Won’t do", () => {
 			const actions = open(item({ text: "Call the doctor" }));
 			wontDo().click();

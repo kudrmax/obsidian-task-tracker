@@ -1,4 +1,4 @@
-import { type GroupName, nextProgress, nextReminder, plainText, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, nextProgress, nextReminder, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -369,7 +369,7 @@ export class TaskMenu extends LiftedMenu {
 		this.confirmAsked = confirm;
 		askGroup(this.panel, {
 			verb,
-			title: plainText(item.text),
+			title: item.title,
 			confirm: verb,
 			icon,
 			danger: what === "delete",

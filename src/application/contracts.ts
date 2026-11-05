@@ -29,8 +29,8 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
 export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
-/** A task's text cut into text and links, or plain, each link by its word. */
-export { plainText, textParts, type TextPart } from "../domain/TaskText";
+/** A task's text cut into text and links, each link by its word. */
+export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
 export type { ZoomLevel } from "../settings";
 /** A priority level, its colours in the order the settings offer them. */
@@ -80,6 +80,8 @@ export interface SubtaskProgress {
 export interface TaskItem {
 	readonly key: TaskKey;
 	readonly text: string;
+	/** `text` with each link's word in its place: for where a link can't be shown, such as a question about the task. */
+	readonly title: string;
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
