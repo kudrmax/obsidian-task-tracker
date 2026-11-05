@@ -1,3 +1,4 @@
+import { type GapPlace, placeOfGap } from "../../application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import type { ListEntry, TaskList } from "../TaskList";
@@ -5,7 +6,7 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
-import { type GapPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, sameGap } from "./listPlace";
+import { type PlacedCard, type PlacedHead, placeAt, sameGap } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
@@ -141,7 +142,7 @@ export class ListDrop implements DropTarget {
 		if (!this.placesAnywhere(drag)) return { kind: "listBefore", before: null, column: this.column };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place || this.isHome(this.place)) return null;
-		const result = resultOf(this.placed(readFrame(this.list.el)), this.place);
+		const result = placeOfGap(this.placed(readFrame(this.list.el)), this.place);
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
 		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
 		return { kind: "listBefore", before: result.before, column: this.column };

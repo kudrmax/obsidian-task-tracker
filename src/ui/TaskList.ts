@@ -1,9 +1,8 @@
-import { type GroupName, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GapPlace, type GroupName, type ListCard, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
-import type { GapPlace, ListCard } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
@@ -86,7 +85,7 @@ export class TaskList {
 		const rows: { node: HTMLElement; level: number }[] = [];
 		let entered = entry === null;
 		let groupStart = 0;
-		/** At a card's place, or at the end of its section for a place outside that section's cards: where `resultOf` writes it. */
+		/** At a card's place, or at the end of its section for a place outside that section's cards: where `placeOfGap` writes it. */
 		const enter = (group: GroupName, groupEnd = false): void => {
 			if (entered || !entry || (this.withHeaders && entry.place.group !== group)) return;
 			const { index } = entry.place;

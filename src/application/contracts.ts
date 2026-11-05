@@ -16,6 +16,8 @@ export { DayBoundary } from "../domain/DayBoundary";
 export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
+/** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
+export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
 /** A task's text cut into text and links, or plain, each link by its word. */
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */

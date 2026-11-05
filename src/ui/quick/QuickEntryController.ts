@@ -1,4 +1,4 @@
-import { type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { gapOfPlace, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -6,7 +6,6 @@ import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
 import type { DragController } from "../drag/DragController";
 import type { DropTarget, ListColumn, DropResult } from "../drag/DropTarget";
-import { gapOf, type ListCard, type PlaceResult } from "../drag/listPlace";
 import type { GestureArbiter } from "../gestures";
 import type { CloseHow } from "../menu/Overlay";
 import type { TaskMenu } from "../menu/TaskMenu";
@@ -81,7 +80,7 @@ const LOOK_IN: Readonly<Record<RightMode, readonly ListColumn[]>> = {
 };
 
 /** What a drop of the plus on a list means for the file; null for a drop elsewhere. */
-function placeResultOf(result: DropResult): PlaceResult | null {
+function placeResultOf(result: DropResult): ListPlace | null {
 	switch (result.kind) {
 		case "listBefore":
 			return { kind: "task", group: null, before: result.before };
@@ -241,7 +240,7 @@ export class QuickEntryController {
 	addSubtask(parent: TaskItem, menu?: TaskMenu): void {
 		const found = this.find(parent.key);
 		if (found || !menu?.stacks) menu?.close();
-		if (found) this.open({ kind: "list", column: found.column, place: gapOf(this.cards(found.column), { kind: "subtask", parent: parent.key, before: null }) });
+		if (found) this.open({ kind: "list", column: found.column, place: gapOfPlace(this.cards(found.column), { kind: "subtask", parent: parent.key, before: null }) });
 		else if (menu?.stacks) this.openStack(parent, menu);
 	}
 
@@ -354,7 +353,7 @@ export class QuickEntryController {
 	}
 
 	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace {
+	placeOf(column: ListColumn, result: ListPlace): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
 		if (column !== "left") return { kind: "list", list: column, group, before };
@@ -406,7 +405,7 @@ export class QuickEntryController {
 		this.ring.hide();
 		const column = this.droppedOn;
 		const place = result && column ? placeResultOf(result) : null;
-		if (column && place) this.open({ kind: "list", column, place: gapOf(this.cards(column), place) });
+		if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.cards(column), place) });
 		else if (result?.kind === "slot") this.open({ kind: "slot", slot: result.slot });
 		else this.showPlus();
 	}
