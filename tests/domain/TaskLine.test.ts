@@ -104,6 +104,7 @@ describe("formatTaskLine", () => {
 						status: "todo",
 						statusChar: " ",
 						priority: null,
+						labels: [],
 						text: "A",
 						dueDate: "2026-11-03",
 						repeat: null,
@@ -120,7 +121,7 @@ describe("formatTaskLine", () => {
 	it("formats a slot ending at midnight", () => {
 		expect(
 			formatTaskLine(
-				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, reminder: "notification", repeat: null, priority: null, children: [] } },
+				{ indent: "", bullet: "-", task: { status: "done", statusChar: "x", text: "A", dueDate: null, slot: { date: "2026-11-02", start: 1380, end: 1440 }, reminder: "notification", repeat: null, priority: null, labels: [], children: [] } },
 				M,
 			),
 		).toBe("- [x] A ⏰ 2026-11-02 23:00-24:00");

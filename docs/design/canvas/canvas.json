@@ -2161,6 +2161,62 @@
    "w": 390,
    "x": 17270,
    "y": 0
+  },
+  "Label32V1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 1 — поровну"
+  },
+  "Label32V2.dc.html": {
+   "x": 1028,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 2 — перелив"
+  },
+  "Label32V3.dc.html": {
+   "x": 2056,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 3 — косой срез"
+  },
+  "Label32V4.dc.html": {
+   "x": 3084,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 4 — точки меток"
+  },
+  "Label32V5.dc.html": {
+   "x": 4112,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 5 — цвет сочетания"
+  },
+  "Label32Phone.dc.html": {
+   "x": 18210,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экрана с метками (его показывают доски «Метки»)"
+  },
+  "Label32V6.dc.html": {
+   "x": 5140,
+   "y": 0,
+   "w": 948,
+   "h": 1310,
+   "page": "labels32",
+   "title": "Вариант 6 — полоски"
   }
  },
  "createdOnFiles": {
@@ -2848,7 +2904,14 @@
   "Search29PhoneBoard.dc.html",
   "Search29Row.dc.html",
   "EmptySecFlow.dc.html",
-  "EmptySec.dc.html"
+  "EmptySec.dc.html",
+  "Label32V1.dc.html",
+  "Label32V2.dc.html",
+  "Label32V3.dc.html",
+  "Label32V4.dc.html",
+  "Label32V5.dc.html",
+  "Label32Phone.dc.html",
+  "Label32V6.dc.html"
  ],
  "pages": [
   {
@@ -2954,6 +3017,10 @@
   {
    "id": "emptysec",
    "name": "Пустая секция"
+  },
+  {
+   "id": "labels32",
+   "name": "Метки"
   }
  ],
  "title": "Task Calendar",

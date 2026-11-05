@@ -1,5 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarOption, type CountField, type GoogleAccount, hexColor, isPresetColor, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarOption, type CountField, type GoogleAccount, hexColor, isPresetColor, LABEL_PAINTS, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -26,6 +26,21 @@ const MARKERS: readonly (readonly [Marker, string, string])[] = [
 	["repeatMarker", "Repeat marker", "Precedes the repeat rule on a task line."],
 ];
 
+const PAINT_NAMES: Readonly<Record<LabelPaint, string>> = { stripes: "Stripes", blend: "Blend" };
+
+/** What a group of colour rows edits: the priorities or the labels, each by its index in the settings. */
+interface ColourRows {
+	readonly rows: readonly { readonly name: string; readonly color: PriorityColor }[];
+	readonly nameClass: string;
+	rename(index: number, name: string): Promise<void>;
+	recolour(index: number, color: PriorityColor): Promise<void>;
+	remove(index: number): Promise<void>;
+	move(from: number, to: number): Promise<void>;
+	/** The colour being picked, on the screen and in the menus, before it is saved. */
+	preview(index: number, color: PriorityColor): void;
+	readonly deleteTooltip: string;
+}
+
 const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 	inbox: "Inbox",
 	now: "Now",
@@ -47,6 +62,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		this.prioritiesGroup(containerEl);
+		this.labelsGroup(containerEl);
 		this.sectionsGroup(containerEl);
 		this.cardsGroup(containerEl);
 		this.moreGroup(containerEl);
@@ -87,25 +103,70 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		for (const [marker, name, desc] of MARKERS) {
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
+		this.text(el, "Label tag", "The tag's part before the slash: a task tagged #label/<name> has the label of that name. One word.", this.settings.labelTag, (tag) => this.service.setLabelTag(tag));
+	}
+
+	/** The priorities' rows; see `colourRows`. */
+	private prioritiesGroup(group: HTMLElement): void {
+		new Setting(group).setName("Priorities").setHeading();
+		const levels = this.settings.priorities;
+		this.colourRows(group, {
+			rows: levels.map((level) => ({ name: level.prefix, color: level.color })),
+			nameClass: "tc-level-prefix",
+			rename: (index, name) => this.service.renameLevel(index, name),
+			recolour: (index, color) => this.service.recolourLevel(index, color),
+			remove: (index) => this.service.removeLevel(index),
+			move: (from, to) => this.service.moveLevel(from, to),
+			preview: (index, color) => showPriorityColors(levels.map((level, i) => (i === index ? { ...level, color } : level)), this.settings.labels),
+			deleteTooltip: "Delete level",
+		});
+		new Setting(group)
+			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
+			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
+	}
+
+	/** The labels' rows, as the priorities', the name shown with spaces; how a card of several is painted. */
+	private labelsGroup(group: HTMLElement): void {
+		new Setting(group).setName("Labels").setHeading();
+		const labels = this.settings.labels;
+		this.colourRows(group, {
+			rows: labels.map((label) => ({ name: labelTitle(label.name), color: label.color })),
+			nameClass: "tc-label-name",
+			rename: (index, name) => this.service.renameLabel(index, name),
+			recolour: (index, color) => this.service.recolourLabel(index, color),
+			remove: (index) => this.service.removeLabel(index),
+			move: (from, to) => this.service.moveLabel(from, to),
+			preview: (index, color) => showPriorityColors(this.settings.priorities, labels.map((label, i) => (i === index ? { ...label, color } : label))),
+			deleteTooltip: "Delete label",
+		});
+		new Setting(group)
+			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card.`)
+			.addButton((b) => b.setButtonText("Add label").onClick(() => void this.redrawn(this.service.addLabel())));
+		new Setting(group)
+			.setName("Several labels")
+			.setDesc("How a card of several labels is painted.")
+			.addDropdown((d) => {
+				for (const paint of LABEL_PAINTS) d.addOption(paint, PAINT_NAMES[paint]);
+				d.setValue(this.settings.labelPaint).onChange((value) => this.service.setLabelPaint(value as LabelPaint));
+			});
 	}
 
 	/**
-	 * A row per level: its prefix, the six colours and the circle that picks any other, the chosen one ringed, the colour's
-	 * code, a card in that colour, a bin; then Add priority. The circles are drawn in the shade a card takes, so the colour
-	 * here is the colour on the screen.
+	 * A row per level or label: its name, the six colours and the circle that picks any other, the chosen one ringed, the
+	 * colour's code, a card in that colour, a bin. The circles are drawn in the shade a card takes, so the colour here is the
+	 * colour on the screen.
 	 */
-	private prioritiesGroup(group: HTMLElement): void {
-		new Setting(group).setName("Priorities").setHeading();
+	private colourRows(group: HTMLElement, spec: ColourRows): void {
 		const rows = group.createDiv("tc-level-rows");
-		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(this.service.moveLevel(from, to)));
-		this.settings.priorities.forEach((level, index) => {
+		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(spec.move(from, to)));
+		spec.rows.forEach((level, index) => {
 			const row = rows.createDiv("setting-item tc-level-row");
 			reorder.grip(row, index);
-			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void this.service.renameLevel(index, value));
-			prefix.inputEl.addClass("tc-level-prefix");
+			const name = new TextComponent(row).setValue(level.name).onChange((value) => void spec.rename(index, value));
+			name.inputEl.addClass(spec.nameClass);
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of PRIORITY_COLORS) {
-				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void this.redrawn(this.service.recolourLevel(index, color)) });
+				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void this.redrawn(spec.recolour(index, color)) });
 				swatch.el.dataset.priority = color;
 				swatch.setOn(color === level.color);
 			}
@@ -126,32 +187,33 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			el(preview, "span", "tc-progress-dot");
 			el(preview, "span", "tc-level-preview-title", "Call mom");
 			el(preview, "span", "tc-level-preview-time", "10:00");
-			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.redrawn(this.service.removeLevel(index)));
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip(spec.deleteTooltip).onClick(() => void this.redrawn(spec.remove(index)));
+			const show = (color: PriorityColor, withCode?: TextComponent) => {
+				spec.preview(index, color);
+				preview.dataset.priority = color;
+				withCode?.setValue(inkOf(color, this.theme).slice(1));
+			};
 			picker.addEventListener("input", () => {
 				const color = this.colorOf(picker.value);
-				if (!color) return;
-				this.previewLevel(index, color, preview, code);
+				if (color) show(color, code);
 			});
 			picker.addEventListener("change", () => {
 				const color = this.colorOf(picker.value);
-				if (color) void this.redrawn(this.service.recolourLevel(index, color));
+				if (color) void this.redrawn(spec.recolour(index, color));
 			});
 			code.onChange((value) => {
 				const color = this.colorOf(value);
-				if (color) this.previewLevel(index, color, preview);
+				if (color) show(color);
 			});
 			code.inputEl.addEventListener("blur", () => {
 				const color = this.colorOf(code.getValue());
-				if (color && color !== level.color) void this.redrawn(this.service.recolourLevel(index, color));
-				else this.previewLevel(index, level.color, preview, code);
+				if (color && color !== level.color) void this.redrawn(spec.recolour(index, color));
+				else show(level.color, code);
 			});
 			code.inputEl.addEventListener("keydown", (e) => {
 				if (e.key === "Enter") code.inputEl.blur();
 			});
 		});
-		new Setting(group)
-			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
-			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
 	}
 
 	private get theme(): Theme {
@@ -163,13 +225,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const hex = hexColor(text);
 		if (!hex) return null;
 		return PRIORITY_COLORS.find((preset) => inkOf(preset, this.theme) === hex) ?? hex;
-	}
-
-	/** The colour being picked, on the row's card and everywhere else, before it is saved; with `code`, its code there too. */
-	private previewLevel(index: number, color: PriorityColor, preview: HTMLElement, code?: TextComponent): void {
-		showPriorityColors(this.settings.priorities.map((level, i) => (i === index ? { ...level, color } : level)));
-		preview.dataset.priority = color;
-		code?.setValue(inkOf(color, this.theme).slice(1));
 	}
 
 	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */

@@ -375,7 +375,7 @@ describe("the settings tab: the order", () => {
 	}
 
 	it("puts what is changed often first and the set-up-once part on pages under More", () => {
-		expect(headings(tab.containerEl)).toEqual(["Priorities", "Sections", "Cards", "More"]);
+		expect(headings(tab.containerEl)).toEqual(["Priorities", "Labels", "Sections", "Cards", "More"]);
 		for (const name of ["Calendars", "Day and timeline", "Tasks file"]) expect(rows(name)).toHaveLength(1);
 		for (const name of ["Account", "Client id", "Day starts at", "Scroll to hour", "Due date marker", "Long press delay", "Zoom levels", "Stale after"]) expect(rows(name)).toHaveLength(0);
 	});

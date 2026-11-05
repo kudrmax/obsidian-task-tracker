@@ -2,6 +2,7 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
+import type { LabelLevel, LabelPaint } from "../domain/Label";
 import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
@@ -45,6 +46,7 @@ export type { Clock } from "./ports";
 /** A card's height and the gap between cards before the settings are read. */
 export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
 /** A priority level, its colours in the order the settings offer them. */
+export { LABEL_PAINTS, type LabelLevel, type LabelPaint, labelTitle, sameLabels } from "../domain/Label";
 export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
@@ -106,6 +108,8 @@ export interface TaskItem {
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
+	/** The labels the task is tagged with, in the settings' order; none while it has a priority. */
+	readonly labels: readonly LabelLevel[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
 	/** The list the task is in, its task's for a subtask. */
@@ -169,6 +173,7 @@ export class TasksFileMissingError extends Error {
 export type TaskChange =
 	| { readonly kind: "status"; readonly status: TaskStatus }
 	| { readonly kind: "priority"; readonly priority: string | null }
+	| { readonly kind: "labels"; readonly labels: readonly string[] }
 	| { readonly kind: "dueDate"; readonly date: LocalDate | null }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	| { readonly kind: "remove" }
@@ -230,6 +235,8 @@ export interface ScreenView {
 export interface TaskService {
 	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
 	priorityLevels(): readonly PriorityLevel[];
+	/** The labels that tag tasks, in the settings' order: usable names, the first of two alike. */
+	labelLevels(): readonly LabelLevel[];
 	/** The level a typed title starts with and the title without it, as the file will read it. */
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null };
 	/** Nothing to write: no text, or a level's prefix alone. */
@@ -312,6 +319,8 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/** The task's labels become these names, written as tags; a task with a priority keeps none. */
+	setLabels(key: TaskKey, labels: readonly string[]): Promise<void>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
 	/**
@@ -569,6 +578,7 @@ export interface ScreenSettings extends ViewSettings {
 	/** The heading over tasks outside any section. */
 	readonly ungrouped: string;
 	readonly priorities: readonly PriorityLevel[];
+	readonly labels: readonly LabelLevel[];
 }
 
 /** What the screen sets by hand, on this device only: the divider's place, the columns shown, the zoom. */
@@ -596,6 +606,9 @@ export interface SettingsForm {
 	readonly sections: SectionNames;
 	readonly markers: Readonly<Record<Marker, string>>;
 	readonly priorities: readonly PriorityLevel[];
+	readonly labelTag: string;
+	readonly labels: readonly LabelLevel[];
+	readonly labelPaint: LabelPaint;
 	readonly presets: readonly string[];
 	readonly ungrouped: string;
 	readonly cardHeight: number;
@@ -643,6 +656,16 @@ export interface SettingsService {
 	addLevel(): Promise<void>;
 	/** The level at `from` goes to `to`, the others keeping their order. */
 	moveLevel(from: number, to: number): Promise<void>;
+	/** The tag folder trimmed; written when it is one word. */
+	setLabelTag(tag: string): Promise<void>;
+	/** The name as shown, its spaces written as underscores. */
+	renameLabel(index: number, title: string): Promise<void>;
+	recolourLabel(index: number, color: PriorityColor): Promise<void>;
+	removeLabel(index: number): Promise<void>;
+	/** A new label `Label_<n>` no label has, in the first colour no label has. */
+	addLabel(): Promise<void>;
+	moveLabel(from: number, to: number): Promise<void>;
+	setLabelPaint(paint: LabelPaint): Promise<void>;
 	/** The name trimmed. */
 	renamePreset(index: number, name: string): Promise<void>;
 	removePreset(index: number): Promise<void>;

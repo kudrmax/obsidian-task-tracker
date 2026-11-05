@@ -9,7 +9,7 @@ import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
-import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
+import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
 import {
 	StaleTaskError,
 	TasksFileMissingError,
@@ -41,7 +41,7 @@ import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
-import { toItem } from "./taskItems";
+import { itemLevels, toItem } from "./taskItems";
 import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
 
@@ -125,6 +125,10 @@ export class TaskServiceImpl implements TaskService {
 
 	priorityLevels(): readonly PriorityLevel[] {
 		return this.levels(this.settings.get());
+	}
+
+	labelLevels(): readonly LabelLevel[] {
+		return usableLabels(this.settings.get().labels);
 	}
 
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
@@ -284,6 +288,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
+	}
+
+	async setLabels(key: TaskKey, labels: readonly string[]): Promise<void> {
+		await this.mutate((doc) => ops.setLabels(doc, this.entryOf(doc, key), labels));
 	}
 
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
@@ -458,6 +466,8 @@ export class TaskServiceImpl implements TaskService {
 				return ops.setStatus(doc, entry, change.status);
 			case "priority":
 				return ops.setPriority(doc, entry, change.priority);
+			case "labels":
+				return ops.setLabels(doc, entry, change.labels);
 			case "dueDate":
 				return ops.setDueDate(doc, entry, change.date);
 			case "postpone":
@@ -574,9 +584,10 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, dayStartHour, labelTag } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, prefixes, dayStartHour]);
+		const labels = usableLabels(settings.labels).map((l) => l.name);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, prefixes, labelTag, labels, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
@@ -588,8 +599,9 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
-		const levels = this.levels(this.settings.get());
-		return (entry) => toItem(entry, today, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
+		const settings = this.settings.get();
+		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
+		return (entry) => toItem(entry, today, levels);
 	}
 
 	/** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */

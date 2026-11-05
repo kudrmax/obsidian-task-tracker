@@ -1,4 +1,4 @@
-import { type GroupName, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -81,6 +81,22 @@ export function priorityTiles(item: TaskItem, levels: readonly PriorityLevel[]):
 	return levels.map((level) => ({ prefix: level.prefix, color: level.color, on: level.prefix === item.priority?.prefix }));
 }
 
+export interface LabelTile extends LabelLevel {
+	readonly title: string;
+	readonly on: boolean;
+}
+
+/** The label group's tiles, in the settings' order, the task's own on. */
+export function labelTiles(item: TaskItem, labels: readonly LabelLevel[]): readonly LabelTile[] {
+	return labels.map((label) => ({ name: label.name, color: label.color, title: labelTitle(label.name), on: item.labels.some((l) => l.name === label.name) }));
+}
+
+/** A tap on a label puts it on the task beside the others; on one the task has it takes that one off. */
+export function nextLabels(item: TaskItem, name: string): readonly string[] {
+	const names = item.labels.map((l) => l.name);
+	return names.includes(name) ? names.filter((n) => n !== name) : [...names, name];
+}
+
 /** A tap on a level sets it; on the task's own level it takes the priority off. */
 export function nextPriority(item: TaskItem, prefix: string): string | null {
 	return item.priority?.prefix === prefix ? null : prefix;
@@ -96,6 +112,8 @@ export interface MenuActions {
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
+	/** The task's labels become these names. */
+	setLabels(names: readonly string[]): Promise<void>;
 	setReminder(kind: ReminderKind): Promise<void>;
 	/** The task repeats by `rule` from now on; null: it repeats no more. */
 	setRepeat(rule: RepeatRule | null): Promise<void>;
@@ -122,6 +140,8 @@ export interface TaskMenuContext {
 	readonly day: LocalDate;
 	/** The priority levels the submenu offers. */
 	readonly levels: readonly PriorityLevel[];
+	/** The labels the menu offers, after the levels; none without them. */
+	readonly labels?: readonly LabelLevel[];
 	readonly actions: MenuActions;
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
@@ -307,7 +327,7 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
-		const { item, actions, levels } = this.context;
+		const { item, actions, levels, labels } = this.context;
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
 			progress: this.pick(() => actions.setStatus(nextProgress([item.status]))),
@@ -325,8 +345,10 @@ export class TaskMenu extends LiftedMenu {
 		const tiles = statusTiles(item);
 		if (this.asking === "wontdo" || this.asking === "stop") this.askGroup(this.asking);
 		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
-		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
+		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: item.labels.length > 0, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
+		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: item.priority !== null, onPick: this.pick(() => actions.setLabels(nextLabels(item, tile.name))) }));
+		if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
 		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
 			label,
 			icon,

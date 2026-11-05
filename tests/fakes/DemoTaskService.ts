@@ -6,7 +6,7 @@ import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Pri
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
 import { plainText } from "../../src/domain/TaskText";
-import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
+import { DEFAULT_SETTINGS, type LabelLevel, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
 interface DemoTask {
@@ -77,6 +77,13 @@ export class DemoTaskService implements TaskService {
 
 	constructor(private readonly clock: Clock) {}
 
+	/** The demo's tasks carry no labels. */
+	labelLevels(): readonly LabelLevel[] {
+		return [];
+	}
+
+	async setLabels(): Promise<void> {}
+
 	priorityLevels(): readonly PriorityLevel[] {
 		return usableLevels(DEFAULT_SETTINGS.priorities);
 	}
@@ -129,6 +136,7 @@ export class DemoTaskService implements TaskService {
 			open: t.status === "todo" || t.status === "inProgress",
 			repeatable: section !== "done" && (t.status === "todo" || t.status === "inProgress"),
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
+			labels: [],
 			subtasks: [],
 			progress: null,
 			parentText: null,

@@ -58,3 +58,11 @@ describe("the priority stylesheet", () => {
 		expect(priorityRules([{ prefix: "p1", color: "#oops" as PriorityColor }])).not.toContain("oops");
 	});
 });
+
+describe("the labels' fills", () => {
+	it("give a card of several labels each colour's fill in its place, in both themes", () => {
+		const rules = priorityRules([{ name: "Свой", color: "#123456" }]);
+		expect(rules).toContain(`[data-label1="orange"] { --tc-label-fill-1: ${shadesOf("orange", "dark").fill}; }`);
+		expect(rules).toContain(`body.theme-light [data-label0="#123456"] { --tc-label-fill-0: ${shadesOf("#123456", "light").fill}; }`);
+	});
+});

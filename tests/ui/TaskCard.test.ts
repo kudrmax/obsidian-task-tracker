@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import { renderTaskCard } from "../../src/ui/TaskCard";
+import { markColours, renderTaskCard } from "../../src/ui/TaskCard";
 import { TaskList } from "../../src/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
 
@@ -172,5 +172,21 @@ describe("a task with subtasks", () => {
 			["A21", "tc-branch is-last"],
 			["B", null],
 		]);
+	});
+});
+
+describe("a card's colours", () => {
+	const RED = { name: "Важное", color: "red" } as const;
+	const ORANGE = { name: "Срочное", color: "orange" } as const;
+	const attrs = (card: HTMLElement) => [card.dataset.priority, card.dataset.labels, card.getAttribute("data-label0"), card.getAttribute("data-label1")];
+
+	it("tints a card of one label as a priority, and gives a card of several each colour", () => {
+		const card = document.createElement("div");
+		markColours(card, { priority: null, labels: [RED] });
+		expect(attrs(card)).toEqual(["red", undefined, null, null]);
+		markColours(card, { priority: null, labels: [RED, ORANGE] });
+		expect(attrs(card)).toEqual(["red", "2", "red", "orange"]);
+		markColours(card, { priority: null, labels: [] });
+		expect(attrs(card)).toEqual([undefined, undefined, null, null]);
 	});
 });

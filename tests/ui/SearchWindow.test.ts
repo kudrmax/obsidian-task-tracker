@@ -16,6 +16,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 		open: list !== "done",
 		repeatable: false,
 		priority: null,
+		labels: [],
 		group: null,
 		list,
 		isSubtask: false,

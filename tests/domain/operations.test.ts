@@ -24,6 +24,7 @@ import {
 	remove,
 	rename,
 	setDueDate,
+	setLabels,
 	setPriority,
 	setReminder,
 	setSlot,
@@ -47,7 +48,7 @@ function parse(text: string): TaskDocument {
 
 describe("newTask", () => {
 	it("builds a todo task and applies the patch", () => {
-		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "live", repeat: null, priority: null, children: [] });
+		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "live", repeat: null, priority: null, labels: [], children: [] });
 		expect(newTask("A", { dueDate: D }).dueDate).toBe(D);
 	});
 });
@@ -432,6 +433,31 @@ describe("Backlog", () => {
 	it("a drop into a gap of Backlog puts the task there without a due date", () => {
 		const d = parse("## Backlog\n- [ ] L\n- [ ] M\n\n## Now\n- [ ] A 📅 2026-10-30\n");
 		expect(moveToGroup(d, d.tasks("now")[0], "backlog", null, d.tasks("backlog")[1], T).serialize()).toBe("## Backlog\n- [ ] L\n- [ ] A\n- [ ] M\n\n## Now\n");
+	});
+});
+
+describe("labels", () => {
+	const L = { ...M, priorities: ["p1"], labelTag: "label", labels: ["Важное", "Срочное"] };
+	const doc = (text: string) => TaskDocument.parse(text, SECTIONS, L);
+
+	it("setLabels writes the labels as tags, and none takes them off", () => {
+		const d = doc("## Now\n- [ ] X 📅 2026-10-30\n");
+		const tagged = setLabels(d, d.tasks("now")[0], ["Срочное", "Важное"]);
+		expect(tagged.serialize()).toBe("## Now\n- [ ] X #label/Срочное #label/Важное 📅 2026-10-30\n");
+		expect(setLabels(tagged, tagged.tasks("now")[0], []).serialize()).toBe("## Now\n- [ ] X 📅 2026-10-30\n");
+	});
+
+	it("gives a task a priority or labels, never both", () => {
+		const prioritized = doc("## Now\n- [ ] p1 X\n");
+		expect(setLabels(prioritized, prioritized.tasks("now")[0], ["Важное"]).serialize()).toBe("## Now\n- [ ] p1 X\n");
+		const labelled = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(setPriority(labelled, labelled.tasks("now")[0], "p1").serialize()).toBe("## Now\n- [ ] X #label/Важное\n");
+		expect(placeTask(labelled, labelled.tasks("now")[0], { text: "Y", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
+	});
+
+	it("keeps the labels when a task is renamed", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(rename(d, d.tasks("now")[0], "Y").serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
 	});
 });
 

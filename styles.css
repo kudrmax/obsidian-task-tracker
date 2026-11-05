@@ -271,6 +271,14 @@ body {
 	--tc-float-count-ring: 2px;
 	/* The carried stack over the cancel ring, seen through. */
 	--tc-float-cancel-opacity: 0.35;
+	/* A card of several labels, painted as stripes: each colour's band across, then the next, at this slant. */
+	--tc-label-stripe: 6px;
+	--tc-label-stripe-2: calc(2 * var(--tc-label-stripe));
+	--tc-label-stripe-3: calc(3 * var(--tc-label-stripe));
+	--tc-label-stripe-4: calc(4 * var(--tc-label-stripe));
+	--tc-label-stripe-angle: 120deg;
+	/* A menu tile that can't be pressed: a label's while the task has a priority, a level's while it has labels. */
+	--tc-tile-off-opacity: 0.35;
 	/* A subtask's card stands this much further in per level. */
 	--tc-subtask-indent: 20px;
 	/* A branch runs up through the gap and a little under the card above, to the curve of its bottom. */
@@ -314,6 +322,7 @@ body {
 	--tc-stroke-badge: var(--tc-stroke-3-6);
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
 	--tc-level-prefix-w: 48px;
+	--tc-label-name-w: 88px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
 	--tc-swatch-halo: var(--setting-items-background);
@@ -1005,6 +1014,13 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. The shades come per colour from src/ui/priorityColors.ts; a field's row takes its field's, for the dot of the task it renames. */
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
+/* A task with several labels: narrow diagonal stripes of their colours in turn, or, with the settings' blend, one colour flowing into the next. Each label's fill comes from src/ui/priorityColors.ts; the first also tints the card as a priority would, for the dot and the time. */
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="2"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2)); }
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="3"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3)); }
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="4"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3), var(--tc-label-fill-3) var(--tc-label-stripe-3) var(--tc-label-stripe-4)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="2"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="3"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="4"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2), var(--tc-label-fill-3)); }
 .tc-card.is-selected, .tc-lifted.is-selected { background: var(--tc-select-bg); }
 /* Select tasks: every list card leads with a circle, which the accent fills with a check once the task is picked; the in-progress dot gives it its place. */
 .tc-pick { display: none; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: var(--tc-pick-gap); border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; }
@@ -1060,6 +1076,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
 .tc-menu-tile > svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-menu-tile[data-priority] > svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
+.tc-panel button.tc-menu-tile:disabled { opacity: var(--tc-tile-off-opacity); }
 /* The quick moves: their icons in the accent, as the drop zones' were. */
 .tc-menu-tiles.is-move .tc-menu-tile > svg { color: var(--tc-accent-ui); }
 .tc-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
@@ -1186,6 +1203,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-8); }
 .tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; margin: 0; }
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
+.tc-level-row input[type="text"].tc-label-name { width: var(--tc-label-name-w); flex-shrink: 0; margin: 0; }
 .tc-row-grip { touch-action: none; cursor: grab; }
 .tc-level-row.is-dragging { opacity: var(--tc-pressed); }
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-6); flex-shrink: 0; }

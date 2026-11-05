@@ -13,7 +13,7 @@ function parse(text: string): TaskDocument {
 }
 
 function task(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: " ", text, dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
+	return { status: "todo", statusChar: " ", text, dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, labels: [], children: [], ...patch };
 }
 
 describe("TaskDocument.parse", () => {

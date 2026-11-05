@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toItem } from "../../src/application/taskItems";
+import { itemLevels, toItem } from "../../src/application/taskItems";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -42,6 +42,7 @@ describe("toItem", () => {
 			open: true,
 			repeatable: true,
 			priority: null,
+			labels: [],
 			group: null,
 			list: "now",
 			isSubtask: false,
@@ -118,11 +119,29 @@ describe("toItem on a day", () => {
 
 describe("toItem with priority levels", () => {
 	const RED = { prefix: "p1", color: "red" } as const;
-	const levelOf = (prefix: string) => (prefix === "p1" ? RED : null);
+	const levelOf = itemLevels([RED], []);
 
 	it("gives the level of the task's prefix, none without one", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] p1 A\n- [ ] B\n", SECTIONS, { ...M, priorities: ["p1"] });
 		expect(toItem(d.tasks("now")[0], T, levelOf)).toMatchObject({ text: "A", priority: RED });
 		expect(toItem(d.tasks("now")[1], T, levelOf).priority).toBeNull();
+	});
+});
+
+describe("toItem with labels", () => {
+	const RED = { prefix: "p1", color: "red" } as const;
+	const URGENT = { name: "Срочное", color: "orange" } as const;
+	const IMPORTANT = { name: "Важное", color: "red" } as const;
+	const levels = itemLevels([RED], [IMPORTANT, URGENT]);
+	const markers = { ...M, priorities: ["p1"], labelTag: "label", labels: ["Важное", "Срочное"] };
+
+	it("gives the task's labels in the settings' order, whatever order the line has them in", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A #label/Срочное #label/Важное\n", SECTIONS, markers);
+		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ text: "A", labels: [IMPORTANT, URGENT], priority: null });
+	});
+
+	it("gives a task with a priority no labels, though its line has both", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] p1 A #label/Срочное\n", SECTIONS, markers);
+		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ priority: RED, labels: [] });
 	});
 });

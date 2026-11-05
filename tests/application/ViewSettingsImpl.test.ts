@@ -44,6 +44,8 @@ describe("ViewSettingsImpl", () => {
 			sections: DEFAULT_SETTINGS.sections,
 			ungrouped: "No section",
 			priorities: DEFAULT_SETTINGS.priorities,
+			labels: [],
+			labelPaint: "stripes",
 		});
 		expect(JSON.stringify(shown)).not.toMatch(/secret|token|google/);
 	});

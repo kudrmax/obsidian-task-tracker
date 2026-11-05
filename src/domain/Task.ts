@@ -60,6 +60,8 @@ export interface Task {
 	readonly repeat: Repeat | null;
 	/** The prefix of a priority level, the first word of the line's text; null without one. */
 	readonly priority: string | null;
+	/** The names of the labels the line is tagged with, in its order; a task has these or a priority, not both. */
+	readonly labels: readonly string[];
 	/** Nested lines (deeper indent than the task), raw, in file order. They travel with the task. */
 	readonly children: readonly string[];
 }
