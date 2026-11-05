@@ -1,5 +1,4 @@
-import type { Weekday } from "../../application/contracts";
-import type { PriorityColor } from "../../settings";
+import type { PriorityColor, Weekday } from "../../application/contracts";
 import { PROPERTY, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";

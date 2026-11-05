@@ -1,5 +1,4 @@
-import { type Placement, type RepeatRule, samePlacement } from "../../application/contracts";
-import { type PriorityLevel, usableLevels } from "../../settings";
+import { type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -38,6 +37,7 @@ export interface BarAnchor {
 export interface QuickBarDeps {
 	/** Obsidian runs on the desktop: no keyboard rises, the bar is a capsule by the field. */
 	desktop(): boolean;
+	/** The levels that mark tasks, as the panel offers them. */
 	levels(): readonly PriorityLevel[];
 	today(): LocalDate;
 	onIndent(delta: 1 | -1): void;
@@ -224,7 +224,7 @@ export class QuickBar {
 	}
 
 	private levels(): readonly PriorityLevel[] {
-		return usableLevels(this.deps.levels());
+		return this.deps.levels();
 	}
 
 	private showPlace(place: Placement): void {

@@ -1,4 +1,4 @@
-import { PRIORITY_COLORS, type PriorityColor, type PriorityLevel } from "../settings";
+import { PRIORITY_COLORS, type PriorityColor, type PriorityLevel } from "../application/contracts";
 
 /** Changes to the priority levels, each made to the levels as they are saved at that moment, so one edit never undoes the one before it. */
 export class LevelEdits {

@@ -1,9 +1,7 @@
 import { type NewTaskPlace, type Placement, type RepeatRule, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
-import type { PriorityLevel } from "../../settings";
 import type { ListColumn } from "../drag/DropTarget";
 import { type GapPlace, type ListCard, type PlaceResult, fitLevel, resultOf, sameTask, shiftLevel } from "../drag/listPlace";
 import type { Slot } from "../types";
-import { levelOfText } from "./QuickField";
 import { WriteQueue } from "./WriteQueue";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
@@ -46,8 +44,8 @@ export interface QuickEntryDeps {
 	edit: TaskService["edit"];
 	/** The placement a rename at `spot` gives the task. */
 	placement(spot: EntrySpot): Placement;
-	/** The priority levels a text may start with: a text that is only one's prefix is blank. */
-	levels(): readonly PriorityLevel[];
+	/** Nothing to write: no text, or a level's prefix alone. */
+	isBlank: TaskService["isBlank"];
 	/**
 	 * After every change of the state; null once the field closed. `drawnNext`: the lists are about to draw the data this
 	 * change belongs to, so it needs no drawing of its own.
@@ -380,10 +378,8 @@ export class QuickEntry {
 		return field.run.shifted(this.deps.cards(field.run.spot.column), delta);
 	}
 
-	/** Nothing to write: no text, or a priority's prefix alone. */
 	private blank(text: string): boolean {
-		const level = levelOfText(text, this.deps.levels());
-		return (level ? text.slice(level.prefix.length) : text).trim() === "";
+		return this.deps.isBlank(text);
 	}
 
 	private changed(): void {

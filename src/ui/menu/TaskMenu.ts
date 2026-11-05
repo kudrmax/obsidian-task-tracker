@@ -1,5 +1,4 @@
-import { type GroupName, plainText, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
-import type { PriorityLevel } from "../../settings";
+import { type GroupName, plainText, type PriorityLevel, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";

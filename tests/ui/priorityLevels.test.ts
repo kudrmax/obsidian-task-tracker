@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PriorityLevel } from "../../src/settings";
+import type { PriorityLevel } from "../../src/application/contracts";
 import { LevelEdits } from "../../src/ui/priorityLevels";
 
 function edits(start: readonly PriorityLevel[]) {
