@@ -312,3 +312,31 @@ export interface CalendarService {
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 }
+
+/** A calendar of the Google account, as the settings tab lists it. */
+export interface CalendarOption {
+	readonly id: string;
+	readonly title: string;
+	readonly color: string;
+}
+
+/** The Google account as the settings tab sees it: logged in or not, and which of its calendars the timeline shows. */
+export interface GoogleAccount {
+	isLoggedIn(): boolean;
+	/** Opens the browser for Google's consent; the token syncs to the other devices. */
+	login(): Promise<string>;
+	logout(): Promise<void>;
+	/** Asked afresh each time. */
+	listCalendars(): Promise<readonly CalendarOption[]>;
+	/** Shown calendar ids: empty means every calendar selected in Google. */
+	setShown(all: readonly CalendarOption[], id: string, shown: boolean): Promise<void>;
+	isShown(id: string): boolean;
+}
+
+/** What the work calendar needs set up by hand: the Scriptable script, and the export on the phone. */
+export interface WorkCalendarSetup {
+	/** The script to paste into Scriptable. */
+	scriptableLoader(): string;
+	/** Asks the phone for fresh work events. */
+	export(): void;
+}
