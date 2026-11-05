@@ -1,6 +1,6 @@
-import { applyOperation, applyOperationAsRead, boundaryOf, readDocument } from "../application/documentText";
+import { applyOperation, applyOperationAsRead, boundaryOf, readDocument } from "./documentText";
 import type { DayBoundary } from "../domain/DayBoundary";
-import { addDays, localDateOf, minutesToHHMM } from "../domain/LocalDate";
+import { addDays, minutesToHHMM } from "../domain/LocalDate";
 import * as ops from "../domain/operations";
 import { openSlotted } from "../domain/queries";
 import type { LocalDate, Slot } from "../domain/Task";
@@ -34,7 +34,7 @@ function clockOf(date: LocalDate, minutes: number): Date {
 class StaleTask extends Error {}
 
 /** What the phone app asks of the tasks file, read with the plugin's settings (its `data.json`, or nothing for the defaults). */
-export class PhoneReminders {
+export class PhoneReminderService {
 	private readonly settings: TaskCalendarSettings;
 	private readonly boundary: DayBoundary;
 
@@ -62,7 +62,7 @@ export class PhoneReminders {
 	}
 
 	snooze(text: string, id: string, minutes: number, now: Date): PhoneAction {
-		return this.act(text, id, now, (doc, entry, today, boundary) => ops.setSlot(doc, entry, this.from(now, minutes, entry.task.slot!), today, boundary));
+		return this.act(text, id, now, (doc, entry, today, boundary) => ops.setSlot(doc, entry, ops.snoozedSlot(entry.task.slot!, now, minutes), today, boundary));
 	}
 
 	private act(text: string, id: string, now: Date, op: (doc: TaskDocument, entry: TaskEntry, today: LocalDate, boundary: DayBoundary) => TaskDocument): PhoneAction {
@@ -80,13 +80,6 @@ export class PhoneReminders {
 			}
 		}
 		return { changed: false, reason: "stale" };
-	}
-
-	/** `slot` moved to start `minutes` from now, as long as it was. */
-	private from(now: Date, minutes: number, slot: Slot): Slot {
-		const at = new Date(now.getTime() + minutes * 60_000);
-		const start = at.getHours() * HOUR_MINUTES + at.getMinutes();
-		return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
 	}
 
 	private reminder(entry: TaskEntry, slot: Slot): PhoneReminder {

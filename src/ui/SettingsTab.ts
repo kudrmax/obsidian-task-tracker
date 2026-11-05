@@ -1,4 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
+import type { CalendarOption, GoogleAccount, WorkCalendarSetup } from "../application/contracts";
 import type { SettingsStore } from "../application/ports";
 import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import { LevelEdits } from "./priorityLevels";
@@ -7,18 +8,9 @@ import { PresetEdits } from "./presetEdits";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
 
-export interface GoogleCalendarOption {
-	readonly id: string;
-	readonly title: string;
-	readonly color: string;
-}
-
 export interface SettingsTabDeps {
-	login(): Promise<string>;
-	logout(): Promise<void>;
-	listCalendars(): Promise<GoogleCalendarOption[]>;
-	/** The script to paste into Scriptable. */
-	scriptableLoader(): string;
+	readonly google: GoogleAccount;
+	readonly work: WorkCalendarSetup;
 }
 
 const HOURS_PER_DAY = 24;
@@ -201,18 +193,18 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.number(el, "Refresh interval", "Seconds between calendar fetches while the view is open; 0 turns the timer off. Coming back to Obsidian fetches at once.", this.settings.google.refreshSeconds, (refreshSeconds) =>
 			this.google({ refreshSeconds }),
 		);
-		if (this.settings.google.refreshToken) void this.calendarRows(el.createDiv());
+		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
 	}
 
 	private loginRow(el: HTMLElement): void {
-		const loggedIn = this.settings.google.refreshToken !== "";
+		const loggedIn = this.deps.google.isLoggedIn();
 		const row = new Setting(el).setName(loggedIn ? "Logged in" : "Not logged in");
 		row.setDesc(loggedIn ? "The token syncs to your other devices." : "Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {
 				try {
-					if (loggedIn) await this.deps.logout();
-					else await this.deps.login();
+					if (loggedIn) await this.deps.google.logout();
+					else await this.deps.google.login();
 					this.display();
 				} catch (e) {
 					new Notice(`Google: ${e instanceof Error ? e.message : String(e)}`);
@@ -222,9 +214,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	}
 
 	private async calendarRows(el: HTMLElement): Promise<void> {
-		let calendars: GoogleCalendarOption[];
+		let calendars: readonly CalendarOption[];
 		try {
-			calendars = await this.deps.listCalendars();
+			calendars = await this.deps.google.listCalendars();
 		} catch (e) {
 			new Setting(el).setName("Calendars").setDesc(`Could not load: ${e instanceof Error ? e.message : String(e)}`);
 			return;
@@ -232,21 +224,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el).setName("Calendars").setDesc("Which calendars to show. All of them when none is unchecked.");
 		for (const calendar of calendars) {
 			new Setting(el).setName(calendar.title).addToggle((t) =>
-				t.setValue(this.isShown(calendar.id)).onChange((shown) => this.plugin.update(this.google({ calendarIds: this.calendarIdsWith(calendars, calendar.id, shown) }))),
+				t.setValue(this.deps.google.isShown(calendar.id)).onChange((shown) => this.deps.google.setShown(calendars, calendar.id, shown)),
 			);
 		}
-	}
-
-	private isShown(id: string): boolean {
-		const ids = this.settings.google.calendarIds;
-		return ids.length === 0 || ids.includes(id);
-	}
-
-	private calendarIdsWith(all: readonly GoogleCalendarOption[], id: string, shown: boolean): string[] {
-		const selected = new Set(all.filter((c) => this.isShown(c.id)).map((c) => c.id));
-		if (shown) selected.add(id);
-		else selected.delete(id);
-		return all.every((c) => selected.has(c.id)) ? [] : [...selected];
 	}
 
 	private workGroup(el: HTMLElement): void {
@@ -260,7 +240,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc("Paste once into a Scriptable script named Export Work Calendar. The export it runs comes with the plugin and updates with it.")
 			.addButton((b) =>
 				b.setButtonText("Copy").onClick(async () => {
-					await navigator.clipboard.writeText(this.deps.scriptableLoader());
+					await navigator.clipboard.writeText(this.deps.work.scriptableLoader());
 					new Notice("Scriptable script copied");
 				}),
 			);
