@@ -12,6 +12,10 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let expiration = AppSignature.expiration {
+                    SigningPlate(expiration: expiration)
+                }
+
                 Section {
                     Button { picking = true } label: {
                         LabeledContent("Vault Folder", value: model.folderName ?? "Not Chosen")
@@ -45,7 +49,7 @@ struct SettingsView: View {
                 Task { await model.choose(picked) }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
-                if phase == .active { Task { await model.refresh() } }
+                if phase == .active { Task { await model.refresh(); await SigningWarnings.schedule() } }
             }
         }
     }

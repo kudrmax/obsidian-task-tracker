@@ -105,3 +105,12 @@
 ## Оставлено строителю
 
 Шаг и бюджет цепочки повторов; формат идентификаторов напоминаний; как именно intent ждёт дописывания файла; устройство Swift-слоёв; имя URL-схемы приложения; как точка входа плагина собирается и обновляется в приложении.
+
+## The app's signature (2026-11-05)
+
+A free Apple ID signs the app for 7 days; after that it does not open until it is installed from the Mac again. The end comes from the `ExpirationDate` of the provisioning profile inside the app (`embedded.mobileprovision`), so it is the real date, not a timer.
+
+- **Plate** at the top of Settings, whenever the date is known (not in the simulator): a coloured square with a signature glyph, "N days left" (whole days) or, in the last day, "N hours left" (rounded up), and the date and time it ends. Green while more than 2 days are left, orange from 2 days, red from 1 day. Under it: "Install the app from the Mac again before then."
+- **Notices** 2 days, 1 day, 12 hours, 2 hours and 1 hour before the end, quiet like the reminders. Set again each time the app opens (a fresh install brings a new date); the ones already past are not set.
+- The reminders' sync manages only notifications of the reminder category, so it leaves these alone.
+- Simulator check: launch argument `-SignatureHoursLeft <hours>`.

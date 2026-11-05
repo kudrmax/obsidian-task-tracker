@@ -43,8 +43,9 @@ final class UserNotifications: NotificationScheduling {
         center.add(UNNotificationRequest(identifier: "\(reminder.id)#failed", content: content, trigger: nil))
     }
 
+    /// Only the reminders': the sync leaves the app's other notices (the signature's) alone.
     func pending() async -> Set<String> {
-        Set(await Self.center.pendingNotificationRequests().map(\.identifier))
+        Set(await Self.center.pendingNotificationRequests().filter { $0.content.categoryIdentifier == Self.category }.map(\.identifier))
     }
 
     func delivered() async -> [DeliveredNotification] {
