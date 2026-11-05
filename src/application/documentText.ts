@@ -15,6 +15,7 @@ export function markersOf(settings: TaskCalendarSettings): Markers {
 		liveSlot: settings.liveSlotMarker,
 		silentSlot: settings.silentSlotMarker,
 		repeat: settings.repeatMarker,
+		collapsed: settings.collapsedMarker,
 		priorities: usableLevels(settings.priorities).map((l) => l.prefix),
 		labelTag: settings.labelTag,
 		labels: usableLabels(settings.labels).map((l) => l.name),

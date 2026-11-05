@@ -26,6 +26,7 @@ export class SettingsServiceImpl implements SettingsService {
 				liveSlotMarker: s.liveSlotMarker,
 				silentSlotMarker: s.silentSlotMarker,
 				repeatMarker: s.repeatMarker,
+				collapsedMarker: s.collapsedMarker,
 			},
 			priorities: s.priorities,
 			labelTag: s.labelTag,
