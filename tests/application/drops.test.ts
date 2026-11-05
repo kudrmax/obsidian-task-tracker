@@ -1,10 +1,7 @@
-// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem, TaskKey } from "../../src/application/contracts";
+import { acceptsDrop, type DropColumn, type DropFrom, type DropOrigin, type DropTo, placesInGap, type TaskItem, type TaskKey } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { BulkController } from "../../src/ui/BulkController";
-import type { DropResult, ListColumn, TaskDragPayload, TaskOrigin } from "../../src/ui/drag/DropTarget";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 
@@ -85,47 +82,8 @@ async function itemsOf(svc: Svc): Promise<Map<string, TaskItem>> {
 interface DropCase {
 	readonly name: string;
 	readonly day: string;
-	readonly tasks: readonly (readonly [string, TaskOrigin])[];
-	readonly to: (key: (text: string) => TaskKey) => DropResult;
-}
-
-/** The table `applyDrop` of the view holds today, word for word (spec §5.1). */
-function todaysSingle(svc: Svc, key: TaskKey, from: TaskOrigin, result: DropResult, day: string): Promise<void> {
-	const tasks = svc;
-	if (result.kind === "slot") return tasks.setSlot(key, result.slot);
-	if (result.kind === "clearSlot") return tasks.clearSlot(key);
-	if (result.kind === "group") return tasks.moveToGroup(key, result.list, result.group, result.before, result.date ?? undefined);
-	if (result.kind === "nest") return tasks.nest(key, result.parent, result.before);
-	if (from === "timeline") return tasks.clearSlot(key, { before: result.before, date: day });
-	if (result.column === "left") return from === "left" ? tasks.moveBefore(key, result.before, day) : tasks.moveToList(key, day);
-	if (result.before) return tasks.moveBefore(key, result.before, day);
-	if (from === "left") return tasks.moveToSoon(key, day);
-	return tasks.moveToEnd(key, result.column);
-}
-
-/** Several tasks: the bulk controller's steps, written by `applyAll`, as the view does today. */
-function todaysBulk(svc: Svc, items: readonly TaskItem[], froms: readonly TaskOrigin[], result: DropResult, day: string): Promise<void> {
-	const bulk = new BulkController({
-		root: document.body,
-		apply: (steps) => svc.applyAll(steps),
-		today: () => T,
-		day: () => day,
-		levels: () => [],
-		cards: () => [],
-		sections: () => null,
-		desktop: () => true,
-		isMod: () => false,
-	});
-	const drag: TaskDragPayload = {
-		item: items[0],
-		from: froms[0],
-		durationMin: null,
-		grabPx: 0,
-		carried: items.slice(1).map((item, i) => ({ item, from: froms[i + 1] as ListColumn })),
-	};
-	const steps = bulk.dropSteps(drag, result);
-	if (!steps) throw new Error("not a drop of several");
-	return svc.applyAll(steps);
+	readonly tasks: readonly (readonly [string, DropFrom])[];
+	readonly to: (key: (text: string) => TaskKey) => DropTo;
 }
 
 async function dropped(c: DropCase): Promise<string> {
@@ -136,10 +94,7 @@ async function dropped(c: DropCase): Promise<string> {
 		if (!item) throw new Error(`no task ${text}`);
 		return item.key;
 	};
-	const result = c.to(key);
-	const carried = c.tasks.map(([text]) => items.get(text)!);
-	if (c.tasks.length === 1) await todaysSingle(svc, carried[0].key, c.tasks[0][1], result, c.day);
-	else await todaysBulk(svc, carried, c.tasks.map(([, from]) => from), result, c.day);
+	await svc.drop(c.tasks.map(([text, from]) => ({ key: key(text), from })), c.to(key), c.day);
 	return store.text!;
 }
 
@@ -154,28 +109,28 @@ const SINGLE: readonly DropCase[] = [
 	{ name: "Backlog → the timeline", day: T, tasks: [["B2", "backlog"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
 	{ name: "a subtask → the timeline: it becomes a task", day: T, tasks: [["N1a", "left"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
 	{ name: "the timeline → another time, with its duration", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "slot", slot: slot(T, 15, 16) }) },
-	{ name: "the timeline → today's list before a task", day: T, tasks: [["N2", "timeline"]], to: (k) => ({ kind: "listBefore", before: k("N1"), column: "left" }) },
-	{ name: "the timeline → the end of a list", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "the later day's timeline → its list", day: D, tasks: [["ST", "timeline"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
+	{ name: "the timeline → today's list before a task", day: T, tasks: [["N2", "timeline"]], to: (k) => ({ kind: "list", column: "left", before: k("N1") }) },
+	{ name: "the timeline → the end of a list", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "the later day's timeline → its list", day: D, tasks: [["ST", "timeline"]], to: () => ({ kind: "list", column: "left", before: null }) },
 	{ name: "the timeline → a section of today's list", day: T, tasks: [["N2", "timeline"]], to: (k) => ({ kind: "group", list: "now", date: null, group: "Work", before: k("N3") }) },
 	{ name: "the timeline → under a task", day: T, tasks: [["N2", "timeline"]], to: (k) => ({ kind: "nest", parent: k("N1"), before: null }) },
 	{ name: "clearSlot", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "clearSlot" }) },
-	{ name: "a past day's list → before another of its tasks", day: P, tasks: [["NP2", "left"]], to: (k) => ({ kind: "listBefore", before: k("NP"), column: "left" }) },
-	{ name: "a past day's list → its end", day: P, tasks: [["NP", "left"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "Soon → a past day's list", day: P, tasks: [["S1", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "Inbox → a past day's list", day: P, tasks: [["I2", "inbox"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "Backlog → a past day's list", day: P, tasks: [["B1", "backlog"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "Soon → today's list without sections", day: T, tasks: [["S2", "soon"]], to: (k) => ({ kind: "listBefore", before: k("N1"), column: "left" }) },
-	{ name: "Soon → a later day's list without sections", day: D, tasks: [["S2", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
-	{ name: "today's list → before a task", day: T, tasks: [["N3", "left"]], to: (k) => ({ kind: "listBefore", before: k("N1"), column: "left" }) },
-	{ name: "Soon's own card → before another in Soon", day: T, tasks: [["S2", "soon"]], to: (k) => ({ kind: "listBefore", before: k("S1"), column: "soon" }) },
-	{ name: "Soon's own card → the end of Soon", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "soon" }) },
-	{ name: "today's list → the end of Soon", day: T, tasks: [["N1", "left"]], to: () => ({ kind: "listBefore", before: null, column: "soon" }) },
-	{ name: "a later day's list → the end of Soon", day: D, tasks: [["SD", "left"]], to: () => ({ kind: "listBefore", before: null, column: "soon" }) },
-	{ name: "Inbox → the end of Inbox", day: T, tasks: [["I1", "inbox"]], to: () => ({ kind: "listBefore", before: null, column: "inbox" }) },
-	{ name: "Soon → the end of Inbox", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "inbox" }) },
-	{ name: "Soon → the end of Backlog", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "backlog" }) },
-	{ name: "Inbox → before a task of Backlog", day: T, tasks: [["I1", "inbox"]], to: (k) => ({ kind: "listBefore", before: k("B1"), column: "backlog" }) },
+	{ name: "a past day's list → before another of its tasks", day: P, tasks: [["NP2", "left"]], to: (k) => ({ kind: "list", column: "left", before: k("NP") }) },
+	{ name: "a past day's list → its end", day: P, tasks: [["NP", "left"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "Soon → a past day's list", day: P, tasks: [["S1", "soon"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "Inbox → a past day's list", day: P, tasks: [["I2", "inbox"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "Backlog → a past day's list", day: P, tasks: [["B1", "backlog"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "Soon → today's list without sections", day: T, tasks: [["S2", "soon"]], to: (k) => ({ kind: "list", column: "left", before: k("N1") }) },
+	{ name: "Soon → a later day's list without sections", day: D, tasks: [["S2", "soon"]], to: () => ({ kind: "list", column: "left", before: null }) },
+	{ name: "today's list → before a task", day: T, tasks: [["N3", "left"]], to: (k) => ({ kind: "list", column: "left", before: k("N1") }) },
+	{ name: "Soon's own card → before another in Soon", day: T, tasks: [["S2", "soon"]], to: (k) => ({ kind: "list", column: "soon", before: k("S1") }) },
+	{ name: "Soon's own card → the end of Soon", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "list", column: "soon", before: null }) },
+	{ name: "today's list → the end of Soon", day: T, tasks: [["N1", "left"]], to: () => ({ kind: "list", column: "soon", before: null }) },
+	{ name: "a later day's list → the end of Soon", day: D, tasks: [["SD", "left"]], to: () => ({ kind: "list", column: "soon", before: null }) },
+	{ name: "Inbox → the end of Inbox", day: T, tasks: [["I1", "inbox"]], to: () => ({ kind: "list", column: "inbox", before: null }) },
+	{ name: "Soon → the end of Inbox", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "list", column: "inbox", before: null }) },
+	{ name: "Soon → the end of Backlog", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "list", column: "backlog", before: null }) },
+	{ name: "Inbox → before a task of Backlog", day: T, tasks: [["I1", "inbox"]], to: (k) => ({ kind: "list", column: "backlog", before: k("B1") }) },
 	{ name: "Soon → a section of today's list", day: T, tasks: [["S1", "soon"]], to: (k) => ({ kind: "group", list: "now", date: null, group: "Work", before: k("N3") }) },
 	{ name: "Inbox → the end of a section of today's list", day: T, tasks: [["I1", "inbox"]], to: () => ({ kind: "group", list: "now", date: null, group: "Work", before: null }) },
 	{ name: "Backlog → No section of today's list", day: T, tasks: [["B2", "backlog"]], to: (k) => ({ kind: "group", list: "now", date: null, group: null, before: k("N1") }) },
@@ -199,21 +154,21 @@ const SINGLE: readonly DropCase[] = [
 ];
 
 const SEVERAL: readonly DropCase[] = [
-	{ name: "the day and Soon → before a task of a past day's list", day: P, tasks: [["NP2", "left"], ["S1", "soon"]], to: (k) => ({ kind: "listBefore", before: k("NP"), column: "left" }) },
-	{ name: "the day and Soon → a past day's list's end", day: P, tasks: [["NP", "left"], ["S2", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "left" }) },
+	{ name: "the day and Soon → before a task of a past day's list", day: P, tasks: [["NP2", "left"], ["S1", "soon"]], to: (k) => ({ kind: "list", column: "left", before: k("NP") }) },
+	{ name: "the day and Soon → a past day's list's end", day: P, tasks: [["NP", "left"], ["S2", "soon"]], to: () => ({ kind: "list", column: "left", before: null }) },
 	{ name: "the day, Soon and Inbox → a section of today's list", day: T, tasks: [["N1", "left"], ["S1", "soon"], ["I1", "inbox"]], to: (k) => ({ kind: "group", list: "now", date: null, group: "Work", before: k("N3") }) },
 	{ name: "Soon and Inbox → a later day's list", day: D, tasks: [["S2", "soon"], ["I2", "inbox"]], to: (k) => ({ kind: "group", list: "soon", date: D, group: null, before: k("SD") }) },
 	{ name: "Soon and Inbox → Backlog", day: T, tasks: [["S1", "soon"], ["I3", "inbox"]], to: () => ({ kind: "group", list: "backlog", date: null, group: "Someday", before: null }) },
 	{ name: "the day and Backlog → Inbox", day: T, tasks: [["N3", "left"], ["B1", "backlog"]], to: (k) => ({ kind: "group", list: "inbox", date: null, group: null, before: k("I1") }) },
 	{ name: "two → under a task", day: T, tasks: [["N3", "left"], ["S1", "soon"]], to: (k) => ({ kind: "nest", parent: k("N1"), before: k("N1b") }) },
-	{ name: "the day and Soon → the end of Soon", day: T, tasks: [["N3", "left"], ["S2", "soon"]], to: () => ({ kind: "listBefore", before: null, column: "soon" }) },
-	{ name: "the day and Soon → before a task of Soon", day: T, tasks: [["N3", "left"], ["S2", "soon"]], to: (k) => ({ kind: "listBefore", before: k("S1"), column: "soon" }) },
-	{ name: "Soon and Inbox → the end of Inbox", day: T, tasks: [["S1", "soon"], ["I3", "inbox"]], to: () => ({ kind: "listBefore", before: null, column: "inbox" }) },
+	{ name: "the day and Soon → the end of Soon", day: T, tasks: [["N3", "left"], ["S2", "soon"]], to: () => ({ kind: "list", column: "soon", before: null }) },
+	{ name: "the day and Soon → before a task of Soon", day: T, tasks: [["N3", "left"], ["S2", "soon"]], to: (k) => ({ kind: "list", column: "soon", before: k("S1") }) },
+	{ name: "Soon and Inbox → the end of Inbox", day: T, tasks: [["S1", "soon"], ["I3", "inbox"]], to: () => ({ kind: "list", column: "inbox", before: null }) },
 	{ name: "a task with its own subtask → a section: the subtask goes along", day: T, tasks: [["N1", "left"], ["N1a", "left"]], to: () => ({ kind: "group", list: "now", date: null, group: "Work", before: null }) },
 	{ name: "several → the timeline: nothing", day: T, tasks: [["N1", "left"], ["S1", "soon"]], to: () => ({ kind: "slot", slot: slot(T, 12) }) },
 ];
 
-/** The file after each drop, as today's code writes it: `__snapshots__/drops.test.ts.snap` is the record, never updated by this block. */
+/** The file after each drop, as the view and the bulk controller wrote it before the table moved here: `__snapshots__/drops.test.ts.snap` is that record. */
 describe("what a drop writes (spec §5.1)", () => {
 	describe("one task", () => {
 		for (const c of SINGLE) it(c.name, async () => expect(await dropped(c)).toMatchSnapshot());
@@ -221,5 +176,40 @@ describe("what a drop writes (spec §5.1)", () => {
 
 	describe("several tasks", () => {
 		for (const c of SEVERAL) it(c.name, async () => expect(await dropped(c)).toMatchSnapshot());
+	});
+});
+
+describe("which drops a target takes", () => {
+	const ORIGINS: readonly DropOrigin[] = ["left", "soon", "inbox", "backlog", "timeline", "new"];
+	const TAKES: Readonly<Record<DropColumn, readonly DropOrigin[]>> = {
+		left: ["left", "soon", "inbox", "backlog", "timeline", "new"],
+		soon: ["left", "soon", "inbox", "backlog", "new"],
+		inbox: ["soon", "inbox", "backlog", "new"],
+		backlog: ["soon", "inbox", "backlog", "new"],
+	};
+
+	for (const [column, takes] of Object.entries(TAKES) as [DropColumn, readonly DropOrigin[]][])
+		it(`${column} takes a task from ${takes.join(", ")}`, () => {
+			expect(ORIGINS.filter((from) => acceptsDrop(column, [from]))).toEqual(takes);
+		});
+
+	it("a list takes several only when it takes each by where it came from", () => {
+		expect(acceptsDrop("inbox", ["soon", "backlog"])).toBe(true);
+		expect(acceptsDrop("inbox", ["soon", "left"])).toBe(false);
+		expect(acceptsDrop("soon", ["left", "inbox"])).toBe(true);
+		expect(acceptsDrop("left", ["soon", "inbox", "backlog"])).toBe(true);
+	});
+
+	it("the timeline takes one task from anywhere, a new one too, never several", () => {
+		for (const from of ORIGINS) expect(acceptsDrop("timeline", [from])).toBe(true);
+		expect(acceptsDrop("timeline", ["left", "soon"])).toBe(false);
+	});
+
+	it("a list with sections shows a place for a task from anywhere; one without, only for its own task and a new one", () => {
+		expect(placesInGap("left", "soon", true)).toBe(true);
+		expect(placesInGap("left", "soon", false)).toBe(false);
+		expect(placesInGap("left", "timeline", false)).toBe(false);
+		expect(placesInGap("left", "left", false)).toBe(true);
+		expect(placesInGap("left", "new", false)).toBe(true);
 	});
 });

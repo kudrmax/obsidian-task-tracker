@@ -135,6 +135,32 @@ export interface TaskStep {
 	readonly change: TaskChange;
 }
 
+/** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
+export type DropColumn = "left" | "soon" | "inbox" | "backlog";
+/** Where a task that exists is dragged from. */
+export type DropFrom = DropColumn | "timeline";
+/** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */
+export type DropOrigin = DropFrom | "new";
+
+/** Where a task is let go, as the gesture found it. */
+export type DropTo =
+	| { readonly kind: "slot"; readonly slot: Slot }
+	| { readonly kind: "clearSlot" }
+	/** A gap of a list that shows no sections: right before `before`, or at the end (null). */
+	| { readonly kind: "list"; readonly column: DropColumn; readonly before: TaskKey | null }
+	/** A gap of a list that shows sections: right before `before`, or at the end of `group`; `date`, the later day of the column. */
+	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
+	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
+
+/** A task let go, and where it was dragged from. */
+export interface DroppedTask {
+	readonly key: TaskKey;
+	readonly from: DropFrom;
+}
+
+/** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
+export { acceptsDrop, placesInGap } from "./drops";
+
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
@@ -275,6 +301,13 @@ export interface TaskService {
 	 * its removed task is skipped. Rejects with StaleTaskError, writing nothing, when any key no longer matches.
 	 */
 	applyAll(steps: readonly TaskStep[]): Promise<void>;
+	/**
+	 * A drop of one task or several on `to`, the day column showing `day`: what spec §5.1 makes of it. One task as the single
+	 * call it means (`setSlot`, `clearSlot`, `moveToGroup`, `nest`, `moveBefore`, `moveToList`, `moveToSoon`, `moveToEnd`);
+	 * several as `applyAll` of what each means by where it came from, never on the timeline. A list without sections puts a
+	 * task from another column at its end (see `placesInGap`).
+	 */
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;
