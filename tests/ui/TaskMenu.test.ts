@@ -189,11 +189,11 @@ describe("the menu", () => {
 			expect(again.toSection).toHaveBeenCalledWith(null);
 		});
 
-		it("leaves the task where it is on its own section", () => {
+		it("hands its own section to the service too, which leaves the task where it is", () => {
 			const actions = open(item({ group: "Morning" }), sections);
 			row("Section").click();
 			row("Morning").click();
-			expect(actions.toSection).not.toHaveBeenCalled();
+			expect(actions.toSection).toHaveBeenCalledWith("Morning");
 			expect(closing()).toBe(true);
 		});
 

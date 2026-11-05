@@ -385,12 +385,12 @@ export class TaskMenu extends LiftedMenu {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		const { item, actions } = this.context;
+		const { actions } = this.context;
 		sectionChooser(this.panel, {
 			choice: sections,
 			checked: (name) => name === sections.current,
 			onBack: () => this.showMenu(),
-			onPick: (name) => this.pick(() => (name === item.group ? undefined : actions.toSection(name)))(),
+			onPick: (name) => this.pick(() => actions.toSection(name))(),
 			onNew: this.pick(() => actions.newSection()),
 		});
 		this.place();

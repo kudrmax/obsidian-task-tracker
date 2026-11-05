@@ -38,7 +38,7 @@ import {
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import { runDrop } from "./drops";
-import { offeredNames, type SectionOffer } from "./sections";
+import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
@@ -61,6 +61,14 @@ type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSet
 const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
 
 /** The column a section is written in from the field: a list's, or a later day's for Soon with a date. */
+/** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
+function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {
+	return doc
+		.groups(list)
+		.filter((g) => g.heading || g.entries.length > 0)
+		.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+}
+
 function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 	if (place.kind === "day") return { kind: "day", date: place.date };
 	if (place.list === "now") return { kind: "day", date: place.date ?? today };
@@ -162,18 +170,14 @@ export class TaskServiceImpl implements TaskService {
 		const { doc, today, boundary } = await this.readNormalized();
 		const { presets, ungrouped } = this.settings.get().groups;
 		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-		const names = (list: GroupedList) => offeredNames(shown.filter((entry) => entry.section === list).map((entry) => entry.group), presets, ungrouped);
+		const names = (list: GroupedList) =>
+			offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sectionsOf(doc, list)), presets, ungrouped);
 		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
 	}
 
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
 		const { doc } = await this.readNormalized();
-		const sectionsOf = (list: GroupedList): readonly ListSection[] =>
-			doc
-				.groups(list)
-				.filter((g) => g.heading || g.entries.length > 0)
-				.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
-		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(list)])) as Record<GroupedList, readonly ListSection[]>;
+		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)])) as Record<GroupedList, readonly ListSection[]>;
 	}
 
 	async doneView(): Promise<readonly TaskItem[]> {
@@ -356,8 +360,8 @@ export class TaskServiceImpl implements TaskService {
 			const change = this.sectionChange(this.entryOf(doc, key), name);
 			return change ? [{ key, change }] : [];
 		});
-		if (keys.length !== 1) return this.applyAll(steps);
 		if (steps.length === 0) return;
+		if (keys.length !== 1) return this.applyAll(steps);
 		const { key, change } = steps[0];
 		if (change.kind === "moveToGroup") return this.moveToGroup(key, change.list, change.group, change.before, change.date);
 		if (change.kind === "createGroup") return this.createGroup(key, change.list, change.name, change.date);
@@ -574,7 +578,7 @@ export class TaskServiceImpl implements TaskService {
 	/** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */
 	private sectionChange(entry: TaskEntry, name: GroupName): Extract<TaskChange, { readonly kind: "moveToGroup" | "createGroup" }> | null {
 		const list = entry.section;
-		if (list === "done") return null;
+		if (list === "done" || entry.group === name) return null;
 		const date = (list === "soon" ? entry.task.dueDate : null) ?? undefined;
 		return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
 	}
