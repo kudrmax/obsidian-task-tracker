@@ -1025,3 +1025,59 @@ describe("repeat", () => {
 		expect((await svc.dayView(T)).list[0].repeat).not.toBeNull();
 	});
 });
+
+describe("search", () => {
+	const FILE = [
+		"## Inbox", "", "- [ ] Фото на паспорт", "",
+		"## Backlog", "", "- [ ] Разобрать шкаф", "",
+		"## Soon", "", "- [ ] Записаться в МФЦ", "\t- взять старый паспорт и фото", "- [ ] Поездка в Казань", "\t- [ ] Найти паспорт", "\t- [x] Купить паспорт-обложку", "",
+		"## Now", "", "- [ ] Забрать паспорт 📅 2026-11-12", "\t- про паспорт ещё раз", "- [ ] Читать [[Заметка|ёлочный паспорт]]", "",
+		"## Done", "", "- [x] Оплатить госпошлину за паспорт", "",
+	].join("\n");
+
+	it("finds titles and descriptions section by section, a task before its open subtasks", async () => {
+		const { svc } = setup(FILE);
+		const hits = await svc.search("ПАСПОРТ");
+		expect(hits.map((h) => h.item.list)).toEqual(["inbox", "soon", "soon", "now", "now", "done"]);
+		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Записаться", "Найти", "Забрать", "Читать", "Оплатить"]);
+	});
+
+	it("a found subtask is its own hit; a closed one is not found", async () => {
+		const { svc } = setup(FILE);
+		const hits = await svc.search("паспорт");
+		const sub = hits.find((h) => h.item.isSubtask);
+		expect(sub?.title).toEqual([{ text: "Найти ", match: false }, { text: "паспорт", match: true }]);
+		expect(hits.some((h) => h.item.text.includes("обложку"))).toBe(false);
+	});
+
+	it("a match only in the description leaves the title empty and gives the line around it", async () => {
+		const { svc } = setup(FILE);
+		const hit = (await svc.search("паспорт")).find((h) => h.item.text === "Записаться в МФЦ")!;
+		expect(hit.title).toEqual([]);
+		expect(hit.description).toEqual({ before: "взять старый ", match: "паспорт", after: " и фото" });
+	});
+
+	it("a match in both gives both", async () => {
+		const { svc } = setup(FILE);
+		const hit = (await svc.search("паспорт")).find((h) => h.item.list === "now")!;
+		expect(hit.title.some((p) => p.match)).toBe(true);
+		expect(hit.description?.match).toBe("паспорт");
+	});
+
+	it("reads a link by what it shows and «ё» as «е»", async () => {
+		const { svc } = setup(FILE);
+		const hits = await svc.search("елочный");
+		expect(hits.map((h) => h.title)).toEqual([[{ text: "Читать ", match: false }, { text: "ёлочный", match: true }, { text: " паспорт", match: false }]]);
+		expect(await svc.search("Заметка")).toEqual([]);
+	});
+
+	it("a query of spaces finds nothing", async () => {
+		const { svc } = setup(FILE);
+		expect(await svc.search("   ")).toEqual([]);
+	});
+
+	it("doneView lists Done in file order", async () => {
+		const { svc } = setup(FILE);
+		expect((await svc.doneView()).map((i) => i.text)).toEqual(["Оплатить госпошлину за паспорт"]);
+	});
+});

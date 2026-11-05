@@ -78,6 +78,10 @@ export const PROPERTY = {
 	/** How much of a neighbour's place the track holds on each side of the window: none past the wheel's ends. */
 	before: "--tc-seg-before",
 	after: "--tc-seg-after",
+	/** The view's middle, top and height, which the desktop search panel hangs from. */
+	searchLeft: "--tc-search-left",
+	searchTop: "--tc-search-top",
+	searchRoom: "--tc-search-room",
 } as const;
 
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */

@@ -3,6 +3,9 @@ import { acceptsDrop, type CalendarEvent, type CalendarService, type DayBoundary
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
+import { BottomCapsule } from "./BottomCapsule";
+import { FoundCard } from "./FoundCard";
+import { SearchWindow } from "./search/SearchWindow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
 import { CalendarPolling } from "./CalendarPolling";
@@ -41,12 +44,11 @@ import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
-import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Shift, stepScreen } from "./screens";
+import { type Place, type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -111,6 +113,12 @@ export class TaskCalendarView extends ItemView {
 	private soonList: TaskList | null = null;
 	private soonDrop: ListDrop | null = null;
 	private inboxEl: HTMLElement | null = null;
+	private doneEl: HTMLElement | null = null;
+	private doneList: TaskList | null = null;
+	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
+	private atDone = false;
+	private search: SearchWindow | null = null;
+	private readonly found = new FoundCard();
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
 	private backlogList: TaskList | null = null;
@@ -244,6 +252,7 @@ export class TaskCalendarView extends ItemView {
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.settings.sections.inbox,
 			soonName: () => this.settings.sections.soon,
+			doneName: () => this.settings.sections.done,
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -258,6 +267,13 @@ export class TaskCalendarView extends ItemView {
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", (origins) => acceptsDrop("left", origins), () => this.sectionsOf("left"), true, () => this.haptics.tap());
+		this.doneEl = el(root, "div", "tc-done");
+		this.doneList = new TaskList(el(this.doneEl, "div"), {
+			items: () => this.data.done,
+			day: () => null,
+			onCard: (card, item) => this.attachDoneCard(card, item),
+		});
+		el(el(root, "div", "tc-divider is-fixed is-done"), "div", "tc-divider-line");
 		this.inboxEl = el(root, "div", "tc-inbox");
 		const inboxPane = el(this.inboxEl, "div", "tc-pane is-inbox");
 		const backlogPane = el(this.inboxEl, "div", "tc-pane is-backlog");
@@ -323,7 +339,10 @@ export class TaskCalendarView extends ItemView {
 			events: () => this.data.events,
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
-			onBlock: (block, item) => this.drag.attachBlock(block, item),
+			onBlock: (block, item) => {
+				this.found.attach(block, item);
+				this.drag.attachBlock(block, item);
+			},
 			onEvent: (block, event) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) })),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
@@ -347,8 +366,8 @@ export class TaskCalendarView extends ItemView {
 		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
 		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
 		const switcher = new ColumnSwitch(root, {
-			value: () => this.mode(),
-			onChange: (mode) => void this.afterEntry(() => this.setMode(mode)),
+			value: () => this.place(),
+			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
 			dot: () => this.data.statuses.some((s) => s.stale),
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
@@ -386,11 +405,15 @@ export class TaskCalendarView extends ItemView {
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
 		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
-		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
-		this.unsubscribe.push(() => undo.destroy());
+		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch() });
+		this.unsubscribe.push(() => capsule.destroy());
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
+		this.scope.register(["Mod"], "f", () => {
+			this.openSearch();
+			return false;
+		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
@@ -415,6 +438,7 @@ export class TaskCalendarView extends ItemView {
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
+		this.registerDomEvent(document, "pointerdown", () => this.found.clear(), { capture: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
 		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
 		this.arbiter.onIdle(() => {
@@ -548,7 +572,7 @@ export class TaskCalendarView extends ItemView {
 		this.landed();
 		const root = this.contentEl;
 		const parts = stripParts(root);
-		const from = { mode: this.mode(), date: this.selectedDate };
+		const from = { mode: this.place(), date: this.selectedDate };
 		const to = stepScreen(from, shift, this.today());
 		if (!to) return new EdgeTrack(parts, root.clientWidth);
 		if (to.mode !== from.mode) {
@@ -558,7 +582,7 @@ export class TaskCalendarView extends ItemView {
 				root,
 				from: from.mode,
 				to: to.mode,
-				showMode: (mode) => this.showMode(mode),
+				showMode: (place) => this.showPlace(place),
 				turnWheel: (position) => this.switcher?.follow(position),
 				onArrive: (mode) => this.arriveAt(mode),
 			});
@@ -604,12 +628,25 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	/** The strip stands at the place a swipe brought it to: the switch turns there, and the choice is saved. */
-	private arriveAt(mode: RightMode): void {
-		this.shownMode = mode;
-		this.showMode(mode);
-		this.switcher?.show(mode);
-		void this.afterEntry(() => this.setMode(mode, false));
+	/** The strip stands at the place a swipe brought it to: the switch turns there, and the choice is saved. Done is left behind. */
+	private arriveAt(place: Place): void {
+		if (place === "done") return;
+		this.atDone = false;
+		this.shownMode = place;
+		this.showPlace(place);
+		this.switcher?.show(place);
+		void this.afterEntry(() => this.setMode(place, false));
+	}
+
+	/** Where the window stands: Done while the search keeps it there, else the place the settings hold. */
+	private place(): Place {
+		return this.atDone ? "done" : this.mode();
+	}
+
+	/** The wheel turned the screen away: Done goes until the search opens it again. */
+	private leaveDone(mode: RightMode): Promise<void> {
+		this.atDone = false;
+		return this.setMode(mode);
 	}
 
 	/** The screen has drawn the day a swipe brought in: it comes back from aside, and the day drawn over it goes. */
@@ -634,15 +671,67 @@ export class TaskCalendarView extends ItemView {
 			this.switching = window.setTimeout(() => root.classList.remove("is-switching"), tokenMs(root, DURATION.slide));
 		}
 		this.shownMode = mode;
-		this.showMode(mode);
+		this.showPlace(this.place());
 		await this.deps.settings.update({ rightMode: mode });
 		if (this.shownMode === mode) this.shownMode = null;
 		this.parts.request("frame");
 	}
 
-	private showMode(mode: RightMode): void {
-		this.contentEl.classList.toggle("is-lists", mode === "soon");
-		this.contentEl.classList.toggle("is-inbox", mode === "inbox");
+	private showPlace(place: Place): void {
+		this.contentEl.classList.toggle("is-lists", place === "soon");
+		this.contentEl.classList.toggle("is-inbox", place === "inbox" || place === "done");
+		this.contentEl.classList.toggle("is-done", place === "done");
+	}
+
+	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
+	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
+		this.found.attach(card, item);
+		card.addEventListener("click", () => this.showMenu(item, card));
+		card.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.showMenu(item, card);
+		});
+	}
+
+	private openSearch(): void {
+		if (this.search) return;
+		void this.afterEntry(() => {
+			this.search = SearchWindow.open({
+				root: this.contentEl,
+				tasks: this.deps.tasks,
+				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
+				sectionName: (section) => this.settings.sections[section],
+				onPick: (hit) => {
+					this.search = null;
+					void this.reveal(hit.item);
+				},
+				onClose: () => (this.search = null),
+			});
+		});
+	}
+
+	/**
+	 * The screen goes where the found task stands, as the switch and the arrows would take it, and its card wears the ring:
+	 * Done to its own place left of Inbox, Inbox and Backlog to Inbox and Soon, Soon to Soon and Now, a task of a day to
+	 * that day beside its calendar.
+	 */
+	private async reveal(item: TaskItem): Promise<void> {
+		this.found.mark(item);
+		if (item.list === "done") {
+			this.atDone = true;
+			this.switcher?.show("done");
+			await this.setMode("inbox");
+		} else {
+			this.atDone = false;
+			const day = item.day ?? item.dueDate;
+			if (item.list === "inbox" || item.list === "backlog") await this.setMode("inbox");
+			else if (day === null) await this.setMode("soon");
+			else {
+				if (day !== this.selectedDate) this.select(day);
+				await this.setMode("calendar");
+			}
+		}
+		this.parts.request("tasks");
 	}
 
 	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
@@ -735,6 +824,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A list's card: its gestures. */
 	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+		this.found.attach(card, item);
 		this.bulk.attach({ item, card, column, subtree });
 		this.drag.attachCard(card, item, column, subtree);
 	}
@@ -959,11 +1049,11 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private draw(parts: ReadonlySet<ScreenPart>): void {
 		const root = this.contentEl;
-		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
+		if (!this.headers || !this.switcher || !this.leftEl || !this.soonEl || !this.inboxEl || !this.doneEl || !this.doneList || !this.rightEl || !this.allDayEl || !this.timeline || !this.list || !this.soonList || !this.inboxList || !this.backlogList || !this.backlogTitle) return;
 		if (parts.has("frame")) {
 			this.fitListWidth();
 			this.headers.render();
-			this.showMode(this.mode());
+			this.showPlace(this.place());
 		}
 		this.switcher.render();
 		if (parts.has("tasks")) {
@@ -971,13 +1061,14 @@ export class TaskCalendarView extends ItemView {
 			this.list.render();
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
-			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
+			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.doneEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
 			this.inboxList.render();
 			this.backlogTitle.textContent = this.settings.sections.backlog;
 			this.backlogList.render();
+			this.doneList.render();
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), this.deps.clock.now());

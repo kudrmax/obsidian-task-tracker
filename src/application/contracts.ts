@@ -93,6 +93,26 @@ export interface TaskItem {
 	readonly description: string | null;
 }
 
+/** A piece of a found task's title; `match` marks the words searched for. */
+export interface TitlePart {
+	readonly text: string;
+	readonly match: boolean;
+}
+
+/** A line of a found task's description: the words searched for and some around them. */
+export interface SnippetParts {
+	readonly before: string;
+	readonly match: string;
+	readonly after: string;
+}
+
+/** A task the search found: its title cut around the match (empty when the title has none), the description's line (null when it has none). */
+export interface SearchHit {
+	readonly item: TaskItem;
+	readonly title: readonly TitlePart[];
+	readonly description: SnippetParts | null;
+}
+
 export interface DayView {
 	readonly date: LocalDate;
 	/** Left column, in file order: see spec §5. */
@@ -182,6 +202,13 @@ export interface TaskService {
 	inboxView(): Promise<readonly TaskItem[]>;
 	/** Every Backlog task, in file order: none has a due date or a slot, as in Inbox. */
 	backlogView(): Promise<readonly TaskItem[]>;
+	/** Every Done task, in file order. */
+	doneView(): Promise<readonly TaskItem[]>;
+	/**
+	 * The tasks the screen draws whose title or description holds the query, case and «ё» aside: Inbox, Backlog, Soon,
+	 * Now, Done, each in file order, a task before its open subtasks. A query of spaces finds nothing.
+	 */
+	search(query: string): Promise<readonly SearchHit[]>;
 
 	/** Today: end of Now, due today. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
 	createInList(date: LocalDate, text: string): Promise<void>;

@@ -10,7 +10,6 @@ const ROOT = resolve(__dirname, "..");
  */
 const ALLOWED: readonly string[] = [
 	"src/ui/ColumnSwitch.ts → src/settings.ts",
-	"src/ui/ScreenTracks.ts → src/settings.ts",
 	"src/ui/SettingsTab.ts → src/application/ports.ts",
 	"src/ui/SettingsTab.ts → src/settings.ts",
 	"src/ui/TaskCalendarView.ts → src/application/ports.ts",
