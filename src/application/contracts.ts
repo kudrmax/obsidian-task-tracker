@@ -10,6 +10,12 @@ export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 export { sameRule } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
+/** Whether two placements are the same place: the same kind, and for a date the same day. */
+export { samePlacement } from "../domain/operations";
+/** A task's text cut into text and links, or plain, each link by its word. */
+export { plainText, textParts, type TextPart } from "../domain/TaskText";
+/** The hour's heights the settings tab writes and reads as text. */
+export type { ZoomLevel } from "../settings";
 export type { EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**
