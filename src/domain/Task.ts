@@ -17,6 +17,11 @@ export function isOpen(status: TaskStatus): boolean {
 	return status === "todo" || status === "inProgress";
 }
 
+/** In progress, unless every task already is: then back to todo. One task's is `[its status]`. */
+export function nextProgress(statuses: readonly TaskStatus[]): TaskStatus {
+	return statuses.every((status) => status === "inProgress") ? "todo" : "inProgress";
+}
+
 /**
  * Minutes of the day on `date`'s clock, `start` below 1440. `end` may equal 1440 (midnight) or pass it: the slot runs
  * into the next date. A null `end` is a task at a time, without a duration.
@@ -29,6 +34,19 @@ export interface Slot {
 
 /** What the time of a task does on the phone: a quiet notification, an alarm, or nothing. Read from the marker before the slot. */
 export type ReminderKind = "notification" | "alarm" | "none";
+
+/** The order a reminder's kind goes round in. */
+export const REMINDER_KINDS: readonly ReminderKind[] = ["notification", "alarm", "none"];
+
+/** The kind after `kind`, round. */
+export function nextReminder(kind: ReminderKind): ReminderKind {
+	return REMINDER_KINDS[(REMINDER_KINDS.indexOf(kind) + 1) % REMINDER_KINDS.length];
+}
+
+/** Only a task on a time reminds: one without a slot keeps its kind for when it gets one. */
+export function canRemind(slot: Slot | null): boolean {
+	return slot !== null;
+}
 
 export interface Task {
 	readonly status: TaskStatus;

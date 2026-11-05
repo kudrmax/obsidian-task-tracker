@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DescriptionSheet, keptDescription } from "../../src/ui/sheet/DescriptionSheet";
+import { DescriptionSheet } from "../../src/ui/sheet/DescriptionSheet";
 
 function fakeSurface() {
 	const editor = { value: "", focus: vi.fn(), destroy: vi.fn() };
@@ -87,9 +87,11 @@ describe("the description screen", () => {
 		expect(surface.edit.mock.calls[0][1]).toBe("- ");
 	});
 
-	it("keeps a lone empty point as no description", () => {
-		expect(keptDescription("- ")).toBe("");
-		expect(keptDescription("  -  \n")).toBe("");
-		expect(keptDescription("- a")).toBe("- a");
+	it("saves a lone empty point as it is: the service reads it as no description", async () => {
+		const { surface, onSave, button } = open(null, true);
+		surface.editor.value = "- ";
+		button("Save").click();
+		await Promise.resolve();
+		expect(onSave).toHaveBeenCalledWith("- ");
 	});
 });

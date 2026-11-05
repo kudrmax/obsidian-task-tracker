@@ -2,8 +2,9 @@ import { canPostpone, canRemoveDue, dayOfTask } from "../domain/Days";
 import { descriptionMarkdown } from "../domain/description";
 import type { PriorityLevel } from "../domain/Priority";
 import { repeatable } from "../domain/queries";
-import { isOpen, type LocalDate } from "../domain/Task";
+import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
+import { plainText } from "../domain/TaskText";
 import type { SubtaskProgress, TaskItem } from "./contracts";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
@@ -18,6 +19,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levelOf: (prefix: str
 	return {
 		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
 		text: entry.task.text,
+		title: plainText(entry.task.text),
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
@@ -30,7 +32,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levelOf: (prefix: str
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
 		day: dayOfTask(entry.section, entry.task, today),
-		can: { postpone: canPostpone(entry.section), removeDue: canRemoveDue(entry.task.dueDate, today) },
+		can: { postpone: canPostpone(entry.section), removeDue: canRemoveDue(entry.task.dueDate, today), remind: canRemind(entry.task.slot) },
 		subtasks: entry.subtasks.filter((sub) => isOpen(sub.task.status)).map((sub) => toItem(sub, today, levelOf, entry.task.text)),
 		progress: progressOf(entry),
 		description: descriptionMarkdown(entry),

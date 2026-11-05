@@ -52,7 +52,7 @@ describe("the bulk menu", () => {
 	it("offers Remove due date when some task may lose its date, as the item tells", () => {
 		expect(bulkCanRemoveDue([item({ dueDate: T })])).toBe(false);
 		expect(bulkCanRemoveDue([item({ dueDate: T }), item({ dueDate: "2026-11-05" })])).toBe(true);
-		expect(bulkCanRemoveDue([item({ dueDate: "2026-11-05", can: { postpone: true, removeDue: false } })])).toBe(false);
+		expect(bulkCanRemoveDue([item({ dueDate: "2026-11-05", can: { postpone: true, removeDue: false, remind: false } })])).toBe(false);
 	});
 });
 

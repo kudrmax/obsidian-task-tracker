@@ -2,7 +2,7 @@ import { type CalendarEvent, type DayBoundary, samePlace, sameTaskTree, type Tas
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
-import { DESIGN, LAYOUT, PROPERTY } from "./design";
+import { DESIGN, PROPERTY } from "./design";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
 import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
@@ -607,12 +607,7 @@ export class Timeline {
 
 	/** An event that began before the day or ends after it is cut at the day's edges. */
 	private eventSpan(event: CalendarEvent): Span {
-		const boundary = this.deps.boundary();
-		const date = this.deps.date();
-		return {
-			start: Math.max(0, boundary.offsetOf(date, event.start)),
-			end: Math.min(LAYOUT.minutesPerDay, boundary.offsetOf(date, event.end)),
-		};
+		return this.deps.boundary().clipToDay(this.deps.date(), event.start, event.end);
 	}
 
 	private placeEvent(event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {

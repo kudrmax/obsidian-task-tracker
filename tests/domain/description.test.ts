@@ -74,6 +74,14 @@ describe("a task's description", () => {
 		}
 	});
 
+	it("reads a lone empty point as none: it goes away, and a task without one gets nothing", () => {
+		for (const point of ["- ", "  -  \n"]) {
+			expect(nowLines(setDescription(doc, task, point))).toEqual(["- [ ] Задача 1", "\t- [ ] Задача 2 (подзадача)", "\t\t- Описание подзадачи", "- [ ] Другая"]);
+			expect(setDescription(doc, doc.tasks("now")[1], point)).toBe(doc);
+		}
+		expect(nowLines(setDescription(doc, doc.tasks("now")[1], "- a")).slice(-2)).toEqual(["- [ ] Другая", "\t- a"]);
+	});
+
 	it("drops blank lines, which would end the task in the file", () => {
 		expect(nowLines(setDescription(doc, doc.tasks("now")[1], "- a\n\n- b\n"))).toContain("\t- b");
 		expect(nowLines(setDescription(doc, doc.tasks("now")[1], "- a\n\n- b\n")).slice(-3)).toEqual(["- [ ] Другая", "\t- a", "\t- b"]);

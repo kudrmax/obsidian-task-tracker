@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DayBoundary } from "../../src/domain/DayBoundary";
+import { clampSlot, DayBoundary } from "../../src/domain/DayBoundary";
 
 const AT_FOUR = new DayBoundary(4);
 const D = "2026-10-30";
@@ -70,5 +70,41 @@ describe("DayBoundary", () => {
 		expect(new DayBoundary(-3).startHour).toBe(0);
 		expect(new DayBoundary(30).startHour).toBe(0);
 		expect(new DayBoundary(Number.NaN).startHour).toBe(0);
+	});
+});
+
+describe("clampSlot", () => {
+	it("moves a slot near the day's end back, as long as it was", () => {
+		expect(clampSlot(1400, 1460)).toEqual({ start: 1380, end: 1440 });
+		expect(clampSlot(1380, 1440)).toEqual({ start: 1380, end: 1440 });
+	});
+
+	it("starts a task at a time five minutes before the day ends at the latest", () => {
+		expect(clampSlot(1440, null)).toEqual({ start: 1435, end: null });
+		expect(clampSlot(1435, null)).toEqual({ start: 1435, end: null });
+	});
+
+	it("starts no earlier than the day, as long as it was", () => {
+		expect(clampSlot(-40, -10)).toEqual({ start: 0, end: 30 });
+		expect(clampSlot(-5, null)).toEqual({ start: 0, end: null });
+	});
+
+	it("leaves a slot inside the day as it is", () => {
+		expect(clampSlot(600, 660)).toEqual({ start: 600, end: 660 });
+	});
+});
+
+describe("clipToDay", () => {
+	it("cuts what began before the day and ends after it at the day's edges", () => {
+		expect(DayBoundary.MIDNIGHT.clipToDay(D, new Date(2026, 9, 29, 22), new Date(2026, 9, 31, 2))).toEqual({ start: 0, end: 1440 });
+	});
+
+	it("cuts at the edges of a day that starts at four", () => {
+		expect(AT_FOUR.clipToDay(D, new Date(2026, 9, 30, 3), new Date(2026, 9, 31, 5))).toEqual({ start: 0, end: 1440 });
+		expect(AT_FOUR.clipToDay(D, new Date(2026, 9, 31, 1), new Date(2026, 9, 31, 3))).toEqual({ start: 1260, end: 1380 });
+	});
+
+	it("leaves what lies within the day as it is", () => {
+		expect(DayBoundary.MIDNIGHT.clipToDay(D, new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10, 30))).toEqual({ start: 540, end: 630 });
 	});
 });
