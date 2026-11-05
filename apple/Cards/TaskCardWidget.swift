@@ -66,10 +66,7 @@ struct TaskCardWidget: Widget {
                 }
                 .frame(maxWidth: 84, alignment: .leading)
             } compactTrailing: {
-                Elapsed(since: context.attributes.start)
-                    .font(Metrics.button)
-                    .foregroundStyle(Palette.dark.accent)
-                    .frame(width: 56, alignment: .trailing)
+                Text(context.attributes.start, style: .time).font(Metrics.button).monospacedDigit().foregroundStyle(Palette.dark.accent)
             } minimal: {
                 LogoCheck(color: Palette.dark.accent, size: 13)
             }
@@ -105,19 +102,7 @@ struct LogoCheck: View {
     }
 }
 
-/// How long the task has been going: `+25:07`, ticking by itself. iOS keeps it as wide as its widest value and draws
-/// nothing at all for a card that sizes it to fit (`fixedSize`): give it a frame instead.
-struct Elapsed: View {
-    let since: Date
-
-    var body: some View {
-        (Text("+") + Text(since, style: .timer))
-            .monospacedDigit()
-            .multilineTextAlignment(.trailing)
-    }
-}
-
-/// The card: the task, its time and how long it has been going, then the notification's buttons; after Done, the question.
+/// The card: the task and its time, then the notification's buttons; after Done, the question.
 struct TaskCardView: View {
     let task: TaskCardAttributes
     let confirming: Bool
@@ -140,30 +125,14 @@ struct TaskCardView: View {
         }
     }
 
-    /// With a meeting button below, the title keeps to one line so the card stays within iOS's height.
-    @ViewBuilder private var header: some View {
-        if task.meeting == nil {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(task.title).font(Metrics.title).foregroundStyle(palette.text).lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(task.time).foregroundStyle(palette.text)
-                    Elapsed(since: task.start).foregroundStyle(palette.muted)
-                }
-                .font(Metrics.time)
-                .frame(width: 76, alignment: .trailing)
-            }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(task.title).font(Metrics.title).foregroundStyle(palette.text).lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                // One text: the room iOS keeps for the ticking timer stays on its left, next to the title, never between the two.
-                (Text(task.time).foregroundColor(palette.text) + Text("  +").foregroundColor(palette.muted) + Text(task.start, style: .timer).foregroundColor(palette.muted))
-                    .font(Metrics.time)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 150, alignment: .trailing)
-            }
+    /// The title runs up to the time and ends there in an ellipsis; with a meeting button below it keeps to one line, so
+    /// the card stays within iOS's height.
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(task.title).font(Metrics.title).foregroundStyle(palette.text).lineLimit(task.meeting == nil ? 2 : 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(task.time).font(Metrics.time).foregroundStyle(palette.muted).fixedSize()
         }
     }
 
