@@ -165,7 +165,7 @@ body {
 	--tc-pick-gap: var(--tc-space-2);
 	--tc-search-w: 520px;
 	--tc-search-field-pad: var(--tc-space-10);
-	/* Over the keyboard as the quick bar stands, and over Obsidian's navigation while the keyboard is down. */
+	/* Over Obsidian's navigation while the keyboard is down; on the keyboard, as the quick bar stands, while it is up (the rule after the search's). */
 	--tc-search-bottom: calc(var(--tc-bar-bottom) + var(--tc-nav-room));
 	--tc-radius-capsule: calc(var(--tc-plus-size) / 2);
 	--tc-stroke-plus: var(--tc-stroke-2-6);
@@ -1205,6 +1205,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar > .tc-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
 .tc-search-results { display: flex; flex-direction: column; gap: var(--tc-card-gap); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .task-calendar > .tc-search > .tc-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
+.task-calendar.is-keyboard-up > .tc-search { --tc-search-bottom: var(--tc-bar-bottom); }
 .tc-search-results > * { flex-shrink: 0; }
 .tc-search-results > .tc-group-head:first-child { margin-top: 0; }
 .tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
