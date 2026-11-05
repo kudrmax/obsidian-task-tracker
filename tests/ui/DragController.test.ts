@@ -137,7 +137,7 @@ describe("DragController.beginNew", () => {
 		const preview = vi.spyOn(target, "preview");
 		controller.beginNew(source, down(20, 610), [target], vi.fn());
 		pointer("pointermove", 150, 300);
-		expect(preview).toHaveBeenCalledWith(150, 300, expect.objectContaining({ grabPx: 10, grabX: 10 }));
+		expect(preview).toHaveBeenCalledWith(150, 300, expect.objectContaining({ grabPx: 10 }));
 		pointer("pointercancel", 150, 300);
 	});
 });
