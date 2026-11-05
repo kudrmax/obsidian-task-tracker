@@ -21,7 +21,7 @@ export interface QuickBarState {
 	/** Where the field stands; null for a field with no place of its own (a subtask, a slot): no place button. */
 	readonly place: Placement | null;
 	readonly repeat: RepeatRule | null;
-	/** The field may repeat: a subtask's field and one on the calendar may not, and have no repeat button. */
+	/** The field may repeat: one on the calendar may not, and has no repeat button. */
 	readonly repeatable: boolean;
 	/** The field writes a section's name, not a task; null where it cannot (no column with sections, a rename): no section button. */
 	readonly section: boolean | null;

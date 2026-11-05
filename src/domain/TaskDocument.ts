@@ -142,7 +142,7 @@ function insertedLines(before: readonly string[], after: readonly string[]): Set
 }
 
 /** Every task and subtask, each before its own subtasks. */
-function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
+export function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
 	return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
 }
 
@@ -388,7 +388,10 @@ export class TaskDocument {
 		return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
 	}
 
-	/** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+	/**
+	 * The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat;
+	 * description lines as they are. Indented as a task of its own's, even for a subtask.
+	 */
 	freshChildren(entry: TaskEntry): readonly string[] {
 		const first = this.spanOf(entry).line + 1;
 		const children = [...entry.task.children];
@@ -398,7 +401,7 @@ export class TaskDocument {
 			sub.subtasks.forEach(open);
 		};
 		entry.subtasks.forEach(open);
-		return children;
+		return children.map((line) => (line.startsWith(entry.indent) ? line.slice(entry.indent.length) : line));
 	}
 
 	/** A new subtask of `parent`, right before its subtask `before` or last. */

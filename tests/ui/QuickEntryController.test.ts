@@ -842,17 +842,19 @@ describe("QuickEntryController", () => {
 			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "day", date: TODAY, group: null, before: null } }]));
 		});
 
-		it("is not on a subtask's field; the write is a subtask's, whose rule the file drops", async () => {
+		it("is on a subtask's field too: the rule goes with the subtask's write", async () => {
 			const parent = item("A", key("now", 0));
 			const { controller, root, type, press, created } = setUp({ items: { left: [parent] } });
 			controller.openAtEnd("left");
 			chooseThursday(root);
 			press("Tab");
-			expect(repeatButton(root).hidden).toBe(true);
+			expect(repeatButton(root).hidden).toBe(false);
+			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
 			type("Sub");
 			press("Enter");
 			await vi.waitFor(() => expect(created).toHaveLength(1));
 			expect(created[0].place.kind).toBe("subtask");
+			expect(created[0].repeat).toEqual(WEEKLY_THU);
 		});
 
 		it("is not on a field on the calendar", () => {

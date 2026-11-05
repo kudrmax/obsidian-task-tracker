@@ -111,6 +111,11 @@ function repeated(task: Task, rule: RepeatRule | null, today: LocalDate, boundar
 	return { ...task, repeat: anchoredRepeat(rule, first), dueDate: first };
 }
 
+/** The task with `rule` set when there is one. */
+function withRepeat(task: Task, rule: RepeatRule | null | undefined, today: LocalDate, boundary: DayBoundary): Task {
+	return rule ? repeated(task, rule, today, boundary) : task;
+}
+
 /** The draft's rule on the task: none in the draft leaves the task's own. */
 function withDraftRepeat(task: Task, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): Task {
 	return draft.repeat === undefined ? task : repeated(task, draft.repeat, today, boundary);
@@ -321,18 +326,18 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot };
 
-/** A new task at `place`; `repeat` is set as `setRepeat` sets it on a task of its own, and a subtask or a slot takes none. */
+/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. */
 export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null): TaskDocument {
 	switch (place.kind) {
 		case "subtask":
-			return doc.insertUnder(place.parent, newTask(text, { priority }), place.before);
+			return doc.insertUnder(place.parent, withRepeat(newTask(text, { priority }), repeat, today, boundary), place.before);
 		case "slot":
 			return createInSlot(doc, place.slot, text, priority, today, boundary);
 		case "list": {
 			const { list, group, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
 			const task = newTask(text, { dueDate, priority });
-			return doc.insert(list, positionIn(doc, list, group, before), repeat ? repeated(task, repeat, today, boundary) : task);
+			return doc.insert(list, positionIn(doc, list, group, before), withRepeat(task, repeat, today, boundary));
 		}
 	}
 }

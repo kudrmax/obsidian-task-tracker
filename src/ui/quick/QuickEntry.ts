@@ -384,7 +384,7 @@ export class QuickEntry {
 				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
 				return this.deps.fresh(shown());
 			case "stack":
-				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
+				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat);
 				return this.deps.fresh(shown());
 			case "list": {
 				const cards = this.deps.cards(spot.column);
