@@ -1,7 +1,6 @@
-import { type GroupName, keyId, type PriorityLevel, type TaskChange, type TaskItem, type TaskStep } from "../application/contracts";
+import { type GroupName, keyId, type PriorityLevel, type SectionChoice, type TaskChange, type TaskItem, type TaskKey, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
-import type { SectionChoice } from "./menu/TaskMenu";
 import { PlusRing } from "./quick/PlusRing";
 import { type PickedCard, TaskSelection } from "./TaskSelection";
 import type { LocalDate } from "./types";
@@ -11,8 +10,6 @@ export interface BulkSections {
 	readonly choice: SectionChoice;
 	/** Every task stands in `choice.current`: it is checked. */
 	readonly shared: boolean;
-	/** What going to section `name` means for the task of `card`. */
-	change(card: PickedCard, name: GroupName): TaskChange;
 }
 
 export interface BulkDeps {
@@ -27,6 +24,8 @@ export interface BulkDeps {
 	/** The cards of a list, in order. */
 	cards(column: ListColumn): readonly HTMLElement[];
 	sections(cards: readonly PickedCard[]): BulkSections | null;
+	/** The tasks into section `name` of their list, and resolves once the screen shows them. */
+	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** Picking is for the desktop: on the phone a click does what it always did. */
 	desktop(): boolean;
 	/** ⌘ on a Mac, Ctrl elsewhere. */
@@ -130,13 +129,16 @@ export class BulkController {
 			today: this.deps.today(),
 			day: this.deps.day(),
 			levels: this.deps.levels(),
-			sections: sections ? { choice: sections.choice, shared: sections.shared } : undefined,
+			sections: sections ?? undefined,
 			actions: {
 				setStatus: (status) => each(() => ({ kind: "status", status })),
 				setPriority: (priority) => each(() => ({ kind: "priority", priority })),
 				postpone: (date) => each(() => ({ kind: "postpone", date })),
 				removeDue: () => each((card) => (card.item.can.removeDue ? { kind: "dueDate", date: null } : { kind: "dueDate", date: card.item.dueDate })),
-				toSection: (name) => each((card) => sections!.change(card, name)),
+				toSection: (name) => {
+					this.selection.clear();
+					return this.deps.toSection(items.map((item) => item.key), name);
+				},
 				remove: () => each(() => ({ kind: "remove" })),
 			},
 			onClose: () => (this.menu = null),

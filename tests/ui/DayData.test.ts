@@ -78,6 +78,18 @@ describe("DayData", () => {
 		expect(calendars.asked).toEqual([]);
 	});
 
+	it("reads the sections the menus offer with the lists, for the day shown", async () => {
+		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const asked: LocalDate[] = [];
+		const offer = tasks.sectionOffer.bind(tasks);
+		tasks.sectionOffer = (date) => (asked.push(date), offer(date));
+		const { data, setDate } = setup(tasks);
+		setDate(TOMORROW);
+		await data.tasks();
+		expect(asked).toEqual([TOMORROW]);
+		expect(data.sections).toEqual(await offer(TOMORROW));
+	});
+
 	it("another day asks for it with its neighbours", async () => {
 		const { data, calendars, setDate } = setup();
 		setDate(TOMORROW);

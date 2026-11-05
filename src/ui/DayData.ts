@@ -1,4 +1,4 @@
-import { type CalendarEvent, type CalendarService, type DayEvents, type DayView, type SourceStatus, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayEvents, type DayView, type SectionOffer, type SourceStatus, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -19,10 +19,15 @@ interface TasksState {
 	readonly soon: readonly TaskItem[];
 	readonly inbox: readonly TaskItem[];
 	readonly backlog: readonly TaskItem[];
+	/** The sections the menus offer, read with the lists. */
+	readonly sections: SectionOffer;
 	readonly missing: boolean;
 }
 
-const MISSING = { day: null, soon: [], inbox: [], backlog: [], missing: true } as const;
+/** No sections to offer: no file, or nothing read yet. */
+const NO_SECTIONS: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
+
+const MISSING = { day: null, soon: [], inbox: [], backlog: [], sections: NO_SECTIONS, missing: true } as const;
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -30,7 +35,7 @@ const MISSING = { day: null, soon: [], inbox: [], backlog: [], missing: true } a
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], missing: false };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], sections: NO_SECTIONS, missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -66,6 +71,10 @@ export class DayData {
 
 	get backlog(): readonly TaskItem[] {
 		return this.state.backlog;
+	}
+
+	get sections(): SectionOffer {
+		return this.state.sections;
 	}
 
 	get missing(): boolean {
@@ -129,8 +138,8 @@ export class DayData {
 		const date = this.deps.date();
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox, backlog] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView()]);
-			return { date, day, soon, inbox, backlog, missing: false };
+			const [day, soon, inbox, backlog, sections] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView(), tasks.sectionOffer(date)]);
+			return { date, day, soon, inbox, backlog, sections, missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;
