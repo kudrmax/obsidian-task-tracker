@@ -100,7 +100,7 @@ export interface TaskItem {
 	readonly repeat: RepeatRule | null;
 	/** Not done and not given up: todo or in progress. */
 	readonly open: boolean;
-	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
+	/** The task may be given a rule: an open task or subtask; a closed task repeats no more. */
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
@@ -275,7 +275,7 @@ export interface TaskService {
 	 * Quick entry. `list`: in section `group` of the list right before `before` (null: at the end of the section), with the
 	 * due-date rules of `moveToGroup`: Now gets today, Inbox none, Soon `date` (the column's day) or none. `subtask`: among
 	 * `parent`'s subtasks before `before` or last; it has no due date of its own. `slot`: as `createAtTime`. `priority` is a
-	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write, on a task of its own only: a subtask or a slot takes none.
+	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write, on a task or a subtask: a slot takes none.
 	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */

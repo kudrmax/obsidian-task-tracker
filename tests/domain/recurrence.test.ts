@@ -87,8 +87,18 @@ describe("recurClosed: Done and Won't do leave the next copy", () => {
 		expect(once.tasks("soon")).toHaveLength(2);
 	});
 
-	it("ignores a subtask's repeat", () => {
-		const text = file({ now: `- [ ] Неделя\n\t- [x] Зал ${ZAL}` });
+	it("a subtask's copy goes to Soon as a task of its own; the done subtask stays under its task", () => {
+		const doc = normalize(parse(file({ now: `- [ ] Неделя\n\t- [x] Зал ${ZAL}\n\t\t- [x] Разминка` })), T);
+		expect(doc.serialize()).toBe(file({ now: "- [ ] Неделя\n\t- [x] Зал\n\t\t- [x] Разминка", soon: `- [ ] Зал 📅 2026-11-06 ${ZAL}\n\t- [ ] Разминка` }));
+	});
+
+	it("a subtask's copy keeps its task's section", () => {
+		const doc = normalize(parse(file({ now: `### Morning\n- [ ] Неделя\n\t- [-] Зал ${ZAL}` })), T);
+		expect(doc.serialize()).toBe(file({ now: "### Morning\n- [ ] Неделя\n\t- [-] Зал", soon: `### Morning\n- [ ] Зал 📅 2026-11-06 ${ZAL}` }));
+	});
+
+	it("leaves an open subtask with a repeat", () => {
+		const text = file({ now: `- [ ] Неделя\n\t- [ ] Зал 📅 2026-11-06 ${ZAL}` });
 		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 

@@ -788,7 +788,10 @@
       const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
       return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
     }
-    /** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+    /**
+     * The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat;
+     * description lines as they are. Indented as a task of its own's, even for a subtask.
+     */
     freshChildren(entry) {
       const first = this.spanOf(entry).line + 1;
       const children = [...entry.task.children];
@@ -798,7 +801,7 @@
         sub.subtasks.forEach(open);
       };
       entry.subtasks.forEach(open);
-      return children;
+      return children.map((line) => line.startsWith(entry.indent) ? line.slice(entry.indent.length) : line);
     }
     /** A new subtask of `parent`, right before its subtask `before` or last. */
     insertUnder(parent, task, before = null) {
@@ -1160,7 +1163,7 @@
   function recurClosed(doc, today, boundary) {
     if (!doc.hasSection("soon")) return doc;
     for (; ; ) {
-      const entry = RECURRING.flatMap((s) => doc.tasks(s)).find(closedWithRepeat);
+      const entry = RECURRING.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
       if (!entry) return doc;
       const { task } = entry;
       const copy = newTask(task.text, {

@@ -71,10 +71,10 @@ describe("soonWithoutDate", () => {
 });
 
 describe("repeatable", () => {
-	it("is an open task of its own; not a subtask, nor a closed task", () => {
+	it("is an open task or subtask; not a closed task", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] A\n\t- [ ] A1\n- [x] B\n- [-] C\n- [/] D\n", SECTIONS, M);
 		const [a, b, c, dd] = d.tasks("now");
-		expect([a, a.subtasks[0], b, c, dd].map(repeatable)).toEqual([true, false, false, false, true]);
+		expect([a, a.subtasks[0], b, c, dd].map(repeatable)).toEqual([true, true, false, false, true]);
 	});
 });
 

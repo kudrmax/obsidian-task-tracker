@@ -604,7 +604,7 @@ export class QuickEntryController {
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {
 		const place = this.shownPlace(state);
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: place !== null, section: state.section };
+		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
 	}
 
 	/** The level chosen in the bar, else the one the text's prefix stands for. */
@@ -621,7 +621,7 @@ export class QuickEntryController {
 		this.entry.setPriority(prefix);
 	}
 
-	/** The place button, and with it the repeat: a subtask's field, new or renamed, has none, nor does one off the lists. */
+	/** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
 	private shownPlace(state: EntryState): Placement | null {
 		const { spot, renaming } = state;
 		if (spot.kind !== "list") return null;

@@ -62,10 +62,10 @@ describe("toItem", () => {
 		expect(trip.subtasks[0].subtasks.map((s) => [s.list, s.isSubtask])).toEqual([["now", true]]);
 	});
 
-	it("tells whether the task may repeat: an open task of its own; not a subtask, nor a closed task", () => {
+	it("tells whether the task may repeat: an open task or subtask; not a closed task", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] A\n\t- [ ] A1\n- [x] B\n- [-] C\n- [/] D\n", SECTIONS, M);
 		const [a, b, c, dd] = d.tasks("now");
-		expect([toItem(a, T).repeatable, toItem(a, T).subtasks[0].repeatable, toItem(b, T).repeatable, toItem(c, T).repeatable, toItem(dd, T).repeatable]).toEqual([true, false, false, false, true]);
+		expect([toItem(a, T).repeatable, toItem(a, T).subtasks[0].repeatable, toItem(b, T).repeatable, toItem(c, T).repeatable, toItem(dd, T).repeatable]).toEqual([true, true, false, false, true]);
 	});
 
 	it("tells whether the task is open: todo or in progress, not done nor given up", () => {
