@@ -3,7 +3,7 @@ import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
-import { hitIn } from "../../src/domain/search";
+import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
 import { plainText } from "../../src/domain/TaskText";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
@@ -200,17 +200,13 @@ export class DemoTaskService implements TaskService {
 
 	/** The board's tasks have no descriptions: the search looks at titles. */
 	async search(query: string): Promise<readonly SearchHit[]> {
+		const fuzzy = FuzzyQuery.of(query);
+		if (!fuzzy) return [];
 		const sections: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
 		return sections.flatMap((section) =>
 			this.items(section).flatMap((item) => {
-				const hit = hitIn(item.text, query);
-				if (!hit) return [];
-				const title = [
-					{ text: hit.before, match: false },
-					{ text: hit.match, match: true },
-					{ text: hit.after, match: false },
-				].filter((part) => part.text !== "");
-				return [{ item, title, description: null }];
+				const found = fuzzy.match(item.text);
+				return found ? [{ item, title: matchParts(item.text, found.found), description: null }] : [];
 			}),
 		);
 	}

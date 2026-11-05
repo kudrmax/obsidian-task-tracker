@@ -4,7 +4,7 @@ import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { backlogList, type Column, columnGroups, columnList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import { hitIn, snippetIn, type TextHit } from "../domain/search";
+import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
@@ -34,7 +34,6 @@ import {
 	type TaskKey,
 	type TaskService,
 	type TaskStep,
-	type TitlePart,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import { runDrop } from "./drops";
@@ -83,13 +82,16 @@ const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore"
 /** The sections a search walks, in the order its results stand. */
 const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
 
-function titleParts(hit: TextHit): readonly TitlePart[] {
-	const parts: TitlePart[] = [
-		{ text: hit.before, match: false },
-		{ text: hit.match, match: true },
-		{ text: hit.after, match: false },
-	];
-	return parts.filter((part) => part.text !== "");
+interface RankedHit {
+	readonly hit: SearchHit;
+	readonly title: TextMatch | null;
+	readonly description: TextMatch | null;
+}
+
+/** A match in the title before one only in the description, then the higher score; a sort keeps ties in file order. */
+function byQuality(a: RankedHit, b: RankedHit): number {
+	if ((a.title === null) !== (b.title === null)) return a.title ? -1 : 1;
+	return (b.title ?? b.description)!.score - (a.title ?? a.description)!.score;
 }
 
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
@@ -186,18 +188,33 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async search(query: string): Promise<readonly SearchHit[]> {
-		if (query.trim() === "") return [];
+		const fuzzy = FuzzyQuery.of(query);
+		if (!fuzzy) return [];
 		const { doc, today } = await this.readNormalized();
 		const item = this.itemOf(today);
-		const hits: SearchHit[] = [];
+		const ranked: RankedHit[] = [];
 		const visit = (entry: TaskEntry): void => {
-			const title = hitIn(plainText(entry.task.text), query);
+			const titleText = plainText(entry.task.text);
+			const title = fuzzy.match(titleText);
 			const markdown = descriptionMarkdown(entry);
-			const description = markdown === null ? null : snippetIn(markdown, query);
-			if (title || description) hits.push({ item: item(entry), title: title ? titleParts(title) : [], description });
+			const descriptionText = markdown === null ? "" : plainDescription(markdown);
+			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
+			if (title || description) {
+				const hit: SearchHit = {
+					item: item(entry),
+					title: title ? matchParts(titleText, title.found) : [],
+					description: description ? snippetParts(descriptionText, description.found) : null,
+				};
+				ranked.push({ hit, title, description });
+			}
 			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
 		};
-		for (const section of SEARCH_ORDER) for (const entry of doc.tasks(section)) visit(entry);
+		const hits: SearchHit[] = [];
+		for (const section of SEARCH_ORDER) {
+			ranked.length = 0;
+			for (const entry of doc.tasks(section)) visit(entry);
+			hits.push(...ranked.sort(byQuality).map((r) => r.hit));
+		}
 		return hits;
 	}
 

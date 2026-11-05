@@ -31,7 +31,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 
 const HITS: readonly SearchHit[] = [
 	{ item: item("Фото на паспорт", "inbox"), title: [{ text: "Фото на ", match: false }, { text: "паспорт", match: true }], description: null },
-	{ item: item("Записаться в МФЦ", "soon", { description: "взять паспорт" }), title: [], description: { before: "взять ", match: "паспорт", after: "" } },
+	{ item: item("Записаться в МФЦ", "soon", { description: "взять паспорт" }), title: [], description: [{ text: "взять ", match: false }, { text: "паспорт", match: true }] },
 	{ item: item("Оплатить паспорт", "done"), title: [{ text: "Оплатить ", match: false }, { text: "паспорт", match: true }], description: null },
 ];
 
