@@ -1,5 +1,4 @@
 import type { CalendarEvent } from "../application/contracts";
-import type { EventBatch, EventSource } from "../application/EventSource";
 import type { Clock, SettingsStore } from "../application/ports";
 import type { GoogleAuth } from "./GoogleAuth";
 import type { Http } from "./Http";
@@ -38,8 +37,8 @@ function dateOf(point: { dateTime?: string; date?: string }): Date {
 	return new Date(y, m - 1, d);
 }
 
-export class GoogleCalendarSource implements EventSource {
-	readonly name = "google" as const;
+/** Google's Calendar API, read only: the events of the calendars the settings show, and the list of calendars. */
+export class GoogleCalendarApi {
 	private list: { readonly key: string; readonly at: number; readonly calendars: Promise<CalendarListEntry[]> } | null = null;
 
 	constructor(
@@ -49,13 +48,13 @@ export class GoogleCalendarSource implements EventSource {
 		private readonly http: Http,
 	) {}
 
-	async eventsBetween(start: Date, end: Date): Promise<EventBatch> {
+	async eventsBetween(start: Date, end: Date): Promise<CalendarEvent[]> {
 		if (!this.auth.isLoggedIn()) throw new Error("not logged in");
 		const wanted = this.settings.get().google.calendarIds;
 		const calendars = (await this.calendarList()).filter((c) => c.selected !== false && (wanted.length === 0 || wanted.includes(c.id)));
 		try {
 			const perCalendar = await Promise.all(calendars.map((c) => this.eventsOf(c, start, end)));
-			return { events: perCalendar.flat(), updatedAt: this.clock.now() };
+			return perCalendar.flat();
 		} catch (e) {
 			// A calendar removed in Google answers 404: the list is asked again, not kept failing for half an hour.
 			this.list = null;

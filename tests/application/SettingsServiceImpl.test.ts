@@ -1,0 +1,154 @@
+import { describe, expect, it } from "vitest";
+import type { PriorityLevel, SecretField } from "../../src/application/contracts";
+import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
+import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../src/settings";
+import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+
+function service(start: Partial<TaskCalendarSettings> = {}) {
+	const store = new FakeSettingsStore({ ...DEFAULT_SETTINGS, ...start });
+	let writes = 0;
+	store.onChange(() => writes++);
+	return { svc: new SettingsServiceImpl(store), now: () => store.get(), writes: () => writes };
+}
+
+describe("editing the priority levels", () => {
+	const DEFAULT: readonly PriorityLevel[] = [
+		{ prefix: "p1", color: "red" },
+		{ prefix: "p2", color: "orange" },
+	];
+
+	it("keeps a prefix just typed when a level is added or removed right after", async () => {
+		const added = service({ priorities: DEFAULT });
+		await added.svc.renameLevel(0, " high ");
+		await added.svc.addLevel();
+		expect(added.now().priorities.map((l) => l.prefix)).toEqual(["high", "p2", "p3"]);
+		const removed = service({ priorities: DEFAULT });
+		await removed.svc.renameLevel(0, "high");
+		await removed.svc.removeLevel(1);
+		expect(removed.now().priorities).toEqual([{ prefix: "high", color: "red" }]);
+	});
+
+	it("adds the next free prefix in the first unused colour, and recolours a level", async () => {
+		const { svc, now } = service({ priorities: [{ prefix: "p3", color: "red" }] });
+		await svc.addLevel();
+		expect(now().priorities[1]).toEqual({ prefix: "p2", color: "orange" });
+		await svc.recolourLevel(1, "blue");
+		expect(now().priorities[1].color).toBe("blue");
+		await svc.recolourLevel(1, "#123456");
+		expect(now().priorities[1].color).toBe("#123456");
+	});
+
+	it("adds in the first colour when every colour is taken", async () => {
+		const all = (["red", "orange", "yellow", "green", "teal", "blue"] as const).map((color, i) => ({ prefix: `p${i + 1}`, color }));
+		const { svc, now } = service({ priorities: all });
+		await svc.addLevel();
+		expect(now().priorities[6]).toEqual({ prefix: "p7", color: "red" });
+	});
+});
+
+describe("editing the section presets", () => {
+	const presets = (names: string[]) => ({ groups: { ...DEFAULT_SETTINGS.groups, presets: names } });
+
+	it("move reorders", async () => {
+		const { svc, now } = service(presets(["Morning", "Afternoon", "Evening"]));
+		await svc.movePreset(2, 0);
+		expect(now().groups.presets).toEqual(["Evening", "Morning", "Afternoon"]);
+		await svc.movePreset(0, 2);
+		expect(now().groups.presets).toEqual(["Morning", "Afternoon", "Evening"]);
+	});
+
+	it("add appends an empty preset", async () => {
+		const { svc, now } = service(presets(["Morning"]));
+		await svc.addPreset();
+		expect(now().groups.presets).toEqual(["Morning", ""]);
+	});
+
+	it("remove drops one", async () => {
+		const { svc, now } = service(presets(["Morning", "Afternoon"]));
+		await svc.removePreset(0);
+		expect(now().groups.presets).toEqual(["Afternoon"]);
+	});
+
+	it("rename trims and keeps the others, and No section's name", async () => {
+		const { svc, now } = service({ groups: { presets: ["Morning", "Afternoon"], ungrouped: "Loose" } });
+		await svc.renamePreset(1, " Вечер ");
+		expect(now().groups).toEqual({ presets: ["Morning", "Вечер"], ungrouped: "Loose" });
+	});
+});
+
+describe("SettingsServiceImpl", () => {
+	it("shows the tab its fields, the texts as the fields hold them, and no secret", () => {
+		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
+		const form = service({ google, workCalendarTitles: ["A", "B"] }).svc.form();
+		expect(form).toMatchObject({ zoomLevels: "28, 56, 112, 224", workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
+		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", silentSlotMarker: "🔕", repeatMarker: "🔁" });
+		expect(JSON.stringify(form)).not.toMatch(/secret|token/);
+	});
+
+	it("writes a count of zero or more and nothing for any other text", async () => {
+		const { svc, now, writes } = service();
+		for (const bad of ["", " ", "-1", "abc", "Infinity", "NaN"]) await svc.setCount("longPressMs", bad);
+		expect(writes()).toBe(0);
+		await svc.setCount("longPressMs", " 0 ");
+		await svc.setCount("scrollToHour", "7");
+		await svc.setCount("staleAfterMinutes", "2.5");
+		await svc.setCount("refreshSeconds", "0");
+		expect(now()).toMatchObject({ longPressMs: 0, scrollToHour: 7, staleAfterMinutes: 2.5, google: { ...DEFAULT_SETTINGS.google, refreshSeconds: 0 } });
+	});
+
+	it("writes zoom levels that read and nothing for the rest", async () => {
+		const { svc, now, writes } = service();
+		await svc.setZoomLevels("28, x");
+		expect(writes()).toBe(0);
+		await svc.setZoomLevels("40, 80");
+		expect(now().zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
+	});
+
+	it("writes a blank No section as the default, any other name trimmed", async () => {
+		const { svc, now } = service();
+		await svc.setUngrouped(" Loose ");
+		expect(now().groups.ungrouped).toBe("Loose");
+		await svc.setUngrouped("  ");
+		expect(now().groups.ungrouped).toBe("No section");
+	});
+
+	it("writes names, paths and marks as typed", async () => {
+		const { svc, now } = service();
+		await svc.setTasksFile("");
+		await svc.setSection("now", " Today ");
+		await svc.setMarker("repeatMarker", "↻");
+		await svc.setWorkCalendarFile("w.json");
+		expect(now()).toMatchObject({ tasksFile: "", sections: { ...DEFAULT_SETTINGS.sections, now: " Today " }, repeatMarker: "↻", workCalendarFile: "w.json" });
+	});
+
+	it("splits the work calendars at the commas, the blanks dropped", async () => {
+		const { svc, now } = service();
+		await svc.setWorkCalendars(" Work ,, Team ,");
+		expect(now().workCalendarTitles).toEqual(["Work", "Team"]);
+		await svc.setWorkCalendars("");
+		expect(now().workCalendarTitles).toEqual([]);
+	});
+
+	it("puts the saved secret in its field and saves what is typed, keeping the rest of Google's", async () => {
+		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
+		const { svc, now } = service({ google });
+		let shown = "";
+		let typed: (value: string) => void = () => undefined;
+		const field: SecretField = { setValue: (value) => void (shown = value), onChange: (listener) => void (typed = listener) };
+		svc.bindClientSecret(field);
+		expect(shown).toBe("secret");
+		typed("other");
+		await Promise.resolve();
+		expect(now().google).toEqual({ ...google, clientSecret: "other" });
+		await svc.setGoogleClientId("id2");
+		expect(now().google).toEqual({ ...google, clientSecret: "other", clientId: "id2" });
+	});
+
+	it("writes the card's size and the day's start as given", async () => {
+		const { svc, now } = service();
+		await svc.setCardSize("cardHeight", 30);
+		await svc.setCardSize("cardGap", 0);
+		await svc.setDayStartHour(0);
+		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0, dayStartHour: 0 });
+	});
+});

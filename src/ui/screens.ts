@@ -1,4 +1,4 @@
-import type { RightMode } from "../settings";
+import type { RightMode } from "../application/contracts";
 import { addDays } from "./dates";
 import type { LocalDate } from "./types";
 

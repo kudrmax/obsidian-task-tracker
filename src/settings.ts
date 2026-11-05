@@ -33,7 +33,8 @@ export interface GoogleSettings {
 	readonly refreshSeconds: number;
 }
 
-export interface TaskCalendarSettings {
+/** How the tasks file is written: where it is, its sections and the marks of its lines, the levels and the day's start. */
+export interface FileFormatSettings {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;
 	readonly dueDateMarker: string;
@@ -43,32 +44,43 @@ export interface TaskCalendarSettings {
 	/** Precedes the slot of a task that the phone does not remind of. */
 	readonly silentSlotMarker: string;
 	readonly repeatMarker: string;
-	readonly workCalendarFile: string;
-	/** Calendar titles to take from the work file; empty means all. */
-	readonly workCalendarTitles: readonly string[];
-	readonly google: GoogleSettings;
-	readonly longPressMs: number;
-	readonly zoomLevels: readonly ZoomLevel[];
-	/** The zoom a pinch last settled on: the timeline opens at it. */
-	readonly zoom: Zoom;
-	/** The hour a day other than today scrolls to when opened. */
-	readonly scrollToHour: number;
+	/** Priority levels in the order the menu and the task screen offer them. */
+	readonly priorities: readonly PriorityLevel[];
+	readonly groups: GroupSettings;
 	/** The hour one day ends and the next begins, 0..23: today, the due dates and the timeline count from it. */
 	readonly dayStartHour: number;
+}
+
+/** How the screen looks and answers: the columns, the zoom, the cards, the touch. */
+export interface ViewSettings {
 	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
 	readonly listShare: number;
 	/** What the right column shows; the segmented control in the day row sets it. */
 	readonly rightMode: RightMode;
-	/** A calendar source whose last update is older than this gets the orange dot. */
-	readonly staleAfterMinutes: number;
-	/** Priority levels in the order the menu and the task screen offer them. */
-	readonly priorities: readonly PriorityLevel[];
-	readonly groups: GroupSettings;
+	/** The zoom a pinch last settled on: the timeline opens at it. */
+	readonly zoom: Zoom;
+	readonly zoomLevels: readonly ZoomLevel[];
 	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
 	readonly cardHeight: number;
 	/** Between two cards, px: in the list and in a stack on the timeline alike. */
 	readonly cardGap: number;
+	readonly longPressMs: number;
+	/** The hour a day other than today scrolls to when opened. */
+	readonly scrollToHour: number;
 }
+
+/** Where the events come from: the work file, Google, and when a source counts as stale. */
+export interface SourceSettings {
+	readonly workCalendarFile: string;
+	/** Calendar titles to take from the work file; empty means all. */
+	readonly workCalendarTitles: readonly string[];
+	readonly google: GoogleSettings;
+	/** A calendar source whose last update is older than this gets the orange dot. */
+	readonly staleAfterMinutes: number;
+}
+
+/** data.json: one object, its parts typed apart. */
+export type TaskCalendarSettings = FileFormatSettings & ViewSettings & SourceSettings;
 
 export const LIST_WIDTH_MIN = 110;
 export const LIST_WIDTH_MAX = 280;

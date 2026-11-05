@@ -344,8 +344,10 @@ body {
 	--tc-bar-btn-w: 44px;
 	--tc-bar-btn-h: 36px;
 	--tc-radius-bar-btn: calc(var(--tc-bar-btn-h) / 2);
-	/* The bar's buttons stand the cards' gap over the phone keyboard (over the view's bottom where there is none). */
-	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-keyboard-lift) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
+	/* The bar's buttons stand the cards' gap over the view's bottom, which Obsidian shrinks above the phone keyboard once it stops. */
+	--tc-bar-stand: calc(var(--tc-status-room) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
+	/* While the keyboard slides in the view is still tall: the bar alone is lifted onto it. */
+	--tc-bar-bottom: calc(var(--tc-bar-stand) + var(--tc-keyboard-lift));
 	--tc-bar-icon: var(--tc-icon-xl);
 	--tc-bar-flag: var(--tc-icon-l);
 	--tc-stroke-bar: var(--tc-stroke-1-9);
@@ -673,8 +675,12 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
 /* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
 body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
-/* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
-body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
+/*
+ * On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over
+ * the bar shows whole. It stands where the bar rests, never lifted with the slide: its height eases, and a lift eased away after
+ * the view has shrunk would sweep its solid foot up the screen and back.
+ */
+body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }

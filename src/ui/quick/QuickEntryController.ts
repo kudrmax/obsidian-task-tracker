@@ -1,5 +1,4 @@
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
-import type { RightMode } from "../../settings";
+import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
 import { FramePass } from "../FramePass";
@@ -69,8 +68,8 @@ interface MenuField {
 	readonly parent: TaskItem | null;
 }
 
-/** What closes the field when tapped: anything but the field and what its editor shows, the bar with its panels, and the plus. */
-const KEEPS_FIELD = ".tc-quick-row, .tc-quick-bar, .tc-plus";
+/** What closes the field when tapped: anything but the field and what its editor shows, the bar's parts with its panels, and the plus. */
+const KEEPS_FIELD = ".tc-quick-row, .tc-plus";
 
 const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
 
@@ -163,7 +162,7 @@ export class QuickEntryController {
 	/** The view grew or shrank, Obsidian's toolbar coming or going under it: the field keeps over the bar in the same frame. */
 	private readonly sizeWatch = new ResizeObserver(() => this.reveal());
 	private readonly tapAway = (e: Event) => {
-		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.field?.owns(e.target)))) return;
+		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.bar.owns(e.target) || this.field?.owns(e.target)))) return;
 		this.entry.blur();
 	};
 

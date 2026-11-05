@@ -1,4 +1,4 @@
-import { sameLevels, type TaskCalendarSettings } from "../settings";
+import { sameLevels, type ScreenSettings } from "../application/contracts";
 
 /** What a change of the settings asks of the screen. */
 export interface SettingsEffect {
@@ -12,14 +12,14 @@ export interface SettingsEffect {
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-export function settingsEffect(before: TaskCalendarSettings, after: TaskCalendarSettings): SettingsEffect {
+export function settingsEffect(before: ScreenSettings, after: ScreenSettings): SettingsEffect {
 	return {
 		restack: before.cardHeight !== after.cardHeight || before.cardGap !== after.cardGap,
 		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
 		drawn:
 			before.tasksFile !== after.tasksFile ||
 			!same(before.sections, after.sections) ||
-			before.groups.ungrouped !== after.groups.ungrouped ||
+			before.ungrouped !== after.ungrouped ||
 			!sameLevels(before.priorities, after.priorities),
 	};
 }

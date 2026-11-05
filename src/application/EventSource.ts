@@ -1,16 +1,21 @@
-import type { CalendarEvent, CalendarSource } from "./contracts";
+import type { CalendarFile } from "./calendarFile";
+import type { CalendarSource } from "./contracts";
 
-export interface EventBatch {
-	readonly events: readonly CalendarEvent[];
-	readonly updatedAt: Date;
-	/** The work file's `device`; nothing for Google. */
-	readonly detail?: string;
+/** One calendar's file in the vault: what the calendar shows of the source. */
+export interface EventFile {
+	readonly name: CalendarSource;
+	/** Throws when the file is missing or unreadable; the message becomes the source's status. */
+	read(): Promise<CalendarFile>;
+	/** The file was written: by Scriptable, by a feed, or by Sync from another device. */
+	onChange(listener: () => void): () => void;
 }
 
-/** One calendar behind the CalendarService. Throws when it cannot fetch; the message becomes the source status. */
-export interface EventSource {
+/** What brings a source's events into its file from elsewhere: Google's Calendar API. */
+export interface EventFeed {
 	readonly name: CalendarSource;
-	eventsBetween(start: Date, end: Date): Promise<EventBatch>;
-	/** A source that knows when its data changed (the work file) says so; Google has no such signal and is polled. */
-	onChange?(listener: () => void): () => void;
+	/**
+	 * Writes the file afresh. Unless `force`d, a feed that ran successfully less than the refresh interval ago under the
+	 * same settings does nothing. Throws when it cannot; the file then keeps what it had.
+	 */
+	refresh(force: boolean): Promise<void>;
 }
