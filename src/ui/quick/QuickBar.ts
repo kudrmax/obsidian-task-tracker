@@ -170,6 +170,11 @@ export class QuickBar {
 		else this.refreshPanel();
 	}
 
+	/** Part of the bar: the bar with its panels, or the desktop's section capsule. A tap there is not a tap elsewhere. */
+	owns(target: Node): boolean {
+		return this.bar.contains(target) || this.mode.contains(target);
+	}
+
 	hide(): void {
 		this.closePanel();
 		this.stopGlide();

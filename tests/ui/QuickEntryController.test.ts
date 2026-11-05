@@ -1262,6 +1262,14 @@ describe("QuickEntryController: the field switched to a section", () => {
 		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(false);
 	});
 
+	it("a click on the desktop's section capsule switches the field and keeps it open", () => {
+		const { controller, root, field } = setUp({ sections: true, desktop: { chromeTop: 476 } });
+		controller.openAtEnd("left");
+		sectionButton(root).click();
+		expect(field()).not.toBeNull();
+		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("true");
+	});
+
 	it("on the phone it stays first in the bar over the keyboard", () => {
 		const { controller, root } = setUp({ sections: true });
 		controller.openAtEnd("left");
