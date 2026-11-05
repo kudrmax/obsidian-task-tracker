@@ -126,7 +126,7 @@ export class DragController {
 		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
 		const rect = card.getBoundingClientRect();
 		const grabPx = onTimeline ? e.clientY - rect.top : shownCardSize().height / 2;
-		return { item, from, durationMin, grabPx, grabX: e.clientX - rect.left };
+		return { item, from, durationMin, grabPx };
 	}
 
 	/** A click opens the menu at once; a second one, on the copy now over the card, makes it a double click that renames. */
@@ -280,7 +280,7 @@ export class DragController {
 		const float = new PlusFloat({ dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
-		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top, grabX: e.clientX - origin.left };
+		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top };
 		let placed = false;
 		this.follow(
 			source,

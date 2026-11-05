@@ -40,8 +40,8 @@ interface Layout {
 /**
  * A list as a place to drop. No card moves while a drag goes on: a card lifted from the list waits as a dashed place where
  * it stood, and the calendar's drop line between two cards shows the gap and the level, as it does for a new task carried
- * on the plus. Nothing goes into a card: a card carried along takes the gap its top edge picks and the level its left edge
- * picks, so the line stays in sight over it; a new task takes its level from the list's middle, and each of its new places
+ * on the plus. Nothing goes into a card: a card carried along takes the gap its middle picks, a new task the gap under the
+ * finger; both take their level from where the finger stands against the list's middle, and each new place of a new task
  * ticks under the finger. A list that shows sections takes a card from
  * anywhere this way, into the section of the gap; another list takes a card from elsewhere at its end.
  */
@@ -91,7 +91,7 @@ export class ListDrop implements DropTarget {
 			: placeAt(
 					this.placed(frame),
 					fresh ? y : this.cardY(y, drag, layout),
-					fresh ? this.newTaskLevel(x, frame) : this.cardLevel(x, drag, frame),
+					this.levelAt(x, frame),
 					0,
 					null,
 					this.sections() ? this.placedHeads(frame) : [],
@@ -269,18 +269,12 @@ export class ListDrop implements DropTarget {
 		return y - drag.grabPx + layout.size.height / 2;
 	}
 
-	/** A card carried along: the level its left edge stands at. */
-	private cardLevel(x: number, drag: DragPayload, frame: ListFrame): number {
-		const indent = this.layoutFor(frame).indent;
-		return indent > 0 ? (x - drag.grabX - this.baseLeft(frame)) / indent : 0;
-	}
-
 	/**
-	 * A new task: on the list's left half as shallow as the neighbours allow; right of the middle a level deeper for each
-	 * indent, as if the finger held the left edge of a task's card standing in the middle. So the thumb picks a task, a
-	 * subtask or one under that near the middle of the screen, never stretching to the list's left edge.
+	 * The level for a new task and a carried card alike: on the list's left half as shallow as the neighbours allow; right
+	 * of the middle a level deeper for each indent. So the hand picks a task, a subtask or one under that near the middle
+	 * of the list, never stretching to its left edge, wherever it holds the card.
 	 */
-	private newTaskLevel(x: number, frame: ListFrame): number {
+	private levelAt(x: number, frame: ListFrame): number {
 		const r = frame.box;
 		const indent = this.layoutFor(frame).indent;
 		return indent > 0 ? (x - (r.left + r.width / 2)) / indent : 0;
