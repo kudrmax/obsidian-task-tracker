@@ -1,5 +1,6 @@
-import { type DayView, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type DroppedTask, type DropTo, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
+import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
@@ -391,6 +392,10 @@ export class DemoTaskService implements TaskService {
 
 	async removeGroup(): Promise<void> {}
 	async applyAll(): Promise<void> {}
+
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		return runDrop(this, tasks, to, day);
+	}
 
 	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
 		const t = this.take(key);

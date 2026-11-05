@@ -1,5 +1,5 @@
 import { type GroupName, keyId, type PriorityLevel, type TaskChange, type TaskItem, type TaskStep } from "../application/contracts";
-import { carriesMany, type DropResult, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import type { SectionChoice } from "./menu/TaskMenu";
 import { PlusRing } from "./quick/PlusRing";
@@ -98,32 +98,9 @@ export class BulkController {
 		this.ring.hide();
 	}
 
-	/** What a drop of several cards means for each of them, as for one (spec §5.1); null for one carried alone. */
-	dropSteps(drag: TaskDragPayload, result: DropResult): readonly TaskStep[] | null {
-		if (!carriesMany(drag) || drag.from === "timeline") return null;
-		const all = [{ item: drag.item, from: drag.from }, ...(drag.carried ?? [])];
-		const steps = all.flatMap(({ item, from }) => {
-			const change = this.dropChange(from, result);
-			return change ? [{ key: item.key, change }] : [];
-		});
-		this.selection.clear();
-		return steps;
-	}
-
-	private dropChange(from: ListColumn, result: DropResult): TaskChange | null {
-		const day = this.deps.day();
-		switch (result.kind) {
-			case "group":
-				return { kind: "moveToGroup", list: result.list, group: result.group, before: result.before, date: result.date ?? undefined };
-			case "nest":
-				return { kind: "nest", parent: result.parent, before: result.before };
-			case "listBefore":
-				if (result.column === "left") return from === "left" ? { kind: "moveBefore", before: result.before, date: day } : { kind: "moveToList", date: day };
-				if (result.before) return { kind: "moveBefore", before: result.before, date: day };
-				return from === "left" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: result.column };
-			default:
-				return null;
-		}
+	/** Several cards let go on a place: they leave the selection, as any action done on them. */
+	dropping(drag: TaskDragPayload): void {
+		if (carriesMany(drag)) this.selection.clear();
 	}
 
 	/** Escape lets the picked cards go; the menu over them takes its own Escape first. */
