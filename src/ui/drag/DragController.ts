@@ -34,6 +34,8 @@ export interface DragControllerDeps {
 	 * picked ones, so the card's own menu stays shut.
 	 */
 	pick?(item: TaskItem, card: HTMLElement, e: MouseEvent, how: "tap" | "menu"): boolean;
+	/** A list card tapped where `pressed` is: true when the tap folded or unfolded its subtasks, so its menu stays shut. */
+	fold?(item: TaskItem, pressed: EventTarget | null): boolean;
 	/** The other picked cards that go along when `item` is lifted; none when it is not picked or picked alone. */
 	carried?(item: TaskItem): readonly PickedCard[];
 	readonly haptics: Haptics;
@@ -77,6 +79,9 @@ export class DragController {
 			e.preventDefault();
 			if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
 		});
+		/** Where the press began: the card captures the pointer, so the release names the card itself. */
+		let pressed: EventTarget | null = null;
+		card.addEventListener("pointerdown", (e) => (pressed = e.target));
 		new LongPress(card, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
@@ -86,7 +91,8 @@ export class DragController {
 				this.begin(card, payload, e, subtree, carried);
 			},
 			onTap: (e) => {
-				if (!this.deps.pick?.(item, card, e, "tap")) this.tapped(e, item, this.deps.onMenu(item, card));
+				if (this.deps.pick?.(item, card, e, "tap") || this.deps.fold?.(item, pressed)) return;
+				this.tapped(e, item, this.deps.onMenu(item, card));
 			},
 		});
 	}

@@ -48,6 +48,21 @@ describe("TaskList", () => {
 		expect(coming.map((c) => [c.key.raw, c.level, c.group])).toEqual([["Z", 0, null], ["C", 0, null], ["B", 0, "Morning"], ["A1", 1, "Morning"]]);
 	});
 
+	it("draws a collapsed task without its subtasks, its card marked, and hands its subtree to nobody", () => {
+		const sub = { ...task("A1", 0), key: { section: "now" as const, index: 0, path: [0], raw: "A1" } };
+		const subtrees: [string, number][] = [];
+		const list = new TaskList(document.createElement("div"), {
+			items: () => [{ ...task("A", 0), subtasks: [sub], progress: { done: 0, total: 1 }, collapsed: true }, { ...task("B", 1), subtasks: [{ ...sub, key: { ...sub.key, index: 1 } }] }],
+			day: () => null,
+			onCard: (_card, item, subtree) => subtrees.push([item.text, subtree.length]),
+		});
+		list.render();
+		expect(list.cards.map((c) => [c.item.text, c.level])).toEqual([["A", 0], ["B", 0], ["A1", 1]]);
+		expect(list.comingCards.map((c) => c.key.raw)).toEqual(["A", "B", "A1"]);
+		expect(list.cards.map((c) => c.card.classList.contains("is-collapsed"))).toEqual([true, false, false]);
+		expect(subtrees).toEqual([["A", 0], ["B", 1], ["A1", 0]]);
+	});
+
 	it("an empty section shows its header over the No tasks plate, which stands among the elements", () => {
 		const root = document.createElement("div");
 		const plates: string[] = [];

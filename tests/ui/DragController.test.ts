@@ -273,6 +273,32 @@ describe("DragController: a finger held on a timeline block", () => {
 	});
 });
 
+describe("DragController: a tap on a list card", () => {
+	function tapped(on: (card: HTMLElement) => HTMLElement, fold: (pressed: EventTarget | null) => boolean) {
+		const onMenu = vi.fn(() => ({ close: vi.fn(), onClickedAgain: vi.fn() }));
+		const deps = { longPressMs: () => 300, haptics: { tap: () => {} }, arbiter: new GestureArbiter(), onMenu, fold: (_item: TaskItem, pressed: EventTarget | null) => fold(pressed) } as unknown as DragControllerDeps;
+		const card = document.body.appendChild(document.createElement("div"));
+		const count = card.appendChild(document.createElement("span"));
+		count.className = "tc-count";
+		new DragController(deps).attachCard(card, { key: { section: "now", index: 0, path: [], raw: "- [ ] A" } } as unknown as TaskItem, "left");
+		on(card).dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
+		card.dispatchEvent(Object.assign(new Event("pointerup", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, pointerType: "touch" }));
+		return { onMenu, count };
+	}
+
+	it("asks to fold with the element the press began on, though the card captured the release; a fold keeps the menu shut", () => {
+		const seen: (EventTarget | null)[] = [];
+		const { onMenu, count } = tapped((card) => card.querySelector<HTMLElement>(".tc-count")!, (pressed) => (seen.push(pressed), true));
+		expect(seen).toEqual([count]);
+		expect(onMenu).not.toHaveBeenCalled();
+	});
+
+	it("opens the menu when the tap folds nothing", () => {
+		const { onMenu } = tapped((card) => card, () => false);
+		expect(onMenu).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe("DragController: a finger held on a calendar event", () => {
 	it("keeps the screen until it lifts, so the menu opened stays over a day no swipe or scroll moves", () => {
 		vi.useFakeTimers();

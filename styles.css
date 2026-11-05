@@ -18,6 +18,10 @@ body {
 	--tc-card-lift: 11%;
 	--tc-card-lift-light: 5%;
 	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift));
+	/* The card peeking out under a task whose subtasks are folded away: the ground lifted less than a card. */
+	--tc-fold-lift: 6%;
+	--tc-fold-lift-light: 3%;
+	--tc-fold-layer: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-fold-lift));
 	/* The day's arrows and the sources' icons. */
 	--tc-ink-soft: #E5E5EA;
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
@@ -243,6 +247,10 @@ body {
 	/* A lifted section, and a dragged task with subtasks: two layers under it, each a step further down and narrower by a step on each side. */
 	--tc-stack-step-x: 7px;
 	--tc-stack-step-y: 6px;
+	/* A task whose subtasks are folded away: one layer peeking a step out under its card, a step narrower on each side, drawn as its shadow so it stays under the card. */
+	--tc-shadow-fold: 0 calc(var(--tc-stack-step-y) + var(--tc-stack-step-x)) 0 calc(-1 * var(--tc-stack-step-x)) var(--tc-fold-layer);
+	/* The subtask counter of a list card answers a tap from the card's whole height and a few px either side. */
+	--tc-fold-hit-x: var(--tc-space-6);
 	--tc-fade-block: 16px;
 	--tc-fade-card-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent);
 	--tc-fade-block-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent);
@@ -580,6 +588,7 @@ body {
 body.theme-light {
 	--tc-text: #000000;
 	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift-light));
+	--tc-fold-layer: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-fold-lift-light));
 	--tc-ink-soft: #3A3A3C;
 	--tc-ink-strong: #1C1C1E;
 	--tc-on-strong: #FFFFFF;
@@ -852,6 +861,14 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
 .tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+/* A list card's counter folds the subtasks away and shows them again: it takes the tap from the card's whole height and lights up under the pointer. */
+.tc-list > .tc-card .tc-count { position: relative; }
+.tc-list > .tc-card .tc-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+@media (hover: hover) {
+	body:not(.is-mobile) .tc-list > .tc-card .tc-count:hover { color: var(--tc-text); }
+}
+/* A task whose subtasks are folded away: a card peeks out under it, and the next card stands below that. */
+.tc-list > .tc-card.is-collapsed { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* Where a dragged task will land: the calendar's drop line between two cards, at the level it picks, inside the list so it scrolls with the cards. */
 .tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); width: 0; height: var(--tc-drop-dot); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop.is-shown { opacity: 1; }
