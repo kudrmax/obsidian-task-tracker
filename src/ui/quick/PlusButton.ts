@@ -1,3 +1,4 @@
+import type { EntryPart } from "./EntryPart";
 import { LAYOUT } from "../design";
 import { capturePointer, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
@@ -20,7 +21,7 @@ interface Press {
  * The round button beside the column switch. A tap opens the typing field; a finger that moves past the press tolerance
  * hands the gesture over to the drag of a new task, at once: there is no long press.
  */
-export class PlusButton {
+export class PlusButton implements EntryPart {
 	private readonly plus: Button;
 	private press: Press | null = null;
 	private isHidden = false;
@@ -41,6 +42,10 @@ export class PlusButton {
 		button.addEventListener("pointermove", (e) => this.move(e));
 		button.addEventListener("pointerup", (e) => this.up(e));
 		button.addEventListener("pointercancel", (e) => this.cancel(e));
+	}
+
+	owns(target: Element): boolean {
+		return this.plus.el.contains(target);
 	}
 
 	set hidden(value: boolean) {

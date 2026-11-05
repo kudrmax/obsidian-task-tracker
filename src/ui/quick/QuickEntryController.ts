@@ -1,4 +1,5 @@
 import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
 import { FramePass } from "../FramePass";
@@ -68,8 +69,6 @@ interface MenuField {
 	readonly parent: TaskItem | null;
 }
 
-/** What closes the field when tapped: anything but the field and what its editor shows, the bar's parts with its panels, and the plus. */
-const KEEPS_FIELD = ".tc-quick-row, .tc-plus";
 
 const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
 
@@ -162,7 +161,7 @@ export class QuickEntryController {
 	/** The view grew or shrank, Obsidian's toolbar coming or going under it: the field keeps over the bar in the same frame. */
 	private readonly sizeWatch = new ResizeObserver(() => this.reveal());
 	private readonly tapAway = (e: Event) => {
-		if (!this.state || this.pressEnding || (e.target instanceof Element && (e.target.closest(KEEPS_FIELD) || this.bar.owns(e.target) || this.field?.owns(e.target)))) return;
+		if (!this.state || this.pressEnding || (e.target instanceof Element && this.owns(e.target))) return;
 		this.entry.blur();
 	};
 
@@ -205,6 +204,16 @@ export class QuickEntryController {
 	openIn(column: ListColumn, group: GroupName): void {
 		const cards = this.cards(column);
 		this.open({ kind: "list", column, place: { kind: "gap", index: gapOfPlace(cards, { kind: "task", group, before: null }).index, level: 0, group } });
+	}
+
+	/**
+	 * What closes the field when tapped is anything the entry does not own: the field with what its editor shows and the
+	 * row it stands in, the bar with all it puts on the page, the plus. Each part says what is its own.
+	 */
+	private owns(target: Element): boolean {
+		const row: EntryPart = { owns: (node) => this.field?.el.parentElement?.contains(node) ?? false };
+		const parts: readonly (EntryPart | null)[] = [this.field, row, this.bar, this.plus];
+		return parts.some((part) => part?.owns(target));
 	}
 
 	/** A double click on a list's free room: the field at the end of the column. */
