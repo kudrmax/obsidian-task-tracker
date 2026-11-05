@@ -28,7 +28,7 @@ export interface GoogleSettings {
 	readonly clientId: string;
 	readonly clientSecret: string;
 	readonly refreshToken: string;
-	/** Calendar ids to show; empty means every calendar selected in Google. */
+	/** Google calendar ids once shown (empty: all). Read only to carry the choice over into `hiddenCalendars`. */
 	readonly calendarIds: readonly string[];
 	readonly refreshSeconds: number;
 }

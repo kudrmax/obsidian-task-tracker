@@ -45,12 +45,19 @@ function feed() {
 	const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, refreshToken: "r", refreshSeconds: 60 } });
 	const adapter = new MemoryAdapter();
 	const clock = new ManualClock();
-	const api = { events: [meeting("standup")], asked: [] as { start: Date; end: Date }[] };
+	const api = {
+		events: [meeting("standup")],
+		calendars: [
+			{ title: "Personal", account: "max@gmail.com", calendarId: "personal", color: "#123456" },
+			{ title: "Empty", account: "max@gmail.com", calendarId: "empty", color: null },
+		],
+		asked: [] as { start: Date; end: Date }[],
+	};
 	const google = new GoogleCalendarFeed(
 		{
-			eventsBetween: async (start, end) => {
+			export: async (start, end) => {
 				api.asked.push({ start, end });
-				return api.events;
+				return { account: "max@gmail.com", calendars: api.calendars, events: api.events };
 			},
 		},
 		{ isLoggedIn: () => settings.get().google.refreshToken !== "" },
@@ -72,6 +79,14 @@ describe("GoogleCalendarFeed", () => {
 		expect(written(adapter)).toMatchObject({ events: [meeting("standup")], exportedAt: new Date(2026, 9, 30, 9), device: "Google" });
 	});
 
+	it("writes the window and the calendars, an empty one included", async () => {
+		const { google, adapter } = feed();
+		await google.refresh(true);
+		const file = written(adapter);
+		expect([file.from, file.to]).toEqual([new Date(2026, 8, 30), new Date(2027, 0, 29)]);
+		expect(file.calendars.map((c) => c.title)).toEqual(["Personal", "Empty"]);
+	});
+
 	it("unforced, it does not ask Google again within the refresh interval", async () => {
 		const { google, api, clock } = feed();
 		await google.refresh(true);
@@ -83,10 +98,10 @@ describe("GoogleCalendarFeed", () => {
 		expect(api.asked).toHaveLength(2);
 	});
 
-	it("other calendars chosen are asked at once", async () => {
+	it("another login is asked at once", async () => {
 		const { google, api, settings } = feed();
 		await google.refresh(true);
-		await settings.update({ google: { ...settings.get().google, calendarIds: ["work"] } });
+		await settings.update({ google: { ...settings.get().google, refreshToken: "r2" } });
 		await google.refresh(false);
 		expect(api.asked).toHaveLength(2);
 	});
