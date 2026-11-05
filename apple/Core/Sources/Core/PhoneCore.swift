@@ -44,6 +44,20 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         try Self.action(call("silence", text, settingsJSON, id, Self.ms(now)))
     }
 
+    public func calendarFiles(settingsJSON: String) throws -> [String] {
+        guard let paths = try call("calendarFiles", settingsJSON).toArray() as? [String] else { throw PhoneCoreError.scriptFailed("calendarFiles: not a list") }
+        return paths
+    }
+
+    public func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date) throws -> [CalendarEvent] {
+        let value = try call("meetings", settingsJSON, texts.map { $0 ?? NSNull() as Any }, Self.ms(from), Self.ms(to))
+        guard let rows = value.toArray() as? [[String: Any]] else { throw PhoneCoreError.scriptFailed("meetings: not a list") }
+        return try rows.map { row in
+            guard let title = row["title"] as? String else { throw PhoneCoreError.scriptFailed("not a meeting: \(row)") }
+            return CalendarEvent(title: title, start: try Self.date(row["startMs"]), end: try Self.date(row["endMs"]))
+        }
+    }
+
     private func call(_ name: String, _ arguments: Any...) throws -> JSValue {
         lock.lock()
         defer { lock.unlock() }

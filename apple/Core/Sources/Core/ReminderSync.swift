@@ -52,18 +52,16 @@ public actor ReminderSync {
     private let rules: TaskRules
     private let notifications: NotificationScheduling
     private let alarms: AlarmScheduling
-    private let calendar: CalendarEvents
     private let now: @Sendable () -> Date
     /// The operation running now: the next one waits for it, so a sync that read the file before a Done was written
     /// never brings the done task's reminders back.
     private var turn: Task<SyncStatus, Never>?
 
-    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, calendar: CalendarEvents = NoCalendarEvents(), now: @escaping @Sendable () -> Date = Date.init) {
+    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, now: @escaping @Sendable () -> Date = Date.init) {
         self.vault = vault
         self.rules = rules
         self.notifications = notifications
         self.alarms = alarms
-        self.calendar = calendar
         self.now = now
     }
 
@@ -128,7 +126,8 @@ public actor ReminderSync {
         do {
             let file = try vault.read()
             let reminders = try rules.reminders(text: file.tasks, settingsJSON: file.settingsJSON, now: at)
-            if let failure = await apply(reminders, at: at) {
+            let meetings = self.meetings(until: reminders.map(\.dayEnd).max(), settingsJSON: file.settingsJSON, at: at)
+            if let failure = await apply(reminders, meetings: meetings, at: at) {
                 status = .failed("Some reminders weren't set: \(failure.localizedDescription)")
             } else {
                 status = .ok(reminders: Set(reminders.map(\.id)).count, at: at)
@@ -157,7 +156,7 @@ public actor ReminderSync {
     }
 
     /// Alarms first, then notifications; one that iOS refuses does not stop the rest. Returns the first refusal.
-    private func apply(_ reminders: [Reminder], at: Date) async -> Error? {
+    private func apply(_ reminders: [Reminder], meetings: [CalendarEvent], at: Date) async -> Error? {
         var failure: Error?
         let byID = Dictionary(reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
@@ -168,7 +167,9 @@ public actor ReminderSync {
             do { try await alarms.schedule(byID[id]!) } catch { failure = failure ?? error }
         }
 
-        let plan = await offeringMeetings(RepeatPlan.plan(reminders, now: at), of: byID)
+        let plan = RepeatPlan.plan(reminders, now: at).map { planned in
+            planned.offering(AfterEvent.offer(at: planned.fire, before: byID[planned.reminderID]!.dayEnd, among: meetings))
+        }
         let wanted = Set(plan.map(\.identifier))
         let pending = await notifications.pending()
         await notifications.removePending(pending.subtracting(wanted).sorted())
@@ -179,13 +180,12 @@ public actor ReminderSync {
         return failure
     }
 
-    /// Each delivery offers to wait out the meeting under way or next when it shows, within the task's day.
-    private func offeringMeetings(_ plan: [PlannedNotification], of reminders: [String: Reminder]) async -> [PlannedNotification] {
-        guard let first = plan.first?.fire, let last = plan.compactMap({ reminders[$0.reminderID]?.dayEnd }).max() else { return plan }
-        let events = await calendar.events(from: first, to: last)
-        return plan.map { planned in
-            planned.offering(AfterEvent.offer(at: planned.fire, before: reminders[planned.reminderID]!.dayEnd, among: events))
-        }
+    /// The meetings from now to the last reminder's day end, as the plugin's calendar shows them. Meetings that cannot be
+    /// read only take the snooze until a meeting away: the reminders are set all the same.
+    private func meetings(until end: Date?, settingsJSON: String, at: Date) -> [CalendarEvent] {
+        guard let end, let paths = try? rules.calendarFiles(settingsJSON: settingsJSON) else { return [] }
+        let texts = paths.map { vault.read(path: $0) }
+        return (try? rules.meetings(settingsJSON: settingsJSON, texts: texts, from: at, to: end)) ?? []
     }
 
     /// Shown notifications to take away: those of reminders that are gone, and all but the latest of each reminder.

@@ -28,6 +28,8 @@ public protocol TasksVault: Sendable {
     func read() throws -> (tasks: String, settingsJSON: String)
     /// Writes `tasks` only if the file still holds `old`; false when it changed in between.
     func write(tasks: String, expecting old: String) throws -> Bool
+    /// Another file of the vault, by path from its folder; `nil` when it is missing or unreadable.
+    func read(path: String) -> String?
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
@@ -79,6 +81,10 @@ public final class Vault: TasksVault, @unchecked Sendable {
             if let error = coordination ?? failure { throw error }
             return written
         }
+    }
+
+    public func read(path: String) -> String? {
+        try? withFolder { folder in try Self.coordinatedRead(folder.appendingPathComponent(path)) }
     }
 
     private func withFolder<T>(_ body: (URL) throws -> T) throws -> T {
