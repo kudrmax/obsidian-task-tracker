@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { FoundCard } from "../../src/ui/FoundCard";
 
-const task = (raw: string, index = 0) => ({ key: { section: "soon", index, path: [], raw } }) as TaskItem;
+const task = (raw: string, index = 0) => ({ key: { section: "soon", index, path: [], raw } }) as unknown as TaskItem;
 
 describe("FoundCard", () => {
 	it("rings the found task's card, and its new card after a redraw", () => {
