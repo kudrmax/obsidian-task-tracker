@@ -1,4 +1,4 @@
-import { type CalendarFile, onlyCalendars, readCalendarFile } from "../application/calendarFile";
+import { type CalendarFile, readCalendarFile } from "../application/calendarFile";
 import type { CalendarSource } from "../application/contracts";
 import type { EventFile } from "../application/EventSource";
 import type { PathWatcher } from "./VaultPathWatcher";
@@ -8,14 +8,13 @@ export interface CalendarFileAdapter {
 	read(path: string): Promise<string>;
 }
 
-/** A calendar's JSON in the vault, at the path the settings give, with only the calendars they name. */
+/** A writer's JSON in the vault, at the path the settings give. */
 export class CalendarFileSource implements EventFile {
 	private kept: { readonly path: string; readonly mtime: number; readonly size: number; readonly text: string } | null = null;
 
 	constructor(
 		readonly name: CalendarSource,
 		private readonly path: () => string,
-		private readonly calendars: () => readonly string[],
 		private readonly adapter: CalendarFileAdapter,
 		private readonly watcher: PathWatcher,
 	) {}
@@ -25,7 +24,7 @@ export class CalendarFileSource implements EventFile {
 	}
 
 	async read(): Promise<CalendarFile> {
-		return onlyCalendars(readCalendarFile(await this.text(this.path()), this.name), this.calendars());
+		return readCalendarFile(await this.text(this.path()), this.name);
 	}
 
 	/** Read again only when the file's time or size changed. */

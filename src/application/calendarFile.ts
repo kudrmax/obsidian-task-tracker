@@ -126,10 +126,3 @@ export function calendarFileText(file: Omit<CalendarFile, "device"> & { readonly
 	return `${JSON.stringify(content, null, "\t")}\n`;
 }
 
-/** Only the calendars named, case aside; none named keeps all. The work file's titles setting, until the calendars are chosen per calendar. */
-export function onlyCalendars(file: CalendarFile, titles: readonly string[]): CalendarFile {
-	const wanted = titles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
-	if (wanted.length === 0) return file;
-	const kept = (title: string) => wanted.includes(title.toLowerCase());
-	return { ...file, events: file.events.filter((e) => kept(e.calendar)), calendars: file.calendars.filter((c) => kept(c.title)) };
-}

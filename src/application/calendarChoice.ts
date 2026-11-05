@@ -60,7 +60,7 @@ export class CalendarChoice {
 			for (const calendar of this.files.get(source)?.calendars ?? []) {
 				const key = this.keyOf(source, calendar);
 				const text = keyText(key);
-				if (!found.has(text)) found.set(text, { key, color: calendar.color, google: this.isGoogle(key) });
+				if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
 			}
 		}
 		return [...found.values()].sort((a, b) => Number(b.google) - Number(a.google));

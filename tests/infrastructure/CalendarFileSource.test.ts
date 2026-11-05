@@ -45,7 +45,7 @@ function source(titles: string[] = [], path = "calendar/work.json", watcher = ne
 function counted(titles: string[] = [], path = "calendar/work.json", watcher = new FakeWatcher()) {
 	const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, workCalendarFile: path, workCalendarTitles: titles });
 	const adapter = new FakeAdapter({ "calendar/work.json": FILE });
-	const work = new CalendarFileSource("work", () => settings.get().workCalendarFile, () => settings.get().workCalendarTitles, adapter, watcher);
+	const work = new CalendarFileSource("work", () => settings.get().workCalendarFile, adapter, watcher);
 	return { work, adapter, settings };
 }
 
@@ -91,11 +91,6 @@ describe("CalendarFileSource", () => {
 		expect(events[2]).toMatchObject({ allDay: true, color: "#0A84FF" });
 	});
 
-	it("filters by calendar title, ignoring case and blanks", async () => {
-		const { events } = await source(["work", " HOLIDAYS ", ""]).read();
-		expect(events.map((e) => e.title)).toEqual(["Standup", "Holiday"]);
-	});
-
 	it("throws 'file missing' when the file is not there", async () => {
 		await expect(source([], "calendar/other.json").read()).rejects.toThrow("file missing");
 	});
@@ -129,15 +124,6 @@ describe("CalendarFileSource", () => {
 		const { events } = await work.read();
 		expect(adapter.reads).toBe(2);
 		expect(events).toEqual([]);
-	});
-
-	it("applies changed calendars to the file kept, without reading it", async () => {
-		const { work, adapter, settings } = counted();
-		await work.read();
-		await settings.update({ workCalendarTitles: ["personal"] });
-		const { events } = await work.read();
-		expect(adapter.reads).toBe(1);
-		expect(events.map((e) => e.title)).toEqual(["Dentist"]);
 	});
 
 	it("a file that does not parse is read again next time", async () => {

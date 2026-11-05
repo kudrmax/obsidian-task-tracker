@@ -61,8 +61,102 @@
     };
   }
 
+  // src/application/calendarChoice.ts
+  var keyText = (key) => `${key.account}
+${key.title}`;
+  var GOOGLE_ORDER = ["google", "iphone", "work"];
+  var OTHER_ORDER = ["iphone", "work"];
+  var CalendarChoice = class {
+    constructor(files, hidden, staleAfterMs, now) {
+      this.files = files;
+      this.staleAfterMs = staleAfterMs;
+      this.now = now;
+      this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
+      const email = this.googleEmail;
+      this.phoneGoogleAccount = email === null ? null : files.get("iphone")?.calendars.find((c) => c.title === email)?.account ?? null;
+      this.hidden = new Set(hidden.map(keyText));
+    }
+    known() {
+      const found = /* @__PURE__ */ new Map();
+      for (const source of GOOGLE_ORDER) {
+        for (const calendar of this.files.get(source)?.calendars ?? []) {
+          const key = this.keyOf(source, calendar);
+          const text = keyText(key);
+          if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
+        }
+      }
+      return [...found.values()].sort((a, b) => Number(b.google) - Number(a.google));
+    }
+    day(start, end) {
+      const events = [];
+      let stale = false;
+      for (const calendar of this.known()) {
+        if (this.hidden.has(keyText(calendar.key))) continue;
+        const source = this.sourceFor(calendar, start);
+        if (source === null) continue;
+        const file = this.files.get(source);
+        if (!this.fresh(file)) stale = true;
+        const text = keyText(calendar.key);
+        events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
+      }
+      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+    }
+    sourceFor(calendar, day) {
+      const text = keyText(calendar.key);
+      const candidates = (calendar.google ? GOOGLE_ORDER : OTHER_ORDER).filter((source) => {
+        const file = this.files.get(source);
+        return file !== void 0 && covers(file, day) && file.calendars.some((c) => keyText(this.keyOf(source, c)) === text);
+      });
+      const fresh = candidates.find((source) => this.fresh(this.files.get(source)));
+      if (fresh) return fresh;
+      return candidates.reduce(
+        (best, source) => best === null || this.files.get(source).exportedAt > this.files.get(best).exportedAt ? source : best,
+        null
+      );
+    }
+    fresh(file) {
+      return this.now.getTime() - file.exportedAt.getTime() <= this.staleAfterMs;
+    }
+    isGoogle(key) {
+      return this.googleEmail !== null && key.account === this.googleEmail;
+    }
+    /** The calendar a file's row or event belongs to, the same across the files. */
+    keyOf(source, ref) {
+      if (source === "work") return this.scriptableKey(ref);
+      if (source === "iphone" && ref.account !== null && ref.account === this.phoneGoogleAccount) return { account: this.googleEmail, title: ref.title };
+      return { account: ref.account ?? "", title: ref.title };
+    }
+    /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
+    scriptableKey(ref) {
+      const phone = this.files.get("iphone")?.calendars.find((c) => ref.calendarId !== null && c.calendarId === ref.calendarId);
+      if (phone) return this.keyOf("iphone", phone);
+      const titled = /* @__PURE__ */ new Map();
+      for (const source of ["google", "iphone"]) {
+        for (const c of this.files.get(source)?.calendars ?? []) {
+          if (c.title !== ref.title) continue;
+          const key = this.keyOf(source, c);
+          titled.set(keyText(key), key);
+        }
+      }
+      if (titled.size === 1) return [...titled.values()][0];
+      return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
+    }
+  };
+  function calendarOf(e) {
+    return { title: e.calendar, account: e.account, calendarId: e.calendarId };
+  }
+  function covers(file, day) {
+    if (file.from !== null && file.to !== null) return file.from <= day && day < file.to;
+    if (file.events.length === 0) return false;
+    const first = Math.min(...file.events.map((e) => e.start.getTime()));
+    const last = Math.max(...file.events.map((e) => e.end.getTime()));
+    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
+    return first < dayEnd && day.getTime() <= last;
+  }
+
   // src/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
+  var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
   var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
   var dateOrNull = (text) => text ? new Date(text) : null;
   function readCalendarFile(text, source) {
@@ -100,14 +194,22 @@ ${e.calendar}`;
     }
     return [...seen.values()];
   }
-  function onlyCalendars(file, titles) {
-    const wanted = titles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
-    if (wanted.length === 0) return file;
-    const kept = (title) => wanted.includes(title.toLowerCase());
-    return { ...file, events: file.events.filter((e) => kept(e.calendar)), calendars: file.calendars.filter((c) => kept(c.title)) };
+
+  // src/application/calendarMigration.ts
+  function migratedHidden(settings, known, googleIds2) {
+    const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
+    const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
+    return known.filter((c) => c.google ? settings.google.calendarIds.length > 0 && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
+  }
+  function hiddenNow(settings, known, google) {
+    return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));
+  }
+  function googleIds(google) {
+    return new Map((google?.calendars ?? []).flatMap((c) => c.calendarId === null ? [] : [[c.calendarId, c.title]]));
   }
 
   // src/application/PhoneMeetingService.ts
+  var MINUTE_MS = 6e4;
   var PhoneMeetingService = class {
     constructor(settingsJson) {
       this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
@@ -116,22 +218,34 @@ ${e.calendar}`;
     files() {
       return this.sources().map((s) => s.path);
     }
-    /** The timed meetings that overlap `from`–`to`; a file missing (`null`) or unreadable adds none. */
-    between(texts, from, to) {
-      return this.sources().flatMap((source, i) => {
+    /** The timed meetings that overlap `from`–`to`, chosen day by day; a file missing (`null`) or unreadable adds none. */
+    between(texts, from, to, now) {
+      const files = /* @__PURE__ */ new Map();
+      this.sources().forEach((source, i) => {
         const text = texts[i];
-        if (text === null || text === void 0) return [];
+        if (text === null || text === void 0) return;
         try {
-          return onlyCalendars(readCalendarFile(text, source.name), source.calendars).events;
+          files.set(source.name, readCalendarFile(text, source.name));
         } catch {
-          return [];
         }
-      }).filter((e) => !e.allDay && e.start < to && e.end > from).sort((a, b) => a.start.getTime() - b.start.getTime()).map((e) => ({ title: e.title, start: e.start, end: e.end }));
+      });
+      const known = new CalendarChoice(files, [], this.settings.staleAfterMinutes * MINUTE_MS, now).known();
+      const choice = new CalendarChoice(files, hiddenNow(this.settings, known, files.get("google")), this.settings.staleAfterMinutes * MINUTE_MS, now);
+      const found = /* @__PURE__ */ new Map();
+      for (let day = new Date(from.getFullYear(), from.getMonth(), from.getDate()); day < to; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
+        const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+        const start = day < from ? from : day;
+        for (const e of choice.day(start, next < to ? next : to).events) {
+          if (!e.allDay && !found.has(e.id)) found.set(e.id, { title: e.title, start: e.start, end: e.end });
+        }
+      }
+      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
     }
     sources() {
       return [
-        { name: "google", path: GOOGLE_CALENDAR_FILE, calendars: [] },
-        { name: "work", path: this.settings.workCalendarFile, calendars: this.settings.workCalendarTitles }
+        { name: "google", path: GOOGLE_CALENDAR_FILE },
+        { name: "iphone", path: IPHONE_CALENDAR_FILE },
+        { name: "work", path: this.settings.workCalendarFile }
       ];
     }
   };
@@ -1098,7 +1212,7 @@ ${e.calendar}`;
 
   // src/domain/operations.ts
   var HOUR_MINUTES3 = 60;
-  var MINUTE_MS = 6e4;
+  var MINUTE_MS2 = 6e4;
   function newTask(text, patch2 = {}) {
     return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
   }
@@ -1143,7 +1257,7 @@ ${e.calendar}`;
     return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
   }
   function snoozedSlot(slot, now, minutes) {
-    const at = new Date(now.getTime() + minutes * MINUTE_MS);
+    const at = new Date(now.getTime() + minutes * MINUTE_MS2);
     const start = at.getHours() * HOUR_MINUTES3 + at.getMinutes();
     return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
   }
@@ -1511,6 +1625,6 @@ ${e.calendar}`;
     silence: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).silence(text, id, new Date(nowMs)),
     snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs)),
     calendarFiles: (settingsJson) => new PhoneMeetingService(settingsJson).files(),
-    meetings: (settingsJson, texts, fromMs, toMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs)).map(wireMeeting)
+    meetings: (settingsJson, texts, fromMs, toMs, nowMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs), new Date(nowMs)).map(wireMeeting)
   };
 })();

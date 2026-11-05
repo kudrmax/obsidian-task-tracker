@@ -47,7 +47,7 @@ class SlowCalendars implements CalendarService {
 	private fetch(date: LocalDate): Promise<DayEvents> {
 		return new Promise((resolve) =>
 			this.waiting.push(() => {
-				const day = { events: [event(`on ${date}`)], statuses: [] };
+				const day = { events: [event(`on ${date}`)], statuses: [], stale: false };
 				this.last.set(date, day);
 				resolve(day);
 			}),
@@ -57,6 +57,12 @@ class SlowCalendars implements CalendarService {
 	onChange(): () => void {
 		return () => {};
 	}
+
+	async known() {
+		return [];
+	}
+
+	async setShown(): Promise<void> {}
 
 	keepFresh(): CalendarPoll {
 		throw new Error("DayData does not poll");
@@ -178,9 +184,17 @@ describe("DayData", () => {
 		expect(updates()).toBe(shown + 1);
 	});
 
+	it("the dot is the day's stale, not every source's", async () => {
+		const { data, calendars } = setup();
+		const fine = { source: "iphone" as const, kind: "exported" as const, ok: true, message: "", updatedAt: null, detail: null, stale: true };
+		calendars.last.set(TODAY, { events: [event("kept")], statuses: [fine], stale: false });
+		void data.load();
+		expect(data.stale).toBe(false);
+	});
+
 	it("opens with the events last fetched for the day and swaps in the fresh ones when they come", async () => {
 		const { data, calendars } = setup();
-		calendars.last.set(TODAY, { events: [event("kept")], statuses: [] });
+		calendars.last.set(TODAY, { events: [event("kept")], statuses: [], stale: false });
 		const opened = data.load();
 		expect(titles(data)).toEqual(["kept"]);
 		calendars.answer();
@@ -190,7 +204,7 @@ describe("DayData", () => {
 
 	it("opens without waiting for the network: the tasks and the events last fetched at once, the fresh events later", async () => {
 		const { data, calendars, updates } = setup();
-		calendars.last.set(TODAY, { events: [event("kept")], statuses: [] });
+		calendars.last.set(TODAY, { events: [event("kept")], statuses: [], stale: false });
 		await data.load();
 		expect(data.day!.date).toBe(TODAY);
 		expect(titles(data)).toEqual(["kept"]);
@@ -267,7 +281,7 @@ describe("DayData", () => {
 
 	it("stays silent when a poll brings the same events only fetched later", async () => {
 		const { data, calendars, parts } = setup();
-		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
+		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }], stale: false });
 		let at = 0;
 		calendars.eventsOn = async () => later(at++);
 		await data.calendars();

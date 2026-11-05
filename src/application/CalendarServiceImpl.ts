@@ -1,7 +1,9 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
+import { CalendarChoice, type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
+import { hiddenNow } from "./calendarMigration";
 import type {
 	CalendarEvent,
 	CalendarPoll,
@@ -11,6 +13,7 @@ import type {
 	DayEventsAsk,
 	EventsReason,
 	PolledScreen,
+	ShownCalendar,
 	SourceKind,
 	SourceStatus,
 	WorkCalendarSetup,
@@ -43,6 +46,15 @@ class DayWindow {
 		this.timedEnd = localTime(date, 1, boundary.startHour);
 		this.dateStart = localTime(date, 0, 0);
 		this.dateEnd = localTime(date, 1, 0);
+	}
+
+	/** What to choose the events from: both spans. */
+	get fetchStart(): Date {
+		return this.dateStart;
+	}
+
+	get fetchEnd(): Date {
+		return this.timedEnd;
 	}
 
 	shows(e: CalendarEvent): boolean {
@@ -89,7 +101,20 @@ export class CalendarServiceImpl implements CalendarService {
 		private readonly timers: Timers,
 		/** Refresh now asks the phone for fresh work events before it fetches. */
 		private readonly work: Pick<WorkCalendarSetup, "export">,
+		/** Only the phone carries the old choice of calendars over: only there do the phone's and Google's files meet. */
+		private readonly migration: { readonly canMigrate: () => boolean },
 	) {}
+
+	async known(): Promise<readonly ShownCalendar[]> {
+		await this.readFiles();
+		const hidden = new Set(this.hidden().map(keyText));
+		return this.choice().known().map((c) => ({ account: c.key.account, title: c.key.title, color: c.color, shown: !hidden.has(keyText(c.key)) }));
+	}
+
+	async setShown(account: string, title: string, shown: boolean): Promise<void> {
+		const others = this.hidden().filter((k) => k.account !== account || k.title !== title);
+		await this.settings.update({ hiddenCalendars: shown ? others : [...others, { account, title }], calendarsMigrated: true });
+	}
 
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
 		const cached = this.cached(date);
@@ -164,14 +189,29 @@ export class CalendarServiceImpl implements CalendarService {
 					(e) => this.fileProblems.set(file.name, messageOf(e)),
 				),
 			),
-		).then(() => undefined);
+		).then(() => this.carryOver());
+	}
+
+	/** Once, on the phone, when both Google's and the phone's files are there: the old choice becomes the list of hidden calendars. */
+	private async carryOver(): Promise<void> {
+		if (this.settings.get().calendarsMigrated || !this.migration.canMigrate() || !this.lastRead.has("google") || !this.lastRead.has("iphone")) return;
+		await this.settings.update({ hiddenCalendars: this.hidden(), calendarsMigrated: true });
+	}
+
+	private choice(hidden: readonly CalendarKey[] = []): CalendarChoice {
+		return new CalendarChoice(this.lastRead, hidden, this.settings.get().staleAfterMinutes * MINUTE_MS, this.clock.now());
+	}
+
+	private hidden(): CalendarKey[] {
+		return hiddenNow(this.settings.get(), this.choice().known(), this.lastRead.get("google"));
 	}
 
 	private dayOf(date: LocalDate): DayEvents {
 		const window = new DayWindow(date, new DayBoundary(this.settings.get().dayStartHour));
-		const shown = (name: CalendarSource) => (this.lastRead.get(name)?.events ?? []).filter((e) => window.shows(e));
-		const events = this.files.flatMap((f) => shown(f.name)).sort((a, b) => a.start.getTime() - b.start.getTime());
-		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name).length)) };
+		const chosen = this.choice(this.hidden()).day(window.fetchStart, window.fetchEnd);
+		const events = chosen.events.filter((e) => window.shows(e));
+		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
+		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name))), stale: chosen.stale };
 	}
 
 	private status(source: CalendarSource, shown: number): SourceStatus {

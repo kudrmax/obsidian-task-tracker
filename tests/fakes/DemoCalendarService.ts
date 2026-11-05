@@ -47,12 +47,19 @@ export class DemoCalendarService implements CalendarService {
 				{ source: "google", kind: "synced", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
 				{ source: "work", kind: "exported", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
+			stale: true,
 		};
 		this.last.set(date, result);
 		return result;
 	}
 
 	/** Every day's events come at once, the board's day only has any; a peek at a day shown before takes them as they were. */
+	async known() {
+		return [];
+	}
+
+	async setShown(): Promise<void> {}
+
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
 		const cached = this.last.get(date) ?? null;
 		return { cached, fresh: reason === "peek" && cached ? null : () => this.eventsOn(date) };

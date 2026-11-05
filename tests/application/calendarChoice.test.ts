@@ -145,6 +145,12 @@ describe("CalendarChoice", () => {
 		expect(calendars.day(DAY.start, DAY.end).events).toEqual([]);
 	});
 
+	it("a Google file from before accounts were written is still Google's", () => {
+		const plain: Cal = { title: "Personal" };
+		const day = choice({ google: file(2, [plain], [meeting("google", plain, "lunch", 13)]) }).day(DAY.start, DAY.end);
+		expect(titles(day.events)).toEqual(["lunch"]);
+	});
+
 	it("a hidden calendar shows nothing and lights no dot", () => {
 		const day = choice({ iphone: file(300, [WORK_I], [meeting("iphone", WORK_I, "hidden", 10)]) }, [{ account: "max@company.ru", title: "Календарь" }]).day(
 			DAY.start,

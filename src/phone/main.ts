@@ -29,6 +29,6 @@ function wireMeeting(m: PhoneMeeting): WireMeeting {
 	snooze: (text: string, settingsJson: string, id: string, minutes: number, nowMs: number): PhoneAction =>
 		new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs)),
 	calendarFiles: (settingsJson: string): string[] => new PhoneMeetingService(settingsJson).files(),
-	meetings: (settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number): WireMeeting[] =>
-		new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs)).map(wireMeeting),
+	meetings: (settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number, nowMs: number): WireMeeting[] =>
+		new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs), new Date(nowMs)).map(wireMeeting),
 };

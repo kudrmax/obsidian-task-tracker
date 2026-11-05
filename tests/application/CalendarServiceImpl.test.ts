@@ -12,7 +12,7 @@ const WRITTEN = new Date(2026, 9, 30, 8, 0);
 const NOW = new Date(2026, 9, 30, 9, 0);
 
 function event(source: CalendarSource, id: string, start: Date, end: Date, allDay = false): CalendarEvent {
-	return { id, title: id, start, end, allDay, calendar: "Cal", color: "#0A84FF", source, account: null, calendarId: null };
+	return { id, title: id, start, end, allDay, calendar: `${source} calendar`, color: "#0A84FF", source, account: null, calendarId: null };
 }
 
 class FakeFile implements EventFile {
@@ -20,6 +20,8 @@ class FakeFile implements EventFile {
 	failWith: Error | null = null;
 	exportedAt = WRITTEN;
 	device: string | null = null;
+	/** The calendars the file lists; none given, those of its events. */
+	calendars: CalendarFile["calendars"] | null = null;
 	readonly listeners = new Set<() => void>();
 
 	constructor(
@@ -30,7 +32,9 @@ class FakeFile implements EventFile {
 	async read(): Promise<CalendarFile> {
 		this.reads++;
 		if (this.failWith) throw this.failWith;
-		return { events: this.events, calendars: [], exportedAt: this.exportedAt, device: this.device, from: null, to: null, validUntil: null };
+		const firsts = new Map(this.events.map((e) => [e.calendar, e] as const));
+		const calendars = this.calendars ?? [...firsts.values()].map((e) => ({ title: e.calendar, account: e.account, calendarId: e.calendarId, color: null }));
+		return { events: this.events, calendars, exportedAt: this.exportedAt, device: this.device, from: null, to: null, validUntil: null };
 	}
 
 	onChange(listener: () => void): () => void {
@@ -69,8 +73,8 @@ class FakeClock implements Clock {
 const NO_EXPORT = { export: () => undefined };
 const DAY = "2026-10-30";
 
-function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0) {
-	return new CalendarServiceImpl(files, feeds, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), new FakeTimers(), NO_EXPORT);
+function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0, settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), onPhone = false) {
+	return new CalendarServiceImpl(files, feeds, clock, settings, new FakeTimers(), NO_EXPORT, { canMigrate: () => onPhone });
 }
 
 const refreshed = (calendars: CalendarServiceImpl, date = DAY) => calendars.events(date, "refresh").fresh!();
@@ -236,7 +240,7 @@ describe("CalendarServiceImpl.keepFresh", () => {
 		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
 		const order: string[] = [];
 		let hidden = false;
-		const calendars = new CalendarServiceImpl([], [], clock, settings, timers, { export: () => order.push("export") });
+		const calendars = new CalendarServiceImpl([], [], clock, settings, timers, { export: () => order.push("export") }, { canMigrate: () => false });
 		const poll = calendars.keepFresh({
 			refresh: async () => {
 				order.push("fetch");
@@ -285,5 +289,73 @@ describe("CalendarServiceImpl.keepFresh", () => {
 		const t = polled();
 		t.poll.stop();
 		expect(t.timers.delays).toEqual([]);
+	});
+});
+
+describe("CalendarServiceImpl, the calendars across the files", () => {
+	const GMAIL = "max@gmail.com";
+	const work = (source: CalendarSource, title: string, hour: number): CalendarEvent => ({
+		...event(source, title, new Date(2026, 9, 30, hour), new Date(2026, 9, 30, hour + 1)),
+		calendar: "Work",
+		account: source === "iphone" ? "max@company.ru" : null,
+		calendarId: "ek-work",
+	});
+	const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000);
+
+	it("the dot follows the shown calendars, not every writer", async () => {
+		const iphone = new FakeFile("iphone", [work("iphone", "from the app", 10)]);
+		iphone.exportedAt = minutesAgo(300);
+		const scriptable = new FakeFile("work", [work("work", "from Scriptable", 11)]);
+		scriptable.exportedAt = minutesAgo(1);
+		const day = await refreshed(service([iphone, scriptable]));
+		expect(day.events.map((e) => e.title)).toEqual(["from Scriptable"]);
+		expect(day.stale).toBe(false);
+		expect(day.statuses.find((s) => s.source === "iphone")?.stale).toBe(true);
+	});
+
+	it("a day whose shown calendar has only stale files is stale", async () => {
+		const iphone = new FakeFile("iphone", [work("iphone", "from the app", 10)]);
+		iphone.exportedAt = minutesAgo(300);
+		expect((await refreshed(service([iphone]))).stale).toBe(true);
+	});
+
+	it("hidden calendars stay out", async () => {
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0, calendarsMigrated: true, hiddenCalendars: [{ account: "max@company.ru", title: "Work" }] });
+		const day = await refreshed(service([new FakeFile("iphone", [work("iphone", "hidden", 10)])], [], new FakeClock(), 0, settings));
+		expect(day.events).toEqual([]);
+	});
+
+	it("known lists every calendar with whether it is shown, and setShown hides it", async () => {
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, calendarsMigrated: true });
+		const calendars = service([new FakeFile("iphone", [work("iphone", "w", 10)])], [], new FakeClock(), 0, settings);
+		expect(await calendars.known()).toEqual([{ account: "max@company.ru", title: "Work", color: null, shown: true }]);
+		await calendars.setShown("max@company.ru", "Work", false);
+		expect(settings.get().hiddenCalendars).toEqual([{ account: "max@company.ru", title: "Work" }]);
+		expect((await calendars.known())[0].shown).toBe(false);
+	});
+
+	function migrating(onPhone: boolean) {
+		const google = new FakeFile("google");
+		google.calendars = [
+			{ title: GMAIL, account: GMAIL, calendarId: GMAIL, color: null },
+			{ title: "Personal", account: GMAIL, calendarId: "personal", color: null },
+		];
+		const iphone = new FakeFile("iphone");
+		iphone.calendars = [{ title: GMAIL, account: "Gmail", calendarId: "ek-main", color: null }];
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, calendarIds: ["personal"] } });
+		return { settings, calendars: service([google, iphone], [], new FakeClock(), 0, settings, onPhone) };
+	}
+
+	it("before the carry-over the old choice applies, and the phone carries it over once", async () => {
+		const elsewhere = migrating(false);
+		await refreshed(elsewhere.calendars);
+		expect(elsewhere.settings.get().calendarsMigrated).toBe(false);
+		expect((await elsewhere.calendars.known()).map((c) => [c.title, c.shown])).toEqual([
+			[GMAIL, false],
+			["Personal", true],
+		]);
+		const phone = migrating(true);
+		await refreshed(phone.calendars);
+		expect(phone.settings.get()).toMatchObject({ calendarsMigrated: true, hiddenCalendars: [{ account: GMAIL, title: GMAIL }] });
 	});
 });

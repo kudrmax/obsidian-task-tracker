@@ -6,7 +6,7 @@ import { GoogleAccountService } from "./application/GoogleAccountService";
 import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "./application/ports";
 import { TaskServiceImpl } from "./application/TaskServiceImpl";
 import { UndoHistory } from "./application/UndoHistory";
-import { GOOGLE_CALENDAR_FILE } from "./application/calendarFile";
+import { GOOGLE_CALENDAR_FILE, IPHONE_CALENDAR_FILE } from "./application/calendarFile";
 import { CalendarFileSource } from "./infrastructure/CalendarFileSource";
 import { GoogleAuth } from "./infrastructure/GoogleAuth";
 import { GoogleCalendarApi } from "./infrastructure/GoogleCalendarApi";
@@ -45,8 +45,9 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const auth = new GoogleAuth(settings, login, token, clock);
 	const googleApi = new GoogleCalendarApi(auth, settings, clock, obsidianHttp);
 	const watcher = new VaultPathWatcher(app.vault);
-	const googleFile = new CalendarFileSource("google", () => GOOGLE_CALENDAR_FILE, () => [], app.vault.adapter, watcher);
-	const workFile = new CalendarFileSource("work", () => settings.get().workCalendarFile, () => settings.get().workCalendarTitles, app.vault.adapter, watcher);
+	const googleFile = new CalendarFileSource("google", () => GOOGLE_CALENDAR_FILE, app.vault.adapter, watcher);
+	const iphoneFile = new CalendarFileSource("iphone", () => IPHONE_CALENDAR_FILE, app.vault.adapter, watcher);
+	const workFile = new CalendarFileSource("work", () => settings.get().workCalendarFile, app.vault.adapter, watcher);
 	const googleFeed = new GoogleCalendarFeed(googleApi, auth, app.vault.adapter, settings, clock);
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
@@ -56,7 +57,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		tasks,
 		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
 		undo: history,
-		calendars: new CalendarServiceImpl([googleFile, workFile], [googleFeed], clock, settings, windowTimers, work),
+		calendars: new CalendarServiceImpl([googleFile, iphoneFile, workFile], [googleFeed], clock, settings, windowTimers, work, { canMigrate: () => host.shortcuts.isPhone }),
 		google: new GoogleAccountService(auth, googleApi, settings),
 		work,
 		receiveLogin: (params) => login.receive(params),

@@ -479,6 +479,16 @@ export interface SourceStatus {
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
 	readonly statuses: readonly SourceStatus[];
+	/** A calendar shown on the day comes from a file no longer fresh: the orange dot, Refresh now would help. */
+	readonly stale: boolean;
+}
+
+/** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */
+export interface ShownCalendar {
+	readonly account: string;
+	readonly title: string;
+	readonly color: string | null;
+	readonly shown: boolean;
 }
 
 /**
@@ -506,6 +516,9 @@ export interface CalendarService {
 	onChange(listener: () => void): () => void;
 	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */
 	keepFresh(screen: PolledScreen): CalendarPoll;
+	/** Every calendar the files list, Google's first, each once. A new one is shown. */
+	known(): Promise<readonly ShownCalendar[]>;
+	setShown(account: string, title: string, shown: boolean): Promise<void>;
 }
 
 /** What the polling asks of the screen. */
