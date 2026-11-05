@@ -41,7 +41,6 @@ struct Palette {
 private enum Metrics {
     static let title = Font.system(size: 17, weight: .semibold)
     static let time = Font.system(size: 17).monospacedDigit()
-    static let label = Font.system(size: 13, weight: .semibold)
     static let button = Font.system(size: 14, weight: .semibold)
     static let buttonHeight: CGFloat = 36
     static let gap: CGFloat = 6
@@ -102,7 +101,7 @@ struct LogoCheck: View {
     }
 }
 
-/// The card: the task and its time, then the notification's buttons; after Done, the question.
+/// The card: the task and its time, then the notification's buttons; after Done, Cancel and Complete in their row.
 struct TaskCardView: View {
     let task: TaskCardAttributes
     let confirming: Bool
@@ -116,12 +115,8 @@ struct TaskCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if confirming {
-                question
-            } else {
-                header
-                buttons
-            }
+            header
+            buttons
         }
     }
 
@@ -138,9 +133,19 @@ struct TaskCardView: View {
 
     private var buttons: some View {
         VStack(spacing: Metrics.gap) {
-            HStack(spacing: Metrics.gap) {
-                ForEach(ReminderButton.all, id: \.self) { button($0) }
+            // Done asks in place: its row turns into Cancel, where Done was, and Complete. iOS crossfades the two rows for
+            // half a second by default, both half seen at once: they swap at once instead.
+            Group {
+                if confirming {
+                    confirmRow.transition(.identity)
+                } else {
+                    HStack(spacing: Metrics.gap) {
+                        ForEach(ReminderButton.all, id: \.self) { button($0) }
+                    }
+                    .transition(.identity)
+                }
             }
+            .animation(nil, value: confirming)
             if let meeting = task.meeting {
                 Button(intent: CardAfterMeetingIntent(reminderID: task.reminderID, title: task.title, date: task.date, until: meeting.until)) {
                     pill(fill: palette.button) {
@@ -178,29 +183,23 @@ struct TaskCardView: View {
         }
     }
 
-    /// Done asks first. Cancel stands where Done was, so another press by chance lands on Cancel.
-    private var question: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Complete task?").font(Metrics.label).foregroundStyle(palette.muted)
-                Text(task.title).font(Metrics.title).foregroundStyle(palette.text).lineLimit(2)
+    /// Cancel stands where Done was, so another press by chance lands on Cancel.
+    private var confirmRow: some View {
+        HStack(spacing: Metrics.gap) {
+            Button(intent: CardCancelIntent(reminderID: task.reminderID)) {
+                pill(fill: palette.button) { Text("Cancel").foregroundStyle(palette.text) }
             }
-            HStack(spacing: Metrics.gap) {
-                Button(intent: CardCancelIntent(reminderID: task.reminderID)) {
-                    pill(fill: palette.button) { Text("Cancel").foregroundStyle(palette.text) }
-                }
-                .buttonStyle(.plain)
-                Button(intent: CardCompleteIntent(reminderID: task.reminderID, title: task.title, date: task.date)) {
-                    pill(fill: palette.accent) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
-                            Text("Complete")
-                        }
-                        .foregroundStyle(palette.onAccent)
+            .buttonStyle(.plain)
+            Button(intent: CardCompleteIntent(reminderID: task.reminderID, title: task.title, date: task.date)) {
+                pill(fill: palette.accent) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark").font(.system(size: 12, weight: .bold))
+                        Text("Complete")
                     }
+                    .foregroundStyle(palette.onAccent)
                 }
-                .buttonStyle(.plain)
             }
+            .buttonStyle(.plain)
         }
     }
 
