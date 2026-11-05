@@ -5,6 +5,7 @@ import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
 import { el } from "./dom";
+import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
@@ -25,11 +26,11 @@ const MARKERS: readonly (readonly [Marker, string, string])[] = [
 ];
 
 const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
-	inbox: "Inbox section",
-	now: "Now section",
-	soon: "Soon section",
-	backlog: "Backlog section",
-	done: "Done section",
+	inbox: "Inbox",
+	now: "Now",
+	soon: "Soon",
+	backlog: "Backlog",
+	done: "Done",
 };
 
 export class TaskCalendarSettingsTab extends PluginSettingTab {
@@ -44,13 +45,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	override display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		this.tasksFileGroup(containerEl);
+		this.calendarsGroup(containerEl);
 		this.prioritiesGroup(containerEl);
 		this.sectionsGroup(containerEl);
-		this.cardsGroup(containerEl);
-		this.timelineGroup(containerEl);
-		this.googleGroup(containerEl);
-		this.workGroup(containerEl);
+		this.displayGroup(containerEl);
+		this.moreGroup(containerEl);
 	}
 
 	private get settings(): SettingsForm {
@@ -61,12 +60,37 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return this.deps.settings;
 	}
 
-	private tasksFileGroup(el: HTMLElement): void {
-		new Setting(el).setName("Tasks file").setHeading();
+	/** What is looked at and switched most: the Google account and which of its calendars show. */
+	private calendarsGroup(el: HTMLElement): void {
+		new Setting(el).setName("Calendars").setHeading();
+		this.loginRow(el);
+		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
+	}
+
+	/** The set-up-once part, each on a page of its own behind a row. */
+	private moreGroup(el: HTMLElement): void {
+		new Setting(el).setName("More").setHeading();
+		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
+		this.pageRow(el, "Calendar connections", "Google's OAuth client, the work calendar from the iPhone, when a source counts as stale.", (page) => this.connectionsPage(page));
+		this.pageRow(el, "Touch and zoom", "Long press delay and the timeline's zoom levels.", (page) => this.touchPage(page));
+	}
+
+	private pageRow(el: HTMLElement, name: string, desc: string, build: (page: HTMLElement) => void): void {
+		const row = new Setting(el)
+			.setName(name)
+			.setDesc(desc)
+			.addExtraButton((b) => b.setIcon("chevron-right"));
+		row.settingEl.addClass("tc-settings-link", "mod-navigable");
+		row.settingEl.addEventListener("click", () => new SettingsPage(this.app, name, build, () => this.display()).open());
+	}
+
+	private tasksFilePage(el: HTMLElement): void {
 		this.text(el, "File path", "Markdown file with the task sections.", this.settings.tasksFile, (path) => this.service.setTasksFile(path));
+		new Setting(el).setName("Section headings").setDesc("Heading text after ##.").setHeading();
 		for (const key of Object.keys(SECTION_LABELS) as (keyof SectionNames)[]) {
-			this.text(el, SECTION_LABELS[key], "Heading text after ##.", this.settings.sections[key], (name) => this.service.setSection(key, name));
+			this.text(el, SECTION_LABELS[key], "", this.settings.sections[key], (name) => this.service.setSection(key, name));
 		}
+		new Setting(el).setName("Line markers").setDesc("Lines written with an old marker are no longer read: change them in the file by hand.").setHeading();
 		for (const [marker, name, desc] of MARKERS) {
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
@@ -205,16 +229,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.display();
 	}
 
-	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
-	private cardsGroup(el: HTMLElement): void {
-		new Setting(el).setName("Cards").setHeading();
+	/** How the screen looks: the cards' size, the same in the list and in a stack on the timeline, and where a day begins. */
+	private displayGroup(el: HTMLElement): void {
+		new Setting(el).setName("Display").setHeading();
 		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.settings.cardHeight, (px) => this.service.setCardSize("cardHeight", px));
 		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.settings.cardGap, (px) => this.service.setCardSize("cardGap", px));
-	}
-
-	private timelineGroup(el: HTMLElement): void {
-		new Setting(el).setName("Timeline").setHeading();
-		this.count(el, "longPressMs", "Long press delay", "Milliseconds before a touch becomes a drag.");
 		new Setting(el)
 			.setName("Day starts at")
 			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
@@ -223,15 +242,17 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.service.setDayStartHour(Number(value)));
 			});
 		this.count(el, "scrollToHour", "Scroll to hour", "Hour another day opens at.");
+	}
+
+	private touchPage(el: HTMLElement): void {
+		this.count(el, "longPressMs", "Long press delay", "Milliseconds before a touch becomes a drag.");
 		new Setting(el)
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
 			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
-	private googleGroup(el: HTMLElement): void {
-		new Setting(el).setName("Calendar sources").setHeading();
-		this.count(el, "staleAfterMinutes", "Stale after", "Minutes without an update before a source gets the orange dot.");
+	private connectionsPage(el: HTMLElement): void {
 		new Setting(el).setName("Google Calendar").setHeading();
 		this.text(el, "Client id", "OAuth client of type Web application with the redirect URI from the README.", this.settings.googleClientId, (id) => this.service.setGoogleClientId(id));
 		new Setting(el)
@@ -240,15 +261,18 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				t.inputEl.type = "password";
 				this.service.bindClientSecret({ setValue: (value) => t.setValue(value), onChange: (listener) => t.onChange(listener) });
 			});
-		this.loginRow(el);
 		this.count(el, "refreshSeconds", "Refresh interval", "Seconds between calendar fetches while the view is open; 0 turns the timer off. Coming back to Obsidian fetches at once.");
-		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
+		this.workGroup(el);
+		new Setting(el).setName("Both sources").setHeading();
+		this.count(el, "staleAfterMinutes", "Stale after", "Minutes without an update before a source gets the orange dot.");
 	}
 
 	private loginRow(el: HTMLElement): void {
 		const loggedIn = this.deps.google.isLoggedIn();
-		const row = new Setting(el).setName(loggedIn ? "Logged in" : "Not logged in");
-		row.setDesc(loggedIn ? "The token syncs to your other devices." : "Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
+		const row = new Setting(el).setName("Google Calendar");
+		if (loggedIn) row.setDesc("Logged in. The token syncs to your other devices.");
+		else if (!this.settings.googleClientId) row.setDesc("Not logged in. Set the OAuth client first: More, Calendar connections.");
+		else row.setDesc("Not logged in. Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {
 				try {
@@ -267,10 +291,10 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		try {
 			calendars = await this.deps.google.listCalendars();
 		} catch (e) {
-			new Setting(el).setName("Calendars").setDesc(`Could not load: ${e instanceof Error ? e.message : String(e)}`);
+			new Setting(el).setName("Shown calendars").setDesc(`Could not load: ${e instanceof Error ? e.message : String(e)}`);
 			return;
 		}
-		new Setting(el).setName("Calendars").setDesc("Which calendars to show. All of them when none is unchecked.");
+		new Setting(el).setName("Shown calendars").setDesc("Which calendars to show. All of them when none is unchecked.");
 		for (const calendar of calendars) {
 			new Setting(el).setName(calendar.title).addToggle((t) =>
 				t.setValue(this.deps.google.isShown(calendar.id)).onChange((shown) => this.deps.google.setShown(calendars, calendar.id, shown)),
@@ -279,9 +303,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	}
 
 	private workGroup(el: HTMLElement): void {
-		new Setting(el).setName("Work calendar").setHeading();
+		new Setting(el).setName("Work calendar").setDesc("The iPhone's calendars, exported by Scriptable.").setHeading();
 		this.text(el, "File path", "JSON written by the Scriptable export.", this.settings.workCalendarFile, (path) => this.service.setWorkCalendarFile(path));
-		this.text(el, "Calendars", "Titles to take from the file, comma-separated. Empty means all.", this.settings.workCalendars, (text) => this.service.setWorkCalendars(text));
+		this.text(el, "Calendar titles", "Titles to take from the file, comma-separated. Empty means all.", this.settings.workCalendars, (text) => this.service.setWorkCalendars(text));
 		new Setting(el)
 			.setName("Scriptable script")
 			.setDesc("Paste once into a Scriptable script named Export Work Calendar. The export it runs comes with the plugin and updates with it.")
