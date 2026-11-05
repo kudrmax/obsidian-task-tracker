@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import type { App, Plugin } from "obsidian";
-import type { GoogleAccount, WorkCalendarSetup } from "../../src/application/contracts";
+import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../src/application/contracts";
 import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS, sharedOf, type SharedSettings } from "../../src/settings";
@@ -59,6 +59,19 @@ const loggedOut: GoogleAccount = {
 };
 const work: WorkCalendarSetup = { scriptableLoader: () => "loader", export: () => undefined };
 
+/** The calendars the files list, and what the tab asked to show or hide. */
+class KnownCalendars implements Pick<CalendarService, "known" | "setShown"> {
+	readonly asked: [string, string, boolean][] = [];
+	list: ShownCalendar[] = [];
+	async known(): Promise<readonly ShownCalendar[]> {
+		return this.list;
+	}
+	async setShown(account: string, title: string, shown: boolean): Promise<void> {
+		this.asked.push([account, title, shown]);
+	}
+}
+let calendars: KnownCalendars;
+
 let disk: Disk;
 let settings: PluginSettings;
 let tab: TaskCalendarSettingsTab;
@@ -71,7 +84,7 @@ async function open(file: unknown = START): Promise<void> {
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google: loggedOut, work });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google: loggedOut, work, calendars });
 	tab.display();
 }
 
@@ -128,6 +141,7 @@ async function rejects(change: () => void): Promise<void> {
 
 beforeEach(async () => {
 	document.body.className = "";
+	calendars = new KnownCalendars();
 	await open();
 });
 
@@ -323,10 +337,31 @@ describe("the settings tab: the calendar sources", () => {
 		await writes(() => type(input("Refresh interval"), "0"), { google: { ...START.google, refreshSeconds: 0 } });
 	});
 
-	it("writes the work calendar's path as typed and its calendars split at the commas", async () => {
+	it("writes the work calendar's path as typed", async () => {
 		await writes(() => type(input("File path", 1), "cal.json"), { workCalendarFile: "cal.json" });
-		await writes(() => type(input("Calendars"), " Work ,, Team ,"), { workCalendarFile: "cal.json", workCalendarTitles: ["Work", "Team"] });
-		await open({ ...START, workCalendarTitles: ["A", "B"] });
-		expect(input("Calendars").value).toBe("A, B");
+	});
+});
+
+describe("the settings tab: the calendars shown", () => {
+	it("lists every known calendar under its account with a toggle that hides it", async () => {
+		calendars.list = [
+			{ account: "max@gmail.com", title: "Personal", color: null, shown: true },
+			{ account: "max@company.ru", title: "Календарь", color: null, shown: false },
+		];
+		await open();
+		await settled();
+		expect(rows("max@gmail.com")).toHaveLength(1);
+		expect(rows("max@company.ru")).toHaveLength(1);
+		const personal = rows("Personal")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+		expect(personal.checked).toBe(true);
+		expect(rows("Календарь")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!.checked).toBe(false);
+		personal.checked = false;
+		personal.dispatchEvent(new Event("change"));
+		await settled();
+		expect(calendars.asked).toEqual([["max@gmail.com", "Personal", false]]);
+	});
+
+	it("no longer asks for titles to take from the work file", async () => {
+		expect(rows("Calendars").filter((row) => row.querySelector("input[type=text]"))).toEqual([]);
 	});
 });
