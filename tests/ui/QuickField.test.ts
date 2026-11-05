@@ -183,6 +183,8 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 	progress: null,
 	parentText: null,
 	description: null,
+	list: "now",
+	isSubtask: false,
 });
 
 describe("TaskList with a task being typed", () => {

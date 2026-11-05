@@ -25,6 +25,8 @@ export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLe
 		repeatable: repeatable(entry),
 		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
 		group: entry.group,
+		list: entry.section,
+		isSubtask: entry.path.length > 0,
 		subtasks: entry.subtasks.filter((sub) => isOpen(sub.task.status)).map((sub) => toItem(sub, levelOf, entry.task.text)),
 		progress: progressOf(entry),
 		description: descriptionMarkdown(entry),

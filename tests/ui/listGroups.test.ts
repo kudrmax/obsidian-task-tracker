@@ -18,6 +18,8 @@ const item = (text: string, group: GroupName): TaskItem => ({
 	subtasks: [],
 	progress: null,
 	parentText: null, description: null,
+	list: "now",
+	isSubtask: false,
 });
 
 describe("listGroups", () => {

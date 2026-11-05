@@ -128,6 +128,8 @@ export class DemoTaskService implements TaskService {
 			parentText: null,
 			description: t.description ?? null,
 			group: null,
+			list: section,
+			isSubtask: false,
 		};
 	}
 

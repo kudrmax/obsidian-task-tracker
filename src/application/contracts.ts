@@ -12,6 +12,8 @@ export { sameRule } from "../domain/Repeat";
 export { DayBoundary } from "../domain/DayBoundary";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */
 export { samePlacement } from "../domain/operations";
+/** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
+export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** A task's text cut into text and links, or plain, each link by its word. */
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
@@ -64,6 +66,10 @@ export interface TaskItem {
 	readonly priority: PriorityLevel | null;
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
+	/** The list the task is in, its task's for a subtask. */
+	readonly list: SectionKey;
+	/** It sits under another task. */
+	readonly isSubtask: boolean;
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
