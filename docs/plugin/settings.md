@@ -48,6 +48,7 @@ Settings → Task Calendar. Настройки лежат в `data.json` пла�
 
 ## Calendar sources
 
-- **Stale after** (180 минут) — когда источник получает оранжевую точку.
-- **Google Calendar** — Client id, Client secret, Log in / Log out, Refresh interval (60 секунд, 0 — без таймера), галочки календарей. Как получить ключи — [README](../../README.md#google-calendar).
-- **Work calendar** — File path (`calendar/work.json`), Calendars (какие календари брать из файла, пусто — все), Scriptable script → Copy (скрипт для Scriptable). Подробно — [Рабочий календарь на iPhone](work-calendar.md).
+- **Stale after** (180 минут) — сколько файл календарей считается свежим: старше — берётся следующий источник, а если свежих нет, горит оранжевая точка.
+- **Google Calendar** — Client id, Client secret, Log in / Log out, Refresh interval (60 секунд, 0 — без таймера) Как получить ключи — [README](../../README.md#google-calendar).
+- **Work calendar** — File path (`calendar/work.json`), Scriptable script → Copy (скрипт для Scriptable). Подробно — [Рабочий календарь на iPhone](work-calendar.md).
+- **Calendars shown** — все календари из файлов календарей, по аккаунтам, с переключателем у каждого. Новый календарь виден, пока его не выключишь. Подробно — [Календари](calendars.md).
