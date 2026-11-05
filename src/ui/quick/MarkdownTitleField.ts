@@ -1,6 +1,6 @@
 import { EditorState, Prec, type Transaction, type TransactionSpec } from "@codemirror/state";
 import { EditorView, placeholder } from "@codemirror/view";
-import type { App } from "obsidian";
+import { type App, Scope } from "obsidian";
 import { el } from "../dom";
 import { type EditorHost, EmbeddedEditor } from "../markdown/EmbeddedEditor";
 import { composingKey, LINE_BREAK, oneLine, type TitleField, type TitleFieldOptions } from "./TitleField";
@@ -22,6 +22,13 @@ export class MarkdownTitleField implements TitleField {
 	private composing = false;
 	/** What shows while the field is empty: the editor's placeholder draws this node, whose text the owner may change. */
 	private readonly hint: HTMLElement;
+	/**
+	 * The field's own keys, ahead of Obsidian's hotkeys while it has the focus: Option+Tab may be a command's (Templater
+	 * jumps to the next cursor on it), which would otherwise take it before the editor sees it.
+	 */
+	private readonly scope: Scope;
+	private readonly app: App;
+	private scoped = false;
 
 	constructor(app: App, host: EditorHost, sourcePath: string, parent: HTMLElement, opts: TitleFieldOptions) {
 		this.el = el(parent, "div", "tc-title-field");
@@ -48,16 +55,32 @@ export class MarkdownTitleField implements TitleField {
 				{ key: "Enter", run: key(() => events.onEnter()), shift: key(() => events.onEnter()) },
 				{ key: "Escape", run: key(() => events.onEscape()) },
 				{ key: "Tab", run: key(() => events.onTab(false)), shift: key(() => events.onTab(true)) },
-				{ key: "Alt-Tab", run: key(() => events.onSwitch()) },
 			],
 			onChange: () => {
 				if (!this.quiet) events.onInput();
 			},
 		});
+		this.app = app;
+		this.scope = new Scope(app.scope);
+		this.scope.register(["Alt"], "Tab", () => {
+			if (!this.composing) events.onSwitch();
+			return false;
+		});
 		const content = this.editor.contentDOM;
 		content.setAttribute("enterkeyhint", "next");
-		content.addEventListener("blur", () => events.onBlur());
+		content.addEventListener("focus", () => this.holdKeys(true));
+		content.addEventListener("blur", () => {
+			this.holdKeys(false);
+			events.onBlur();
+		});
 		this.quiet = false;
+	}
+
+	private holdKeys(on: boolean): void {
+		if (on === this.scoped) return;
+		this.scoped = on;
+		if (on) this.app.keymap.pushScope(this.scope);
+		else this.app.keymap.popScope(this.scope);
 	}
 
 	setPlaceholder(text: string): void {
@@ -94,6 +117,7 @@ export class MarkdownTitleField implements TitleField {
 	}
 
 	destroy(): void {
+		this.holdKeys(false);
 		this.editor.destroy();
 		this.el.remove();
 	}
