@@ -44,8 +44,12 @@ export interface TaskCalendarSettings {
 	readonly silentSlotMarker: string;
 	readonly repeatMarker: string;
 	readonly workCalendarFile: string;
-	/** Calendar titles to take from the work file; empty means all. */
+	/** Calendar titles to take from the work file; empty means all. Read only to carry the choice over into `hiddenCalendars`. */
 	readonly workCalendarTitles: readonly string[];
+	/** The calendars not shown, by account and title; a calendar not listed is shown, a new one too. */
+	readonly hiddenCalendars: readonly { readonly account: string; readonly title: string }[];
+	/** The old choice (Google's calendar ids, the work file's titles) has been carried over into `hiddenCalendars`. */
+	readonly calendarsMigrated: boolean;
 	readonly google: GoogleSettings;
 	readonly longPressMs: number;
 	readonly zoomLevels: readonly ZoomLevel[];
@@ -86,6 +90,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	repeatMarker: "🔁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
+	hiddenCalendars: [],
+	calendarsMigrated: false,
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
 	longPressMs: 250,
 	zoom: 56,
