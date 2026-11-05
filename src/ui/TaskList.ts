@@ -1,8 +1,8 @@
-import { type GapPlace, type GroupName, type ListCard, type ListSection, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListSection, type ListView, listView, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
-import { isEmptyGroup, type ListGroup, listGroups, showsHeaders, withEmptySections } from "./listGroups";
+import { isEmptyGroup } from "./listGroups";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
@@ -47,6 +47,8 @@ export interface ListEntry {
 	readonly item: TaskItem;
 	/** 0 for a task, one more for each task above a subtask. */
 	readonly level: number;
+	/** The section it is drawn in: none in a list that shows no headers. */
+	readonly group: GroupName;
 }
 
 const QUICK_ROW = "tc-quick-row";
@@ -58,7 +60,7 @@ export const PLATE = "tc-group-empty";
  */
 export class TaskList {
 	private entries: ListEntry[] = [];
-	private rendered: ListGroup[] = [];
+	private rendered: readonly ListGroup[] = [];
 	private nodes: HTMLElement[] = [];
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
@@ -87,8 +89,9 @@ export class TaskList {
 		this.nodes = [];
 		const day = this.deps.day();
 		const items = this.deps.items();
-		this.rendered = this.groupsOf(items);
-		this.withHeaders = showsHeaders(this.rendered);
+		const view = this.viewOf(items);
+		this.rendered = view.groups;
+		this.withHeaders = view.showsHeaders;
 		const rows: { node: HTMLElement; level: number }[] = [];
 		let entered = entry === null;
 		let groupStart = 0;
@@ -107,7 +110,7 @@ export class TaskList {
 			card.style.setProperty(PROPERTY.level, String(level));
 			const renamed = renaming !== null && samePlace(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
-			this.entries.push({ card, item, level });
+			this.entries.push({ card, item, level, group });
 			this.nodes.push(card);
 			if (!renamed) rows.push({ node: card, level });
 		};
@@ -197,18 +200,16 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		const groups = this.groupsOf(this.deps.items());
-		const headers = showsHeaders(groups);
-		return groups.flatMap((group) => rowsOf(group.items)).map(({ item, level }) => cardOf(item, level, headers));
+		return this.viewOf(this.deps.items()).groups.flatMap((group) => rowsOf(group.items).map(({ item, level }) => ({ key: item.key, level, group: group.name })));
 	}
 
-	private groupsOf(items: readonly TaskItem[]): ListGroup[] {
-		return this.deps.grouped?.() ? [...withEmptySections(listGroups(items), this.deps.sections?.() ?? [])] : [{ name: null, items }];
+	private viewOf(items: readonly TaskItem[]): ListView {
+		return listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);
 	}
 
-	/** A card as places in the list see it: a list that shows no headers draws every card outside any section. */
+	/** A card as places in the list see it: in the section it is drawn in. */
 	listCard(entry: ListEntry): ListCard {
-		return cardOf(entry.item, entry.level, this.withHeaders);
+		return { key: entry.item.key, level: entry.level, group: entry.group };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */
@@ -258,11 +259,6 @@ interface Row {
 /** A section's tasks in the order the list draws them: each task, then its subtasks a level deeper. */
 function rowsOf(items: readonly TaskItem[], level = 0): Row[] {
 	return items.flatMap((item) => [{ item, level }, ...rowsOf(item.subtasks, level + 1)]);
-}
-
-/** A card as places in the list see it: a list that shows no headers puts every card outside any section. */
-function cardOf(item: TaskItem, level: number, withHeaders: boolean): ListCard {
-	return { key: item.key, level, group: withHeaders ? item.group : null };
 }
 
 function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {

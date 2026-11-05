@@ -1,4 +1,4 @@
-import { type CalendarEvent, type CalendarService, type DayEvents, type DayView, type GroupedList, type ListSection, type SourceStatus, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayEvents, type DayView, type GroupedList, type ListSection, type SectionOffer, type SourceStatus, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -22,6 +22,8 @@ interface TasksState {
 	readonly done: readonly TaskItem[];
 	/** Each grouped list's groups in file order, its empty sections among them. */
 	readonly sections: ListSections;
+	/** The sections the menus offer, read with the lists. */
+	readonly offer: SectionOffer;
 	readonly missing: boolean;
 }
 
@@ -29,7 +31,10 @@ type ListSections = Readonly<Record<GroupedList, readonly ListSection[]>>;
 
 const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 
-const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, missing: true } as const;
+/** No sections to offer: no file, or nothing read yet. */
+const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
+
+const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: true } as const;
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -37,7 +42,7 @@ const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], section
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, missing: false };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false };
 	private dayEvents: DayEvents = { events: [], statuses: [] };
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -77,6 +82,11 @@ export class DayData {
 
 	get sections(): ListSections {
 		return this.state.sections;
+	}
+
+	/** The sections the menus offer. */
+	get offer(): SectionOffer {
+		return this.state.offer;
 	}
 
 	get done(): readonly TaskItem[] {
@@ -144,8 +154,8 @@ export class DayData {
 		const date = this.deps.date();
 		try {
 			await tasks.normalize();
-			const [day, soon, inbox, backlog, done, sections] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView(), tasks.doneView(), tasks.listSections()]);
-			return { date, day, soon, inbox, backlog, done, sections, missing: false };
+			const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView(), tasks.doneView(), tasks.listSections(), tasks.sectionOffer(date)]);
+			return { date, day, soon, inbox, backlog, done, sections, offer, missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;

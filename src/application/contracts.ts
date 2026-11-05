@@ -5,6 +5,7 @@ import type { Placement, TaskDraft } from "../domain/Placement";
 import type { PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
+import type { SectionOffer } from "./sections";
 
 export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -18,6 +19,10 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** A list in its sections, and whether it shows their headers. */
+export { listView, type ListGroup, type ListView } from "./sections";
+/** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
+export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
 /** A task's text cut into text and links, or plain, each link by its word. */
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
@@ -226,6 +231,8 @@ export interface TaskService {
 	 * groups its tasks are in and the empty sections of its list, in this order; No section is never empty here.
 	 */
 	listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>>;
+	/** The sections a task's menu offers in each list, the screen showing `date` (see `SectionOffer`); `sectionChoice` picks a task's. */
+	sectionOffer(date: LocalDate): Promise<SectionOffer>;
 
 	/** Today: end of Now, due today. Another day D: end of Soon with due date D. Whitespace-only text creates nothing. */
 	createInList(date: LocalDate, text: string): Promise<void>;
@@ -331,6 +338,12 @@ export interface TaskService {
 	 * it among the tasks outside any section. The task enters the list as with `moveToGroup`.
 	 */
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void>;
+	/**
+	 * A menu's section picked, or a new one named: each task into section `name` of its list, null outside any, as
+	 * `createGroup` takes a name; a task of Soon keeps its due date. One task as `moveToGroup` or `createGroup`, several as
+	 * one `applyAll`. The section a task stands in already is no exception: it goes to its end.
+	 */
+	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
 	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */

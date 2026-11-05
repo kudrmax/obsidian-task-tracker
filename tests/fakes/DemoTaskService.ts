@@ -1,4 +1,4 @@
-import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
@@ -409,7 +409,15 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	/** The demo keeps no sections. */
+	/** The demo keeps no sections: its menus offer the presets. */
+	async sectionOffer(): Promise<SectionOffer> {
+		const { presets, ungrouped } = DEFAULT_SETTINGS.groups;
+		const names = presets.filter((preset) => preset !== ungrouped);
+		return { lists: { now: names, soon: names, inbox: names, backlog: names }, ungrouped };
+	}
+
+	async toSection(): Promise<void> {}
+
 	async moveToGroup(): Promise<void> {}
 
 	async createGroup(): Promise<void> {}

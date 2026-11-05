@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { BulkController, type BulkDeps } from "../../src/ui/BulkController";
 import { bulkCanRemoveDue, bulkLevelTiles, bulkMoveTiles, bulkNextPriority, bulkProgress, countLabel } from "../../src/ui/menu/BulkMenu";
@@ -91,6 +91,7 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 		levels: () => LEVELS,
 		cards: () => [],
 		sections: () => null,
+		toSection: async () => {},
 		desktop: () => true,
 		isMod: (e) => e.metaKey,
 		...extra,
@@ -133,6 +134,25 @@ describe("bulk actions", () => {
 		expect(bulk.selection.size).toBe(2);
 		bulk.dropping({ ...drag, carried: [{ item: b.item, from: "soon" }] });
 		expect(bulk.selection.size).toBe(0);
+	});
+
+	it("sends the picked tasks to a section in one call and lets them go", async () => {
+		const toSection = vi.fn(async () => {});
+		const sections = vi.fn(() => ({ choice: { names: ["Work"], current: null, ungrouped: "No section" }, shared: true }));
+		const bulk = controller({ sections, toSection });
+		const [a, b] = cards([item(), item()]);
+		for (const card of [a, b]) document.body.append(card.card);
+		bulk.selection.toggle(a);
+		bulk.selection.toggle(b);
+		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(true);
+		expect(sections).toHaveBeenCalledWith([a, b]);
+		const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
+		row("Section").click();
+		row("Work").click();
+		await Promise.resolve();
+		expect(toSection).toHaveBeenCalledWith([a.item.key, b.item.key], "Work");
+		expect(bulk.selection.size).toBe(0);
+		document.body.replaceChildren();
 	});
 
 	it("offers the cancel ring only while several cards are carried", () => {

@@ -2,7 +2,7 @@ import type { GroupedList, GroupName, GroupPlace } from "../../application/contr
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
-import type { ListGroup } from "../listGroups";
+import type { ListGroup } from "../../application/contracts";
 import type { TaskList } from "../TaskList";
 import { LongPress } from "./LongPress";
 
