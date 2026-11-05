@@ -48,6 +48,7 @@ targets:
       - path: Cards
       - path: App/Cards/TaskCardAttributes.swift
       - path: App/Cards/CardIntents.swift
+      - path: App/Reminders/ReminderButton.swift
     configFiles:
       Debug: App/Config/Base.xcconfig
       Release: App/Config/Base.xcconfig

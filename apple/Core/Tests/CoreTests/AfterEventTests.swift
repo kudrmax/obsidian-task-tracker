@@ -14,7 +14,7 @@ import Testing
             Self.meeting("Retro", Fixtures.date(4, 15), Fixtures.date(4, 16)),
             Self.meeting("Standup", Fixtures.date(4, 10, 30), Fixtures.date(4, 11, 30)),
         ])
-        #expect(offer == AfterEvent(title: "After Standup (1 h 30 min)", until: Fixtures.date(4, 11, 30)))
+        #expect(offer == AfterEvent(meeting: "Standup", left: "1 h 30 min", until: Fixtures.date(4, 11, 30)))
     }
 
     @Test func aMeetingUnderWayCountsAsTheNext() {
@@ -22,7 +22,7 @@ import Testing
             Self.meeting("Standup", Fixtures.date(4, 10, 30), Fixtures.date(4, 11)),
             Self.meeting("Planning", Fixtures.date(4, 9), Fixtures.date(4, 10, 45)),
         ])
-        #expect(offer == AfterEvent(title: "After Planning (45 min)", until: Fixtures.date(4, 10, 45)))
+        #expect(offer == AfterEvent(meeting: "Planning", left: "45 min", until: Fixtures.date(4, 10, 45)))
     }
 
     @Test func aMeetingAlreadyOverIsNotOffered() {
@@ -83,8 +83,16 @@ import Testing
         let planned = await notifications.pendingIDs.values
         let first = planned.first { $0.fire == Fixtures.date(4, 10) }
         let afterIt = planned.first { $0.fire == Fixtures.date(4, 11, 15) }
-        #expect(first?.after == AfterEvent(title: "After Standup (1 hour)", until: Fixtures.date(4, 11)))
+        #expect(first?.after == AfterEvent(meeting: "Standup", left: "1 hour", until: Fixtures.date(4, 11)))
         #expect(afterIt != nil && afterIt?.after == nil)
+    }
+
+    @Test func aCardOffersTheMeetingAsItStandsAtTheTasksStart() async {
+        let cards = FakeCards()
+        let vault = FakeVault(Fixtures.file("- [ ] Pay 📌 2026-11-04 10:00"))
+        vault.files["calendar/work.json"] = Self.workFile([CalendarEvent(title: "Standup", start: Fixtures.date(4, 10, 30), end: Fixtures.date(4, 11))])
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: cards, now: { Fixtures.date(4, 9) }).sync()
+        #expect(await cards.meetings["- [ ] Pay 📌 2026-11-04 10:00"] == AfterEvent(meeting: "Standup", left: "1 hour", until: Fixtures.date(4, 11)))
     }
 
     @Test func aMovedMeetingSetsTheDeliveriesAgain() async {
