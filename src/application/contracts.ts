@@ -35,6 +35,7 @@ export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
+import type { SectionNames, ViewSettings } from "../settings";
 export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
 export { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, LIST_WIDTH_MAX, LIST_WIDTH_MIN, sameLevels } from "../settings";
 export type { Clock } from "./ports";
@@ -558,4 +559,25 @@ export interface WorkCalendarSetup {
 	scriptableLoader(): string;
 	/** Asks the phone for fresh work events. */
 	export(): void;
+}
+
+/** What the screen reads of the settings: its own, and the path, the names and the levels it draws. */
+export interface ScreenSettings extends ViewSettings {
+	readonly tasksFile: string;
+	readonly sections: SectionNames;
+	/** The heading over tasks outside any section. */
+	readonly ungrouped: string;
+	readonly priorities: readonly PriorityLevel[];
+}
+
+/** What the screen sets by hand, on this device only: the divider's place, the columns shown, the zoom. */
+export type ScreenState = Pick<ViewSettings, "listShare" | "rightMode" | "zoom">;
+
+/** The settings as the screen sees them, and what it sets by hand. */
+export interface ViewSettingsStore {
+	/** The same object while the settings stay the same. */
+	get(): ScreenSettings;
+	set(patch: Partial<ScreenState>): Promise<void>;
+	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
 }

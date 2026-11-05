@@ -4,6 +4,7 @@ import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
+import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
 import { createServices, type Services, type ServicesHost, vaultEntryLog } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
@@ -68,7 +69,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			days: services.days,
 			undo: services.undo,
 			calendars: services.calendars,
-			settings: this,
+			settings: new ViewSettingsImpl(this),
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
 			entryLog: vaultEntryLog(this.app.vault.adapter),

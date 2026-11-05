@@ -11,9 +11,6 @@ const ROOT = resolve(__dirname, "..");
 const ALLOWED: readonly string[] = [
 	"src/ui/SettingsTab.ts → src/application/ports.ts",
 	"src/ui/SettingsTab.ts → src/settings.ts",
-	"src/ui/TaskCalendarView.ts → src/application/ports.ts",
-	"src/ui/TaskCalendarView.ts → src/settings.ts",
-	"src/ui/settingsEffect.ts → src/settings.ts",
 ];
 
 type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
