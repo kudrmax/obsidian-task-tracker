@@ -1,5 +1,7 @@
 import { keyId, type TaskItem } from "../application/contracts";
+import { el } from "./dom";
 import type { ListColumn } from "./drag/DropTarget";
+import { icon } from "./kit/icons";
 
 /** A list card as the selection knows it: the task, the card drawn for it, the list it stands in, its subtasks' cards. */
 export interface PickedCard {
@@ -11,8 +13,16 @@ export interface PickedCard {
 
 const SELECTED = "is-selected";
 
+/** The circle at a card's start that Select tasks shows: empty, or the accent with a check once the task is picked. */
+export function pickMark(card: HTMLElement): void {
+	if (card.querySelector(":scope > .tc-pick")) return;
+	const mark = el(null, "span", "tc-pick");
+	mark.appendChild(icon("check"));
+	card.prepend(mark);
+}
+
 /**
- * The tasks picked with ⌘-click for an action on all of them (bulk actions spec, desktop only). A redraw gives each
+ * The tasks picked for an action on all of them: with ⌘-click, or with a tap while Select tasks is on. A redraw gives each
  * picked task its new card, which wears the selection; a task no list draws any more drops out of it.
  */
 export class TaskSelection {
