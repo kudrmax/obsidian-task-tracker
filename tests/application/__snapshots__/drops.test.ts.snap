@@ -1,0 +1,2343 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`what a drop writes (spec §5.1) > one task > Backlog → Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+- [ ] B1
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Backlog → No section of today's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] B2 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Backlog → a past day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] B1 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Backlog → the timeline 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] B2 ⏰ 2026-10-30 13:00
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Backlog → under a task of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+	- [ ] B1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] I3
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → a past day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] I2 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → a section of Backlog 1`] = `
+"## Inbox
+
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] I1
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → before a task of Backlog 1`] = `
+"## Inbox
+
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] I1
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → the end of Inbox 1`] = `
+"## Inbox
+
+- [ ] I2
+- [ ] I1
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → the end of a section of today's list 1`] = `
+"## Inbox
+
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+- [ ] I1 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → the timeline 1`] = `
+"## Inbox
+
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] I1 ⏰ 2026-10-30 13:00
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Inbox → under a task of Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+	- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → a later day's list in a section 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+- [ ] S1 📅 2026-11-03
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → a later day's list without sections 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2 📅 2026-11-03
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → a past day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] S1 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → a section of Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+- [ ] S1
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → a section of today's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] S1 📅 2026-10-30
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → the end of Backlog 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+- [ ] S1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → the end of Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+- [ ] S1
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → the timeline 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] S1 ⏰ 2026-10-30 13:00
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → today's list without sections 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+- [ ] S2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon → under a task of today 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] S1
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon's own card → before another in Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] S1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > Soon's own card → the end of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+- [ ] S1
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a later day's list → a section of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] SD
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a later day's list → its timeline: Soon with that day 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03 ⏰ 2026-11-03 12:00
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a later day's list → the end of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a past day's list → before another of its tasks 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP2 📅 2026-10-30
+- [ ] NP 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a past day's list → its end 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] NP 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a subtask → a section: it becomes a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+- [ ] N1b 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a subtask → before its sibling 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1b
+	- [ ] N1a
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a subtask → the timeline: it becomes a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+- [ ] N1a ⏰ 2026-10-30 13:00
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > a task → under a subtask 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+		- [ ] N3
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > clearSlot 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the later day's timeline → its list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the timeline → a section of today's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N2 📅 2026-10-30
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the timeline → another time, with its duration 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 15:00-16:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the timeline → the end of a list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+- [ ] N2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the timeline → today's list before a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > the timeline → under a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+	- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] NP
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+- [ ] N3
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → a later day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] N1 📅 2026-11-03
+	- [ ] N1a
+	- [ ] N1b
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → a later day's timeline: Now goes to Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+- [ ] N3 ⏰ 2026-11-03 12:00
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → before a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N3 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → its section 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+- [ ] N1 📅 2026-10-30
+	- [ ] N1a
+	- [ ] N1b
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → the end of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → the timeline 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1 ⏰ 2026-10-30 12:00
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > one task > today's list → under a task, last 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+	- [ ] N3
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > Soon and Inbox → Backlog 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+- [ ] I3
+- [ ] S1
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > Soon and Inbox → a later day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] I2 📅 2026-11-03
+- [ ] S2 📅 2026-11-03
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > Soon and Inbox → the end of Inbox 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+- [ ] I3
+- [ ] S1
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > a task with its own subtask → a section: the subtask goes along 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+- [ ] N1 📅 2026-10-30
+	- [ ] N1a
+	- [ ] N1b
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > several → the timeline: nothing 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-28
+- [ ] NP2 📅 2026-10-28
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day and Backlog → Inbox 1`] = `
+"## Inbox
+
+- [ ] N3
+- [ ] B1
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day and Soon → a past day's list's end 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] S2 📅 2026-10-30
+- [ ] NP 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day and Soon → before a task of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] N3
+- [ ] S2
+- [ ] S1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day and Soon → before a task of a past day's list 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] S1 📅 2026-10-30
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP2 📅 2026-10-30
+- [ ] NP 📅 2026-10-30
+### Work
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day and Soon → the end of Soon 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S1
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+- [ ] N3
+- [ ] S2
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > the day, Soon and Inbox → a section of today's list 1`] = `
+"## Inbox
+
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+### Work
+- [ ] I1 📅 2026-10-30
+- [ ] N1 📅 2026-10-30
+	- [ ] N1a
+	- [ ] N1b
+- [ ] S1 📅 2026-10-30
+- [ ] N3
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
+
+exports[`what a drop writes (spec §5.1) > several tasks > two → under a task 1`] = `
+"## Inbox
+
+- [ ] I1
+- [ ] I2
+### Ideas
+- [ ] I3
+
+## Now
+
+- [ ] N1
+	- [ ] N1a
+	- [ ] N3
+	- [ ] S1
+	- [ ] N1b
+- [ ] N2 ⏰ 2026-10-30 10:00-11:00
+- [ ] NP 📅 2026-10-30
+- [ ] NP2 📅 2026-10-30
+
+## Soon
+
+- [ ] S2
+- [ ] SD 📅 2026-11-03
+- [ ] ST ⏰ 2026-11-03 09:00-09:30
+### Later
+- [ ] S3
+
+## Backlog
+
+- [ ] B1
+### Someday
+- [ ] B2
+
+## Done
+"
+`;
