@@ -10,7 +10,7 @@ final class AppServices: Sendable {
 
     private init() {
         vault = Vault(bookmarks: UserDefaultsBookmarks())
-        sync = ReminderSync(vault: vault, rules: Self.rules(), notifications: UserNotifications(), alarms: Alarms())
+        sync = ReminderSync(vault: vault, rules: Self.rules(), notifications: UserNotifications(), alarms: Alarms(), calendar: PhoneCalendar())
     }
 
     @discardableResult
@@ -28,6 +28,10 @@ final class AppServices: Sendable {
 
     func snooze(_ reminder: ShownReminder, minutes: Int) async {
         report(await sync.snooze(reminderID: reminder.id, minutes: minutes), for: reminder)
+    }
+
+    func snooze(_ reminder: ShownReminder, until end: Date) async {
+        report(await sync.snooze(reminderID: reminder.id, until: end), for: reminder)
     }
 
     func silence(_ reminder: ShownReminder) async {

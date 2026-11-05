@@ -8,7 +8,7 @@ struct TaskCalendarApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        UserNotifications.registerCategory()
+        Task { await UserNotifications.registerCategories() }
         UNUserNotificationCenter.current().delegate = Self.notifications
     }
 
