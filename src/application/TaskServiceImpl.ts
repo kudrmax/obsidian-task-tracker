@@ -146,7 +146,7 @@ export class TaskServiceImpl implements TaskService {
 		const item = this.itemOf(today);
 		const hits: SearchHit[] = [];
 		const visit = (entry: TaskEntry): void => {
-			const title = hitIn(plainText(this.parseTitle(entry.task.text).text), query);
+			const title = hitIn(plainText(entry.task.text), query);
 			const markdown = descriptionMarkdown(entry);
 			const description = markdown === null ? null : snippetIn(markdown, query);
 			if (title || description) hits.push({ item: item(entry), title: title ? titleParts(title) : [], description });

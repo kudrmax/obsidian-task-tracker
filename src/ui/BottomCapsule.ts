@@ -28,7 +28,7 @@ export class BottomCapsule {
 				if (this.undo.canUndo()) actions.onUndo();
 			},
 		});
-		Button.create(this.el, { kind: "icon", label: "Search", icon: "search", cls: "tc-search", onPress: () => actions.onSearch() });
+		Button.create(this.el, { kind: "icon", label: "Search", icon: "search", cls: "tc-search-open", onPress: () => actions.onSearch() });
 		this.unsubscribe = undo.onChange(() => this.show());
 		this.show();
 	}

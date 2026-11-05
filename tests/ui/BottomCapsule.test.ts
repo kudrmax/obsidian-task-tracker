@@ -57,7 +57,7 @@ describe("BottomCapsule", () => {
 	it("the magnifier opens the search, with or without a step to take back", () => {
 		const on = actions();
 		new BottomCapsule(document.body, service(0), on);
-		document.querySelector<HTMLButtonElement>(".tc-search")!.click();
+		document.querySelector<HTMLButtonElement>(".tc-search-open")!.click();
 		expect(on.onSearch).toHaveBeenCalledOnce();
 	});
 });

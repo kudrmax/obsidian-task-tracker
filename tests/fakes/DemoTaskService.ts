@@ -187,7 +187,7 @@ export class DemoTaskService implements TaskService {
 		const sections: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
 		return sections.flatMap((section) =>
 			this.items(section).flatMap((item) => {
-				const hit = hitIn(this.parseTitle(item.text).text, query);
+				const hit = hitIn(item.text, query);
 				if (!hit) return [];
 				const title = [
 					{ text: hit.before, match: false },
