@@ -220,7 +220,7 @@ describe("WorkCalendarExportScript", () => {
 		});
 
 		it("writes calendar colours as #RRGGBB whether Scriptable gives the # or not", async () => {
-			const { files, loader } = await setUp([event(), event({ calendar: { title: "Home", color: { hex: "#FF9500" } } })]);
+			const { files, loader } = await setUp([event(), event({ calendar: { identifier: "cal-home", title: "Home", color: { hex: "#FF9500" } } })]);
 			await runInScriptable(loader);
 			expect((await exported(files)).events.map((e) => e.color)).toEqual(["#1BADF8", "#FF9500"]);
 		});

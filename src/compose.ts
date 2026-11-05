@@ -14,6 +14,7 @@ import { GoogleCalendarFeed } from "./infrastructure/GoogleCalendarFeed";
 import { browserLoginDeps, GoogleRedirectLogin } from "./infrastructure/GoogleRedirectLogin";
 import { requestToken } from "./infrastructure/GoogleToken";
 import { obsidianHttp } from "./infrastructure/ObsidianHttp";
+import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
@@ -52,7 +53,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const tasks = new TaskServiceImpl(store, settings, clock, history);
-	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => workShortcut.run() };
+	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => iphoneFile.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
+	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	return {
 		tasks,
 		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
