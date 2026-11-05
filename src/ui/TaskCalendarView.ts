@@ -1,7 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
-import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock, LIST_WIDTH_MIN, type RightMode, type ScreenSettings, type ViewSettingsStore, type ZoomLevel } from "../application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
@@ -78,7 +76,7 @@ export interface ViewDeps {
 	/** The plugin's own changes of the tasks file, taken back by the corner button and Cmd+Z. */
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
-	readonly settings: SettingsStore;
+	readonly settings: ViewSettingsStore;
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
@@ -127,7 +125,7 @@ export class TaskCalendarView extends ItemView {
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	/** The settings the screen last followed: a change is weighed against them. */
-	private seen: TaskCalendarSettings;
+	private seen: ScreenSettings;
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -164,7 +162,7 @@ export class TaskCalendarView extends ItemView {
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,
 			haptics: this.haptics,
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			onTap: (head, list, group) => this.showGroupMenu(head, list, group),
 			onMove: (list, group, place) => this.act(() => this.deps.tasks.moveGroup(list, group, place)),
 		});
@@ -249,7 +247,7 @@ export class TaskCalendarView extends ItemView {
 			entry: () => this.quick?.entryIn("left") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", (origins) => acceptsDrop("left", origins), () => this.sectionsOf("left"), true, () => this.haptics.tap());
@@ -273,7 +271,7 @@ export class TaskCalendarView extends ItemView {
 			entry: () => this.quick?.entryIn("inbox") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
@@ -288,7 +286,7 @@ export class TaskCalendarView extends ItemView {
 			entry: () => this.quick?.entryIn("backlog") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "backlog", this.backlogList!, group),
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
 		});
 		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
@@ -303,7 +301,7 @@ export class TaskCalendarView extends ItemView {
 			entry: () => this.quick?.entryIn("soon") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap());
@@ -312,7 +310,7 @@ export class TaskCalendarView extends ItemView {
 		new Divider(el(root, "div"), {
 			width: () => shownListWidth(this.settings.listShare, root.clientWidth),
 			onWidth: (width) => root.style.setProperty(PROPERTY.listWidth, px(width)),
-			onRelease: (width) => void this.deps.settings.update({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.parts.request("frame")),
+			onRelease: (width) => void this.deps.settings.set({ listShare: listShareOf(width, root.clientWidth) }).then(() => this.parts.request("frame")),
 			min: LIST_WIDTH_MIN,
 			max: () => listWidthMax(root.clientWidth),
 			center: () => centeredListWidth(root.clientWidth),
@@ -398,8 +396,9 @@ export class TaskCalendarView extends ItemView {
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
 		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
-		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch() });
+		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() });
 		this.unsubscribe.push(() => capsule.destroy());
+		this.bulk.mount();
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
@@ -594,7 +593,7 @@ export class TaskCalendarView extends ItemView {
 				const column = this.deps.tasks.dayColumn(date);
 				return column.sections ? this.data.sections[column.list] : [];
 			},
-			ungroupedName: () => this.settings.groups.ungrouped,
+			ungroupedName: () => this.settings.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
 			allDayExtraRows: () => this.rightEl?.style.getPropertyValue(PROPERTY.allDayExtraRows) ?? "",
@@ -669,7 +668,7 @@ export class TaskCalendarView extends ItemView {
 		}
 		this.shownMode = mode;
 		this.showPlace(this.place());
-		await this.deps.settings.update({ rightMode: mode });
+		await this.deps.settings.set({ rightMode: mode });
 		if (this.shownMode === mode) this.shownMode = null;
 		this.parts.request("frame");
 	}
@@ -806,7 +805,7 @@ export class TaskCalendarView extends ItemView {
 	/** Released, the scale stays where the fingers left it, and the timeline opens at it next time; out all the way it is the whole day. */
 	private settleZoom(hourPx: number): void {
 		this.wholeDay = hourPx <= this.zoomLevels()[0].hourPx;
-		void this.deps.settings.update({ zoom: this.wholeDay ? "wholeDay" : hourPx });
+		void this.deps.settings.set({ zoom: this.wholeDay ? "wholeDay" : hourPx });
 	}
 
 	/** The two columns the window shows, as places to drop. */

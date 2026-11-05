@@ -1,3 +1,4 @@
+import type { EntryPart } from "./EntryPart";
 import type { PriorityLevel, TaskService } from "../../application/contracts";
 import { markPriority } from "../TaskCard";
 import type { TitleFieldFactory } from "./TitleField";
@@ -19,7 +20,7 @@ export interface QuickFieldOptions {
 	onBlur(): void;
 }
 
-export interface QuickFieldHandle {
+export interface QuickFieldHandle extends EntryPart {
 	readonly el: HTMLElement;
 	readonly text: string;
 	readonly focused: boolean;

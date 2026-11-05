@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../src/settings";
 import { settingsEffect } from "../../src/ui/settingsEffect";
+import { screenSettingsOf } from "../../src/application/ViewSettingsImpl";
 
 const before = DEFAULT_SETTINGS;
-const after = (patch: Partial<TaskCalendarSettings>) => settingsEffect(before, { ...before, ...patch });
+const after = (patch: Partial<TaskCalendarSettings>) => settingsEffect(screenSettingsOf(before), screenSettingsOf({ ...before, ...patch }));
 const NOTHING = { restack: false, frame: false, drawn: false };
 
 describe("settingsEffect", () => {
@@ -49,6 +50,6 @@ describe("settingsEffect", () => {
 	});
 
 	it("nothing for the same settings copied", () => {
-		expect(settingsEffect(before, structuredClone(before))).toEqual(NOTHING);
+		expect(settingsEffect(screenSettingsOf(before), screenSettingsOf(structuredClone(before)))).toEqual(NOTHING);
 	});
 });

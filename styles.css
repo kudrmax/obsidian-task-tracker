@@ -95,6 +95,7 @@ body {
 	--tc-stroke-2-4: 2.4px;
 	--tc-stroke-2-6: 2.6px;
 	--tc-stroke-2-8: 2.8px;
+	--tc-stroke-3-4: 3.4px;
 	--tc-stroke-3-6: 3.6px;
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
@@ -104,6 +105,8 @@ body {
 	--tc-radius-time-pill: 6px;
 	--tc-radius-seg: calc(var(--tc-seg) / 2);
 	--tc-radius-seg-btn: calc(var(--tc-seg-btn-h) / 2);
+	--tc-radius-wheel: calc(var(--tc-wheel) / 2);
+	--tc-radius-wheel-btn: calc(var(--tc-wheel-btn-h) / 2);
 	--tc-radius-handle: 5px;
 	--tc-radius-pill: 8px;
 	/* A button that is only its text (the day's name, the description screen's Close and Edit): its corners, seen only under the pointer or the keyboard's ring. */
@@ -148,16 +151,27 @@ body {
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
 	--tc-seg-shrink: 0.14;
 	--tc-seg-dim: 0.28;
+	/* The wheel is as tall as Undo's capsule and the plus beside it, so the foot reads as one bar in three parts. */
+	--tc-wheel: var(--tc-plus-size);
+	--tc-wheel-pad: var(--tc-space-4);
+	--tc-wheel-btn-h: calc(var(--tc-wheel) - 2 * var(--tc-wheel-pad));
 	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
-	--tc-foot-gap: 12px;
-	--tc-switch-row: calc(var(--tc-seg) + var(--tc-foot-gap));
+	--tc-foot-gap: 6px;
+	--tc-switch-row: calc(var(--tc-wheel) + var(--tc-foot-gap));
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
 	--tc-plus-icon: var(--tc-icon-xl);
 	--tc-capsule-btn: 40px;
+	/* Select tasks: the circle at a card's start. */
+	--tc-pick-size: var(--tc-icon-m);
+	--tc-pick-check: 12px;
+	--tc-pick-ring: var(--tc-select-ring);
+	--tc-stroke-pick: var(--tc-stroke-3-4);
+	--tc-pick-pad-start: 9px;
+	--tc-pick-gap: var(--tc-space-2);
 	--tc-search-w: 520px;
 	--tc-search-field-pad: var(--tc-space-10);
-	/* Over the keyboard as the quick bar stands, and over Obsidian's navigation while the keyboard is down. */
+	/* Over Obsidian's navigation while the keyboard is down; on the keyboard, as the quick bar stands, while it is up (the rule after the search's). */
 	--tc-search-bottom: calc(var(--tc-bar-bottom) + var(--tc-nav-room));
 	--tc-radius-capsule: calc(var(--tc-plus-size) / 2);
 	--tc-stroke-plus: var(--tc-stroke-2-6);
@@ -336,8 +350,10 @@ body {
 	--tc-bar-btn-w: 44px;
 	--tc-bar-btn-h: 36px;
 	--tc-radius-bar-btn: calc(var(--tc-bar-btn-h) / 2);
-	/* The bar's buttons stand the cards' gap over the phone keyboard (over the view's bottom where there is none). */
-	--tc-bar-bottom: calc(var(--tc-status-room) + var(--tc-keyboard-lift) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
+	/* The bar's buttons stand the cards' gap over the view's bottom, which Obsidian shrinks above the phone keyboard once it stops. */
+	--tc-bar-stand: calc(var(--tc-status-room) + var(--tc-card-gap) - (var(--tc-bar-h) - var(--tc-bar-btn-h)) / 2);
+	/* While the keyboard slides in the view is still tall: the bar alone is lifted onto it. */
+	--tc-bar-bottom: calc(var(--tc-bar-stand) + var(--tc-keyboard-lift));
 	--tc-bar-icon: var(--tc-icon-xl);
 	--tc-bar-flag: var(--tc-icon-l);
 	--tc-stroke-bar: var(--tc-stroke-1-9);
@@ -346,7 +362,7 @@ body {
 	--tc-place-icon: var(--tc-icon-m);
 	/*
 	 * The quick bar on the desktop (board «8. Десктоп: панель у поля», QuickDesk.dc.html): no keyboard, so the same
-	 * buttons are a capsule in the wheel's track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
+	 * buttons are a capsule in a segmented track (--tc-seg, --tc-seg-pad, --tc-radius-seg) by the field, and float over the list.
 	 */
 	--tc-desk-bar-gap: 8px;
 	--tc-desk-bar-btn-w: 32px;
@@ -362,7 +378,9 @@ body {
 
 	/* Sizes: the calendar sources */
 	--tc-dot: 7px;
-	--tc-dot-top: 2px;
+	/* The dot stands as far over the calendar icon's top as it did in the old 28 px cell. */
+	--tc-dot-rise: 3px;
+	--tc-dot-top: calc((var(--tc-wheel-btn-h) - var(--tc-seg-icon)) / 2 - var(--tc-dot-rise));
 	--tc-dot-right: 6px;
 	--tc-popover-w: 268px;
 	--tc-popover-gap: var(--tc-space-12);
@@ -665,32 +683,43 @@ button.tc-btn.is-swatch.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc
 .task-calendar > .tc-fade { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tc-foot-fade-day); background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-half-ink), transparent) var(--tc-foot-fade-half), color-mix(in srgb, var(--tc-bg) var(--tc-foot-fade-deep-ink), transparent) var(--tc-foot-fade-deep), var(--tc-bg) var(--tc-foot-fade-solid)); z-index: var(--tc-layer-fade); pointer-events: none; transition: height var(--tc-duration-slide) var(--tc-ease-in-out); }
 /* On the desktop the field is typed with the wheel and the plus hidden and no bar at the bottom: the foot fade gives way, so a field near the bottom shows whole. */
 body:not(.is-mobile) .task-calendar.is-entering > .tc-fade { height: var(--tc-chrome-room); }
-/* On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over the bar shows whole. */
-body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-bottom)); }
+/*
+ * On the phone the bar over the keyboard is the foot while a task is typed: the fade stays behind it, so the field 16 px over
+ * the bar shows whole. It stands where the bar rests, never lifted with the slide: its height eases, and a lift eased away after
+ * the view has shrunk would sweep its solid foot up the screen and back.
+ */
+body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar-h) + var(--tc-bar-stand)); }
 /* The switch stands at the bottom, its window in the middle of the screen, over the lists' ground and over the timeline. */
-.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
-.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
+.task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+.tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); height: var(--tc-wheel); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > .tc-capsule { left: var(--tc-space-16); height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
+.task-calendar > .tc-capsule { left: var(--tc-space-16); }
+.tc-capsule { height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
 .tc-capsule button.tc-btn.is-icon { width: var(--tc-capsule-btn); height: 100%; border-radius: 0; color: var(--tc-text); }
 .tc-capsule button.tc-btn.is-icon.is-off { color: var(--tc-ink-dim); }
 .tc-capsule svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
 .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule { display: none; }
+/* Select tasks: a capsule like Undo + ⋯ holds the cross and how many are picked, a round button like the plus holds «⋯» for the menu; while it lasts, and while a stack is carried, Undo + ⋯ and the plus are gone. */
+.task-calendar:not(.is-selecting) > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-dragging > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule:not(.tc-select-capsule)) { display: none; }
+.task-calendar > button.tc-select-menu { right: var(--tc-space-16); }
+button.tc-select-menu svg, .tc-capsule .tc-more-open svg { stroke: none; fill: currentColor; }
+button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.tc-capsule button.tc-select-num { font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
 .tc-plus svg { stroke-width: var(--tc-stroke-plus); }
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }
 .task-calendar > .tc-plus-ring.is-hot { border-style: solid; border-color: var(--tc-accent); background: var(--tc-drop-bg); }
 .task-calendar > .tc-plus-ring.is-cross { color: var(--tc-muted); background: var(--tc-bg); }
 .task-calendar > .tc-plus-ring.is-cross.is-hot { color: var(--tc-accent); background: var(--tc-drop-bg); }
-.tc-seg-view { position: absolute; top: var(--tc-seg-pad); left: var(--tc-seg-pad); right: var(--tc-seg-pad); height: var(--tc-seg-btn-h); overflow: hidden; }
+.tc-seg-view { position: absolute; top: var(--tc-wheel-pad); left: var(--tc-wheel-pad); right: var(--tc-wheel-pad); height: var(--tc-wheel-btn-h); overflow: hidden; }
 /* The window: the pill stands still; the icons under it are a second copy of the wheel, dark on the pill. */
-.tc-seg-pill { position: absolute; top: var(--tc-seg-pad); left: calc(var(--tc-seg-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-seg-btn-h); border-radius: var(--tc-radius-seg-btn); background: var(--tc-ink-strong); overflow: hidden; }
+.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: var(--tc-seg-window); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; }
 .tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-seg-pos)) * var(--tc-seg-btn-w)); display: flex; }
 .tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-seg-pos) * var(--tc-seg-btn-w)); }
-.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-seg-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
+.tc-seg-icon { position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
 .tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
 /* Let go, the wheel rolls on to its place, and the track's ends follow. */
@@ -701,7 +730,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .tc-dot.is-shown { display: block; }
 
 /* The sources window: the switch stays over the backdrop; the panel hangs under it at the right edge. */
-.tc-seg-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
+.tc-seg-copy, .tc-control-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; }
 .tc-popover, .tc-panel, .tc-float, .tc-section-float, .tc-lifted, .tc-menu-subtasks, .tc-quick-bar.is-over, .tc-drop, .tc-menu-field { font-family: var(--tc-font-ui); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); }
 .tc-panel, .tc-popover, .tc-desc-peek { border-radius: var(--tc-radius-panel); overflow: hidden; }
 /* One window over the screen: the menus, the description's peek and the sources window share its ground and its shadow. */
@@ -972,11 +1001,22 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* Closing, the copy fades with the sheet and the panel: they go together. */
 /* A timeline card's subtasks, between its copy and the menu. */
 .tc-menu-subtasks { position: fixed; z-index: var(--tc-layer-panel); padding-top: var(--tc-card-gap); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--tc-card-gap); font-size: var(--tc-font-body); }
-.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-lifted.is-closing, .tc-seg-copy.is-closing, .tc-control-copy.is-closing, .tc-menu-subtasks.is-closing { opacity: 0; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. The shades come per colour from src/ui/priorityColors.ts; a field's row takes its field's, for the dot of the task it renames. */
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
 .tc-card.is-selected, .tc-lifted.is-selected { background: var(--tc-select-bg); }
+/* Select tasks: every list card leads with a circle, which the accent fills with a check once the task is picked; the in-progress dot gives it its place. */
+.tc-pick { display: none; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: var(--tc-pick-gap); border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; }
+.tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
+.task-calendar.is-selecting .tc-card > .tc-pick, .tc-lifted > .tc-pick { display: flex; }
+.task-calendar.is-selecting .tc-card, .tc-lifted:has(> .tc-pick) { padding-left: var(--tc-pick-pad-start); }
+.task-calendar.is-selecting .tc-card > .tc-progress-dot, .tc-lifted:has(> .tc-pick) > .tc-progress-dot { display: none; }
+:is(.tc-card, .tc-lifted).is-selected > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+:is(.tc-card, .tc-lifted).is-selected > .tc-pick svg { visibility: visible; }
+/* The menu over the count grows out of it, from its right edge; «⋯»'s grows out of the capsule. */
+.tc-panel.is-bulk.is-over.is-above { transform-origin: 100% 100%; }
+.tc-panel.is-more { width: var(--tc-popover-w); }
 .tc-card.is-lifted.is-waiting { visibility: visible; background: none; border: var(--tc-hairline) dashed var(--tc-dash); box-shadow: none; }
 .tc-card.is-waiting > * { visibility: hidden; }
 .tc-float-count { min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; margin: calc(-1 * var(--tc-float-count-out)) 0 0 calc(var(--tc-float-count-out) - var(--tc-float-count-size)); padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
@@ -1173,6 +1213,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .task-calendar > .tc-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); }
 .tc-search-results { display: flex; flex-direction: column; gap: var(--tc-card-gap); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .task-calendar > .tc-search > .tc-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
+.task-calendar.is-keyboard-up > .tc-search { --tc-search-bottom: var(--tc-bar-bottom); }
 .tc-search-results > * { flex-shrink: 0; }
 .tc-search-results > .tc-group-head:first-child { margin-top: 0; }
 .tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }

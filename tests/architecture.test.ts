@@ -4,24 +4,6 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "..");
 
-/**
- * The imports that still cross a layer, as `file → import`. Each block of the layers series strikes out its own;
- * none is added. A line that no longer occurs fails too, so the list only shrinks.
- */
-const ALLOWED: readonly string[] = [
-	"src/ui/ColumnSwitch.ts → src/settings.ts",
-	"src/ui/SettingsTab.ts → src/application/ports.ts",
-	"src/ui/SettingsTab.ts → src/settings.ts",
-	"src/ui/TaskCalendarView.ts → src/application/ports.ts",
-	"src/ui/TaskCalendarView.ts → src/settings.ts",
-	"src/ui/cardSize.ts → src/settings.ts",
-	"src/ui/listWidth.ts → src/settings.ts",
-	"src/ui/quick/QuickEntryController.ts → src/settings.ts",
-	"src/ui/screens.ts → src/settings.ts",
-	"src/ui/settingsEffect.ts → src/settings.ts",
-	"src/ui/zoomLevels.ts → src/settings.ts",
-];
-
 type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
@@ -101,12 +83,7 @@ describe("the layers", () => {
 		expect(importsOf("src/infrastructure/WorkCalendarExportScript.ts")).toContain("scriptable/work-calendar-export.js");
 	});
 
-	it("crosses no layer but where the list allows", () => {
-		expect(violations().filter((v) => !ALLOWED.includes(v))).toEqual([]);
-	});
-
-	it("allows only what still occurs, so the list only shrinks", () => {
-		const found = violations();
-		expect(ALLOWED.filter((v) => !found.includes(v))).toEqual([]);
+	it("crosses no layer", () => {
+		expect(violations()).toEqual([]);
 	});
 });

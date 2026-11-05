@@ -631,4 +631,17 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const cls of [".tc-bar-outdent", ".tc-bar-flag", ".tc-bar-repeat", ".tc-bar-place"]) expect(q(on.parent, cls).hidden).toBe(true);
 		expect(q(setup().parent, ".tc-bar-section").hidden).toBe(true);
 	});
+
+	it("owns every element it puts on the page, on the phone and on the desktop, so a tap there never closes the field", () => {
+		for (const desktop of [false, true]) {
+			const parent = document.createElement("div");
+			const other = parent.appendChild(document.createElement("span"));
+			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			bar.show({ ...STATE, section: false });
+			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
+			expect(own.length).toBeGreaterThan(0);
+			for (const node of own) expect(bar.owns(node)).toBe(true);
+			expect(bar.owns(other)).toBe(false);
+		}
+	});
 });

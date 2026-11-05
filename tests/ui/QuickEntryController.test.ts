@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
-import type { RightMode } from "../../src/settings";
+import type { RightMode } from "../../src/application/contracts";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
@@ -1260,6 +1260,14 @@ describe("QuickEntryController: the field switched to a section", () => {
 		controller.openAtEnd("left");
 		expect(sectionButton(root).closest(".tc-quick-mode")).not.toBeNull();
 		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(false);
+	});
+
+	it("a click on the desktop's section capsule switches the field and keeps it open", () => {
+		const { controller, root, field } = setUp({ sections: true, desktop: { chromeTop: 476 } });
+		controller.openAtEnd("left");
+		sectionButton(root).click();
+		expect(field()).not.toBeNull();
+		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("true");
 	});
 
 	it("on the phone it stays first in the bar over the keyboard", () => {

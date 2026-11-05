@@ -1,5 +1,6 @@
 const NS = "http://www.w3.org/2000/svg";
 const CIRCLE = "M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z";
+const DOTS = "M5 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M19 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z";
 
 export interface IconSpec {
 	/** The stroke, as the board draws it; stroke widths come from the stylesheet. Strokes that cross are drawn one over the other, each its own path. */
@@ -12,6 +13,7 @@ export interface IconSpec {
 const DRAWINGS = {
 	chevronLeft: { d: "M15 5L8 12L15 19" },
 	chevronRight: { d: "M9 5L16 12L9 19" },
+	chevronUp: { d: "M6 15l6-6 6 6" },
 	calendar: { d: "M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5" },
 	inbox: { d: "M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z" },
 	backlog: { d: "M3.5 4.5h17v4.5h-17z M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9 M10 13h4" },
@@ -26,6 +28,8 @@ const DRAWINGS = {
 	minus: { d: "M5 12h14" },
 	cross: { d: "M6 6l12 12 M18 6L6 18" },
 	undo: { d: "M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" },
+	more: { d: [], fill: DOTS },
+	select: { d: `${CIRCLE} M8 12.5l2.8 2.8L16 9.8` },
 	search: { d: "M10.5 4a6.5 6.5 0 1 1 0 13a6.5 6.5 0 1 1 0-13z M15.5 15.5L20 20" },
 	progress: { d: CIRCLE, fill: "M12 3a9 9 0 0 1 0 18z" },
 	done: { d: CIRCLE, fill: CIRCLE },

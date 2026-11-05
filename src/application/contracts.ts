@@ -2,10 +2,11 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
-import type { PriorityLevel } from "../domain/Priority";
+import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
+import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
@@ -34,7 +35,13 @@ export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
-export type { ZoomLevel } from "../settings";
+import type { SectionNames, ViewSettings } from "../settings";
+export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
+export { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, LIST_WIDTH_MAX, LIST_WIDTH_MIN, sameLevels } from "../settings";
+export type { Clock } from "./ports";
+
+/** A card's height and the gap between cards before the settings are read. */
+export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
 /** A priority level, its colours in the order the settings offer them. */
 export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
@@ -569,4 +576,100 @@ export interface WorkCalendarSetup {
 	scriptableLoader(): string;
 	/** Asks the phone for fresh work events. */
 	export(): void;
+}
+
+/** What the screen reads of the settings: its own, and the path, the names and the levels it draws. */
+export interface ScreenSettings extends ViewSettings {
+	readonly tasksFile: string;
+	readonly sections: SectionNames;
+	/** The heading over tasks outside any section. */
+	readonly ungrouped: string;
+	readonly priorities: readonly PriorityLevel[];
+}
+
+/** What the screen sets by hand, on this device only: the divider's place, the columns shown, the zoom. */
+export type ScreenState = Pick<ViewSettings, "listShare" | "rightMode" | "zoom">;
+
+/** The settings as the screen sees them, and what it sets by hand. */
+export interface ViewSettingsStore {
+	/** The same object while the settings stay the same. */
+	get(): ScreenSettings;
+	set(patch: Partial<ScreenState>): Promise<void>;
+	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
+}
+
+/** The marks of a task line the settings tab sets. */
+export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "silentSlotMarker" | "repeatMarker";
+/** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
+export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
+/** The cards' size, set by a slider. */
+export type CardField = "cardHeight" | "cardGap";
+
+/** The settings tab's fields as it shows them: no secret of Google's among them. */
+export interface SettingsForm {
+	readonly tasksFile: string;
+	readonly sections: SectionNames;
+	readonly markers: Readonly<Record<Marker, string>>;
+	readonly priorities: readonly PriorityLevel[];
+	readonly presets: readonly string[];
+	readonly ungrouped: string;
+	readonly cardHeight: number;
+	readonly cardGap: number;
+	readonly longPressMs: number;
+	readonly dayStartHour: number;
+	readonly scrollToHour: number;
+	/** The hour's heights as the field shows them: `28, 56, 112, 224`. */
+	readonly zoomLevels: string;
+	readonly staleAfterMinutes: number;
+	readonly googleClientId: string;
+	readonly refreshSeconds: number;
+	readonly workCalendarFile: string;
+	/** The work file's calendars to take, comma-separated. */
+	readonly workCalendars: string;
+}
+
+/** A field the service fills with a secret and takes typed text from: the UI never asks for the secret. */
+export interface SecretField {
+	setValue(value: string): void;
+	onChange(listener: (value: string) => void): void;
+}
+
+/**
+ * The settings tab's commands: each checks its value against the settings of this moment, and writes nothing on a bad
+ * one. A level or a preset is changed in the levels or presets as they are saved then, so one edit never undoes the one
+ * before it.
+ */
+export interface SettingsService {
+	form(): SettingsForm;
+	setTasksFile(path: string): Promise<void>;
+	setSection(key: keyof SectionNames, name: string): Promise<void>;
+	setMarker(marker: Marker, text: string): Promise<void>;
+	/** Written when the text reads as a number of zero or more. */
+	setCount(field: CountField, text: string): Promise<void>;
+	setCardSize(field: CardField, px: number): Promise<void>;
+	setDayStartHour(hour: number): Promise<void>;
+	/** Written when the text reads as the hour's heights. */
+	setZoomLevels(text: string): Promise<void>;
+	/** The prefix trimmed. */
+	renameLevel(index: number, prefix: string): Promise<void>;
+	recolourLevel(index: number, color: PriorityColor): Promise<void>;
+	removeLevel(index: number): Promise<void>;
+	/** The next `p<n>` no level has, in the first colour no level has. */
+	addLevel(): Promise<void>;
+	/** The name trimmed. */
+	renamePreset(index: number, name: string): Promise<void>;
+	removePreset(index: number): Promise<void>;
+	/** An empty preset at the end. */
+	addPreset(): Promise<void>;
+	/** The preset at `from` goes to `to`, the others keeping their order. */
+	movePreset(from: number, to: number): Promise<void>;
+	/** The name trimmed; a blank one is the default. */
+	setUngrouped(name: string): Promise<void>;
+	setGoogleClientId(id: string): Promise<void>;
+	/** The saved client secret goes into the field, and what is typed there is saved. */
+	bindClientSecret(field: SecretField): void;
+	setWorkCalendarFile(path: string): Promise<void>;
+	/** The titles between the commas, trimmed, the empty ones dropped. */
+	setWorkCalendars(text: string): Promise<void>;
 }

@@ -1,3 +1,4 @@
+import type { EntryPart } from "./EntryPart";
 import { type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
@@ -91,7 +92,7 @@ const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "
  * from it, away from the field. One panel at a time. The bar knows nothing of the entry: it shows the state it is given and
  * reports taps. A press on the bar or its panels never takes the focus from the field.
  */
-export class QuickBar {
+export class QuickBar implements EntryPart {
 	private readonly bar: HTMLElement;
 	private readonly section: HTMLButtonElement;
 	/** On the desktop the section button stands apart, in its own capsule under the field's left edge: it switches the field, it is no part of the task. */
@@ -111,19 +112,17 @@ export class QuickBar {
 	private desk: { readonly room: DOMRect; readonly side: Side } | null = null;
 	/** The field the bar last stood by: a panel opening or closing moves the desktop capsule to make room for it. */
 	private anchor: BarAnchor | null = null;
+	/** Every element the bar puts on the page on its own: what it owns, the panels inside them. */
+	private readonly parts: HTMLElement[] = [];
 	private readonly pressOutside = (e: Event) => {
-		if (!(e.target instanceof Node) || !this.bar.contains(e.target)) this.closePanel();
+		if (!(e.target instanceof Node) || !this.owns(e.target)) this.closePanel();
 	};
 
 	constructor(private readonly parent: HTMLElement, private readonly deps: QuickBarDeps) {
-		this.bar = el(parent, "div", "tc-quick-bar");
-		this.bar.hidden = true;
-		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
+		this.bar = this.part("tc-quick-bar");
 		this.section = Button.create(this.bar, { kind: "bar", label: "Section", title: "Section (⌥Tab)", icon: "section", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
-		this.mode = el(null, "div", "tc-quick-mode");
+		this.mode = this.part("tc-quick-mode");
 		parent.insertBefore(this.mode, this.bar);
-		this.mode.hidden = true;
-		for (const type of ["pointerdown", "mousedown"]) this.mode.addEventListener(type, (e) => e.preventDefault());
 		this.shifts = el(this.bar, "span", "tc-bar-shifts");
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
@@ -168,6 +167,20 @@ export class QuickBar {
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		if (section) this.closePanel();
 		else this.refreshPanel();
+	}
+
+	/** Part of the bar: any of its parts with what is inside, its panels too. */
+	owns(target: Node): boolean {
+		return this.parts.some((part) => part.contains(target));
+	}
+
+	/** An element of the bar's own on the page, hidden until shown: a press on it never takes the focus from the field. */
+	private part(cls: string): HTMLElement {
+		const part = el(this.parent, "div", cls);
+		part.hidden = true;
+		for (const type of ["pointerdown", "mousedown"]) part.addEventListener(type, (e) => e.preventDefault());
+		this.parts.push(part);
+		return part;
 	}
 
 	hide(): void {

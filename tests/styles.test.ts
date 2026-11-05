@@ -362,7 +362,12 @@ describe("styles.css keeps to its design system", () => {
 	it("lets the foot fade give way while a task is typed, so a field at the end of a column shows whole: down to the status bar on the desktop, behind the bar on the phone", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(of("body:not(.is-mobile) .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-chrome-room)");
-		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-bottom))");
+		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-stand))");
+	});
+
+	it("keeps the phone's foot fade off the keyboard's slide: only the bar rides it, so the fade's eased height never sweeps a dark band over the screen", () => {
+		expect(sheet.tokens.get("--tc-bar-stand")).not.toContain("keyboard");
+		expect(sheet.tokens.get("--tc-bar-bottom")).toBe("calc(var(--tc-bar-stand) + var(--tc-keyboard-lift))");
 	});
 
 	it("marks a task in progress with a dot in the middle of the card's left padding, level with the title, in the card's meta tint", () => {
@@ -399,10 +404,10 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
-		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule");
+		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
-		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
@@ -416,6 +421,14 @@ describe("styles.css keeps to its design system", () => {
 		const hidden = sheet.rules.find((d) => d.selector.includes(".mobile-toolbar") && d.property === "display");
 		expect(hidden?.selector).toBe("body.is-mobile:has(.task-calendar.is-entering) :is(.mobile-toolbar, .mobile-toolbar-spacer)");
 		expect(hidden?.value).toBe("none");
+	});
+
+	it("stands the phone's search bar on the keyboard while it is up, over Obsidian's navigation only while it is down", () => {
+		expect(sheet.tokens.get("--tc-search-bottom")).toBe("calc(var(--tc-bar-bottom) + var(--tc-nav-room))");
+		const up = sheet.rules.find((d) => d.property === "--tc-search-bottom");
+		expect(up?.selector).toBe(".task-calendar.is-keyboard-up > .tc-search");
+		expect(up?.value).toBe("var(--tc-bar-bottom)");
+		expect(sheet.rules.find((d) => d.selector === ".tc-search-bar" && d.property === "bottom")?.value).toBe("var(--tc-search-bottom)");
 	});
 
 	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
@@ -440,7 +453,7 @@ describe("styles.css keeps to its design system", () => {
 	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
-		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
+		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 
 	it("reads the hour only on the canvas", () => {
