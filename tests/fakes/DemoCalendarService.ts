@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, PolledScreen } from "../../src/application/contracts";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../src/application/contracts";
 import type { LocalDate } from "../../src/ui/types";
 
 const DEMO_DATE = "2026-10-30";
@@ -36,7 +36,7 @@ const WORK_EXPORTED = new Date(2026, 9, 29, 8, 2);
 export class DemoCalendarService implements CalendarService {
 	private readonly last = new Map<LocalDate, DayEvents>();
 
-	async eventsOn(date: LocalDate): Promise<DayEvents> {
+	private async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const events: CalendarEvent[] = date === DEMO_DATE
 			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source }))
 			: [];
@@ -52,12 +52,10 @@ export class DemoCalendarService implements CalendarService {
 		return result;
 	}
 
-	eventsAround(date: LocalDate): Promise<DayEvents> {
-		return this.eventsOn(date);
-	}
-
-	cached(date: LocalDate): DayEvents | null {
-		return this.last.get(date) ?? null;
+	/** Every day's events come at once, the board's day only has any; a peek at a day shown before takes them as they were. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.last.get(date) ?? null;
+		return { cached, fresh: reason === "peek" && cached ? null : () => this.eventsOn(date) };
 	}
 
 	onChange(): () => void {

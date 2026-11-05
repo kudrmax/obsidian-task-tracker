@@ -450,17 +450,27 @@ export interface DayEvents {
 	readonly statuses: readonly SourceStatus[];
 }
 
+/**
+ * Why the screen wants a day's events. `open`: the day opens on the screen, its events fetched with the days next to it,
+ * one request per source, so a swipe finds them ready; a source polled over the network that answered for the day less
+ * than the refresh interval ago is not asked again. `peek`: a day drawn in under the finger, fetched as on `open` only
+ * when nothing was ever fetched for it. `refresh`: the polling, Refresh now, a source that changed: both sources afresh
+ * for the day alone.
+ */
+export type EventsReason = "open" | "peek" | "refresh";
+
+/** A day's events as the screen gets them: the last ones at once, the fresh ones when it starts the fetch. */
+export interface DayEventsAsk {
+	/** The events last fetched for the day, staleness counted from now; null when none were. */
+	readonly cached: DayEvents | null;
+	/** Starts the fetch the reason calls for; null when the cached events are enough. */
+	readonly fresh: (() => Promise<DayEvents>) | null;
+}
+
 /** Events of both sources for one day. A failing source keeps its last good events and reports the error. */
 export interface CalendarService {
-	/** Fetches both sources afresh for the day alone: polling, Refresh now, a source that changed. */
-	eventsOn(date: LocalDate): Promise<DayEvents>;
-	/**
-	 * Another day opens: the day and the days next to it, one request per source. A source polled over the network that
-	 * answered for the day less than the refresh interval ago is not asked again: its last answer is shown.
-	 */
-	eventsAround(date: LocalDate): Promise<DayEvents>;
-	/** The last result for `date` without a fetch; null when `eventsOn` was never called for it. */
-	cached(date: LocalDate): DayEvents | null;
+	/** The day's events for `reason`: the cached ones and how to fetch them afresh. Nothing is fetched until `fresh` is called. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk;
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */

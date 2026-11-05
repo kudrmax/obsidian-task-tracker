@@ -78,10 +78,10 @@ export interface DayEventsAsk {
 interface CalendarService { events(date: LocalDate, reason: EventsReason): DayEventsAsk }
 ```
 
-- [ ] `open` — `eventsAround`, `refresh` — `eventsOn`, `peek` — при кэше `fresh: null`, иначе `eventsAround`. `eventsOn`/`eventsAround`/`cached` уходят из контракта, остаются в реализации.
-- [ ] Тесты `events`: какой запрос за какой причиной, `fresh` не стартует до вызова, `peek` с кэшем — ноль запросов.
-- [ ] `DayData`: кэш в момент выбора — `events(date, "open").cached`; запрос очереди — `events(date, around ? "open" : "refresh").fresh`. `DayPeek` — `events(date, "peek")`. Фейк `SlowCalendars` в `DayData.test.ts` отвечает через `events`, числа те же.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `open` — `eventsAround`, `refresh` — `eventsOn`, `peek` — при кэше `fresh: null`, иначе `eventsAround`. `eventsOn`/`eventsAround`/`cached` уходят из контракта, остаются в реализации.
+- [x] Тесты `events`: какой запрос за какой причиной, `fresh` не стартует до вызова, `peek` с кэшем — ноль запросов.
+- [x] `DayData`: кэш в момент выбора — `events(date, "open").cached`; запрос очереди — `events(date, around ? "open" : "refresh").fresh`. `DayPeek` — `events(date, "peek")`. Фейк `SlowCalendars` в `DayData.test.ts` отвечает через `events`, числа те же.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 3: Вид источника — `SourceStatus.kind`
 

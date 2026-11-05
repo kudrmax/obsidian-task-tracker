@@ -2,7 +2,7 @@ import { DayBoundary } from "../domain/DayBoundary";
 import { addDays } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
-import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, PolledScreen, SourceStatus, WorkCalendarSetup } from "./contracts";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen, SourceStatus, WorkCalendarSetup } from "./contracts";
 import type { EventBatch, EventSource } from "./EventSource";
 import type { Clock, EventCache, SettingsStore, Timers } from "./ports";
 
@@ -96,6 +96,14 @@ export class CalendarServiceImpl implements CalendarService {
 		private readonly work: Pick<WorkCalendarSetup, "export">,
 	) {}
 
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.cached(date);
+		if (reason === "refresh") return { cached, fresh: () => this.eventsOn(date) };
+		if (reason === "peek" && cached) return { cached, fresh: null };
+		return { cached, fresh: () => this.eventsAround(date) };
+	}
+
+	/** Fetches both sources afresh for the day alone. */
 	async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const key = this.answerKey();
 		const window = this.windowOf(date);
@@ -106,6 +114,10 @@ export class CalendarServiceImpl implements CalendarService {
 		return day;
 	}
 
+	/**
+	 * The day and the days next to it, one request per source. A source polled over the network that answered for the
+	 * day less than the refresh interval ago is not asked again: its last answer is shown.
+	 */
 	async eventsAround(date: LocalDate): Promise<DayEvents> {
 		const key = this.answerKey();
 		const dates = [-AROUND_DAYS, 0, AROUND_DAYS].map((n) => addDays(date, n));
@@ -136,7 +148,7 @@ export class CalendarServiceImpl implements CalendarService {
 		return opened;
 	}
 
-	/** Staleness counts from now: a day cached yesterday shows its orange dot today. */
+	/** The last result for `date` without a fetch; null when none was kept. Staleness counts from now: a day cached yesterday shows its orange dot today. */
 	cached(date: LocalDate): DayEvents | null {
 		const day = this.lastDay.get(date);
 		if (!day) return null;

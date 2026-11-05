@@ -522,3 +522,41 @@ describe("CalendarServiceImpl.keepFresh", () => {
 		expect(t.timers.delays).toEqual([]);
 	});
 });
+
+describe("CalendarServiceImpl.events", () => {
+	const DAY = "2026-10-30";
+
+	function counted() {
+		const google = new FakeSource("google", [event("google", "g", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+		const svc = service([google]);
+		return { google, svc };
+	}
+
+	it("asks nothing until the fresh events are asked for", () => {
+		const { google, svc } = counted();
+		for (const reason of ["open", "peek", "refresh"] as const) svc.events(DAY, reason);
+		expect(google.calls).toEqual([]);
+	});
+
+	it("opens a day with the days next to it, and refreshes the day alone", async () => {
+		const { google, svc } = counted();
+		await svc.events(DAY, "open").fresh!();
+		expect(google.calls).toEqual([{ start: new Date(2026, 9, 29), end: new Date(2026, 10, 1) }]);
+		google.calls = [];
+		await svc.events(DAY, "refresh").fresh!();
+		expect(google.calls).toEqual([{ start: new Date(2026, 9, 30), end: new Date(2026, 9, 31) }]);
+	});
+
+	it("gives the cached events at once, and a peek at a day fetched before asks nothing", async () => {
+		const { google, svc } = counted();
+		const first = svc.events(DAY, "peek");
+		expect(first.cached).toBeNull();
+		await first.fresh!();
+		google.calls = [];
+		const again = svc.events(DAY, "peek");
+		expect(again.fresh).toBeNull();
+		expect(again.cached!.events.map((e) => e.id)).toEqual(["g"]);
+		expect(svc.events(DAY, "open").cached).toEqual(svc.cached(DAY));
+		expect(google.calls).toEqual([]);
+	});
+});

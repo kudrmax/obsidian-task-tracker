@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
 import { DayData, type DayPart } from "../../src/ui/DayData";
 import type { LocalDate } from "../../src/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -25,6 +25,13 @@ class SlowCalendars implements CalendarService {
 	private readonly waiting: (() => void)[] = [];
 	readonly last = new Map<LocalDate, DayEvents>();
 
+	/** `asked`: the day alone was fetched; `around`: the day with its neighbours. */
+	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
+		const cached = this.last.get(date) ?? null;
+		if (reason === "peek" && cached) return { cached, fresh: null };
+		return { cached, fresh: () => (reason === "refresh" ? this.eventsOn(date) : this.eventsAround(date)) };
+	}
+
 	eventsOn(date: LocalDate): Promise<DayEvents> {
 		this.asked.push(date);
 		return this.fetch(date);
@@ -43,10 +50,6 @@ class SlowCalendars implements CalendarService {
 				resolve(day);
 			}),
 		);
-	}
-
-	cached(date: LocalDate): DayEvents | null {
-		return this.last.get(date) ?? null;
 	}
 
 	onChange(): () => void {
