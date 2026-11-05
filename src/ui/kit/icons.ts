@@ -26,6 +26,7 @@ const DRAWINGS = {
 	minus: { d: "M5 12h14" },
 	cross: { d: "M6 6l12 12 M18 6L6 18" },
 	undo: { d: "M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11" },
+	search: { d: "M10.5 4a6.5 6.5 0 1 1 0 13a6.5 6.5 0 1 1 0-13z M15.5 15.5L20 20" },
 	progress: { d: CIRCLE, fill: "M12 3a9 9 0 0 1 0 18z" },
 	done: { d: CIRCLE, fill: CIRCLE },
 	wontdo: { d: `${CIRCLE} M8 12h8` },

@@ -3,6 +3,7 @@ import { type CalendarEvent, type CalendarService, type DayBoundary, type DayCha
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
+import { BottomCapsule } from "./BottomCapsule";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
 import { CalendarPolling } from "./CalendarPolling";
@@ -41,7 +42,6 @@ import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
-import { UndoButton } from "./UndoButton";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
@@ -388,8 +388,8 @@ export class TaskCalendarView extends ItemView {
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
 		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
-		const undo = new UndoButton(root, this.deps.undo, () => void this.undoStep("undo"));
-		this.unsubscribe.push(() => undo.destroy());
+		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch() });
+		this.unsubscribe.push(() => capsule.destroy());
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
@@ -646,6 +646,8 @@ export class TaskCalendarView extends ItemView {
 		this.contentEl.classList.toggle("is-lists", mode === "soon");
 		this.contentEl.classList.toggle("is-inbox", mode === "inbox");
 	}
+
+	private openSearch(): void {}
 
 	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
 	private deselectUnless(target: EventTarget | null): void {

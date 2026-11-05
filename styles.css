@@ -173,6 +173,8 @@ body {
 	/* The plus: a round button at the right edge, on the switch's row. */
 	--tc-plus-size: 44px;
 	--tc-plus-icon: var(--tc-icon-xl);
+	--tc-capsule-btn: 40px;
+	--tc-radius-capsule: calc(var(--tc-plus-size) / 2);
 	--tc-stroke-plus: var(--tc-stroke-2-6);
 	/* The ring that holds the plus's place while it is carried: its plus is thinner. */
 	--tc-stroke-ring: var(--tc-stroke-2-2);
@@ -640,7 +642,7 @@ button.tc-btn:not(:disabled):active { opacity: var(--tc-pressed); }
 }
 /* The keyboard's focus (desktop only, and in the settings): a ring outside the button; inside it in the windows that clip their content. */
 body:not(.is-mobile) button.tc-btn:focus-visible, body:not(.is-mobile) .tc-seg:focus-visible, button.tc-btn.is-swatch:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
-body:not(.is-mobile) :is(.tc-panel, .tc-popover, .tc-picker) button.tc-btn:focus-visible { outline-offset: calc(-1 * var(--tc-focus-offset)); }
+body:not(.is-mobile) :is(.tc-panel, .tc-popover, .tc-picker, .tc-capsule) button.tc-btn:focus-visible { outline-offset: calc(-1 * var(--tc-focus-offset)); }
 /*
  * The button's kinds. Obsidian pads a button on the iPad and greys a tapped one on the phone at (0,2,1): a kind's padding,
  * ground and shadow weigh that much at least, and so does every purpose rule after them that sets its own.
@@ -692,13 +694,14 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > .tc-seg { position: absolute; left: calc(50% - var(--tc-seg-window) / 2 - var(--tc-seg-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
 .tc-seg { position: relative; width: calc(var(--tc-seg-window) + (var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-seg-pad)); height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; border-radius: var(--tc-radius-seg); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; }
 /* The plus stands at the right edge, centred on the switch's row, over the lists and the timeline. */
-.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
+.task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 .task-calendar > button.tc-plus.is-hidden { display: none; }
-.task-calendar > button.tc-undo { left: var(--tc-space-16); }
-.task-calendar > button.tc-undo.is-off { color: var(--tc-ink-dim); }
-.task-calendar > button.tc-plus.is-hidden ~ button.tc-undo { display: none; }
-.tc-undo svg { stroke-width: var(--tc-stroke-ring); }
+.task-calendar > .tc-capsule { left: var(--tc-space-16); height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
+.tc-capsule button.tc-btn.is-icon { width: var(--tc-capsule-btn); height: 100%; border-radius: 0; color: var(--tc-text); }
+.tc-capsule button.tc-btn.is-icon.is-off { color: var(--tc-ink-dim); }
+.tc-capsule svg { width: var(--tc-plus-icon); height: var(--tc-plus-icon); stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.task-calendar > button.tc-plus.is-hidden ~ .tc-capsule { display: none; }
 .tc-plus svg { stroke-width: var(--tc-stroke-plus); }
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }
