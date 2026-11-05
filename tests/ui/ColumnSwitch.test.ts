@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RightMode } from "../../src/settings";
+import type { Place } from "../../src/ui/screens";
 import { ColumnSwitch } from "../../src/ui/ColumnSwitch";
 import { GestureArbiter } from "../../src/ui/gestures";
 
@@ -17,7 +18,7 @@ function pointer(type: string, clientX: number, time = 0): PointerEvent {
 const CREEP = Array.from({ length: 7 }, (_, i) => ({ dx: i + 1, t: (i + 1) * 20 }));
 
 /** happy-dom lays nothing out: the icon's width and the pill's place are what the stylesheet would give. */
-function setUp(initial: RightMode, dot = false, arbiter = new GestureArbiter()) {
+function setUp(initial: Place, dot = false, arbiter = new GestureArbiter()) {
 	let mode = initial;
 	const changes: RightMode[] = [];
 	let sources = 0;
@@ -232,5 +233,14 @@ describe("ColumnSwitch", () => {
 	it("puts the dot of a stale source on the calendar, under the window too", () => {
 		expect(setUp("soon", true).control.el.querySelectorAll(".tc-dot.is-shown").length).toBe(2);
 		expect(setUp("soon").control.el.querySelector(".tc-dot.is-shown")).toBeNull();
+	});
+
+	it("stands a step left of Inbox at Done, which it has no icon for, and turns on to Inbox and Soon from there", () => {
+		const done = setUp("done");
+		expect(done.wheel()).toBe(-1);
+		done.control.show("done");
+		expect(done.changes).toEqual([]);
+		done.tap(1);
+		expect(done.changes).toEqual(["inbox"]);
 	});
 });

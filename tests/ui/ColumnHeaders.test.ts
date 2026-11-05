@@ -13,6 +13,7 @@ function setUp() {
 		onStep: (days) => steps.push(days),
 		onToday: () => todays++,
 		inboxName: () => names.inbox,
+		doneName: () => "Done",
 		soonName: () => names.soon,
 	});
 	const text = (selector: string) => root.querySelector(`${selector} .tc-head-title`)!.textContent;

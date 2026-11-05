@@ -4,10 +4,11 @@ import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { PLACES } from "./screens";
+import { type Place, placeIndex, PLACES } from "./screens";
 
 export interface ColumnSwitchOptions {
-	value(): RightMode;
+	/** Where the screen stands; Done, which the wheel has no icon for, puts the window a step left of Inbox. */
+	value(): Place;
 	onChange(mode: RightMode): void;
 	/** A calendar source is stale or failing: the orange dot on the calendar icon. */
 	dot(): boolean;
@@ -24,7 +25,7 @@ const COLUMNS: readonly SwitchColumn[] = ["inbox", "soon", "now", "calendar"];
 
 const DRAG = "switch";
 
-const placeOf = (mode: RightMode): number => PLACES.indexOf(mode);
+const placeOf = (place: Place): number => placeIndex(place);
 
 /** The place a tap on a column turns to: none when the window shows it, else the nearest that does. */
 function placeShowing(column: number, from: number): number | null {
@@ -182,12 +183,12 @@ export class ColumnSwitch {
 	}
 
 	/** The wheel rolls from where it stands to its place; a place other than the one shown moves the screen with it. */
-	show(mode: RightMode): void {
+	show(place: Place): void {
 		window.clearTimeout(this.settling);
 		this.el.classList.add("is-settling");
 		this.settling = window.setTimeout(() => this.el.classList.remove("is-settling"), tokenMs(this.el, DURATION.slide));
-		this.turn(placeOf(mode));
-		if (mode !== this.opts.value()) this.opts.onChange(mode);
+		this.turn(placeOf(place));
+		if (place !== this.opts.value() && place !== "done") this.opts.onChange(place);
 	}
 
 	/** The wheel turns with the screen while a finger draws the screen: `position` a share of the way from one place to the next. */
@@ -203,7 +204,7 @@ export class ColumnSwitch {
 	 */
 	private turn(position: number): void {
 		this.el.style.setProperty(PROPERTY.wheel, String(position));
-		this.el.style.setProperty(PROPERTY.before, String(Math.min(1, position)));
+		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, position))));
 		this.el.style.setProperty(PROPERTY.after, String(Math.min(1, PLACES.length - 1 - position)));
 		this.icons.forEach((cell, i) => {
 			const out = Math.max(0, Math.abs((i % COLUMNS.length) - position - 0.5) - 0.5);

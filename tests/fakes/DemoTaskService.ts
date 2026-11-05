@@ -1,7 +1,9 @@
-import { type DayView, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
+import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
+import { hitIn } from "../../src/domain/search";
 import { DEFAULT_SETTINGS, type PriorityLevel, usableLevels } from "../../src/settings";
 import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
 
@@ -181,6 +183,27 @@ export class DemoTaskService implements TaskService {
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
 		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ name: null, empty: false }] : []);
 		return { inbox: groups("inbox"), backlog: groups("backlog"), now: groups("now"), soon: groups("soon") };
+	}
+
+	async doneView(): Promise<readonly TaskItem[]> {
+		return this.items("done");
+	}
+
+	/** The board's tasks have no descriptions: the search looks at titles. */
+	async search(query: string): Promise<readonly SearchHit[]> {
+		const sections: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
+		return sections.flatMap((section) =>
+			this.items(section).flatMap((item) => {
+				const hit = hitIn(item.text, query);
+				if (!hit) return [];
+				const title = [
+					{ text: hit.before, match: false },
+					{ text: hit.match, match: true },
+					{ text: hit.after, match: false },
+				].filter((part) => part.text !== "");
+				return [{ item, title, description: null }];
+			}),
+		);
 	}
 
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */
@@ -401,6 +424,10 @@ export class DemoTaskService implements TaskService {
 		return null;
 	}
 	async applyAll(): Promise<void> {}
+
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		return runDrop(this, tasks, to, day);
+	}
 
 	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
 		const t = this.take(key);

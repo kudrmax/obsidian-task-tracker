@@ -4,7 +4,10 @@ import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { backlogList, type Column, columnGroups, columnList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
+import { hitIn, snippetIn, type TextHit } from "../domain/search";
+import { plainText } from "../domain/TaskText";
+import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
+import { descriptionMarkdown } from "../domain/description";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
@@ -12,6 +15,8 @@ import {
 	TasksFileMissingError,
 	type DayColumn,
 	type DayView,
+	type DroppedTask,
+	type DropTo,
 	type EndList,
 	type GroupedList,
 	type GroupName,
@@ -21,14 +26,17 @@ import {
 	type Placement,
 	type RepeatRule,
 	type SectionPlace,
+	type SearchHit,
 	type TaskChange,
 	type TaskDraft,
 	type TaskItem,
 	type TaskKey,
 	type TaskService,
 	type TaskStep,
+	type TitlePart,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
+import { runDrop } from "./drops";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
@@ -62,6 +70,18 @@ function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
 
 /** The other tasks a change names: the task to stand before, or the parent and the subtask to stand before. */
+/** The sections a search walks, in the order its results stand. */
+const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
+
+function titleParts(hit: TextHit): readonly TitlePart[] {
+	const parts: TitlePart[] = [
+		{ text: hit.before, match: false },
+		{ text: hit.match, match: true },
+		{ text: hit.after, match: false },
+	];
+	return parts.filter((part) => part.text !== "");
+}
+
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
 	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
 	if (change.kind === "nest") return [change.parent, change.before];
@@ -138,6 +158,27 @@ export class TaskServiceImpl implements TaskService {
 				.filter((g) => g.heading || g.entries.length > 0)
 				.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
 		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(list)])) as Record<GroupedList, readonly ListSection[]>;
+	}
+
+	async doneView(): Promise<readonly TaskItem[]> {
+		const { doc, today } = await this.readNormalized();
+		return doc.tasks("done").map(this.itemOf(today));
+	}
+
+	async search(query: string): Promise<readonly SearchHit[]> {
+		if (query.trim() === "") return [];
+		const { doc, today } = await this.readNormalized();
+		const item = this.itemOf(today);
+		const hits: SearchHit[] = [];
+		const visit = (entry: TaskEntry): void => {
+			const title = hitIn(plainText(entry.task.text), query);
+			const markdown = descriptionMarkdown(entry);
+			const description = markdown === null ? null : snippetIn(markdown, query);
+			if (title || description) hits.push({ item: item(entry), title: title ? titleParts(title) : [], description });
+			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
+		};
+		for (const section of SEARCH_ORDER) for (const entry of doc.tasks(section)) visit(entry);
+		return hits;
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -354,6 +395,10 @@ export class TaskServiceImpl implements TaskService {
 			}
 			return tags.untag(current);
 		});
+	}
+
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		return runDrop(this, tasks, to, day);
 	}
 
 	/** One step of `applyAll`; `first` and `second` are the tasks its change names, in the order `refsOf` gives them. */

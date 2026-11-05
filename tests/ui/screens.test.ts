@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stepScreen } from "../../src/ui/screens";
+import { placeIndex, stepScreen } from "../../src/ui/screens";
 
 const TODAY = "2026-11-01";
 
@@ -30,5 +30,12 @@ describe("stepScreen", () => {
 	it("walks a past day further back, since the lists stand before today only", () => {
 		expect(stepScreen({ mode: "calendar", date: "2026-10-31" }, -1, TODAY)).toEqual({ mode: "calendar", date: "2026-10-30" });
 		expect(stepScreen({ mode: "calendar", date: "2026-10-31" }, 1, TODAY)).toEqual({ mode: "calendar", date: TODAY });
+	});
+
+	it("goes from Done on to Inbox, and nothing leads back to Done", () => {
+		expect(placeIndex("done")).toBe(-1);
+		expect(stepScreen({ mode: "done", date: TODAY }, 1, TODAY)).toEqual({ mode: "inbox", date: TODAY });
+		expect(stepScreen({ mode: "done", date: TODAY }, -1, TODAY)).toBeNull();
+		expect(stepScreen({ mode: "inbox", date: TODAY }, -1, TODAY)).toBeNull();
 	});
 });

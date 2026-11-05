@@ -348,7 +348,7 @@ describe("styles.css keeps to its design system", () => {
 
 	it("runs a list to the bottom under its foot and the fade, its end room a row rather than padding, the lists fading as the day does", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
-		expect(of(".tc-left, .tc-soon, .tc-inbox")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
+		expect(of(".tc-left, .tc-soon, .tc-inbox, .tc-done")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
 		const list = of(".tc-list");
 		expect([list.get("flex"), list.get("min-height")]).toEqual(["1 1 0", "0"]);
 		expect([...list.keys()].filter((property) => property.startsWith("padding"))).toEqual([]);
@@ -399,7 +399,7 @@ describe("styles.css keeps to its design system", () => {
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
 		const seg = of(".task-calendar > .tc-seg");
-		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo");
+		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
 		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
@@ -440,7 +440,7 @@ describe("styles.css keeps to its design system", () => {
 	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
-		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > button.tc-undo").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
+		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 
 	it("reads the hour only on the canvas", () => {
