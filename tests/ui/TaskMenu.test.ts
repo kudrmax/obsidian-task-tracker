@@ -150,6 +150,14 @@ describe("the menu", () => {
 		expect(actions.postpone).not.toHaveBeenCalled();
 	});
 
+	it("offers Remove due date in the picker only when the item says its date may go", () => {
+		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false } }));
+		const tiles = panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile");
+		tiles[tiles.length - 1].click();
+		expect(panel().querySelector(".tc-picker-grid")).not.toBeNull();
+		expect(row("Remove due date")).toBeUndefined();
+	});
+
 	describe("Section", () => {
 		const sections: SectionChoice = { names: ["Morning", "Evening", "Работа"], current: "Morning", ungrouped: "No section" };
 

@@ -40,6 +40,8 @@ export interface QuickBarDeps {
 	/** The levels that mark tasks, as the panel offers them. */
 	levels(): readonly PriorityLevel[];
 	today(): LocalDate;
+	/** The placement of a task for a day picked: Now for today, else that day. */
+	placementOfDay(day: LocalDate): Placement;
 	onIndent(delta: 1 | -1): void;
 	/** A level's prefix, or null to take the level off. */
 	onPriority(prefix: string | null): void;
@@ -357,7 +359,7 @@ export class QuickBar {
 			today,
 			selected: chosen,
 			onPick: (day) => {
-				const placement: Placement = day === today ? { kind: "now" } : { kind: "date", date: day };
+				const placement = this.deps.placementOfDay(day);
 				this.picked(() => (current && samePlacement(current, placement) ? undefined : this.deps.onPlace(placement)))();
 			},
 		});

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Placement, RepeatRule } from "../../src/application/contracts";
 import type { PriorityLevel } from "../../src/application/contracts";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
+import { placementOfDay } from "../../src/domain/Days";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -14,7 +15,10 @@ const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true,
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
-function setup(state: Partial<QuickBarState> = {}, desktop = false) {
+const TODAY = "2026-11-01";
+const dayPlacement = (day: string): Placement => placementOfDay(day, TODAY);
+
+function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf: (day: string) => Placement = dayPlacement) {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const indents: (1 | -1)[] = [];
@@ -24,7 +28,8 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false) {
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 		levels: () => LEVELS,
-		today: () => "2026-11-01",
+		today: () => TODAY,
+		placementOfDay: placementOf,
 		onIndent: (delta) => indents.push(delta),
 		onPriority: (prefix) => priorities.push(prefix),
 		onPlace: (placement) => places.push(placement),
@@ -46,7 +51,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -150,7 +155,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => "2026-11-01", onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -209,6 +214,14 @@ describe("the place panel", () => {
 		days.find((d) => d.textContent === "5" && !d.classList.contains("is-other"))!.click();
 		expect(places).toEqual([{ kind: "date", date: "2026-11-05" }]);
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
+	});
+
+	it("reports the placement the service gives for the day picked", () => {
+		const { parent, places } = setup({ place: { kind: "inbox" } }, false, () => ({ kind: "soon" }));
+		q(parent, ".tc-bar-place").click();
+		tiles(parent)[4].click();
+		q(parent, ".tc-day.is-today").click();
+		expect(places).toEqual([{ kind: "soon" }]);
 	});
 
 	it("reports today as Now", () => {

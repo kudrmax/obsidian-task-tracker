@@ -1,7 +1,6 @@
 import { type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
-import { type DayColumn, dayColumn } from "../dayColumn";
 import { LAYOUT } from "../design";
 import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
@@ -28,7 +27,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -185,6 +184,7 @@ export class QuickEntryController {
 			desktop: () => deps.desktop(),
 			levels: () => deps.tasks.priorityLevels(),
 			today: () => deps.today(),
+			placementOfDay: (day) => deps.tasks.placementOfDay(day),
 			onIndent: (delta) => this.entry.indent(delta),
 			onPriority: (prefix) => this.choosePriority(prefix),
 			onPlace: (placement) => void this.moveTo(placement),
@@ -353,13 +353,12 @@ export class QuickEntryController {
 		this.bar.hide();
 	}
 
-	/** Where a task written in `column` goes, for the day the column shows: Now for today or a past day, Soon for a later one. */
+	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
 	placeOf(column: ListColumn, result: PlaceResult): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
 		if (column !== "left") return { kind: "list", list: column, group, before };
-		const { list, date } = this.shownDay();
-		return date === null ? { kind: "list", list, group, before } : { kind: "list", list, group, before, date };
+		return { kind: "day", date: this.deps.day(), group, before };
 	}
 
 	private open(spot: EntrySpot, renaming?: TaskItem): void {
@@ -376,11 +375,6 @@ export class QuickEntryController {
 
 	private cards(column: ListColumn): readonly ListCard[] {
 		return this.deps.list(column)?.listCards ?? [];
-	}
-
-	/** What the day column stands for on the day it shows. */
-	private shownDay(): DayColumn {
-		return dayColumn(this.deps.day(), this.deps.today());
 	}
 
 	private find(key: TaskKey): { readonly column: ListColumn; readonly index: number } | null {
@@ -624,9 +618,7 @@ export class QuickEntryController {
 	}
 
 	private columnPlacement(column: ListColumn): Placement {
-		if (column !== "left") return { kind: column };
-		const { date } = this.shownDay();
-		return date === null ? { kind: "now" } : { kind: "date", date };
+		return column === "left" ? this.deps.tasks.placementOfDay(this.deps.day()) : { kind: column };
 	}
 
 	/**
@@ -636,7 +628,7 @@ export class QuickEntryController {
 	 */
 	private async moveTo(placement: Placement): Promise<void> {
 		const column: ListColumn = placement.kind === "now" || placement.kind === "date" ? "left" : placement.kind;
-		const date = placement.kind === "now" ? this.deps.today() : placement.kind === "date" ? placement.date : null;
+		const date = this.deps.tasks.dayOfPlacement(placement);
 		this.moved = true;
 		this.entry.moveTo(this.endOf(column));
 		this.turning = true;

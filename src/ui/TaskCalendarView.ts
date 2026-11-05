@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, DayBoundary, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -32,7 +32,6 @@ import { DescriptionSheet } from "./sheet/DescriptionSheet";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, stepFor } from "./zoomLevels";
-import { dayColumn } from "./dayColumn";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -104,8 +103,6 @@ export interface ViewDeps {
  */
 export class TaskCalendarView extends ItemView {
 	private selectedDate: LocalDate;
-	/** The day the last minute's tick saw as today: the next day's first tick releases the slots and reads the tasks anew. */
-	private shownToday: LocalDate;
 	/** A minute passed while the view was hidden or a gesture held it: it ticks once as soon as it can. */
 	private missedTick = false;
 	private headers: ColumnHeaders | null = null;
@@ -166,7 +163,6 @@ export class TaskCalendarView extends ItemView {
 		super(leaf);
 		this.seen = this.settings;
 		this.selectedDate = this.today();
-		this.shownToday = this.selectedDate;
 		this.data = new DayData({ tasks: deps.tasks, calendars: deps.calendars, date: () => this.selectedDate, onUpdate: (part) => this.parts.request(part) });
 		this.polling = new CalendarPolling({
 			refresh: () => this.data.calendars(),
@@ -406,6 +402,7 @@ export class TaskCalendarView extends ItemView {
 			this.deps.tasks.onChange(() => void this.data.tasks()),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
 			this.deps.settings.onChange(() => this.onSettings()),
+			this.deps.days.onDayChange((change) => this.onDayChange(change), () => this.canTick()),
 		);
 		this.registerDomEvent(window, "focus", () => this.polling.wake());
 		this.registerDomEvent(document, "visibilitychange", () => {
@@ -427,38 +424,45 @@ export class TaskCalendarView extends ItemView {
 			this.catchUpTick();
 		});
 		this.registerEvent(this.app.workspace.on("css-change", () => this.parts.request("events")));
-		this.registerInterval(window.setInterval(() => void this.tick(), MINUTE_MS));
+		this.registerInterval(window.setInterval(() => this.tick(), MINUTE_MS));
 		this.polling.start();
 		this.render();
 		await this.data.load();
 	}
 
-	/**
-	 * Once a minute: the now line moves, nothing else is drawn. A day that ended releases its slots (the file is written
-	 * only when a rule fires) and the lists, which depend on today, are drawn and read anew. A hidden view, or one a gesture holds, waits.
-	 */
-	private async tick(): Promise<void> {
-		if (document.hidden || !this.contentEl.isShown() || this.arbiter.busy) {
+	/** Once a minute the now line moves, nothing else is drawn. A hidden view, or one a gesture holds, waits. */
+	private tick(): void {
+		if (!this.canTick()) {
 			this.missedTick = true;
 			return;
 		}
 		this.missedTick = false;
-		const today = this.today();
-		if (today === this.shownToday) {
-			this.timeline?.tickNow();
-			return;
-		}
-		this.shownToday = today;
-		try {
-			await this.deps.tasks.normalize();
-		} finally {
-			this.parts.request("frame", "tasks");
-			void this.data.tasks();
-		}
+		this.timeline?.tickNow();
 	}
 
+	private canTick(): boolean {
+		return !(document.hidden || !this.contentEl.isShown() || this.arbiter.busy);
+	}
+
+	/** The minute missed while hidden or held is ticked once, the day's check with it. */
 	private catchUpTick(): void {
-		if (this.missedTick) void this.tick();
+		if (this.missedTick) this.tick();
+		this.deps.days.catchUp();
+	}
+
+	/**
+	 * A day that ended has released its slots (the file is written only when a rule fires): the lists, which depend on
+	 * today, are drawn and read anew. Another hour for the day's start moves today and the timeline: the screen opens today afresh.
+	 */
+	private onDayChange(change: DayChange): void {
+		if (change === "passed") {
+			this.parts.request("frame", "tasks");
+			void this.data.tasks();
+			return;
+		}
+		this.scrolledFor = null;
+		this.parts.request("frame", "tasks", "events");
+		void this.afterEntry(() => this.select(this.today()));
 	}
 
 	override async onClose(): Promise<void> {
@@ -487,31 +491,24 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private today(): LocalDate {
-		return this.boundary().dayOf(this.deps.clock.now());
+		return this.deps.days.today();
 	}
 
 	private boundary(): DayBoundary {
-		return new DayBoundary(this.settings.dayStartHour);
+		return this.deps.days.boundary();
 	}
 
 	/**
-	 * Another card size restacks the timeline. Another file, its names or marks, or other levels: the headers and the lists
-	 * follow the names at once, and the tasks are read anew. Another hour for the day's start moves today and the timeline:
-	 * the screen opens today afresh. Anything else redraws nothing.
+	 * Another card size restacks the timeline. Another name, path or level the screen draws: the headers and the lists
+	 * follow at once (the task service reads the tasks anew itself). Anything else redraws nothing here: the day service
+	 * tells of another start hour.
 	 */
 	private onSettings(): void {
 		const effect = settingsEffect(this.seen, this.settings);
 		this.seen = this.settings;
 		if (effect.restack) this.timeline?.layoutTasks();
-		if (effect.reload) {
-			this.parts.request("frame", "tasks");
-			void this.data.tasks();
-		}
+		if (effect.drawn) this.parts.request("frame", "tasks");
 		if (effect.frame) this.parts.request("frame");
-		if (!effect.newDay) return;
-		this.scrolledFor = null;
-		this.parts.request("frame", "tasks", "events");
-		void this.afterEntry(() => this.select(this.today()));
 	}
 
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
@@ -577,7 +574,7 @@ export class TaskCalendarView extends ItemView {
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
-			grouped: (date) => dayColumn(date, this.today()).sections,
+			grouped: (date) => this.deps.tasks.dayColumn(date).sections,
 			ungroupedName: () => this.settings.groups.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
@@ -818,7 +815,7 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
 		if (column !== "left") return { list: column, date: null };
-		const { list, date, sections } = dayColumn(this.selectedDate, this.today());
+		const { list, date, sections } = this.deps.tasks.dayColumn(this.selectedDate);
 		return sections ? { list, date } : null;
 	}
 

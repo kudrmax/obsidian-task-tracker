@@ -7,7 +7,7 @@ import { showWhole } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
-import { canRemoveDue, moveTiles } from "./quickMoves";
+import { moveTiles } from "./quickMoves";
 import { askGroup, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
@@ -441,7 +441,7 @@ export class TaskMenu extends LiftedMenu {
 			today,
 			selected: item.dueDate,
 			onPick: (date) => this.pick(() => actions.postpone(date))(),
-			onRemove: canRemoveDue(today, item.dueDate) ? this.pick(() => actions.removeDue()) : undefined,
+			onRemove: item.can.removeDue ? this.pick(() => actions.removeDue()) : undefined,
 		});
 		this.place();
 	}

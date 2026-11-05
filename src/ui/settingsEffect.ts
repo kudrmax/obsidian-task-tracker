@@ -4,12 +4,10 @@ import { sameLevels, type TaskCalendarSettings } from "../settings";
 export interface SettingsEffect {
 	/** The cards on the timeline stack anew: their height or the gap between them changed. */
 	readonly restack: boolean;
-	/** The tasks are read anew: the file, its names or its marks changed. */
-	readonly reload: boolean;
-	/** Today moved: the day starts at another hour. */
-	readonly newDay: boolean;
 	/** The columns shown or their width changed: another view of the calendar set them. */
 	readonly frame: boolean;
+	/** What the screen draws straight from the settings changed: a list's name, No section's, the tasks file's path, the levels. */
+	readonly drawn: boolean;
 }
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -17,18 +15,11 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 export function settingsEffect(before: TaskCalendarSettings, after: TaskCalendarSettings): SettingsEffect {
 	return {
 		restack: before.cardHeight !== after.cardHeight || before.cardGap !== after.cardGap,
-		reload:
+		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
+		drawn:
 			before.tasksFile !== after.tasksFile ||
 			!same(before.sections, after.sections) ||
-			before.dueDateMarker !== after.dueDateMarker ||
-			before.slotMarker !== after.slotMarker ||
-			before.alarmSlotMarker !== after.alarmSlotMarker ||
-			before.silentSlotMarker !== after.silentSlotMarker ||
-			before.repeatMarker !== after.repeatMarker ||
 			before.groups.ungrouped !== after.groups.ungrouped ||
-			!same(before.groups.presets, after.groups.presets) ||
 			!sameLevels(before.priorities, after.priorities),
-		newDay: before.dayStartHour !== after.dayStartHour,
-		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
 	};
 }

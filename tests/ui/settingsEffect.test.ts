@@ -4,7 +4,7 @@ import { settingsEffect } from "../../src/ui/settingsEffect";
 
 const before = DEFAULT_SETTINGS;
 const after = (patch: Partial<TaskCalendarSettings>) => settingsEffect(before, { ...before, ...patch });
-const NOTHING = { restack: false, reload: false, newDay: false, frame: false };
+const NOTHING = { restack: false, frame: false, drawn: false };
 
 describe("settingsEffect", () => {
 	it("restacks the timeline for another card height", () => {
@@ -15,44 +15,28 @@ describe("settingsEffect", () => {
 		expect(after({ cardGap: 8 })).toEqual({ ...NOTHING, restack: true });
 	});
 
-	it("reloads the tasks for another tasks file", () => {
-		expect(after({ tasksFile: "Other.md" })).toEqual({ ...NOTHING, reload: true });
+	it("redraws what it draws for another tasks file: the missing file's path", () => {
+		expect(after({ tasksFile: "Other.md" })).toEqual({ ...NOTHING, drawn: true });
 	});
 
-	it("reloads the tasks for any section renamed", () => {
+	it("redraws what it draws for any section renamed: the headers", () => {
 		for (const name of ["inbox", "now", "soon", "backlog", "done"] as const) {
-			expect(after({ sections: { ...before.sections, [name]: "Renamed" } })).toEqual({ ...NOTHING, reload: true });
+			expect(after({ sections: { ...before.sections, [name]: "Renamed" } })).toEqual({ ...NOTHING, drawn: true });
 		}
 	});
 
-	it("reloads the tasks for another repeat marker", () => {
-		expect(after({ repeatMarker: "↻" })).toEqual({ ...NOTHING, reload: true });
+	it("redraws what it draws for another name of No section", () => {
+		expect(after({ groups: { ...before.groups, ungrouped: "Loose" } })).toEqual({ ...NOTHING, drawn: true });
 	});
 
-	it("reloads the tasks for another due date marker", () => {
-		expect(after({ dueDateMarker: "🗓" })).toEqual({ ...NOTHING, reload: true });
+	it("redraws what it draws for other priority levels: the quick bar's", () => {
+		expect(after({ priorities: [{ prefix: "p9", color: "blue" }] })).toEqual({ ...NOTHING, drawn: true });
 	});
 
-	it("reloads the tasks for another slot marker", () => {
-		expect(after({ slotMarker: "🕐" })).toEqual({ ...NOTHING, reload: true });
-		expect(after({ alarmSlotMarker: "🔔" })).toEqual({ ...NOTHING, reload: true });
-		expect(after({ silentSlotMarker: "🤫" })).toEqual({ ...NOTHING, reload: true });
-	});
-
-	it("reloads the tasks for another name of No section", () => {
-		expect(after({ groups: { ...before.groups, ungrouped: "Loose" } })).toEqual({ ...NOTHING, reload: true });
-	});
-
-	it("reloads the tasks for other preset sections", () => {
-		expect(after({ groups: { ...before.groups, presets: ["Night"] } })).toEqual({ ...NOTHING, reload: true });
-	});
-
-	it("reloads the tasks for other priority levels", () => {
-		expect(after({ priorities: [{ prefix: "p9", color: "blue" }] })).toEqual({ ...NOTHING, reload: true });
-	});
-
-	it("opens a new day for another hour the day starts at", () => {
-		expect(after({ dayStartHour: 3 })).toEqual({ ...NOTHING, newDay: true });
+	it("nothing for the marks and the presets, which only read the tasks anew, nor for the hour the day starts at: the services tell", () => {
+		for (const patch of [{ repeatMarker: "↻" }, { dueDateMarker: "🗓" }, { slotMarker: "🕐" }, { alarmSlotMarker: "🔔" }, { silentSlotMarker: "🤫" }, { groups: { ...before.groups, presets: ["Night"] } }, { dayStartHour: 3 }]) {
+			expect(after(patch)).toEqual(NOTHING);
+		}
 	});
 
 	it("redraws the frame for the divider or the column shown, set by another view", () => {

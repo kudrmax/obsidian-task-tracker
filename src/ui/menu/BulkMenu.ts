@@ -9,7 +9,7 @@ import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup,
 import { datePage } from "./DatePage";
 import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
-import { canRemoveDue, type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
+import { type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
 import type { LevelTile, SectionChoice } from "./TaskMenu";
 
 /** "3 tasks". */
@@ -44,8 +44,8 @@ export function bulkMoveTiles(items: readonly TaskItem[], today: LocalDate): rea
 const MOVE_ORDER: readonly MoveTileId[] = ["today", "tomorrow", "pick"];
 
 /** Remove due date, when some task has one to take off. */
-export function bulkCanRemoveDue(items: readonly TaskItem[], today: LocalDate): boolean {
-	return items.some((item) => canRemoveDue(today, item.dueDate));
+export function bulkCanRemoveDue(items: readonly TaskItem[]): boolean {
+	return items.some((item) => item.can.removeDue);
 }
 
 export interface BulkActions {
@@ -167,7 +167,7 @@ export class BulkMenu {
 				today,
 				selected: shared,
 				onPick: (date) => this.pick(() => actions.postpone(date))(),
-				onRemove: bulkCanRemoveDue(items, today) ? this.pick(() => actions.removeDue()) : undefined,
+				onRemove: bulkCanRemoveDue(items) ? this.pick(() => actions.removeDue()) : undefined,
 			}),
 		);
 	}
