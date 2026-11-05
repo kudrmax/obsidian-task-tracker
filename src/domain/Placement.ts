@@ -17,6 +17,8 @@ export interface TaskDraft {
 	readonly placement: Placement;
 	/** A level's prefix, or none. */
 	readonly priority: string | null;
+	/** The labels' names; undefined leaves the task's own (a new task has none). */
+	readonly labels?: readonly string[];
 	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off; undefined leaves the task's own (a new task has none). */
 	readonly repeat?: RepeatRule | null;
 }

@@ -119,6 +119,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
+			labelLevels: () => [],
 			createInPlace: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;

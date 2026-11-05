@@ -68,9 +68,9 @@ export function createInSoon(doc: TaskDocument, text: string): TaskDocument {
 	return doc.insert("soon", "end", newTask(text));
 }
 
-function createInSlot(doc: TaskDocument, slot: Slot, text: string, priority: string | null, today: LocalDate, boundary: DayBoundary): TaskDocument {
+function createInSlot(doc: TaskDocument, slot: Slot, text: string, marks: Marks, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
-	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, priority }));
+	return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, ...marks }));
 }
 
 export function createAtTime(
@@ -81,7 +81,7 @@ export function createAtTime(
 	text: string,
 	boundary = DayBoundary.MIDNIGHT,
 ): TaskDocument {
-	return createInSlot(doc, { date, start, end: null }, text, null, today, boundary);
+	return createInSlot(doc, { date, start, end: null }, text, marksOf(null, []), today, boundary);
 }
 
 export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatus): TaskDocument {
@@ -186,7 +186,7 @@ function subtaskDueDate(placement: Placement, inherited: Placement, today: Local
 
 export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
 	const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
-	return doc.insertUnder(parent, newTask(draft.text, { dueDate, priority: draft.priority }));
+	return doc.insertUnder(parent, newTask(draft.text, { dueDate, ...marksOf(draft.priority, draft.labels ?? []) }));
 }
 
 function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
@@ -241,12 +241,11 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 /** Inbox is what is not sorted yet, Backlog what waits for some day: a task placed in either loses its slot as well as its due date. */
 export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
-	const { priority } = draft;
 	const unsorted = isUndated(section);
-	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), priority }), draft, today, boundary));
+	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marksOf(draft.priority, draft.labels ?? []) }), draft, today, boundary));
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, text: draft.text.trim(), priority: exclusivePriority(entry.task, priority), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const changed = { ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -256,12 +255,19 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);
 	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), priority: exclusivePriority(entry.task, draft.priority), dueDate }, draft, today, boundary));
+	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), dueDate }, draft, today, boundary));
 }
 
-/** The priority an edit gives a task: none while it has labels. */
-function exclusivePriority(task: Task, priority: string | null): string | null {
-	return task.labels.length > 0 ? null : priority;
+type Marks = Pick<Task, "priority" | "labels">;
+
+/** A priority or labels, never both: the labels win, a task that has them keeps no priority. */
+function marksOf(priority: string | null, labels: readonly string[]): Marks {
+	return { priority: labels.length > 0 ? null : priority, labels };
+}
+
+/** What an edit marks a task with: the draft's labels, else the task's own, and the draft's priority while there are none. */
+function draftMarks(task: Task, draft: TaskDraft): Marks {
+	return marksOf(draft.priority, draft.labels ?? task.labels);
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */
@@ -339,17 +345,18 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot };
 
-/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. */
-export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null): TaskDocument {
+/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority or `labels`, not both. */
+export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = []): TaskDocument {
+	const marks = marksOf(priority, labels);
 	switch (place.kind) {
 		case "subtask":
-			return doc.insertUnder(place.parent, withRepeat(newTask(text, { priority }), repeat, today, boundary), place.before);
+			return doc.insertUnder(place.parent, withRepeat(newTask(text, marks), repeat, today, boundary), place.before);
 		case "slot":
-			return createInSlot(doc, place.slot, text, priority, today, boundary);
+			return createInSlot(doc, place.slot, text, marks, today, boundary);
 		case "list": {
 			const { list, group, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;
-			const task = newTask(text, { dueDate, priority });
+			const task = newTask(text, { dueDate, ...marks });
 			return doc.insert(list, positionIn(doc, list, group, before), withRepeat(task, repeat, today, boundary));
 		}
 	}

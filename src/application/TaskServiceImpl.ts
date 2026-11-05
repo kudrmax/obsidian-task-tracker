@@ -237,9 +237,9 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
 		if (this.isBlank(text)) return null;
-		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat));
+		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels));
 		const created = change?.after.insertedSince(change.before);
 		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}

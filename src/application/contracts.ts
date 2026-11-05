@@ -287,7 +287,7 @@ export interface TaskService {
 	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
