@@ -7,6 +7,7 @@ import { systemClock, type Clock, type SettingsStore } from "./application/ports
 import { createServices, type Services, type ServicesHost, vaultEntryLog } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
+import { clearPriorityColors, showPriorityColors } from "./ui/priorityColors";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
@@ -29,9 +30,13 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			},
 			`${this.pluginDir}/data.json`,
 		);
-		this.pluginSettings.onChange(() => showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap }));
+		this.pluginSettings.onChange(() => {
+			showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap });
+			showPriorityColors(this.get().priorities);
+		});
 		await this.pluginSettings.load();
 		this.register(clearCardSize);
+		this.register(clearPriorityColors);
 		this.registerEvent(this.watchSettingsFile());
 		this.registerDomEvent(document, "visibilitychange", () => {
 			if (!document.hidden) void this.pluginSettings.reload();

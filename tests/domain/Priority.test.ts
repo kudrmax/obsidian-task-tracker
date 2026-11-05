@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBlankTitle, type PriorityLevel, priorityOfText, sameLevels, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
+import { hexColor, isBlankTitle, isPresetColor, type PriorityLevel, priorityOfText, sameLevels, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -59,5 +59,22 @@ describe("a priority prefix in a text", () => {
 		expect(withPriority("p1  x", null, PREFIXES)).toBe("x");
 		expect(withPriority("x", "p1", PREFIXES)).toBe("p1 x");
 		expect(withPriority("p3 x", null, PREFIXES)).toBe("p3 x");
+	});
+});
+
+describe("a colour's code", () => {
+	it("reads six hex digits with or without the #, in any case", () => {
+		expect(hexColor("ff6a00")).toBe("#FF6A00");
+		expect(hexColor("#Ff6A00")).toBe("#FF6A00");
+		expect(hexColor("  #ff6a00 ")).toBe("#FF6A00");
+	});
+
+	it("reads nothing else", () => {
+		for (const text of ["", "#", "ff6a0", "ff6a000", "#gg6a00", "##ff6a00", "red"]) expect(hexColor(text), text).toBeNull();
+	});
+
+	it("tells a preset from a code", () => {
+		expect(isPresetColor("teal")).toBe(true);
+		expect(isPresetColor("#FF6A00")).toBe(false);
 	});
 });

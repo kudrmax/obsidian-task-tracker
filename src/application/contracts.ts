@@ -28,7 +28,7 @@ export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
 export type { ZoomLevel } from "../settings";
 /** A priority level, its colours in the order the settings offer them. */
-export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel } from "../domain/Priority";
+export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**

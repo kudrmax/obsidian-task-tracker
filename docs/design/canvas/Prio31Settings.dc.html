@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Настройки приоритетов: свой цвет</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{s.bg}}; color: {{s.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; inset: 0; padding: 64px 16px 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;">
+<h1 style="margin: 0 0 16px; font-size: 17px; font-weight: 600; text-align: center;">Task Calendar</h1>
+<span style="padding: 0 16px; font-size: 13px; color: #8E8E93;">PRIORITIES</span>
+<div style="border-radius: 12px; overflow: hidden; background: {{s.group}};">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<div style="box-sizing: border-box; padding: 12px 10px 12px 14px; border-bottom: 0.5px solid {{s.sep}}; display: flex; flex-direction: column; gap: 10px;">
+<div style="height: 32px; display: flex; align-items: center; gap: 12px;">
+<span style="width: 56px; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px; border-radius: 8px; background: {{s.field}}; display: flex; align-items: center; font-size: 16px;">{{l.prefix}}</span>
+<div style="flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between;">
+<sc-for list="{{l.swatches}}" as="w" hint-placeholder-count="6">
+<span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 13px; background: {{w.fill}}; box-shadow: {{w.ring}};"></span>
+</sc-for>
+<button aria-label="Свой цвет" style="width: 26px; height: 26px; flex-shrink: 0; border: 0; padding: 0; border-radius: 13px; background: {{l.well.bg}}; box-shadow: {{l.well.ring}}; display: flex; align-items: center; justify-content: center;"><span style="width: 16px; height: 16px; border-radius: 8px; background: {{l.well.inner}}; box-shadow: {{l.well.innerRing}};"></span></button>
+</div>
+<button aria-label="Delete level" style="width: 32px; height: 32px; flex-shrink: 0; border: 0; padding: 0; background: transparent; color: #8E8E93; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13"></path></svg></button>
+</div>
+<div style="height: 32px; display: flex; align-items: center; gap: 12px;">
+<sc-if value="{{showCard}}">
+<div style="flex: 1; min-width: 0; height: 32px; box-sizing: border-box; border-radius: 16px; background: {{l.card}}; position: relative; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<span style="position: absolute; left: 5px; top: 14px; width: 4px; height: 4px; border-radius: 2px; background: {{l.meta}};"></span>
+<span style="flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden;">Позвонить в банк</span>
+<span style="flex-shrink: 0; font-size: 12px; font-weight: 600; color: {{l.meta}};">10:00</span>
+</div>
+</sc-if>
+<sc-if value="{{showGap}}">
+<span style="width: 56px; flex-shrink: 0;"></span>
+</sc-if>
+<label style="width: 104px; height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px; border-radius: 8px; background: {{s.field}}; display: flex; align-items: center; gap: 2px; font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 15px;"><span style="color: #8E8E93;">#</span><span>{{l.hex}}</span></label>
+</div>
+</div>
+</sc-for>
+<button style="width: 100%; height: 46px; box-sizing: border-box; padding: 0 14px; border: 0; background: transparent; color: {{s.accent}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg>Add priority</button>
+</div>
+<span style="padding: 0 16px; font-size: 13px; line-height: 18px; color: #8E8E93;">A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code.</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"look":{"editor":"enum","default":"tint","options":["tint","card","mix"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const light = this.props.theme === 'light';
+    const look = this.props.look ?? 'tint';
+    const s = light
+      ? { bg: '#F2F2F7', group: '#FFFFFF', text: '#000000', field: '#F2F2F7', sep: '#D1D1D6', accent: '#8A5CF5', halo: '#FFFFFF',
+          card: '#F2F2F7', alpha: 0.16, pole: [0, 0, 0],
+          colors: ['#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#30B0C7', '#007AFF'] }
+      : { bg: '#000000', group: '#1C1C1E', text: '#FFFFFF', field: '#2C2C2E', sep: '#48484A', accent: '#9580FF', halo: '#1C1C1E',
+          card: '#1C1C1E', alpha: 0.26, pole: [255, 255, 255],
+          colors: ['#FF453A', '#FF9F0A', '#FFD60A', '#30D158', '#40C8E0', '#0A84FF'] };
+    const ch = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const hx = (c) => '#' + c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+    const mix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
+    const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+    const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const grey = ch('#8E8E93');
+    const card = ch(s.card);
+    const target = contrast(grey, card);
+    const tone = (hex) => {
+      const ink = ch(hex);
+      const fill = mix(card, ink, s.alpha);
+      const half = mix(ink, grey, 0.5);
+      let lo = 0, hi = 1;
+      for (let k = 0; k < 30; k++) { const t = (lo + hi) / 2; if (contrast(mix(half, s.pole, t), fill) < target) lo = t; else hi = t; }
+      return { ink: hex, fill: hx(fill), meta: hx(mix(half, s.pole, hi)) };
+    };
+    const custom = light ? '#C2185B' : '#FF5FA2';
+    const rows = [{ prefix: 'p1', pick: 0 }, { prefix: 'p2', pick: 1 }, { prefix: 'p3', pick: -1 }];
+    const levels = rows.map((r) => {
+      const hex = r.pick >= 0 ? s.colors[r.pick] : custom;
+      const t = tone(hex);
+      const swatches = s.colors.map((c, i) => {
+        const w = tone(c);
+        const on = i === r.pick;
+        const inset = look === 'tint' ? 'inset 0 0 0 1.5px ' + w.ink : '';
+        const outer = on ? '0 0 0 2px ' + s.halo + ', 0 0 0 4px ' + w.ink : '';
+        return { fill: look === 'card' ? w.ink : w.fill, ring: [inset, outer].filter(Boolean).join(', ') || 'none' };
+      });
+      const rainbow = 'conic-gradient(#FF453A, #FFD60A, #30D158, #40C8E0, #0A84FF, #BF5AF2, #FF453A)';
+      const wellOn = r.pick < 0;
+      const well = {
+        bg: rainbow,
+        ring: wellOn ? '0 0 0 2px ' + s.halo + ', 0 0 0 4px ' + t.ink : 'none',
+        inner: wellOn ? (look === 'card' ? t.ink : t.fill) : s.group,
+        innerRing: wellOn && look === 'tint' ? 'inset 0 0 0 1.5px ' + t.ink : 'none'
+      };
+      return { prefix: r.prefix, swatches, well, hex: hex.slice(1), card: t.fill, meta: t.meta };
+    });
+    return { s, levels, showCard: look !== 'tint', showGap: look === 'tint' };
+  }
+}
+</script>
+</body>
+</html>
