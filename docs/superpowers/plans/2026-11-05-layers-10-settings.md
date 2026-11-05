@@ -26,7 +26,7 @@
 ## Global Constraints
 
 - Рефакторинг: ни вида, ни записи в файл, ни `data.json`, ни поведения не меняется. Каждое поле принимает и отвергает то же и пишет в тот же момент (синхронно в обработчике, тем же патчем от настроек этого момента). `docs/plugin/` не меняется.
-- Сначала характеризующие тесты против текущего кода: настоящая вкладка (`TaskCalendarSettingsTab`) над поддельным модулем `obsidian` (`tests/fakes/obsidian.ts`, алиас в `vitest.config.ts`: у пакета `obsidian` нет кода, вкладку иначе не загрузить) и настоящим `PluginSettings` над поддельным хранилищем; проверяется `data.json` байт в байт и localStorage после каждого действия. Потом перенос; ожидания не меняются, меняется только сборка вкладки в тесте.
+- Сначала характеризующие тесты против текущего кода: настоящая вкладка (`TaskCalendarSettingsTab`) над поддельным модулем `obsidian` (`tests/fakes/obsidian.ts`, алиас в `vitest.config.mts`: у пакета `obsidian` нет кода, вкладку иначе не загрузить) и настоящим `PluginSettings` над поддельным хранилищем; проверяется `data.json` байт в байт и localStorage после каждого действия. Потом перенос; ожидания не меняются, меняется только сборка вкладки в тесте.
 - Перенос правила = перенос его тестов: `tests/ui/priorityLevels.test.ts`, `presetEdits.test.ts`, `zoomLevelsText.test.ts` → `tests/application/SettingsServiceImpl.test.ts`, `zoomLevelsText.test.ts`.
 - Контракты только добавляют: типы и константы выше, `ScreenSettings`, `ScreenState`, `ViewSettingsStore`, `SettingsForm`, `SecretField`, `SettingsService`, `Clock`, `sameLevels`, `DEFAULT_CARD_SIZE`. `PluginSettings` и порт `SettingsStore` не меняются.
 - `ALLOWED` в страже — ровно оставшиеся нарушения; в конце пуст и удалён, проверка «ни одного нарушения» остаётся.
@@ -39,7 +39,7 @@
 
 **Files:**
 - Create: `tests/fakes/obsidian.ts`, `tests/ui/SettingsTab.test.ts`
-- Modify: `vitest.config.ts`
+- Modify: `vitest.config.mts`
 
 - [x] Поддельный `obsidian`: `Setting` (имя, описание, заголовок; `addText`, `addSlider`, `addDropdown`, `addButton`, `addToggle`), `TextComponent` (`input` → `onChange`), `ExtraButtonComponent`, `PluginSettingTab`, `Plugin`, `Notice`; методы Obsidian на `HTMLElement` (`createDiv`, `createEl`, `empty`, `addClass`, `toggleClass`, `hasClass`).
 - [x] Вкладка над `PluginSettings`; каждое поле: верное значение — что в `data.json` (строкой, байт в байт) и что в localStorage; неверное — ничего не записано. Поля: File path; пять разделов (пустое имя пишется как есть); пять маркеров; уровни — переименование (обрезка, без перерисовки), добавление (`p<n>`, первый свободный цвет), удаление, цвет кружком, кодом (верный, неверный, готовый оттенок темы → готовый цвет), выбор цвета; заготовки — переименование (обрезка), добавление пустой, удаление, перестановка; No section (пусто/пробелы → `No section`); высота и зазор; Long press delay, Scroll to hour, Stale after, Refresh interval (`""`, `" "`, `-1`, `abc`, `Infinity` — ничего; `0`, `" 12 "` — пишется); Day starts at; Zoom levels (верный, старый с шагом, неверный, `0`); Client id; Client secret (поле показывает сохранённый, набранное пишется, `refreshToken` остаётся); Work calendar File path и Calendars (запятые, пробелы, пустые).
