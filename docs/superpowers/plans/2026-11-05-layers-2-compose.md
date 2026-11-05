@@ -18,7 +18,7 @@
 - **`ViewDeps.exportWorkCalendar`** остаётся как есть (вид его уже получает функцией); в корне он идёт через тот же `WorkCalendarSetup.export`.
 - **Лог ввода в демо-сборке:** `DemoTaskCalendarPlugin` строит `ViewDeps` сам, а лог сейчас пишется и в демо (на телефоне). Чтобы поведение не менялось, демо берёт тот же лог из корня (`vaultEntryLog(app.vault.adapter)` в `compose.ts`).
 - **Тесты правила «показанные календари»** в UI нет: правило покрывается новыми тестами `tests/application/GoogleAccountService.test.ts` (ожидания — как считает вкладка сейчас).
-- **Тесты телефона:** `tests/phone/PhoneReminders.test.ts` — тесты правила, они переезжают вместе с классом в `tests/application/PhoneReminderService.test.ts` (меняются только импорт и имя класса, ожидания те же). `tests/phone/build.test.ts` остаётся и требует свежего `phone/task-calendar-phone.js`: бандл пересобирается и коммитится (меняются порядок модулей и имя класса внутри, `TaskCalendarPhone` и его ответы — нет). Для `snoozedSlot` — свой тест в `tests/domain`.
+- **Тесты телефона:** `tests/phone/PhoneReminders.test.ts` — тесты правила, они переезжают вместе с классом в `tests/application/PhoneReminderService.test.ts` (меняются только импорт и имя класса, ожидания те же). `tests/phone/build.test.ts` остаётся и требует свежего `phone/task-calendar-phone.js`: бандл пересобирается и коммитится (меняются порядок модулей и имя класса внутри, `TaskCalendarPhone` и его ответы — нет). Для `snoozedSlot` — свой `describe` в `tests/domain/operations.test.ts`.
 - **Нарушения сейчас** — 40 строк. Блок вычёркивает 19: `application/services.ts` → `obsidian` и 11 модулей инфраструктуры (12 строк), `phone/PhoneReminders.ts` → домен (7 строк). Остаётся 21: UI → `settings.ts` и UI → `application/ports.ts` (блок 10).
 
 ## Global Constraints
@@ -69,8 +69,7 @@
 
 **Files:**
 - Move (`git mv`): `src/phone/PhoneReminders.ts` → `src/application/PhoneReminderService.ts`, `tests/phone/PhoneReminders.test.ts` → `tests/application/PhoneReminderService.test.ts`
-- Create: `tests/domain/snoozedSlot.test.ts`
-- Modify: `src/domain/operations.ts` (`snoozedSlot`), `src/phone/main.ts`, `phone/task-calendar-phone.js`, `tests/architecture.test.ts`
+- Modify: `src/domain/operations.ts` (`snoozedSlot`), `tests/domain/operations.test.ts`, `src/phone/main.ts`, `phone/task-calendar-phone.js`, `tests/architecture.test.ts`
 
 **Interfaces:** `export function snoozedSlot(slot: Slot, now: Date, minutes: number): Slot` — слот начинается через `minutes` от `now` (дата — день этого момента), длина та же, открытый остаётся открытым.
 

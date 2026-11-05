@@ -925,6 +925,8 @@
 
   // src/domain/operations.ts
   var SLOT_STEP = 5;
+  var HOUR_MINUTES2 = 60;
+  var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
     return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
   }
@@ -967,6 +969,11 @@
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
     const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
     return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
+  }
+  function snoozedSlot(slot, now, minutes) {
+    const at = new Date(now.getTime() + minutes * MINUTE_MS);
+    const start = at.getHours() * HOUR_MINUTES2 + at.getMinutes();
+    return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
   }
   function toList(doc, entry, date, today) {
     return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
@@ -1321,16 +1328,16 @@
     }
   }
 
-  // src/phone/PhoneReminders.ts
+  // src/application/PhoneReminderService.ts
   var DAY_MINUTES3 = 1440;
-  var HOUR_MINUTES2 = 60;
+  var HOUR_MINUTES3 = 60;
   function clockOf(date, minutes) {
     const [year, month, day] = date.split("-").map(Number);
     return new Date(year, month - 1, day, 0, minutes);
   }
   var StaleTask = class extends Error {
   };
-  var PhoneReminders = class {
+  var PhoneReminderService = class {
     constructor(settingsJson) {
       this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
       this.boundary = boundaryOf(this.settings);
@@ -1347,7 +1354,7 @@
       return this.act(text, id, now, (doc, entry) => setReminder(doc, entry, "none"));
     }
     snooze(text, id, minutes, now) {
-      return this.act(text, id, now, (doc, entry, today, boundary) => setSlot(doc, entry, this.from(now, minutes, entry.task.slot), today, boundary));
+      return this.act(text, id, now, (doc, entry, today, boundary) => setSlot(doc, entry, snoozedSlot(entry.task.slot, now, minutes), today, boundary));
     }
     act(text, id, now, op) {
       const onTask = (doc, today, boundary) => {
@@ -1364,12 +1371,6 @@
       }
       return { changed: false, reason: "stale" };
     }
-    /** `slot` moved to start `minutes` from now, as long as it was. */
-    from(now, minutes, slot) {
-      const at = new Date(now.getTime() + minutes * 6e4);
-      const start = at.getHours() * HOUR_MINUTES2 + at.getMinutes();
-      return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
-    }
     reminder(entry, slot) {
       const start = minutesToHHMM(slot.start);
       const nextDay = addDays(this.boundary.dayOfSlot(slot), 1);
@@ -1380,7 +1381,7 @@
         kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
         date: slot.date,
         start: clockOf(slot.date, slot.start),
-        dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES2)
+        dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES3)
       };
     }
   };
@@ -1391,9 +1392,9 @@
     return { ...rest, startMs: start.getTime(), dayEndMs: dayEnd.getTime() };
   }
   globalThis.TaskCalendarPhone = {
-    reminders: (text, settingsJson, nowMs) => new PhoneReminders(settingsJson).reminders(text, new Date(nowMs)).map(wire),
-    complete: (text, settingsJson, id, nowMs) => new PhoneReminders(settingsJson).complete(text, id, new Date(nowMs)),
-    silence: (text, settingsJson, id, nowMs) => new PhoneReminders(settingsJson).silence(text, id, new Date(nowMs)),
-    snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminders(settingsJson).snooze(text, id, minutes, new Date(nowMs))
+    reminders: (text, settingsJson, nowMs) => new PhoneReminderService(settingsJson).reminders(text, new Date(nowMs)).map(wire),
+    complete: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).complete(text, id, new Date(nowMs)),
+    silence: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).silence(text, id, new Date(nowMs)),
+    snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs))
   };
 })();

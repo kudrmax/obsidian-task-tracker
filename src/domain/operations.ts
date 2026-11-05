@@ -1,4 +1,5 @@
 import { DayBoundary } from "./DayBoundary";
+import { localDateOf } from "./LocalDate";
 import type { GroupSettings } from "./Groups";
 import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
@@ -7,6 +8,8 @@ import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type S
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const SLOT_STEP = 5;
+const HOUR_MINUTES = 60;
+const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
 	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch };
@@ -182,6 +185,13 @@ function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today:
 
 export function clearSlot(doc: TaskDocument, entry: TaskEntry): TaskDocument {
 	return patch(doc, entry, { slot: null });
+}
+
+/** `slot` moved to start `minutes` from `now`, as long as it was: a reminder put off on the phone. */
+export function snoozedSlot(slot: Slot, now: Date, minutes: number): Slot {
+	const at = new Date(now.getTime() + minutes * MINUTE_MS);
+	const start = at.getHours() * HOUR_MINUTES + at.getMinutes();
+	return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
 }
 
 function toList(doc: TaskDocument, entry: TaskEntry, date: LocalDate, today: LocalDate): TaskDocument {

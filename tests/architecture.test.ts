@@ -9,13 +9,6 @@ const ROOT = resolve(__dirname, "..");
  * none is added. A line that no longer occurs fails too, so the list only shrinks.
  */
 const ALLOWED: readonly string[] = [
-	"src/phone/PhoneReminders.ts → src/domain/DayBoundary.ts",
-	"src/phone/PhoneReminders.ts → src/domain/LocalDate.ts",
-	"src/phone/PhoneReminders.ts → src/domain/Task.ts",
-	"src/phone/PhoneReminders.ts → src/domain/TaskDocument.ts",
-	"src/phone/PhoneReminders.ts → src/domain/TaskText.ts",
-	"src/phone/PhoneReminders.ts → src/domain/operations.ts",
-	"src/phone/PhoneReminders.ts → src/domain/queries.ts",
 	"src/ui/BulkController.ts → src/settings.ts",
 	"src/ui/ColumnSwitch.ts → src/settings.ts",
 	"src/ui/ScreenTracks.ts → src/settings.ts",

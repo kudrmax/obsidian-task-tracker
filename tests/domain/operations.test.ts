@@ -28,6 +28,7 @@ import {
 	setSlot,
 	setRepeat,
 	setStatus,
+	snoozedSlot,
 	stop,
 } from "../../src/domain/operations";
 import { DayBoundary } from "../../src/domain/DayBoundary";
@@ -718,3 +719,20 @@ describe("reminder kind through operations", () => {
 	});
 });
 
+
+describe("snoozedSlot", () => {
+	const now = new Date(2026, 10, 4, 10, 7);
+
+	it("starts the slot the minutes from now and keeps its length", () => {
+		expect(snoozedSlot({ date: "2026-11-04", start: 9 * 60, end: 10 * 60 }, now, 30)).toEqual({ date: "2026-11-04", start: 10 * 60 + 37, end: 11 * 60 + 37 });
+	});
+
+	it("keeps a slot with no end open", () => {
+		expect(snoozedSlot({ date: "2026-11-04", start: 9 * 60, end: null }, now, 15)).toEqual({ date: "2026-11-04", start: 10 * 60 + 22, end: null });
+	});
+
+	it("lands on the next day past midnight", () => {
+		const late = new Date(2026, 10, 4, 23, 50);
+		expect(snoozedSlot({ date: "2026-11-04", start: 23 * 60 + 30, end: 24 * 60 + 30 }, late, 60)).toEqual({ date: "2026-11-05", start: 50, end: 110 });
+	});
+});
