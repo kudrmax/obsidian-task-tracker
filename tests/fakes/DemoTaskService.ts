@@ -1,4 +1,4 @@
-import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
@@ -156,6 +156,12 @@ export class DemoTaskService implements TaskService {
 
 	private changed(): void {
 		for (const listener of this.listeners) listener();
+	}
+
+	async screen(date: LocalDate): Promise<ScreenView> {
+		await this.normalize();
+		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
+		return { day, soon, inbox, backlog, done, sections, offer };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {

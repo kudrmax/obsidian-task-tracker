@@ -1174,3 +1174,36 @@ describe("search", () => {
 		expect((await svc.doneView()).map((i) => i.text)).toEqual(["Оплатить госпошлину за паспорт"]);
 	});
 });
+
+describe("TaskServiceImpl.screen", () => {
+	const FILE = "## Inbox\n\n- [ ] I\n\n## Now\n\n- [x] Finished\n- [ ] A\n\n## Soon\n\n- [ ] S\n- [ ] Later 📅 2026-11-03\n\n## Backlog\n\n- [ ] B\n\n## Done\n";
+
+	it("normalizes the file first, then reads what the screen shows as each read alone does", async () => {
+		const { store, svc } = setup(FILE);
+		const screen = await svc.screen(D);
+		expect(store.writes).toBe(1);
+		expect(screen).toEqual({
+			day: await svc.dayView(D),
+			soon: await svc.soonWithoutDateView(),
+			inbox: await svc.inboxView(),
+			backlog: await svc.backlogView(),
+			done: await svc.doneView(),
+			sections: await svc.listSections(),
+			offer: await svc.sectionOffer(D),
+		});
+		expect(screen.done.map((t) => t.text)).toEqual(["Finished"]);
+		expect(screen.day.list.map((t) => t.text)).toEqual(["Later"]);
+	});
+
+	it("reads the file as often as the normalization and the seven reads did", async () => {
+		const { store, svc } = setup(FILE);
+		const read = vi.spyOn(store, "read");
+		await svc.screen(T);
+		expect(read).toHaveBeenCalledTimes(8);
+	});
+
+	it("rejects without a file", async () => {
+		const { svc } = setup(null);
+		await expect(svc.screen(T)).rejects.toBeInstanceOf(TasksFileMissingError);
+	});
+});

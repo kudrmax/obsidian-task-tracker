@@ -151,12 +151,9 @@ export class DayData {
 	}
 
 	private async readTasks(): Promise<TasksState> {
-		const tasks = this.deps.tasks;
 		const date = this.deps.date();
 		try {
-			await tasks.normalize();
-			const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([tasks.dayView(date), tasks.soonWithoutDateView(), tasks.inboxView(), tasks.backlogView(), tasks.doneView(), tasks.listSections(), tasks.sectionOffer(date)]);
-			return { date, day, soon, inbox, backlog, done, sections, offer, missing: false };
+			return { date, ...(await this.deps.tasks.screen(date)), missing: false };
 		} catch (error) {
 			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
 			throw error;

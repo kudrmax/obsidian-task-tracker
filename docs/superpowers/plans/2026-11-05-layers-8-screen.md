@@ -107,9 +107,9 @@ export interface ScreenView {
 screen(date: LocalDate): Promise<ScreenView>;
 ```
 
-- [ ] Тест сервиса: нормализует до чтения (запись правила видна в `day`), то же, что семь чтений по отдельности, тот же счёт `store.read`; без файла — `TasksFileMissingError`.
-- [ ] `DayData.readTasks` — `screen(date)`; тесты `DayData` подменяют `screen` вместо `normalize`/`sectionOffer`.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] Тест сервиса: нормализует до чтения (запись правила видна в `day`), то же, что семь чтений по отдельности, тот же счёт `store.read`; без файла — `TasksFileMissingError`.
+- [x] `DayData.readTasks` — `screen(date)`; тесты `DayData` подменяют `screen` вместо `normalize`/`sectionOffer`.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 5: Сборки, проверка в тестовом Obsidian, ход работы
 

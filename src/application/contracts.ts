@@ -196,6 +196,17 @@ export interface DroppedTask {
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
 
+/** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
+export interface ScreenView {
+	readonly day: DayView;
+	readonly soon: readonly TaskItem[];
+	readonly inbox: readonly TaskItem[];
+	readonly backlog: readonly TaskItem[];
+	readonly done: readonly TaskItem[];
+	readonly sections: Readonly<Record<GroupedList, readonly ListSection[]>>;
+	readonly offer: SectionOffer;
+}
+
 /**
  * Everything the UI does with tasks. Every mutating call reads the file afresh, applies one operation, writes once,
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
@@ -211,6 +222,8 @@ export interface TaskService {
 	/** `text` with `prefix` first in place of the one it had; null takes it off. */
 	withPriority(text: string, prefix: string | null): string;
 
+	/** Everything the screen shows of the tasks for `date`, the file normalized first. Rejects with TasksFileMissingError. */
+	screen(date: LocalDate): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;

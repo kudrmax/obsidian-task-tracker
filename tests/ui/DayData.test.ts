@@ -88,13 +88,13 @@ describe("DayData", () => {
 	it("reads the sections the menus offer with the lists, for the day shown", async () => {
 		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const asked: LocalDate[] = [];
-		const offer = tasks.sectionOffer.bind(tasks);
-		tasks.sectionOffer = (date) => (asked.push(date), offer(date));
+		const screen = tasks.screen.bind(tasks);
+		tasks.screen = (date) => (asked.push(date), screen(date));
 		const { data, setDate } = setup(tasks);
 		setDate(TOMORROW);
 		await data.tasks();
 		expect(asked).toEqual([TOMORROW]);
-		expect(data.offer).toEqual(await offer(TOMORROW));
+		expect(data.offer).toEqual((await screen(TOMORROW)).offer);
 	});
 
 	it("another day asks for it with its neighbours", async () => {
@@ -207,7 +207,7 @@ describe("DayData", () => {
 	});
 
 	it("shows nothing of a missing file, and no events or statuses with it", async () => {
-		const missing = { normalize: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
+		const missing = { screen: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
 		const { data, calendars } = setup(missing);
 		const opened = data.load();
 		calendars.answer();
@@ -224,7 +224,7 @@ describe("DayData", () => {
 		let gone = true;
 		const demo = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const flaky = new Proxy(demo, {
-			get: (target, name, receiver) => (gone && name === "normalize" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
+			get: (target, name, receiver) => (gone && name === "screen" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
 		});
 		const { data, calendars, parts } = setup(flaky);
 		const opened = data.load();
