@@ -22,6 +22,11 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => new Date() };
 
+/** Runs `tick` every `ms` until the returned stop is called. */
+export interface Ticker {
+	every(ms: number, tick: () => void): () => void;
+}
+
 /** Settings as the UI and the services see them; `update` persists to data.json. */
 export interface SettingsStore {
 	get(): TaskCalendarSettings;

@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, DayBoundary, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -82,6 +82,8 @@ function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
+	/** Which day today is, where it begins, and when that changes. */
+	readonly days: DayService;
 	/** The plugin's own changes of the tasks file, taken back by the corner button and Cmd+Z. */
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;

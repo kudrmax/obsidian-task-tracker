@@ -4,6 +4,7 @@ import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import type { PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
+import type { DayBoundary } from "../domain/DayBoundary";
 
 export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -280,6 +281,25 @@ export interface TaskService {
 
 	/** Fires after the file changed, by the plugin or by hand. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+}
+
+/** How today changed: `passed`, the clock passed the hour the day starts at; `moved`, the setting moved that hour. */
+export type DayChange = "passed" | "moved";
+
+/** Which day today is and where it begins, by the clock and the hour the settings start the day at. */
+export interface DayService {
+	today(): LocalDate;
+	/** Where a day begins: the timeline places slots, events and now by it. */
+	boundary(): DayBoundary;
+	/**
+	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
+	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
+	 * `catchUp`. `moved` fires at once on another hour for the day's start, even when the date stays: the day's hours moved.
+	 * Returns the unsubscribe; the last one stops the minute's check.
+	 */
+	onDayChange(listener: (change: DayChange) => void, ready?: () => boolean): () => void;
+	/** A minute's check that waited for a listener to be ready runs now; without one waiting, nothing happens. */
+	catchUp(): void;
 }
 
 /** What a step back or forward did: changed the file, found nothing to do, or found its lines edited since and left the file as it is. */

@@ -1,8 +1,9 @@
 import type { App, DataAdapter } from "obsidian";
 import { CalendarServiceImpl } from "./application/CalendarServiceImpl";
-import type { CalendarService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
+import type { CalendarService, DayService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
+import { DayServiceImpl } from "./application/DayServiceImpl";
 import { GoogleAccountService } from "./application/GoogleAccountService";
-import { systemClock, type Clock, type SettingsStore } from "./application/ports";
+import { systemClock, type Clock, type SettingsStore, type Ticker } from "./application/ports";
 import { TaskServiceImpl } from "./application/TaskServiceImpl";
 import { UndoHistory } from "./application/UndoHistory";
 import { DeviceEventCache } from "./infrastructure/DeviceEventCache";
@@ -19,6 +20,7 @@ import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastru
 
 export interface Services {
 	readonly tasks: TaskService;
+	readonly days: DayService;
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
 	readonly google: GoogleAccount;
@@ -44,8 +46,10 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
+	const tasks = new TaskServiceImpl(store, settings, clock, history);
 	return {
-		tasks: new TaskServiceImpl(store, settings, clock, history),
+		tasks,
+		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
 		undo: history,
 		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app)),
 		google: new GoogleAccountService(auth, googleSource, settings),
@@ -54,6 +58,14 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
 	};
 }
+
+/** The window's interval timer. */
+const windowTicker: Ticker = {
+	every: (ms, tick) => {
+		const id = window.setInterval(tick, ms);
+		return () => window.clearInterval(id);
+	},
+};
 
 /** Temporary: the quick entry trace's note in the vault, appended to; a failed write only goes to the console. */
 export function vaultEntryLog(adapter: DataAdapter): { append(text: string): void } {
