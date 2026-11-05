@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Метки на телефоне: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<dc-import name="Screen" foot="prod" plus="true" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 494px; overflow: hidden; background: {{c.bg}}; z-index: 5;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{r.bg}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<sc-if value="{{r.progress}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 5px; top: 15.5px; width: 4px; height: 4px; border-radius: 50%; background: {{r.meta}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 15px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasDots}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; display: flex; gap: 3px;">
+<sc-for list="{{r.dots}}" as="d" hint-placeholder-count="2"><span style="width: 6px; height: 6px; border-radius: 3px; background: {{d.ink}};"></span></sc-for>
+</span>
+</sc-if>
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}">
+<span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;">
+<span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span>
+<span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">{{r.mon}}</span>
+</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"look":{"editor":"enum","default":"split","options":["split","blend","diag","dots","combo","stripes"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const look = this.props.look ?? 'split';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', base: '#F2F2F7', alpha: 0.16, pole: [0, 0, 0], text: '#000000', muted: '#8E8E93', strong: '#1C1C1E', mark: '#FF9500',
+          ink: { important: '#FF3B30', urgent: '#FF9500', health: '#34C759', both: '#AF52DE' } }
+      : { bg: '#000000', card: '#1C1C1C', base: '#1C1C1E', alpha: 0.26, pole: [255, 255, 255], text: '#FFFFFF', muted: '#8E8E93', strong: '#E5E5EA', mark: '#FFD60A',
+          ink: { important: '#FF453A', urgent: '#FF9F0A', health: '#30D158', both: '#BF5AF2' } };
+
+    const ch = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const hx = (v) => '#' + v.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('').toUpperCase();
+    const mix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
+    const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const lum = (v) => 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
+    const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const grey = ch(c.muted);
+    const base = ch(c.base);
+    const target = contrast(grey, base);
+    const tone = (hex) => {
+      const ink = ch(hex);
+      const fill = mix(base, ink, c.alpha);
+      const half = mix(ink, grey, 0.5);
+      let lo = 0, hi = 1;
+      for (let k = 0; k < 30; k++) { const t = (lo + hi) / 2; if (contrast(mix(half, c.pole, t), fill) < target) lo = t; else hi = t; }
+      return { ink: hex, fill: hx(fill), meta: hx(mix(half, c.pole, hi)) };
+    };
+
+    const stops = (fills, hard) => fills.map((f, i) => {
+      if (!hard) return f;
+      const a = (i * 100 / fills.length).toFixed(2), b = ((i + 1) * 100 / fills.length).toFixed(2);
+      return f + ' ' + a + '% ' + b + '%';
+    }).join(', ');
+
+    const paint = (labels) => {
+      if (labels.length === 0) return { bg: c.card, meta: c.muted, dots: [] };
+      const tones = labels.map((l) => tone(c.ink[l]));
+      if (labels.length === 1) return { bg: tones[0].fill, meta: tones[0].meta, dots: [] };
+      const fills = tones.map((t) => t.fill);
+      if (look === 'split') return { bg: 'linear-gradient(to right, ' + stops(fills, true) + ')', meta: tones[0].meta, dots: [] };
+      if (look === 'blend') return { bg: 'linear-gradient(to right, ' + stops(fills, false) + ')', meta: tones[0].meta, dots: [] };
+      if (look === 'diag') return { bg: 'linear-gradient(120deg, ' + stops(fills, true) + ')', meta: tones[0].meta, dots: [] };
+      if (look === 'stripes') {
+        const w = 6;
+        const bands = fills.map((f, i) => f + ' ' + i * w + 'px ' + (i + 1) * w + 'px').join(', ');
+        return { bg: 'repeating-linear-gradient(120deg, ' + bands + ')', meta: tones[0].meta, dots: [] };
+      }
+      if (look === 'dots') return { bg: tones[0].fill, meta: tones[0].meta, dots: tones.map((t) => ({ ink: t.ink })) };
+      const own = labels.join('+') === 'important+urgent' ? tone(c.ink.both) : tones[0];
+      return { bg: own.fill, meta: own.meta, dots: [] };
+    };
+
+    const tasks = [
+      { title: 'Позвонить в банк', labels: ['important', 'urgent'] },
+      { title: 'Оплатить счёт', labels: ['urgent'], day: '5', mon: 'NOV' },
+      { title: 'Подготовить доклад', labels: ['important'], progress: true },
+      { title: 'Записаться к врачу', labels: ['important', 'urgent', 'health'] },
+      { title: 'Разобрать почту', labels: [], progress: true },
+      { title: 'Позвонить маме', labels: [] },
+      { title: 'Чай масала', labels: [] }
+    ];
+    const rows = tasks.map((t, i) => {
+      const p = paint(t.labels);
+      return {
+        top: i * 37,
+        title: t.title,
+        bg: p.bg,
+        meta: p.meta,
+        dots: p.dots,
+        hasDots: p.dots.length > 0,
+        progress: !!t.progress,
+        hasDue: !!t.day,
+        day: t.day ?? '',
+        mon: t.mon ?? ''
+      };
+    });
+
+    const LIST_TOP = 166;
+    const ring = (i, tag) => ({ left: 6, top: LIST_TOP + i * 37 - 4, width: 183, height: 43, radius: 21.5, tag, tagPos: 'left: 194px; top: ' + (LIST_TOP + i * 37 + 7) + 'px;' });
+    const marks = [ring(0, '← Важное и Срочное'), ring(3, '← Важное, Срочное, Здоровье')];
+
+    return {
+      c, rows,
+      theme: light ? 'light' : 'dark',
+      marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

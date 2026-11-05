@@ -203,7 +203,7 @@ describe("DragController: a drop that changes nothing", () => {
 		} as unknown as DragControllerDeps;
 		const block = document.body.appendChild(document.createElement("div"));
 		block.getBoundingClientRect = () => rect(10, 600);
-		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
+		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, labels: [], dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
 		new DragController(deps).attachBlock(block, item as never);
 		const at = (type: string, x: number, y: number, el: EventTarget) =>
 			el.dispatchEvent(Object.assign(new Event(type, { bubbles: true }), { pointerId: 1, clientX: x, clientY: y, isPrimary: true, button: 0, pointerType: "mouse" }));
@@ -239,7 +239,7 @@ describe("DragController: a finger held on a timeline block", () => {
 		} as unknown as DragControllerDeps;
 		const block = document.body.appendChild(document.createElement("div"));
 		block.getBoundingClientRect = () => rect(10, 600);
-		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
+		const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", priority: null, labels: [], dueDate: null, description: null, subtasks: [], links: [], slot: { date: "2026-11-01", start: 600, end: 660 } };
 		new DragController(deps).attachBlock(block, item as never);
 		block.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
 		vi.advanceTimersByTime(300);
@@ -293,7 +293,7 @@ describe("DragController: a finger held on a calendar event", () => {
 });
 
 describe("DragController: stretching a block (block 3)", () => {
-	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
+	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, labels: [], subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
 
 	function stretching(onResize: () => Promise<void> = async () => undefined) {
 		const arbiter = new GestureArbiter();

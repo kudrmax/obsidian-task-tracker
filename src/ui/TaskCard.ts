@@ -1,4 +1,5 @@
 import type { PriorityLevel, TaskItem } from "../application/contracts";
+import { LABEL_SLOTS } from "./priorityColors";
 import type { LocalDate } from "./types";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
@@ -32,7 +33,7 @@ export function showProgressDot(parent: HTMLElement, item: TaskItem): void {
 }
 
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
-	markPriority(card, item.priority);
+	markColours(card, item);
 	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
@@ -69,6 +70,22 @@ function metaOf(item: TaskItem): HTMLElement | null {
 	if (item.description !== null) meta.appendChild(icon("description")).classList.add("tc-desc-mark");
 	meta.classList.toggle("is-pair", item.progress !== null && item.description !== null);
 	return meta;
+}
+
+/**
+ * Gives a card the colours of its task: a priority's, or its labels'. The first colour tints it as a priority does; a
+ * card of several labels also carries each colour, up to four, which the stylesheet paints as stripes or a blend.
+ */
+export function markColours(card: HTMLElement, item: Pick<TaskItem, "priority" | "labels">): void {
+	const colours = item.priority ? [item.priority.color] : item.labels.slice(0, LABEL_SLOTS.length).map((label) => label.color);
+	if (colours.length > 0) card.dataset.priority = colours[0];
+	else delete card.dataset.priority;
+	LABEL_SLOTS.forEach((slot, i) => {
+		if (colours.length > 1 && i < colours.length) card.setAttribute(slot.attribute, colours[i]);
+		else card.removeAttribute(slot.attribute);
+	});
+	if (colours.length > 1) card.dataset.labels = String(colours.length);
+	else delete card.dataset.labels;
 }
 
 /** Gives a card, or a dot, the colour of a priority level; none takes it away. */

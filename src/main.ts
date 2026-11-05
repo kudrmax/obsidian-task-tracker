@@ -10,7 +10,7 @@ import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
 import { createServices, type Services, type ServicesHost } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
-import { clearPriorityColors, showPriorityColors } from "./ui/priorityColors";
+import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 
@@ -35,7 +35,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		);
 		this.pluginSettings.onChange(() => {
 			showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap });
-			showPriorityColors(this.get().priorities);
+			showPriorityColors(this.get().priorities, this.get().labels);
+			showLabelPaint(this.get().labelPaint);
 		});
 		await this.pluginSettings.load();
 		this.register(clearCardSize);

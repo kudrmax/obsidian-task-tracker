@@ -956,6 +956,7 @@ export class TaskCalendarView extends ItemView {
 			today: this.today(),
 			day: this.selectedDate,
 			levels: tasks.priorityLevels(),
+			labels: tasks.labelLevels(),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
@@ -965,6 +966,7 @@ export class TaskCalendarView extends ItemView {
 					if (column && sections) this.askGroupName(item, column);
 				},
 				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
+				setLabels: (names) => this.act(() => tasks.setLabels(item.key, names)),
 				setReminder: (kind) => this.act(() => tasks.setReminder(item.key, kind)),
 				setRepeat: (rule) => this.act(() => tasks.setRepeat(item.key, rule)),
 				stop: () => this.act(() => tasks.stop(item.key)),

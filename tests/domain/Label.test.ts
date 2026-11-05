@@ -28,6 +28,11 @@ describe("a task line with labels", () => {
 		expect(formatTaskLine(q, M)).toBe("- [ ] Позвонить в банк #label/Важное #label/Срочное 📅 2026-11-03");
 	});
 
+	it("reads a slot the tags come after", () => {
+		const p = parseTaskLine("- [ ] Созвон ⏰ 2026-11-03 10:00-10:45 #label/Важное #label/Срочное", M)!;
+		expect(p.task).toMatchObject({ text: "Созвон", labels: ["Важное", "Срочное"], slot: { date: "2026-11-03", start: 600, end: 645 } });
+	});
+
 	it("reads the priority and the labels of a line that has both", () => {
 		expect(parseTaskLine("- [ ] p1 A #label/Важное", M)!.task).toMatchObject({ priority: "p1", text: "A", labels: ["Важное"] });
 	});

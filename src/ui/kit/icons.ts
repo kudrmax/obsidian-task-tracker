@@ -38,6 +38,7 @@ const DRAWINGS = {
 	delete: { d: "M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13" },
 	removeDue: { d: `${CIRCLE} M9 9l6 6 M15 9l-6 6` },
 	priority: { d: "M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5" },
+	label: { d: "M3.5 4.5a1 1 0 0 1 1-1h7.1a1 1 0 0 1 .7.3l8.4 8.4a1 1 0 0 1 0 1.4l-7.1 7.1a1 1 0 0 1-1.4 0l-8.4-8.4a1 1 0 0 1-.3-.7z" },
 	removeSection: { d: "M4 6h9 M4 12h9 M4 18h9 M16 9l5 5 M21 9l-5 5" },
 	subtask: { d: "M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4" },
 	openFile: { d: "M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" },
