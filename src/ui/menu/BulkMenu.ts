@@ -1,5 +1,4 @@
-import type { GroupName, TaskItem } from "../../application/contracts";
-import type { PriorityLevel } from "../../settings";
+import type { GroupName, PriorityLevel, TaskItem } from "../../application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";

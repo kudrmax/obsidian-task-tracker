@@ -1,5 +1,5 @@
-import type { NewTaskPlace, Placement, TaskItem, TaskKey, TaskService } from "../../application/contracts";
-import { type PriorityLevel, type RightMode, usableLevels } from "../../settings";
+import type { NewTaskPlace, Placement, PriorityLevel, TaskItem, TaskKey, TaskService } from "../../application/contracts";
+import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { type DayColumn, dayColumn } from "../dayColumn";
 import { LAYOUT } from "../design";
@@ -18,7 +18,7 @@ import { PlusButton } from "./PlusButton";
 import { PlusRing } from "./PlusRing";
 import { QuickBar, type QuickBarState } from "./QuickBar";
 import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
-import { levelOfText, QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
+import { QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
 import { ScrollGlide } from "./ScrollGlide";
 import type { TitleFieldFactory } from "./TitleField";
 
@@ -28,7 +28,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -39,7 +39,6 @@ export interface QuickEntryControllerDeps {
 	task(key: TaskKey): TaskItem | null;
 	/** Where the plus may be carried: the lists the window shows, and the timeline while it shows. */
 	dropTargets(): { readonly lists: readonly ColumnDrop[]; readonly timeline: DropTarget | null };
-	levels(): readonly PriorityLevel[];
 	today(): LocalDate;
 	/** Obsidian runs on the desktop: the bar is a capsule by the field, not a bar over the keyboard. */
 	desktop(): boolean;
@@ -176,7 +175,7 @@ export class QuickEntryController {
 			createInPlace: (text, priority, place, repeat) => deps.tasks.createInPlace(text, priority, place, repeat),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),
-			levels: () => usableLevels(deps.levels()),
+			isBlank: (text) => deps.tasks.isBlank(text),
 			onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			onError: (error) => deps.onError(error),
 		});
@@ -184,7 +183,7 @@ export class QuickEntryController {
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
 			desktop: () => deps.desktop(),
-			levels: () => deps.levels(),
+			levels: () => deps.tasks.priorityLevels(),
 			today: () => deps.today(),
 			onIndent: (delta) => this.entry.indent(delta),
 			onPriority: (prefix) => this.choosePriority(prefix),
@@ -597,16 +596,15 @@ export class QuickEntryController {
 
 	/** The level chosen in the bar, else the one the text's prefix stands for. */
 	private levelOf(state: EntryState): PriorityLevel | null {
-		const levels = usableLevels(this.deps.levels());
-		return levels.find((level) => level.prefix === state.priority) ?? levelOfText(state.text, levels);
+		const { tasks } = this.deps;
+		return tasks.priorityLevels().find((level) => level.prefix === state.priority) ?? tasks.parseTitle(state.text).priority;
 	}
 
 	/** A level chosen in the bar takes the place of a prefix typed: the text keeps no prefix, so the file gets one. */
 	private choosePriority(prefix: string | null): void {
 		const state = this.state;
 		if (!state) return;
-		const typed = levelOfText(state.text, usableLevels(this.deps.levels()));
-		if (typed) this.entry.type(state.text.slice(typed.prefix.length + 1));
+		if (this.deps.tasks.parseTitle(state.text).priority) this.entry.type(this.deps.tasks.withPriority(state.text, null));
 		this.entry.setPriority(prefix);
 	}
 
@@ -662,10 +660,9 @@ export class QuickEntryController {
 
 	private openField(row: HTMLElement): QuickFieldHandle {
 		const state = this.state;
-		const levels = usableLevels(this.deps.levels());
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
-			levels,
+			parseTitle: (text) => this.deps.tasks.parseTitle(text),
 			priority: state ? this.levelOf(state) : null,
 			titleField: this.deps.titleField,
 			onInput: (text) => {

@@ -1,7 +1,7 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
 import { type CalendarEvent, type CalendarService, DayBoundary, type GroupedList, type GroupName, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
-import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, usableLevels, type ZoomLevel } from "../settings";
+import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
@@ -187,7 +187,7 @@ export class TaskCalendarView extends ItemView {
 			apply: (steps) => this.act(() => this.deps.tasks.applyAll(steps)),
 			today: () => this.today(),
 			day: () => this.selectedDate,
-			levels: () => usableLevels(this.settings.priorities),
+			levels: () => this.deps.tasks.priorityLevels(),
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
 			sections: (cards) => this.bulkSections(cards),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
@@ -374,7 +374,6 @@ export class TaskCalendarView extends ItemView {
 				const shown = this.shownDrops();
 				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
 			},
-			levels: () => this.settings.priorities,
 			today: () => this.today(),
 			desktop: () => !root.ownerDocument.body.classList.contains("is-mobile"),
 			chromeTop: () => chrome.statusBarTop(),
@@ -916,7 +915,7 @@ export class TaskCalendarView extends ItemView {
 			markdown: this.markdown,
 			today: this.today(),
 			day: this.selectedDate,
-			levels: usableLevels(this.settings.priorities),
+			levels: tasks.priorityLevels(),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
 				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),

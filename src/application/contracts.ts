@@ -16,6 +16,8 @@ export { samePlacement } from "../domain/operations";
 export { plainText, textParts, type TextPart } from "../domain/TaskText";
 /** The hour's heights the settings tab writes and reads as text. */
 export type { ZoomLevel } from "../settings";
+/** A priority level, its colours in the order the settings offer them. */
+export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**
@@ -120,6 +122,15 @@ export interface TaskStep {
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
  */
 export interface TaskService {
+	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
+	priorityLevels(): readonly PriorityLevel[];
+	/** The level a typed title starts with and the title without it, as the file will read it. */
+	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null };
+	/** Nothing to write: no text, or a level's prefix alone. */
+	isBlank(text: string): boolean;
+	/** `text` with `prefix` first in place of the one it had; null takes it off. */
+	withPriority(text: string, prefix: string | null): string;
+
 	dayView(date: LocalDate): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;

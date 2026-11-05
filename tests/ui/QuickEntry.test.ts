@@ -3,6 +3,7 @@ import { type NewTaskPlace, type RepeatRule, StaleTaskError, type TaskDraft, typ
 import type { PlacedCard } from "../../src/ui/drag/listPlace";
 import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
 import { WriteQueue } from "../../src/ui/quick/WriteQueue";
+import { priorityTitles } from "../fakes/FakePriorityTitles";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): PlacedCard => ({ key: key(name), level, top: 0, height: 0, group: null });
@@ -100,10 +101,10 @@ class FakeTasks {
 				this.edits.push({ key: k, draft });
 			},
 			placement: () => ({ kind: "now" }),
-			levels: () => [
+			isBlank: priorityTitles([
 				{ prefix: "!!", color: "red" },
 				{ prefix: "p1", color: "orange" },
-			],
+			]).isBlank,
 			onChange: (state, drawnNext) => {
 				this.changes.push(state);
 				this.drawnNext.push(drawnNext === true);

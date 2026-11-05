@@ -1,4 +1,4 @@
-import type { PriorityLevel } from "../../settings";
+import type { PriorityLevel, TaskService } from "../../application/contracts";
 import { markPriority } from "../TaskCard";
 import type { TitleFieldFactory } from "./TitleField";
 
@@ -6,8 +6,8 @@ export type QuickKey = "enter" | "escape" | "tab" | "shiftTab";
 
 export interface QuickFieldOptions {
 	readonly value: string;
-	/** The levels a prefix at the start of the text may stand for. */
-	readonly levels: readonly PriorityLevel[];
+	/** The level a prefix at the start of the text stands for. */
+	readonly parseTitle: TaskService["parseTitle"];
 	/** The level the field starts with. */
 	readonly priority: PriorityLevel | null;
 	/** The field the text is typed in. */
@@ -36,18 +36,14 @@ export interface QuickFieldHandle {
 	destroy(): void;
 }
 
-/** The level whose prefix, then a space, starts the text. */
-export function levelOfText(text: string, levels: readonly PriorityLevel[]): PriorityLevel | null {
-	return levels.find((level) => text.startsWith(`${level.prefix} `)) ?? null;
-}
-
 /**
  * A task typed in place in the list: a card-like field that wraps long text and grows downward with it. Enter, Escape and
  * Tab are the owner's to handle; the text never takes a line break.
  */
 export const QuickField = {
 	open(parent: HTMLElement, opts: QuickFieldOptions): QuickFieldHandle {
-		let fromText = levelOfText(opts.value, opts.levels);
+		const levelOf = (text: string) => opts.parseTitle(text).priority;
+		let fromText = levelOf(opts.value);
 		const title = opts.titleField(parent, {
 			text: opts.value,
 			placeholder: "New task",
@@ -55,7 +51,7 @@ export const QuickField = {
 				onInput: () => {
 					const text = title.text;
 					opts.onInput(text);
-					const level = levelOfText(text, opts.levels);
+					const level = levelOf(text);
 					if (level?.prefix === fromText?.prefix) return;
 					fromText = level;
 					markPriority(title.el, level);
@@ -88,7 +84,7 @@ export const QuickField = {
 			},
 			setValue(text) {
 				title.setText(text);
-				fromText = levelOfText(text, opts.levels);
+				fromText = levelOf(text);
 			},
 			owns(target) {
 				return title.owns(target);

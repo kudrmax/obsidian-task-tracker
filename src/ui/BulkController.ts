@@ -1,5 +1,4 @@
-import type { GroupName, TaskChange, TaskItem, TaskStep } from "../application/contracts";
-import type { PriorityLevel } from "../settings";
+import type { GroupName, PriorityLevel, TaskChange, TaskItem, TaskStep } from "../application/contracts";
 import { carriesMany, type DropResult, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { canRemoveDue } from "./menu/quickMoves";

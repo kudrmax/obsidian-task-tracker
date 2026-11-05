@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import type { PriorityLevel } from "../../src/settings";
+import type { PriorityLevel } from "../../src/application/contracts";
 import type { PendingText } from "../../src/ui/quick/QuickEntry";
 import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
+import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 
 const URGENT: PriorityLevel = { prefix: "p1", color: "red" };
@@ -20,7 +21,7 @@ function open(value = "", priority: PriorityLevel | null = null) {
 	const handle = QuickField.open(parent, {
 		value,
 		priority,
-		levels: [URGENT, LATER],
+		parseTitle: priorityTitles([URGENT, LATER]).parseTitle,
 		titleField: fakeTitleField,
 		onInput: (t) => texts.push(t),
 		onPriority: (p) => priorities.push(p),
@@ -192,7 +193,7 @@ describe("TaskList with a task being typed", () => {
 			entry: () => ({
 				place: { kind: "gap", index, level, group: null },
 				pending,
-				field: (parent) => QuickField.open(parent, { value: "", levels: [], priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
+				field: (parent) => QuickField.open(parent, { value: "", parseTitle: priorityTitles([]).parseTitle, priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
 			}),
 		});
 		l.render();

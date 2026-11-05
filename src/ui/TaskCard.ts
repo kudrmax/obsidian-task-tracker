@@ -1,6 +1,5 @@
-import type { TaskItem } from "../application/contracts";
+import type { PriorityLevel, TaskItem } from "../application/contracts";
 import type { LocalDate } from "./types";
-import type { PriorityLevel } from "../settings";
 import { dayOfMonth, monthAbbreviation } from "./dates";
 import { el } from "./dom";
 import { icon } from "./kit/icons";

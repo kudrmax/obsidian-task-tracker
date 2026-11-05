@@ -10,6 +10,7 @@ import { dayColumn } from "../../src/ui/dayColumn";
 import { TaskList } from "../../src/ui/TaskList";
 import { Timeline } from "../../src/ui/Timeline";
 import { DayBoundary } from "../../src/application/contracts";
+import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 
 const TODAY = "2026-11-01";
@@ -124,6 +125,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 				edits.push({ key: k, draft });
 			},
 			placementOf: (): Placement => ({ kind: "now" }),
+			...priorityTitles([{ prefix: "p1", color: "red" }]),
 		},
 		arbiter: new GestureArbiter(),
 		drag: { beginNew },
@@ -136,7 +138,6 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		timeline: () => timeline,
 		task: (k) => slotted.find((t) => t.key.raw === k.raw) ?? null,
 		dropTargets: () => ({ lists: drops, timeline: null }),
-		levels: () => [{ prefix: "p1", color: "red" }],
 		today: () => TODAY,
 		desktop: () => desktop !== undefined,
 		chromeTop: () => desktop?.chromeTop ?? Infinity,

@@ -1,5 +1,6 @@
 import { Repeat } from "./Repeat";
 import { isValidLocalDate, minutesToHHMM, parseHHMM } from "./LocalDate";
+import { priorityOfText } from "./Priority";
 
 const DAY_MINUTES = 1440;
 import { STATUS_CHARS, type ReminderKind, type Slot, type Task, type TaskStatus } from "./Task";
@@ -23,7 +24,6 @@ export interface ParsedTaskLine {
 
 const LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
 const DATE = "(\\d{4}-\\d{2}-\\d{2})";
-const FIRST_WORD_RE = /^(\S+)\s+(\S.*)$/;
 const TIME = "(\\d{2}:\\d{2})";
 
 export function statusOf(char: string): TaskStatus {
@@ -132,14 +132,8 @@ export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | 
 	return {
 		indent: m[1],
 		bullet: m[2],
-		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOf(fields.text, markers), children: [] },
+		task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), children: [] },
 	};
-}
-
-function priorityOf(text: string, markers: Markers): { text: string; priority: string | null } {
-	const m = FIRST_WORD_RE.exec(text);
-	if (!m || !markers.priorities?.includes(m[1])) return { text, priority: null };
-	return { text: m[2], priority: m[1] };
 }
 
 export function formatTaskLine(parsed: ParsedTaskLine, markers: Markers): string {

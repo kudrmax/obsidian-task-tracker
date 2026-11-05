@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Placement, RepeatRule } from "../../src/application/contracts";
-import type { PriorityLevel } from "../../src/settings";
+import type { PriorityLevel } from "../../src/application/contracts";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
 
 const LEVELS: readonly PriorityLevel[] = [
