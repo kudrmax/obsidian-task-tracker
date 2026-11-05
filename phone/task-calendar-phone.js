@@ -26,6 +26,8 @@
     repeatMarker: "🔁",
     workCalendarFile: "calendar/work.json",
     workCalendarTitles: [],
+    hiddenCalendars: [],
+    calendarsMigrated: false,
     google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
     longPressMs: 250,
     zoom: 56,
