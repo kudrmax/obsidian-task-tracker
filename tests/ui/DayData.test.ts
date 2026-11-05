@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CalendarEvent, type CalendarService, type DayEvents, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
 import { DayData, type DayPart } from "../../src/ui/DayData";
 import type { LocalDate } from "../../src/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -51,6 +51,10 @@ class SlowCalendars implements CalendarService {
 
 	onChange(): () => void {
 		return () => {};
+	}
+
+	keepFresh(): CalendarPoll {
+		throw new Error("DayData does not poll");
 	}
 
 	answer(): void {

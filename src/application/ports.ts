@@ -27,6 +27,12 @@ export interface Ticker {
 	every(ms: number, tick: () => void): () => void;
 }
 
+/** One-shot timers: the window's in the plugin, fakes in tests. */
+export interface Timers {
+	set(fn: () => void, ms: number): number;
+	clear(id: number): void;
+}
+
 /** Settings as the UI and the services see them; `update` persists to data.json. */
 export interface SettingsStore {
 	get(): TaskCalendarSettings;

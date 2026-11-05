@@ -463,6 +463,30 @@ export interface CalendarService {
 	cached(date: LocalDate): DayEvents | null;
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */
+	keepFresh(screen: PolledScreen): CalendarPoll;
+}
+
+/** What the polling asks of the screen. */
+export interface PolledScreen {
+	/** Fetches the shown day's events afresh and shows them. */
+	refresh(): Promise<void>;
+	/** The screen is not on view: the document hidden or its tab behind another. Read at every tick. */
+	hidden(): boolean;
+}
+
+/**
+ * The events kept fresh while the screen is on view: a fetch every interval, and one when the app or the window comes
+ * back unless the last is under half an interval old. A tick missed off screen is fetched when the screen is back.
+ */
+export interface CalendarPoll {
+	/** The window got the focus or the app came to the front. */
+	wake(): void;
+	/** The screen is on view again: the tick it missed is fetched now. */
+	catchUp(): void;
+	/** Refresh now: asks the phone for fresh work events, then fetches at once. */
+	refreshNow(): Promise<void>;
+	stop(): void;
 }
 
 /** A calendar of the Google account, as the settings tab lists it. */

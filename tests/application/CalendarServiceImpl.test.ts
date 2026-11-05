@@ -5,6 +5,7 @@ import type { EventBatch, EventSource } from "../../src/application/EventSource"
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
+import { FakeTimers } from "../fakes/FakeTimers";
 import { MemoryEventCache } from "../fakes/MemoryEventCache";
 
 const FETCHED = new Date(2026, 9, 30, 8, 0);
@@ -44,8 +45,10 @@ class FakeClock implements Clock {
 	}
 }
 
+const NO_EXPORT = { export: () => undefined };
+
 function service(sources: EventSource[], clock = new FakeClock(), staleAfterMinutes = DEFAULT_SETTINGS.staleAfterMinutes, cache = new MemoryEventCache(), dayStartHour = 0) {
-	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes, dayStartHour }), cache);
+	return new CalendarServiceImpl(sources, clock, new FakeSettingsStore({ ...DEFAULT_SETTINGS, staleAfterMinutes, dayStartHour }), cache, new FakeTimers(), NO_EXPORT);
 }
 
 describe("CalendarServiceImpl", () => {
@@ -267,7 +270,7 @@ describe("CalendarServiceImpl.eventsAround", () => {
 	function around(sources: EventSource[], refreshSeconds = 60, cache = new MemoryEventCache()) {
 		const clock = new FakeClock();
 		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 5, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
-		const svc = new CalendarServiceImpl(sources, clock, settings, cache);
+		const svc = new CalendarServiceImpl(sources, clock, settings, cache, new FakeTimers(), NO_EXPORT);
 		const pass = (ms: number) => (clock.current = new Date(clock.current.getTime() + ms));
 		return { svc, clock, settings, cache, pass };
 	}
@@ -458,5 +461,64 @@ describe("CalendarServiceImpl.eventsAround", () => {
 		expect(cache.reads).toBe(1);
 		svc.cached(D);
 		expect(cache.reads).toBe(1);
+	});
+});
+
+describe("CalendarServiceImpl.keepFresh", () => {
+	function polled(refreshSeconds = 60) {
+		const timers = new FakeTimers();
+		const clock = new FakeClock();
+		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, google: { ...DEFAULT_SETTINGS.google, refreshSeconds } });
+		const order: string[] = [];
+		let hidden = false;
+		const svc = new CalendarServiceImpl([], clock, settings, new MemoryEventCache(), timers, { export: () => order.push("export") });
+		const poll = svc.keepFresh({
+			refresh: async () => {
+				order.push("fetch");
+			},
+			hidden: () => hidden,
+		});
+		return { poll, timers, clock, settings, order, setHidden: (h: boolean) => (hidden = h) };
+	}
+
+	it("starts at once with the refresh interval of the settings, read afresh at every tick", async () => {
+		const t = polled(60);
+		expect(t.timers.delays).toEqual([60_000]);
+		await t.settings.update({ google: { ...DEFAULT_SETTINGS.google, refreshSeconds: 30 } });
+		t.timers.fire();
+		expect(t.order).toEqual(["fetch"]);
+		expect(t.timers.delays).toEqual([30_000]);
+	});
+
+	it("fetches nothing for a screen off view and catches up when it is back", () => {
+		const t = polled();
+		t.setHidden(true);
+		t.timers.fire();
+		expect(t.order).toEqual([]);
+		t.setHidden(false);
+		t.poll.catchUp();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("wakes by the service's clock: under half an interval since the last fetch, nothing", () => {
+		const t = polled(60);
+		t.clock.current = new Date(t.clock.current.getTime() + 29_000);
+		t.poll.wake();
+		expect(t.order).toEqual([]);
+		t.clock.current = new Date(t.clock.current.getTime() + 2_000);
+		t.poll.wake();
+		expect(t.order).toEqual(["fetch"]);
+	});
+
+	it("Refresh now asks the phone for work events first, then fetches", async () => {
+		const t = polled();
+		await t.poll.refreshNow();
+		expect(t.order).toEqual(["export", "fetch"]);
+	});
+
+	it("leaves no timer once stopped", () => {
+		const t = polled();
+		t.poll.stop();
+		expect(t.timers.delays).toEqual([]);
 	});
 });

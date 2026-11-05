@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, CalendarSource, DayEvents } from "../../src/application/contracts";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, PolledScreen } from "../../src/application/contracts";
 import type { LocalDate } from "../../src/ui/types";
 
 const DEMO_DATE = "2026-10-30";
@@ -62,5 +62,10 @@ export class DemoCalendarService implements CalendarService {
 
 	onChange(): () => void {
 		return () => {};
+	}
+
+	/** The board's events never change: no timer, Refresh now fetches them again. */
+	keepFresh(screen: PolledScreen): CalendarPoll {
+		return { wake: () => undefined, catchUp: () => undefined, refreshNow: () => screen.refresh(), stop: () => undefined };
 	}
 }

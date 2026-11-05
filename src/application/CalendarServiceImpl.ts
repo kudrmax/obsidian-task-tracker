@@ -1,15 +1,17 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { addDays } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
-import type { CalendarEvent, CalendarService, CalendarSource, DayEvents, SourceStatus } from "./contracts";
+import { CalendarPolling } from "./CalendarPolling";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, PolledScreen, SourceStatus, WorkCalendarSetup } from "./contracts";
 import type { EventBatch, EventSource } from "./EventSource";
-import type { Clock, EventCache, SettingsStore } from "./ports";
+import type { Clock, EventCache, SettingsStore, Timers } from "./ports";
 
 interface SourceResult {
 	readonly status: SourceStatus;
 	readonly events: readonly CalendarEvent[];
 }
 
+const SECOND_MS = 1000;
 const MINUTE_MS = 60_000;
 /** A source silent this long counts as failed: its last events stay, marked stale, and the next fetch asks it afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
@@ -89,6 +91,9 @@ export class CalendarServiceImpl implements CalendarService {
 		private readonly clock: Clock,
 		private readonly settings: SettingsStore,
 		private readonly cache: EventCache,
+		private readonly timers: Timers,
+		/** Refresh now asks the phone for fresh work events before it fetches. */
+		private readonly work: Pick<WorkCalendarSetup, "export">,
 	) {}
 
 	async eventsOn(date: LocalDate): Promise<DayEvents> {
@@ -141,6 +146,26 @@ export class CalendarServiceImpl implements CalendarService {
 	onChange(listener: () => void): () => void {
 		const offs = this.sources.flatMap((s) => (s.onChange ? [s.onChange(listener)] : []));
 		return () => offs.forEach((off) => off());
+	}
+
+	keepFresh(screen: PolledScreen): CalendarPoll {
+		const polling = new CalendarPolling({
+			refresh: () => screen.refresh(),
+			intervalMs: () => this.settings.get().google.refreshSeconds * SECOND_MS,
+			hidden: () => screen.hidden(),
+			now: () => this.clock.now().getTime(),
+			timers: this.timers,
+		});
+		polling.start();
+		return {
+			wake: () => polling.wake(),
+			catchUp: () => polling.catchUp(),
+			refreshNow: () => {
+				this.work.export();
+				return polling.refresh();
+			},
+			stop: () => polling.stop(),
+		};
 	}
 
 	/** The device cache, read on first use: a start with the view closed reads nothing. */

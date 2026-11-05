@@ -65,7 +65,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			calendars: services.calendars,
 			settings: this,
 			clock,
-			exportWorkCalendar: () => services.work.export(),
 			openInCalendar: (event) => calendarApp.open(event),
 			entryLog: vaultEntryLog(this.app.vault.adapter),
 		};

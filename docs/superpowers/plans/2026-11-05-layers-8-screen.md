@@ -56,11 +56,11 @@ interface CalendarService {
 }
 ```
 
-- [ ] `CalendarPolling` — тот же код, `PollingTimers` → порт `Timers`; тесты переезжают без изменений, кроме пути.
-- [ ] `CalendarServiceImpl(sources, clock, settings, cache, timers, work)`: `keepFresh` — `CalendarPolling` с `refreshSeconds * 1000` (читается на каждом тике), `clock.now().getTime()`, `start()`; `refreshNow` — `work.export()`, затем `refresh()`.
-- [ ] Тесты `keepFresh`: интервал из настроек и его смена, запрос на тике и `refresh` экрана, `refreshNow` — экспорт до запроса, `stop` — нет таймера, скрытый экран — ноль запросов.
-- [ ] Вид: `poll = calendars.keepFresh({ refresh: () => data.calendars(), hidden: … })` там, где был `start()`; `wake`/`catchUp`/`stop`/`refreshNow` — через `poll`. `ViewDeps.exportWorkCalendar`, `SECOND_MS` и чтение `settings.google` уходят.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `CalendarPolling` — тот же код, `PollingTimers` → порт `Timers`; тесты переезжают без изменений, кроме пути.
+- [x] `CalendarServiceImpl(sources, clock, settings, cache, timers, work)`: `keepFresh` — `CalendarPolling` с `refreshSeconds * 1000` (читается на каждом тике), `clock.now().getTime()`, `start()`; `refreshNow` — `work.export()`, затем `refresh()`.
+- [x] Тесты `keepFresh`: интервал из настроек и его смена, запрос на тике и `refresh` экрана, `refreshNow` — экспорт до запроса, `stop` — нет таймера, скрытый экран — ноль запросов.
+- [x] Вид: `poll = calendars.keepFresh({ refresh: () => data.calendars(), hidden: … })` там, где был `start()`; `wake`/`catchUp`/`stop`/`refreshNow` — через `poll`. `ViewDeps.exportWorkCalendar`, `SECOND_MS` и чтение `settings.google` уходят.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 2: Какие события и когда — `events(date, reason)`
 

@@ -3,7 +3,7 @@ import { CalendarServiceImpl } from "./application/CalendarServiceImpl";
 import type { CalendarService, DayService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
 import { DayServiceImpl } from "./application/DayServiceImpl";
 import { GoogleAccountService } from "./application/GoogleAccountService";
-import { systemClock, type Clock, type SettingsStore, type Ticker } from "./application/ports";
+import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "./application/ports";
 import { TaskServiceImpl } from "./application/TaskServiceImpl";
 import { UndoHistory } from "./application/UndoHistory";
 import { DeviceEventCache } from "./infrastructure/DeviceEventCache";
@@ -47,13 +47,14 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const tasks = new TaskServiceImpl(store, settings, clock, history);
+	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => workShortcut.run() };
 	return {
 		tasks,
 		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
 		undo: history,
-		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app)),
+		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app), windowTimers, work),
 		google: new GoogleAccountService(auth, googleSource, settings),
-		work: { scriptableLoader: () => workExport.loader, export: () => workShortcut.run() },
+		work,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
 	};
@@ -66,6 +67,9 @@ const windowTicker: Ticker = {
 		return () => window.clearInterval(id);
 	},
 };
+
+/** The window's one-shot timers. */
+const windowTimers: Timers = { set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => window.clearTimeout(id) };
 
 /** Temporary: the quick entry trace's note in the vault, appended to; a failed write only goes to the console. */
 export function vaultEntryLog(adapter: DataAdapter): { append(text: string): void } {
