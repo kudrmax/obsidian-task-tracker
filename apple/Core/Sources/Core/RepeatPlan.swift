@@ -41,13 +41,20 @@ public enum RepeatPlan {
     }
 
     /// Each reminder's first delivery is kept before any repeat: overdue tasks repeating all evening must not use up
-    /// the budget that tomorrow morning's task needs to be reminded at all.
-    public static func plan(_ reminders: [Reminder], now: Date) -> [PlannedNotification] {
+    /// the budget that tomorrow morning's task needs to be reminded at all. A card's task that started before it could be
+    /// shown is told of at once (`fire` is `now`), unless a notification of it is already on the screen (`told`).
+    public static func plan(_ reminders: [Reminder], now: Date, told: Set<String> = []) -> [PlannedNotification] {
         var firsts: [PlannedNotification] = []
         var repeats: [PlannedNotification] = []
         var seen = Set<String>()
         // Two identical task lines are one reminder: an action finds the task by its line.
         for reminder in reminders where seen.insert(reminder.id).inserted {
+            if reminder.kind == .live, reminder.start <= now {
+                if !told.contains(reminder.id), now < reminder.dayEnd {
+                    firsts.append(PlannedNotification(identifier: "\(reminder.id)#0", reminderID: reminder.id, fire: now))
+                }
+                continue
+            }
             let offsets = offsets(for: reminder.kind)
             for offset in offsets {
                 let fire = reminder.start.addingTimeInterval(Double(offset) * 60)

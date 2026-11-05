@@ -7,9 +7,13 @@ enum LastSync {
 
     @discardableResult
     static func save(_ status: SyncStatus) -> SyncStatus {
-        let value: [String: Any] = switch status {
-        case .ok(let reminders, let at): ["reminders": reminders, "at": at]
-        case .failed(let reason): ["failed": reason]
+        var value: [String: Any] = [:]
+        switch status {
+        case .ok(let reminders, let at, let cardsRefused):
+            value = ["reminders": reminders, "at": at]
+            value["cardsRefused"] = cardsRefused
+        case .failed(let reason):
+            value = ["failed": reason]
         }
         UserDefaults.standard.set(value, forKey: key)
         return status
@@ -19,6 +23,6 @@ enum LastSync {
         guard let value = UserDefaults.standard.dictionary(forKey: key) else { return nil }
         if let reason = value["failed"] as? String { return .failed(reason) }
         guard let reminders = value["reminders"] as? Int, let at = value["at"] as? Date else { return nil }
-        return .ok(reminders: reminders, at: at)
+        return .ok(reminders: reminders, at: at, cardsRefused: value["cardsRefused"] as? String)
     }
 }
