@@ -94,6 +94,10 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.saveLevels([...levels, { prefix: `p${n}`, color }]);
 	}
 
+	moveLevel(from: number, to: number): Promise<void> {
+		return this.saveLevels(moved(this.settings.priorities, from, to));
+	}
+
 	renamePreset(index: number, name: string): Promise<void> {
 		return this.savePresets(this.presets.map((preset, i) => (i === index ? name.trim() : preset)));
 	}
@@ -107,10 +111,7 @@ export class SettingsServiceImpl implements SettingsService {
 	}
 
 	movePreset(from: number, to: number): Promise<void> {
-		const presets = [...this.presets];
-		const [moved] = presets.splice(from, 1);
-		presets.splice(to, 0, moved);
-		return this.savePresets(presets);
+		return this.savePresets(moved(this.presets, from, to));
 	}
 
 	setUngrouped(name: string): Promise<void> {
@@ -161,4 +162,12 @@ export class SettingsServiceImpl implements SettingsService {
 	private google(patch: Partial<GoogleSettings>): Partial<TaskCalendarSettings> {
 		return { google: { ...this.settings.google, ...patch } };
 	}
+}
+
+/** The list with the item at `from` taken out and put back at `to`. */
+function moved<T>(list: readonly T[], from: number, to: number): T[] {
+	const items = [...list];
+	const [item] = items.splice(from, 1);
+	items.splice(to, 0, item);
+	return items;
 }

@@ -5,6 +5,7 @@ import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
 import { el } from "./dom";
+import { RowReorder } from "./RowReorder";
 import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
@@ -45,10 +46,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	override display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		this.calendarsGroup(containerEl);
 		this.prioritiesGroup(containerEl);
 		this.sectionsGroup(containerEl);
-		this.displayGroup(containerEl);
+		this.cardsGroup(containerEl);
 		this.moreGroup(containerEl);
 	}
 
@@ -60,22 +60,15 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return this.deps.settings;
 	}
 
-	/** What is looked at and switched most: the Google account and which of its calendars show. */
-	private calendarsGroup(el: HTMLElement): void {
-		new Setting(el).setName("Calendars").setHeading();
-		this.loginRow(el);
-		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
-	}
-
 	/** The set-up-once part, each on a page of its own behind a row. */
 	private moreGroup(el: HTMLElement): void {
 		new Setting(el).setName("More").setHeading();
+		this.pageRow(el, "Calendars", "Google account and which calendars show, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
+		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels.", (page) => this.dayPage(page));
 		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
-		this.pageRow(el, "Calendar connections", "Google's OAuth client, the work calendar from the iPhone, when a source counts as stale.", (page) => this.connectionsPage(page));
-		this.pageRow(el, "Touch and zoom", "Long press delay and the timeline's zoom levels.", (page) => this.touchPage(page));
 	}
 
-	private pageRow(el: HTMLElement, name: string, desc: string, build: (page: HTMLElement) => void): void {
+	private pageRow(el: HTMLElement, name: string, desc: string, build: (page: HTMLElement, redraw: () => void) => void): void {
 		const row = new Setting(el)
 			.setName(name)
 			.setDesc(desc)
@@ -103,8 +96,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	 */
 	private prioritiesGroup(group: HTMLElement): void {
 		new Setting(group).setName("Priorities").setHeading();
+		const rows = group.createDiv("tc-level-rows");
+		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(this.service.moveLevel(from, to)));
 		this.settings.priorities.forEach((level, index) => {
-			const row = group.createDiv("setting-item tc-level-row");
+			const row = rows.createDiv("setting-item tc-level-row");
+			reorder.grip(row, index);
 			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void this.service.renameLevel(index, value));
 			prefix.inputEl.addClass("tc-level-prefix");
 			const swatches = row.createDiv("tc-swatches");
@@ -154,7 +150,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			});
 		});
 		new Setting(group)
-			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Levels show in this order in the task menu and in the bar shown while a task is typed.")
+			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
 			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
 	}
 
@@ -180,11 +176,10 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private sectionsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Sections").setHeading();
 		const rows = el.createDiv("tc-preset-rows");
+		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(this.service.movePreset(from, to)));
 		this.settings.presets.forEach((name, index) => {
 			const row = rows.createDiv("setting-item tc-level-row tc-preset-row");
-			const grip = new ExtraButtonComponent(row).setIcon("menu").setTooltip("Drag to reorder");
-			grip.extraSettingsEl.addClass("tc-preset-grip");
-			grip.extraSettingsEl.addEventListener("pointerdown", (e) => this.dragPreset(rows, row, index, e));
+			reorder.grip(row, index);
 			const field = new TextComponent(row).setValue(name).onChange((value) => void this.service.renamePreset(index, value));
 			field.inputEl.addClass("tc-preset-name");
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete preset").onClick(() => void this.redrawn(this.service.removePreset(index)));
@@ -195,45 +190,20 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.text(el, "No section", "The heading over tasks outside any section, shown once a list has sections.", this.settings.ungrouped, (name) => this.service.setUngrouped(name));
 	}
 
-	/** A preset's row follows the grip up and down among the others; let go, the presets take that order. */
-	private dragPreset(rows: HTMLElement, row: HTMLElement, from: number, e: PointerEvent): void {
-		if (!e.isPrimary || e.button !== 0) return;
-		e.preventDefault();
-		row.addClass("is-dragging");
-		let to = from;
-		const move = (ev: PointerEvent) => {
-			if (ev.pointerId !== e.pointerId) return;
-			const others = Array.from(rows.children).filter((child): child is HTMLElement => child !== row);
-			to = others.filter((other) => {
-				const r = other.getBoundingClientRect();
-				return ev.clientY > r.top + r.height / 2;
-			}).length;
-			rows.insertBefore(row, others[to] ?? null);
-		};
-		const up = (ev: PointerEvent) => {
-			if (ev.pointerId !== e.pointerId) return;
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", up);
-			row.removeClass("is-dragging");
-			if (to !== from) void this.redrawn(this.service.movePreset(from, to));
-		};
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", up);
-	}
-
 	/** A change that adds, drops or reorders rows: once written, the rows are drawn anew. */
 	private async redrawn(change: Promise<void>): Promise<void> {
 		await change;
 		this.display();
 	}
 
-	/** How the screen looks: the cards' size, the same in the list and in a stack on the timeline, and where a day begins. */
-	private displayGroup(el: HTMLElement): void {
-		new Setting(el).setName("Display").setHeading();
+	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
+	private cardsGroup(el: HTMLElement): void {
+		new Setting(el).setName("Cards").setHeading();
 		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.settings.cardHeight, (px) => this.service.setCardSize("cardHeight", px));
 		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.settings.cardGap, (px) => this.service.setCardSize("cardGap", px));
+	}
+
+	private dayPage(el: HTMLElement): void {
 		new Setting(el)
 			.setName("Day starts at")
 			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
@@ -242,9 +212,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.service.setDayStartHour(Number(value)));
 			});
 		this.count(el, "scrollToHour", "Scroll to hour", "Hour another day opens at.");
-	}
-
-	private touchPage(el: HTMLElement): void {
 		this.count(el, "longPressMs", "Long press delay", "Milliseconds before a touch becomes a drag.");
 		new Setting(el)
 			.setName("Zoom levels")
@@ -252,8 +219,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
-	private connectionsPage(el: HTMLElement): void {
+	/** The account and its calendars first, then the client they need; the work calendar; when a source counts as stale. */
+	private calendarsPage(el: HTMLElement, redraw: () => void): void {
 		new Setting(el).setName("Google Calendar").setHeading();
+		this.loginRow(el, redraw);
+		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
 		this.text(el, "Client id", "OAuth client of type Web application with the redirect URI from the README.", this.settings.googleClientId, (id) => this.service.setGoogleClientId(id));
 		new Setting(el)
 			.setName("Client secret")
@@ -267,18 +237,18 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.count(el, "staleAfterMinutes", "Stale after", "Minutes without an update before a source gets the orange dot.");
 	}
 
-	private loginRow(el: HTMLElement): void {
+	private loginRow(el: HTMLElement, redraw: () => void): void {
 		const loggedIn = this.deps.google.isLoggedIn();
-		const row = new Setting(el).setName("Google Calendar");
+		const row = new Setting(el).setName("Account");
 		if (loggedIn) row.setDesc("Logged in. The token syncs to your other devices.");
-		else if (!this.settings.googleClientId) row.setDesc("Not logged in. Set the OAuth client first: More, Calendar connections.");
+		else if (!this.settings.googleClientId) row.setDesc("Not logged in. Fill in the client id and secret below first.");
 		else row.setDesc("Not logged in. Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {
 				try {
 					if (loggedIn) await this.deps.google.logout();
 					else await this.deps.google.login();
-					this.display();
+					redraw();
 				} catch (e) {
 					new Notice(`Google: ${e instanceof Error ? e.message : String(e)}`);
 				}

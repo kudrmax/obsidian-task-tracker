@@ -67,12 +67,12 @@ async function settled(): Promise<void> {
 	for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function open(file: unknown = START): Promise<void> {
+async function open(file: unknown = START, google: GoogleAccount = loggedOut): Promise<void> {
 	document.body.replaceChildren();
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google: loggedOut, work });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work });
 	tab.display();
 }
 
@@ -263,8 +263,18 @@ describe("the settings tab: the sections", () => {
 		expect(presetRows()).toHaveLength(3);
 	});
 
+	it("moves a level by its grip", async () => {
+		const grip = levelRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
+		await writes(() => {
+			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
+			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
+			document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientY: 10 }));
+		}, { priorities: [START.priorities[1], START.priorities[0]] });
+		expect(levelRows().map((row) => row.querySelector<HTMLInputElement>(".tc-level-prefix")!.value)).toEqual(["p2", "p1"]);
+	});
+
 	it("moves a preset by its grip", async () => {
-		const grip = presetRows()[0].querySelector<HTMLElement>(".tc-preset-grip")!;
+		const grip = presetRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
 		await writes(() => {
 			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
 			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
@@ -285,11 +295,10 @@ describe("the settings tab: the cards and the timeline", () => {
 	});
 
 	it("writes a count of zero or more, and nothing for anything else", async () => {
-		const pages = { "Long press delay": "Touch and zoom", "Scroll to hour": null, "Stale after": "Calendar connections" } as const;
+		const pages = { "Long press delay": "Day and timeline", "Scroll to hour": "Day and timeline", "Stale after": "Calendars" } as const;
 		const opened = async (label: keyof typeof pages) => {
 			await open();
-			const name = pages[label];
-			if (name) page(name);
+			page(pages[label]);
 		};
 		for (const label of Object.keys(pages) as (keyof typeof pages)[]) {
 			for (const bad of ["", "  ", "-1", "abc", "Infinity", "1,5"]) {
@@ -308,21 +317,22 @@ describe("the settings tab: the cards and the timeline", () => {
 	});
 
 	it("writes the hour the day starts at as the dropdown chose it", async () => {
+		page("Day and timeline");
 		expect(input("Day starts at").value).toBe("5");
 		await writes(() => type(input("Day starts at"), "0", "change"), { dayStartHour: 0 });
 		await writes(() => type(input("Day starts at"), "23", "change"), { dayStartHour: 23 });
 	});
 
 	it("writes zoom levels that read, the old text with steps too, and nothing for the rest", async () => {
-		page("Touch and zoom");
+		page("Day and timeline");
 		expect(input("Zoom levels").value).toBe("28, 56, 112, 224");
 		for (const bad of ["", "28, x", "0", "28:", "28,,56"]) {
 			await open();
-			page("Touch and zoom");
+			page("Day and timeline");
 			await rejects(() => type(input("Zoom levels"), bad));
 		}
 		await open();
-		page("Touch and zoom");
+		page("Day and timeline");
 		await writes(() => type(input("Zoom levels"), " 40 , 80"), { zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] });
 		await writes(() => type(input("Zoom levels"), "28:60, 56:30"), { zoomLevels: [{ hourPx: 28 }, { hourPx: 56 }] });
 	});
@@ -330,7 +340,7 @@ describe("the settings tab: the cards and the timeline", () => {
 
 describe("the settings tab: the calendar sources", () => {
 	beforeEach(() => {
-		page("Calendar connections");
+		page("Calendars");
 	});
 
 	it("writes Google's client id and keeps the secret and the token", async () => {
@@ -354,7 +364,7 @@ describe("the settings tab: the calendar sources", () => {
 		await writes(() => type(input("File path"), "cal.json"), { workCalendarFile: "cal.json" });
 		await writes(() => type(input("Calendar titles"), " Work ,, Team ,"), { workCalendarFile: "cal.json", workCalendarTitles: ["Work", "Team"] });
 		await open({ ...START, workCalendarTitles: ["A", "B"] });
-		page("Calendar connections");
+		page("Calendars");
 		expect(input("Calendar titles").value).toBe("A, B");
 	});
 });
@@ -365,9 +375,9 @@ describe("the settings tab: the order", () => {
 	}
 
 	it("puts what is changed often first and the set-up-once part on pages under More", () => {
-		expect(headings(tab.containerEl)).toEqual(["Calendars", "Priorities", "Sections", "Display", "More"]);
-		for (const name of ["Tasks file", "Calendar connections", "Touch and zoom"]) expect(rows(name)).toHaveLength(1);
-		for (const name of ["Client id", "Due date marker", "Long press delay", "Zoom levels", "Stale after"]) expect(rows(name)).toHaveLength(0);
+		expect(headings(tab.containerEl)).toEqual(["Priorities", "Sections", "Cards", "More"]);
+		for (const name of ["Calendars", "Day and timeline", "Tasks file"]) expect(rows(name)).toHaveLength(1);
+		for (const name of ["Account", "Client id", "Day starts at", "Scroll to hour", "Due date marker", "Long press delay", "Zoom levels", "Stale after"]) expect(rows(name)).toHaveLength(0);
 	});
 
 	it("opens a page over the tab with its title, and draws the tab anew once it closes", async () => {
@@ -379,10 +389,35 @@ describe("the settings tab: the order", () => {
 		expect(rows("Client id")).toHaveLength(0);
 	});
 
+	it("shows the account and its calendars on the Calendars page only, and draws the page anew on logging out", async () => {
+		let loggedIn = true;
+		const google: GoogleAccount = {
+			...loggedOut,
+			isLoggedIn: () => loggedIn,
+			logout: async () => {
+				loggedIn = false;
+			},
+			listCalendars: async () => [{ id: "a", title: "Timetable", color: "#3366ff" }, { id: "b", title: "Deadlines", color: "#ff3300" }],
+		};
+		await open(START, google);
+		await settled();
+		expect(rows("Timetable")).toHaveLength(0);
+		page("Calendars");
+		await settled();
+		expect(rows("Shown calendars")).toHaveLength(1);
+		expect(rows("Timetable")).toHaveLength(1);
+		rows("Account")[0].querySelector<HTMLElement>("button")!.click();
+		await settled();
+		expect(rows("Timetable")).toHaveLength(0);
+		expect(rows("Account")[0].querySelector(".setting-item-description")!.textContent).toContain("Not logged in");
+	});
+
 	it("tells where to set the OAuth client up while there is none", async () => {
-		const description = () => rows("Google Calendar")[0].querySelector(".setting-item-description")!.textContent;
+		const description = () => rows("Account")[0].querySelector(".setting-item-description")!.textContent;
+		page("Calendars");
 		expect(description()).toContain("Opens the browser");
 		await open({ ...START, google: { ...START.google, clientId: "" } });
-		expect(description()).toContain("Calendar connections");
+		page("Calendars");
+		expect(description()).toContain("client id and secret below");
 	});
 });
