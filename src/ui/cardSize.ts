@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "../settings";
+import { DEFAULT_CARD_SIZE } from "../application/contracts";
 import { PROPERTY } from "./design";
 import { px } from "./dom";
 
@@ -8,7 +8,7 @@ export interface CardSize {
 	readonly gap: number;
 }
 
-const DEFAULT_SIZE: CardSize = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
+const DEFAULT_SIZE: CardSize = DEFAULT_CARD_SIZE;
 
 let shown: CardSize = DEFAULT_SIZE;
 

@@ -1,4 +1,4 @@
-import type { ZoomLevel } from "../settings";
+import type { ZoomLevel } from "../application/contracts";
 import { LAYOUT } from "./design";
 import { minutesToPx } from "./timelineLayout";
 
