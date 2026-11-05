@@ -133,19 +133,19 @@ struct TaskCardView: View {
 
     private var buttons: some View {
         VStack(spacing: Metrics.gap) {
-            // Done asks in place: its row turns into Cancel, where Done was, and Complete. iOS crossfades the two rows for
-            // half a second by default, both half seen at once: they swap at once instead.
+            // Done asks in place: its row turns into Cancel, where Done was, and Complete. The change comes from the app a
+            // moment after the press, so a quick crossfade of the row alone hides the wait; a swap at once only shows it.
             Group {
                 if confirming {
-                    confirmRow.transition(.identity)
+                    confirmRow.transition(.opacity)
                 } else {
                     HStack(spacing: Metrics.gap) {
                         ForEach(ReminderButton.all, id: \.self) { button($0) }
                     }
-                    .transition(.identity)
+                    .transition(.opacity)
                 }
             }
-            .animation(nil, value: confirming)
+            .animation(.easeInOut(duration: 0.3), value: confirming)
             if let meeting = task.meeting {
                 Button(intent: CardAfterMeetingIntent(reminderID: task.reminderID, title: task.title, date: task.date, until: meeting.until)) {
                     pill(fill: palette.button) {
