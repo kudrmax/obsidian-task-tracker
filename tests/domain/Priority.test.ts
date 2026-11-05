@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "../../src/domain/Priority";
+import { isBlankTitle, type PriorityLevel, priorityOfText, sameLevels, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -31,5 +31,33 @@ describe("priority levels", () => {
 		expect(sameLevels(LEVELS, copy)).toBe(true);
 		expect(sameLevels(LEVELS, [{ prefix: "p1", color: "blue" }, { prefix: "p2", color: "orange" }])).toBe(false);
 		expect(sameLevels(LEVELS, LEVELS.slice(0, 1))).toBe(false);
+	});
+});
+
+describe("a priority prefix in a text", () => {
+	const PREFIXES = ["p1", "p2"];
+
+	it("is the first word when it is a level's prefix and whitespace follows it, the text what comes after", () => {
+		expect(priorityOfText("p1 x", PREFIXES)).toEqual({ priority: "p1", text: "x" });
+		expect(priorityOfText("p1\tx", PREFIXES)).toEqual({ priority: "p1", text: "x" });
+		expect(priorityOfText("p1  x y", PREFIXES)).toEqual({ priority: "p1", text: "x y" });
+		expect(priorityOfText("p1 ", PREFIXES)).toEqual({ priority: "p1", text: "" });
+	});
+
+	it("is none for a word alone, a word that only begins with it, another word, a leading space or no levels", () => {
+		for (const text of ["p1", "p1x", "x", "p3 x", " p1 x", ""]) expect(priorityOfText(text, PREFIXES)).toEqual({ priority: null, text });
+		expect(priorityOfText("p1 x", [])).toEqual({ priority: null, text: "p1 x" });
+	});
+
+	it("leaves nothing to write for no text or a prefix alone, but a prefix without its space is a text", () => {
+		for (const text of ["", "  ", "p1 ", "p1\t", "p2   "]) expect(isBlankTitle(text, PREFIXES)).toBe(true);
+		for (const text of ["p1", "p1 x", "p1x", "x", "p3 "]) expect(isBlankTitle(text, PREFIXES)).toBe(false);
+	});
+
+	it("puts another level first in place of the one typed, or takes it off", () => {
+		expect(withPriority("p1 x", "p2", PREFIXES)).toBe("p2 x");
+		expect(withPriority("p1  x", null, PREFIXES)).toBe("x");
+		expect(withPriority("x", "p1", PREFIXES)).toBe("p1 x");
+		expect(withPriority("p3 x", null, PREFIXES)).toBe("p3 x");
 	});
 });

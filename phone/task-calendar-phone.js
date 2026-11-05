@@ -310,11 +310,24 @@
     return markdown.split(/\r?\n/).filter((line) => line.trim() !== "");
   }
 
+  // src/domain/Priority.ts
+  function usablePrefix(prefix) {
+    return /^\S+$/.test(prefix);
+  }
+  function usableLevels(levels) {
+    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+  }
+  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+  function priorityOfText(text, prefixes) {
+    const m = FIRST_WORD_RE.exec(text);
+    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+    return { priority: m[1], text: m[2] };
+  }
+
   // src/domain/TaskLine.ts
   var DAY_MINUTES2 = 1440;
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
   var DATE = "(\\d{4}-\\d{2}-\\d{2})";
-  var FIRST_WORD_RE = /^(\S+)\s+(\S.*)$/;
   var TIME = "(\\d{2}:\\d{2})";
   function statusOf(char) {
     for (const status of Object.keys(STATUS_CHARS)) {
@@ -407,13 +420,8 @@
     return {
       indent: m[1],
       bullet: m[2],
-      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOf(fields.text, markers), children: [] }
+      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), children: [] }
     };
-  }
-  function priorityOf(text, markers) {
-    const m = FIRST_WORD_RE.exec(text);
-    if (!m || !markers.priorities?.includes(m[1])) return { text, priority: null };
-    return { text: m[2], priority: m[1] };
   }
   function formatTaskLine(parsed, markers) {
     const { indent, bullet, task } = parsed;
@@ -1157,14 +1165,6 @@
     const result = normalizeGroups(listed2, today).spacedHeadings();
     if (result === doc) return doc;
     return result.serialize() === doc.serialize() ? doc : result;
-  }
-
-  // src/domain/Priority.ts
-  function usablePrefix(prefix) {
-    return /^\S+$/.test(prefix);
-  }
-  function usableLevels(levels) {
-    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
   }
 
   // src/settings.ts

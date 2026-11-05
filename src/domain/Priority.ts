@@ -21,3 +21,26 @@ export function sameLevels(a: readonly PriorityLevel[], b: readonly PriorityLeve
 export function usableLevels(levels: readonly PriorityLevel[]): readonly PriorityLevel[] {
 	return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
 }
+
+const FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+
+/**
+ * The level a text starts with: its first word when that is one of `prefixes` and whitespace follows it; the text is
+ * what comes after that whitespace. Any other text has none and stays as it is.
+ */
+export function priorityOfText(text: string, prefixes: readonly string[]): { priority: string | null; text: string } {
+	const m = FIRST_WORD_RE.exec(text);
+	if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+	return { priority: m[1], text: m[2] };
+}
+
+/** Nothing to write: no text, or a level's prefix with nothing after it. */
+export function isBlankTitle(text: string, prefixes: readonly string[]): boolean {
+	return priorityOfText(text, prefixes).text.trim() === "";
+}
+
+/** `text` with `prefix` first in place of the one it had; null takes it off. */
+export function withPriority(text: string, prefix: string | null, prefixes: readonly string[]): string {
+	const rest = priorityOfText(text, prefixes).text;
+	return prefix === null ? rest : `${prefix} ${rest}`;
+}
