@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type GroupName, listView, type TaskItem } from "../../src/application/contracts";
-import { gapPlace, listGaps } from "../../src/ui/listGroups";
+import { gapPlace, isEmptyGroup, listGaps } from "../../src/ui/listGroups";
 
 /** A list that shows sections, in its sections. */
 const listGroups = (items: readonly TaskItem[]) => listView(items, true).groups;
@@ -25,6 +25,26 @@ const item = (text: string, group: GroupName): TaskItem => onDay({
 	list: "now",
 	isSubtask: false,
 }, "2026-11-01");
+
+describe("an empty section", () => {
+	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+
+	it("is drawn over the No tasks plate; a group with tasks is not", () => {
+		const drawn = listView([item("A", null)], true, sections(["Morning", true], [null, false])).groups;
+		expect(isEmptyGroup(drawn[0])).toBe(true);
+		expect(isEmptyGroup(drawn[1])).toBe(false);
+	});
+
+	it("has one gap, its end", () => {
+		const a = item("A", null);
+		const drawn = listView([a], true, sections([null, false], ["Evening", true])).groups;
+		expect(listGaps(drawn, true).map((g) => g.place)).toEqual([
+			{ group: null, before: a.key },
+			{ group: null, before: null },
+			{ group: "Evening", before: null },
+		]);
+	});
+});
 
 describe("gaps", () => {
 	const a = item("A", null);

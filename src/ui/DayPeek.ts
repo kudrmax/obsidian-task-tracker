@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, DayBoundary, DayView, TaskService } from "../application/contracts";
+import type { CalendarEvent, CalendarService, DayBoundary, DayView, ListSection, TaskService } from "../application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { PROPERTY } from "./design";
 import { el } from "./dom";
@@ -17,6 +17,8 @@ export interface DayPeekDeps {
 	now(): Date;
 	/** Whether the day's list shows its sections. */
 	grouped(date: LocalDate): boolean;
+	/** The groups of the list the day's column shows, where its empty sections stand. */
+	sections(date: LocalDate): readonly ListSection[];
 	ungroupedName(): string;
 	/** How far the shown day's list is scrolled: the next day's opens there too. */
 	listScroll(): number;
@@ -56,6 +58,7 @@ export class DayPeek {
 			items: () => this.day?.list ?? [],
 			day: () => date,
 			grouped: () => deps.grouped(date),
+			sections: () => deps.sections(date),
 			ungroupedName: () => deps.ungroupedName(),
 		});
 		this.right = el(this.el, "div", "tc-right");

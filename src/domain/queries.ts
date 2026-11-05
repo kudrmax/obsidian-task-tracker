@@ -1,6 +1,8 @@
 import { DayBoundary } from "./DayBoundary";
-import { isOpen, type LocalDate } from "./Task";
-import type { TaskDocument, TaskEntry } from "./TaskDocument";
+import { dayColumn } from "./Days";
+import type { GroupedList } from "./Lists";
+import { isOpen, type GroupName, type LocalDate } from "./Task";
+import { type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
 
 function slottedOnDate(entry: TaskEntry, date: LocalDate, boundary: DayBoundary): boolean {
 	return entry.task.slot !== null && boundary.dayOfSlot(entry.task.slot) === date;
@@ -42,4 +44,39 @@ export function backlogList(doc: TaskDocument): readonly TaskEntry[] {
 /** An open task of its own may repeat; a subtask goes with its parent, and a closed task repeats no more. */
 export function repeatable(entry: TaskEntry): boolean {
 	return entry.path.length === 0 && isOpen(entry.task.status);
+}
+
+/** A column that shows a list's sections: Inbox, Backlog, Soon without a date, or the day column on `date`. */
+export type Column = { readonly kind: "inbox" | "backlog" | "soon" } | { readonly kind: "day"; readonly date: LocalDate };
+
+/** A group of a list as a column shows it: the tasks of its own it shows, in screen order. */
+export interface ColumnGroup {
+	readonly list: GroupedList;
+	/** Its place among the list's groups. */
+	readonly index: number;
+	readonly name: GroupName;
+	readonly entries: readonly TaskEntry[];
+}
+
+/** The list whose sections the column shows; null for a past day, which shows none. */
+export function columnList(column: Column, today: LocalDate): GroupedList | null {
+	if (column.kind !== "day") return column.kind;
+	const day = dayColumn(column.date, today);
+	return day.sections ? day.list : null;
+}
+
+/**
+ * The column's groups in screen order (empty sections spec §5.1): those with tasks the column shows, and the empty
+ * sections of its list, with no task in the file. The tasks of another list (Now's on a later day) lead No section.
+ */
+export function columnGroups(doc: TaskDocument, column: Column, today: LocalDate, boundary = DayBoundary.MIDNIGHT): readonly ColumnGroup[] {
+	const list = columnList(column, today);
+	if (list === null) return [];
+	const shown = column.kind === "day" ? dayList(doc, column.date, today, boundary) : column.kind === "soon" ? soonWithoutDate(doc) : doc.tasks(list);
+	const groups = doc.groups(list);
+	const ungrouped = ungroupedIndex(groups);
+	const others = shown.filter((e) => e.section !== list);
+	return groups
+		.map((g) => ({ list, index: g.index, name: g.name, entries: [...(g.index === ungrouped ? others : []), ...shown.filter((e) => e.section === list && g.entries.includes(e))] }))
+		.filter((g, i) => g.entries.length > 0 || (groups[i].heading && g.name !== null && groups[i].entries.length === 0));
 }

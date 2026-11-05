@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Пустая секция: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<dc-import name="Screen" foot="prod" plus="true" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 494px; overflow: hidden; background: {{c.bg}}; z-index: 5;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; white-space: nowrap; overflow: hidden; font-size: 13px; line-height: 20px; font-weight: 600; color: {{r.ink}};">{{r.title}}</div>
+</sc-if>
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px;"><div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div></div>
+</sc-if>
+<sc-if value="{{r.isOrigin}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 35px; box-sizing: border-box; border: 1px dashed {{c.dash}}; border-radius: 17.5px;"></div>
+</sc-if>
+<sc-if value="{{r.isEmpty}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: 175px; height: 35px; box-sizing: border-box; border: 1px {{r.line}} {{r.border}}; border-radius: 17.5px; background: {{r.fill}}; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px; color: {{r.ink}};">No tasks</div>
+</sc-if>
+</sc-for>
+</div>
+
+<sc-if value="{{drag}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 22px; top: 333px; width: 190px; height: 37px; box-sizing: border-box; background: {{c.float}}; border-radius: 18.5px; box-shadow: {{c.lift}}; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px; z-index: 8;">Чай масала</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"empty","options":["empty","drop"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const drop = this.props.view === 'drop';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', pull: '#6C6C70', dash: '#C7C7CC', accent: '#8A5CF5', dropBg: '#F1ECFE', float: '#FFFFFF', lift: '0 14px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.12)', mark: '#FF9500' }
+      : { bg: '#000000', card: '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', pull: '#AEAEB2', dash: '#3A3A3C', accent: '#9580FF', dropBg: '#251F3D', float: '#2C2C2E', lift: '0 14px 32px rgba(0,0,0,0.7), 0 0 0 1px #48484A', mark: '#FFD60A' };
+    const head = (top, title, ink) => ({ isHead: true, top, title, ink });
+    const card = (top, title) => ({ isCard: true, top, title });
+    const rows = [
+      head(0, 'No section', c.muted),
+      card(26, 'Разобрать почту'),
+      card(63, 'Позвонить маме'),
+      drop ? { isOrigin: true, top: 100 } : card(100, 'Чай масала'),
+      head(147, 'Evening', c.pull),
+      drop
+        ? { isEmpty: true, top: 173, line: 'solid', border: c.accent, fill: c.dropBg, ink: c.accent }
+        : { isEmpty: true, top: 173, line: 'dashed', border: c.dash, fill: c.bg, ink: c.muted }
+    ];
+    const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
+    const marks = [ring(10, 166 + 147, 175, 61, 17.5, drop ? '↑ Задача над плашкой: отпустил — она в Evening' : '↑ Пустая секция: плашка «No tasks»', 'left: 10px; top: ' + (166 + 147 + 61 + 12 + (drop ? 30 : 0)) + 'px;')];
+    return {
+      c, rows, drag: drop,
+      theme: light ? 'light' : 'dark',
+      marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

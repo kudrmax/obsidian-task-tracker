@@ -87,7 +87,7 @@ describe("DayData", () => {
 		setDate(TOMORROW);
 		await data.tasks();
 		expect(asked).toEqual([TOMORROW]);
-		expect(data.sections).toEqual(await offer(TOMORROW));
+		expect(data.offer).toEqual(await offer(TOMORROW));
 	});
 
 	it("another day asks for it with its neighbours", async () => {

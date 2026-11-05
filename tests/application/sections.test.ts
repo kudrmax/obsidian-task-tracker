@@ -15,7 +15,8 @@ const clock: Clock = { now: () => new Date(2026, 9, 30, 14, 20) };
 /**
  * Every list with sections. Now: a subtask, two tasks in Work, Evening holding only a task on today's timeline (rule 5
  * takes it out of the section, the empty heading goes). Soon: a
- * task for the later day outside any section, Trip holding only tasks of that day, the preset Morning. Done: a task.
+ * task for the later day outside any section, Trip holding only tasks of that day, the preset Morning. Now and Soon each
+ * end with an empty section, which stays (empty sections spec). Done: a task.
  */
 const FILE = [
 	"## Inbox",
@@ -36,6 +37,7 @@ const FILE = [
 	"- [ ] NE ⏰ 2026-10-30 19:00-20:00",
 	"### Работа",
 	"- [ ] N4",
+	"### Пусто",
 	"",
 	"## Soon",
 	"",
@@ -47,6 +49,7 @@ const FILE = [
 	"- [ ] ST 📅 2026-11-03",
 	"### Morning",
 	"- [ ] SM",
+	"### Empty",
 	"",
 	"## Backlog",
 	"",
@@ -118,6 +121,11 @@ describe("the sections a task's menu offers", () => {
 		expect(await choice(setup().svc, T, ["N1"])).toEqual({ names: ["Work", "Работа", "Morning", "Afternoon", "Evening"], current: null, ungrouped: "No section", shared: true });
 	});
 
+	it("an empty section is offered by none of the menus: they offer the sections of the tasks on the screen", async () => {
+		expect((await choice(setup().svc, T, ["N3"]))?.names).not.toContain("Пусто");
+		expect((await choice(setup().svc, T, ["S1"]))?.names).not.toContain("Empty");
+	});
+
 	it("a task in a section: that one is current", async () => {
 		expect((await choice(setup().svc, T, ["N3"]))?.current).toBe("Work");
 	});
@@ -175,6 +183,7 @@ describe("to a section", () => {
 			- [ ] N4
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
+			### Пусто
 
 			## Soon
 
@@ -186,6 +195,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -219,6 +229,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -230,6 +241,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -263,6 +275,7 @@ describe("to a section", () => {
 			- [ ] N3 📅 2026-10-30
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -274,6 +287,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -305,6 +319,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 			### Evening
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
@@ -319,6 +334,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -350,6 +366,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 			### Afternoon
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
@@ -364,6 +381,140 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
+
+			## Backlog
+
+			- [ ] B1
+			### Someday
+			- [ ] B2
+
+			## Done
+
+			- [x] X1
+			"
+		`);
+	});
+
+	it("one task into an empty section", async () => {
+		expect(await written(T, ["N1"], "Пусто")).toMatchInlineSnapshot(`
+			"## Inbox
+
+			- [ ] I1
+			- [ ] I2
+			### Ideas
+			- [ ] I3
+
+			## Now
+
+			- [ ] NE ⏰ 2026-10-30 19:00-20:00
+			### Work
+			- [ ] N3
+			- [ ] N3b
+			### Работа
+			- [ ] N4
+			### Пусто
+			- [ ] N1 📅 2026-10-30
+				- [ ] N1a
+
+			## Soon
+
+			- [ ] S1
+			- [ ] SD 📅 2026-11-03
+			### Later
+			- [ ] S2
+			### Trip
+			- [ ] ST 📅 2026-11-03
+			### Morning
+			- [ ] SM
+			### Empty
+
+			## Backlog
+
+			- [ ] B1
+			### Someday
+			- [ ] B2
+
+			## Done
+
+			- [x] X1
+			"
+		`);
+	});
+
+	it("the last task out of its section: the section goes", async () => {
+		expect(await written(T, ["N4"], null)).toMatchInlineSnapshot(`
+			"## Inbox
+
+			- [ ] I1
+			- [ ] I2
+			### Ideas
+			- [ ] I3
+
+			## Now
+
+			- [ ] N1
+				- [ ] N1a
+			- [ ] NE ⏰ 2026-10-30 19:00-20:00
+			- [ ] N4 📅 2026-10-30
+			### Work
+			- [ ] N3
+			- [ ] N3b
+			### Пусто
+
+			## Soon
+
+			- [ ] S1
+			- [ ] SD 📅 2026-11-03
+			### Later
+			- [ ] S2
+			### Trip
+			- [ ] ST 📅 2026-11-03
+			### Morning
+			- [ ] SM
+			### Empty
+
+			## Backlog
+
+			- [ ] B1
+			### Someday
+			- [ ] B2
+
+			## Done
+
+			- [x] X1
+			"
+		`);
+		expect(await written(T, ["N4"], "Work")).toMatchInlineSnapshot(`
+			"## Inbox
+
+			- [ ] I1
+			- [ ] I2
+			### Ideas
+			- [ ] I3
+
+			## Now
+
+			- [ ] N1
+				- [ ] N1a
+			- [ ] NE ⏰ 2026-10-30 19:00-20:00
+			### Work
+			- [ ] N3
+			- [ ] N3b
+			- [ ] N4 📅 2026-10-30
+			### Пусто
+
+			## Soon
+
+			- [ ] S1
+			- [ ] SD 📅 2026-11-03
+			### Later
+			- [ ] S2
+			### Trip
+			- [ ] ST 📅 2026-11-03
+			### Morning
+			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -395,6 +546,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 			### Экскурсия
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
@@ -409,6 +561,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -442,6 +595,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -453,6 +607,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -486,6 +641,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -497,6 +653,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -527,6 +684,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -537,6 +695,7 @@ describe("to a section", () => {
 			- [ ] S2
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -570,6 +729,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -581,6 +741,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -611,6 +772,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -622,10 +784,56 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
 			- [ ] B1
+			- [ ] B2
+
+			## Done
+
+			- [x] X1
+			"
+		`);
+	});
+
+	it("several into an empty section, one of them the last of its own", async () => {
+		expect(await written(T, ["N4", "N1"], "Пусто")).toMatchInlineSnapshot(`
+			"## Inbox
+
+			- [ ] I1
+			- [ ] I2
+			### Ideas
+			- [ ] I3
+
+			## Now
+
+			- [ ] NE ⏰ 2026-10-30 19:00-20:00
+			### Work
+			- [ ] N3
+			- [ ] N3b
+			### Пусто
+			- [ ] N1 📅 2026-10-30
+				- [ ] N1a
+			- [ ] N4 📅 2026-10-30
+
+			## Soon
+
+			- [ ] S1
+			- [ ] SD 📅 2026-11-03
+			### Later
+			- [ ] S2
+			### Trip
+			- [ ] ST 📅 2026-11-03
+			### Morning
+			- [ ] SM
+			### Empty
+
+			## Backlog
+
+			- [ ] B1
+			### Someday
 			- [ ] B2
 
 			## Done
@@ -654,6 +862,7 @@ describe("to a section", () => {
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
 			- [ ] N3 📅 2026-10-30
+			### Пусто
 
 			## Soon
 
@@ -665,6 +874,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -698,6 +908,7 @@ describe("to a section", () => {
 			- [ ] N3b 📅 2026-10-30
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -709,6 +920,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -742,6 +954,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -751,6 +964,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -794,6 +1008,7 @@ describe("to a section", () => {
 			- [ ] N3b
 			### Работа
 			- [ ] N4
+			### Пусто
 
 			## Soon
 
@@ -805,6 +1020,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -831,6 +1047,7 @@ describe("to a section", () => {
 			### Work
 			- [ ] N3
 			- [ ] N3b
+			### Пусто
 			### Экскурсия
 			- [ ] N1 📅 2026-10-30
 				- [ ] N1a
@@ -846,6 +1063,7 @@ describe("to a section", () => {
 			- [ ] ST 📅 2026-11-03
 			### Morning
 			- [ ] SM
+			### Empty
 
 			## Backlog
 
@@ -910,5 +1128,29 @@ describe("listView", () => {
 		expect(listView([item("A", null), item("B", "X")], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" }), expect.objectContaining({ text: "B" })] }] });
 		expect(listView([], false)).toEqual({ showsHeaders: false, groups: [{ name: null, items: [] }] });
 		expect(listView([], true)).toEqual({ showsHeaders: false, groups: [] });
+	});
+});
+
+describe("listView with empty sections", () => {
+	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+	const names = (view: { groups: readonly { name: GroupName; items: readonly TaskItem[] }[] }) => view.groups.map((g) => [g.name, g.items.length]);
+
+	it("puts an empty section where it stands in the file, after the group drawn above it", () => {
+		const view = listView([item("A", null), item("B", "Evening")], true, sections([null, false], ["Morning", true], ["Evening", false], ["Later", true]));
+		expect(names(view)).toEqual([[null, 1], ["Morning", 0], ["Evening", 1], ["Later", 0]]);
+	});
+
+	it("an empty section first in the file comes first; one section, empty, turns the headers on", () => {
+		const view = listView([item("A", null)], true, sections(["Morning", true], [null, false]));
+		expect(view.groups.map((g) => g.name)).toEqual(["Morning", null]);
+		expect(view.showsHeaders).toBe(true);
+	});
+
+	it("a section with tasks the column does not show stays out", () => {
+		expect(listView([item("A", null)], true, sections([null, false], ["Evening", false])).groups).toHaveLength(1);
+	});
+
+	it("a list that shows no sections draws no empty one", () => {
+		expect(listView([item("A", null)], false, sections(["Morning", true], [null, false]))).toEqual({ showsHeaders: false, groups: [{ name: null, items: [expect.objectContaining({ text: "A" })] }] });
 	});
 });

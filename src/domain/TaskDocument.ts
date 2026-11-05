@@ -288,24 +288,43 @@ export class TaskDocument {
 		return this.withLines(lines);
 	}
 
+	/** The last task taken out of a section takes the section away, unless something but blank lines is left under it. */
 	removeEntry(entry: TaskEntry): TaskDocument {
 		const span = this.spanOf(entry);
-		return this.withLines(this.splice(span.line, span.lineCount, []));
+		return this.leftBy(entry, this.withLines(this.splice(span.line, span.lineCount, [])));
 	}
 
-	/** A subtask moved here leaves its task and becomes a task of `section`. */
+	/** A subtask moved here leaves its task and becomes a task of `section`. The section it leaves empty goes, as with `removeEntry`. */
 	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition): TaskDocument {
 		const span = this.spanOf(entry);
 		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
 		const without = this.withLines(this.splice(span.line, span.lineCount, []));
 		const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
-		return without.withLines(without.splice(target, 0, moved));
+		return this.leftBy(entry, without.withLines(without.splice(target, 0, moved)));
 	}
 
 	/** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
 	addGroup(section: SectionKey, name: string, before: number): TaskDocument {
 		if (before < 1) throw new Error("No group goes above the tasks outside any section");
 		return this.withLines(this.splice(this.groupStartLine(section, before), 0, [`### ${name}`]));
+	}
+
+	/**
+	 * The `moved` tasks of group `index`, with their subtasks and in their order, go under a new `### name` right after the
+	 * group's last line that stays; the rest of the group stays as it is, even when nothing is left in it. Nothing to move is `addGroup` after the group.
+	 */
+	splitGroup(section: SectionKey, index: number, name: string, moved: readonly TaskEntry[]): TaskDocument {
+		if (moved.length === 0) return this.addGroup(section, name, index + 1);
+		const block = this.blockOf(section, index);
+		const spans = moved.map((entry) => this.spanOf(entry));
+		const inMoved = (line: number) => spans.some((span) => line >= span.line && line < span.line + span.lineCount);
+		let at = block.end;
+		while (at > block.start && (this.lines[at - 1].trim() === "" || inMoved(at - 1))) at--;
+		if (at === block.start) at = Math.min(...spans.map((span) => span.line));
+		const lines = moved.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
+		const kept = this.lines.filter((_, line) => !inMoved(line));
+		kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, `### ${name}`, ...lines);
+		return this.withLines(kept);
 	}
 
 	/** Group `from` goes before group `before`. The top block moved down gets the heading of the tasks outside any section. */
@@ -354,7 +373,7 @@ export class TaskDocument {
 		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
 		const without = this.splice(span.line, span.lineCount, []);
 		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
-		return this.withLines(without);
+		return this.leftBy(entry, this.withLines(without));
 	}
 
 	/**
@@ -413,6 +432,18 @@ export class TaskDocument {
 			lines.splice(heading + 1, filled - heading - 1, "");
 		}
 		return lines ? this.withLines(lines) : this;
+	}
+
+	/**
+	 * `after`, this document once `entry` was taken from its place (and put elsewhere): without the section it was the
+	 * last task of, when only blank lines are left under its heading. No section's heading is left to the rules.
+	 */
+	private leftBy(entry: TaskEntry, after: TaskDocument): TaskDocument {
+		if (entry.path.length > 0 || entry.group === null) return after;
+		const group = this.groups(entry.section).find((g) => g.entries.some((e) => e.index === entry.index));
+		const left = group && after.groups(entry.section)[group.index];
+		if (!group || !left?.heading || left.name !== group.name || !left.blank) return after;
+		return after.deleteGroup(entry.section, left.index);
 	}
 
 	private withLines(lines: readonly string[]): TaskDocument {

@@ -3,8 +3,11 @@ import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
-import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
+import { backlogList, type Column, columnGroups, columnList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
+import { hitIn, snippetIn, type TextHit } from "../domain/search";
+import { plainText } from "../domain/TaskText";
+import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
+import { descriptionMarkdown } from "../domain/description";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
@@ -18,15 +21,19 @@ import {
 	type GroupedList,
 	type GroupName,
 	type GroupPlace,
+	type ListSection,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
+	type SectionPlace,
+	type SearchHit,
 	type TaskChange,
 	type TaskDraft,
 	type TaskItem,
 	type TaskKey,
 	type TaskService,
 	type TaskStep,
+	type TitlePart,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import { runDrop } from "./drops";
@@ -50,10 +57,32 @@ interface Normalized {
 
 type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
 
+const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
+
+/** The column a section is written in from the field: a list's, or a later day's for Soon with a date. */
+function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
+	if (place.kind === "day") return { kind: "day", date: place.date };
+	if (place.list === "now") return { kind: "day", date: place.date ?? today };
+	if (place.list === "soon" && place.date !== undefined && place.date > today) return { kind: "day", date: place.date };
+	return { kind: place.list };
+}
+
 /** The changes that take a task elsewhere: its subtasks go along with it. */
 const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
 
 /** The other tasks a change names: the task to stand before, or the parent and the subtask to stand before. */
+/** The sections a search walks, in the order its results stand. */
+const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
+
+function titleParts(hit: TextHit): readonly TitlePart[] {
+	const parts: TitlePart[] = [
+		{ text: hit.before, match: false },
+		{ text: hit.match, match: true },
+		{ text: hit.after, match: false },
+	];
+	return parts.filter((part) => part.text !== "");
+}
+
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
 	if (change.kind === "moveBefore" || change.kind === "moveToGroup") return [change.before];
 	if (change.kind === "nest") return [change.parent, change.before];
@@ -128,6 +157,37 @@ export class TaskServiceImpl implements TaskService {
 		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
 		const names = (list: GroupedList) => offeredNames(shown.filter((entry) => entry.section === list).map((entry) => entry.group), presets, ungrouped);
 		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
+	}
+
+	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
+		const { doc } = await this.readNormalized();
+		const sectionsOf = (list: GroupedList): readonly ListSection[] =>
+			doc
+				.groups(list)
+				.filter((g) => g.heading || g.entries.length > 0)
+				.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(list)])) as Record<GroupedList, readonly ListSection[]>;
+	}
+
+	async doneView(): Promise<readonly TaskItem[]> {
+		const { doc, today } = await this.readNormalized();
+		return doc.tasks("done").map(this.itemOf(today));
+	}
+
+	async search(query: string): Promise<readonly SearchHit[]> {
+		if (query.trim() === "") return [];
+		const { doc, today } = await this.readNormalized();
+		const item = this.itemOf(today);
+		const hits: SearchHit[] = [];
+		const visit = (entry: TaskEntry): void => {
+			const title = hitIn(plainText(entry.task.text), query);
+			const markdown = descriptionMarkdown(entry);
+			const description = markdown === null ? null : snippetIn(markdown, query);
+			if (title || description) hits.push({ item: item(entry), title: title ? titleParts(title) : [], description });
+			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
+		};
+		for (const section of SEARCH_ORDER) for (const entry of doc.tasks(section)) visit(entry);
+		return hits;
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -316,6 +376,22 @@ export class TaskServiceImpl implements TaskService {
 			this.groupOf(doc, list, group);
 			return ops.removeGroup(doc, list, group);
 		});
+	}
+
+	async createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
+		const group = name.trim();
+		const column = columnOfPlace(place, this.today());
+		const list = columnList(column, this.today());
+		if (list === null || group === "" || group === this.settings.get().groups.ungrouped || group === place.group) return null;
+		const change = await this.mutate((doc, today, settings, boundary) => {
+			this.groupOf(doc, list, place.group);
+			const before = place.before ? this.entryOf(doc, place.before) : null;
+			const shown = columnGroups(doc, column, today, boundary).find((g) => g.name === place.group)?.entries ?? [];
+			if (before && !shown.some((e) => e.section === before.section && e.index === before.index && e.path.length === 0)) throw new StaleTaskError();
+			return ops.createSection(doc, column, place.group, before, group, settings.groups, today, boundary);
+		});
+		if (!change || change.after.serialize() === change.before.serialize()) return null;
+		return { list, group };
 	}
 
 	async applyAll(steps: readonly TaskStep[]): Promise<void> {

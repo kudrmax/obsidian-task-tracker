@@ -1,6 +1,6 @@
 import type { GroupedList } from "../domain/Lists";
 import type { GroupName } from "../domain/Task";
-import type { TaskItem } from "./contracts";
+import type { ListSection, TaskItem } from "./contracts";
 
 /** The tasks of one section of a list, in file order. */
 export interface ListGroup {
@@ -8,26 +8,50 @@ export interface ListGroup {
 	readonly items: readonly TaskItem[];
 }
 
-/** A list as its column draws it: its sections, and whether they show headers. */
+/**
+ * A list as its column draws it: its sections, and whether they show headers. A group with no items is an empty section,
+ * drawn as its heading over the No tasks plate (empty sections spec §5.2).
+ */
 export interface ListView {
-	/** Once the list has a section; the tasks outside any alone need none (sections spec §5.1). */
+	/** Once the column shows a section, an empty one too; the tasks outside any alone need none (sections spec §5.1). */
 	readonly showsHeaders: boolean;
 	readonly groups: readonly ListGroup[];
 }
 
 /**
  * The tasks of a list in its sections. A list that shows sections has each section's tasks where the section first shows (a
- * later day's column lists Now's tasks before Soon's, and a section's tasks gather where it first shows); one that shows none, all its tasks outside any.
+ * later day's column lists Now's tasks before Soon's, and a section's tasks gather where it first shows), and its list's
+ * empty sections, each right after the last group drawn that stands above it in the file (`sections`, in file order;
+ * empty sections spec §5). One that shows none: all its tasks outside any.
  */
-export function listView(items: readonly TaskItem[], sections: boolean): ListView {
+export function listView(items: readonly TaskItem[], sections: boolean, listSections: readonly ListSection[] = []): ListView {
 	if (!sections) return { showsHeaders: false, groups: [{ name: null, items }] };
+	const groups = withEmptySections(byGroup(items), listSections);
+	return { showsHeaders: groups.some((g) => g.name !== null), groups };
+}
+
+function byGroup(items: readonly TaskItem[]): ListGroup[] {
 	const groups: { name: GroupName; items: TaskItem[] }[] = [];
 	for (const item of items) {
 		const group = groups.find((g) => g.name === item.group);
 		if (group) group.items.push(item);
 		else groups.push({ name: item.group, items: [item] });
 	}
-	return { showsHeaders: groups.some((g) => g.name !== null), groups };
+	return groups;
+}
+
+function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
+	const drawn = [...groups];
+	sections.forEach((section, i) => {
+		if (!section.empty || drawn.some((g) => g.name === section.name)) return;
+		const above = new Set(sections.slice(0, i).map((s) => s.name));
+		let at = 0;
+		drawn.forEach((g, j) => {
+			if (above.has(g.name)) at = j + 1;
+		});
+		drawn.splice(at, 0, { name: section.name, items: [] });
+	});
+	return drawn;
 }
 
 /** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */

@@ -1,11 +1,10 @@
-import type { RightMode } from "../settings";
 import { LAYOUT } from "./design";
 import type { DayPeek } from "./DayPeek";
-import { PLACES, type Shift } from "./screens";
+import { type Place, placeIndex, type Shift } from "./screens";
 import type { ScreenTrack } from "./ScreenPager";
 
 /** What stands on the strip and slides with it: the columns, the dividers between them and the headers over them. */
-const STRIP = [".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
+const STRIP = [".tc-done", ".tc-inbox", ".tc-soon", ".tc-left", ".tc-right", ".tc-divider", ".tc-head"];
 
 export function stripParts(root: HTMLElement): HTMLElement[] {
 	return [...root.querySelectorAll<HTMLElement>(STRIP.map((part) => `:scope > ${part}`).join(", "))];
@@ -112,18 +111,18 @@ export function restore(parts: readonly HTMLElement[]): void {
 
 export interface StripTrackDeps {
 	readonly root: HTMLElement;
-	readonly from: RightMode;
-	readonly to: RightMode;
+	readonly from: Place;
+	readonly to: Place;
 	/** Sets the classes of a place on the screen, with no slide. */
-	showMode(mode: RightMode): void;
+	showMode(place: Place): void;
 	/** The switch's wheel turned to a place, a share of the way to the next one. */
 	turnWheel(position: number): void;
 	/** Arrived: the screen takes the place for good. */
-	onArrive(mode: RightMode): void;
+	onArrive(place: Place): void;
 }
 
 /** The sides and sizes that differ from one place of the strip to the next. */
-const SLIDING = ["left", "width", "paddingLeft", "paddingRight", "gap"] as const;
+const SLIDING = ["left", "marginLeft", "width", "paddingLeft", "paddingRight", "gap"] as const;
 /** The strip's slide is drawn as a still animation the finger scrubs through, a share of this per share of the way. */
 const SCRUB_MS = 1000;
 
@@ -146,10 +145,10 @@ export class StripTrack implements ScreenTrack {
 		deps.showMode(deps.to);
 		const after = parts.map(lookOf);
 		deps.showMode(deps.from);
-		this.fromPlace = PLACES.indexOf(deps.from);
-		this.way = PLACES.indexOf(deps.to) - this.fromPlace;
+		this.fromPlace = placeIndex(deps.from);
+		this.way = placeIndex(deps.to) - this.fromPlace;
 		const soon = parts.findIndex((part) => part.classList.contains("tc-soon"));
-		this.distance = soon < 0 ? root.clientWidth : Math.abs(parseFloat(after[soon].left ?? "0") - parseFloat(before[soon].left ?? "0"));
+		this.distance = soon < 0 ? root.clientWidth : Math.abs(offsetOf(after[soon]) - offsetOf(before[soon]));
 		parts.forEach((part, i) => {
 			const [start, end] = changed(before[i], after[i]);
 			if (Object.keys(start).length === 0) return;
@@ -171,6 +170,11 @@ export class StripTrack implements ScreenTrack {
 		else this.deps.turnWheel(this.fromPlace);
 		for (const animation of this.animations) animation.cancel();
 	}
+}
+
+/** How far from the window's edge a part stands: its left side and the margin that moves the strip to Done. */
+function offsetOf(look: Look): number {
+	return parseFloat(look.left ?? "0") + (parseFloat(look.marginLeft ?? "0") || 0);
 }
 
 function lookOf(part: HTMLElement): Look {

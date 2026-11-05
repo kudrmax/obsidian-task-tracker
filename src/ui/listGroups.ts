@@ -12,6 +12,11 @@ export interface ListGap {
 	readonly at: number;
 }
 
+/** A section with no task: its header stands over the No tasks plate. */
+export function isEmptyGroup(group: ListGroup): boolean {
+	return group.name !== null && group.items.length === 0;
+}
+
 /**
  * The gaps of a list, top to bottom: before each card of a section and after its last one. With headers and no task
  * outside any section, a gap above the first header puts the card there. The dragged card makes no gap of its own.
