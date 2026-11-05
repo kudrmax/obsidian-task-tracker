@@ -37,6 +37,25 @@ struct FakeExporter: CalendarExporting {
         #expect(first?.after?.title == "After Standup (1 hour)")
     }
 
+    @Test func theSameCalendarsAreNotWrittenAgainWithinTenMinutes() async {
+        let vault = FakeVault(Fixtures.file(Self.quiet))
+        let at = { (minute: Int) in
+            CalendarExport.text(calendars: [Self.work], events: [], from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9, minute), device: "iPhone", validUntil: nil)
+        }
+        vault.files["calendar/iphone.json"] = at(0)
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: at(5)), now: { Fixtures.date(4, 9, 5) }).sync()
+        #expect(vault.files["calendar/iphone.json"] == at(0))
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: at(10)), now: { Fixtures.date(4, 9, 10) }).sync()
+        #expect(vault.files["calendar/iphone.json"] == at(10))
+    }
+
+    @Test func theAccountIdGoesWithEachCalendar() {
+        let text = CalendarExport.text(
+            calendars: [ExportedCalendar(title: "Personal", calendarId: "p", account: "Gmail", color: nil, sourceId: "src-1")], events: [],
+            from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9), device: "iPhone", validUntil: nil)
+        #expect(text.contains(#""sourceId" : "src-1""#))
+    }
+
     @Test func noCalendarAccessLeavesTheFileAloneAndSetsTheRemindersAllTheSame() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         vault.files["calendar/iphone.json"] = "kept"

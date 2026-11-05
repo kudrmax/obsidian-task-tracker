@@ -186,7 +186,7 @@ public actor ReminderSync {
     /// The phone's calendars into the vault for the plugin, before the meetings are read back. Without access the file is
     /// left as it is; a write that fails leaves the reminders to be set all the same.
     private func exportCalendars(at: Date) async {
-        guard let text = try? await calendar.export(now: at) else { return }
+        guard let text = try? await calendar.export(now: at), CalendarExport.adds(text, over: vault.read(path: CalendarExport.path), at: at) else { return }
         try? vault.write(path: CalendarExport.path, text: text)
     }
 

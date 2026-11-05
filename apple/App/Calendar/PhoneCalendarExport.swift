@@ -21,7 +21,7 @@ final class PhoneCalendarExport: CalendarExporting {
         let from = Calendar.current.date(byAdding: .day, value: -Self.daysBack, to: today)!
         let to = Calendar.current.date(byAdding: .day, value: Self.daysAhead + 1, to: today)!
         let calendars = store.calendars(for: .event).map {
-            ExportedCalendar(title: $0.title, calendarId: $0.calendarIdentifier, account: $0.source.title, color: Self.hex($0.cgColor))
+            ExportedCalendar(title: $0.title, calendarId: $0.calendarIdentifier, account: $0.source.title, color: Self.hex($0.cgColor), sourceId: $0.source.sourceIdentifier)
         }
         let events = store.events(matching: store.predicateForEvents(withStart: from, end: to, calendars: nil))
             .filter { $0.status != .canceled && !Self.declined($0) }

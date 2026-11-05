@@ -6,12 +6,15 @@ public struct ExportedCalendar: Sendable {
     public let calendarId: String
     public let account: String
     public let color: String?
+    /// The account's own id: two accounts may share a title («Gmail»).
+    public let sourceId: String?
 
-    public init(title: String, calendarId: String, account: String, color: String?) {
+    public init(title: String, calendarId: String, account: String, color: String?, sourceId: String? = nil) {
         self.title = title
         self.calendarId = calendarId
         self.account = account
         self.color = color
+        self.sourceId = sourceId
     }
 }
 
@@ -59,7 +62,9 @@ public enum CalendarExport {
             "from": iso.string(from: from),
             "to": iso.string(from: to),
             "validUntil": validUntil.map(iso.string(from:)) ?? NSNull(),
-            "calendars": calendars.map { ["calendar": $0.title, "calendarId": $0.calendarId, "account": $0.account, "color": $0.color ?? NSNull()] as [String: Any] },
+            "calendars": calendars.map {
+                ["calendar": $0.title, "calendarId": $0.calendarId, "account": $0.account, "color": $0.color ?? NSNull(), "sourceId": $0.sourceId ?? NSNull()] as [String: Any]
+            },
             "events": events.map { event -> [String: Any] in
                 let calendar = byId[event.calendarId]
                 return [
@@ -71,5 +76,24 @@ public enum CalendarExport {
         ]
         let data = try! JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
         return String(decoding: data, as: UTF8.self) + "\n"
+    }
+
+    /// Sync carries every write: the same calendars are written again only to say they are still fresh, at most this often.
+    static let freshStep: TimeInterval = 10 * 60
+
+    /// `new` says nothing `old` did not, and `old` is not yet due to be called fresh again.
+    static func adds(_ new: String, over old: String?, at now: Date) -> Bool {
+        guard let old, let before = parsed(old), let after = parsed(new) else { return true }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let written = (before["exportedAt"] as? String).flatMap(iso.date(from:)), now.timeIntervalSince(written) < freshStep else { return true }
+        var a = before, b = after
+        a["exportedAt"] = nil
+        b["exportedAt"] = nil
+        return !NSDictionary(dictionary: a).isEqual(to: b)
+    }
+
+    private static func parsed(_ text: String) -> [String: Any]? {
+        (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
     }
 }
