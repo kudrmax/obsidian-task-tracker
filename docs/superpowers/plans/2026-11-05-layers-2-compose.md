@@ -41,8 +41,8 @@
 
 **Interfaces:** как в спеке. `GoogleAccountService(login: GoogleLogin, calendars: GoogleCalendarList, settings: SettingsStore)`; `isShown(id)` — `calendarIds` пуст или содержит `id`; `setShown(all, id, shown)` пишет `google.calendarIds` (все показаны — пустой список) через `settings.update({ google: { ...google, calendarIds } })`.
 
-- [ ] Тесты: «вошёл ли» и вход/выход идут в порт; пустой список — показаны все; снять галку — остальные в списке; вернуть последнюю — снова пустой; календарь не из списка не показан, пока список не пуст; список календарей — из порта.
-- [ ] `npm test` — PASS. Commit `Google account behind a contract: logged in, the calendars and which are shown, over two ports`.
+- [x] Тесты: «вошёл ли» и вход/выход идут в порт; пустой список — показаны все; снять галку — остальные в списке; вернуть последнюю — снова пустой; календарь не из списка не показан, пока список не пуст; список календарей — из порта.
+- [x] `npm test` — PASS. Commit `Google account behind a contract: logged in, the calendars and which are shown, over two ports`.
 
 ### Task 2: Корень сборки `src/compose.ts`, вкладка настроек на контрактах
 
@@ -50,20 +50,20 @@
 - Move (`git mv`): `src/application/services.ts` → `src/compose.ts`
 - Modify: `src/compose.ts`, `src/main.ts`, `src/ui/SettingsTab.ts`, `tests/architecture.test.ts`
 
-- [ ] `Services`: `tasks`, `undo`, `calendars`, `google: GoogleAccount`, `work: WorkCalendarSetup`, `receiveLogin(params)`, `keepWorkExportInstalled()`. `WorkCalendarSetup` — `{ scriptableLoader: () => workExport.loader, export: () => workShortcut.run() }`.
-- [ ] `SettingsTabDeps` → `{ google: GoogleAccount; work: WorkCalendarSetup }`; `GoogleCalendarOption`, `isShown`, `calendarIdsWith` уходят из UI; «вошёл ли» — `google.isLoggedIn()`.
-- [ ] `main.ts`: `createServices` из `./compose`; обработчик протокола — `services.receiveLogin`; `exportWorkCalendar` — `services.work.export()`.
-- [ ] Вычеркнуть 12 строк `src/application/services.ts → …`.
-- [ ] `grep -rn "obsidian\"\|infrastructure" src/application` — пусто. `npm test`, `npx tsc --noEmit` — PASS. Commit `Composition root next to main: application knows no Obsidian and no infrastructure; the settings tab asks the Google account`.
+- [x] `Services`: `tasks`, `undo`, `calendars`, `google: GoogleAccount`, `work: WorkCalendarSetup`, `receiveLogin(params)`, `keepWorkExportInstalled()`. `WorkCalendarSetup` — `{ scriptableLoader: () => workExport.loader, export: () => workShortcut.run() }`.
+- [x] `SettingsTabDeps` → `{ google: GoogleAccount; work: WorkCalendarSetup }`; `GoogleCalendarOption`, `isShown`, `calendarIdsWith` уходят из UI; «вошёл ли» — `google.isLoggedIn()`.
+- [x] `main.ts`: `createServices` из `./compose`; обработчик протокола — `services.receiveLogin`; `exportWorkCalendar` — `services.work.export()`.
+- [x] Вычеркнуть 12 строк `src/application/services.ts → …`.
+- [x] `grep -rn "obsidian\"\|infrastructure" src/application` — пусто. `npm test`, `npx tsc --noEmit` — PASS. Commit `Composition root next to main: application knows no Obsidian and no infrastructure; the settings tab asks the Google account`.
 
 ### Task 3: Лог быстрого ввода через зависимость вида
 
 **Files:**
 - Modify: `src/ui/TaskCalendarView.ts` (`ViewDeps.entryLog`), `src/compose.ts` (`vaultEntryLog`), `src/main.ts`, `src/demo.ts`
 
-- [ ] `ViewDeps.entryLog: { append(text: string): void }`; `traceEntry` пишет в него, условие (`Platform.isMobile`) и текст — те же.
-- [ ] `vaultEntryLog(adapter)` в корне: тот же путь «Task Calendar entry log.md», `exists` → `append`/`write`, ошибка — в консоль. Его берут `main.ts` и `demo.ts`.
-- [ ] `npm test`, `npm run build:demo` — PASS. Commit `The quick entry log goes through the view's deps, written by the root over the vault`.
+- [x] `ViewDeps.entryLog: { append(text: string): void }`; `traceEntry` пишет в него, условие (`Platform.isMobile`) и текст — те же.
+- [x] `vaultEntryLog(adapter)` в корне: тот же путь «Task Calendar entry log.md», `exists` → `append`/`write`, ошибка — в консоль. Его берут `main.ts` и `demo.ts`.
+- [x] `npm test`, `npm run build:demo` — PASS. Commit `The quick entry log goes through the view's deps, written by the root over the vault`.
 
 ### Task 4: Телефон над сервисом из application
 
@@ -73,13 +73,13 @@
 
 **Interfaces:** `export function snoozedSlot(slot: Slot, now: Date, minutes: number): Slot` — слот начинается через `minutes` от `now` (дата — день этого момента), длина та же, открытый остаётся открытым.
 
-- [ ] Тест `snoozedSlot`: длина сохраняется; через полночь — следующий день; открытый слот.
-- [ ] Класс `PhoneReminderService`, логика та же, `from` → `ops.snoozedSlot`. `phone/main.ts` импортирует только его.
-- [ ] Вычеркнуть 7 строк `src/phone/PhoneReminders.ts → …`.
-- [ ] `node phone/build.mjs`; `npm test` — PASS. Commit `Phone reminders are an application service; the snoozed slot is the domain's; the phone module only wires it`.
+- [x] Тест `snoozedSlot`: длина сохраняется; через полночь — следующий день; открытый слот.
+- [x] Класс `PhoneReminderService`, логика та же, `from` → `ops.snoozedSlot`. `phone/main.ts` импортирует только его.
+- [x] Вычеркнуть 7 строк `src/phone/PhoneReminders.ts → …`.
+- [x] `node phone/build.mjs`; `npm test` — PASS. Commit `Phone reminders are an application service; the snoozed slot is the domain's; the phone module only wires it`.
 
 ### Task 5: Сборки, проверка в тестовом Obsidian, ход работы
 
-- [ ] `npm test`, `npm run build:demo`, `npm run build` — PASS.
-- [ ] Тестовый Obsidian (порт 9352, свой профиль и vault в scratchpad): `basePath` — свой vault; сборка ветки в `.obsidian/plugins/task-calendar/`, плагин перезагружен; вид открыт; снимки Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная; в консоли нет ошибок плагина; вкладка настроек — раздел Google и рабочего календаря как раньше (не вошёл).
-- [ ] Строка 2 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 2 planned, done and checked in Obsidian`.
+- [x] `npm test`, `npm run build:demo`, `npm run build` — PASS.
+- [x] Тестовый Obsidian (порт 9367: 9352 не отвечал, поднят новый профиль `profile-2` над тем же vault; свой профиль и vault в scratchpad): `basePath` — свой vault; сборка ветки в `.obsidian/plugins/task-calendar/`, плагин перезагружен; вид открыт; снимки Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная; в консоли нет ошибок плагина; вкладка настроек — раздел Google и рабочего календаря как раньше (не вошёл).
+- [x] Строка 2 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 2 planned, done and checked in Obsidian`.
