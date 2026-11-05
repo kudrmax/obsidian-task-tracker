@@ -407,7 +407,7 @@ describe("styles.css keeps to its design system", () => {
 		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
 		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
-		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-seg) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
+		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
 	});
@@ -421,6 +421,14 @@ describe("styles.css keeps to its design system", () => {
 		const hidden = sheet.rules.find((d) => d.selector.includes(".mobile-toolbar") && d.property === "display");
 		expect(hidden?.selector).toBe("body.is-mobile:has(.task-calendar.is-entering) :is(.mobile-toolbar, .mobile-toolbar-spacer)");
 		expect(hidden?.value).toBe("none");
+	});
+
+	it("stands the phone's search bar on the keyboard while it is up, over Obsidian's navigation only while it is down", () => {
+		expect(sheet.tokens.get("--tc-search-bottom")).toBe("calc(var(--tc-bar-bottom) + var(--tc-nav-room))");
+		const up = sheet.rules.find((d) => d.property === "--tc-search-bottom");
+		expect(up?.selector).toBe(".task-calendar.is-keyboard-up > .tc-search");
+		expect(up?.value).toBe("var(--tc-bar-bottom)");
+		expect(sheet.rules.find((d) => d.selector === ".tc-search-bar" && d.property === "bottom")?.value).toBe("var(--tc-search-bottom)");
 	});
 
 	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
