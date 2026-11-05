@@ -83,7 +83,7 @@ describe("the selection", () => {
 });
 
 function controller(extra: Partial<BulkDeps> = {}): BulkController {
-	return new BulkController({
+	const bulk = new BulkController({
 		root: document.body,
 		apply: async () => {},
 		today: () => T,
@@ -96,6 +96,8 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 		isMod: (e) => e.metaKey,
 		...extra,
 	});
+	bulk.mount();
+	return bulk;
 }
 
 describe("bulk actions", () => {

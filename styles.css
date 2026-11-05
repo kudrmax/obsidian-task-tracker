@@ -696,9 +696,10 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar:not(.is-selecting) > button.tc-select-btn, .task-calendar.is-dragging > button.tc-select-btn, .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule) { display: none; }
 .task-calendar > button.tc-select-exit { left: var(--tc-space-16); }
 .task-calendar > button.tc-select-exit svg { stroke-width: var(--tc-stroke-ring); }
-.task-calendar > button.tc-select-count { right: var(--tc-space-16); width: auto; min-width: var(--tc-select-count-w); padding: 0 var(--tc-space-12) 0 var(--tc-space-16); flex-direction: row-reverse; gap: var(--tc-space-4); font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
-.task-calendar > button.tc-select-count svg { width: var(--tc-select-count-icon); height: var(--tc-select-count-icon); stroke-width: var(--tc-stroke-select-count); }
-.task-calendar > button.tc-btn.tc-select-count.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.task-calendar > button.tc-select-count { right: var(--tc-space-16); }
+button.tc-btn.tc-select-count { width: auto; min-width: var(--tc-select-count-w); padding: 0 var(--tc-space-12) 0 var(--tc-space-16); flex-direction: row-reverse; gap: var(--tc-space-4); font-size: var(--tc-text-17); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
+button.tc-select-count svg { width: var(--tc-select-count-icon); height: var(--tc-select-count-icon); stroke-width: var(--tc-stroke-select-count); }
+button.tc-btn.tc-select-count.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
 .tc-plus svg { stroke-width: var(--tc-stroke-plus); }
 .task-calendar > .tc-plus-ring { border: var(--tc-hairline) dashed var(--tc-dash); color: var(--tc-accent); pointer-events: none; }
 .task-calendar > .tc-plus-ring svg { stroke-width: var(--tc-stroke-ring); }

@@ -48,14 +48,19 @@ const SELECTING = "is-selecting";
 export class BulkController {
 	readonly selection = new TaskSelection(() => this.showCount());
 	private readonly ring: PlusRing;
-	private readonly count: Button;
+	private count: Button | null = null;
 	private menu: BulkMenu | null = null;
 	private selecting = false;
 
 	constructor(private readonly deps: BulkDeps) {
 		this.ring = new PlusRing(deps.root, "cross");
-		Button.create(deps.root, { kind: "round", label: "Stop selecting", icon: "cross", cls: "tc-select-btn tc-select-exit", onPress: () => this.stop() });
-		this.count = Button.create(deps.root, { kind: "round", tone: "accent", label: "Actions for selected tasks", icon: "chevronUp", text: "0", cls: "tc-select-btn tc-select-count", onPress: () => this.openMenu(this.count.el, "over") });
+	}
+
+	/** The view's content is laid out: the cross and the count of Select tasks join it, hidden until it starts. */
+	mount(): void {
+		Button.create(this.deps.root, { kind: "round", label: "Stop selecting", icon: "cross", cls: "tc-select-btn tc-select-exit", onPress: () => this.stop() });
+		const count = Button.create(this.deps.root, { kind: "round", tone: "accent", label: "Actions for selected tasks", icon: "chevronUp", text: "0", cls: "tc-select-btn tc-select-count", onPress: () => this.openMenu(count.el, "over") });
+		this.count = count;
 		this.showCount();
 	}
 

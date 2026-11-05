@@ -400,6 +400,7 @@ export class TaskCalendarView extends ItemView {
 		this.unsubscribe.push(() => keyboard.destroy());
 		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() });
 		this.unsubscribe.push(() => capsule.destroy());
+		this.bulk.mount();
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
