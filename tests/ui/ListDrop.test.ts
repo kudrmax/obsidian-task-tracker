@@ -21,6 +21,8 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	subtasks: [],
 	progress: null,
 	parentText: null, description: null,
+	list: section,
+	isSubtask: false,
 });
 
 /** How often each node's place was read: a drag measures a card once. */

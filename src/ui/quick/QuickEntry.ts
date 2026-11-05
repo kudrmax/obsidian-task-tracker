@@ -1,6 +1,6 @@
-import { type NewTaskPlace, type Placement, type RepeatRule, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { type NewTaskPlace, type Placement, type RepeatRule, sameLine, samePlace, sameRule, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { ListColumn } from "../drag/DropTarget";
-import { type GapPlace, type ListCard, type PlaceResult, fitLevel, resultOf, sameTask, shiftLevel } from "../drag/listPlace";
+import { type GapPlace, type LevelCard, type ListCard, type PlaceResult, fitLevel, resultOf, shiftLevel } from "../drag/listPlace";
 import type { Slot } from "../types";
 import { WriteQueue } from "./WriteQueue";
 
@@ -60,9 +60,6 @@ interface Line extends PendingText {
 	readonly repeat: RepeatRule | null;
 }
 
-/** The key of a card that stands for a text not yet written: only its level counts. */
-const UNWRITTEN: TaskKey = { section: "now", index: -1, path: [], raw: "" };
-
 /**
  * A spot the entry still writes at or reads from: the field's, a renamed task's own, one whose texts are queued. Its
  * place in a list follows the cards that land, so it keeps meaning the same gap until the file catches up with it.
@@ -83,8 +80,8 @@ class Run {
 	shifted(cards: readonly ListCard[], delta: 1 | -1): GapPlace | null {
 		if (this.spot.kind !== "list") return null;
 		const { place } = this.spot;
-		const unwritten = this.pending.map((line): ListCard => ({ key: UNWRITTEN, level: line.level, group: place.group }));
-		const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
+		const unwritten = this.pending.map((line): LevelCard => ({ level: line.level, group: place.group }));
+		const shown: LevelCard[] = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
 		const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
 		return shifted && { ...place, level: shifted.level };
 	}
@@ -288,7 +285,7 @@ export class QuickEntry {
 	private keyAt(home: Run, item: TaskItem): TaskKey {
 		if (home.spot.kind !== "list") return item.key;
 		const card = this.deps.cards(home.spot.column)[home.spot.place.index];
-		return card?.key.raw === item.key.raw ? card.key : item.key;
+		return card && sameLine(card.key, item.key) ? card.key : item.key;
 	}
 
 	/** The field's text, written at its run once the lists show the writes before it: at the level it was entered at, as far as the cards then allow. */
@@ -349,7 +346,7 @@ export class QuickEntry {
 	 * stays where it is, as for a task put elsewhere.
 	 */
 	private landed(column: ListColumn, created: TaskKey, cards: readonly ListCard[]): void {
-		const index = cards.findIndex((card) => sameTask(card.key, created) && card.key.raw === created.raw);
+		const index = cards.findIndex((card) => samePlace(card.key, created) && sameLine(card.key, created));
 		if (index >= 0) this.runs.landed(column, index);
 	}
 

@@ -5,7 +5,7 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
-import { type GapPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, samePlace } from "./listPlace";
+import { type GapPlace, type PlacedCard, type PlacedHead, placeAt, resultOf, sameGap } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
@@ -99,7 +99,7 @@ export class ListDrop implements DropTarget {
 					LAYOUT.dropHysteresis,
 				);
 		this.place = place;
-		if (fresh && (!before || !samePlace(before, place) || before.level !== place.level)) this.onNewPlace();
+		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
 		if (!this.isHome(place)) {
 			const line = this.lineRect(place, frame);
 			this.line.show(line.left, line.right, line.top, frame, fresh ? { x, y } : null);
@@ -150,7 +150,7 @@ export class ListDrop implements DropTarget {
 	/** The place the card was lifted from, at its level: let go there, the card only goes back. Several cards carried have none. */
 	private isHome(place: GapPlace): boolean {
 		const home = this.liftedFrom();
-		return home !== null && !this.carriesMany() && samePlace(place, home) && place.level === home.level;
+		return home !== null && !this.carriesMany() && sameGap(place, home) && place.level === home.level;
 	}
 
 	private carriesMany(): boolean {
@@ -285,7 +285,7 @@ export class ListDrop implements DropTarget {
 		const layout = this.layoutFor(frame);
 		const gap = this.gapRect(place, frame);
 		const home = this.liftedFrom();
-		if (layout.waiting && home && samePlace(place, home) && !this.carriesMany()) {
+		if (layout.waiting && home && sameGap(place, home) && !this.carriesMany()) {
 			const over = toClient(frame, 0, layout.waiting.top - layout.size.gap / 2).y;
 			return new DOMRect(gap.left, over, gap.width, 0);
 		}

@@ -1,10 +1,14 @@
-import type { GroupName, TaskKey } from "../../application/contracts";
+import { type GroupName, samePlace, type TaskKey } from "../../application/contracts";
 
-/** A card of the list as a place in it sees it: its task, how deep, and the section it is drawn in (none in a list that shows none). */
-export interface ListCard {
-	readonly key: TaskKey;
+/** A card as the levels around a place see it: how deep, and the section it is drawn in (none in a list that shows none). */
+export interface LevelCard {
 	readonly level: number;
 	readonly group: GroupName;
+}
+
+/** A card of the list as a place in it sees it: also its task. */
+export interface ListCard extends LevelCard {
+	readonly key: TaskKey;
 }
 
 /** A card of the list as the drop sees it: also where it stands. */
@@ -40,7 +44,7 @@ function orderOf(heads: readonly PlacedHead[], group: GroupName): number {
 }
 
 /** The same place but perhaps for its level: the same gap in the same section. */
-export function samePlace(a: GapPlace, b: GapPlace): boolean {
+export function sameGap(a: GapPlace, b: GapPlace): boolean {
 	return a.index === b.index && a.group === b.group;
 }
 
@@ -67,8 +71,8 @@ export function placeAt(
 ): GapPlace {
 	const at = (finger: number) => rawPlaceAt(cards, finger, level, shift, room, heads);
 	const place = at(y);
-	if (!held || hysteresis <= 0 || samePlace(place, held)) return place;
-	if (!samePlace(at(y - hysteresis), held) && !samePlace(at(y + hysteresis), held)) return place;
+	if (!held || hysteresis <= 0 || sameGap(place, held)) return place;
+	if (!sameGap(at(y - hysteresis), held) && !sameGap(at(y + hysteresis), held)) return place;
 	return fitLevel(cards, { ...held, level: Math.round(level) });
 }
 
@@ -89,20 +93,20 @@ function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shif
  * The levels a card may take in the gap before card `index`, in section `group`: no shallower than the card below, no deeper
  * than one under the card above. Neighbours of another section do not count, so a header breaks nesting.
  */
-export function levelRange(cards: readonly ListCard[], index: number, group: GroupName): { readonly min: number; readonly max: number } {
+export function levelRange(cards: readonly LevelCard[], index: number, group: GroupName): { readonly min: number; readonly max: number } {
 	const prev = cards[index - 1]?.group === group ? cards[index - 1] : undefined;
 	const next = cards[index]?.group === group ? cards[index] : undefined;
 	return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
 }
 
 /** The place at the level nearest its own that the neighbours allow. */
-export function fitLevel(cards: readonly ListCard[], place: GapPlace): GapPlace {
+export function fitLevel(cards: readonly LevelCard[], place: GapPlace): GapPlace {
 	const { min, max } = levelRange(cards, place.index, place.group);
 	return { ...place, level: Math.max(min, Math.min(max, place.level)) };
 }
 
 /** The place one level deeper (`delta` 1) or shallower (-1), or null when the neighbours do not allow it. */
-export function shiftLevel(cards: readonly ListCard[], place: GapPlace, delta: 1 | -1): GapPlace | null {
+export function shiftLevel(cards: readonly LevelCard[], place: GapPlace, delta: 1 | -1): GapPlace | null {
 	const level = place.level + delta;
 	const { min, max } = levelRange(cards, place.index, place.group);
 	return level >= min && level <= max ? { ...place, level } : null;
@@ -117,18 +121,13 @@ export function resultOf(cards: readonly ListCard[], place: GapPlace): PlaceResu
 	return { kind: "subtask", parent: cards[parent].key, before };
 }
 
-/** The same line of the file: the same place, whatever its text. */
-export function sameTask(a: TaskKey, b: TaskKey): boolean {
-	return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-}
-
 /**
  * The gap a result means, read back as `resultOf` writes it: right before `before` at its level; else after the whole of
  * the parent's subtree a level under it, or at the end of the section (above every header for the tasks outside any,
  * when none of them shows).
  */
 export function gapOf(cards: readonly ListCard[], result: PlaceResult): GapPlace {
-	const at = (key: TaskKey) => cards.findIndex((card) => sameTask(card.key, key));
+	const at = (key: TaskKey) => cards.findIndex((card) => samePlace(card.key, key));
 	const before = result.before ? at(result.before) : -1;
 	if (before >= 0) return { kind: "gap", index: before, level: cards[before].level, group: cards[before].group };
 	const parent = result.kind === "subtask" ? at(result.parent) : -1;

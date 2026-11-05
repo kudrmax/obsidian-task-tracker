@@ -1,11 +1,10 @@
-import type { CalendarEvent, DayBoundary, TaskItem, TaskKey } from "../application/contracts";
+import { type CalendarEvent, type DayBoundary, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, LAYOUT, PROPERTY } from "./design";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
-import { sameTask } from "./drag/listPlace";
 import { markPriority, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
@@ -468,7 +467,7 @@ export class Timeline {
 	}
 
 	private isRenamed(item: TaskItem): boolean {
-		return this.field?.at.kind === "rename" && sameTask(this.field.at.key, item.key);
+		return this.field?.at.kind === "rename" && samePlace(this.field.at.key, item.key);
 	}
 
 	/** Where the dropped task will come to rest once the stack takes it in, in client pixels. */
@@ -497,7 +496,7 @@ export class Timeline {
 	/** The change of task `key`'s time is written, or failed: its card stands as its task says. A stretch of another task, begun meanwhile, stays. */
 	endStretch(key: TaskKey): void {
 		const stretch = this.stretch;
-		if (!stretch?.key || !sameTask(stretch.key, key)) return;
+		if (!stretch?.key || !samePlace(stretch.key, key)) return;
 		this.stretch = null;
 		this.frame = null;
 		stretch.el.classList.remove("is-resizing");
@@ -506,7 +505,7 @@ export class Timeline {
 
 	/** A redraw while the new time is written: the task, still on the time it had, stays stretched on its new card. */
 	private keepStretch(stretch: Stretch): void {
-		const task = stretch.key && stretch.from ? this.tasks.find((t) => sameTask(t.item.key, stretch.key!)) : undefined;
+		const task = stretch.key && stretch.from ? this.tasks.find((t) => samePlace(t.item.key, stretch.key!)) : undefined;
 		if (!task || !sameSlot(task.item.slot, stretch.from)) return;
 		task.el.classList.add("is-resizing");
 		this.stretch = { ...stretch, el: task.el };
@@ -584,7 +583,7 @@ export class Timeline {
 	}
 
 	private isSelected(item: TaskItem): boolean {
-		return this.selected !== null && item.key.section === this.selected.section && item.key.index === this.selected.index;
+		return this.selected !== null && sameTaskTree(item.key, this.selected);
 	}
 
 	private mark(parent: HTMLElement, minutes: number, text: string): HourMark {

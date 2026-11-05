@@ -15,12 +15,12 @@ export interface MoveTile {
 /** The day a task stands on: its slot's, today's for Now, else its due date. */
 function dayOf(item: TaskItem, today: LocalDate): LocalDate | null {
 	if (item.slot) return item.slot.date;
-	return item.key.section === "now" ? today : item.dueDate;
+	return item.list === "now" ? today : item.dueDate;
 }
 
 /** Today, Tomorrow and Pick a date, without the day the task already stands on; a done task is put off nowhere. */
 export function moveTiles(item: TaskItem, today: LocalDate): readonly MoveTile[] {
-	if (item.key.section === "done") return [];
+	if (item.list === "done") return [];
 	const own = dayOf(item, today);
 	const tomorrow = addDays(today, 1);
 	const tiles: MoveTile[] = [

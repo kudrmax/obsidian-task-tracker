@@ -34,6 +34,8 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	progress: null,
 	parentText: null,
 	description: null,
+	list: k.section,
+	isSubtask: k.path.length > 0,
 });
 
 interface SetUp {

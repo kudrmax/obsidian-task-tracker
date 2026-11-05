@@ -217,7 +217,7 @@ describe("DragController: a drop that changes nothing", () => {
 });
 
 describe("DragController: stretching a block (block 3)", () => {
-	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null } as unknown as TaskItem;
+	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
 
 	function stretching(onResize: () => Promise<void> = async () => undefined) {
 		const arbiter = new GestureArbiter();

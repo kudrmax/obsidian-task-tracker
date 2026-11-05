@@ -1,10 +1,10 @@
-import type { GroupName, PriorityLevel, TaskChange, TaskItem, TaskStep } from "../application/contracts";
+import { type GroupName, keyId, type PriorityLevel, type TaskChange, type TaskItem, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropResult, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { canRemoveDue } from "./menu/quickMoves";
 import type { SectionChoice } from "./menu/TaskMenu";
 import { PlusRing } from "./quick/PlusRing";
-import { keyId, type PickedCard, TaskSelection } from "./TaskSelection";
+import { type PickedCard, TaskSelection } from "./TaskSelection";
 import type { LocalDate } from "./types";
 
 /** Where the picked tasks can go among their list's sections: only when they all stand in one list that shows them. */

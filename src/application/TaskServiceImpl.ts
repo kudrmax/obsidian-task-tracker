@@ -28,6 +28,7 @@ import { EntryTags } from "../domain/EntryTags";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { toItem } from "./taskItems";
+import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
@@ -52,8 +53,9 @@ function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
 	return [];
 }
 
+/** The same task as read: its place and its line. */
 function sameKey(a: TaskKey, b: TaskKey): boolean {
-	return a.section === b.section && a.index === b.index && a.raw === b.raw && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+	return samePlace(a, b) && sameLine(a, b);
 }
 
 /** `a` is a task `b` sits under, at any depth. */

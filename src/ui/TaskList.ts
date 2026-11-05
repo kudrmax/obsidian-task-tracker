@@ -1,9 +1,9 @@
-import type { GroupName, TaskItem, TaskKey } from "../application/contracts";
+import { type GroupName, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { type ListGroup, listGroups, showsHeaders } from "./listGroups";
-import { type GapPlace, type ListCard, sameTask } from "./drag/listPlace";
+import type { GapPlace, ListCard } from "./drag/listPlace";
 import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
@@ -99,7 +99,7 @@ export class TaskList {
 			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
-			const renamed = renaming !== null && sameTask(renaming, item.key);
+			const renamed = renaming !== null && samePlace(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
 			this.entries.push({ card, item, level });
 			this.nodes.push(card);
@@ -168,7 +168,7 @@ export class TaskList {
 	private markRenamed(renaming: TaskKey | null): void {
 		const row = this.keptRow();
 		if (!row) return;
-		const renamed = renaming === null ? undefined : this.entries.find((e) => sameTask(renaming, e.item.key));
+		const renamed = renaming === null ? undefined : this.entries.find((e) => samePlace(renaming, e.item.key));
 		if (renamed) showProgressDot(row, renamed.item);
 		else row.querySelector(":scope > .tc-progress-dot")?.remove();
 	}

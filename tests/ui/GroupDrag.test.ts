@@ -49,6 +49,8 @@ describe("a section carried (block 3)", () => {
 		progress: null,
 		parentText: null,
 		description: null,
+		list: "soon",
+		isSubtask: false,
 	});
 	const pointer = (type: string, x: number, y: number) => new PointerEvent(type, { clientX: x, clientY: y, pointerId: 3, isPrimary: true, button: 0, bubbles: true, pointerType: "touch" });
 

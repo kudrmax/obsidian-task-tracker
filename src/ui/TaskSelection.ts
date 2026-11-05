@@ -1,4 +1,4 @@
-import type { TaskItem, TaskKey } from "../application/contracts";
+import { keyId, type TaskItem } from "../application/contracts";
 import type { ListColumn } from "./drag/DropTarget";
 
 /** A list card as the selection knows it: the task, the card drawn for it, the list it stands in, its subtasks' cards. */
@@ -10,11 +10,6 @@ export interface PickedCard {
 }
 
 const SELECTED = "is-selected";
-
-/** The same task as read: its place and its line. */
-export function keyId(key: TaskKey): string {
-	return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
-}
 
 /**
  * The tasks picked with ⌘-click for an action on all of them (bulk actions spec, desktop only). A redraw gives each

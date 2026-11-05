@@ -19,6 +19,8 @@ const task = (text: string, index: number): TaskItem => ({
 	progress: null,
 	parentText: null,
 	description: null,
+	list: "now",
+	isSubtask: false,
 });
 
 describe("TaskList", () => {

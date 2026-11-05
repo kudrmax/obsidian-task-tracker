@@ -19,7 +19,7 @@ const item = (extra: Partial<TaskItem> = {}): TaskItem => ({
 	subtasks: [],
 	progress: null,
 	parentText: null, description: null,
-	...extra,
+	list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra,
 });
 
 describe("renderTaskCard", () => {

@@ -42,10 +42,21 @@ describe("toItem", () => {
 			repeatable: true,
 			priority: null,
 			group: null,
+			list: "now",
+			isSubtask: false,
 			subtasks: [],
 			progress: null,
 			parentText: null, description: null,
 		});
+	});
+
+	it("tells the list a task is in and whether it is a subtask, a subtask's list its task's", () => {
+		const trip = toItem(parse(TRIP).tasks("now")[0]);
+		const later = toItem(parse(TRIP).tasks("soon")[0]);
+		expect([trip.list, trip.isSubtask]).toEqual(["now", false]);
+		expect([later.list, later.isSubtask]).toEqual(["soon", false]);
+		expect(trip.subtasks.map((s) => [s.list, s.isSubtask])).toEqual([["now", true], ["now", true]]);
+		expect(trip.subtasks[0].subtasks.map((s) => [s.list, s.isSubtask])).toEqual([["now", true]]);
 	});
 
 	it("tells whether the task may repeat: an open task of its own; not a subtask, nor a closed task", () => {

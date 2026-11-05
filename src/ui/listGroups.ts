@@ -1,5 +1,4 @@
-import type { GroupName, TaskItem, TaskKey } from "../application/contracts";
-import { sameTask } from "./drag/listPlace";
+import { type GroupName, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 
 /** The cards of one section of a list, in file order. */
 export interface ListGroup {
@@ -46,7 +45,7 @@ export function listGaps(groups: readonly ListGroup[], headers: boolean, dragged
 	for (const group of groups) {
 		if (headers) at++;
 		for (const item of group.items) {
-			if (!dragged || !sameTask(item.key, dragged)) gaps.push({ place: { group: group.name, before: item.key }, at });
+			if (!dragged || !samePlace(item.key, dragged)) gaps.push({ place: { group: group.name, before: item.key }, at });
 			at++;
 		}
 		gaps.push({ place: { group: group.name, before: null }, at });
