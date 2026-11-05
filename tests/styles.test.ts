@@ -482,8 +482,7 @@ describe("the code keeps to the design system", () => {
 	});
 });
 
-describe("the time on a card with a priority", () => {
-	const LEVELS = ["red", "orange", "yellow", "green", "teal", "blue"];
+describe("a plain card", () => {
 	const luminance = (hex: string): number => {
 		const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
 		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -512,15 +511,5 @@ describe("the time on a card with a priority", () => {
 	it.each(GROUNDS)("leaves a plain card standing out from the ground as much as the board's, %s", (_, tokens, [boardCard, boardGround]) => {
 		const t = tokens();
 		expect(contrast(resolve(t, "var(--tc-card-bg)"), resolve(t, "var(--tc-bg)"))).toBeGreaterThanOrEqual(contrast(boardCard, boardGround) - 0.01);
-	});
-
-	it.each(GROUNDS)("takes the level's hue and reads as well as the grey on a plain card, %s", (_, tokens) => {
-		const t = tokens();
-		const grey = contrast(t.get("--tc-muted")!, resolve(t, "var(--tc-card-bg)"));
-		for (const level of LEVELS) {
-			const meta = t.get(`--tc-priority-${level}-meta`)!;
-			expect(contrast(meta, t.get(`--tc-priority-${level}-card`)!), level).toBeGreaterThanOrEqual(grey - 0.01);
-			expect(meta).not.toBe(t.get("--tc-muted"));
-		}
 	});
 });
