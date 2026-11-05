@@ -82,7 +82,13 @@ export class DemoTaskService implements TaskService {
 		return [];
 	}
 
-	async setLabels(): Promise<void> {}
+	async setLabels(): Promise<null> {
+		return null;
+	}
+
+	async setLabelsAll(steps: readonly unknown[]): Promise<readonly null[]> {
+		return steps.map(() => null);
+	}
 
 	priorityLevels(): readonly PriorityLevel[] {
 		return usableLevels(DEFAULT_SETTINGS.priorities);

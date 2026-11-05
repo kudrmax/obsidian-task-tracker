@@ -1,4 +1,4 @@
-import { type GroupName, keyId, type PriorityLevel, type SectionChoice, type TaskChange, type TaskItem, type TaskKey, type TaskStep } from "../application/contracts";
+import { type GroupName, keyId, type LabelLevel, type PriorityLevel, type SectionChoice, type TaskChange, type TaskItem, type TaskKey, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
@@ -23,6 +23,9 @@ export interface BulkDeps {
 	/** The day the day column shows. */
 	day(): LocalDate;
 	levels(): readonly PriorityLevel[];
+	labels(): readonly LabelLevel[];
+	/** Writes each task's labels, the screen shows them, and resolves with the tasks as they then stand, null for one gone. */
+	setLabels(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** The cards of a list, in order. */
 	cards(column: ListColumn): readonly HTMLElement[];
 	sections(cards: readonly PickedCard[]): BulkSections | null;
@@ -163,11 +166,12 @@ export class BulkController {
 		const cards = this.selection.cards;
 		const source = at === "beside" ? card : this.menuButton?.el;
 		if (cards.length === 0 || !source) return;
-		const items = cards.map((card) => card.item);
+		/** The tasks as the menu last saw them: labels set from it give them fresh keys, which the next action needs. */
+		let items = cards.map((card) => card.item);
 		const sections = this.deps.sections(cards);
-		const each = (change: (card: PickedCard) => TaskChange) => {
+		const each = (change: (item: TaskItem) => TaskChange) => {
 			this.stop();
-			return this.deps.apply(cards.map((card) => ({ key: card.item.key, change: change(card) })));
+			return this.deps.apply(items.map((item) => ({ key: item.key, change: change(item) })));
 		};
 		this.menu = BulkMenu.open({
 			items,
@@ -177,12 +181,20 @@ export class BulkController {
 			today: this.deps.today(),
 			day: this.deps.day(),
 			levels: this.deps.levels(),
+			labels: this.deps.labels(),
 			sections: sections ?? undefined,
 			actions: {
 				setStatus: (status) => each(() => ({ kind: "status", status })),
 				setPriority: (priority) => each(() => ({ kind: "priority", priority })),
 				postpone: (date) => each(() => ({ kind: "postpone", date })),
-				removeDue: () => each((card) => (card.item.can.removeDue ? { kind: "dueDate", date: null } : { kind: "dueDate", date: card.item.dueDate })),
+				removeDue: () => each((item) => (item.can.removeDue ? { kind: "dueDate", date: null } : { kind: "dueDate", date: item.dueDate })),
+				setLabels: async (names) => {
+					const written = await this.deps.setLabels(items.map((item, i) => ({ key: item.key, labels: names[i] })));
+					this.selection.renew(items.flatMap((item, i) => (written[i] ? [{ from: item.key, to: written[i]!.key }] : [])));
+					if (written.some((item) => item === null)) return null;
+					items = written as TaskItem[];
+					return items;
+				},
 				toSection: (name) => {
 					this.stop();
 					return this.deps.toSection(items.map((item) => item.key), name);

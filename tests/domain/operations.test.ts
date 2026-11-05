@@ -455,6 +455,13 @@ describe("labels", () => {
 		expect(placeTask(labelled, labelled.tasks("now")[0], { text: "Y", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
 	});
 
+	it("writes a new task's labels, and an edit's labels in place of the task's own, a priority none beside them", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(createInPlace(d, "Y", "p1", { kind: "list", list: "now", group: null, before: null, date: null }, T, DayBoundary.MIDNIGHT, undefined, ["Срочное"]).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] Y #label/Срочное 📅 2026-10-30\n");
+		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: null, labels: ["Срочное", "Важное"] }, T).serialize()).toBe("## Now\n- [ ] X #label/Срочное #label/Важное\n");
+		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: "p1", labels: [] }, T).serialize()).toBe("## Now\n- [ ] p1 X\n");
+	});
+
 	it("keeps the labels when a task is renamed", () => {
 		const d = doc("## Now\n- [ ] X #label/Важное\n");
 		expect(rename(d, d.tasks("now")[0], "Y").serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");

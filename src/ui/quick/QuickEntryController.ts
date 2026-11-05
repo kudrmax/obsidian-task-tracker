@@ -1,4 +1,4 @@
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService, type LabelLevel } from "../../application/contracts";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -26,7 +26,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -170,7 +170,7 @@ export class QuickEntryController {
 			cards: (column) => this.cards(column),
 			placeOf: (column, result) => this.placeOf(column, result),
 			fresh: (beforeShow) => this.fresh(beforeShow),
-			createInPlace: (text, priority, place, repeat) => deps.tasks.createInPlace(text, priority, place, repeat),
+			createInPlace: (text, priority, place, repeat, labels) => deps.tasks.createInPlace(text, priority, place, repeat, labels),
 			createSection: (name, place) => deps.tasks.createSection(name, place),
 			sectioned: (column) => deps.sectioned(column),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
@@ -184,11 +184,13 @@ export class QuickEntryController {
 		this.bar = new QuickBar(deps.root, {
 			desktop: () => deps.desktop(),
 			levels: () => deps.tasks.priorityLevels(),
+			labels: () => deps.tasks.labelLevels(),
 			today: () => deps.today(),
 			placementOfDay: (day) => deps.tasks.placementOfDay(day),
 			onIndent: (delta) => this.entry.indent(delta),
 			onSection: () => this.entry.toggleSection(),
 			onPriority: (prefix) => this.choosePriority(prefix),
+			onLabels: (names) => this.entry.setLabels(names),
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
 		});
@@ -596,15 +598,21 @@ export class QuickEntryController {
 	/** The field and the bar show the state: its text, its level, what the field may do. */
 	private sync(state: EntryState): void {
 		const level = state.section ? null : this.levelOf(state);
+		const labels = this.labelsOf(state);
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setSection(state.section === true);
-		if (!state.section) this.field?.setPriority(level);
-		this.bar.show(this.barState(state, level));
+		if (!state.section) this.field?.setTint(level?.color ?? labels[0]?.color ?? null);
+		this.bar.show(this.barState(state, level, labels));
 	}
 
-	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {
+	private barState(state: EntryState, priority: PriorityLevel | null, labels: readonly LabelLevel[]): QuickBarState {
 		const place = this.shownPlace(state);
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
+		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, labels: priority ? [] : labels, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
+	}
+
+	/** The labels chosen, in the settings' order. */
+	private labelsOf(state: EntryState): readonly LabelLevel[] {
+		return this.deps.tasks.labelLevels().filter((label) => state.labels.includes(label.name));
 	}
 
 	/** The level chosen in the bar, else the one the text's prefix stands for. */

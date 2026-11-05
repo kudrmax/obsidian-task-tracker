@@ -130,7 +130,7 @@ describe("QuickField", () => {
 
 		it("says nothing for a text with no prefix on a field whose level was chosen elsewhere", () => {
 			const { field, priorities, type, handle } = open("", null);
-			handle.setPriority(LATER);
+			handle.setTint(LATER.color);
 			type("buy");
 			expect(field.dataset.priority).toBe("blue");
 			expect(priorities).toEqual([]);

@@ -287,7 +287,7 @@ export interface TaskService {
 	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
@@ -319,8 +319,10 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
-	/** The task's labels become these names, written as tags; a task with a priority keeps none. */
-	setLabels(key: TaskKey, labels: readonly string[]): Promise<void>;
+	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
+	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null>;
+	/** `setLabels` for several tasks in one write; each task as it then stands, in the order given, null for one gone. */
+	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
 	/**

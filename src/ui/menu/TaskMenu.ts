@@ -1,7 +1,7 @@
 import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
-import { fillCard, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
+import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
 import type { LocalDate, TaskStatus } from "../types";
@@ -112,8 +112,8 @@ export interface MenuActions {
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
 	setPriority(prefix: string | null): Promise<void>;
-	/** The task's labels become these names. */
-	setLabels(names: readonly string[]): Promise<void>;
+	/** The task's labels become these names; the task as it then stands, null once it is gone. */
+	setLabels(names: readonly string[]): Promise<TaskItem | null>;
 	setReminder(kind: ReminderKind): Promise<void>;
 	/** The task repeats by `rule` from now on; null: it repeats no more. */
 	setRepeat(rule: RepeatRule | null): Promise<void>;
@@ -186,7 +186,10 @@ export class TaskMenu extends LiftedMenu {
 		return new TaskMenu(context);
 	}
 
-	private constructor(private readonly context: TaskMenuContext) {
+	/** A label being written: taps on the labels wait for it, the next one reads the task as it then stands. */
+	private labelling = false;
+
+	private constructor(private context: TaskMenuContext) {
 		super();
 		this.openOver(context.source, () => this.build());
 	}
@@ -347,7 +350,7 @@ export class TaskMenu extends LiftedMenu {
 		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
 		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: item.labels.length > 0, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: item.priority !== null, onPick: this.pick(() => actions.setLabels(nextLabels(item, tile.name))) }));
+		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: item.priority !== null, onPick: () => void this.toggleLabel(tile.name) }));
 		if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
 		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
 			label,
@@ -362,6 +365,26 @@ export class TaskMenu extends LiftedMenu {
 		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, size: "tall", apart: true, onPick: () => this.askFor("delete") });
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
+	}
+
+	/**
+	 * A label goes on or off and the menu stays, for the next one: it is drawn again for the task as the file now has it,
+	 * the copy over the blur in the task's new colours. Closed meanwhile, or the task gone, it stays closed.
+	 */
+	private async toggleLabel(name: string): Promise<void> {
+		if (this.labelling) return;
+		this.labelling = true;
+		try {
+			const next = await this.context.actions.setLabels(nextLabels(this.context.item, name));
+			if (this.isClosed) return;
+			if (!next) return this.close();
+			this.context = { ...this.context, item: next };
+			const card = this.lifted.classList.contains("is-block") ? this.lifted.querySelector<HTMLElement>(".tc-block-card") : this.lifted;
+			if (card) markColours(card, next);
+			this.showMenu(this.groupsAbove());
+		} finally {
+			this.labelling = false;
+		}
 	}
 
 	/** Delete, Won’t do and Stop ask first, in place of what was pressed; the rest of the menu stays as it is. */
