@@ -323,6 +323,8 @@ body {
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
 	--tc-level-prefix-w: 48px;
 	--tc-label-name-w: 88px;
+	/* The row's card shows its title and its time: a row with less room for it lays out as on the phone. */
+	--tc-level-preview-min: 140px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
 	--tc-swatch-halo: var(--setting-items-background);
@@ -1203,7 +1205,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-8); }
 .tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; margin: 0; }
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
-.tc-level-row input[type="text"].tc-label-name { width: var(--tc-label-name-w); flex-shrink: 0; margin: 0; }
+.tc-level-row input[type="text"].tc-label-name { flex: 1 1 var(--tc-label-name-w); width: auto; min-width: var(--tc-label-name-w); margin: 0; }
 .tc-row-grip { touch-action: none; cursor: grab; }
 .tc-level-row.is-dragging { opacity: var(--tc-pressed); }
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-6); flex-shrink: 0; }
@@ -1215,14 +1217,14 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-level-hex { position: relative; width: var(--tc-level-hex-w); flex-shrink: 0; display: flex; align-items: center; }
 .tc-level-hex-mark { position: absolute; left: var(--tc-space-10); font-family: var(--tc-font-code); color: var(--tc-muted); pointer-events: none; }
 .tc-level-row input[type="text"].tc-level-hex-input { width: 100%; padding-left: var(--tc-level-hex-pad); font-family: var(--tc-font-code); }
-.tc-level-preview { position: relative; flex: 1; min-width: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-priority-fill); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); color: var(--tc-text); }
+.tc-level-preview { position: relative; flex: 1; min-width: var(--tc-level-preview-min); height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-priority-fill); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-level-preview-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-level-preview-time { flex-shrink: 0; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-priority-meta); font-variant-numeric: tabular-nums; }
-/* The phone's row is too narrow for all of it: the prefix, the card and the bin; under them the circles across the row; then the code. */
-.is-phone .modal .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }
-.is-phone .tc-level-row :is(.tc-level-preview, .extra-setting-button:not(.tc-row-grip)) { order: 1; }
-.is-phone .tc-level-row .tc-swatches { order: 2; flex-basis: 100%; justify-content: space-between; }
-.is-phone .tc-level-row .tc-level-hex { order: 2; }
+/* A row too narrow for all of it, the phone's and a narrow settings window's: the name, the card and the bin; under them the circles across the row; then the code. */
+:is(.is-phone .modal, .tc-level-rows.is-wrapped) .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row :is(.tc-level-preview, .extra-setting-button:not(.tc-row-grip)) { order: 1; }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row .tc-swatches { order: 2; flex-basis: 100%; justify-content: space-between; }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row .tc-level-hex { order: 2; }
 
 /* No tasks file yet. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }

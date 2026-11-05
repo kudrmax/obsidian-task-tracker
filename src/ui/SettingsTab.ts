@@ -158,6 +158,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	 */
 	private colourRows(group: HTMLElement, spec: ColourRows): void {
 		const rows = group.createDiv("tc-level-rows");
+		wrapWhenNarrow(rows);
 		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(spec.move(from, to)));
 		spec.rows.forEach((level, index) => {
 			const row = rows.createDiv("setting-item tc-level-row");
@@ -369,4 +370,24 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc(desc)
 			.addText((t) => t.setValue(String(this.settings[field])).onChange((text) => this.service.setCount(field, text)));
 	}
+}
+
+/**
+ * The rows lay out as on the phone while one line can't hold them: tried in one line at every change of the width, and
+ * wrapped again before a frame is drawn when a row runs over. The settings may open in a window of their own: the rows
+ * are watched by that window.
+ */
+function wrapWhenNarrow(rows: HTMLElement): void {
+	const fit = () => {
+		rows.classList.remove("is-wrapped");
+		const over = [...rows.children].some((row) => row.scrollWidth > row.clientWidth);
+		rows.classList.toggle("is-wrapped", over);
+	};
+	let width = -1;
+	const Observer = rows.ownerDocument.defaultView?.ResizeObserver ?? ResizeObserver;
+	new Observer(() => {
+		if (rows.clientWidth === width) return;
+		width = rows.clientWidth;
+		fit();
+	}).observe(rows);
 }
