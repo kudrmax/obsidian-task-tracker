@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxList, dayList, openSlotted, slottedOn, soonWithoutDate, toItem } from "../../src/domain/queries";
+import { inboxList, dayList, openSlotted, repeatable, slottedOn, soonWithoutDate } from "../../src/domain/queries";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
@@ -70,29 +70,11 @@ describe("soonWithoutDate", () => {
 	});
 });
 
-describe("toItem", () => {
-	it("carries the key and the fields the UI shows", () => {
-		expect(toItem(doc.tasks("now")[1])).toEqual({
-			key: { section: "now", index: 1, path: [], raw: "- [/] Slotted today ⏰ 2026-10-30 10:00-11:00" },
-			text: "Slotted today",
-			status: "inProgress",
-			dueDate: null,
-			slot: { date: T, start: 600, end: 660 },
-			reminder: "notification",
-			repeat: null,
-			repeatable: true,
-			priority: null,
-			group: null,
-			subtasks: [],
-			progress: null,
-			parentText: null, description: null,
-		});
-	});
-
-	it("tells whether the task may repeat: an open task of its own; not a subtask, nor a closed task", () => {
+describe("repeatable", () => {
+	it("is an open task of its own; not a subtask, nor a closed task", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] A\n\t- [ ] A1\n- [x] B\n- [-] C\n- [/] D\n", SECTIONS, M);
 		const [a, b, c, dd] = d.tasks("now");
-		expect([toItem(a).repeatable, toItem(a).subtasks[0].repeatable, toItem(b).repeatable, toItem(c).repeatable, toItem(dd).repeatable]).toEqual([true, false, false, false, true]);
+		expect([a, a.subtasks[0], b, c, dd].map(repeatable)).toEqual([true, false, false, false, true]);
 	});
 });
 
@@ -120,16 +102,5 @@ describe("inboxList", () => {
 	it("keeps Inbox out of the day's list, Soon and the timeline", () => {
 		expect(texts(dayList(withInbox, T, T))).toEqual(["N"]);
 		expect(texts(soonWithoutDate(withInbox))).toEqual(["S"]);
-	});
-});
-
-describe("toItem with priority levels", () => {
-	const RED = { prefix: "p1", color: "red" } as const;
-	const levelOf = (prefix: string) => (prefix === "p1" ? RED : null);
-
-	it("gives the level of the task's prefix, none without one", () => {
-		const d = TaskDocument.parse("## Now\n- [ ] p1 A\n- [ ] B\n", SECTIONS, { ...M, priorities: ["p1"] });
-		expect(toItem(d.tasks("now")[0], levelOf)).toMatchObject({ text: "A", priority: RED });
-		expect(toItem(d.tasks("now")[1], levelOf).priority).toBeNull();
 	});
 });

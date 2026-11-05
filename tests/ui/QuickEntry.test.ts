@@ -21,6 +21,7 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 		slot: null,
 		reminder: "notification",
 		repeat: null,
+		open: true,
 		repeatable: true,
 		priority: { prefix: "!", color: "red" },
 		group: null,

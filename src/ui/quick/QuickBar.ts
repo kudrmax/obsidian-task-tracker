@@ -1,5 +1,4 @@
-import type { Placement, RepeatRule } from "../../application/contracts";
-import { samePlacement } from "../../application/placements";
+import { type Placement, type RepeatRule, samePlacement } from "../../application/contracts";
 import { type PriorityLevel, usableLevels } from "../../settings";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";

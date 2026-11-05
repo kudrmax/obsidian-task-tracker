@@ -1,8 +1,5 @@
-import type { SubtaskProgress, TaskItem } from "../application/contracts";
-import type { PriorityLevel } from "../settings";
 import { DayBoundary } from "./DayBoundary";
-import { descriptionMarkdown } from "./description";
-import type { LocalDate } from "./Task";
+import { isOpen, type LocalDate } from "./Task";
 import type { TaskDocument, TaskEntry } from "./TaskDocument";
 
 function slottedOnDate(entry: TaskEntry, date: LocalDate, boundary: DayBoundary): boolean {
@@ -26,7 +23,7 @@ export function slottedOn(doc: TaskDocument, date: LocalDate, boundary = DayBoun
 
 /** Unfinished tasks of Now and Soon that are put on a time, on any day. */
 export function openSlotted(doc: TaskDocument): readonly TaskEntry[] {
-	return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
+	return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
 }
 
 /** The Soon column: Soon is everything not for today, and the column shows the part of it without a date. */
@@ -42,37 +39,7 @@ export function backlogList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("backlog");
 }
 
-function isOpen(entry: TaskEntry): boolean {
-	return entry.task.status === "todo" || entry.task.status === "inProgress";
-}
-
 /** An open task of its own may repeat; a subtask goes with its parent, and a closed task repeats no more. */
 export function repeatable(entry: TaskEntry): boolean {
-	return entry.path.length === 0 && isOpen(entry);
-}
-
-/** Of the task's own subtasks, the done ones out of all but those given up. */
-function progressOf(entry: TaskEntry): SubtaskProgress | null {
-	if (entry.subtasks.length === 0) return null;
-	const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
-	return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
-}
-
-export function toItem(entry: TaskEntry, levelOf: (prefix: string) => PriorityLevel | null = () => null, parentText: string | null = null): TaskItem {
-	return {
-		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
-		text: entry.task.text,
-		status: entry.task.status,
-		dueDate: entry.task.dueDate,
-		slot: entry.task.slot,
-		reminder: entry.task.reminder,
-		repeat: entry.task.repeat?.rule ?? null,
-		repeatable: repeatable(entry),
-		priority: entry.task.priority === null ? null : levelOf(entry.task.priority),
-		group: entry.group,
-		subtasks: entry.subtasks.filter(isOpen).map((sub) => toItem(sub, levelOf, entry.task.text)),
-		progress: progressOf(entry),
-		description: descriptionMarkdown(entry),
-		parentText,
-	};
+	return entry.path.length === 0 && isOpen(entry.task.status);
 }

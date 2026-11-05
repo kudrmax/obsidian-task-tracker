@@ -1,6 +1,8 @@
 import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
-import type { PriorityLevel } from "../settings";
+import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
+import type { Placement, TaskDraft } from "../domain/Placement";
+import type { PriorityLevel } from "../domain/Priority";
 
 export type { GroupName, ReminderKind, SectionKey };
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -8,6 +10,13 @@ export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 export { sameRule } from "../domain/Repeat";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
+/** Whether two placements are the same place: the same kind, and for a date the same day. */
+export { samePlacement } from "../domain/operations";
+/** A task's text cut into text and links, or plain, each link by its word. */
+export { plainText, textParts, type TextPart } from "../domain/TaskText";
+/** The hour's heights the settings tab writes and reads as text. */
+export type { ZoomLevel } from "../settings";
+export type { EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the
@@ -23,20 +32,11 @@ export interface TaskKey {
 	readonly raw: string;
 }
 
-/** The lists that hold sections. */
-export type GroupedList = "inbox" | "backlog" | "soon" | "now";
-
-/** The lists a task is put at the end of: a drop on such a column from another one, or at the end of its own. */
-export type EndList = "inbox" | "backlog" | "soon";
-
 /** Where to create a task: a place in a list, a place among subtasks, or a slot on the calendar. */
 export type NewTaskPlace =
 	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	| { readonly kind: "slot"; readonly slot: Slot };
-
-/** Where a section goes among the sections of its list: before another one, or last. */
-export type GroupPlace = { readonly before: GroupName } | "end";
 
 /** Of a task's own subtasks: how many are done out of those not given up. */
 export interface SubtaskProgress {
@@ -54,6 +54,8 @@ export interface TaskItem {
 	readonly reminder: ReminderKind;
 	/** The rule after the task's repeat marker; null for a task that does not repeat. */
 	readonly repeat: RepeatRule | null;
+	/** Not done and not given up: todo or in progress. */
+	readonly open: boolean;
 	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
@@ -91,26 +93,6 @@ export class TasksFileMissingError extends Error {
 		super(`Tasks file not found: ${path}`);
 		this.name = "TasksFileMissingError";
 	}
-}
-
-/**
- * Where the task sheet puts a task: Inbox = section Inbox without a due date or slot, Backlog = section Backlog likewise,
- * Soon = section Soon without a due date, Now = section Now with today's due date (Now is today), Date = a due date.
- */
-export type Placement =
-	| { readonly kind: "inbox" }
-	| { readonly kind: "backlog" }
-	| { readonly kind: "soon" }
-	| { readonly kind: "now" }
-	| { readonly kind: "date"; readonly date: LocalDate };
-
-export interface TaskDraft {
-	readonly text: string;
-	readonly placement: Placement;
-	/** A level's prefix, or none. */
-	readonly priority: string | null;
-	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off; undefined leaves the task's own (a new task has none). */
-	readonly repeat?: RepeatRule | null;
 }
 
 /** One change `applyAll` makes to a task: each kind does what the single call of that name does. */

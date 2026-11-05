@@ -25,6 +25,7 @@ const item = (text: string, k: TaskKey, group: string | null = null, subtasks: T
 	slot: null,
 	reminder: "notification",
 	repeat: null,
+	open: true,
 	repeatable: true,
 	priority: null,
 	group,

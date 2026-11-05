@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { samePlacement } from "../../src/application/placements";
+import { samePlacement } from "../../src/domain/operations";
 
 describe("samePlacement", () => {
 	it("is the same kind, and for a date the same day", () => {

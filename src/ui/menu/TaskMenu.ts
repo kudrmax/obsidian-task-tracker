@@ -1,4 +1,4 @@
-import { type GroupName, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, plainText, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import type { PriorityLevel } from "../../settings";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
@@ -10,7 +10,6 @@ import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { canRemoveDue, moveTiles } from "./quickMoves";
 import { askGroup, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
-import { plainText } from "../../application/taskText";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
 import { type SectionChoice, sectionChooser } from "./SectionChooser";

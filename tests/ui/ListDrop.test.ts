@@ -14,6 +14,7 @@ const item = (section: SectionKey, index: number, text: string, group: GroupName
 	slot: null,
 	reminder: "notification",
 	repeat: null,
+	open: true,
 	repeatable: true,
 	priority: null,
 	group,

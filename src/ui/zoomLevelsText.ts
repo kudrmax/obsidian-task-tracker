@@ -1,4 +1,4 @@
-import type { ZoomLevel } from "../settings";
+import type { ZoomLevel } from "../application/contracts";
 
 /** `28, 56, 112` — the hour's heights in pixels, as the settings tab shows them. */
 export function formatZoomLevels(levels: readonly ZoomLevel[]): string {
