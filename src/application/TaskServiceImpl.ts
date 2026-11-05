@@ -30,6 +30,7 @@ import {
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import { runDrop } from "./drops";
+import { offeredNames, type SectionOffer } from "./sections";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
@@ -119,6 +120,14 @@ export class TaskServiceImpl implements TaskService {
 	async backlogView(): Promise<readonly TaskItem[]> {
 		const { doc, today } = await this.readNormalized();
 		return backlogList(doc).map(this.itemOf(today));
+	}
+
+	async sectionOffer(date: LocalDate): Promise<SectionOffer> {
+		const { doc, today, boundary } = await this.readNormalized();
+		const { presets, ungrouped } = this.settings.get().groups;
+		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
+		const names = (list: GroupedList) => offeredNames(shown.filter((entry) => entry.section === list).map((entry) => entry.group), presets, ungrouped);
+		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -272,6 +281,19 @@ export class TaskServiceImpl implements TaskService {
 	async createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void> {
 		if (this.blank(name)) return;
 		await this.mutate((doc, today, settings) => ops.createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today, date ?? null));
+	}
+
+	async toSection(keys: readonly TaskKey[], name: GroupName): Promise<void> {
+		const { doc } = await this.readNormalized();
+		const steps = keys.flatMap((key): TaskStep[] => {
+			const change = this.sectionChange(this.entryOf(doc, key), name);
+			return change ? [{ key, change }] : [];
+		});
+		if (keys.length !== 1) return this.applyAll(steps);
+		if (steps.length === 0) return;
+		const { key, change } = steps[0];
+		if (change.kind === "moveToGroup") return this.moveToGroup(key, change.list, change.group, change.before, change.date);
+		if (change.kind === "createGroup") return this.createGroup(key, change.list, change.name, change.date);
 	}
 
 	async moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void> {
@@ -464,6 +486,14 @@ export class TaskServiceImpl implements TaskService {
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
 		const levels = this.levels(this.settings.get());
 		return (entry) => toItem(entry, today, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
+	}
+
+	/** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */
+	private sectionChange(entry: TaskEntry, name: GroupName): Extract<TaskChange, { readonly kind: "moveToGroup" | "createGroup" }> | null {
+		const list = entry.section;
+		if (list === "done") return null;
+		const date = (list === "soon" ? entry.task.dueDate : null) ?? undefined;
+		return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
 	}
 
 	/** A section the UI names must still be in the file, as a task must. */

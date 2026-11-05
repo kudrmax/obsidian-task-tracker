@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type GroupedList, type GroupName, listView, type TaskChange, type TaskItem, type TaskKey } from "../../src/application/contracts";
+import { type GroupName, listView, type SectionChoice, sectionChoice, StaleTaskError, type TaskItem } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { DEFAULT_SETTINGS } from "../../src/settings";
@@ -92,54 +92,19 @@ function byText(data: Screen): Map<string, TaskItem> {
 /** The task of Done, which no column of the screen lists. */
 const doneItem = (data: Screen): TaskItem => ({ ...byText(data).get("N1")!, key: { section: "done", index: 0, path: [], raw: "- [x] X1" }, text: "X1", list: "done" });
 
-// A copy of the view's rules as they stand (TaskCalendarView: sectionsHome, sectionChoice, bulkSections, showMenu's toSection), for every card in a column that shows sections.
-
-interface SectionChoice {
-	readonly names: readonly string[];
-	readonly current: GroupName;
-	readonly ungrouped: string;
-}
-
-function homeOf(item: TaskItem): { list: GroupedList; date: string | null } | null {
-	if (item.parentText !== null || item.list === "done") return null;
-	const list = item.list;
-	return { list, date: list === "soon" ? item.dueDate : null };
-}
-
-function choiceOf(data: Screen, list: GroupedList, item: TaskItem): SectionChoice {
-	const { presets, ungrouped } = SETTINGS.groups;
-	const tasks = [...data.day.list, ...data.soon, ...data.inbox, ...data.backlog].filter((task) => task.list === list);
-	const names = [...tasks.flatMap((task) => (task.group === null ? [] : [task.group])), ...presets.map((preset) => preset.trim())];
-	return { names: [...new Set(names)].filter((name) => name !== "" && name !== ungrouped), current: item.group, ungrouped };
-}
-
+/** What a menu over these tasks offers on `day`, and whether they all stand in its current section, as the bulk menu checks it. */
 async function choice(svc: Svc, day: string, texts: readonly string[], done = false): Promise<(SectionChoice & { shared: boolean }) | null> {
 	const data = await screen(svc, day);
 	const items = byText(data);
 	const tasks = texts.map((text) => items.get(text)!);
 	if (done) tasks.push(doneItem(data));
-	const homes = tasks.map(homeOf);
-	const first = homes[0];
-	if (!first || homes.some((home) => !home || home.list !== first.list)) return null;
-	return { ...choiceOf(data, first.list, tasks[0]), shared: tasks.every((task) => task.group === tasks[0].group) };
+	const found = sectionChoice(tasks, await svc.sectionOffer(day));
+	return found && { ...found, shared: tasks.every((task) => task.group === tasks[0].group) };
 }
 
 async function toSection(svc: Svc, day: string, texts: readonly string[], name: GroupName): Promise<void> {
 	const items = byText(await screen(svc, day));
-	const tasks = texts.map((text) => items.get(text)!);
-	if (tasks.length === 1) {
-		const item = tasks[0];
-		const home = homeOf(item)!;
-		const date = home.date ?? undefined;
-		await (name === null ? svc.moveToGroup(item.key, home.list, null, null, date) : svc.createGroup(item.key, home.list, name, date));
-		return;
-	}
-	const list = homeOf(tasks[0])!.list;
-	const change = (item: TaskItem): TaskChange => {
-		const date = (item.list === "soon" ? item.dueDate : null) ?? undefined;
-		return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
-	};
-	await svc.applyAll(tasks.map((item) => ({ key: item.key as TaskKey, change: change(item) })));
+	await svc.toSection(texts.map((text) => items.get(text)!.key), name);
 }
 
 async function written(day: string, texts: readonly string[], name: GroupName): Promise<string> {
@@ -798,6 +763,15 @@ describe("to a section", () => {
 			- [x] X1
 			"
 		`);
+	});
+
+	it("a task changed in the file since it was read: rejected, nothing written", async () => {
+		const { store, svc } = setup();
+		const n1 = byText(await screen(svc, T)).get("N1")!;
+		const stale = { ...n1.key, raw: "- [ ] N1 before" };
+		await expect(svc.toSection([stale], "Work")).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.toSection([stale, byText(await screen(svc, T)).get("N4")!.key], "Work")).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(FILE);
 	});
 
 	it("several into a preset the list lacks, and into a new name", async () => {
