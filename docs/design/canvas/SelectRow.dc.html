@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Нижний ряд в режиме выбора — три варианта</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2788px; height: 1400px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 2660px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Нижний ряд в режиме выбора — три варианта</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">Только фигуры, которые уже есть внизу: круг как плюс и капсула как «Отмена + ⋯». Пунктиром обведено то, что меняется</div>
+</div>
+<sc-for list="{{heads}}" as="h" hint-placeholder-count="3">
+<div style="position: absolute; left: {{h.left}}px; top: 210px; width: 820px; display: flex; flex-direction: column; gap: 8px;">
+<div style="font-size: 40px; line-height: 48px; font-weight: 700; color: #1C1C1E;">{{h.title}}</div>
+<div style="font-size: 18px; line-height: 24px; color: #6B6A65;">{{h.sub}}</div>
+</div>
+</sc-for>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="6">
+<div style="position: absolute; left: {{p.left}}px; top: 380px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="SelectPhone" view="picked" row="{{p.row}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: 1240px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2788,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {"heads": [{"left": 64, "title": "Вариант 1 — число в круге вместо плюса", "sub": "Слева круглый крестик (как прежняя кнопка отмены), справа круг как плюс, в нём число выбранных. Тап по кругу — меню на все. Пока ничего не выбрано, круг серый с «0»"}, {"left": 984, "title": "Вариант 2 — капсула «крестик + число», меню в круге", "sub": "Слева та же капсула, что «Отмена + ⋯», в ней крестик и число выбранных. Справа круг как плюс, в нём «⋯» — меню на все"}, {"left": 1904, "title": "Вариант 3 — без числа, «⋯» в круге", "sub": "Слева круглый крестик, справа круг как плюс с «⋯» — меню на все. Сколько выбрано, видно по галкам и в заголовке меню «3 tasks»"}], "frames": [{"row": "v1", "theme": "dark", "left": 64, "name": "Тёмная", "cap": "Выбраны три задачи"}, {"row": "v1", "theme": "light", "left": 494, "name": "Светлая", "cap": "То же в светлой теме"}, {"row": "v2", "theme": "dark", "left": 984, "name": "Тёмная", "cap": "Выбраны три задачи"}, {"row": "v2", "theme": "light", "left": 1414, "name": "Светлая", "cap": "То же в светлой теме"}, {"row": "v3", "theme": "dark", "left": 1904, "name": "Тёмная", "cap": "Выбраны три задачи"}, {"row": "v3", "theme": "light", "left": 2334, "name": "Светлая", "cap": "То же в светлой теме"}]};
+  }
+}
+</script>
+</body>
+</html>

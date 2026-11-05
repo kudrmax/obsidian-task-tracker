@@ -43,7 +43,7 @@ describe("BulkMenu (block 3)", () => {
 		});
 		const done = async () => undefined;
 		const actions: BulkActions = { setStatus: done, setPriority: done, postpone: done, removeDue: done, toSection: done, remove: done };
-		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], today: "2026-11-04", day: "2026-11-04", levels: [], actions, onClose: () => {} });
+		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", levels: [], actions, onClose: () => {} });
 		expect(lifted.length).toBeGreaterThanOrEqual(5);
 		expect(lifted.every((count) => count === 0)).toBe(true);
 		expect(document.querySelectorAll(".tc-lifted").length).toBe(5);

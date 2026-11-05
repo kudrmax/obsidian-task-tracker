@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Выбор нескольких задач на телефоне</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2238px; height: 2340px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 2110px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Выбор нескольких задач на телефоне</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">Лупа уходит в меню «⋯» вместе с новым пунктом Select tasks. Дальше всё как на Mac: выделение, меню на все, перенос стопкой. Пунктиром обведено новое</div>
+</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="10">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: 390px; height: 844px; overflow: hidden; border-radius: 34px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="SelectPhone" view="{{p.view}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: 390px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2238,"height":2340}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {"frames": [{"view": "normal", "theme": "dark", "left": 64, "top": 330, "capTop": 1190, "name": "1. Обычный экран", "cap": "В капсуле слева вместо лупы — «⋯». Отмена остаётся на месте, колёсико и плюс не двигаются"}, {"view": "normal", "theme": "light", "left": 64, "top": 1420, "capTop": 2280, "name": "1. Обычный экран — светлая", "cap": ""}, {"view": "more", "theme": "dark", "left": 494, "top": 330, "capTop": 1190, "name": "2. Нажал «⋯»", "cap": "Над капсулой открывается маленькое меню, как меню задачи: Search (тот же поиск, что сейчас) и Select tasks. Тап мимо закрывает"}, {"view": "more", "theme": "light", "left": 494, "top": 1420, "capTop": 2280, "name": "2. Нажал «⋯» — светлая", "cap": ""}, {"view": "empty", "theme": "dark", "left": 924, "top": 330, "capTop": 1190, "name": "3. Режим выбора", "cap": "На каждой задаче в списках слева пустой кружок. Тап по задаче теперь не открывает её меню, а ставит галку. Плюса и «⋯» нет: слева крестик «выйти», справа счётчик, пока погашен. Колёсико и свайп работают — можно выбирать в Inbox, Soon и Now сразу. Задачи на календаре не выбираются"}, {"view": "empty", "theme": "light", "left": 924, "top": 1420, "capTop": 2280, "name": "3. Режим выбора — светлая", "cap": ""}, {"view": "picked", "theme": "dark", "left": 1354, "top": 330, "capTop": 1190, "name": "4. Выбрал три", "cap": "Выбранная задача — с галкой и залита акцентом, как на Mac. Счётчик загорается и показывает, сколько выбрано. Долгое нажатие на выбранную уносит все стопкой, как на Mac"}, {"view": "picked", "theme": "light", "left": 1354, "top": 1420, "capTop": 2280, "name": "4. Выбрал три — светлая", "cap": ""}, {"view": "menu", "theme": "dark", "left": 1784, "top": 330, "capTop": 1190, "name": "5. Нажал на счётчик", "cap": "Над счётчиком открывается то же меню на все выбранные, что на Mac: статус, приоритет, перенос, Section (если все из одного списка), Delete. После действия режим выбора закрывается сам"}, {"view": "menu", "theme": "light", "left": 1784, "top": 1420, "capTop": 2280, "name": "5. Нажал на счётчик — светлая", "cap": ""}]};
+  }
+}
+</script>
+</body>
+</html>
