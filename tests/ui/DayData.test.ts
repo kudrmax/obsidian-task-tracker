@@ -265,7 +265,7 @@ describe("DayData", () => {
 
 	it("stays silent when a poll brings the same events only fetched later", async () => {
 		const { data, calendars, parts } = setup();
-		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
+		const later = (at: number) => ({ events: [event("same")], statuses: [{ source: "google" as const, kind: "synced" as const, ok: true, message: "1 event", updatedAt: new Date(at), detail: null, stale: false }] });
 		let at = 0;
 		calendars.eventsOn = async () => later(at++);
 		await data.calendars();

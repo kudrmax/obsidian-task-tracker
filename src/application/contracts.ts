@@ -432,8 +432,12 @@ export interface CalendarEvent {
 	readonly source: CalendarSource;
 }
 
+/** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */
+export type SourceKind = "synced" | "exported";
+
 export interface SourceStatus {
 	readonly source: CalendarSource;
+	readonly kind: SourceKind;
 	readonly ok: boolean;
 	/** "12 events", "not logged in", "file missing", an error text. */
 	readonly message: string;

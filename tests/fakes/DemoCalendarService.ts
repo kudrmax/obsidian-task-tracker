@@ -44,8 +44,8 @@ export class DemoCalendarService implements CalendarService {
 		const result: DayEvents = {
 			events,
 			statuses: [
-				{ source: "google", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
-				{ source: "work", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
+				{ source: "google", kind: "synced", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
+				{ source: "work", kind: "exported", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
 		};
 		this.last.set(date, result);

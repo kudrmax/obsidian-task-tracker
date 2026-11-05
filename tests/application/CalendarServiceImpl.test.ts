@@ -556,7 +556,18 @@ describe("CalendarServiceImpl.events", () => {
 		const again = svc.events(DAY, "peek");
 		expect(again.fresh).toBeNull();
 		expect(again.cached!.events.map((e) => e.id)).toEqual(["g"]);
-		expect(svc.events(DAY, "open").cached).toEqual(svc.cached(DAY));
+		expect(svc.events(DAY, "open").cached!.events).toEqual(svc.cached(DAY)!.events);
 		expect(google.calls).toEqual([]);
+	});
+
+	it("tells each source's kind, cached and fresh, and keeps it out of the device cache", async () => {
+		const google = new FakeSource("google");
+		const work = new FakeSource("work");
+		const cache = new MemoryEventCache();
+		const svc = service([google, work], new FakeClock(), DEFAULT_SETTINGS.staleAfterMinutes, cache);
+		const fresh = await svc.events(DAY, "refresh").fresh!();
+		expect(fresh.statuses.map((s) => [s.source, s.kind])).toEqual([["google", "synced"], ["work", "exported"]]);
+		expect(svc.events(DAY, "open").cached!.statuses.map((s) => s.kind)).toEqual(["synced", "exported"]);
+		expect(cache.days.get(DAY)!.statuses.every((s) => !("kind" in s))).toBe(true);
 	});
 });

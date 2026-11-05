@@ -88,10 +88,10 @@ interface CalendarService { events(date: LocalDate, reason: EventsReason): DayEv
 **Files:**
 - Modify: `src/application/contracts.ts`, `src/application/ports.ts`, `src/application/CalendarServiceImpl.ts`, `src/infrastructure/DeviceEventCache.ts`, `src/ui/sources/sourceText.ts`, `tests/fakes/MemoryEventCache.ts`, `tests/fakes/DemoCalendarService.ts`, `tests/ui/sourceText.test.ts`, `tests/application/CalendarServiceImpl.test.ts`
 
-- [ ] `SourceStatus.kind: "synced" | "exported"`; `KeptStatus`/`KeptDay` — без него, ими работают кэш и внутренности сервиса.
-- [ ] `events()` добавляет `kind` к статусам и кэша, и свежих; тест: Google — `synced`, рабочий — `exported`, в кэш устройства `kind` не пишется.
-- [ ] `sourceText`: «Exported from …» — по `kind`; тесты с `kind`.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit.
+- [x] `SourceStatus.kind: "synced" | "exported"`; `KeptStatus`/`KeptDay` — без него, ими работают кэш и внутренности сервиса.
+- [x] `events()` добавляет `kind` к статусам и кэша, и свежих; тест: Google — `synced`, рабочий — `exported`, в кэш устройства `kind` не пишется.
+- [x] `sourceText`: «Exported from …» — по `kind`; тесты с `kind`.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit.
 
 ### Task 4: Экран задач — `TaskService.screen(date)`
 
