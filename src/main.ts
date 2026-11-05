@@ -2,6 +2,7 @@ import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 
+import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { SettingsServiceImpl } from "./application/SettingsServiceImpl";
@@ -39,9 +40,12 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		await this.pluginSettings.load();
 		this.register(clearCardSize);
 		this.register(clearPriorityColors);
-		this.registerEvent(this.watchSettingsFile());
+		const code = this.watchOwnCode();
+		this.registerEvent(this.watchSettingsFile(code));
 		this.registerDomEvent(document, "visibilitychange", () => {
-			if (!document.hidden) void this.pluginSettings.reload();
+			if (document.hidden) return;
+			void this.pluginSettings.reload();
+			void code.check();
 		});
 		const deps = this.createDeps();
 		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
@@ -87,12 +91,38 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		};
 	}
 
-	/** Sync brings data.json from the other device (the Google token, logged in on the Mac): it counts here at once, with no reload. */
-	private watchSettingsFile(): EventRef {
+	/**
+	 * Sync brings data.json from the other device (the Google token, logged in on the Mac): it counts here at once, with no
+	 * reload. A new release's files load the plugin again.
+	 */
+	private watchSettingsFile(code: PluginCodeWatcher): EventRef {
 		const vault = this.app.vault as Vault & { on(name: "raw", callback: (path: string) => void): EventRef };
 		return vault.on("raw", (path) => {
 			if (this.pluginSettings.owns(path)) void this.pluginSettings.reload();
+			code.changed(path);
 		});
+	}
+
+	/** The plugin runs the code in its folder: a release Sync brought loads at once, not at Obsidian's next start. */
+	private watchOwnCode(): PluginCodeWatcher {
+		const adapter = this.app.vault.adapter;
+		const plugins = (this.app as unknown as { plugins: { disablePlugin(id: string): Promise<void>; enablePlugin(id: string): Promise<boolean> } }).plugins;
+		const id = this.manifest.id;
+		const watcher = new PluginCodeWatcher(
+			{
+				stat: (path) => adapter.stat(path),
+				reload: async () => {
+					await plugins.disablePlugin(id);
+					await plugins.enablePlugin(id);
+				},
+				setTimeout: (run, ms) => window.setTimeout(run, ms),
+				clearTimeout: (timer) => window.clearTimeout(timer),
+			},
+			this.pluginDir,
+		);
+		void watcher.start();
+		this.register(() => watcher.stop());
+		return watcher;
 	}
 
 	get(): TaskCalendarSettings {
