@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import type { App, DataAdapter } from "obsidian";
 import { CalendarServiceImpl } from "./application/CalendarServiceImpl";
 import type { CalendarService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
 import { GoogleAccountService } from "./application/GoogleAccountService";
@@ -52,5 +52,17 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		work: { scriptableLoader: () => workExport.loader, export: () => workShortcut.run() },
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
+	};
+}
+
+/** Temporary: the quick entry trace's note in the vault, appended to; a failed write only goes to the console. */
+export function vaultEntryLog(adapter: DataAdapter): { append(text: string): void } {
+	const path = "Task Calendar entry log.md";
+	return {
+		append: (text) =>
+			void adapter
+				.exists(path)
+				.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
+				.catch((error) => console.error(error)),
 	};
 }

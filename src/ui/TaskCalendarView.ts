@@ -92,6 +92,8 @@ export interface ViewDeps {
 	exportWorkCalendar(): void;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
+	/** Temporary: the note the quick entry trace is written to, for a phone with no console. */
+	readonly entryLog: { append(text: string): void };
 }
 
 /**
@@ -468,15 +470,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** Temporary: how quick entry opens and closes on the phone, frame by frame, in «Task Calendar entry log.md». */
 	private traceEntry(root: HTMLElement): void {
-		const path = "Task Calendar entry log.md";
-		const adapter = this.app.vault.adapter;
-		const trace = new EntryTrace(root.ownerDocument, {
-			write: (text) =>
-				void adapter
-					.exists(path)
-					.then((exists) => (exists ? adapter.append(path, text) : adapter.write(path, text)))
-					.catch((error) => console.error(error)),
-		});
+		const trace = new EntryTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) });
 		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
 		this.unsubscribe.push(() => trace.destroy());
 	}

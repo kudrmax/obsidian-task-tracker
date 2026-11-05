@@ -4,7 +4,7 @@ import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
-import { createServices, type Services, type ServicesHost } from "./compose";
+import { createServices, type Services, type ServicesHost, vaultEntryLog } from "./compose";
 import type { TaskCalendarSettings } from "./settings";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
@@ -66,6 +66,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			clock,
 			exportWorkCalendar: () => services.work.export(),
 			openInCalendar: (event) => calendarApp.open(event),
+			entryLog: vaultEntryLog(this.app.vault.adapter),
 		};
 	}
 
