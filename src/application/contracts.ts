@@ -319,8 +319,10 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
-	/** The task's labels become these names, written as tags; a task with a priority keeps none. */
-	setLabels(key: TaskKey, labels: readonly string[]): Promise<void>;
+	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
+	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null>;
+	/** `setLabels` for several tasks in one write; each task as it then stands, in the order given, null for one gone. */
+	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
 	/**

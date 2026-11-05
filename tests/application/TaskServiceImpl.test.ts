@@ -1245,3 +1245,25 @@ describe("TaskServiceImpl.screen", () => {
 		await expect(svc.screen(T)).rejects.toBeInstanceOf(TasksFileMissingError);
 	});
 });
+
+describe("labels", () => {
+	const labelled = () => new FakeSettingsStore({ ...DEFAULT_SETTINGS, labels: [{ name: "Важное", color: "red" }, { name: "Срочное", color: "orange" }] });
+
+	it("writes several tasks' labels at once and gives each task back as it then stands, its key fresh", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] p1 B\n- [ ] C #label/Важное\n", labelled());
+		const now = (await svc.dayView(T)).list;
+		const items = await svc.setLabelsAll([
+			{ key: now[0].key, labels: ["Срочное"] },
+			{ key: now[1].key, labels: ["Срочное"] },
+			{ key: now[2].key, labels: ["Важное", "Срочное"] },
+		]);
+		expect(await store.read()).toContain("- [ ] A #label/Срочное\n- [ ] p1 B\n- [ ] C #label/Важное #label/Срочное");
+		expect(items.map((item) => [item?.text, item?.labels.map((l) => l.name), item?.key.raw])).toEqual([
+			["A", ["Срочное"], "- [ ] A #label/Срочное"],
+			["B", [], "- [ ] p1 B"],
+			["C", ["Важное", "Срочное"], "- [ ] C #label/Важное #label/Срочное"],
+		]);
+		const again = await svc.setLabels(items[0]!.key, []);
+		expect(again?.labels).toEqual([]);
+	});
+});

@@ -169,6 +169,14 @@ export class TaskCalendarView extends ItemView {
 			today: () => this.today(),
 			day: () => this.selectedDate,
 			levels: () => this.deps.tasks.priorityLevels(),
+			labels: () => this.deps.tasks.labelLevels(),
+			setLabels: async (steps) => {
+				const written: { items: readonly (TaskItem | null)[] } = { items: steps.map(() => null) };
+				await this.act(async () => {
+					written.items = await this.deps.tasks.setLabelsAll(steps);
+				});
+				return written.items;
+			},
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
 			sections: (cards) => this.bulkSections(cards),
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
@@ -946,6 +954,8 @@ export class TaskCalendarView extends ItemView {
 		const tasks = this.deps.tasks;
 		const column = this.sectionColumn(source);
 		const sections = column ? sectionChoice([item], this.data.offer) : null;
+		/** The task as the menu last saw it: a label set from the menu gives it a fresh key, which the next action needs. */
+		let current = item;
 		return TaskMenu.open({
 			item,
 			source,
@@ -958,23 +968,30 @@ export class TaskCalendarView extends ItemView {
 			levels: tasks.priorityLevels(),
 			labels: tasks.labelLevels(),
 			actions: {
-				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
-				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
-				removeDue: () => this.act(() => tasks.setDueDate(item.key, null)),
-				toSection: (name) => this.act(() => tasks.toSection([item.key], name)),
+				setStatus: (status) => this.act(() => tasks.setStatus(current.key, status)),
+				postpone: (date) => this.act(() => tasks.postpone(current.key, date)),
+				removeDue: () => this.act(() => tasks.setDueDate(current.key, null)),
+				toSection: (name) => this.act(() => tasks.toSection([current.key], name)),
 				newSection: () => {
-					if (column && sections) this.askGroupName(item, column);
+					if (column && sections) this.askGroupName(current, column);
 				},
-				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				setLabels: (names) => this.act(() => tasks.setLabels(item.key, names)),
-				setReminder: (kind) => this.act(() => tasks.setReminder(item.key, kind)),
-				setRepeat: (rule) => this.act(() => tasks.setRepeat(item.key, rule)),
-				stop: () => this.act(() => tasks.stop(item.key)),
-				rename: (menu) => this.quick?.rename(item, menu),
-				openDescription: (editing) => this.descriptionSheet(item, editing),
-				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
-				remove: () => this.act(() => tasks.remove(item.key)),
-				openInObsidian: () => void this.openInObsidian(item),
+				setPriority: (prefix) => this.act(() => tasks.setPriority(current.key, prefix)),
+				setLabels: async (names) => {
+					const written: { item: TaskItem | null } = { item: null };
+					await this.act(async () => {
+						written.item = await tasks.setLabels(current.key, names);
+					});
+					if (written.item) current = written.item;
+					return written.item;
+				},
+				setReminder: (kind) => this.act(() => tasks.setReminder(current.key, kind)),
+				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
+				stop: () => this.act(() => tasks.stop(current.key)),
+				rename: (menu) => this.quick?.rename(current, menu),
+				openDescription: (editing) => this.descriptionSheet(current, editing),
+				addSubtask: (menu) => this.quick?.addSubtask(current, menu),
+				remove: () => this.act(() => tasks.remove(current.key)),
+				openInObsidian: () => void this.openInObsidian(current),
 				openLink: (link) => this.openLink(link),
 			},
 		});

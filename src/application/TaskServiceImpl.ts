@@ -290,8 +290,37 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
 	}
 
-	async setLabels(key: TaskKey, labels: readonly string[]): Promise<void> {
-		await this.mutate((doc) => ops.setLabels(doc, this.entryOf(doc, key), labels));
+	async setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null> {
+		const [item] = await this.setLabelsAll([{ key, labels }]);
+		return item ?? null;
+	}
+
+	async setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]> {
+		if (steps.length === 0) return [];
+		let places: readonly (TaskKey | null)[] = [];
+		const change = await this.mutate((doc) => {
+			const { doc: tagged, tags } = EntryTags.tag(doc, steps.map((step) => this.entryOf(doc, step.key)));
+			let current = tagged;
+			steps.forEach((step, n) => {
+				const entry = tags.find(current, n);
+				if (entry) current = ops.setLabels(current, entry, step.labels);
+			});
+			places = steps.map((_, n) => {
+				const entry = tags.find(current, n);
+				return entry ? { section: entry.section, index: entry.index, path: entry.path, raw: "" } : null;
+			});
+			return tags.untag(current);
+		});
+		if (!change) return steps.map(() => null);
+		const settings = this.settings.get();
+		const today = this.boundary(settings).dayOf(this.clock.now());
+		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
+		return places.map((place) => {
+			const entry = place && change.after.find(place.section, place.index, place.path);
+			if (!place || !entry) return null;
+			const parent = place.path.length > 0 ? change.after.find(place.section, place.index, place.path.slice(0, -1)) : undefined;
+			return toItem(entry, today, levels, parent?.task.text ?? null);
+		});
 	}
 
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {

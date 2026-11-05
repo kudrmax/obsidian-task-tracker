@@ -41,6 +41,11 @@ export class Overlay {
 		requestAnimationFrame(() => this.all().forEach((part) => part.classList.add("is-shown")));
 	}
 
+	/** It has begun to close, or closed. */
+	get isClosed(): boolean {
+		return this.closed;
+	}
+
 	/** Every part fades out at once and they leave the page together; false when it was already closing. */
 	close(): boolean {
 		if (this.closed) return false;
