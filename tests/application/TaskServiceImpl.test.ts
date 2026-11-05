@@ -1138,11 +1138,11 @@ describe("search", () => {
 		"## Done", "", "- [x] Оплатить госпошлину за паспорт", "",
 	].join("\n");
 
-	it("finds titles and descriptions section by section, a task before its open subtasks", async () => {
+	it("finds titles and descriptions section by section, open subtasks too", async () => {
 		const { svc } = setup(FILE);
 		const hits = await svc.search("ПАСПОРТ");
 		expect(hits.map((h) => h.item.list)).toEqual(["inbox", "soon", "soon", "now", "now", "done"]);
-		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Записаться", "Найти", "Забрать", "Читать", "Оплатить"]);
+		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Найти", "Записаться", "Забрать", "Читать", "Оплатить"]);
 	});
 
 	it("a found subtask is its own hit; a closed one is not found", async () => {
@@ -1157,20 +1157,48 @@ describe("search", () => {
 		const { svc } = setup(FILE);
 		const hit = (await svc.search("паспорт")).find((h) => h.item.text === "Записаться в МФЦ")!;
 		expect(hit.title).toEqual([]);
-		expect(hit.description).toEqual({ before: "взять старый ", match: "паспорт", after: " и фото" });
+		expect(hit.description).toEqual([
+			{ text: "взять старый ", match: false },
+			{ text: "паспорт", match: true },
+			{ text: " и фото", match: false },
+		]);
 	});
 
 	it("a match in both gives both", async () => {
 		const { svc } = setup(FILE);
 		const hit = (await svc.search("паспорт")).find((h) => h.item.list === "now")!;
 		expect(hit.title.some((p) => p.match)).toBe(true);
-		expect(hit.description?.match).toBe("паспорт");
+		expect(hit.description?.find((p) => p.match)?.text).toBe("паспорт");
 	});
 
 	it("reads a link by what it shows and «ё» as «е»", async () => {
 		const { svc } = setup(FILE);
 		const hits = await svc.search("елочный");
 		expect(hits.map((h) => h.title)).toEqual([[{ text: "Читать ", match: false }, { text: "ёлочный", match: true }, { text: " паспорт", match: false }]]);
+		expect(await svc.search("Заметка")).toEqual([]);
+	});
+
+	it("finds the query's words in their order, each a part of a word, and the best match first", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Отвезти шкаф Элеоноре", "- [ ] Ответить Элине", "- [ ] Разобрать почту", ""].join("\n"));
+		const hits = await svc.search("отв эл");
+		expect(hits.map((h) => h.item.text)).toEqual(["Ответить Элине", "Отвезти шкаф Элеоноре"]);
+		expect(hits[0].title).toEqual([
+			{ text: "Отв", match: true },
+			{ text: "етить ", match: false },
+			{ text: "Эл", match: true },
+			{ text: "ине", match: false },
+		]);
+	});
+
+	it("a match in the title stands before one only in the description", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- про паспорт", "- [ ] Сделать паспорт", ""].join("\n"));
+		expect((await svc.search("паспорт")).map((h) => h.item.text)).toEqual(["Сделать паспорт", "Позвонить"]);
+	});
+
+	it("reads a description by its words, not its Markdown", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- **важно** сегодня", "\t- [[Заметка|план]]", ""].join("\n"));
+		const [hit] = await svc.search("важно сегодня план");
+		expect(hit.description?.map((p) => p.text).join("")).toBe("важно сегодня план");
 		expect(await svc.search("Заметка")).toEqual([]);
 	});
 

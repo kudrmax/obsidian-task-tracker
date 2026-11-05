@@ -125,24 +125,20 @@ export interface TaskItem {
 	readonly description: string | null;
 }
 
-/** A piece of a found task's title; `match` marks the words searched for. */
-export interface TitlePart {
+/** A piece of a found task's text; `match` marks a piece the search found. */
+export interface FoundPart {
 	readonly text: string;
 	readonly match: boolean;
 }
 
-/** A line of a found task's description: the words searched for and some around them. */
-export interface SnippetParts {
-	readonly before: string;
-	readonly match: string;
-	readonly after: string;
-}
-
-/** A task the search found: its title cut around the match (empty when the title has none), the description's line (null when it has none). */
+/**
+ * A task the search found: its title in pieces (empty when the title has none), and a line of the description's words
+ * from a little before the first found piece (null when it has none).
+ */
 export interface SearchHit {
 	readonly item: TaskItem;
-	readonly title: readonly TitlePart[];
-	readonly description: SnippetParts | null;
+	readonly title: readonly FoundPart[];
+	readonly description: readonly FoundPart[] | null;
 }
 
 export interface DayView {
@@ -251,8 +247,11 @@ export interface TaskService {
 	/** Every Done task, in file order. */
 	doneView(): Promise<readonly TaskItem[]>;
 	/**
-	 * The tasks the screen draws whose title or description holds the query, case and «ё» aside: Inbox, Backlog, Soon,
-	 * Now, Done, each in file order, a task before its open subtasks. A query of spaces finds nothing.
+	 * The tasks the screen draws whose title or description holds the query as Obsidian's quick switcher finds it: the
+	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
+	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
+	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
+	 * A query of spaces finds nothing.
 	 */
 	search(query: string): Promise<readonly SearchHit[]>;
 

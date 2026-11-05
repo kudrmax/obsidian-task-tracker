@@ -1,4 +1,4 @@
-import type { SearchHit, SectionKey, SnippetParts, TitlePart } from "../../application/contracts";
+import type { FoundPart, SearchHit, SectionKey } from "../../application/contracts";
 import { el } from "../dom";
 import { renderTaskCard } from "../TaskCard";
 
@@ -11,20 +11,12 @@ export interface SearchRow {
 }
 
 /** The found words picked out of the text they stand in. */
-function fillParts(parent: HTMLElement, parts: readonly TitlePart[]): void {
+function fillParts(parent: HTMLElement, parts: readonly FoundPart[]): void {
 	parent.textContent = "";
 	for (const part of parts) {
 		if (part.match) el(parent, "mark", "tc-hit", part.text);
 		else parent.appendChild(document.createTextNode(part.text));
 	}
-}
-
-function fillSnippet(parent: HTMLElement, snippet: SnippetParts): void {
-	fillParts(parent, [
-		{ text: snippet.before, match: false },
-		{ text: snippet.match, match: true },
-		{ text: snippet.after, match: false },
-	]);
 }
 
 /** A found task as its card: the found words picked out of the title; found in the description, the description's line under the title. */
@@ -39,7 +31,7 @@ function renderRow(parent: HTMLElement, hit: SearchHit): HTMLElement {
 		const text = el(null, "div", "tc-hit-text");
 		card.replaceChild(text, title);
 		text.appendChild(title);
-		fillSnippet(el(text, "div", "tc-hit-desc"), hit.description);
+		fillParts(el(text, "div", "tc-hit-desc"), hit.description);
 	}
 	return card;
 }
