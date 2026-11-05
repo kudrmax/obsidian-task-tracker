@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import path from "node:path";
 
+const { version } = JSON.parse(await readFile("manifest.json", "utf8"));
+
 const production = process.argv.includes("production");
 const demo = process.argv.includes("demo");
 
@@ -26,6 +28,8 @@ const context = await esbuild.context({
   outfile: "main.js",
   logLevel: "info",
   plugins: [raw],
+  // The release checks it: a main.js left from an older build carries another version.
+  banner: { js: `// task-calendar ${version}` },
 });
 
 if (production) {
