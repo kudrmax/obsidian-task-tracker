@@ -362,7 +362,12 @@ describe("styles.css keeps to its design system", () => {
 	it("lets the foot fade give way while a task is typed, so a field at the end of a column shows whole: down to the status bar on the desktop, behind the bar on the phone", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(of("body:not(.is-mobile) .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-chrome-room)");
-		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-bottom))");
+		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-stand))");
+	});
+
+	it("keeps the phone's foot fade off the keyboard's slide: only the bar rides it, so the fade's eased height never sweeps a dark band over the screen", () => {
+		expect(sheet.tokens.get("--tc-bar-stand")).not.toContain("keyboard");
+		expect(sheet.tokens.get("--tc-bar-bottom")).toBe("calc(var(--tc-bar-stand) + var(--tc-keyboard-lift))");
 	});
 
 	it("marks a task in progress with a dot in the middle of the card's left padding, level with the title, in the card's meta tint", () => {
