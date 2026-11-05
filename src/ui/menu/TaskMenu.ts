@@ -121,8 +121,10 @@ export interface MenuActions {
 	stop(): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
-	/** The description's screen: to read it, or straight in the editor. */
+	/** The task on the whole screen: to read its description, or with the caret straight in it. */
 	openDescription(editing: boolean): void;
+	/** The task on the whole screen; none where it already is. */
+	openFull?(): void;
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
 	addSubtask(menu: TaskMenu): void;
 	remove(): Promise<void>;
@@ -360,7 +362,11 @@ export class TaskMenu extends LiftedMenu {
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
 		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
-		menuRow(this.panel, { label: "Open in Obsidian", icon: "openFile", size: "tall", apart: true, onPick: this.pick(() => actions.openInObsidian()) });
+		const openFull = actions.openFull;
+		menuGroup(this.panel, [
+			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", size: "tall", onPick: this.pick(() => openFull()) } as const] : []),
+			{ label: "Open in Obsidian", icon: "openFile", size: "tall", onPick: this.pick(() => actions.openInObsidian()) },
+		]);
 		if (this.asking === "delete") this.askGroup("delete");
 		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, size: "tall", apart: true, onPick: () => this.askFor("delete") });
 		this.place(keepAbove);

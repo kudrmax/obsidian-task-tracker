@@ -49,6 +49,7 @@ describe("toItem", () => {
 			day: T,
 			can: { postpone: true, removeDue: false, remind: true },
 			subtasks: [],
+			allSubtasks: [],
 			progress: null,
 			parentText: null, description: null,
 		});
@@ -79,6 +80,13 @@ describe("toItem", () => {
 		expect(item.progress).toEqual({ done: 1, total: 2 });
 		expect(item.subtasks.map((s) => [s.text, s.parentText, s.key.path])).toEqual([["D", "A", [2]]]);
 		expect(toItem(parse(TRIP).tasks("now")[1], T).progress).toBeNull();
+	});
+
+	it("carries every subtask too, done and given up ones among them, in file order", () => {
+		const item = toItem(parse("## Now\n- [ ] A\n  - [x] B\n    - [ ] B1\n  - [-] C\n  - [ ] D\n").tasks("now")[0], T);
+		expect(item.allSubtasks.map((s) => [s.text, s.status, s.key.path])).toEqual([["B", "done", [0]], ["C", "cancelled", [1]], ["D", "todo", [2]]]);
+		expect(item.allSubtasks[0].allSubtasks.map((s) => [s.text, s.parentText])).toEqual([["B1", "B"]]);
+		expect(item.subtasks).toEqual([item.allSubtasks[2]]);
 	});
 
 	it("carries the description of the task and of its subtasks", () => {

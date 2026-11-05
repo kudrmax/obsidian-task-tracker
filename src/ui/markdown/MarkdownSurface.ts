@@ -1,7 +1,11 @@
 /** A running editor of Markdown: what it holds now, and the way to drop it. */
 export interface MarkdownEditing {
 	readonly value: string;
+	/** The page's focus is in it. */
+	readonly focused: boolean;
 	focus(): void;
+	/** Its whole text replaced: the file changed it elsewhere. */
+	setValue(markdown: string): void;
 	destroy(): void;
 }
 
@@ -12,6 +16,6 @@ export interface MarkdownEditing {
 export interface MarkdownSurface {
 	/** Draws the Markdown into `el`; links in it open as in a note. */
 	render(el: HTMLElement, markdown: string): Promise<void>;
-	/** Puts an editor holding `markdown` into `el`; Escape in it, unless a note search is open there, calls `onEscape`. */
-	edit(el: HTMLElement, markdown: string, onEscape: () => void): MarkdownEditing;
+	/** Puts an editor holding `markdown` into `el`; Escape in it, unless a note search is open there, calls `onEscape`; each change to its text calls `onChange`. */
+	edit(el: HTMLElement, markdown: string, onEscape: () => void, onChange?: () => void): MarkdownEditing;
 }

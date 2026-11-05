@@ -123,6 +123,8 @@ export interface TaskItem {
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
+	/** Every subtask right under this one, done and given up ones too, in file order, each with all its own. */
+	readonly allSubtasks: readonly TaskItem[];
 	/** Null without subtasks. */
 	readonly progress: SubtaskProgress | null;
 	/** The text of the task a subtask belongs to; null for a task. */
@@ -341,6 +343,11 @@ export interface TaskService {
 	remove(key: TaskKey): Promise<void>;
 	/** The task's line in the file, from 0, once the file is normalized: where Open in Obsidian puts the cursor. */
 	lineOf(key: TaskKey): Promise<number>;
+	/**
+	 * The task `key` names as the file now has it: its line at its place; moved, the one line like it anywhere; else the
+	 * task at its place whose text is `text`, its other fields changed there. Null when none of these is found.
+	 */
+	find(key: TaskKey, text: string): Promise<TaskItem | null>;
 
 	/**
 	 * Puts `key` right before the task `before` in the file, in `before`'s section. `before` null: end of the list's section

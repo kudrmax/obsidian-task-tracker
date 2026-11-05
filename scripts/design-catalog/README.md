@@ -35,8 +35,8 @@
 
 | Где | Состояния |
 |---|---|
-| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `sheet`, `quick`, `quick-priority`, `quick-place`, `quick-picker`, `block-menu`, `drag`, `undo`, `settings`, `active-handle` |
-| Только Mac | `bulk`, `bulk-section`, `bulk-picker`, `hover-row`, `hover-plus`, `active-tile`, `focus-arrow`, `hover-tile-on`, `hover-day`, `focus-row`, `focus-seg`, `hover-sheet` |
+| Везде | `main`, `soon`, `inbox`, `menu`, `section`, `picker`, `confirm`, `group`, `sources`, `full`, `quick`, `quick-priority`, `quick-place`, `quick-picker`, `block-menu`, `drag`, `undo`, `settings`, `active-handle` |
+| Только Mac | `bulk`, `bulk-section`, `bulk-picker`, `hover-row`, `hover-plus`, `active-tile`, `focus-arrow`, `hover-tile-on`, `hover-day`, `focus-row`, `focus-seg`, `hover-full` |
 | Только телефон | `active-row` |
 
 `bulk` выбирает ⌘-нажатием «Work task 2» и «Work task 4» и открывает меню выбранных задач; `bulk-section` и `bulk-picker` — его подменю. `quick-*` — панели полосы быстрого ввода. `block-menu` — меню карточки таймлайна с подзадачами.
@@ -47,4 +47,4 @@
 
 ## Tap and iPad probe
 
-`node scripts/design-catalog/tapcheck.mjs` switches the test Obsidian to the phone view and, in the main screen, the task menu, the date picker, the delete question, the sources window, the description and the quick bar, gives every visible plugin button Obsidian's tap mark `.mobile-tap` and prints each button whose ground, shadow or padding changes. `TAB=1` does the same with the body marked `.is-tablet` (Obsidian's iPad button padding). Each button is read with its transitions off: Obsidian's buttons ease their ground, and a read at once would still see the old one. An empty state means no button changed.
+`node scripts/design-catalog/tapcheck.mjs` switches the test Obsidian to the phone view and, in the main screen, the task menu, the date picker, the delete question, the sources window, a task on the full screen and the quick bar, gives every visible plugin button Obsidian's tap mark `.mobile-tap` and prints each button whose ground, shadow or padding changes. `TAB=1` does the same with the body marked `.is-tablet` (Obsidian's iPad button padding). Each button is read with its transitions off: Obsidian's buttons ease their ground, and a read at once would still see the old one. An empty state means no button changed.

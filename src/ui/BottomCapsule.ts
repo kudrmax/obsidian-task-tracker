@@ -1,15 +1,14 @@
 import type { UndoService } from "../application/contracts";
 import { el } from "./dom";
 import { Button } from "./kit/Button";
-import { MoreMenu } from "./menu/MoreMenu";
 
 export interface BottomCapsuleActions {
 	onUndo(): void;
-	onSearch(): void;
-	onSelect(): void;
+	/** «⋯»: a menu over the capsule, which it is given. */
+	onMore(capsule: HTMLElement): void;
 }
 
-/** The capsule opposite the plus: Undo takes the last action back and stays dim while there is none; «⋯» opens Search and Select tasks over it. */
+/** The capsule opposite the plus: Undo takes the last action back and stays dim while there is none; «⋯» opens a menu over it. */
 export class BottomCapsule {
 	readonly el: HTMLElement;
 	private readonly undoButton: Button;
@@ -30,7 +29,7 @@ export class BottomCapsule {
 				if (this.undo.canUndo()) actions.onUndo();
 			},
 		});
-		Button.create(this.el, { kind: "icon", label: "More", icon: "more", cls: "tc-more-open", onPress: () => MoreMenu.open({ anchor: this.el, onSearch: actions.onSearch, onSelect: actions.onSelect }) });
+		Button.create(this.el, { kind: "icon", label: "More", icon: "more", cls: "tc-more-open", onPress: () => actions.onMore(this.el) });
 		this.unsubscribe = undo.onChange(() => this.show());
 		this.show();
 	}

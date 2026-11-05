@@ -27,7 +27,8 @@ import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
-import { DescriptionSheet } from "./sheet/DescriptionSheet";
+import { FullScreen } from "./full/FullScreen";
+import { MoreMenu } from "./menu/MoreMenu";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, stepFor } from "./zoomLevels";
@@ -103,6 +104,8 @@ export class TaskCalendarView extends ItemView {
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
 	private atDone = false;
 	private search: SearchWindow | null = null;
+	/** The task on the whole screen, while one is. */
+	private full: FullScreen | null = null;
 	private readonly found = new FoundCard();
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
@@ -400,7 +403,10 @@ export class TaskCalendarView extends ItemView {
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
 		this.unsubscribe.push(() => keyboard.destroy());
-		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() });
+		const capsule = new BottomCapsule(root, this.deps.undo, {
+			onUndo: () => void this.undoStep("undo"),
+			onMore: (anchor) => MoreMenu.open({ anchor, onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() }),
+		});
 		this.unsubscribe.push(() => capsule.destroy());
 		this.bulk.mount();
 		this.scope = new Scope(this.app.scope);
@@ -416,7 +422,10 @@ export class TaskCalendarView extends ItemView {
 			target: new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth }),
 		});
 		this.unsubscribe.push(
-			this.deps.tasks.onChange(() => void this.data.tasks()),
+			this.deps.tasks.onChange(() => {
+				void this.data.tasks();
+				void this.full?.refresh();
+			}),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
 			this.deps.settings.onChange(() => this.onSettings()),
 			this.deps.days.onDayChange((change) => this.onDayChange(change), () => this.canTick()),
@@ -484,6 +493,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onClose(): Promise<void> {
+		this.full?.close();
 		this.quick?.close();
 		this.poll?.stop();
 		this.timeline?.destroy();
@@ -938,19 +948,34 @@ export class TaskCalendarView extends ItemView {
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
 	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
 
-	/** A task's description on its own screen: to read, or straight in the editor. */
-	private descriptionSheet(item: TaskItem, editing: boolean): void {
-		DescriptionSheet.open(this.contentEl, {
-			title: item.text,
-			markdown: item.description,
+	/** The task over the whole view; one already open there takes it in over its own. `editing` puts the caret in its description. */
+	private openFull(item: TaskItem, editing: boolean): void {
+		if (this.full) {
+			this.full.show(item, editing);
+			return;
+		}
+		this.full = FullScreen.open(
+			{
+				root: this.contentEl,
+				tasks: this.deps.tasks,
+				undo: this.deps.undo,
+				surface: this.markdown,
+				titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
+				day: () => this.today(),
+				act: (change) => this.act(change),
+				onUndo: () => void this.undoStep("undo"),
+				menu: (task, source) => {
+					if (this.full) this.showMenu(task, source, source.classList.contains("tc-card") ? (copy) => FullScreen.mark(copy, task) : undefined, this.full);
+				},
+				onClose: () => (this.full = null),
+			},
+			item,
 			editing,
-			surface: this.markdown,
-			onSave: (markdown) => this.act(() => this.deps.tasks.setDescription(item.key, markdown)),
-		});
+		);
 	}
 
-	/** The task menu; a list card's offers the sections of its list too. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
+	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
 		const tasks = this.deps.tasks;
 		const column = this.sectionColumn(source);
 		const sections = column ? sectionChoice([item], this.data.offer) : null;
@@ -962,7 +987,7 @@ export class TaskCalendarView extends ItemView {
 			lifted,
 			sections: sections ?? undefined,
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
-			markdown: this.markdown,
+			markdown: full?.holds(item) ? undefined : this.markdown,
 			today: this.today(),
 			day: this.selectedDate,
 			levels: tasks.priorityLevels(),
@@ -987,9 +1012,10 @@ export class TaskCalendarView extends ItemView {
 				setReminder: (kind) => this.act(() => tasks.setReminder(current.key, kind)),
 				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
 				stop: () => this.act(() => tasks.stop(current.key)),
-				rename: (menu) => this.quick?.rename(current, menu),
-				openDescription: (editing) => this.descriptionSheet(current, editing),
-				addSubtask: (menu) => this.quick?.addSubtask(current, menu),
+				rename: (menu) => (full ? full.rename(current) : this.quick?.rename(current, menu)),
+				openDescription: (editing) => this.openFull(current, editing),
+				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
+				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
 				remove: () => this.act(() => tasks.remove(current.key)),
 				openInObsidian: () => void this.openInObsidian(current),
 				openLink: (link) => this.openLink(link),
