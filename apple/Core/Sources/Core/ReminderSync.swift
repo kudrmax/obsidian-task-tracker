@@ -33,23 +33,29 @@ public protocol AlarmScheduling: Sendable {
 /// The reminders' Live Activities, by reminder id: when each starts.
 public protocol CardScheduling: Sendable {
     func shown() async -> [String: Date]
+    /// Cards iOS ended or the person swiped away that may still stand on the lock screen.
+    func lingering() async -> [String]
     func show(_ reminder: Reminder) async throws
     func remove(_ reminderIDs: [String]) async
 }
 
-/// Which tasks get a card: iOS keeps few Live Activities of an app, so the nearest, the started ones first.
+/// Which tasks get a card: iOS keeps few Live Activities of an app, so the coming ones, the nearest first, then the
+/// started ones, the latest first: a task started long ago and still open must not take the card of one still to come.
 public enum CardPlan {
     public static let budget = 5
 
-    public static func plan(_ reminders: [Reminder]) -> [Reminder] {
+    public static func plan(_ reminders: [Reminder], now: Date) -> [Reminder] {
         var seen = Set<String>()
         let live = reminders.filter { $0.kind == .live && seen.insert($0.id).inserted }
-        return Array(live.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }.prefix(budget))
+        let coming = live.filter { $0.start > now }.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
+        let started = live.filter { $0.start <= now }.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start > $1.start }
+        return Array((coming + started).prefix(budget))
     }
 }
 
 public enum SyncStatus: Equatable, Sendable {
-    case ok(reminders: Int, at: Date)
+    /// `cardsRefused`: why iOS showed some cards as notifications instead, if it did.
+    case ok(reminders: Int, at: Date, cardsRefused: String? = nil)
     case failed(String)
 }
 
@@ -147,10 +153,11 @@ public actor ReminderSync {
             let file = try vault.read()
             let reminders = try rules.reminders(text: file.tasks, settingsJSON: file.settingsJSON, now: at)
             let meetings = self.meetings(until: reminders.map(\.dayEnd).max(), settingsJSON: file.settingsJSON, at: at)
-            if let failure = await apply(reminders, meetings: meetings, at: at) {
+            let outcome = await apply(reminders, meetings: meetings, at: at)
+            if let failure = outcome.failure {
                 status = .failed("Some reminders weren't set: \(failure.localizedDescription)")
             } else {
-                status = .ok(reminders: Set(reminders.map(\.id)).count, at: at)
+                status = .ok(reminders: Set(reminders.map(\.id)).count, at: at, cardsRefused: outcome.refusedCard?.localizedDescription)
             }
         } catch {
             status = .failed(Self.message(error))
@@ -175,9 +182,11 @@ public actor ReminderSync {
         }
     }
 
-    /// Alarms and cards first, then notifications; one that iOS refuses does not stop the rest. Returns the first refusal.
-    private func apply(_ reminders: [Reminder], meetings: [CalendarEvent], at: Date) async -> Error? {
+    /// Alarms and cards first, then notifications; one that iOS refuses does not stop the rest. Returns the first refusal,
+    /// and the first card iOS refused, told of by a notification instead.
+    private func apply(_ reminders: [Reminder], meetings: [CalendarEvent], at: Date) async -> (failure: Error?, refusedCard: Error?) {
         var failure: Error?
+        var refusedCard: Error?
         let byID = Dictionary(reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         let ringing = Dictionary(reminders.filter { $0.kind == .alarm && $0.start > at }.map { ($0.id, $0.start) }, uniquingKeysWith: { first, _ in first })
@@ -187,17 +196,23 @@ public actor ReminderSync {
             do { try await alarms.schedule(byID[id]!) } catch { failure = failure ?? error }
         }
 
-        let carded = CardPlan.plan(reminders)
+        let carded = CardPlan.plan(reminders, now: at)
         let wantedCards = Dictionary(carded.map { ($0.id, $0.start) }, uniquingKeysWith: { first, _ in first })
         let shown = await cards.shown()
-        await cards.remove(shown.filter { wantedCards[$0.key] != $0.value }.map(\.key).sorted())
+        await cards.remove(Set(shown.filter { wantedCards[$0.key] != $0.value }.map(\.key) + (await cards.lingering())).sorted())
         var onCards = Set(shown.filter { wantedCards[$0.key] == $0.value }.keys)
         for reminder in carded where !onCards.contains(reminder.id) {
             // A card iOS refuses is not a failure: the task is told of by a notification instead.
-            if (try? await cards.show(reminder)) != nil { onCards.insert(reminder.id) }
+            do {
+                try await cards.show(reminder)
+                onCards.insert(reminder.id)
+            } catch {
+                refusedCard = refusedCard ?? error
+            }
         }
 
-        let plan = RepeatPlan.plan(reminders.filter { !onCards.contains($0.id) }, now: at).map { planned in
+        let told = Set(await notifications.delivered().map(\.reminderID))
+        let plan = RepeatPlan.plan(reminders.filter { !onCards.contains($0.id) }, now: at, told: told).map { planned in
             planned.offering(AfterEvent.offer(at: planned.fire, before: byID[planned.reminderID]!.dayEnd, among: meetings))
         }
         let wanted = Set(plan.map(\.identifier))
@@ -207,7 +222,7 @@ public actor ReminderSync {
             do { try await notifications.schedule(planned, reminder: byID[planned.reminderID]!) } catch { failure = failure ?? error }
         }
         await notifications.removeDelivered(Self.outdated(await notifications.delivered(), of: Set(byID.keys)))
-        return failure
+        return (failure, refusedCard)
     }
 
     /// The meetings from now to the last reminder's day end, as the plugin's calendar shows them. Meetings that cannot be

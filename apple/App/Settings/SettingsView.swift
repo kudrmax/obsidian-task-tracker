@@ -57,9 +57,13 @@ struct SettingsView: View {
     @ViewBuilder
     private var status: some View {
         switch model.status {
-        case .ok(let reminders, let at):
+        case .ok(let reminders, let at, let cardsRefused):
             LabeledContent("Reminders", value: "\(reminders)")
             LabeledContent("Updated", value: at.formatted(date: .omitted, time: .shortened))
+            if let cardsRefused {
+                Label("Live Activity refused, sent as a notification: \(cardsRefused)", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
         case .failed(let reason):
             Label(reason, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)

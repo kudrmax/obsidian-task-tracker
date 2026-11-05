@@ -90,7 +90,8 @@ final class UserNotifications: NotificationScheduling {
         let request = UNNotificationRequest(
             identifier: notification.identifier,
             content: content,
-            trigger: UNCalendarNotificationTrigger(dateMatching: when, repeats: false))
+            // One due already, a card's task that started before its card could be shown, is delivered at once.
+            trigger: notification.fire > Date() ? UNCalendarNotificationTrigger(dateMatching: when, repeats: false) : nil)
         try await Self.center.add(request)
         if notification.after != nil { await Self.registerCategories() }
     }

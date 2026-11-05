@@ -66,13 +66,16 @@ actor FakeCards: CardScheduling {
     var cards: [String: Date] = [:]
     var calls = 0
     var refuse = false
+    var ended: [String] = []
     func shown() async -> [String: Date] { cards }
+    func lingering() async -> [String] { ended }
     func show(_ reminder: Reminder) async throws {
         if refuse { throw CocoaError(.featureUnsupported) }
         calls += 1; cards[reminder.id] = reminder.start
     }
-    func remove(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { cards[$0] = nil } }
+    func remove(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { cards[$0] = nil }; ended.removeAll { ids.contains($0) } }
     func refuseAll() { refuse = true }
+    func end(_ id: String) { cards[id] = nil; ended.append(id) }
 }
 
 @Suite struct ReminderSyncTests {
@@ -126,8 +129,40 @@ actor FakeCards: CardScheduling {
 
     @Test func aRefusedCardNotifiesOnceInstead() async {
         await cards.refuseAll()
-        _ = await sync(FakeVault(Fixtures.file(Self.pinned))).sync()
+        let status = await sync(FakeVault(Fixtures.file(Self.pinned))).sync()
         #expect(await notifications.pendingIDs.values.map(\.identifier) == ["\(Self.pinned)#0"])
+        guard case .ok(_, _, let refused) = status else { Issue.record("not ok"); return }
+        #expect(refused != nil)
+    }
+
+    @Test func aRefusedCardOfAStartedTaskNotifiesAtOnceAndOnce() async {
+        await cards.refuseAll()
+        let s = sync(FakeVault(Fixtures.file(Self.pinned)), at: Fixtures.date(4, 11, 20))
+        _ = await s.sync()
+        let planned = await notifications.pendingIDs.values
+        #expect(planned.map(\.identifier) == ["\(Self.pinned)#0"])
+        #expect(planned.map(\.fire) == [Fixtures.date(4, 11, 20)])
+        await notifications.removePending(["\(Self.pinned)#0"])
+        await notifications.deliver(DeliveredNotification(identifier: "\(Self.pinned)#0", reminderID: Self.pinned, at: Fixtures.date(4, 11, 20)))
+        _ = await s.sync()
+        #expect(await notifications.pendingIDs.isEmpty)
+    }
+
+    @Test func comingTasksTakeTheCardsBeforeLongStartedOnes() async {
+        let started = (0..<4).map { "- [ ] Old\($0) 📌 2026-11-04 0\($0 + 5):00" }
+        let coming = (0..<3).map { "- [ ] New\($0) 📌 2026-11-04 2\($0):00" }
+        _ = await sync(FakeVault(Fixtures.file(started + coming)), at: Fixtures.date(4, 12)).sync()
+        #expect(Set(await cards.cards.keys) == Set(coming + [started[3], started[2]]))
+    }
+
+    @Test func anEndedCardOfADoneTaskIsTakenOffTheLockScreen() async {
+        let vault = FakeVault(Fixtures.file(Self.pinned))
+        let s = sync(vault, at: Fixtures.date(4, 11, 5))
+        _ = await s.sync()
+        await cards.end(Self.pinned)
+        _ = await s.complete(reminderID: Self.pinned)
+        #expect(await cards.ended.isEmpty)
+        #expect(await cards.cards.isEmpty)
     }
 
     @Test func firstSyncPlansNotificationsAndAlarms() async {

@@ -13,6 +13,10 @@ final class Cards: CardScheduling {
         return result
     }
 
+    func lingering() async -> [String] {
+        Activity<TaskCardAttributes>.activities.filter { [.ended, .dismissed].contains($0.activityState) }.map(\.attributes.reminderID)
+    }
+
     func show(_ reminder: Reminder) async throws {
         let attributes = TaskCardAttributes(reminderID: reminder.id, title: reminder.title, time: reminder.body, date: reminder.date, start: reminder.start)
         let content = ActivityContent(state: TaskCardAttributes.ContentState(), staleDate: reminder.dayEnd)
