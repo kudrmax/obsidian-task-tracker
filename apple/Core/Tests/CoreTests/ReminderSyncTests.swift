@@ -62,15 +62,72 @@ actor FakeAlarms: AlarmScheduling {
     func cancel(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { alarms[$0] = nil } }
 }
 
+actor FakeCards: CardScheduling {
+    var cards: [String: Date] = [:]
+    var calls = 0
+    var refuse = false
+    func shown() async -> [String: Date] { cards }
+    func show(_ reminder: Reminder) async throws {
+        if refuse { throw CocoaError(.featureUnsupported) }
+        calls += 1; cards[reminder.id] = reminder.start
+    }
+    func remove(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { cards[$0] = nil } }
+    func refuseAll() { refuse = true }
+}
+
 @Suite struct ReminderSyncTests {
     static let quiet = "- [ ] Call ⏰ 2026-11-04 10:00"
     static let alarm = "- [ ] Wake 🚨 2026-11-04 12:00"
+    static let pinned = "- [ ] Pay 📌 2026-11-04 11:00"
     let rules = try! PhoneCore(script: Fixtures.phoneScript)
     let notifications = FakeNotifications()
     let alarms = FakeAlarms()
+    let cards = FakeCards()
 
     func sync(_ vault: FakeVault, at now: Date = Fixtures.date(4, 9)) -> ReminderSync {
-        ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: alarms, now: { now })
+        ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: alarms, cards: cards, now: { now })
+    }
+
+    @Test func aPinnedTaskGetsACardAlone() async {
+        let status = await sync(FakeVault(Fixtures.file(Self.quiet, Self.pinned))).sync()
+        #expect(status == .ok(reminders: 2, at: Fixtures.date(4, 9)))
+        #expect(await cards.cards == [Self.pinned: Fixtures.date(4, 11)])
+        #expect(await notifications.reminderIDs() == [Self.quiet])
+        #expect(await alarms.alarms.isEmpty)
+    }
+
+    @Test func aCardIsShownOnce() async {
+        let s = sync(FakeVault(Fixtures.file(Self.pinned)))
+        _ = await s.sync()
+        let before = await cards.calls
+        _ = await s.sync()
+        #expect(await cards.calls == before)
+    }
+
+    @Test func aClosedOrMovedTaskTakesItsCardAway() async {
+        let vault = FakeVault(Fixtures.file(Self.pinned))
+        let s = sync(vault, at: Fixtures.date(4, 11, 5))
+        _ = await s.sync()
+        _ = await s.snooze(reminderID: Self.pinned, minutes: 30)
+        #expect(await cards.cards == ["- [ ] Pay 📌 2026-11-04 11:35": Fixtures.date(4, 11, 35)])
+        _ = await s.complete(reminderID: "- [ ] Pay 📌 2026-11-04 11:35")
+        #expect(await cards.cards.isEmpty)
+    }
+
+    @Test func cardsBeyondTheBudgetNotifyOnceAtTheStart() async {
+        let lines = (0..<7).map { "- [ ] Pay\($0) 📌 2026-11-04 1\($0):00" }
+        _ = await sync(FakeVault(Fixtures.file(lines))).sync()
+        #expect(Set(await cards.cards.keys) == Set(lines.prefix(CardPlan.budget)))
+        let planned = await notifications.pendingIDs.values
+        #expect(Set(planned.map(\.reminderID)) == Set(lines.dropFirst(CardPlan.budget)))
+        #expect(planned.count == lines.count - CardPlan.budget)
+        #expect(planned.allSatisfy { $0.identifier.hasSuffix("#0") })
+    }
+
+    @Test func aRefusedCardNotifiesOnceInstead() async {
+        await cards.refuseAll()
+        _ = await sync(FakeVault(Fixtures.file(Self.pinned))).sync()
+        #expect(await notifications.pendingIDs.values.map(\.identifier) == ["\(Self.pinned)#0"])
     }
 
     @Test func firstSyncPlansNotificationsAndAlarms() async {
@@ -153,7 +210,7 @@ actor FakeAlarms: AlarmScheduling {
     }
 
     @Test func noAccessIsSaid() async {
-        let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks()), rules: rules, notifications: notifications, alarms: alarms, now: { Fixtures.date(4, 9) })
+        let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks()), rules: rules, notifications: notifications, alarms: alarms, cards: cards, now: { Fixtures.date(4, 9) })
         #expect(await s.sync() == .failed("No access to the vault folder: choose it in the app"))
     }
 

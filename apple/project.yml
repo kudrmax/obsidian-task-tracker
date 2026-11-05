@@ -18,6 +18,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: Core
+      - target: TaskCalendarCards
     configFiles:
       Debug: App/Config/Base.xcconfig
       Release: App/Config/Base.xcconfig
@@ -37,5 +38,31 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: Alarms for tasks set to a time
+        NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]
+  TaskCalendarCards:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Cards
+      - path: App/Cards/TaskCardAttributes.swift
+      - path: App/Cards/CardIntents.swift
+    configFiles:
+      Debug: App/Config/Base.xcconfig
+      Release: App/Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kudrmax.taskcalendar.cards
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: WIDGET
+    info:
+      path: Cards/Info.plist
+      properties:
+        CFBundleDisplayName: Task Calendar
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

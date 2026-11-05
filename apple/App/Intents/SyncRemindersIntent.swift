@@ -1,7 +1,8 @@
 import AppIntents
 
 /// Run by the «Obsidian Is Closed» automation: re-reads the tasks file without opening the app.
-struct SyncRemindersIntent: AppIntent {
+/// A Live Activity intent: a card is started from the background only by one.
+struct SyncRemindersIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Update Reminders"
     static let description = IntentDescription("Reads the tasks file again and sets its reminders.")
     static let supportedModes: IntentModes = .background

@@ -14,6 +14,10 @@ enum Fixtures {
     }
 
     static func file(_ now: String...) -> String {
+        file(now)
+    }
+
+    static func file(_ now: [String]) -> String {
         (["## Now", ""] + now + ["", "## Soon", "", "## Done", ""]).joined(separator: "\n")
     }
 }
