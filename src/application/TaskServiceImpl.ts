@@ -1,7 +1,7 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
-import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate, toItem } from "../domain/queries";
+import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
 import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
@@ -26,6 +26,7 @@ import {
 import { EntryTags } from "../domain/EntryTags";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
+import { toItem } from "./taskItems";
 import type { UndoHistory } from "./UndoHistory";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */

@@ -21,8 +21,6 @@ const ALLOWED: readonly string[] = [
 	"src/application/services.ts → src/infrastructure/WorkCalendarExportScript.ts",
 	"src/application/services.ts → src/infrastructure/WorkCalendarFileSource.ts",
 	"src/application/services.ts → src/infrastructure/WorkCalendarShortcut.ts",
-	"src/domain/queries.ts → src/application/contracts.ts",
-	"src/domain/queries.ts → src/settings.ts",
 	"src/phone/PhoneReminders.ts → src/domain/DayBoundary.ts",
 	"src/phone/PhoneReminders.ts → src/domain/LocalDate.ts",
 	"src/phone/PhoneReminders.ts → src/domain/Task.ts",

@@ -98,6 +98,7 @@ export class DemoTaskService implements TaskService {
 			slot: t.slot,
 			reminder: "notification",
 			repeat: t.repeat ?? null,
+			open: t.status === "todo" || t.status === "inProgress",
 			repeatable: section !== "done" && (t.status === "todo" || t.status === "inProgress"),
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			subtasks: [],

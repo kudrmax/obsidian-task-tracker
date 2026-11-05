@@ -48,6 +48,8 @@ export interface TaskItem {
 	readonly reminder: ReminderKind;
 	/** The rule after the task's repeat marker; null for a task that does not repeat. */
 	readonly repeat: RepeatRule | null;
+	/** Not done and not given up: todo or in progress. */
+	readonly open: boolean;
 	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */

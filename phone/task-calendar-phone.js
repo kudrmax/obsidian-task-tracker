@@ -129,6 +129,17 @@
     }
   };
 
+  // src/domain/Task.ts
+  function isOpen(status) {
+    return status === "todo" || status === "inProgress";
+  }
+  var STATUS_CHARS = {
+    todo: " ",
+    inProgress: "/",
+    done: "x",
+    cancelled: "-"
+  };
+
   // src/domain/Repeat.ts
   var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
@@ -265,14 +276,6 @@
         if (date > base) return date;
       }
     }
-  };
-
-  // src/domain/Task.ts
-  var STATUS_CHARS = {
-    todo: " ",
-    inProgress: "/",
-    done: "x",
-    cancelled: "-"
   };
 
   // src/domain/description.ts
@@ -1028,9 +1031,6 @@
   }
 
   // src/domain/normalize.ts
-  function isOpen(task) {
-    return task.status === "todo" || task.status === "inProgress";
-  }
   function untilSettled(doc, pass) {
     for (; ; ) {
       const next = pass(doc);
@@ -1040,13 +1040,13 @@
   }
   function erasePastSlots(doc, today, boundary) {
     return untilSettled(doc, (d) => {
-      const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
+      const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.slot !== null && boundary.dayOfSlot(e.task.slot) < today);
       return d.replaceAll(past.map((e) => [e, { ...e.task, slot: null, dueDate: e.task.dueDate ?? boundary.dayOfSlot(e.task.slot) }]));
     });
   }
   function pastDatesToToday(doc, today) {
     return untilSettled(doc, (d) => {
-      const past = d.allTasks().filter((e) => isOpen(e.task) && e.task.dueDate !== null && e.task.dueDate < today);
+      const past = d.allTasks().filter((e) => isOpen(e.task.status) && e.task.dueDate !== null && e.task.dueDate < today);
       return d.replaceAll(past.map((e) => [e, { ...e.task, dueDate: today }]));
     });
   }
@@ -1062,19 +1062,19 @@
     }
   }
   function closedToDone(doc) {
-    return gatherAtStart(doc, "done", (e) => !isOpen(e.task));
+    return gatherAtStart(doc, "done", (e) => !isOpen(e.task.status));
   }
   function datedOutOfUndated(doc) {
     if (!doc.hasSection("soon")) return doc;
     for (; ; ) {
-      const entry = [...doc.tasks("inbox"), ...doc.tasks("backlog")].find((e) => isOpen(e.task) && (e.task.dueDate !== null || e.task.slot !== null));
+      const entry = [...doc.tasks("inbox"), ...doc.tasks("backlog")].find((e) => isOpen(e.task.status) && (e.task.dueDate !== null || e.task.slot !== null));
       if (!entry) return doc;
       doc = doc.moveEntry(entry, "soon", "end");
     }
   }
   function dueToNow(doc, today, boundary, presets) {
     const came = (e) => {
-      if (e.section !== "soon" || !isOpen(e.task)) return false;
+      if (e.section !== "soon" || !isOpen(e.task.status)) return false;
       const due = e.task.dueDate !== null && e.task.dueDate <= today;
       const slotted = e.task.slot !== null && boundary.dayOfSlot(e.task.slot) <= today;
       return due || slotted;
@@ -1251,7 +1251,7 @@
     return [...doc.tasks("now"), ...doc.tasks("soon")];
   }
   function openSlotted(doc) {
-    return listed(doc).filter((e) => e.task.slot !== null && e.task.status !== "done" && e.task.status !== "cancelled");
+    return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
   }
 
   // src/domain/TaskText.ts

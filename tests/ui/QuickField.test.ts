@@ -174,6 +174,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => ({
 	slot: null,
 	reminder: "notification",
 	repeat: null,
+	open: true,
 	repeatable: true,
 	priority: null,
 	group: null,
