@@ -11,6 +11,8 @@ import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard
 export interface ListEntryInput {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
+	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
+	readonly section?: boolean;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -123,7 +125,7 @@ export class TaskList {
 		if (aboveHeaders) enter(null, true);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			if (isEmptyGroup(group) && entry?.place.group !== group.name) this.nodes.push(this.plate(group));
+			if (isEmptyGroup(group) && (entry?.place.group !== group.name || entry.section)) this.nodes.push(this.plate(group));
 			groupStart = this.entries.length;
 			for (const row of rowsOf(group.items)) add(row, group.name);
 			subtrees(groupStart);
@@ -167,6 +169,7 @@ export class TaskList {
 		const row = kept ?? el(this.el, "div", QUICK_ROW);
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
+		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.place.level);
 	}
 

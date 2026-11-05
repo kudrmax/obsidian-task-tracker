@@ -96,9 +96,9 @@ function placeResultOf(result: DropResult): PlaceResult | null {
 	}
 }
 
-/** The list redraws when the field moves or the texts waiting before it change; typing only changes the field. */
+/** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
 function movesRows(before: EntryState | null, after: EntryState): boolean {
-	if (!before || before.spot !== after.spot || before.renaming !== after.renaming) return true;
+	if (!before || before.spot !== after.spot || before.renaming !== after.renaming || before.section !== after.section) return true;
 	return before.pending.length !== after.pending.length || before.pending.some((line, i) => line.text !== after.pending[i].text || line.level !== after.pending[i].level);
 }
 
@@ -286,7 +286,7 @@ export class QuickEntryController {
 	entryIn(column: ListColumn): ListEntryInput | null {
 		const state = this.state;
 		if (state?.spot.kind !== "list" || state.spot.column !== column) return null;
-		return { place: state.spot.place, pending: state.pending, field: (row) => this.fieldIn(row) };
+		return { place: state.spot.place, pending: state.pending, section: state.section === true, field: (row) => this.fieldIn(row) };
 	}
 
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
