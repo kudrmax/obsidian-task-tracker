@@ -1,6 +1,5 @@
-import type { LocalDate } from "../domain/Task";
 import type { TaskCalendarSettings } from "../settings";
-import type { CalendarEvent, CalendarOption, SourceStatus } from "./contracts";
+import type { CalendarOption } from "./contracts";
 
 /** The tasks file as text. Implemented over the Obsidian vault; in tests, in memory. */
 export interface TaskFileStore {
@@ -39,21 +38,6 @@ export interface SettingsStore {
 	update(patch: Partial<TaskCalendarSettings>): Promise<void>;
 	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
-}
-
-/** A source's status as the calendar service keeps it, in memory and on the device: its kind follows from the source. */
-export type KeptStatus = Omit<SourceStatus, "kind">;
-
-/** A day's events as the calendar service keeps them. */
-export interface KeptDay {
-	readonly events: readonly CalendarEvent[];
-	readonly statuses: readonly KeptStatus[];
-}
-
-/** The events last fetched for each day, kept on the device across restarts: the calendar opens with them before the network answers. */
-export interface EventCache {
-	read(): ReadonlyMap<LocalDate, KeptDay>;
-	write(days: ReadonlyMap<LocalDate, KeptDay>): void;
 }
 
 /** Google's login: the refresh token kept in the settings. Implemented by GoogleAuth. */

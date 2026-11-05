@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Clock } from "../../src/application/ports";
-import { GoogleCalendarSource } from "../../src/infrastructure/GoogleCalendarSource";
+import { GoogleCalendarApi } from "../../src/infrastructure/GoogleCalendarApi";
 import type { HttpRequest, HttpResponse } from "../../src/infrastructure/Http";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -55,10 +55,10 @@ function source() {
 	const clock = new ManualClock();
 	const http = new FakeHttp();
 	const auth = { isLoggedIn: () => settings.get().google.refreshToken !== "", accessToken: async () => "a" };
-	return { google: new GoogleCalendarSource(auth, settings, clock, http.http), settings, clock, http };
+	return { google: new GoogleCalendarApi(auth, settings, clock, http.http), settings, clock, http };
 }
 
-describe("GoogleCalendarSource", () => {
+describe("GoogleCalendarApi", () => {
 	it("asks for the calendar list once for two fetches in a row", async () => {
 		const { google, http } = source();
 		await google.eventsBetween(START, END);
@@ -112,8 +112,8 @@ describe("GoogleCalendarSource", () => {
 			["", { items: [event("e1")], nextPageToken: "p2" }],
 			["p2", { items: [event("e2")] }],
 		]);
-		const batch = await google.eventsBetween(START, END);
-		expect(batch.events.map((e) => e.id)).toEqual(["google:work:e1", "google:work:e2"]);
+		const events = await google.eventsBetween(START, END);
+		expect(events.map((e) => e.id)).toEqual(["google:work:e1", "google:work:e2"]);
 		const [first, second] = http.eventRequests;
 		expect(first.searchParams.get("pageToken")).toBeNull();
 		expect(second.searchParams.get("pageToken")).toBe("p2");

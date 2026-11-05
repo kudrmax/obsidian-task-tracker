@@ -6,16 +6,17 @@ import { GoogleAccountService } from "./application/GoogleAccountService";
 import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "./application/ports";
 import { TaskServiceImpl } from "./application/TaskServiceImpl";
 import { UndoHistory } from "./application/UndoHistory";
-import { DeviceEventCache } from "./infrastructure/DeviceEventCache";
+import { GOOGLE_CALENDAR_FILE } from "./application/calendarFile";
+import { CalendarFileSource } from "./infrastructure/CalendarFileSource";
 import { GoogleAuth } from "./infrastructure/GoogleAuth";
-import { GoogleCalendarSource } from "./infrastructure/GoogleCalendarSource";
+import { GoogleCalendarApi } from "./infrastructure/GoogleCalendarApi";
+import { GoogleCalendarFeed } from "./infrastructure/GoogleCalendarFeed";
 import { browserLoginDeps, GoogleRedirectLogin } from "./infrastructure/GoogleRedirectLogin";
 import { requestToken } from "./infrastructure/GoogleToken";
 import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
-import { WorkCalendarFileSource } from "./infrastructure/WorkCalendarFileSource";
 import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastructure/WorkCalendarShortcut";
 
 export interface Services {
@@ -42,8 +43,11 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const token = (fields: Record<string, string>) => requestToken(obsidianHttp, settings.get().google.clientId, settings.get().google.clientSecret, fields);
 	const login = new GoogleRedirectLogin(browserLoginDeps(token));
 	const auth = new GoogleAuth(settings, login, token, clock);
-	const googleSource = new GoogleCalendarSource(auth, settings, clock, obsidianHttp);
-	const workSource = new WorkCalendarFileSource(app.vault.adapter, settings, new VaultPathWatcher(app.vault));
+	const googleApi = new GoogleCalendarApi(auth, settings, clock, obsidianHttp);
+	const watcher = new VaultPathWatcher(app.vault);
+	const googleFile = new CalendarFileSource("google", () => GOOGLE_CALENDAR_FILE, () => [], app.vault.adapter, watcher);
+	const workFile = new CalendarFileSource("work", () => settings.get().workCalendarFile, () => settings.get().workCalendarTitles, app.vault.adapter, watcher);
+	const googleFeed = new GoogleCalendarFeed(googleApi, auth, app.vault.adapter, settings, clock);
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const tasks = new TaskServiceImpl(store, settings, clock, history);
@@ -52,8 +56,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		tasks,
 		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
 		undo: history,
-		calendars: new CalendarServiceImpl([googleSource, workSource], clock, settings, new DeviceEventCache(app), windowTimers, work),
-		google: new GoogleAccountService(auth, googleSource, settings),
+		calendars: new CalendarServiceImpl([googleFile, workFile], [googleFeed], clock, settings, windowTimers, work),
+		google: new GoogleAccountService(auth, googleApi, settings),
 		work,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
