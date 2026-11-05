@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
+import { type CalendarEvent, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type GroupName, type ListSection, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -252,6 +252,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("left") !== null,
+			sections: () => this.listSectionsOf("left"),
+			onPlate: (plate, group) => this.attachPlate(plate, "left", group),
 			pending: () => this.namingIn("left"),
 			entry: () => this.quick?.entryIn("left") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -267,6 +269,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.inbox),
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
+			sections: () => this.listSectionsOf("inbox"),
+			onPlate: (plate, group) => this.attachPlate(plate, "inbox", group),
 			pending: () => this.namingIn("inbox"),
 			entry: () => this.quick?.entryIn("inbox") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -280,6 +284,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.backlog),
 			day: () => null,
 			grouped: () => this.sectionsOf("backlog") !== null,
+			sections: () => this.listSectionsOf("backlog"),
+			onPlate: (plate, group) => this.attachPlate(plate, "backlog", group),
 			pending: () => this.namingIn("backlog"),
 			entry: () => this.quick?.entryIn("backlog") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -293,6 +299,8 @@ export class TaskCalendarView extends ItemView {
 			items: () => this.unnamed(this.data.soon),
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
+			sections: () => this.listSectionsOf("soon"),
+			onPlate: (plate, group) => this.attachPlate(plate, "soon", group),
 			pending: () => this.namingIn("soon"),
 			entry: () => this.quick?.entryIn("soon") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
@@ -365,6 +373,7 @@ export class TaskCalendarView extends ItemView {
 			drag: this.drag,
 			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
 			list: (column) => this.listOf(column),
+			sectioned: (column) => this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
 			task: (key) => findTask(this.data.day?.slotted ?? [], key),
 			dropTargets: () => {
@@ -575,6 +584,10 @@ export class TaskCalendarView extends ItemView {
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
 			grouped: (date) => this.deps.tasks.dayColumn(date).sections,
+			sections: (date) => {
+				const column = this.deps.tasks.dayColumn(date);
+				return column.sections ? this.data.sections[column.list] : [];
+			},
 			ungroupedName: () => this.settings.groups.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
@@ -807,6 +820,17 @@ export class TaskCalendarView extends ItemView {
 				else this.render();
 			},
 		});
+	}
+
+	/** The groups of the list whose sections `column` shows, where its empty sections stand. */
+	private listSectionsOf(column: ListColumn): readonly ListSection[] {
+		const sections = this.sectionsOf(column);
+		return sections ? this.data.sections[sections.list] : [];
+	}
+
+	/** A tap on an empty section's No tasks plate: the field of a new task in that section. */
+	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup): void {
+		plate.addEventListener("click", () => this.quick?.openIn(column, group.name));
 	}
 
 	/**

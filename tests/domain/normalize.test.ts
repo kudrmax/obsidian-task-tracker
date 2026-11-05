@@ -139,8 +139,9 @@ describe("rule 3 for Backlog: a Backlog task that got its day leaves Backlog", (
 		expect(normalize(parse("## Backlog\n\n- [x] A\n\n## Done\n"), T).serialize()).toBe("## Backlog\n\n## Done\n\n- [x] A\n");
 	});
 
-	it("keeps its sections, and drops an empty one", () => {
-		expect(normalize(parse("## Backlog\n\n- [ ] A\n### Дом\n- [ ] B\n### Пусто\n\n## Done\n"), T).serialize()).toBe("## Backlog\n\n- [ ] A\n### Дом\n- [ ] B\n\n## Done\n");
+	it("keeps its sections, an empty one too", () => {
+		const text = "## Backlog\n\n- [ ] A\n### Дом\n- [ ] B\n### Пусто\n\n## Done\n";
+		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 });
 
@@ -224,8 +225,9 @@ describe("sections: rules 5-8", () => {
 		expect(run(text)).toBe(text);
 	});
 
-	it("rule 8 deletes an empty group and an empty ungrouped heading", () => {
-		expect(run("## Now\n\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### No section\n\n## Soon\n")).toBe("## Now\n\n- [ ] A\n### Y\n- [ ] B\n\n## Soon\n");
+	it("rule 8 deletes an empty ungrouped heading and keeps an empty section", () => {
+		expect(run("## Now\n\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### No section\n\n## Soon\n")).toBe("## Now\n\n- [ ] A\n### X\n\n### Y\n- [ ] B\n\n## Soon\n");
+		expect(run("## Now\n\n### X\n- [ ] A\n### No section\n")).toBe("## Now\n\n### X\n- [ ] A\n");
 	});
 
 	it("rule 4 puts today's Soon tasks at the start of No section, in order", () => {
@@ -252,6 +254,40 @@ describe("sections: rules 5-8", () => {
 			const once = normalize(TaskDocument.parse(text, G, M), T);
 			expect(normalize(once, T).serialize()).toBe(once.serialize());
 		}
+	});
+});
+
+describe("empty sections", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const run = (text: string) => normalize(TaskDocument.parse(text, G, M), T).serialize();
+
+	it("an empty section is a fixed point in Inbox, Backlog, Now and Soon", () => {
+		for (const list of ["Inbox", "Backlog", "Now", "Soon"]) {
+			const text = `## ${list}\n\n- [ ] A\n### X\n\n### Y\n- [ ] B\n### Z\n\n## Done\n`;
+			expect(run(text)).toBe(text);
+			const alone = `## ${list}\n\n### X\n\n## Done\n`;
+			expect(run(alone)).toBe(alone);
+		}
+	});
+
+	it("rule 5 takes the only slotted task out, and the section goes with it", () => {
+		expect(run("## Now\n\n- [ ] A\n### Вечер\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n")).toBe("## Now\n\n- [ ] A\n- [ ] B ⏰ 2026-10-30 18:00-19:00\n");
+	});
+
+	it("rule 4: the only task of a Soon section came due, the section goes; one for another day keeps it", () => {
+		expect(run("## Now\n\n- [ ] N\n\n## Soon\n\n- [ ] S\n### X\n- [ ] A 📅 2026-10-30\n")).toBe("## Now\n\n- [ ] N\n### X\n- [ ] A 📅 2026-10-30\n\n## Soon\n\n- [ ] S\n");
+		expect(run("## Now\n\n- [ ] A 📅 2026-10-30\n\n## Soon\n\n- [ ] S\n### X\n- [ ] B 📅 2026-10-30\n- [ ] C 📅 2026-11-03\n")).toBe(
+			"## Now\n\n- [ ] A 📅 2026-10-30\n### X\n- [ ] B 📅 2026-10-30\n\n## Soon\n\n- [ ] S\n### X\n- [ ] C 📅 2026-11-03\n",
+		);
+	});
+
+	it("rules 2 and 3: the last task of a section done, or dated in Inbox, takes the section away", () => {
+		expect(run("## Now\n\n- [ ] N\n### X\n- [x] A\n\n## Done\n")).toBe("## Now\n\n- [ ] N\n\n## Done\n\n- [x] A\n");
+		expect(run("## Inbox\n\n- [ ] I\n### X\n- [ ] A 📅 2026-11-03\n\n## Soon\n")).toBe("## Inbox\n\n- [ ] I\n\n## Soon\n\n- [ ] A 📅 2026-11-03\n");
+	});
+
+	it("an empty No section heading goes", () => {
+		expect(run("## Now\n\n### X\n- [ ] A\n### No section\n\n### Y\n\n## Soon\n")).toBe("## Now\n\n### X\n- [ ] A\n### Y\n\n## Soon\n");
 	});
 });
 

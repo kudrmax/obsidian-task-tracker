@@ -22,6 +22,8 @@ export interface QuickBarState {
 	readonly repeat: RepeatRule | null;
 	/** The field may repeat: a subtask's field and one on the calendar may not, and have no repeat button. */
 	readonly repeatable: boolean;
+	/** The field writes a section's name, not a task; null where it cannot (no column with sections, a rename): no section button. */
+	readonly section: boolean | null;
 }
 
 /** Where the field stands, for the bar to stand by it. */
@@ -43,6 +45,8 @@ export interface QuickBarDeps {
 	/** The placement of a task for a day picked: Now for today, else that day. */
 	placementOfDay(day: LocalDate): Placement;
 	onIndent(delta: 1 | -1): void;
+	/** The section button: the field switches between a task and a section's name. */
+	onSection(): void;
 	/** A level's prefix, or null to take the level off. */
 	onPriority(prefix: string | null): void;
 	onPlace(placement: Placement): void;
@@ -89,6 +93,9 @@ const placeIcon = (placement: Placement): PlaceIconName => (placement.kind === "
  */
 export class QuickBar {
 	private readonly bar: HTMLElement;
+	private readonly section: HTMLButtonElement;
+	private readonly sectionRule: HTMLElement;
+	private readonly spacer: HTMLElement;
 	private readonly shifts: HTMLElement;
 	private readonly outdent: HTMLButtonElement;
 	private readonly indent: HTMLButtonElement;
@@ -111,10 +118,12 @@ export class QuickBar {
 		this.bar = el(parent, "div", "tc-quick-bar");
 		this.bar.hidden = true;
 		for (const type of ["pointerdown", "mousedown"]) this.bar.addEventListener(type, (e) => e.preventDefault());
+		this.section = Button.create(this.bar, { kind: "bar", label: "Section", title: "Section", icon: "section", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
+		this.sectionRule = el(this.bar, "span", "tc-bar-rule");
 		this.shifts = el(this.bar, "span", "tc-bar-shifts");
 		this.outdent = this.shiftButton("tc-bar-outdent", "outdent", "Move out", "Shift+Tab", -1);
 		this.indent = this.shiftButton("tc-bar-indent", "indent", "Move in", "Tab", 1);
-		el(this.bar, "span", "tc-bar-spacer");
+		this.spacer = el(this.bar, "span", "tc-bar-spacer");
 		this.flag = Button.create(this.bar, { kind: "bar", label: "Priority", title: "Priority", icon: "priority", cls: "tc-bar-flag", onPress: () => this.toggle("priority") }).el;
 		this.repeat = Button.create(this.bar, { kind: "bar", label: "Repeat", title: "Repeat", icon: "repeat", cls: "tc-bar-repeat", onPress: () => this.toggle("repeat") }).el;
 		this.place = Button.create(this.bar, { kind: "bar", label: "Place", title: "Place", icon: "inbox", text: "", cls: "tc-bar-place", onPress: () => this.toggle("place") });
@@ -131,19 +140,26 @@ export class QuickBar {
 		this.state = state;
 		this.bar.hidden = false;
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
-		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents;
+		const section = state.section === true;
+		this.section.hidden = state.section === null;
+		this.section.classList.toggle("is-set", section);
+		this.section.setAttribute("aria-pressed", String(section));
+		this.sectionRule.hidden = state.section === null || section || !state.indents;
+		this.spacer.hidden = section && this.deps.desktop();
+		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents || section;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
-		this.flag.hidden = this.levels().length === 0;
+		this.flag.hidden = this.levels().length === 0 || section;
 		this.flag.classList.toggle("is-set", state.priority !== null);
 		if (state.priority) this.flag.dataset.priority = state.priority.color;
 		else delete this.flag.dataset.priority;
-		this.repeat.hidden = !state.repeatable;
+		this.repeat.hidden = !state.repeatable || section;
 		this.repeat.classList.toggle("is-set", state.repeat !== null);
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
-		this.place.el.hidden = state.place === null;
+		this.place.el.hidden = state.place === null || section;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
-		this.refreshPanel();
+		if (section) this.closePanel();
+		else this.refreshPanel();
 	}
 
 	hide(): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GroupName, TaskItem } from "../../src/application/contracts";
-import { gapPlace, listGaps, listGroups, showsHeaders } from "../../src/ui/listGroups";
+import { gapPlace, isEmptyGroup, listGaps, listGroups, showsHeaders, withEmptySections } from "../../src/ui/listGroups";
 import { onDay } from "../fakes/itemOnDay";
 
 let n = 0;
@@ -45,6 +45,38 @@ describe("listGroups", () => {
 
 	it("a header when the only group is a section", () => {
 		expect(showsHeaders(listGroups([item("A", "Экскурсия")]))).toBe(true);
+	});
+});
+
+describe("withEmptySections", () => {
+	const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+
+	it("puts an empty section where it stands in the file, after the group drawn above it", () => {
+		const groups = listGroups([item("A", null), item("B", "Evening")]);
+		const drawn = withEmptySections(groups, sections([null, false], ["Morning", true], ["Evening", false], ["Later", true]));
+		expect(drawn.map((g) => [g.name, g.items.length])).toEqual([[null, 1], ["Morning", 0], ["Evening", 1], ["Later", 0]]);
+	});
+
+	it("an empty section first in the file comes first; one section, empty, turns the headers on", () => {
+		const drawn = withEmptySections(listGroups([item("A", null)]), sections(["Morning", true], [null, false]));
+		expect(drawn.map((g) => g.name)).toEqual(["Morning", null]);
+		expect(showsHeaders(drawn)).toBe(true);
+		expect(isEmptyGroup(drawn[0])).toBe(true);
+		expect(isEmptyGroup(drawn[1])).toBe(false);
+	});
+
+	it("a section with tasks the column does not show stays out", () => {
+		expect(withEmptySections(listGroups([item("A", null)]), sections([null, false], ["Evening", false]))).toHaveLength(1);
+	});
+
+	it("an empty section's one gap is its end", () => {
+		const a = item("A", null);
+		const drawn = withEmptySections(listGroups([a]), sections([null, false], ["Evening", true]));
+		expect(listGaps(drawn, true).map((g) => g.place)).toEqual([
+			{ group: null, before: a.key },
+			{ group: null, before: null },
+			{ group: "Evening", before: null },
+		]);
 	});
 });
 

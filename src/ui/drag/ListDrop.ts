@@ -1,6 +1,6 @@
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
-import type { ListEntry, TaskList } from "../TaskList";
+import { type ListEntry, PLATE, type TaskList } from "../TaskList";
 import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragPayload, type DropResult, type DropTarget, type ListColumn } from "./DropTarget";
 import { DropLine } from "./DropLine";
@@ -11,6 +11,8 @@ const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
 /** A lifted card that stays where it stood as a dashed place; the other lifted ones, its subtasks, fold away under it. */
 const WAITING = "is-waiting";
+/** An empty section's plate under the card. */
+const HOT = "is-hot";
 
 /** A card where it stands in the list's content, the folded cards gone. */
 interface Measured {
@@ -51,6 +53,8 @@ export class ListDrop implements DropTarget {
 	private layout: Layout | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly line: DropLine;
+	/** The No tasks plate the drop puts the card on, lit while it does. */
+	private plate: HTMLElement | null = null;
 	private readonly scroll: AutoScroll;
 
 	constructor(
@@ -100,7 +104,10 @@ export class ListDrop implements DropTarget {
 				);
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
-		if (!this.isHome(place)) {
+		const plate = this.isHome(place) ? null : this.list.plateOf(place.group);
+		this.light(plate);
+		if (plate) this.line.hide();
+		else if (!this.isHome(place)) {
 			const line = this.lineRect(place, frame);
 			this.line.show(line.left, line.right, line.top, frame, fresh ? { x, y } : null);
 		} else this.line.hide();
@@ -110,6 +117,7 @@ export class ListDrop implements DropTarget {
 	landing(): DOMRect | null {
 		if (!this.layout || !this.place) return null;
 		const frame = readFrame(this.list.el);
+		if (this.plate) return this.plate.getBoundingClientRect();
 		if (this.last?.drag.from === "new") return this.lineRect(this.place, frame);
 		const gap = this.gapRect(this.place, frame);
 		const leaving = this.waitingAbove(this.place.index) * (this.layout.size.height + this.layout.size.gap);
@@ -129,7 +137,16 @@ export class ListDrop implements DropTarget {
 		this.layout = null;
 	}
 
+	/** An empty section's plate lights while the card would land in it; any other goes dark. */
+	private light(plate: HTMLElement | null): void {
+		if (plate === this.plate) return;
+		this.plate?.classList.remove(HOT);
+		plate?.classList.add(HOT);
+		this.plate = plate;
+	}
+
 	private reset(): void {
+		this.light(null);
 		this.scroll.stop();
 		this.place = null;
 		this.last = null;
@@ -198,6 +215,7 @@ export class ListDrop implements DropTarget {
 				else waiting ??= { top: node.offsetTop - removed, height: node.offsetHeight };
 				continue;
 			}
+			if (node.classList.contains(PLATE)) continue;
 			const entry = entries.get(node);
 			if (entry) {
 				cards.push({ entry, top: node.offsetTop - removed, left: node.offsetLeft, width: node.offsetWidth, height: node.offsetHeight });

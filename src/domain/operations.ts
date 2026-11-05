@@ -3,6 +3,7 @@ import { localDateOf } from "./LocalDate";
 import type { GroupSettings } from "./Groups";
 import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
+import { type Column, columnGroups, columnList } from "./queries";
 import { Repeat, type RepeatRule } from "./Repeat";
 import { STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
@@ -346,6 +347,36 @@ export function createGroup(doc: TaskDocument, entry: TaskEntry, list: GroupedLi
 	const at = presets.includes(trimmed) ? presetPlace(doc.groups(list), trimmed, presets) : doc.groups(list).length;
 	const added = doc.addGroup(list, trimmed, at);
 	return moveToGroup(added, sameEntryIn(added, entry), list, trimmed, null, today, date);
+}
+
+/**
+ * The quick-entry field switched to a section, at `before` in `group` of the column, or at its end (empty sections spec §4):
+ * the tasks the column shows from `before` to the group's end go into `### name`, written right after the group; those it
+ * hides stay. A blank name, the No section name, the group's own name or a past day changes nothing; a name the list has
+ * takes the tasks to the end of that section. Another list's tasks (Now's on a later day) enter it first.
+ */
+export function createSection(doc: TaskDocument, column: Column, group: GroupName, before: TaskEntry | null, name: string, groups: GroupSettings, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
+	const list = columnList(column, today);
+	const trimmed = name.trim();
+	if (list === null || trimmed === "" || trimmed === groups.ungrouped || trimmed === group) return doc;
+	const shown = columnGroups(doc, column, today, boundary).find((g) => g.name === group)?.entries ?? [];
+	const at = before === null ? shown.length : shown.findIndex((e) => samePlace(e, before));
+	if (at < 0) throw new Error(`Not a task the column shows in its group: ${before!.raw}`);
+	const below = shown.slice(at);
+	const own = below.filter((e) => e.section === list);
+	const index = groupIndex(doc, list, group);
+	const twin = groupIndex(doc, list, trimmed) >= 0;
+	if (twin && below.length === 0) return doc;
+	let split = doc.splitGroup(list, index, trimmed, own);
+	if (twin) split = split.mergeGroup(list, index + 1, split.groups(list).findIndex((g) => g.index > 0 && g.index !== index + 1 && g.name === trimmed), "end");
+	const date = column.kind === "day" ? column.date : null;
+	return below
+		.filter((e) => e.section !== list)
+		.reduce((current, entry, i) => {
+			const target = current.groups(list)[groupIndex(current, list, trimmed)].entries;
+			const first = own.length > 0 ? target[target.length - own.length] : null;
+			return moveToGroup(current, current.tasks(entry.section)[entry.index - i], list, trimmed, first, today, date);
+		}, split);
 }
 
 /** A section goes before another one or last; one put above the tasks outside any section pushes them under their heading. */

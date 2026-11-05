@@ -7,6 +7,7 @@ import {
 	groupIndex,
 	createInPlace,
 	createInSoon,
+	createSection,
 	moveBefore,
 	moveGroupTo,
 	moveToGroup,
@@ -734,5 +735,148 @@ describe("snoozedSlot", () => {
 	it("lands on the next day past midnight", () => {
 		const late = new Date(2026, 10, 4, 23, 50);
 		expect(snoozedSlot({ date: "2026-11-04", start: 23 * 60 + 30, end: 24 * 60 + 30 }, late, 60)).toEqual({ date: "2026-11-05", start: 50, end: 110 });
+	});
+});
+
+describe("empty sections", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const SETTINGS = { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" };
+	const blanks = (text: string) => text.split("\n").filter((l) => l === "").length;
+
+	it("moveToGroup into an empty section puts the task in it; on a later day's column it is Soon with that day", () => {
+		const d = parseG("## Now\n\n- [ ] A\n### X\n\n## Soon\n\n- [ ] S\n### Y\n");
+		expect(normalize(moveToGroup(d, d.tasks("now")[0], "now", "X", null, T), T).serialize()).toBe("## Now\n\n### X\n- [ ] A 📅 2026-10-30\n\n## Soon\n\n- [ ] S\n### Y\n");
+		expect(normalize(moveToGroup(d, d.tasks("now")[0], "soon", "Y", null, T, "2026-10-31"), T).serialize()).toBe("## Now\n\n### X\n\n## Soon\n\n- [ ] S\n### Y\n- [ ] A 📅 2026-10-31\n");
+	});
+
+	it("createGroup from the only task of a section takes the section away and makes the new one", () => {
+		const d = parseG("## Now\n\n- [ ] A\n### X\n- [ ] B\n");
+		expect(normalize(createGroup(d, d.tasks("now")[1], "now", "Y", SETTINGS, T), T).serialize()).toBe("## Now\n\n- [ ] A\n### Y\n- [ ] B 📅 2026-10-30\n");
+	});
+
+	it("an empty section is renamed and removed as any", () => {
+		const d = parseG("## Now\n\n- [ ] A\n### X\n### Y\n- [ ] B\n");
+		expect(normalize(renameGroup(d, "now", "X", "Вечер", "No section"), T).serialize()).toBe("## Now\n\n- [ ] A\n### Вечер\n### Y\n- [ ] B\n");
+		expect(normalize(removeGroup(d, "now", "X"), T).serialize()).toBe("## Now\n\n- [ ] A\n### Y\n- [ ] B\n");
+	});
+
+	describe("moving an empty section", () => {
+		const FILE = "## Now\n\n- [ ] U\n### A\n- [ ] a\n### E\n### B\n- [ ] b\n\n## Soon\n\n- [ ] S\n";
+		const moved = (text: string, group: string, place: Parameters<typeof moveGroupTo>[3]) => {
+			const once = normalize(moveGroupTo(parseG(text), "now", group, place), T);
+			expect(normalize(once, T).serialize()).toBe(once.serialize());
+			return once.serialize();
+		};
+
+		it("into the middle and to the end of the list", () => {
+			expect(moved(FILE, "E", { before: "A" })).toBe("## Now\n\n- [ ] U\n### E\n### A\n- [ ] a\n### B\n- [ ] b\n\n## Soon\n\n- [ ] S\n");
+			expect(moved(FILE, "E", "end")).toBe("## Now\n\n- [ ] U\n### A\n- [ ] a\n### B\n- [ ] b\n### E\n\n## Soon\n\n- [ ] S\n");
+		});
+
+		it("to the end of the last list of the file", () => {
+			const last = "## Soon\n\n- [ ] S\n### E\n### B\n- [ ] b\n";
+			const once = normalize(moveGroupTo(parseG(last), "soon", "E", "end"), T);
+			expect(once.serialize()).toBe("## Soon\n\n- [ ] S\n### B\n- [ ] b\n### E\n");
+		});
+
+		it("above No section: its tasks go under the No section heading; without them no heading is written", () => {
+			expect(moved(FILE, "E", { before: null })).toBe("## Now\n\n### E\n### No section\n- [ ] U\n### A\n- [ ] a\n### B\n- [ ] b\n\n## Soon\n\n- [ ] S\n");
+			expect(moved("## Now\n\n### A\n- [ ] a\n### E\n\n## Soon\n", "E", { before: null })).toBe("## Now\n\n### E\n### A\n- [ ] a\n\n## Soon\n");
+		});
+
+		it("two empty sections side by side both stay", () => {
+			const two = "## Now\n\n- [ ] U\n### A\n- [ ] a\n### E\n### F\n\n## Soon\n";
+			expect(moved(two, "F", { before: "A" })).toBe("## Now\n\n- [ ] U\n### F\n### A\n- [ ] a\n### E\n\n## Soon\n");
+			expect(moved(two, "E", "end")).toBe("## Now\n\n- [ ] U\n### A\n- [ ] a\n### F\n### E\n\n## Soon\n");
+		});
+
+		it("the blank lines stay as with a section that has tasks, at either end of the list", () => {
+			const spaced = "## Now\n\n- [ ] U\n\n### A\n- [ ] a\n\n### E\n\n### B\n- [ ] b\n\n## Soon\n\n- [ ] S\n";
+			const first = moved(spaced, "E", { before: null });
+			expect(first.startsWith("## Now\n\n### E\n")).toBe(true);
+			expect(blanks(first)).toBe(blanks(spaced));
+			const last = moved(spaced, "E", "end");
+			expect(last.endsWith("### E\n\n## Soon\n\n- [ ] S\n")).toBe(true);
+			expect(blanks(last)).toBe(blanks(spaced));
+			expect(parseG(last).groups("now").map((g) => g.name)).toEqual([null, "A", "B", "E"]);
+		});
+	});
+});
+
+describe("createSection", () => {
+	const G = { ...SECTIONS, ungrouped: "No section" };
+	const parseG = (text: string) => TaskDocument.parse(text, G, M);
+	const SETTINGS = { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" };
+	const B = DayBoundary.MIDNIGHT;
+	const LATER = "2026-10-31";
+	const TODAY = { kind: "day", date: T } as const;
+	const named = (d: TaskDocument, text: string) => d.allTasks().find((e) => e.task.text === text)!;
+	const section = (text: string, group: string | null, before: string | null, name: string, column: Parameters<typeof createSection>[1] = TODAY) => {
+		const d = parseG(text);
+		return normalize(createSection(d, column, group, before === null ? null : named(d, before), name, SETTINGS, T, B), T).serialize();
+	};
+
+	it("the middle of a group: the tasks below go into the new section right after the group", () => {
+		expect(section("## Now\n\n- [ ] U\n### A\n- [ ] a1\n- [ ] a2\n- [ ] a3\n### B\n- [ ] b\n", "A", "a2", " Z ")).toBe(
+			"## Now\n\n- [ ] U\n### A\n- [ ] a1\n### Z\n- [ ] a2\n- [ ] a3\n### B\n- [ ] b\n",
+		);
+	});
+
+	it("above the first task of a section: the section stays empty", () => {
+		expect(section("## Now\n\n- [ ] U\n### A\n- [ ] a1\n- [ ] a2\n", "A", "a1", "Z")).toBe("## Now\n\n- [ ] U\n### A\n### Z\n- [ ] a1\n- [ ] a2\n");
+	});
+
+	it("the end of a group writes an empty section; the end of the last group, at the end of the list", () => {
+		expect(section("## Now\n\n- [ ] U\n### A\n- [ ] a\n### B\n- [ ] b\n\n## Soon\n", "A", null, "Z")).toBe("## Now\n\n- [ ] U\n### A\n- [ ] a\n### Z\n### B\n- [ ] b\n\n## Soon\n");
+		expect(section("## Now\n\n- [ ] U\n### A\n- [ ] a\n\n## Soon\n", "A", null, "Z")).toBe("## Now\n\n- [ ] U\n### A\n- [ ] a\n### Z\n\n## Soon\n");
+	});
+
+	it("the middle of No section on top: the new section is the first heading", () => {
+		expect(section("## Now\n\n- [ ] U1\n- [ ] U2\n### A\n- [ ] a\n", null, "U2", "Z")).toBe("## Now\n\n- [ ] U1\n### Z\n- [ ] U2\n### A\n- [ ] a\n");
+		expect(section("## Now\n\n- [ ] U1\n- [ ] U2\n", null, "U1", "Z")).toBe("## Now\n\n### Z\n- [ ] U1\n- [ ] U2\n");
+	});
+
+	it("subtasks go with their tasks; a preset name stands where the field is", () => {
+		expect(section("## Now\n\n- [ ] U\n### Evening\n- [ ] e1\n- [ ] e2\n  - [ ] sub\n", "Evening", "e2", "Morning")).toBe(
+			"## Now\n\n- [ ] U\n### Evening\n- [ ] e1\n### Morning\n- [ ] e2\n  - [ ] sub\n",
+		);
+	});
+
+	it("a blank name, the No section name and the group's own name leave the document as it is", () => {
+		const d = parseG("## Now\n\n- [ ] U\n### A\n- [ ] a\n");
+		for (const name of ["  ", "No section", "A"]) expect(createSection(d, TODAY, "A", d.tasks("now")[1], name, SETTINGS, T, B)).toBe(d);
+	});
+
+	it("the name of a section the list has, above or below the line: the tasks below go to its end, no section moves", () => {
+		const text = "## Now\n\n### H\n- [ ] h\n### A\n- [ ] a1\n- [ ] a2\n### K\n- [ ] k\n";
+		expect(section(text, "A", "a2", "H")).toBe("## Now\n\n### H\n- [ ] h\n- [ ] a2\n### A\n- [ ] a1\n### K\n- [ ] k\n");
+		expect(section(text, "A", "a1", "K")).toBe("## Now\n\n### H\n- [ ] h\n### A\n### K\n- [ ] k\n- [ ] a1\n- [ ] a2\n");
+	});
+
+	it("a later day: the Soon tasks it hides stay in the group, in place; Soon's column keeps its order", () => {
+		const text = "## Now\n\n## Soon\n\n### A\n- [ ] a1 📅 2026-10-31\n- [ ] free\n- [ ] a2 📅 2026-10-31\n- [ ] other 📅 2026-11-03\n- [ ] a3 📅 2026-10-31\n### B\n- [ ] b\n";
+		expect(section(text, "A", "a2", "Z", { kind: "day", date: LATER })).toBe(
+			"## Now\n\n## Soon\n\n### A\n- [ ] a1 📅 2026-10-31\n- [ ] free\n- [ ] other 📅 2026-11-03\n### Z\n- [ ] a2 📅 2026-10-31\n- [ ] a3 📅 2026-10-31\n### B\n- [ ] b\n",
+		);
+	});
+
+	it("in Soon's column only the tasks without a date go", () => {
+		const text = "## Soon\n\n- [ ] s1\n- [ ] s2\n- [ ] d 📅 2026-10-31\n- [ ] s3\n";
+		expect(section(text, null, "s2", "Z", { kind: "soon" })).toBe("## Soon\n\n- [ ] s1\n- [ ] d 📅 2026-10-31\n### Z\n- [ ] s2\n- [ ] s3\n");
+	});
+
+	it("a later day: Now's tasks of that day below the line enter the new Soon section first, with the day", () => {
+		const text = "## Now\n\n- [ ] keep\n- [ ] n1 📅 2026-10-31\n- [ ] n2 📅 2026-10-31\n\n## Soon\n\n- [ ] s 📅 2026-10-31\n";
+		expect(section(text, null, "n2", "Z", { kind: "day", date: LATER })).toBe(
+			"## Now\n\n- [ ] keep\n- [ ] n1 📅 2026-10-31\n\n## Soon\n\n### Z\n- [ ] n2 📅 2026-10-31\n- [ ] s 📅 2026-10-31\n",
+		);
+		expect(section("## Now\n\n- [ ] n 📅 2026-10-31\n\n## Soon\n\n- [ ] free\n", null, "n", "Z", { kind: "day", date: LATER })).toBe(
+			"## Now\n\n## Soon\n\n- [ ] free\n### Z\n- [ ] n 📅 2026-10-31\n",
+		);
+	});
+
+	it("Inbox: a section from the field in its column", () => {
+		expect(section("## Inbox\n\n- [ ] i1\n- [ ] i2\n", null, "i2", "Z", { kind: "inbox" })).toBe("## Inbox\n\n- [ ] i1\n### Z\n- [ ] i2\n");
 	});
 });

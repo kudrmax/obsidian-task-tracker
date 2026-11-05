@@ -1025,3 +1025,96 @@ describe("repeat", () => {
 		expect((await svc.dayView(T)).list[0].repeat).not.toBeNull();
 	});
 });
+
+describe("empty sections", () => {
+	const FILE = "## Inbox\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n### E\n\n## Soon\n\n- [ ] S\n\n## Backlog\n\n## Done\n";
+
+	function withHistory(text: string) {
+		const store = new InMemoryTaskFileStore(text);
+		const history = new UndoHistory(store);
+		return { store, history, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, history) };
+	}
+
+	it("listSections gives each list's groups in file order, empty sections marked", async () => {
+		const { svc } = setup("## Inbox\n\n### Пусто\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n### E\n### T\nnote\n\n## Soon\n\n### Y\n- [ ] S 📅 2026-11-03\n\n## Backlog\n\n## Done\n");
+		expect(await svc.listSections()).toEqual({
+			inbox: [{ name: "Пусто", empty: true }],
+			backlog: [],
+			now: [
+				{ name: null, empty: false },
+				{ name: "X", empty: false },
+				{ name: "E", empty: true },
+				{ name: "T", empty: true },
+			],
+			soon: [{ name: "Y", empty: false }],
+		});
+	});
+
+	it("listSections names No section where its heading stands", async () => {
+		const { svc } = setup("## Now\n\n### X\n- [ ] B\n### No section\n- [ ] A\n");
+		expect((await svc.listSections()).now).toEqual([
+			{ name: "X", empty: false },
+			{ name: null, empty: false },
+		]);
+	});
+
+	it("createSection is one write and one undo step, and gives the section", async () => {
+		const { store, history, svc } = withHistory(FILE);
+		const [, , c] = (await svc.dayView(T)).list;
+		expect(await svc.createSection(" Z ", { kind: "day", date: T, group: "X", before: c.key })).toEqual({ list: "now", group: "Z" });
+		expect(store.writes).toBe(1);
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n### Z\n- [ ] C\n### E\n\n## Soon\n\n- [ ] S\n\n## Backlog\n\n## Done\n");
+		await history.undo();
+		expect(store.text).toBe(FILE);
+		expect(history.canUndo()).toBe(false);
+	});
+
+	it("createSection at the end of a group writes an empty section in a list's column", async () => {
+		const { store, svc } = setup(FILE);
+		expect(await svc.createSection("Z", { kind: "list", list: "soon", group: null, before: null })).toEqual({ list: "soon", group: "Z" });
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n- [ ] C\n### E\n\n## Soon\n\n- [ ] S\n### Z\n\n## Backlog\n\n## Done\n");
+	});
+
+	it("createSection writes nothing for a blank name, the No section name, the group's own name or a past day", async () => {
+		const { store, svc } = setup(FILE);
+		const [, b] = (await svc.dayView(T)).list;
+		expect(await svc.createSection("  ", { kind: "day", date: T, group: "X", before: b.key })).toBeNull();
+		expect(await svc.createSection("No section", { kind: "day", date: T, group: "X", before: b.key })).toBeNull();
+		expect(await svc.createSection("X", { kind: "day", date: T, group: "X", before: b.key })).toBeNull();
+		expect(await svc.createSection("Z", { kind: "day", date: "2026-10-28", group: null, before: null })).toBeNull();
+		expect(await svc.createSection("Z", { kind: "list", list: "now", group: null, before: null, date: "2026-10-28" })).toBeNull();
+		expect(store.writes).toBe(0);
+		expect(store.text).toBe(FILE);
+	});
+
+	it("createSection rejects a group the file lacks and a task not of that group, and writes nothing", async () => {
+		const { store, svc } = setup(FILE);
+		const [a, b] = (await svc.dayView(T)).list;
+		await expect(svc.createSection("Z", { kind: "day", date: T, group: "Y", before: null })).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.createSection("Z", { kind: "day", date: T, group: "X", before: a.key })).rejects.toBeInstanceOf(StaleTaskError);
+		await expect(svc.createSection("Z", { kind: "day", date: T, group: "X", before: { ...b.key, raw: "- [ ] gone" } })).rejects.toBeInstanceOf(StaleTaskError);
+		expect(store.text).toBe(FILE);
+	});
+
+	it("taking the last task out of a section takes it away, and undo brings both back", async () => {
+		const text = "## Inbox\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n";
+		const { store, history, svc } = withHistory(text);
+		const [, b] = (await svc.dayView(T)).list;
+		await svc.moveToGroup(b.key, "now", null, null);
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B 📅 2026-10-30\n\n## Soon\n\n## Backlog\n\n## Done\n");
+		expect((await svc.listSections()).now).toEqual([{ name: null, empty: false }]);
+		await history.undo();
+		expect(store.text).toBe(text);
+	});
+
+	it("a task dropped into an empty section fills it", async () => {
+		const { store, svc } = setup(FILE);
+		const [a] = (await svc.dayView(T)).list;
+		await svc.moveToGroup(a.key, "now", "E", null);
+		expect(store.text).toContain("### E\n- [ ] A 📅 2026-10-30\n");
+		expect((await svc.listSections()).now).toEqual([
+			{ name: "X", empty: false },
+			{ name: "E", empty: false },
+		]);
+	});
+});

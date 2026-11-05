@@ -125,11 +125,11 @@ function mergeDuplicates(doc: TaskDocument): TaskDocument {
 	return doc;
 }
 
-/** Rule 8: a section with nothing but blank lines goes. */
-function dropEmptyGroups(doc: TaskDocument): TaskDocument {
+/** Rule 8: a No section heading with nothing but blank lines under it goes. An empty section stays (empty sections spec §3). */
+function dropEmptyUngroupedHeading(doc: TaskDocument): TaskDocument {
 	for (const section of GROUPED) {
 		for (;;) {
-			const empty = doc.groups(section).find((g) => g.index > 0 && g.blank);
+			const empty = doc.groups(section).find((g) => g.index > 0 && g.name === null && g.blank);
 			if (!empty) break;
 			doc = doc.deleteGroup(section, empty.index);
 		}
@@ -149,7 +149,7 @@ function placeUngrouped(doc: TaskDocument): TaskDocument {
 }
 
 function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
-	return placeUngrouped(dropEmptyGroups(mergeDuplicates(misplacedOutOfGroups(doc, today))));
+	return placeUngrouped(dropEmptyUngroupedHeading(mergeDuplicates(misplacedOutOfGroups(doc, today))));
 }
 
 /** `presets`: the section presets in their order, for a section rule 4 has to make in Now. */

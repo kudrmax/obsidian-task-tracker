@@ -24,6 +24,8 @@ export interface TitleField {
 	readonly focused: boolean;
 	/** A text set by the owner, the caret at its end; no input is reported for it. */
 	setText(text: string): void;
+	/** What shows while the field is empty, from now on. */
+	setPlaceholder(text: string): void;
 	/** Puts the caret at the end, the keyboard up. */
 	focusEnd(): void;
 	/** The focus given back, the selection as it was, without scrolling. */

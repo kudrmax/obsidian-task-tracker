@@ -1,4 +1,4 @@
-import { type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { type GroupName, type NewTaskPlace, type Placement, type PriorityLevel, samePlace, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../../settings";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -27,12 +27,14 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "parseTitle" | "isBlank" | "withPriority">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
 	readonly titleField: TitleFieldFactory;
 	list(column: ListColumn): TaskList | null;
+	/** The column shows sections: the field may write one there. */
+	sectioned(column: ListColumn): boolean;
 	timeline(): Timeline | null;
 	/** A task of the timeline as the screen shows it now; null once it is not there. */
 	task(key: TaskKey): TaskItem | null;
@@ -172,6 +174,8 @@ export class QuickEntryController {
 			placeOf: (column, result) => this.placeOf(column, result),
 			fresh: (beforeShow) => this.fresh(beforeShow),
 			createInPlace: (text, priority, place, repeat) => deps.tasks.createInPlace(text, priority, place, repeat),
+			createSection: (name, place) => deps.tasks.createSection(name, place),
+			sectioned: (column) => deps.sectioned(column),
 			edit: (key, draft) => deps.tasks.edit(key, draft),
 			placement: (spot) => this.placement(spot),
 			isBlank: (text) => deps.tasks.isBlank(text),
@@ -186,6 +190,7 @@ export class QuickEntryController {
 			today: () => deps.today(),
 			placementOfDay: (day) => deps.tasks.placementOfDay(day),
 			onIndent: (delta) => this.entry.indent(delta),
+			onSection: () => this.entry.toggleSection(),
 			onPriority: (prefix) => this.choosePriority(prefix),
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
@@ -196,6 +201,12 @@ export class QuickEntryController {
 		deps.root.addEventListener("scroll", this.scrolled, true);
 		deps.root.addEventListener("transitionend", this.settled, true);
 		this.sizeWatch.observe(deps.root);
+	}
+
+	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
+	openIn(column: ListColumn, group: GroupName): void {
+		const cards = this.cards(column);
+		this.open({ kind: "list", column, place: { kind: "gap", index: gapOf(cards, { kind: "task", group, before: null }).index, level: 0, group } });
 	}
 
 	/** A double click on a list's free room: the field at the end of the column. */
@@ -577,15 +588,16 @@ export class QuickEntryController {
 
 	/** The field and the bar show the state: its text, its level, what the field may do. */
 	private sync(state: EntryState): void {
-		const level = this.levelOf(state);
+		const level = state.section ? null : this.levelOf(state);
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
-		this.field?.setPriority(level);
+		this.field?.setSection(state.section === true);
+		if (!state.section) this.field?.setPriority(level);
 		this.bar.show(this.barState(state, level));
 	}
 
 	private barState(state: EntryState, priority: PriorityLevel | null): QuickBarState {
 		const place = this.shownPlace(state);
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: place !== null };
+		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, place, repeat: state.repeat, repeatable: place !== null, section: state.section };
 	}
 
 	/** The level chosen in the bar, else the one the text's prefix stands for. */

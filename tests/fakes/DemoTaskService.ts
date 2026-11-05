@@ -1,4 +1,4 @@
-import { type DayView, type EndList, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { type DayView, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type SectionKey, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
@@ -175,6 +175,12 @@ export class DemoTaskService implements TaskService {
 
 	async backlogView(): Promise<readonly TaskItem[]> {
 		return this.items("backlog");
+	}
+
+	/** The demo keeps no sections: a list with tasks is No section alone. */
+	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
+		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ name: null, empty: false }] : []);
+		return { inbox: groups("inbox"), backlog: groups("backlog"), now: groups("now"), soon: groups("soon") };
 	}
 
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */
@@ -390,6 +396,10 @@ export class DemoTaskService implements TaskService {
 	async renameGroup(): Promise<void> {}
 
 	async removeGroup(): Promise<void> {}
+
+	async createSection(): Promise<null> {
+		return null;
+	}
 	async applyAll(): Promise<void> {}
 
 	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
