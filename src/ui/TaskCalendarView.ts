@@ -4,6 +4,8 @@ import type { Clock, SettingsStore } from "../application/ports";
 import { LIST_WIDTH_MIN, type RightMode, type TaskCalendarSettings, type ZoomLevel } from "../settings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
+import { FoundCard } from "./FoundCard";
+import { SearchWindow } from "./search/SearchWindow";
 import { BulkController, type BulkSections } from "./BulkController";
 import type { PickedCard } from "./TaskSelection";
 import { CalendarPolling } from "./CalendarPolling";
@@ -117,6 +119,8 @@ export class TaskCalendarView extends ItemView {
 	private doneList: TaskList | null = null;
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
 	private atDone = false;
+	private search: SearchWindow | null = null;
+	private readonly found = new FoundCard();
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
 	private backlogList: TaskList | null = null;
@@ -337,7 +341,10 @@ export class TaskCalendarView extends ItemView {
 			events: () => this.data.events,
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
-			onBlock: (block, item) => this.drag.attachBlock(block, item),
+			onBlock: (block, item) => {
+				this.found.attach(block, item);
+				this.drag.attachBlock(block, item);
+			},
 			onEvent: (block, event) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) })),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
@@ -405,6 +412,10 @@ export class TaskCalendarView extends ItemView {
 		this.scope = new Scope(this.app.scope);
 		this.scope.register(["Mod"], "z", () => this.undoKey("undo"));
 		this.scope.register(["Mod", "Shift"], "z", () => this.undoKey("redo"));
+		this.scope.register(["Mod"], "f", () => {
+			this.openSearch();
+			return false;
+		});
 		new Swipe(root, {
 			arbiter: this.arbiter,
 			accepts: swipeStartsAt,
@@ -429,6 +440,7 @@ export class TaskCalendarView extends ItemView {
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
+		this.registerDomEvent(document, "pointerdown", () => this.found.clear(), { capture: true });
 		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
 		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
 		this.arbiter.onIdle(() => {
@@ -675,6 +687,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
 	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
+		this.found.attach(card, item);
 		card.addEventListener("click", () => this.showMenu(item, card));
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
@@ -682,7 +695,46 @@ export class TaskCalendarView extends ItemView {
 		});
 	}
 
-	private openSearch(): void {}
+	private openSearch(): void {
+		if (this.search) return;
+		void this.afterEntry(() => {
+			this.search = SearchWindow.open({
+				root: this.contentEl,
+				tasks: this.deps.tasks,
+				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
+				sectionName: (section) => this.settings.sections[section],
+				onPick: (hit) => {
+					this.search = null;
+					void this.reveal(hit.item);
+				},
+				onClose: () => (this.search = null),
+			});
+		});
+	}
+
+	/**
+	 * The screen goes where the found task stands, as the switch and the arrows would take it, and its card wears the ring:
+	 * Done to its own place left of Inbox, Inbox and Backlog to Inbox and Soon, Soon to Soon and Now, a task of a day to
+	 * that day beside its calendar.
+	 */
+	private async reveal(item: TaskItem): Promise<void> {
+		this.found.mark(item);
+		if (item.list === "done") {
+			this.atDone = true;
+			this.switcher?.show("done");
+			await this.setMode("inbox");
+		} else {
+			this.atDone = false;
+			const day = item.day ?? item.dueDate;
+			if (item.list === "inbox" || item.list === "backlog") await this.setMode("inbox");
+			else if (day === null) await this.setMode("soon");
+			else {
+				if (day !== this.selectedDate) this.select(day);
+				await this.setMode("calendar");
+			}
+		}
+		this.parts.request("tasks");
+	}
 
 	/** A tap anywhere but the selected card, its dots, or the menu over it lets the selection go. */
 	private deselectUnless(target: EventTarget | null): void {
@@ -774,6 +826,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A list's card: its gestures. */
 	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+		this.found.attach(card, item);
 		this.bulk.attach({ item, card, column, subtree });
 		this.drag.attachCard(card, item, column, subtree);
 	}
