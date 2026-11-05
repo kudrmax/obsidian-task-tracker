@@ -39,6 +39,7 @@ import { clear, el, px } from "./dom";
 import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
 import { EntryTrace } from "./entryTrace";
+import { GestureTrace } from "./gestureTrace";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -491,6 +492,9 @@ export class TaskCalendarView extends ItemView {
 		const trace = new EntryTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) });
 		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
 		this.unsubscribe.push(() => trace.destroy());
+		const gestures = new GestureTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) }, () => this.arbiter.owner);
+		gestures.log(`gestures ${(this.app as unknown as { plugins?: { manifests?: Record<string, { version: string }> } }).plugins?.manifests?.["task-calendar"]?.version ?? "?"}`);
+		this.unsubscribe.push(() => gestures.destroy());
 	}
 
 	override onResize(): void {
