@@ -43,38 +43,38 @@ export function withPriority(text: string, prefix: string | null, prefixes: read
 ```
 `priorityOfText`: первое слово — префикс, за ним пробельные символы; текст — всё после них. `isBlankTitle`: текст без префикса пуст после `trim`. `withPriority`: префикс текста снят, `prefix` (если есть) — первым через пробел.
 
-- [ ] Тесты: `p1 x`, `p1⇥x`, `p1  x` → `p1`/`x`; `p1 ` → `p1`/пусто; `p1`, `p1x`, `x`, ` p1 x`, `p3 x` (не уровень) → без уровня, текст как был; пусто: `""`, `"  "`, `p1 `, `p1⇥`, но не `p1`, `p1 x`; `withPriority`: заменяет `p1 x` → `p2 x`, снимает (`null`) → `x`, ставит на текст без префикса.
-- [ ] `TaskLine.priorityOf` → `priorityOfText(text, markers.priorities ?? [])`; тесты `TaskLine` без изменений.
-- [ ] `npm test` — PASS. Commit `Priority prefix in a text is one domain rule: the level, the text after it, blank, another level in its place`.
+- [x] Тесты: `p1 x`, `p1⇥x`, `p1  x` → `p1`/`x`; `p1 ` → `p1`/пусто; `p1`, `p1x`, `x`, ` p1 x`, `p3 x` (не уровень) → без уровня, текст как был; пусто: `""`, `"  "`, `p1 `, `p1⇥`, но не `p1`, `p1 x`; `withPriority`: заменяет `p1 x` → `p2 x`, снимает (`null`) → `x`, ставит на текст без префикса.
+- [x] `TaskLine.priorityOf` → `priorityOfText(text, markers.priorities ?? [])`; тесты `TaskLine` без изменений.
+- [x] `npm test` — PASS. Commit `Priority prefix in a text is one domain rule: the level, the text after it, blank, another level in its place`.
 
 ### Task 2: Сервис отвечает про уровни и текст
 
 **Files:**
 - Modify: `src/application/contracts.ts`, `src/application/TaskServiceImpl.ts`, `tests/fakes/DemoTaskService.ts`, `tests/application/TaskServiceImpl.test.ts`
 
-- [ ] `contracts.ts`: `export type { PriorityColor, PriorityLevel }`, `export { PRIORITY_COLORS }` из `domain/Priority`; в `TaskService` — `priorityLevels()`, `parseTitle(text)`, `isBlank(text)`, `withPriority(text, prefix)` с doc-комментариями из спеки.
-- [ ] `TaskServiceImpl`: четыре метода над `usableLevels(settings.priorities)`; создания отсекают пустое через `isBlankTitle`.
-- [ ] `DemoTaskService`: те же методы над `usableLevels(DEFAULT_SETTINGS.priorities)` через доменные функции.
-- [ ] Тесты сервиса: годные уровни (одно слово, первый из двух одинаковых, порядок настроек); `parseTitle` даёт уровень с цветом; `isBlank`; `withPriority`; `createInPlace("p1 ")` и `create({ text: "p1 " })` ничего не пишут, `createInPlace("p1")` пишет задачу «p1».
-- [ ] **Табличный тест** (спека): для `"p1 x"`, `"p1\tx"`, `"p1  x"`, `"p1 "`, `"p1"`, `"p1x"`, `"x"` — то, что отвечает поле (`parseTitle`, `isBlank`), совпадает с тем, что окажется в файле: `createInPlace(s, null, …)` и чтение обратно (`dayView`) дают тот же уровень и текст, а пустое не пишется.
-- [ ] `npm test` — PASS. Commit `The task service answers the usable levels, a typed title's level and text, blank, and a level in its place; creating skips a prefix alone`.
+- [x] `contracts.ts`: `export type { PriorityColor, PriorityLevel }`, `export { PRIORITY_COLORS }` из `domain/Priority`; в `TaskService` — `priorityLevels()`, `parseTitle(text)`, `isBlank(text)`, `withPriority(text, prefix)` с doc-комментариями из спеки.
+- [x] `TaskServiceImpl`: четыре метода над `usableLevels(settings.priorities)`; создания отсекают пустое через `isBlankTitle`.
+- [x] `DemoTaskService`: те же методы над `usableLevels(DEFAULT_SETTINGS.priorities)` через доменные функции.
+- [x] Тесты сервиса: годные уровни (одно слово, первый из двух одинаковых, порядок настроек); `parseTitle` даёт уровень с цветом; `isBlank`; `withPriority`; `createInPlace("p1 ")` и `create({ text: "p1 " })` ничего не пишут, `createInPlace("p1")` пишет задачу «p1».
+- [x] **Табличный тест** (спека): для `"p1 x"`, `"p1\tx"`, `"p1  x"`, `"p1 "`, `"p1"`, `"p1x"`, `"x"` — то, что отвечает поле (`parseTitle`, `isBlank`), совпадает с тем, что окажется в файле: `createInPlace(s, null, …)` и чтение обратно (`dayView`) дают тот же уровень и текст, а пустое не пишется.
+- [x] `npm test` — PASS. Commit `The task service answers the usable levels, a typed title's level and text, blank, and a level in its place; creating skips a prefix alone`.
 
 ### Task 3: UI спрашивает сервис
 
 **Files:**
 - Modify: `src/ui/quick/QuickField.ts`, `src/ui/quick/QuickEntry.ts`, `src/ui/quick/QuickEntryController.ts`, `src/ui/quick/QuickBar.ts`, `src/ui/TaskCalendarView.ts`, `src/ui/BulkController.ts`, `src/ui/TaskCard.ts`, `src/ui/menu/BulkMenu.ts`, `src/ui/menu/MenuPanel.ts`, `src/ui/menu/TaskMenu.ts`, `src/ui/priorityLevels.ts`, тесты UI с этими опциями, `tests/architecture.test.ts`
 
-- [ ] `QuickField`: `levels` → `parseTitle: TaskService["parseTitle"]`; `levelOfText` удалён.
-- [ ] `QuickEntry`: `deps.levels` → `deps.isBlank: TaskService["isBlank"]`; свой `blank` спрашивает его.
-- [ ] `QuickEntryController`: `deps.levels` удалён; `deps.tasks` — ещё `priorityLevels`, `parseTitle`, `isBlank`, `withPriority`; `levelOf` — выбранный уровень из `priorityLevels()`, иначе `parseTitle(text).priority`; выбор в панели — `withPriority(text, null)`, если набран префикс.
-- [ ] `QuickBar`: уровни из deps уже годные, свой `usableLevels` уходит. `TaskCalendarView`: массовые действия и меню задачи — `tasks.priorityLevels()`.
-- [ ] Импорты `PriorityLevel`/`PriorityColor`/`PRIORITY_COLORS` в UI (кроме `SettingsTab.ts`, `TaskCalendarView.ts`, `QuickEntryController.ts` для прочих настроек) — из контрактов.
-- [ ] Фейки тестов UI отвечают доменными функциями (тот же ответ, что у сервиса); ожидания не меняются.
-- [ ] Страж: вычеркнуть 9 строк. `grep -rn "levelOfText\|usableLevels\|startsWith(\`" src/ui` — пусто.
-- [ ] `npm test`, `npx tsc --noEmit` — PASS. Commit `The quick field, the bar and the menus ask the task service for the levels and the prefix; priority types come from the contracts`.
+- [x] `QuickField`: `levels` → `parseTitle: TaskService["parseTitle"]`; `levelOfText` удалён.
+- [x] `QuickEntry`: `deps.levels` → `deps.isBlank: TaskService["isBlank"]`; свой `blank` спрашивает его.
+- [x] `QuickEntryController`: `deps.levels` удалён; `deps.tasks` — ещё `priorityLevels`, `parseTitle`, `isBlank`, `withPriority`; `levelOf` — выбранный уровень из `priorityLevels()`, иначе `parseTitle(text).priority`; выбор в панели — `withPriority(text, null)`, если набран префикс.
+- [x] `QuickBar`: уровни из deps уже годные, свой `usableLevels` уходит. `TaskCalendarView`: массовые действия и меню задачи — `tasks.priorityLevels()`.
+- [x] Импорты `PriorityLevel`/`PriorityColor`/`PRIORITY_COLORS` в UI (кроме `SettingsTab.ts`, `TaskCalendarView.ts`, `QuickEntryController.ts` для прочих настроек) — из контрактов.
+- [x] Фейки тестов UI отвечают доменными функциями (тот же ответ, что у сервиса); ожидания не меняются.
+- [x] Страж: вычеркнуть 9 строк. `grep -rn "levelOfText\|usableLevels\|startsWith(\`" src/ui` — пусто.
+- [x] `npm test`, `npx tsc --noEmit` — PASS. Commit `The quick field, the bar and the menus ask the task service for the levels and the prefix; priority types come from the contracts`.
 
 ### Task 4: Сборки, проверка в тестовом Obsidian, ход работы
 
-- [ ] `npm test`, `npm run build:demo`, `npm run build` — PASS.
-- [ ] Тестовый Obsidian (порт 9367, свой профиль и vault в scratchpad; `basePath` — свой vault): сборка ветки в `.obsidian/plugins/task-calendar/`, плагин перезагружен; Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная: `p1 Тест` в быстром вводе красит поле, выбор уровня в панели снимает набранный префикс и ставит выбранный, после Enter строка в файле — `- [ ] p1 Тест` / с выбранным уровнем; ошибок плагина в консоли нет.
-- [ ] Строка 3 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 3 planned, done and checked in Obsidian`.
+- [x] `npm test`, `npm run build:demo`, `npm run build` — PASS.
+- [x] Тестовый Obsidian (порт 9367, свой профиль и vault в scratchpad; `basePath` — свой vault): сборка ветки в `.obsidian/plugins/task-calendar/`, плагин перезагружен; Mac и телефон (390×844, `app.emulateMobile(true)`), светлая и тёмная: `p1 Тест` в быстром вводе красит поле, выбор уровня в панели снимает набранный префикс и ставит выбранный, после Enter строка в файле — `- [ ] p1 Тест` / с выбранным уровнем; ошибок плагина в консоли нет.
+- [x] Строка 3 в «Ход работы» обзора: план, реализация, проверка — готово. Commit `Layers overview: block 3 planned, done and checked in Obsidian`.
