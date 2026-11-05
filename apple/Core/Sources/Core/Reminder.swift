@@ -1,7 +1,8 @@
 import Foundation
 
 public enum ReminderKind: String, Sendable {
-    case notification, alarm
+    /// `live`: a Live Activity on the lock screen, from the start until the task is done or moved.
+    case notification, alarm, live
 }
 
 /// A task on a time, as the phone reminds of it: from `start` until its plugin day ends at `dayEnd`.

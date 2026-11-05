@@ -6,4 +6,5 @@ DerivedData/
 
 App/Config/Team.xcconfig
 App/Info.plist
+Cards/Info.plist
 build/

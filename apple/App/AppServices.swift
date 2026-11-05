@@ -10,7 +10,7 @@ final class AppServices: Sendable {
 
     private init() {
         vault = Vault(bookmarks: UserDefaultsBookmarks())
-        sync = ReminderSync(vault: vault, rules: Self.rules(), notifications: UserNotifications(), alarms: Alarms())
+        sync = ReminderSync(vault: vault, rules: Self.rules(), notifications: UserNotifications(), alarms: Alarms(), cards: Cards())
     }
 
     @discardableResult

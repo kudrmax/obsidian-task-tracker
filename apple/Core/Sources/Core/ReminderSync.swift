@@ -30,6 +30,24 @@ public protocol AlarmScheduling: Sendable {
     func cancel(_ reminderIDs: [String]) async
 }
 
+/// The reminders' Live Activities, by reminder id: when each starts.
+public protocol CardScheduling: Sendable {
+    func shown() async -> [String: Date]
+    func show(_ reminder: Reminder) async throws
+    func remove(_ reminderIDs: [String]) async
+}
+
+/// Which tasks get a card: iOS keeps few Live Activities of an app, so the nearest, the started ones first.
+public enum CardPlan {
+    public static let budget = 5
+
+    public static func plan(_ reminders: [Reminder]) -> [Reminder] {
+        var seen = Set<String>()
+        let live = reminders.filter { $0.kind == .live && seen.insert($0.id).inserted }
+        return Array(live.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }.prefix(budget))
+    }
+}
+
 public enum SyncStatus: Equatable, Sendable {
     case ok(reminders: Int, at: Date)
     case failed(String)
@@ -52,16 +70,18 @@ public actor ReminderSync {
     private let rules: TaskRules
     private let notifications: NotificationScheduling
     private let alarms: AlarmScheduling
+    private let cards: CardScheduling
     private let now: @Sendable () -> Date
     /// The operation running now: the next one waits for it, so a sync that read the file before a Done was written
     /// never brings the done task's reminders back.
     private var turn: Task<SyncStatus, Never>?
 
-    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, cards: CardScheduling, now: @escaping @Sendable () -> Date = Date.init) {
         self.vault = vault
         self.rules = rules
         self.notifications = notifications
         self.alarms = alarms
+        self.cards = cards
         self.now = now
     }
 
@@ -155,7 +175,7 @@ public actor ReminderSync {
         }
     }
 
-    /// Alarms first, then notifications; one that iOS refuses does not stop the rest. Returns the first refusal.
+    /// Alarms and cards first, then notifications; one that iOS refuses does not stop the rest. Returns the first refusal.
     private func apply(_ reminders: [Reminder], meetings: [CalendarEvent], at: Date) async -> Error? {
         var failure: Error?
         let byID = Dictionary(reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -167,7 +187,17 @@ public actor ReminderSync {
             do { try await alarms.schedule(byID[id]!) } catch { failure = failure ?? error }
         }
 
-        let plan = RepeatPlan.plan(reminders, now: at).map { planned in
+        let carded = CardPlan.plan(reminders)
+        let wantedCards = Dictionary(carded.map { ($0.id, $0.start) }, uniquingKeysWith: { first, _ in first })
+        let shown = await cards.shown()
+        await cards.remove(shown.filter { wantedCards[$0.key] != $0.value }.map(\.key).sorted())
+        var onCards = Set(shown.filter { wantedCards[$0.key] == $0.value }.keys)
+        for reminder in carded where !onCards.contains(reminder.id) {
+            // A card iOS refuses is not a failure: the task is told of by a notification instead.
+            if (try? await cards.show(reminder)) != nil { onCards.insert(reminder.id) }
+        }
+
+        let plan = RepeatPlan.plan(reminders.filter { !onCards.contains($0.id) }, now: at).map { planned in
             planned.offering(AfterEvent.offer(at: planned.fire, before: byID[planned.reminderID]!.dayEnd, among: meetings))
         }
         let wanted = Set(plan.map(\.identifier))

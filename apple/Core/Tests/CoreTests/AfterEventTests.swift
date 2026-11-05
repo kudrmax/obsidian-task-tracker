@@ -74,7 +74,7 @@ import Testing
 
     func sync(_ vault: FakeVault, _ events: [CalendarEvent], at now: Date) -> ReminderSync {
         vault.files["calendar/work.json"] = Self.workFile(events)
-        return ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { now })
+        return ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), now: { now })
     }
 
     @Test func eachDeliveryOffersTheMeetingAsItStandsThen() async {
@@ -101,13 +101,13 @@ import Testing
     @Test func googleMeetingsCountAndTheWorkFilterApplies() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         vault.files["calendar/google.json"] = #"{"exportedAt":"2026-11-04T08:00:00Z","events":[{"id":"g","title":"Lunch","start":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 10, 30)))","end":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 11)))","allDay":false,"calendar":"Personal"}]}"#
-        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { Fixtures.date(4, 9) }).sync()
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), now: { Fixtures.date(4, 9) }).sync()
         let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
         #expect(first?.after?.title == "After Lunch (1 hour)")
     }
 
     @Test func noCalendarFilesNoOffer() async {
-        _ = await ReminderSync(vault: FakeVault(Fixtures.file(Self.quiet)), rules: rules, notifications: notifications, alarms: FakeAlarms(), now: { Fixtures.date(4, 9) }).sync()
+        _ = await ReminderSync(vault: FakeVault(Fixtures.file(Self.quiet)), rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), now: { Fixtures.date(4, 9) }).sync()
         let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
         #expect(first != nil && first?.after == nil)
     }
