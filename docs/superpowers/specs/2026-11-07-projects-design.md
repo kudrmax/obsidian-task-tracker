@@ -24,12 +24,13 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    its width; the card's height does not change. A tap on the icon opens the project note, a tap on the rest of the card
    opens the menu as always. The project's name is in the task menu («Project») and, on the Mac, in a tooltip on hover.
    Board: `docs/design/canvas/Proj2V1.dc.html`.
-7. **An untaken project task is in Backlog.** Whatever is written in a project note and not taken yet is the project's
-   backlog, so the plugin shows it in Backlog, grouped by project. Taking it is the same
-   move as for any Backlog task: to Soon, Now, a day or the calendar.
-8. **A project task never leaves its note.** Taken, moved or done, its line stays in the project note; the plugin writes
-   where it is in the lane on that line. Done, it stays in the note as `- [x]` and leaves the screen like any done task:
-   the note keeps the project's history. The general Done of `TODOs Tasks.md` holds only tasks of that file.
+7. **A project note has the same sections as `TODOs Tasks.md`**: Inbox, Now, Soon, Backlog, Done, with the same
+   meaning and the same rules, reused one to one (the morning rules, sections inside them, subtasks, descriptions). A
+   project task's place in the lane is the section it stands in, exactly as in the file; no new field. The Backlog column
+   shows each project's Backlog as its group; a project's Inbox, Now and Soon tasks are in those columns with the mark.
+8. **A project task never leaves its note.** Moved through the lane, it moves between the note's sections; done, it goes
+   to the note's Done and leaves the screen like any done task: the note keeps the project's history. The general Done of
+   `TODOs Tasks.md` holds only tasks of that file.
 9. **A project note is a note tagged `#project`**, anywhere in the vault (Max hardly uses folders). The tag counts in the
    note's properties or in its text; the project's name is the note's name.
 10. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project note; the
@@ -39,33 +40,31 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     `docs/design/canvas/Proj1.dc.html`.
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
-    `TODOs Tasks.md` into that project's note (the end of its `## Tasks`), keeping where it is in the
-    lane; «No project» moves it back into the file. A project group has no plus of its own: the plus at the bottom right,
+    `TODOs Tasks.md` into the same section of that project's note (Inbox to Inbox, Now to Now…), keeping its
+    place in the lane; «No project» moves it back into the file. A project group has no plus of its own: the plus at the bottom right,
     taken to a project group (the way it is taken to any place), writes the new task into that project's note.
     Everything inside a project group is that project's: tasks, their subtasks and descriptions.
-12. **Project tasks live under `## Tasks`.** Only checkboxes in the note's `## Tasks` section (down to the next heading of
-    the same or a higher level) are project tasks; every other checkbox is a plain checklist the plugin never reads. A new
-    or moved-in task is written at the end of that section; a note without one gets it at its end on the first write.
-13. **The lane on a project task's line** uses the existing fields: nothing — Backlog; `📅` — a day, today's date — Now;
-    `⏰` (or `🚨`, `📌`, `🔕`) — the calendar. Soon without a date is `🔜` at the end of the line, like the other fields.
+12. **Plain checkboxes stay out.** A checkbox outside the note's lane sections is a plain checklist the plugin never
+    reads. A section the plugin needs and the note lacks is added when it first writes there.
 
 ## How it is used
 
-1. **Start a project.** A new note «Окружение в новой стране» with `#project`. Write freely: why, thoughts, observations,
-   and, under `## Tasks`, the steps that come to mind (`- [ ] Сходить на языковой обмен`).
-2. **See it in the plugin.** Backlog shows a group «Окружение в новой стране» with those steps, beside the other projects
-   and «No project».
-3. **Take a step.** Drag «Сходить на языковой обмен» from its group to Soon, Now, a day or the calendar, as any Backlog
-   task. On its card the project mark says where it comes from; a tap on the mark opens the note.
-4. **A thought on the run.** Into Inbox as always; at the next review, the task menu → «Project» → «Окружение…»: the task
-   moves into the note.
-5. **Done.** The task leaves the screen; in the note it stays as `- [x]`, the project's history.
+1. **Start a project.** A new note «Окружение в новой стране» with `#project`. Write freely: why, thoughts, observations;
+   the steps go into its Backlog section.
+2. **See it in the plugin.** The Backlog column shows a group «Окружение в новой стране» beside the other projects and
+   «No project».
+3. **Take a step.** Drag it from the group to Soon, Now, a day or the calendar, as any Backlog task: the line moves to that
+   section of the note. Its card has the project mark; a tap on the mark opens the note.
+4. **A thought on the run.** Into Inbox as always; the task menu → «Project» → «Окружение…» moves it into the note's
+   Inbox. Or the plus taken to the project's group writes it straight into the project.
+5. **Done.** The task leaves the screen and goes to the note's Done: the project's history.
+
+The task menu's «Project»: board `docs/design/canvas/Proj3Flow.dc.html` (approved).
 
 ## Open (being planned now)
 
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
-- The task menu's «Project»: board.
-- What the project mark on a card looks like, on the phone and the desktop.
+- Where the lane sections stand in a project note: right in the note as `## Inbox`… or under one `## Tasks`.
 - How the iPhone app reads tasks spread over many files.
 
 ## Ideas for later
