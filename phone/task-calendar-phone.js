@@ -72,12 +72,10 @@ ${key.title}`.toLowerCase();
       this.staleAfterMs = staleAfterMs;
       this.now = now;
       this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-      const email = this.googleEmail?.toLowerCase() ?? null;
-      const main = email === null ? void 0 : files.get("iphone")?.calendars.find((c) => c.title.toLowerCase() === email);
-      this.phoneGoogle = main ? { sourceId: main.sourceId ?? null, account: main.account } : null;
-      const google = this.phoneGoogle;
+      const phone = files.get("iphone")?.calendars ?? [];
+      const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google").calendars, phone);
       this.phoneGoogleIds = new Set(
-        (files.get("iphone")?.calendars ?? []).filter((c) => google !== null && (google.sourceId !== null ? c.sourceId === google.sourceId : c.account === google.account)).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
+        phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
       );
       this.hidden = new Set(hidden.map(keyText));
     }
@@ -149,6 +147,21 @@ ${key.title}`.toLowerCase();
       return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
     }
   };
+  function phoneAccountOf(calendar) {
+    return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
+  }
+  function phoneGoogleAccount(google, phone) {
+    const titles = new Set(google.map((c) => c.title.toLowerCase()));
+    const shared = /* @__PURE__ */ new Map();
+    for (const calendar of phone) {
+      if (!titles.has(calendar.title.toLowerCase())) continue;
+      const account = phoneAccountOf(calendar);
+      shared.set(account, (shared.get(account) ?? 0) + 1);
+    }
+    const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
+    if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
+    return ranked[0][0];
+  }
   function byAccount(a, b) {
     if (a === b) return 0;
     if (a === "") return 1;

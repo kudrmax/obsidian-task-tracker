@@ -102,7 +102,29 @@ describe("CalendarChoice", () => {
 		]);
 	});
 
-	it("only the phone's account holding the main calendar is Google's, the email in any case", () => {
+	it("the phone's Google account is the one sharing Google's calendar titles, whatever the main one is called", () => {
+		const defaultG: Cal = { title: "Default", account: GMAIL, calendarId: GMAIL };
+		const plannedG: Cal = { title: "Planned", account: GMAIL, calendarId: "planned" };
+		const defaultI: Cal = { title: "Default", account: "Gmail", calendarId: "ek-default" };
+		const plannedI: Cal = { title: "Planned", account: "Gmail", calendarId: "ek-planned" };
+		const day = choice({
+			google: file(2, [defaultG, plannedG], [meeting("google", plannedG, "from Google", 15)]),
+			iphone: file(5, [defaultI, plannedI, WORK_I], [meeting("iphone", plannedI, "from the app", 15)]),
+		});
+		expect(day.known().map((c) => [c.key.account, c.key.title, c.google])).toEqual([
+			[GMAIL, "Default", true],
+			[GMAIL, "Planned", true],
+			["max@company.ru", "Календарь", false],
+		]);
+		expect(titles(day.day(DAY.start, DAY.end).events)).toEqual(["from Google"]);
+	});
+
+	it("no phone account shares Google's titles: none of the phone's calendars is Google's", () => {
+		const known = choice({ google: file(2, [MAIN_G, PERSONAL_G], []), iphone: file(5, [WORK_I], []) }).known();
+		expect(known.filter((c) => !c.google).map((c) => c.key)).toEqual([{ account: "max@company.ru", title: "Календарь" }]);
+	});
+
+	it("of two phone accounts, the one sharing more of Google's titles is Google's, in any case", () => {
 		const other: Cal = { title: "Personal", account: "Gmail", calendarId: "ek-other" };
 		const known = choice({
 			google: file(2, [{ ...MAIN_G, title: "Max@Gmail.com", account: "Max@Gmail.com" }, { ...PERSONAL_G, account: "Max@Gmail.com" }], []),

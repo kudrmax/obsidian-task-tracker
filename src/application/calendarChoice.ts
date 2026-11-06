@@ -1,4 +1,4 @@
-import type { CalendarFile } from "./calendarFile";
+import type { CalendarFile, FileCalendar } from "./calendarFile";
 import type { CalendarEvent, CalendarSource } from "./contracts";
 
 /** A calendar across the writers' files: its account (an email; "" when no writer knows it) and its title. */
@@ -39,8 +39,6 @@ interface CalendarRef {
  */
 export class CalendarChoice {
 	private readonly googleEmail: string | null;
-	/** The phone's Google account: the one whose calendar is titled with Google's email, by its id where the phone gives one. */
-	private readonly phoneGoogle: { readonly sourceId: string | null; readonly account: string | null } | null;
 	/** The phone's calendar ids that belong to Google's account. */
 	private readonly phoneGoogleIds: ReadonlySet<string>;
 	private readonly hidden: ReadonlySet<string>;
@@ -52,14 +50,10 @@ export class CalendarChoice {
 		private readonly now: Date,
 	) {
 		this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-		const email = this.googleEmail?.toLowerCase() ?? null;
-		const main = email === null ? undefined : files.get("iphone")?.calendars.find((c) => c.title.toLowerCase() === email);
-		this.phoneGoogle = main ? { sourceId: main.sourceId ?? null, account: main.account } : null;
-		const google = this.phoneGoogle;
+		const phone = files.get("iphone")?.calendars ?? [];
+		const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google")!.calendars, phone);
 		this.phoneGoogleIds = new Set(
-			(files.get("iphone")?.calendars ?? [])
-				.filter((c) => google !== null && (google.sourceId !== null ? c.sourceId === google.sourceId : c.account === google.account))
-				.flatMap((c) => (c.calendarId === null ? [] : [c.calendarId])),
+			phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => (c.calendarId === null ? [] : [c.calendarId])),
 		);
 		this.hidden = new Set(hidden.map(keyText));
 	}
@@ -137,6 +131,28 @@ export class CalendarChoice {
 		if (titled.size === 1) return [...titled.values()][0];
 		return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
 	}
+}
+
+/** An account on the phone: by its id where the phone gives one, else by its name. */
+function phoneAccountOf(calendar: FileCalendar): string {
+	return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
+}
+
+/**
+ * The phone names Google's account as it likes ("Gmail") and its main calendar as Google does, which need not be the email:
+ * Google's account is the phone's account sharing the most calendar titles with Google, and none on a tie.
+ */
+function phoneGoogleAccount(google: readonly FileCalendar[], phone: readonly FileCalendar[]): string | null {
+	const titles = new Set(google.map((c) => c.title.toLowerCase()));
+	const shared = new Map<string, number>();
+	for (const calendar of phone) {
+		if (!titles.has(calendar.title.toLowerCase())) continue;
+		const account = phoneAccountOf(calendar);
+		shared.set(account, (shared.get(account) ?? 0) + 1);
+	}
+	const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
+	if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
+	return ranked[0][0];
 }
 
 /** Accounts by name; the calendars no writer gives an account last. */
