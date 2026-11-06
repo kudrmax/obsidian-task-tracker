@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ObsidianChrome } from "../../src/ui/quick/ObsidianChrome";
+import { ObsidianChrome } from "../../obsidian/ui/quick/ObsidianChrome";
 
 function addStatusBar(top: number, height = 22): HTMLElement {
 	const app = document.body.appendChild(document.createElement("div"));

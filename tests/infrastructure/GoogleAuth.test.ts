@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Clock } from "../../src/application/ports";
-import { GoogleAuth } from "../../src/infrastructure/GoogleAuth";
-import type { TokenResponse } from "../../src/infrastructure/GoogleToken";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import type { Clock } from "../../core/application/ports";
+import { GoogleAuth } from "../../obsidian/infrastructure/GoogleAuth";
+import type { TokenResponse } from "../../obsidian/infrastructure/GoogleToken";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 class ManualClock implements Clock {

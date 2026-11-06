@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CalendarChoice } from "../../src/application/calendarChoice";
-import { CalendarDays } from "../../src/application/calendarDays";
-import type { CalendarFile } from "../../src/application/calendarFile";
-import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
-import { DayBoundary } from "../../src/domain/DayBoundary";
+import { CalendarChoice } from "../../core/application/calendarChoice";
+import { CalendarDays } from "../../core/application/calendarDays";
+import type { CalendarFile } from "../../core/application/calendarFile";
+import type { CalendarEvent, CalendarSource } from "../../core/application/contracts";
+import { DayBoundary } from "../../core/domain/DayBoundary";
 
 const NOW = new Date(2026, 9, 31, 0, 30);
 const event = (id: string, start: Date, end: Date, allDay = false): CalendarEvent => ({ id, title: id, start, end, allDay, calendar: "Work", color: "#0A84FF", source: "work", account: null, calendarId: null });

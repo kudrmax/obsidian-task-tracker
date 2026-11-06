@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import type { PriorityColor } from "../../src/application/contracts";
-import type { PendingText } from "../../src/application/contracts";
-import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
-import { TaskList } from "../../src/ui/TaskList";
+import type { TaskItem } from "../../core/application/contracts";
+import type { PriorityColor } from "../../core/application/contracts";
+import type { PendingText } from "../../core/application/contracts";
+import { QuickField, type QuickKey } from "../../obsidian/ui/quick/QuickField";
+import { TaskList } from "../../obsidian/ui/TaskList";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
-import { type EntryDrawing, entryAt } from "../../src/application/QuickEntry";
-import type { GapPlace } from "../../src/application/nesting";
+import { type EntryDrawing, entryAt } from "../../core/application/QuickEntry";
+import type { GapPlace } from "../../core/application/nesting";
 
 /** The field's spot among what the list draws, as the quick entry answers it. */
 const spotted = (drawing: EntryDrawing, place: GapPlace) => ({ at: entryAt(drawing, place, false), level: place.level });

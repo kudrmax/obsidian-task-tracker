@@ -1,21 +1,21 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { LabelLevel, NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
-import type { RightMode } from "../../src/ui/viewSettings";
-import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
-import { GestureArbiter } from "../../src/ui/gestures";
-import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
-import { TaskMenu } from "../../src/ui/menu/TaskMenu";
-import { taskMenu } from "../../src/application/menus";
-import { dayColumn, dayOfPlacement, placementOfDay } from "../../src/domain/Days";
-import { TaskList } from "../../src/ui/TaskList";
-import { Timeline } from "../../src/ui/Timeline";
-import { DayBoundary } from "../../src/application/contracts";
+import type { LabelLevel, NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../core/application/contracts";
+import type { RightMode } from "../../obsidian/ui/viewSettings";
+import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../obsidian/ui/drag/DropTarget";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import { type ColumnDrop, QuickEntryController } from "../../obsidian/ui/quick/QuickEntryController";
+import { TaskMenu } from "../../obsidian/ui/menu/TaskMenu";
+import { taskMenu } from "../../core/application/menus";
+import { dayColumn, dayOfPlacement, placementOfDay } from "../../core/domain/Days";
+import { TaskList } from "../../obsidian/ui/TaskList";
+import { Timeline } from "../../obsidian/ui/Timeline";
+import { DayBoundary } from "../../core/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
 import { withShownSpan } from "../fakes/timelineDeps";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox"];

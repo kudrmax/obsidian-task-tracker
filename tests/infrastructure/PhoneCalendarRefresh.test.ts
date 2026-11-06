@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CalendarFile } from "../../src/application/calendarFile";
-import { PhoneCalendarRefresh } from "../../src/infrastructure/PhoneCalendarRefresh";
+import type { CalendarFile } from "../../core/application/calendarFile";
+import { PhoneCalendarRefresh } from "../../obsidian/infrastructure/PhoneCalendarRefresh";
 import { FakeTimers } from "../fakes/FakeTimers";
 
 const NOW = new Date(2026, 10, 5, 12);

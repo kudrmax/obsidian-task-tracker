@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { placeOfGap, type TaskKey } from "../../src/application/contracts";
-import { sameGap } from "../../src/application/contracts";
-import { type PlacedCard, placeAt } from "../../src/ui/drag/listPlace";
+import { placeOfGap, type TaskKey } from "../../core/application/contracts";
+import { sameGap } from "../../core/application/contracts";
+import { type PlacedCard, placeAt } from "../../obsidian/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;

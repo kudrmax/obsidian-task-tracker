@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DESCRIPTION_TEMPLATE } from "../../src/application/contracts";
-import { DescriptionDraft } from "../../src/application/DescriptionDraft";
+import { DESCRIPTION_TEMPLATE } from "../../core/application/contracts";
+import { DescriptionDraft } from "../../core/application/DescriptionDraft";
 
 const idle = { focused: false, pending: false };
 

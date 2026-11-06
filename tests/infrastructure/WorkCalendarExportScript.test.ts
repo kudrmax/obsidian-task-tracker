@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WorkCalendarExportScript, type ExportScriptAdapter } from "../../src/infrastructure/WorkCalendarExportScript";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { WorkCalendarExportScript, type ExportScriptAdapter } from "../../obsidian/infrastructure/WorkCalendarExportScript";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 const PLUGIN_DIR = ".obsidian/plugins/task-calendar";

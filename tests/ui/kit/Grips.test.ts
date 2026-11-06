@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import { Grips, type GripEdge } from "../../../src/ui/kit/Grips";
+import { Grips, type GripEdge } from "../../../obsidian/ui/kit/Grips";
 
 afterEach(() => document.body.replaceChildren());
 

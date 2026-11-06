@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { ColumnHeaders } from "../../src/ui/ColumnHeaders";
+import { ColumnHeaders } from "../../obsidian/ui/ColumnHeaders";
 
 function setUp() {
 	const names = { inbox: "Inbox", soon: "Soon" };

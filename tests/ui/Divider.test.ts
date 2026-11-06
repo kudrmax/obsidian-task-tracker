@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { Divider, type DividerOptions } from "../../src/ui/Divider";
-import { GestureArbiter } from "../../src/ui/gestures";
+import { Divider, type DividerOptions } from "../../obsidian/ui/Divider";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
 
 const SLOW_STEP_MS = 1000;
 let now = 0;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
-import { failureText } from "../../src/ui/failureText";
+import { StaleTaskError, TasksFileMissingError } from "../../core/application/contracts";
+import { failureText } from "../../obsidian/ui/failureText";
 
 describe("failureText", () => {
 	it("says a task changed under the screen in the screen's words", () => {

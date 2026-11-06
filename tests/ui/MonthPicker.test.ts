@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { MonthPicker } from "../../src/ui/menu/MonthPicker";
+import { MonthPicker } from "../../obsidian/ui/menu/MonthPicker";
 
 describe("MonthPicker", () => {
 	it("draws six weeks from the Monday before the month, marking today and the chosen day", () => {

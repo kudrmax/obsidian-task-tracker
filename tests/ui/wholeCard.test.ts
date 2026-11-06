@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grownStart, roomWidth, wholeHeight, wholeWidth } from "../../src/ui/wholeCard";
+import { grownStart, roomWidth, wholeHeight, wholeWidth } from "../../obsidian/ui/wholeCard";
 
 const phone = roomWidth({ width: 390, height: 844, margin: 10 });
 

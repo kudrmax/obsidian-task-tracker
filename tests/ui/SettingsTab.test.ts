@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import type { App, Plugin } from "obsidian";
-import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../src/application/contracts";
-import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
-import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
-import { DEFAULT_SETTINGS } from "../../src/settings";
-import { SETTINGS_FILE, type StoredSettings } from "../../src/settingsFile";
-import { TaskCalendarSettingsTab } from "../../src/ui/SettingsTab";
-import { ViewSettingsStore } from "../../src/ui/viewSettings";
+import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../core/application/contracts";
+import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
+import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../obsidian/infrastructure/PluginSettings";
+import { DEFAULT_SETTINGS } from "../../core/settings";
+import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
+import { TaskCalendarSettingsTab } from "../../obsidian/ui/SettingsTab";
+import { ViewSettingsStore } from "../../obsidian/ui/viewSettings";
 
 type FileSettings = Omit<StoredSettings, "listShare" | "rightMode" | "zoom">;
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { readCalendarFile } from "../../src/application/calendarFile";
-import { CalendarServiceImpl } from "../../src/application/CalendarServiceImpl";
-import type { CalendarSource } from "../../src/application/contracts";
-import type { EventFile } from "../../src/application/EventSource";
-import { phoneDoor as door } from "../../src/application/PhoneDoor";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { readCalendarFile } from "../../core/application/calendarFile";
+import { CalendarServiceImpl } from "../../core/application/CalendarServiceImpl";
+import type { CalendarSource } from "../../core/application/contracts";
+import type { EventFile } from "../../core/application/EventSource";
+import { phoneDoor as door } from "../../core/application/PhoneDoor";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { FakeTimers } from "../fakes/FakeTimers";
 

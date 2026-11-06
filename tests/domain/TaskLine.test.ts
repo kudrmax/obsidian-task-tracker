@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TaskDocument } from "../../src/domain/TaskDocument";
-import { fieldSlicerFor, formatTaskLine, parseTaskLine, statusOf, type Markers } from "../../src/domain/TaskLine";
+import { TaskDocument } from "../../core/domain/TaskDocument";
+import { fieldSlicerFor, formatTaskLine, parseTaskLine, statusOf, type Markers } from "../../core/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
 

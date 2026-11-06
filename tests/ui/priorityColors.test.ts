@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PRIORITY_COLORS, type PriorityColor } from "../../src/application/contracts";
-import { contrast, inkOf, priorityRules, shadesOf } from "../../src/ui/priorityColors";
+import { PRIORITY_COLORS, type PriorityColor } from "../../core/application/contracts";
+import { contrast, inkOf, priorityRules, shadesOf } from "../../obsidian/ui/priorityColors";
 
 const THEMES = ["dark", "light"] as const;
 const BOARD_CARD = { dark: "#1C1C1E", light: "#F2F2F7" };

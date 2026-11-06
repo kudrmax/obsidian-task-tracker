@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { boundaryOf, markersOf, readDocument, readingKey } from "../../src/application/documentText";
-import { TaskRules } from "../../src/application/TaskRules";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { setStatus } from "../../src/domain/operations";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { boundaryOf, markersOf, readDocument, readingKey } from "../../core/application/documentText";
+import { TaskRules } from "../../core/application/TaskRules";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { setStatus } from "../../core/domain/operations";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 

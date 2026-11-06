@@ -52,7 +52,7 @@ public struct DoorReply: @unchecked Sendable {
     public let settingsJSON: String?
 }
 
-/// Runs the core's phone module (`phone/task-calendar-phone.js`) in JavaScriptCore: every rule of the tasks
+/// Runs the core's phone module (`core/task-calendar-phone.js`) in JavaScriptCore: every rule of the tasks
 /// file is the core's, asked for through its door (`docs/door.md`).
 public final class PhoneCore: TaskRules, @unchecked Sendable {
     private let context: JSContext

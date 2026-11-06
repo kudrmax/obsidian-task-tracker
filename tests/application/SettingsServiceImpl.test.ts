@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { PriorityLevel, SecretField } from "../../src/application/contracts";
-import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
-import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../src/settings";
+import type { PriorityLevel, SecretField } from "../../core/application/contracts";
+import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
+import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 function service(start: Partial<TaskCalendarSettings> = {}) {

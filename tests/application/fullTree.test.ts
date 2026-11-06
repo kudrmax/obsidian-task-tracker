@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { fullTree } from "../../src/application/fullTree";
-import { toItem } from "../../src/application/taskItems";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { fullTree } from "../../core/application/fullTree";
+import { toItem } from "../../core/application/taskItems";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const T = "2026-11-06";
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };

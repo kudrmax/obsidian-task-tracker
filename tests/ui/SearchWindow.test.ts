@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SearchGroup, SearchHit, SectionKey, TaskItem } from "../../src/application/contracts";
-import { SearchWindow } from "../../src/ui/search/SearchWindow";
+import type { SearchGroup, SearchHit, SectionKey, TaskItem } from "../../core/application/contracts";
+import { SearchWindow } from "../../obsidian/ui/search/SearchWindow";
 
 function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): TaskItem {
 	return {

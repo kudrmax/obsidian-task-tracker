@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WriteQueue } from "../../src/ui/quick/WriteQueue";
+import { WriteQueue } from "../../obsidian/ui/quick/WriteQueue";
 
 function deferred(): { promise: Promise<void>; resolve(): void } {
 	let resolve!: () => void;

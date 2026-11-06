@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Overlay } from "../../src/ui/menu/Overlay";
+import { Overlay } from "../../obsidian/ui/menu/Overlay";
 
 const open = () => {
 	const overlay = new Overlay(() => overlay.close());

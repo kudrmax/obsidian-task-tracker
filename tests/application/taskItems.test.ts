@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { itemLevels, toItem } from "../../src/application/taskItems";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { itemLevels, toItem } from "../../core/application/taskItems";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };

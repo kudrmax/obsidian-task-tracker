@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatZoomLevels, parseZoomLevels, VIEW_DEFAULTS } from "../../src/ui/viewSettings";
+import { formatZoomLevels, parseZoomLevels, VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
 
 describe("zoom levels text", () => {
 	it("formats the defaults as the hour's heights", () => {

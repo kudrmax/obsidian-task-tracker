@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { snapMinute, snapStep } from "../../src/application/snapGrid";
+import { snapMinute, snapStep } from "../../core/application/snapGrid";
 
 describe("snapStep", () => {
 	it("takes the finest of 5, 15, 30 and 60 minutes that a finger still moves a step at", () => {

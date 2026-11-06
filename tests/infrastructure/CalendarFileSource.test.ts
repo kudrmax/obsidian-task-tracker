@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { PathWatcher } from "../../src/infrastructure/VaultPathWatcher";
-import { CalendarFileSource } from "../../src/infrastructure/CalendarFileSource";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import type { PathWatcher } from "../../obsidian/infrastructure/VaultPathWatcher";
+import { CalendarFileSource } from "../../obsidian/infrastructure/CalendarFileSource";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 const FILE = JSON.stringify({

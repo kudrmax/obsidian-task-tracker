@@ -2,7 +2,14 @@
 
 ## One repository, one core, several frontends
 
-This repository holds the whole product: the core (the tasks file and every rule about it, TypeScript), the Obsidian plugin (a frontend of that core) and the Apple apps in `apple/` (Swift frontends: the iPhone app today, a Mac app later). The core is one code, never a copy or a port: the plugin bundles it into `main.js`, the apps run `phone/task-calendar-phone.js` (built from `src/phone`, committed, `tests/phone/build.test.ts` keeps it the build of the current source) in JavaScriptCore through `apple/Core`. A rule a Swift frontend needs is added to the core and asked for through the door (`docs/door.md`), never written again in Swift. `manifest.json`, `versions.json` and `README.md` stay at the root: Obsidian and BRAT look for them there. The apps are installed from Xcode, never as GitHub releases of this repository: BRAT takes the highest release as the plugin's. `kudrmax/task-calendar-ios` is the apps' old repository: emptied, its README points here.
+This repository holds the whole product, one core and its frontends:
+
+- `core/` — the core, TypeScript: `domain`, `application`, `settings.ts`, and `phone/main.ts`, the door the Apple apps call. `core/build.mjs` builds it into `core/task-calendar-phone.js` (committed; `tests/phone/build.test.ts` keeps it the build of the current source).
+- `obsidian/` — the Obsidian frontend: `ui`, `infrastructure` (vault, Google, the work file), `main.ts`, `compose.ts`. esbuild bundles it with the core into `main.js`.
+- `apple/` — the Swift frontends: the iPhone app today, a Mac app later. They run `core/task-calendar-phone.js` in JavaScriptCore through `apple/Core`.
+- The root holds what Obsidian and BRAT take from a plugin's repository: `manifest.json`, `versions.json`, `styles.css`, the built `main.js`, `README.md`. `tests/` covers the core and the Obsidian frontend.
+
+The core is one code, never a copy or a port. A rule a Swift frontend needs is added to the core and asked for through the door (`docs/door.md`), never written again in Swift. The apps are installed from Xcode, never as GitHub releases of this repository: BRAT takes the highest release as the plugin's. `kudrmax/task-calendar-ios` is the apps' old repository: emptied, its README points here.
 
 ## The screen is decided
 
@@ -18,16 +25,16 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 ## Layers
 
-`src/domain` (pure: the file, the tasks, the rules), `src/application` (`contracts.ts` is the API the UI talks to; services), `src/infrastructure` (vault, Google, the work file), `src/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `src/settings.ts` and `src/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.
+`core/domain` (pure: the file, the tasks, the rules), `core/application` (`contracts.ts` is the API the UI talks to; services), `obsidian/infrastructure` (vault, Google, the work file), `obsidian/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `core/settings.ts` and `core/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.
 
 **The UI decides nothing.** The Swift frontends in `apple/` use the same core. Everything it would have to repeat lives in `application`: what is offered and what is disabled, what a tap writes, defaults, where a new task goes, what counts as the same, empty or overdue. The UI gets the decision ready (a field in `TaskItem.can`, a service method, a ready menu model) and only draws and turns gestures into minutes and places. The test: if the Swift version would have to write this line, it doesn't belong here.
 
-`domain` and `application` are pure: no host globals (`window`, `document`, `setTimeout`, `localStorage`…), they get the clock and timers through ports. `src/phone` is the iOS app's door, `globalThis.TaskCalendarPhone`: its functions keep their names, arguments and results (adding is fine), the app calls them. `tests/architecture.test.ts` guards the imports, the host globals (`tsconfig.core.json`) and what `contracts.ts` re-exports; `tests/uiDecides.test.ts` trips on task fields compared in `src/ui`. Don't loosen them or raise a baseline: move the decision into `application`.
+`domain` and `application` are pure: no host globals (`window`, `document`, `setTimeout`, `localStorage`…), they get the clock and timers through ports. `core/phone` is the Apple apps' door, `globalThis.TaskCalendarPhone`: its functions keep their names, arguments and results (adding is fine), the app calls them. `tests/architecture.test.ts` guards the imports, the host globals (`core/tsconfig.json`) and what `contracts.ts` re-exports; `tests/uiDecides.test.ts` trips on task fields compared in `obsidian/ui`. Don't loosen them or raise a baseline: move the decision into `application`.
 
 ## One design system
 
-- `styles.css`: the `body { … }` block at the top holds every token (`--tc-…`): colours, radii, sizes, type, spacing, motion. Component rules only read `var(--tc-…)`. `tests/styles.test.ts` fails on a bare number, colour or radius in a rule, on an unused or undefined token, and on `DESIGN` in `src/ui/design.ts` disagreeing with the CSS. Don't loosen it: move the value into a token.
-- Colours are the design's (explicit), not Obsidian's theme, except the light accent (`--interactive-accent`) and the ground: `--tc-bg` is the theme's `--background-primary` (black on the phone, grey on the desktop), and a plain card and the switch's track are that ground lifted towards the text (`color-mix`), so they stand out on either. The theme follows Obsidian's: the `body.theme-light { … }` block right after the tokens overrides the colours with the light values of the board «Палитра»; it defines no new names. Event colours are computed in `src/ui/eventColors.ts` per theme.
+- `styles.css`: the `body { … }` block at the top holds every token (`--tc-…`): colours, radii, sizes, type, spacing, motion. Component rules only read `var(--tc-…)`. `tests/styles.test.ts` fails on a bare number, colour or radius in a rule, on an unused or undefined token, and on `DESIGN` in `obsidian/ui/design.ts` disagreeing with the CSS. Don't loosen it: move the value into a token.
+- Colours are the design's (explicit), not Obsidian's theme, except the light accent (`--interactive-accent`) and the ground: `--tc-bg` is the theme's `--background-primary` (black on the phone, grey on the desktop), and a plain card and the switch's track are that ground lifted towards the text (`color-mix`), so they stand out on either. The theme follows Obsidian's: the `body.theme-light { … }` block right after the tokens overrides the colours with the light values of the board «Палитра»; it defines no new names. Event colours are computed in `obsidian/ui/eventColors.ts` per theme.
 
 ## Trying a build
 
@@ -51,7 +58,7 @@ Delete only with `trash`, never `rm`.
 
 ## The Apple apps
 
-`apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `phone/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
+`apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `core/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
 
 ### Installing on the iPhone
 

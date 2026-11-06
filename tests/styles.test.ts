@@ -1,9 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { VIEW_DEFAULTS } from "../src/ui/viewSettings";
-import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../src/ui/design";
-import { STATUS_BAR_SHOWN } from "../src/ui/StatusBarRoom";
+import { VIEW_DEFAULTS } from "../obsidian/ui/viewSettings";
+import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../obsidian/ui/design";
+import { STATUS_BAR_SHOWN } from "../obsidian/ui/StatusBarRoom";
 
 interface Declaration {
 	readonly selector: string;
@@ -82,7 +82,7 @@ class Code {
 }
 
 const sheet = new Stylesheet(readFileSync(join(__dirname, "..", "styles.css"), "utf8"));
-const code = new Code(join(__dirname, "..", "src"));
+const code = new Code(join(__dirname, "..", "obsidian"));
 
 /** Numbers that say how a layout is built rather than how it looks: none, one, halves, the whole, a quarter turn. */
 const STRUCTURAL = new Set(["0", "1", "-1", "2", "1fr", "50%", "-50%", "100%", "90deg", "-90deg"]);

@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../src/application/contracts";
-import type { DragPayload, ListColumn, NewTaskPayload } from "../../src/ui/drag/DropTarget";
-import { ListDrop } from "../../src/ui/drag/ListDrop";
-import { readDrop } from "../../src/application/drops";
-import type { ColumnSections } from "../../src/application/contracts";
-import { TaskList } from "../../src/ui/TaskList";
-import { shownCardSize } from "../../src/ui/cardSize";
+import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../core/application/contracts";
+import type { DragPayload, ListColumn, NewTaskPayload } from "../../obsidian/ui/drag/DropTarget";
+import { ListDrop } from "../../obsidian/ui/drag/ListDrop";
+import { readDrop } from "../../core/application/drops";
+import type { ColumnSections } from "../../core/application/contracts";
+import { TaskList } from "../../obsidian/ui/TaskList";
+import { shownCardSize } from "../../obsidian/ui/cardSize";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (section: SectionKey, index: number, text: string, group: GroupName): TaskItem => onDay({

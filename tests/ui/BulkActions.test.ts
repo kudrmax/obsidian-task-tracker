@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import type { PickedTask, TaskItem } from "../../src/application/contracts";
-import { BulkController, type BulkDeps } from "../../src/ui/BulkController";
-import { carriedWith, taskMenu } from "../../src/application/menus";
-import { countLabel } from "../../src/ui/menu/BulkMenu";
-import { type PickedCard, TaskSelection } from "../../src/ui/TaskSelection";
-import type { TaskDragPayload } from "../../src/ui/drag/DropTarget";
+import type { PickedTask, TaskItem } from "../../core/application/contracts";
+import { BulkController, type BulkDeps } from "../../obsidian/ui/BulkController";
+import { carriedWith, taskMenu } from "../../core/application/menus";
+import { countLabel } from "../../obsidian/ui/menu/BulkMenu";
+import { type PickedCard, TaskSelection } from "../../obsidian/ui/TaskSelection";
+import type { TaskDragPayload } from "../../obsidian/ui/drag/DropTarget";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";

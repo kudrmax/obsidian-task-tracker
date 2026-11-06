@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { type GroupName, listView, type SectionChoice, sectionChoice, StaleTaskError, type TaskItem } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { type GroupName, listView, type SectionChoice, sectionChoice, StaleTaskError, type TaskItem } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 import { onDay } from "../fakes/itemOnDay";

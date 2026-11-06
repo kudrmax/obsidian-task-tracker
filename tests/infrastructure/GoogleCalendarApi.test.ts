@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Clock } from "../../src/application/ports";
-import { GoogleCalendarApi } from "../../src/infrastructure/GoogleCalendarApi";
-import type { HttpRequest, HttpResponse } from "../../src/infrastructure/Http";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import type { Clock } from "../../core/application/ports";
+import { GoogleCalendarApi } from "../../obsidian/infrastructure/GoogleCalendarApi";
+import type { HttpRequest, HttpResponse } from "../../obsidian/infrastructure/Http";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 const START = new Date(2026, 9, 30, 5);

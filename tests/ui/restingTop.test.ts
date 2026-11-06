@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { restingTop } from "../../src/ui/dom";
+import { restingTop } from "../../obsidian/ui/dom";
 
 describe("restingTop", () => {
 	it("takes off the shifts drawn on the element and on what holds it", () => {

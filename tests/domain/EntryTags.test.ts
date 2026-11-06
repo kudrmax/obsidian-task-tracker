@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EntryTags } from "../../src/domain/EntryTags";
-import { TaskDocument, type TaskEntry } from "../../src/domain/TaskDocument";
+import { EntryTags } from "../../core/domain/EntryTags";
+import { TaskDocument, type TaskEntry } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };

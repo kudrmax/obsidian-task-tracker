@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TimelineSpans } from "../../src/application/TimelineSpans";
-import { DayBoundary } from "../../src/domain/DayBoundary";
+import { TimelineSpans } from "../../core/application/TimelineSpans";
+import { DayBoundary } from "../../core/domain/DayBoundary";
 
 const T = "2026-10-31";
 const NOON = new Date(2026, 9, 31, 12, 0);

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { KEYBOARD_UP, Keyboard } from "../../src/ui/Keyboard";
+import { KEYBOARD_UP, Keyboard } from "../../obsidian/ui/Keyboard";
 
 const slide = (type: "keyboardWillShow" | "keyboardWillHide", keyboardHeight: number) =>
 	window.dispatchEvent(Object.assign(new Event(type), { keyboardHeight }));

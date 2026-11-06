@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarFileText, iphoneCalendarAdds, phoneCalendarText, readCalendarFile } from "../../src/application/calendarFile";
+import { calendarFileText, iphoneCalendarAdds, phoneCalendarText, readCalendarFile } from "../../core/application/calendarFile";
 
 const event = (title: string, calendar: string, extra: object = {}) => ({
 	id: title,

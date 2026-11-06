@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../src/ui/drag/DragSession";
+import type { TaskItem } from "../../core/application/contracts";
+import { DragSession, type DragPayload, type DropResult, type DropTarget, type Float, type NewTaskPayload } from "../../obsidian/ui/drag/DragSession";
 import { onDay } from "../fakes/itemOnDay";
 
 const item: TaskItem = onDay({ key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-11-01");

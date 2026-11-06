@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LongPress } from "../../src/ui/drag/LongPress";
+import { LongPress } from "../../obsidian/ui/drag/LongPress";
 
 type Log = string[];
 

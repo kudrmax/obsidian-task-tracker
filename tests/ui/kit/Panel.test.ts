@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Panel, Picks } from "../../../src/ui/kit/Panel";
-import { Overlay } from "../../../src/ui/menu/Overlay";
+import { Panel, Picks } from "../../../obsidian/ui/kit/Panel";
+import { Overlay } from "../../../obsidian/ui/menu/Overlay";
 
 afterEach(() => {
 	vi.useRealTimers();

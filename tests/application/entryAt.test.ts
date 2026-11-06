@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { entryAt } from "../../src/application/QuickEntry";
-import type { GroupName } from "../../src/application/contracts";
+import { entryAt } from "../../core/application/QuickEntry";
+import type { GroupName } from "../../core/application/contracts";
 
 const key = (raw: string) => ({ section: "now" as const, index: 0, path: [], raw });
 const card = (raw: string, group: GroupName) => ({ key: key(raw), level: 0, group });

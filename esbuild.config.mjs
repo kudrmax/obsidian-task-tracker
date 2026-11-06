@@ -18,7 +18,7 @@ const raw = {
 };
 
 const context = await esbuild.context({
-  entryPoints: [demo ? "src/demo.ts" : "src/main.ts"],
+  entryPoints: [demo ? "obsidian/demo.ts" : "obsidian/main.ts"],
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules],
   format: "cjs",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markChoices, marksOf, typedMarks } from "../../src/domain/Marks";
+import { markChoices, marksOf, typedMarks } from "../../core/domain/Marks";
 
 describe("marks", () => {
 	it("gives a task a priority or labels, never both: the priority wins", () => {

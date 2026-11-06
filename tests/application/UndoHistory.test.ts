@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { UndoHistory } from "../../src/application/UndoHistory";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { UndoHistory } from "../../core/application/UndoHistory";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 

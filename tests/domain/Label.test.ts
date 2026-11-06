@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { labelNameOf, labelsOfText, labelTitle, toggledLabel, usableLabels } from "../../src/domain/Label";
-import { formatTaskLine, parseTaskLine, type Markers } from "../../src/domain/TaskLine";
+import { labelNameOf, labelsOfText, labelTitle, toggledLabel, usableLabels } from "../../core/domain/Label";
+import { formatTaskLine, parseTaskLine, type Markers } from "../../core/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰", priorities: ["p1"], labelTag: "label", labels: ["Важное", "Срочное", "Приоритет_1"] };
 

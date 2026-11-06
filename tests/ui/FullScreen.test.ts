@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TaskItem, UndoService } from "../../src/application/contracts";
-import type { TaskStatus } from "../../src/ui/types";
-import { fullTree } from "../../src/application/fullTree";
-import { FullScreen } from "../../src/ui/full/FullScreen";
+import type { TaskItem, UndoService } from "../../core/application/contracts";
+import type { TaskStatus } from "../../obsidian/ui/types";
+import { fullTree } from "../../core/application/fullTree";
+import { FullScreen } from "../../obsidian/ui/full/FullScreen";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";

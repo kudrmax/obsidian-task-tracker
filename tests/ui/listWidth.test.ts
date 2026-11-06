@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "../../src/ui/listWidth";
+import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "../../obsidian/ui/listWidth";
 
 describe("list width", () => {
 	it("keeps the design's bounds on a phone", () => {

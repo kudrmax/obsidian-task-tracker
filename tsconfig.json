@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
+  "include": ["core/**/*.ts", "obsidian/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
 }

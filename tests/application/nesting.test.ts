@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, fitLevel, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "../../src/application/nesting";
+import type { TaskKey } from "../../core/application/contracts";
+import { type GapPlace, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, fitLevel, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "../../core/application/nesting";
 
 const key = (index: number, path: number[] = []): TaskKey => ({ section: "now", index, path, raw: `${index}${path.join("")}` });
 /** A, its subtasks A0 and A1, A1's subtask A10, then B. */

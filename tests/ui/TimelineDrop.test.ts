@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { type DaySpan, DayBoundary, type DropOrigin, type TaskItem } from "../../src/application/contracts";
-import type { Timeline } from "../../src/ui/Timeline";
-import type { TaskDragPayload } from "../../src/ui/drag/DropTarget";
-import { TimelineDrop } from "../../src/ui/drag/TimelineDrop";
+import { type DaySpan, DayBoundary, type DropOrigin, type TaskItem } from "../../core/application/contracts";
+import type { Timeline } from "../../obsidian/ui/Timeline";
+import type { TaskDragPayload } from "../../obsidian/ui/drag/DropTarget";
+import { TimelineDrop } from "../../obsidian/ui/drag/TimelineDrop";
 
 const DAY = "2026-11-05";
 

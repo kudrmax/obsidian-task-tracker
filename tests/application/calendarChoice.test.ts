@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CalendarFile, FileCalendar } from "../../src/application/calendarFile";
-import { CalendarChoice, type CalendarKey, textOrder } from "../../src/application/calendarChoice";
-import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
+import type { CalendarFile, FileCalendar } from "../../core/application/calendarFile";
+import { CalendarChoice, type CalendarKey, textOrder } from "../../core/application/calendarChoice";
+import type { CalendarEvent, CalendarSource } from "../../core/application/contracts";
 
 const NOW = new Date(2026, 10, 5, 12);
 const STALE_AFTER = 3 * 60 * 60_000;

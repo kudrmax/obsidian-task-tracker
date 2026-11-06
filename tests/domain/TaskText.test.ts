@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plainText, textParts } from "../../src/domain/TaskText";
+import { plainText, textParts } from "../../core/domain/TaskText";
 
 describe("textParts", () => {
 	it("keeps text without links whole", () => {

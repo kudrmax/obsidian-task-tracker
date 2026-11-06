@@ -1,20 +1,20 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
-import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../src/application/menus";
-import type { Clock } from "../../src/application/ports";
-import { dropMoves, readDrop } from "../../src/application/drops";
-import { snapMinute } from "../../src/application/snapGrid";
-import { fullTree } from "../../src/application/fullTree";
-import { droppedSpan, TimelineSpans } from "../../src/application/TimelineSpans";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../src/domain/Days";
-import { typedMarks } from "../../src/domain/Marks";
-import { draftMarksOf, markColors } from "../../src/application/marks";
-import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
-import { FuzzyQuery, matchParts } from "../../src/domain/search";
-import { canRemind } from "../../src/domain/Task";
-import { plainText } from "../../src/domain/TaskText";
-import { DEFAULT_SETTINGS, type LabelLevel, type PriorityLevel, usableLevels } from "../../src/settings";
-import type { LocalDate, Slot, TaskStatus } from "../../src/ui/types";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
+import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
+import type { Clock } from "../../core/application/ports";
+import { dropMoves, readDrop } from "../../core/application/drops";
+import { snapMinute } from "../../core/application/snapGrid";
+import { fullTree } from "../../core/application/fullTree";
+import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../core/domain/Days";
+import { typedMarks } from "../../core/domain/Marks";
+import { draftMarksOf, markColors } from "../../core/application/marks";
+import { isBlankTitle, priorityOfText, withPriority } from "../../core/domain/Priority";
+import { FuzzyQuery, matchParts } from "../../core/domain/search";
+import { canRemind } from "../../core/domain/Task";
+import { plainText } from "../../core/domain/TaskText";
+import { DEFAULT_SETTINGS, type LabelLevel, type PriorityLevel, usableLevels } from "../../core/settings";
+import type { LocalDate, Slot, TaskStatus } from "../../obsidian/ui/types";
 
 interface DemoTask {
 	text: string;

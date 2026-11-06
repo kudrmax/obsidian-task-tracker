@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import { repeatDraft, type RepeatRule } from "../../src/application/contracts";
-import { repeatPanel, type RepeatPanelOptions } from "../../src/ui/repeat/RepeatPanel";
+import { repeatDraft, type RepeatRule } from "../../core/application/contracts";
+import { repeatPanel, type RepeatPanelOptions } from "../../obsidian/ui/repeat/RepeatPanel";
 
 afterEach(() => document.body.replaceChildren());
 

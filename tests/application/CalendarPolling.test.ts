@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CalendarPolling } from "../../src/application/CalendarPolling";
+import { CalendarPolling } from "../../core/application/CalendarPolling";
 import { FakeTimers } from "../fakes/FakeTimers";
 
 function setup(seconds = 60) {

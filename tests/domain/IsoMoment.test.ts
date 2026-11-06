@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isoMoment } from "../../src/domain/IsoMoment";
+import { isoMoment } from "../../core/domain/IsoMoment";
 
 describe("isoMoment", () => {
 	it("reads what the calendars' writers write as Date does", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ScreenSettingsImpl, screenSettingsOf } from "../../src/application/ScreenSettingsImpl";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { ScreenSettingsImpl, screenSettingsOf } from "../../core/application/ScreenSettingsImpl";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 describe("ScreenSettingsImpl", () => {

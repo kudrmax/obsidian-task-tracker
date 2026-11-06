@@ -4,7 +4,7 @@
 	"private": true,
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc --noEmit && node esbuild.config.mjs production && node phone/build.mjs",
+		"build": "tsc --noEmit && node esbuild.config.mjs production && node core/build.mjs",
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"test": "vitest run",

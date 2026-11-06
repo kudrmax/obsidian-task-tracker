@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barBesideField, panelSide } from "../../src/ui/quick/barPlacement";
+import { barBesideField, panelSide } from "../../obsidian/ui/quick/barPlacement";
 
 const box = (left: number, top: number, right: number, bottom: number) => ({ left, top, right, bottom });
 const ROOM = box(0, 100, 400, 700);

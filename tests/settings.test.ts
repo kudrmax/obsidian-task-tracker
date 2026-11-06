@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, settingsFrom } from "../src/settings";
-import { storedSettingsFrom } from "../src/settingsFile";
-import { viewSettingsFrom } from "../src/ui/viewSettings";
+import { DEFAULT_SETTINGS, settingsFrom } from "../core/settings";
+import { storedSettingsFrom } from "../obsidian/settingsFile";
+import { viewSettingsFrom } from "../obsidian/ui/viewSettings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {

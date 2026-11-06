@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Reload } from "../../src/ui/Reload";
+import { Reload } from "../../obsidian/ui/Reload";
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;

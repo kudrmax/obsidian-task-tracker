@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GestureArbiter } from "../../src/ui/gestures";
-import { PinchZoom } from "../../src/ui/PinchZoom";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import { PinchZoom } from "../../obsidian/ui/PinchZoom";
 
 function pointer(type: string, id: number, x: number, y: number, isPrimary = id === 1): PointerEvent {
 	return new PointerEvent(type, { clientX: x, clientY: y, pointerId: id, isPrimary, button: 0, bubbles: true, pointerType: "touch" });

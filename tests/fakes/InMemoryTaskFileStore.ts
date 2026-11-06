@@ -1,5 +1,5 @@
-import { TasksFileMissingError } from "../../src/application/contracts";
-import type { TaskFileStore } from "../../src/application/ports";
+import { TasksFileMissingError } from "../../core/application/contracts";
+import type { TaskFileStore } from "../../core/application/ports";
 
 export class InMemoryTaskFileStore implements TaskFileStore {
 	writes = 0;

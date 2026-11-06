@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { GestureArbiter } from "../../src/ui/gestures";
-import { PlusButton } from "../../src/ui/quick/PlusButton";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import { PlusButton } from "../../obsidian/ui/quick/PlusButton";
 
 function pointer(type: string, x: number, y: number, init: PointerEventInit = {}): PointerEvent {
 	return new PointerEvent(type, { clientX: x, clientY: y, pointerId: 3, isPrimary: true, button: 0, bubbles: true, pointerType: "touch", ...init });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { type PhoneAction, phoneDoor as door } from "../../src/application/PhoneDoor";
-import { callDoor, type DoorAnswer } from "../../src/application/PhoneCalls";
+import { type PhoneAction, phoneDoor as door } from "../../core/application/PhoneDoor";
+import { callDoor, type DoorAnswer } from "../../core/application/PhoneCalls";
 
 const at = new Date(2026, 10, 6, 14, 32).getTime();
 const file = ["## Inbox", "", "- [ ] Old", "", "## Now", "", "- [ ] Today 📅 2026-11-06", "", "## Soon", "", "- [ ] Later", "", "## Backlog", "", "- [ ] Someday", "", "## Done", ""].join("\n");

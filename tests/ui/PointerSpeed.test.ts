@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PointerSpeed } from "../../src/ui/PointerSpeed";
+import { PointerSpeed } from "../../obsidian/ui/PointerSpeed";
 
 describe("PointerSpeed", () => {
 	it("starts still", () => {

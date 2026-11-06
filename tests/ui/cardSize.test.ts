@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VIEW_DEFAULTS } from "../../src/ui/viewSettings";
-import { clearCardSize, showCardSize, shownCardSize } from "../../src/ui/cardSize";
+import { VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
+import { clearCardSize, showCardSize, shownCardSize } from "../../obsidian/ui/cardSize";
 
 describe("cardSize", () => {
 	afterEach(() => {

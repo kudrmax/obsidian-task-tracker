@@ -1,4 +1,4 @@
-import type { Timers } from "../../src/application/ports";
+import type { Timers } from "../../core/application/ports";
 
 /** Timers fired by hand: `delays` lists the pending ones, `fire` runs the first. */
 export class FakeTimers implements Timers {

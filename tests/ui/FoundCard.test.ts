@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import { FoundCard } from "../../src/ui/FoundCard";
+import type { TaskItem } from "../../core/application/contracts";
+import { FoundCard } from "../../obsidian/ui/FoundCard";
 
 const task = (raw: string, index = 0) => ({ key: { section: "soon", index, path: [], raw } }) as unknown as TaskItem;
 

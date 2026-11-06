@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { DayPeek } from "../../src/ui/DayPeek";
-import { type DayLane, DayTrack } from "../../src/ui/ScreenTracks";
+import type { DayPeek } from "../../obsidian/ui/DayPeek";
+import { type DayLane, DayTrack } from "../../obsidian/ui/ScreenTracks";
 
 const part = () => document.createElement("div");
 

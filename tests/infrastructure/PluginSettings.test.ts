@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
-import { DEFAULT_SETTINGS } from "../../src/settings";
-import { SETTINGS_FILE, type StoredSettings } from "../../src/settingsFile";
+import { PluginSettings, type SettingsPersistence } from "../../obsidian/infrastructure/PluginSettings";
+import { DEFAULT_SETTINGS } from "../../core/settings";
+import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
 
 /** The file the defaults are written as: every key but the device's. */
 const DEFAULT_FILE: Partial<StoredSettings> = (({ listShare: _s, rightMode: _m, zoom: _z, ...file }) => file)(SETTINGS_FILE.from(null));

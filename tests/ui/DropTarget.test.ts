@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TaskItem, TaskKey } from "../../src/application/contracts";
-import { droppedTasks, originsOf, type TaskDragPayload } from "../../src/ui/drag/DropTarget";
+import type { TaskItem, TaskKey } from "../../core/application/contracts";
+import { droppedTasks, originsOf, type TaskDragPayload } from "../../obsidian/ui/drag/DropTarget";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-10-30";
