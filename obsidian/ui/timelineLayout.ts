@@ -1,6 +1,6 @@
 import type { CardSize } from "./cardSize";
-export { durationParts, stackCorner, timeParts } from "../../core/application/contracts";
-import { eventLevels, gridAt as coreGridAt, overlayLeft as coreOverlayLeft, type StackBox, stackTasks as coreStackTasks, type TaskSpan } from "../../core/application/contracts";
+export { durationParts, type Grid, gridMarks, stackCorner, timeParts } from "../../core/application/contracts";
+import { eventLevels, type Grid, gridAt as coreGridAt, overlayLeft as coreOverlayLeft, type StackBox, stackTasks as coreStackTasks, type TaskSpan } from "../../core/application/contracts";
 import { DESIGN, LAYOUT } from "./design";
 
 export interface Span {
@@ -18,12 +18,6 @@ export interface EventBox {
 export type PlacedSpan = Span & { readonly level: number };
 
 export type { StackBox, TaskSpan };
-
-/** The minutes between the grid's labelled lines and between all its lines. */
-export interface Grid {
-	readonly labels: number;
-	readonly lines: number;
-}
 
 export interface ItemBox {
 	readonly top: number;

@@ -188,3 +188,9 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   named in a comment beside `PAST_SHARES` in `paints.ts`.
 - backend: `rules.formatZoomLevels` is offered too (the plugin's settings field uses it; the app may show the levels the
   same way).
+- frontend-obsidian: the plugin draws the grid's minor lines and labels from `gridMarks` and takes `Grid` from contracts;
+  past events keep their CSS tokens, a comment by them names `PAST_SHARES`. Still in the plugin, for the backend to take:
+  a released pinch counts as the whole day when its height is at or under `levelsFor(...)[0]`
+  (`TaskCalendarView.settleZoom`), and before the timeline is measured the whole day's height falls back to the smallest
+  configured level (`TaskCalendarView.zoomLevels`). Swift would repeat the first; a core `zoomAfterPinch(hourPx, levels)`
+  answering `"wholeDay" | hourPx` would end it.
