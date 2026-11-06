@@ -32,7 +32,7 @@ import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
-import { levelsFor } from "./zoomLevels";
+import { levelsFor, zoomAfterPinch, zoomShown } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -801,17 +801,22 @@ export class TaskCalendarView extends ItemView {
 		void this.data.tasks();
 	}
 
-	/** The settings' levels at this screen's height, the whole day first; the settings' own before the timeline is laid out. */
+	/** The settings' levels at this screen's height, the whole day first; before the timeline has a height, the core's stand-in for the whole day. */
 	private zoomLevels(): ZoomLevel[] {
-		const configured = this.settings.zoomLevels;
-		return levelsFor(this.timeline?.wholeDayHourPx() ?? Math.min(...configured.map((l) => l.hourPx)), configured);
+		const levels = this.settings.zoomLevels;
+		return levelsFor(zoomShown("wholeDay", this.wholeDayPx(), levels), levels);
+	}
+
+	/** The whole day's hour height, once the timeline is laid out. */
+	private wholeDayPx(): number | null {
+		return this.timeline?.wholeDayHourPx() ?? null;
 	}
 
 	/** The timeline opens at the zoom it was left at; the whole day takes its height once the timeline is laid out. */
 	private restoreZoom(): void {
 		const zoom = this.settings.zoom;
 		this.wholeDay = zoom === "wholeDay";
-		if (typeof zoom === "number" && zoom > 0) this.hourPx = zoom;
+		this.hourPx = zoomShown(zoom, this.wholeDayPx(), this.settings.zoomLevels);
 	}
 
 	/** Zoomed out to the whole day, the day keeps fitting when the timeline's height changes; a timeline grown past its day zooms in to fill it. */
@@ -836,8 +841,9 @@ export class TaskCalendarView extends ItemView {
 
 	/** Released, the scale stays where the fingers left it, and the timeline opens at it next time; out all the way it is the whole day. */
 	private settleZoom(hourPx: number): void {
-		this.wholeDay = hourPx <= this.zoomLevels()[0].hourPx;
-		void this.deps.settings.set({ zoom: this.wholeDay ? "wholeDay" : hourPx });
+		const zoom = zoomAfterPinch(hourPx, this.wholeDayPx(), this.settings.zoomLevels);
+		this.wholeDay = zoom === "wholeDay";
+		void this.deps.settings.set({ zoom });
 	}
 
 	/** The two columns the window shows, as places to drop. */

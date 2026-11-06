@@ -12,12 +12,9 @@ export type RightMode = "calendar" | "soon" | "inbox";
  */
 
 /** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
-export type { ZoomLevel } from "../../core/application/contracts";
-import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, parseZoomLevels, type ZoomLevel } from "../../core/application/contracts";
+export type { Zoom, ZoomLevel } from "../../core/application/contracts";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, parseZoomLevels, type Zoom, type ZoomLevel } from "../../core/application/contracts";
 export { formatZoomLevels, parseZoomLevels } from "../../core/application/contracts";
-
-/** Where the timeline was zoomed to: an hour's height, or the whole day, whatever the screen's height. */
-export type Zoom = number | "wholeDay";
 
 /** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
 export type LabelPaint = "stripes" | "blend";

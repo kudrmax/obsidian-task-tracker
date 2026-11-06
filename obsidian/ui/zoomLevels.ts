@@ -1,1 +1,1 @@
-export { levelsFor } from "../../core/application/contracts";
+export { levelsFor, zoomAfterPinch, zoomShown } from "../../core/application/contracts";
