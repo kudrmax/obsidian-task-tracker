@@ -118,7 +118,7 @@ describe("task cards", () => {
 	});
 
 	it("tints the card of a task with a priority", () => {
-		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [{ ...task(0, 900, null), priority: { prefix: "p2", color: "orange" } }, task(1, 1020, null)]);
+		const view = timeline({ hourPx: 56 }, DayBoundary.MIDNIGHT, [{ ...task(0, 900, null), priority: { prefix: "p2", color: "orange" }, colors: ["orange"] }, task(1, 1020, null)]);
 		const cards = view.itemsEl.querySelectorAll<HTMLElement>(".tc-block-card");
 		expect(cards[0].dataset.priority).toBe("orange");
 		expect(cards[1].hasAttribute("data-priority")).toBe(false);

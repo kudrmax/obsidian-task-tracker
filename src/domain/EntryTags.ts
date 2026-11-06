@@ -23,6 +23,11 @@ export class EntryTags {
 		return { doc: tagged, tags: new EntryTags(entries.length) };
 	}
 
+	/** `text` with the n-th mark: written in place of a tagged task's text, it keeps the task tagged. */
+	static marked(text: string, n: number): string {
+		return text + markOf(n);
+	}
+
 	/** The n-th tagged task where it stands now; null once it is gone. */
 	find(doc: TaskDocument, n: number): TaskEntry | null {
 		const mark = markOf(n);

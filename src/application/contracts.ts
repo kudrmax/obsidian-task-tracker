@@ -43,7 +43,9 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
-export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
+export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
+/** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
+export { SectionNameEntry } from "./SectionNameEntry";
 /** A list in its sections, and whether it shows their headers. */
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
@@ -126,6 +128,8 @@ export interface TaskItem {
 	readonly priority: PriorityLevel | null;
 	/** The labels the task is tagged with, in the settings' order; none while it has a priority, which wins on a line with both. */
 	readonly labels: readonly LabelLevel[];
+	/** The colours its card is drawn in: its priority's alone, else each label's in the settings' order; the first tints it. None without either. */
+	readonly colors: readonly PriorityColor[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
 	/** The list the task is in, its task's for a subtask. */
@@ -374,6 +378,17 @@ export interface DraftMarks {
 	/** In the settings' order; none while there is a priority. */
 	readonly labels: readonly LabelLevel[];
 	readonly can: { readonly setPriority: boolean; readonly setLabels: boolean };
+	/** The colour the field and the flag take: the priority's, else the first label's; none without either. */
+	readonly tint: PriorityColor | null;
+	/** Every level and then every label, as the flag's panel offers them: on when the task is written with it, enabled while it may be chosen. */
+	readonly tiles: { readonly levels: readonly MarkTile<PriorityLevel>[]; readonly labels: readonly MarkTile<LabelLevel>[] };
+}
+
+/** A level or a label offered for a task being typed. */
+export interface MarkTile<T> {
+	readonly mark: T;
+	readonly on: boolean;
+	readonly enabled: boolean;
 }
 
 export interface TaskService {
@@ -459,9 +474,10 @@ export interface TaskService {
 	 * The task sheet on an existing task: new text and placement in one write. The slot stays. A placement equal to the
 	 * task's current one leaves its position in the file alone; a different one moves it as `create` would place it.
 	 * Inbox takes the slot away too. A subtask stays where it is: a different placement only sets its due date, as for
-	 * `createSubtask`.
+	 * `createSubtask`. A blank text (a level's prefix alone too) writes nothing. The task as it now stands, its key fresh;
+	 * null when nothing was written.
 	 */
-	edit(key: TaskKey, draft: TaskDraft): Promise<void>;
+	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null>;
 	/** The placement the sheet shows for a task: `now` when it is due today, `date` when it has another due date, else its section (a subtask's is its task's). */
 	placementOf(item: TaskItem): Placement;
 	/** What the day column stands for on `date`: today is Now with its sections, a later day Soon with that day, a past day Now with that day and no sections. */

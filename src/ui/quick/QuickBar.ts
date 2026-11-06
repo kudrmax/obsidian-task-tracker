@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type EntryState, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, repeatDraft, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type EntryState, type GroupedList, labelTitle, type PlaceChoice, type Placement, repeatDraft, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -12,7 +12,7 @@ import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
 
 /** What the bar shows: the session's answer for the field, what each button shows and whether it shows at all. */
-export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "marks" | "place" | "places" | "repeat" | "repeatable" | "repeatDay" | "section">;
+export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "markable" | "marks" | "place" | "places" | "repeat" | "repeatable" | "repeatDay" | "section">;
 
 /** Where the field stands, for the bar to stand by it. */
 export interface BarAnchor {
@@ -27,10 +27,6 @@ export interface BarAnchor {
 export interface QuickBarDeps {
 	/** Obsidian runs on the desktop: no keyboard rises, the bar is a capsule by the field. */
 	desktop(): boolean;
-	/** The levels that mark tasks, as the panel offers them. */
-	levels(): readonly PriorityLevel[];
-	/** The labels that tag tasks, which the same panel offers under the levels. */
-	labels(): readonly LabelLevel[];
 	today(): LocalDate;
 	/** The name a list goes by, as the user named its section. */
 	listName(list: GroupedList): string;
@@ -138,18 +134,18 @@ export class QuickBar implements EntryPart {
 		this.section.setAttribute("aria-pressed", String(section));
 		reclass(this.bar, "is-idle", desktop && section);
 		this.spacer.hidden = section && desktop;
-		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents || section;
+		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
-		this.flag.hidden = !this.marks() || section;
-		const color = state.marks.priority?.color ?? state.marks.labels[0]?.color ?? null;
+		this.flag.hidden = !state.markable;
+		const color = state.marks.tint;
 		this.flag.classList.toggle("is-set", color !== null);
 		if (color) this.flag.dataset.priority = color;
 		else delete this.flag.dataset.priority;
-		this.repeat.hidden = !state.repeatable || section;
+		this.repeat.hidden = !state.repeatable;
 		this.repeat.classList.toggle("is-set", state.repeat !== null);
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
-		this.place.el.hidden = state.place === null || section;
+		this.place.el.hidden = state.place === null;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		if (!this.place.el.hidden) this.fadeLongPlace();
 		if (section) this.closePanel();
@@ -265,10 +261,6 @@ export class QuickBar implements EntryPart {
 		return bar.height > 0 ? Math.max(DESIGN.barHeight, this.parent.getBoundingClientRect().bottom - restingTop(this.bar)) : DESIGN.barHeight;
 	}
 
-	private levels(): readonly PriorityLevel[] {
-		return this.deps.levels();
-	}
-
 	private showPlace(place: Placement): void {
 		this.shownPlace = place;
 		this.place.setIcon(placeIcon(place));
@@ -308,7 +300,7 @@ export class QuickBar implements EntryPart {
 	/** The shown state changed under an open panel: it follows, or closes when its button is gone. */
 	private refreshPanel(): void {
 		if (!this.panel) return;
-		const gone = this.panel.kind === "priority" ? !this.marks() : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
+		const gone = this.panel.kind === "priority" ? !this.state?.markable : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
 		if (gone) this.closePanel();
 		else if (!this.panel.picking && this.panel.drawn !== this.drawnKey(this.panel.kind)) this.renderPanel();
 	}
@@ -320,7 +312,7 @@ export class QuickBar implements EntryPart {
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
 		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, state?.repeatDay ?? null]);
-		return JSON.stringify([kind, this.levels(), this.deps.labels(), state?.marks ?? null, state?.place ?? null, this.deps.today()]);
+		return JSON.stringify([kind, state?.marks ?? null, state?.places ?? null, this.deps.today()]);
 	}
 
 	private renderPanel(): void {
@@ -349,27 +341,15 @@ export class QuickBar implements EntryPart {
 
 	/**
 	 * The flag's panel: the levels, a pick that closes it; under them the labels, each tap putting one on or taking it off
-	 * while the panel stays for the next. The tiles of what the service says may not be chosen now are off.
+	 * while the panel stays for the next. Each tile is on and enabled as the session's marks say.
 	 */
 	private renderLevels(parent: HTMLElement): void {
-		const marks = this.state?.marks;
-		const current = marks?.priority ?? null;
-		const chosen = marks?.labels.map((l) => l.name) ?? [];
-		const levels = this.levels().map((level): MenuTileSpec => {
-			const on = level.prefix === current?.prefix;
-			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: !(marks?.can.setPriority ?? true), onPick: this.picked(() => this.deps.onPriority(level.prefix)) };
-		});
+		const tiles = this.state?.marks.tiles;
+		if (!tiles) return;
+		const levels = tiles.levels.map(({ mark, on, enabled }): MenuTileSpec => ({ label: mark.prefix, icon: "priority", color: mark.color, on, disabled: !enabled, onPick: this.picked(() => this.deps.onPriority(mark.prefix)) }));
 		if (levels.length > 0) markLongLabels(tileGroup(parent, "is-priority", tileRows(levels)));
-		const labels = this.deps.labels().map((label): MenuTileSpec => {
-			const on = chosen.includes(label.name);
-			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: !(marks?.can.setLabels ?? true), onPick: () => this.deps.onLabel(label.name) };
-		});
+		const labels = tiles.labels.map(({ mark, on, enabled }): MenuTileSpec => ({ label: labelTitle(mark.name), icon: "label", color: mark.color, on, disabled: !enabled, onPick: () => this.deps.onLabel(mark.name) }));
 		if (labels.length > 0) markLongLabels(tileGroup(parent, "is-labels", tileRows(labels)));
-	}
-
-	/** The flag stands for the levels and the labels: it shows while there is one of either. */
-	private marks(): boolean {
-		return this.levels().length > 0 || this.deps.labels().length > 0;
 	}
 
 	/** Every change is reported at once and the panel stays, standing again as it grows or shrinks; Remove repeat is a pick. */
@@ -386,28 +366,24 @@ export class QuickBar implements EntryPart {
 	}
 
 	private renderPlaces(parent: HTMLElement): void {
-		const current = this.state?.place ?? null;
-		const fixed = (this.state?.places ?? []).map((kind: GroupedList): MenuTileSpec => {
-			const placement: Placement = { kind };
-			return { label: this.deps.listName(kind), icon: kind, on: current?.kind === kind, onPick: this.picked(() => this.deps.onPlace(placement)) };
+		const tiles = (this.state?.places ?? []).map((choice: PlaceChoice): MenuTileSpec => {
+			if (choice.kind === "date") return { label: "Date", icon: "calendar", on: choice.on, onPick: () => this.openPicker() };
+			const placement: Placement = { kind: choice.kind };
+			return { label: this.deps.listName(choice.kind), icon: choice.kind, on: choice.on, onPick: this.picked(() => this.deps.onPlace(placement)) };
 		});
-		const date: MenuTileSpec = {
-			label: "Date",
-			icon: "calendar",
-			on: current?.kind === "date",
-			onPick: () => {
-				if (!this.panel) return;
-				this.panel.picking = true;
-				this.renderPanel();
-			},
-		};
-		markLongLabels(tileGroup(parent, "is-place", [[...fixed, date]]));
+		markLongLabels(tileGroup(parent, "is-place", [tiles]));
+	}
+
+	private openPicker(): void {
+		if (!this.panel) return;
+		this.panel.picking = true;
+		this.renderPanel();
 	}
 
 	private renderPicker(parent: HTMLElement): void {
 		const today = this.deps.today();
-		const current = this.state?.place ?? null;
-		const chosen = current?.kind === "date" ? current.date : null;
+		const date = this.state?.places.find((choice) => choice.kind === "date");
+		const chosen = date?.kind === "date" ? date.date : null;
 		new MonthPicker(el(parent, "div"), {
 			month: chosen ?? today,
 			today,

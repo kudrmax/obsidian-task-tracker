@@ -24,6 +24,9 @@ export interface PendingText {
 /** The places the bar offers a task, before the date: the lists, in this order. */
 export const ENTRY_PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
 
+/** A tile of the place button's panel: a list, or Date last, which opens the month picker on the field's day if it has one. */
+export type PlaceChoice = { readonly kind: GroupedList; readonly on: boolean } | { readonly kind: "date"; readonly on: boolean; readonly date: LocalDate | null };
+
 export interface EntryState {
 	readonly spot: EntrySpot;
 	readonly text: string;
@@ -37,7 +40,7 @@ export interface EntryState {
 	readonly pending: readonly PendingText[];
 	/** The task whose text the field edits; null for a new one. */
 	readonly renaming: TaskItem | null;
-	/** The field shifts a level at all: one in a list; then whether it can go a level in or out now. */
+	/** The field shifts a level at all: one in a list writing a task; then whether it can go a level in or out now. */
 	readonly indents: boolean;
 	readonly canIndent: boolean;
 	readonly canOutdent: boolean;
@@ -45,11 +48,13 @@ export interface EntryState {
 	readonly section: boolean | null;
 	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. */
 	readonly marks: DraftMarks;
-	/** Where the task goes, for the place button; null for a field with no place of its own (a subtask, a slot, a stack). */
+	/** The flag shows: there is a level or a label to choose, and the field writes a task, not a section's name. */
+	readonly markable: boolean;
+	/** Where the task goes, for the place button; null for a field with no place of its own (a subtask, a slot, a stack, a section's name). */
 	readonly place: Placement | null;
-	/** The lists the place button offers, before the date. */
-	readonly places: readonly GroupedList[];
-	/** The field may repeat: one in a slot may not. */
+	/** The tiles the place button offers, in order: the lists, then Date. */
+	readonly places: readonly PlaceChoice[];
+	/** The field may repeat: one in a slot may not, nor one writing a section's name. */
 	readonly repeatable: boolean;
 	/** The day a new rule starts from: the field's own day, else today. */
 	readonly repeatDay: LocalDate;
@@ -81,6 +86,8 @@ export interface QuickEntryView {
 	 * change belongs to, so it needs no drawing of its own.
 	 */
 	onChange(state: EntryState | null, drawnNext?: boolean): void;
+	/** A rename was written: `was` as it was opened, `now` as the file now has it, its key fresh. */
+	renamed?(was: TaskItem, now: TaskItem): void;
 }
 
 /** The writes, one at a time in the order pushed; a failing one is reported by the queue and the next one still runs. */
@@ -202,7 +209,8 @@ export class QuickEntrySession {
 		const field = this.field;
 		if (!field) return null;
 		const marks = this.tasks.draftMarks(field.text, field.priority, field.labels);
-		const place = this.shownPlace(field);
+		const task = !field.section;
+		const place = task ? this.shownPlace(field) : null;
 		return {
 			spot: field.run.spot,
 			text: field.text,
@@ -211,13 +219,14 @@ export class QuickEntrySession {
 			repeat: field.repeat,
 			pending: field.run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename?.item ?? null,
-			indents: listSpot(field.run.spot) !== null,
+			indents: task && listSpot(field.run.spot) !== null,
 			...this.mayShift(field),
 			section: this.maySection(field) ? field.section : null,
 			marks,
+			markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
 			place,
-			places: ENTRY_PLACES,
-			repeatable: field.run.spot.kind !== "slot",
+			places: placeChoices(place),
+			repeatable: task && field.run.spot.kind !== "slot",
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.view.today()),
 		};
 	}
@@ -522,7 +531,8 @@ export class QuickEntrySession {
 		const draft: TaskDraft = { text: field.text, placement: this.placement(field), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }) };
 		this.queued(home, async () => {
 			await this.view.fresh();
-			await this.tasks.edit(this.keyAt(home, item), draft);
+			const now = await this.tasks.edit(this.keyAt(home, item), draft);
+			if (now) this.view.renamed?.(item, now);
 		});
 	}
 
@@ -666,6 +676,12 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 		default:
 			return null;
 	}
+}
+
+/** The place button's tiles for a task going to `place`: the lists, then Date, the one it goes to on. */
+function placeChoices(place: Placement | null): readonly PlaceChoice[] {
+	const lists = ENTRY_PLACES.map((kind): PlaceChoice => ({ kind, on: place?.kind === kind }));
+	return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
 }
 
 function runsOf(field: Field | null): Run[] {
