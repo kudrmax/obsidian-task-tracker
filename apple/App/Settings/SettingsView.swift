@@ -10,66 +10,64 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        NavigationStack {
-            Form {
-                if let expiration = AppSignature.expiration {
-                    SigningPlate(expiration: expiration)
-                }
-
-                Section {
-                    Button { picking = true } label: {
-                        LabeledContent("Vault Folder", value: model.folderName ?? "Not Chosen")
-                    }
-                    status
-                } footer: {
-                    Text("Your Obsidian vault: On My iPhone → Obsidian → your vault.")
-                }
-
-                Section {
-                    permission("Notifications", allowed: model.notifications == .authorized, undecided: model.notifications == .notDetermined) {
-                        await model.allowNotifications()
-                    }
-                    permission("Alarms", allowed: model.alarms == .authorized, undecided: model.alarms == .notDetermined) {
-                        await model.allowAlarms()
-                    }
-                    permission("Calendar", allowed: model.calendar == .fullAccess, undecided: model.calendar == .notDetermined) {
-                        await model.allowCalendar()
-                    }
-                } header: {
-                    Text("Permissions")
-                } footer: {
-                    Text("Lets the plugin take your work calendar from this iPhone.")
-                }
-
-                Section {
-                    Toggle("Alarm Sound", isOn: $model.alarmSound)
-                    Picker("Snooze Alarm For", selection: $model.alarmSnooze) {
-                        ForEach(AppSettings.alarmSnoozeChoices, id: \.self) { Text("\($0) min").tag($0) }
-                    }
-                } footer: {
-                    Text("Without the sound an alarm still covers the screen. Snooze moves the task this much later.")
-                }
-
-                Section {
-                    LabeledContent("Recording Tag") {
-                        TextField("None", text: $model.recordingTag)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                } footer: {
-                    Text("Goes after a recording's link in its task, for the plugin that transcribes it. Empty for none.")
-                }
+        Form {
+            if let expiration = AppSignature.expiration {
+                SigningPlate(expiration: expiration)
             }
-            .navigationTitle("Settings")
-            .refreshable { await model.refresh() }
-            .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { picked in
-                Task { await model.choose(picked) }
+
+            Section {
+                Button { picking = true } label: {
+                    LabeledContent("Vault Folder", value: model.folderName ?? "Not Chosen")
+                }
+                status
+            } footer: {
+                Text("Your Obsidian vault: On My iPhone → Obsidian → your vault.")
             }
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                if phase == .active { Task { await model.refresh(); await SigningWarnings.schedule() } }
+
+            Section {
+                permission("Notifications", allowed: model.notifications == .authorized, undecided: model.notifications == .notDetermined) {
+                    await model.allowNotifications()
+                }
+                permission("Alarms", allowed: model.alarms == .authorized, undecided: model.alarms == .notDetermined) {
+                    await model.allowAlarms()
+                }
+                permission("Calendar", allowed: model.calendar == .fullAccess, undecided: model.calendar == .notDetermined) {
+                    await model.allowCalendar()
+                }
+            } header: {
+                Text("Permissions")
+            } footer: {
+                Text("Lets the plugin take your work calendar from this iPhone.")
+            }
+
+            Section {
+                Toggle("Alarm Sound", isOn: $model.alarmSound)
+                Picker("Snooze Alarm For", selection: $model.alarmSnooze) {
+                    ForEach(AppSettings.alarmSnoozeChoices, id: \.self) { Text("\($0) min").tag($0) }
+                }
+            } footer: {
+                Text("Without the sound an alarm still covers the screen. Snooze moves the task this much later.")
+            }
+
+            Section {
+                LabeledContent("Recording Tag") {
+                    TextField("None", text: $model.recordingTag)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+            } footer: {
+                Text("Goes after a recording's link in its task, for the plugin that transcribes it. Empty for none.")
             }
         }
+        .refreshable { await model.refresh() }
+        .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { picked in
+            Task { await model.choose(picked) }
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            if phase == .active { Task { await model.refresh(); await SigningWarnings.schedule() } }
+        }
+        .tabScreen("Settings")
     }
 
     @ViewBuilder
