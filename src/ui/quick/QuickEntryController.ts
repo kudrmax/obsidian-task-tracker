@@ -1,4 +1,4 @@
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService, type DraftMarks } from "../../application/contracts";
+import { type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type RightMode, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -14,11 +14,11 @@ import type { Timeline } from "../Timeline";
 import type { LocalDate, Slot } from "../types";
 import { PlusButton } from "./PlusButton";
 import { PlusRing } from "./PlusRing";
-import { QuickBar, type QuickBarState } from "./QuickBar";
-import { type EntrySpot, type EntryState, QuickEntry } from "./QuickEntry";
+import { QuickBar } from "./QuickBar";
 import { QuickField, type QuickFieldHandle, type QuickKey } from "./QuickField";
 import { ScrollGlide } from "./ScrollGlide";
 import type { TitleFieldFactory } from "./TitleField";
+import { WriteQueue } from "./WriteQueue";
 
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
@@ -26,7 +26,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "listName" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "priorityLevels" | "labelLevels">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -72,27 +72,6 @@ interface MenuField {
 
 const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
 
-/** The columns to look for a task in: those the window shows first. */
-const LOOK_IN: Readonly<Record<RightMode, readonly ListColumn[]>> = {
-	calendar: ["left", "soon", "inbox", "backlog"],
-	soon: ["soon", "left", "inbox", "backlog"],
-	inbox: ["inbox", "backlog", "soon", "left"],
-};
-
-/** What a drop of the plus on a list means for the file; null for a drop elsewhere. */
-function placeResultOf(result: DropResult): ListPlace | null {
-	switch (result.kind) {
-		case "list":
-			return { kind: "task", group: null, before: result.before };
-		case "group":
-			return { kind: "task", group: result.group, before: result.before };
-		case "nest":
-			return { kind: "subtask", parent: result.parent, before: result.before };
-		default:
-			return null;
-	}
-}
-
 /** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
 function movesRows(before: EntryState | null, after: EntryState): boolean {
 	if (!before || before.spot !== after.spot || before.renaming !== after.renaming || before.section !== after.section) return true;
@@ -103,10 +82,10 @@ function movesRows(before: EntryState | null, after: EntryState): boolean {
  * Typing tasks in place (quick-add spec §4.2–4.9): opens the entry from a double click on a list, the plus, a long tap on the timeline,
  * the task menu; draws the field in its list, in its slot or over its card on the timeline, or last in a calendar menu's
  * stack of subtasks, and keeps it focused across redraws, 16 px over the bar; shows the bar and hides the plus while the
- * entry is open. What the entry means for the file is QuickEntry's.
+ * entry is open. What the entry means is QuickEntrySession's.
  */
 export class QuickEntryController {
-	private readonly entry: QuickEntry;
+	private readonly entry: QuickEntrySession;
 	private readonly bar: QuickBar;
 	private readonly plus: PlusButton;
 	private readonly ring: PlusRing;
@@ -114,8 +93,6 @@ export class QuickEntryController {
 	private field: QuickFieldHandle | null = null;
 	/** The field took the focus with its own selection; after that a redraw only gives it back. */
 	private focused = false;
-	/** A rename's place was chosen in the bar: the task goes where the field now stands. */
-	private moved = false;
 	private dragging = false;
 	private carrying = false;
 	private droppedOn: ListColumn | null = null;
@@ -166,19 +143,20 @@ export class QuickEntryController {
 	};
 
 	constructor(private readonly deps: QuickEntryControllerDeps) {
-		this.entry = new QuickEntry({
-			cards: (column) => this.cards(column),
-			placeOf: (column, result) => this.placeOf(column, result),
-			fresh: (beforeShow) => this.fresh(beforeShow),
-			createInPlace: (text, priority, place, repeat, labels) => deps.tasks.createInPlace(text, priority, place, repeat, labels),
-			createSection: (name, place) => deps.tasks.createSection(name, place),
-			sectioned: (column) => deps.sectioned(column),
-			edit: (key, draft) => deps.tasks.edit(key, draft),
-			placement: (spot) => this.placement(spot),
-			isBlank: (text) => deps.tasks.isBlank(text),
-			onChange: (state, drawnNext) => this.changed(state, drawnNext),
-			onError: (error) => deps.onError(error),
-		});
+		this.entry = new QuickEntrySession(
+			deps.tasks,
+			{
+				cards: (column) => this.cards(column),
+				sections: (column) => deps.list(column)?.groups.map((group) => group.name) ?? [],
+				sectioned: (column) => deps.sectioned(column),
+				day: () => deps.day(),
+				today: () => deps.today(),
+				mode: () => deps.mode(),
+				fresh: (beforeShow) => this.fresh(beforeShow),
+				onChange: (state, drawnNext) => this.changed(state, drawnNext),
+			},
+			new WriteQueue((error) => deps.onError(error)),
+		);
 		this.plus = new PlusButton(deps.root, { onTap: () => this.openFromPress(), onDrag: (e, source) => this.dragFromPlus(e, source), arbiter: deps.arbiter });
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
@@ -190,8 +168,8 @@ export class QuickEntryController {
 			placementOfDay: (day) => deps.tasks.placementOfDay(day),
 			onIndent: (delta) => this.entry.indent(delta),
 			onSection: () => this.entry.toggleSection(),
-			onPriority: (prefix) => this.choosePriority(prefix),
-			onLabels: (names) => this.entry.setLabels(names),
+			onPriority: (prefix) => this.entry.togglePriority(prefix),
+			onLabel: (name) => this.entry.toggleLabel(name),
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
 		});
@@ -205,8 +183,8 @@ export class QuickEntryController {
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
 	openIn(column: ListColumn, group: GroupName): void {
-		const cards = this.cards(column);
-		this.open({ kind: "list", column, place: { kind: "gap", index: gapOfPlace(cards, { kind: "task", group, before: null }).index, level: 0, group } });
+		this.dropField();
+		this.entry.openIn(column, group);
 	}
 
 	/**
@@ -221,12 +199,14 @@ export class QuickEntryController {
 
 	/** A double click on a list's free room: the field at the end of the column. */
 	openAtEnd(column: ListColumn): void {
-		this.open(this.endOf(column));
+		this.dropField();
+		this.entry.openAtEnd(column);
 	}
 
-	/** The end of the day column while it shows, of Inbox when the window shows Inbox and Soon. */
+	/** The plus tapped: the field where the session opens a new task. */
 	openFromPlus(): void {
-		this.openAtEnd(this.deps.mode() === "inbox" ? "inbox" : "left");
+		this.dropField();
+		this.entry.openFromPlus();
 	}
 
 	/** The plus tapped: the field opens as the press ends, and what that press still sends is not a tap elsewhere. */
@@ -252,7 +232,8 @@ export class QuickEntryController {
 	/** A long tap on the timeline's free room let go: the field of a new task in the slot it showed. */
 	openSlot(slot: Slot): void {
 		this.pressEnding = true;
-		this.open({ kind: "slot", slot });
+		this.dropField();
+		this.entry.openSlot(slot);
 	}
 
 	/**
@@ -260,10 +241,16 @@ export class QuickEntryController {
 	 * stack of its calendar menu, which stays open for it. Any other menu closes.
 	 */
 	addSubtask(parent: TaskItem, menu?: TaskMenu): void {
-		const found = this.find(parent.key);
-		if (found || !menu?.stacks) menu?.close();
-		if (found) this.open({ kind: "list", column: found.column, place: gapOfPlace(this.cards(found.column), { kind: "subtask", parent: parent.key, before: null }) });
-		else if (menu?.stacks) this.openStack(parent, menu);
+		const spot = this.entry.subtaskSpot(parent.key);
+		switch (spot.kind) {
+			case "stack":
+				if (menu?.stacks) this.openStack(parent, spot, menu);
+				else menu?.close();
+				return;
+			default:
+				menu?.close();
+				this.open(spot);
+		}
 	}
 
 	/**
@@ -272,14 +259,15 @@ export class QuickEntryController {
 	 * calendar is renamed in its card on the timeline, where it keeps its place. Any other menu closes.
 	 */
 	rename(item: TaskItem, menu?: TaskMenu): void {
-		const found = this.find(item.key);
-		const inMenu = !found && !!menu?.inStack;
-		if (!inMenu) menu?.close();
-		if (menu && inMenu) this.renameInMenu(item, menu);
-		else if (!found && item.slot) this.open({ kind: "slot", slot: item.slot }, item);
-		if (!found) return;
-		const card = this.cards(found.column)[found.index];
-		this.open({ kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } }, item);
+		const spot = this.entry.renameSpot(item, !!menu?.inStack);
+		switch (spot?.kind) {
+			case "stack":
+				if (menu) this.renameInMenu(item, spot, menu);
+				return;
+			default:
+				menu?.close();
+				if (spot) this.open(spot, item);
+		}
 	}
 
 	/**
@@ -294,14 +282,13 @@ export class QuickEntryController {
 
 	/** What `column`'s list draws for the entry: none when the field stands elsewhere. */
 	entryIn(column: ListColumn): ListEntryInput | null {
-		const state = this.state;
-		if (state?.spot.kind !== "list" || state.spot.column !== column) return null;
-		return { place: state.spot.place, pending: state.pending, section: state.section === true, field: (row) => this.fieldIn(row) };
+		const entry = this.state && this.entry.listEntry(column);
+		return entry ? { ...entry, field: (row) => this.fieldIn(row) } : null;
 	}
 
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
 	renaming(): TaskKey | null {
-		return this.state?.renaming?.key ?? null;
+		return this.entry.renaming;
 	}
 
 	/** A card is lifted or settled: the plus hides while it is carried. */
@@ -374,36 +361,13 @@ export class QuickEntryController {
 		this.bar.hide();
 	}
 
-	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-	placeOf(column: ListColumn, result: ListPlace): NewTaskPlace {
-		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
-		const { group, before } = result;
-		if (column !== "left") return { kind: "list", list: column, group, before };
-		return { kind: "day", date: this.deps.day(), group, before };
-	}
-
 	private open(spot: EntrySpot, renaming?: TaskItem): void {
 		this.dropField();
 		this.entry.open(spot, renaming);
 	}
 
-	/** After the last card, in the last section, at the top level. */
-	private endOf(column: ListColumn): EntrySpot {
-		const list = this.deps.list(column);
-		const groups = list?.groups ?? [];
-		return { kind: "list", column, place: { kind: "gap", index: list?.cards.length ?? 0, level: 0, group: groups[groups.length - 1]?.name ?? null } };
-	}
-
 	private cards(column: ListColumn): readonly ListCard[] {
 		return this.deps.list(column)?.listCards ?? [];
-	}
-
-	private find(key: TaskKey): { readonly column: ListColumn; readonly index: number } | null {
-		for (const column of LOOK_IN[this.deps.mode()]) {
-			const index = this.cards(column).findIndex((card) => samePlace(card.key, key));
-			if (index >= 0) return { column, index };
-		}
-		return null;
 	}
 
 	/** A list the plus is carried over, which notes that it took the drop: the result alone does not say which list it was. */
@@ -425,23 +389,20 @@ export class QuickEntryController {
 	private dropped(result: DropResult | null): void {
 		this.carrying = false;
 		this.ring.hide();
-		const column = this.droppedOn;
-		const place = result && column ? placeResultOf(result) : null;
-		if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.cards(column), place) });
-		else if (result?.kind === "slot") this.open({ kind: "slot", slot: result.slot });
-		else this.showPlus();
+		this.dropField();
+		if (!this.entry.openAtDrop(this.droppedOn, result)) this.showPlus();
 	}
 
 	/** The menu stays over the screen, its panel gone, and the field stands last in its stack of subtasks. */
-	private openStack(parent: TaskItem, menu: TaskMenu): void {
+	private openStack(parent: TaskItem, spot: EntrySpot, menu: TaskMenu): void {
 		this.stack = { menu, row: menu.openStack((how) => this.menuClosed(menu, how)), parent };
-		this.open({ kind: "stack", parent: parent.key });
+		this.open(spot);
 	}
 
 	/** The card of the stack becomes the field, in a calendar menu kept open; the spot is the menu's, of the task itself, where nothing new is written. */
-	private renameInMenu(item: TaskItem, menu: TaskMenu): void {
+	private renameInMenu(item: TaskItem, spot: EntrySpot, menu: TaskMenu): void {
 		this.stack = { menu, row: menu.openRename((how) => this.menuClosed(menu, how)), parent: null };
-		this.open({ kind: "stack", parent: item.key }, item);
+		this.open(spot, item);
 	}
 
 	/** The menu closed by itself: Escape drops the field's text, a tap on the blur keeps it as a tap elsewhere does. */
@@ -519,7 +480,7 @@ export class QuickEntryController {
 	 */
 	private bringIntoSight(state: EntryState, rect: DOMRect, view: DOMRect, box: DOMRect, glide?: Glide): boolean {
 		const limit = this.deps.desktop() ? this.roomOf(view, box).bottom - this.bar.room : view.bottom - this.bar.room - LAYOUT.fieldOverBar;
-		const menu = state.spot.kind === "stack" ? this.stack?.menu : null;
+		const menu = this.stack?.menu ?? null;
 		if (menu) {
 			menu.raise(menu.raised + rect.bottom - limit);
 			return true;
@@ -544,7 +505,7 @@ export class QuickEntryController {
 		const anchor = {
 			field,
 			room: this.roomOf(view, box),
-			overMenu: state.spot.kind === "stack" ? view : null,
+			overMenu: this.stack ? view : null,
 		};
 		this.bar.follow(anchor, rise);
 	}
@@ -577,7 +538,6 @@ export class QuickEntryController {
 	private changed(state: EntryState | null, drawnNext = false): void {
 		const before = this.state;
 		this.state = state;
-		if (state?.renaming !== before?.renaming) this.moved = false;
 		if (!state) {
 			this.glide.stop();
 			this.revealing = false;
@@ -598,48 +558,10 @@ export class QuickEntryController {
 
 	/** The field and the bar show the state: its text, the marks it is written with, what the field may do. */
 	private sync(state: EntryState): void {
-		const marks = this.marksOf(state);
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setSection(state.section === true);
-		if (!state.section) this.field?.setTint(marks.priority?.color ?? marks.labels[0]?.color ?? null);
-		this.bar.show(this.barState(state, marks));
-	}
-
-	private barState(state: EntryState, marks: DraftMarks): QuickBarState {
-		const place = this.shownPlace(state);
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", marks, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
-	}
-
-	/** The priority and labels the field's task is written with, as the service answers for its text and choices. */
-	private marksOf(state: EntryState): DraftMarks {
-		return this.deps.tasks.draftMarks(state.text, state.priority, state.labels);
-	}
-
-	/** A level chosen in the bar takes the place of a prefix typed: the text keeps no prefix, so the file gets one. */
-	private choosePriority(prefix: string | null): void {
-		const state = this.state;
-		if (!state) return;
-		if (this.deps.tasks.parseTitle(state.text).priority) this.entry.type(this.deps.tasks.withPriority(state.text, null));
-		this.entry.setPriority(prefix);
-	}
-
-	/** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
-	private shownPlace(state: EntryState): Placement | null {
-		const { spot, renaming } = state;
-		if (spot.kind !== "list") return null;
-		if (renaming) return renaming.isSubtask ? null : this.placement(spot);
-		return spot.place.level > 0 ? null : this.columnPlacement(spot.column);
-	}
-
-	/** Where a renamed task goes: where it was, until a place is chosen in the bar. */
-	private placement(spot: EntrySpot): Placement {
-		const item = this.state?.renaming ?? null;
-		if (spot.kind === "list" && (this.moved || !item)) return this.columnPlacement(spot.column);
-		return item ? this.deps.tasks.placementOf(item) : this.columnPlacement("left");
-	}
-
-	private columnPlacement(column: ListColumn): Placement {
-		return column === "left" ? this.deps.tasks.placementOfDay(this.deps.day()) : { kind: column };
+		if (!state.section) this.field?.setTint(state.marks.priority?.color ?? state.marks.labels[0]?.color ?? null);
+		this.bar.show(state);
 	}
 
 	/**
@@ -648,20 +570,18 @@ export class QuickEntryController {
 	 * written, as it was written for the day shown; the field then goes to the end of that day's list.
 	 */
 	private async moveTo(placement: Placement): Promise<void> {
-		const column: ListColumn = placement.kind === "now" || placement.kind === "date" ? "left" : placement.kind;
-		const date = this.deps.tasks.dayOfPlacement(placement);
-		this.moved = true;
-		this.entry.moveTo(this.endOf(column));
+		const move = this.entry.choosePlace(placement);
+		if (!move) return;
 		this.turning = true;
 		try {
-			this.deps.turnTo(modeShowing(SWITCH_COLUMN[column], this.deps.mode()));
+			this.deps.turnTo(modeShowing(SWITCH_COLUMN[move.column], this.deps.mode()));
 		} finally {
 			this.turning = false;
 		}
-		if (date === null || date === this.deps.day()) return;
+		if (move.day === null) return;
 		await this.entry.idle();
-		await this.deps.showDay(date);
-		this.entry.moveTo(this.endOf(column));
+		await this.deps.showDay(move.day);
+		this.entry.moveToEnd(move.column);
 	}
 
 	private fieldIn(row: HTMLElement): HTMLElement {
@@ -676,7 +596,7 @@ export class QuickEntryController {
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
 			parseTitle: (text) => this.deps.tasks.parseTitle(text),
-			priority: state ? this.marksOf(state).priority : null,
+			priority: state?.marks.priority ?? null,
 			titleField: this.deps.titleField,
 			onInput: (text) => {
 				this.entry.type(text);

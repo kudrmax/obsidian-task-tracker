@@ -30,7 +30,9 @@ const RENAMED: Readonly<Record<GroupedList, string>> = { inbox: "Входящи�
 let listNames = DEFAULT_NAMES;
 const listName = (list: GroupedList) => listNames[list];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
+const PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
+
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), place: { kind: "soon" }, places: PLACES, repeat: null, repeatable: true, repeatDay: "2026-11-01", section: null };
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
@@ -41,16 +43,16 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const indents: (1 | -1)[] = [];
-	const priorities: (string | null)[] = [];
+	const priorities: string[] = [];
 	const places: Placement[] = [];
 	const repeats: (RepeatRule | null)[] = [];
 	const sections: true[] = [];
-	const labelled: (readonly string[])[] = [];
+	const labelled: string[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 		levels: () => LEVELS,
 		labels: () => shownLabels,
-		onLabels: (names: readonly string[]) => labelled.push(names),
+		onLabel: (name: string) => labelled.push(name),
 		today: () => TODAY,
 		listName,
 		placementOfDay: placementOf,
@@ -78,7 +80,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -203,16 +205,16 @@ describe("the priority panel", () => {
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
-	it("takes the level off on a tap on the current one", () => {
+	it("reports a tap on the current level too: the session takes it off", () => {
 		const { parent, priorities } = setup({ marks: marks(LEVELS[0]) });
 		q(parent, ".tc-bar-flag").click();
 		tiles(parent)[0].click();
-		expect(priorities).toEqual([null]);
+		expect(priorities).toEqual(["p1"]);
 	});
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -251,11 +253,11 @@ describe("the place panel", () => {
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
-	it("only closes on a tap on the current place", () => {
+	it("reports a tap on the current place too, and closes: the session leaves the field where it is", () => {
 		const { parent, places } = setup();
 		q(parent, ".tc-bar-place").click();
 		tiles(parent)[2].click();
-		expect(places).toEqual([]);
+		expect(places).toEqual([{ kind: "soon" }]);
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
@@ -304,12 +306,12 @@ describe("the place panel", () => {
 		expect(q(parent, ".tc-day.is-selected").textContent).toBe("24");
 	});
 
-	it("closes without a report on the field's own day", () => {
+	it("reports the field's own day too, and closes", () => {
 		const { parent, places } = setup({ place: { kind: "date", date: "2026-11-05" } });
 		q(parent, ".tc-bar-place").click();
 		tiles(parent)[4].click();
 		q(parent, ".tc-day.is-selected").click();
-		expect(places).toEqual([]);
+		expect(places).toEqual([{ kind: "date", date: "2026-11-05" }]);
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 });
@@ -356,8 +358,8 @@ describe("the repeat button", () => {
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
-	it("starts a new rule from the field's day: its weekday", () => {
-		const { parent } = setup({ place: { kind: "date", date: "2026-11-05" } });
+	it("starts a new rule from the day the session gives: its weekday", () => {
+		const { parent } = setup({ place: { kind: "date", date: "2026-11-05" }, repeatDay: "2026-11-05" });
 		q(parent, ".tc-bar-repeat").click();
 		expect(weekday(parent, "Thu").classList.contains("is-on")).toBe(true);
 	});
@@ -698,7 +700,7 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 			bar.show({ ...STATE, section: false });
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);
@@ -716,7 +718,7 @@ describe("the flag's labels", () => {
 		const labels = [...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")];
 		expect(labels.map((t) => [t.textContent, t.classList.contains("is-on")])).toEqual([["Важное", false], ["Очень срочное", true]]);
 		labels[0].click();
-		expect(labelled).toEqual([["Очень_срочное", "Важное"]]);
+		expect(labelled).toEqual(["Важное"]);
 		expect(document.querySelector(".tc-menu-tiles.is-labels")).not.toBeNull();
 	});
 

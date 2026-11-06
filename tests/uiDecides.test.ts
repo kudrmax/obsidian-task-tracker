@@ -31,8 +31,6 @@ const BASELINE: Readonly<Record<string, { readonly count: number; readonly remov
 	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (repeat icon, description mark); they stay" },
 	"src/ui/full/FullScreen.ts": { count: 2, removedBy: "S6 (TaskService.toggleDone, TaskItem.parentKey)" },
 	"src/ui/menu/TaskMenu.ts": { count: 5, removedBy: "S4 (TaskItem.can, togglePriority, toggleLabel) and S8 (the repeat's defaults)" },
-	"src/ui/quick/QuickEntry.ts": { count: 9, removedBy: "S3 (QuickEntrySession)" },
-	"src/ui/quick/QuickEntryController.ts": { count: 5, removedBy: "S3 (QuickEntrySession)" },
 	"src/ui/search/searchRows.ts": { count: 1, removedBy: "S9 (search returns its groups)" },
 };
 
