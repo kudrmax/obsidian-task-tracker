@@ -47,4 +47,12 @@ describe(BUNDLE, () => {
 			{ title: "Standup", startMs: new Date(2026, 10, 4, 10).getTime(), endMs: new Date(2026, 10, 4, 11).getTime() },
 		]);
 	});
+
+	it("captures a title with a line break as one task line", () => {
+		const sandbox: { TaskCalendarPhone?: Phone } = {};
+		runInNewContext(committed, sandbox);
+		const now = new Date(2026, 10, 4, 9).getTime();
+		const written = sandbox.TaskCalendarPhone!.capture("## Inbox\n\n## Now\n", "", "inbox", "Купить\r\nмолоко\u2028и хлеб", now).text!;
+		expect(written).toMatch(/## Inbox\n+- \[ \] Купить молоко и хлеб\n/);
+	});
 });

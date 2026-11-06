@@ -6,13 +6,14 @@ import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { Repeat, type RepeatRule } from "./Repeat";
 import { DEFAULT_REMINDER, isOpen, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { taskTitle } from "./TaskTitle";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -147,7 +148,7 @@ export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: Remin
 }
 
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
-	return patch(doc, entry, { text: text.trim() });
+	return patch(doc, entry, { text: taskTitle(text) });
 }
 
 /** The description from Markdown: see `TaskDocument.setDescription`. */
@@ -273,7 +274,7 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marksOf(draft.priority, draft.labels ?? []) }), draft, today, boundary));
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const changed = { ...entry.task, text: taskTitle(draft.text), ...draftMarks(entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -283,7 +284,7 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);
 	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), dueDate }, draft, today, boundary));
+	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: taskTitle(draft.text), ...draftMarks(entry.task, draft), dueDate }, draft, today, boundary));
 }
 
 type Marks = Pick<Task, "priority" | "labels">;

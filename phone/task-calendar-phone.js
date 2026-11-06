@@ -1017,11 +1017,20 @@
     return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
   }
 
+  // src/domain/TaskTitle.ts
+  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
+  function oneLine(text) {
+    return text.replace(LINE_BREAK, " ");
+  }
+  function taskTitle(text) {
+    return oneLine(text).trim();
+  }
+
   // src/domain/operations.ts
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1431,7 +1440,7 @@
         text,
         this.settings,
         now,
-        (doc, today, boundary) => createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
+        (doc, today, boundary) => createInPlace(doc, title, null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
       );
       return { changed: true, text: written };
     }

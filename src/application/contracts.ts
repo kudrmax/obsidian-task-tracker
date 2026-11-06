@@ -37,6 +37,8 @@ export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections
 export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
+/** A task is one line of the file: a line break in its title reads as one space, the same as the domain writes it. */
+export { LINE_BREAK, oneLine } from "../domain/TaskTitle";
 /** The hour's heights the settings tab writes and reads as text. */
 import type { SectionNames, ViewSettings } from "../settings";
 export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
