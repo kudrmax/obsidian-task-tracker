@@ -13,8 +13,8 @@ struct ListColumn: View {
     /// Where each card and header stands in the list, as a carry reads its place: taken as the carry begins, so the gap
     /// opening under the finger never moves the places it is read against.
     @State private var cardFrames: [String: CGRect] = [:]
-    @State private var headerFrames: [Int: CGRect] = [:]
-    @State private var frozen: (cards: [String: CGRect], headers: [Int: CGRect])?
+    @State private var headerFrames: [String: CGRect] = [:]
+    @State private var frozen: (cards: [String: CGRect], headers: [String: CGRect])?
     /// The card a carry held over the list would land before; past the last card, the list's end.
     @State private var gap: Int?
 
@@ -25,10 +25,10 @@ struct ListColumn: View {
             ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
             ScrollView {
                 VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                    ForEach(Array(list.groups.enumerated()), id: \.element.id) { groupIndex, group in
+                    ForEach(list.groups) { group in
                         if let header = group.header {
                             SectionHeader(title: header, group: group, column: list.column, model: model)
-                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { headerFrames[groupIndex] = $0 }
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { headerFrames[group.id] = $0 }
                         }
                         if group.empty { EmptyPlate() }
                         ForEach(group.cards) { card in
@@ -80,7 +80,8 @@ struct ListColumn: View {
     fileprivate func land(_ id: String, at point: CGPoint) {
         let before = place(at: point)
         let passed = passedHeaders(at: point)
-        let level = Self.level(point.x, width: width - CardMetrics.columnInset * 2)
+        // The drop's point is in the list with its side insets; the level is read in the cards' own width.
+        let level = Self.level(point.x - CardMetrics.columnInset, width: width - CardMetrics.columnInset * 2)
         leave()
         Task { await model.drop(id, in: list.column, before: before, level: level, passed: passed) }
     }
@@ -95,7 +96,7 @@ struct ListColumn: View {
     private func passedHeaders(at point: CGPoint) -> [String?] {
         guard list.showsHeaders else { return [] }
         let frames = frozen?.headers ?? headerFrames
-        return list.groups.enumerated().filter { (frames[$0.offset]?.midY ?? .infinity) < point.y }.map(\.element.name)
+        return list.groups.filter { $0.header != nil && (frames[$0.id]?.midY ?? .infinity) < point.y }.map(\.name)
     }
 }
 

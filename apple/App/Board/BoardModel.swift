@@ -49,23 +49,33 @@ final class BoardModel {
     var fullScreen: [TaskItem] = []
 
     private var reading = false
+    /// A read asked for while one runs: it runs again once that one ends, so the screen always ends on the latest ask.
+    private var readAgain = false
 
     func reload() async {
-        guard !reading else { return }
+        guard !reading else {
+            readAgain = true
+            return
+        }
         reading = true
         defer { reading = false }
-        let day = shownDay
-        let board = board
-        do {
-            snapshot = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
-            problem = nil
-        } catch {
-            problem = Self.words(error)
-        }
+        repeat {
+            readAgain = false
+            let day = shownDay
+            let board = board
+            do {
+                snapshot = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+                problem = nil
+            } catch {
+                problem = Self.words(error)
+            }
+        } while readAgain
     }
 
     /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button.
     func reloadIfChanged() async {
+        // Not under a carry: a card drawn anew mid-drag would lose the drag.
+        guard !carrying else { return }
         let board = board
         let text = try? await Task.detached { try board.files().tasks }.value
         if text != snapshot?.tasksText { await reload() }
@@ -142,13 +152,19 @@ final class BoardModel {
         return ["today": .string(snapshot.today), "day": .string(snapshot.day), "offer": snapshot.screen.offer]
     }
 
+    /// A task's menu: it reads no file, only the settings.
     func menu(for item: TaskItem, from: String) async -> TaskMenuModel? {
-        try? await read("tasks.menu", [item.json, .string(from), menuScreen])
+        let board = board
+        let arguments: [JSONValue] = [item.json, .string(from), menuScreen]
+        return try? await Task.detached { try board.read("tasks.menu", arguments, over: board.settingsOnly()) }.value
     }
 
     func bulkMenu() async -> TaskMenuModel? {
         guard let snapshot else { return nil }
-        let picked = pickedItems.map { item -> JSONValue in ["item": item.json, "from": .string(snapshot.column(of: item.id) ?? "day")] }
+        let picked = picked.compactMap { id -> JSONValue? in
+            guard let item = snapshot.item(id) else { return nil }
+            return ["item": item.json, "from": .string(snapshot.column(of: id) ?? "day")]
+        }
         return try? await read("tasks.bulkMenu", [.array(picked), menuScreen])
     }
 
@@ -266,10 +282,11 @@ final class BoardModel {
     /// A card or the plus let go in a list: before card `index` of its cards (past the last: the list's end) at `level`,
     /// past the headers `passed` (the section it lands in is the last of them).
     func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int, passed: [String?]) async {
+        carrying = false
         guard let snapshot, let list = snapshot.lists[column] else { return }
         let others = list.cards.filter { $0.id != id && !isUnder($0.item, id) }
         let cards = JSONValue.array(others.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
-        let target = list.cards[index...].first { card in others.contains { $0.id == card.id } }
+        let target = list.cards[min(index, list.cards.count)...].first { card in others.contains { $0.id == card.id } }
         let at = others.firstIndex { $0.id == target?.id } ?? others.count
         do {
             let gap: JSONValue = try await rule("rules.gapAt", [cards, .number(Double(at)), .number(Double(level)), .array(passed.map(\.json)), .bool(list.showsHeaders)])
@@ -290,6 +307,7 @@ final class BoardModel {
 
     /// A card or the plus let go on the calendar at `minute` from the start of the day, the timeline drawn `hourHeight` an hour.
     func drop(_ id: String, atMinute minute: Double, hourHeight: CGFloat) async {
+        carrying = false
         guard let snapshot else { return }
         let snapped = snap(minute, hourHeight: hourHeight)
         if id == Carried.plus {
@@ -302,8 +320,15 @@ final class BoardModel {
 
     /// The minute a carry over the calendar stands at, on the grid's step for the timeline drawn `hourHeight` an hour.
     func snap(_ minute: Double, hourHeight: CGFloat) -> Int {
-        (try? board.rule("tasks.snap", [.number(minute), .number(hourHeight), .number(9)])) ?? Int(minute)
+        let whole = Int(minute.rounded())
+        if let known = snapped[whole] { return known }
+        let step = (try? board.rule("tasks.snap", [.number(Double(whole)), .number(hourHeight), .number(9)])) ?? whole
+        snapped[whole] = step
+        return step
     }
+
+    /// The grid's minute for each whole minute a carry has passed over: a drag asks on every move.
+    @ObservationIgnored private var snapped: [Int: Int] = [:]
 
     /// The task the plus was let go for, once its title is typed.
     func create(_ text: String, at spot: NewTaskSpot) async {

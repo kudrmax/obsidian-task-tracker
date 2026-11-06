@@ -24,6 +24,8 @@ public final class TaskBoard: @unchecked Sendable {
     private let core: PhoneCore
     private let vault: TasksVault
     private let lock = NSLock()
+    /// One write at a time: each is made over the file and the undo steps the one before it left.
+    private let writing = NSLock()
     private var history: DoorHistory?
     private var calendarSources: [CalendarFile]?
 
@@ -61,6 +63,11 @@ public final class TaskBoard: @unchecked Sendable {
         try read(method, arguments, over: files).decode(T.self)
     }
 
+    /// The settings alone, for a call that reads no file (a task's menu).
+    public func settingsOnly(now: Date = Date()) -> BoardFiles {
+        BoardFiles(tasks: nil, settingsJSON: vault.settingsJSON(), calendars: [:], now: now)
+    }
+
     /// A pure rule (`rules.*`): made over no file, so a drawing may ask it for every card.
     public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
         try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date())).result.decode(T.self)
@@ -70,6 +77,8 @@ public final class TaskBoard: @unchecked Sendable {
     /// changed in between, the call is made again over the file as it now is. The answer's result.
     @discardableResult
     public func write(_ method: String, _ arguments: [JSONValue] = []) throws -> JSONValue {
+        writing.lock()
+        defer { writing.unlock() }
         for _ in 0..<2 {
             let files = try files()
             let reply = try answer(method, arguments, files)

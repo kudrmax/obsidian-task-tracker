@@ -15,6 +15,8 @@ struct TaskFullScreen: View {
     @State private var saving: Task<Void, Never>?
     @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
+    /// The text is being put in the editor from the file, not typed.
+    @State private var placing = false
 
     private var task: TaskItem { current ?? item }
 
@@ -38,7 +40,7 @@ struct TaskFullScreen: View {
                     .scrollDisabled(true)
                     .frame(minHeight: 200)
                     .scrollContentBackground(.hidden)
-                    .onChange(of: text) { typed() }
+                    .onChange(of: text) { if !placing { typed() } }
             }
             .padding(.horizontal, Layout.margin)
         }
@@ -59,7 +61,10 @@ struct TaskFullScreen: View {
         .menuQuestions($question, model: model)
         .task { await open() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
-        .onDisappear { Task { await save() } }
+        .onDisappear {
+            saving?.cancel()
+            Task { await save() }
+        }
     }
 
     @State private var menuModel: TaskMenuModel?
@@ -93,7 +98,7 @@ struct TaskFullScreen: View {
     private func open() async {
         let opened: [String: JSONValue]? = try? await model.rule("description.open", [task.description.json])
         draft = opened?["state"] ?? .null
-        text = opened?["text"]?.string ?? ""
+        place(opened?["text"]?.string ?? "")
         await refresh()
     }
 
@@ -102,15 +107,21 @@ struct TaskFullScreen: View {
         if let found: TaskItem = try? await model.read("tasks.find", [task.key.json, .string(task.text)]) { current = found }
         tree = try? await model.rule("tasks.fullTree", [task.json])
         listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
-        menuModel = try? await model.read("tasks.menu", [task.json, "full", model.menuScreen])
+        menuModel = await model.menu(for: task, from: "full")
         var menus: [String: TaskMenuModel] = [:]
-        for row in tree?.rows ?? [] { menus[row.item.id] = try? await model.read("tasks.menu", [row.item.json, "full", model.menuScreen]) }
+        for row in tree?.rows ?? [] { menus[row.item.id] = await model.menu(for: row.item, from: "full") }
         subtaskMenus = menus
         let read: [String: JSONValue]? = try? await model.rule("description.read", [draft, task.description.json, ["focused": .bool(typing), "pending": .bool(saving != nil)]])
         if let read {
             draft = read["state"] ?? draft
-            if let replace = read["replace"]?.string { text = replace }
+            if let replace = read["replace"]?.string { place(replace) }
         }
+    }
+
+    private func place(_ new: String) {
+        placing = true
+        text = new
+        Task { @MainActor in placing = false }
     }
 
     private func typed() {

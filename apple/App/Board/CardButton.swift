@@ -42,7 +42,11 @@ struct CardButton: UIViewRepresentable {
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        control.content.configuration = configuration
+        let look = CardControl.Look(card: card, ringed: ringed, height: height, over: over)
+        if control.look != look {
+            control.look = look
+            control.content.configuration = configuration
+        }
         control.menuMaker = menu
         control.onTouch = onTouch
         control.onCarry = onCarry
@@ -55,6 +59,14 @@ final class CardControl: UIView, UIDragInteractionDelegate {
     var menuMaker: () -> UIMenu? = { nil }
     var onTouch: () -> Void = {}
     var onCarry: (Bool) -> Void = { _ in }
+    /// What the card is drawn from: it is drawn anew only when this changes, not on every pass of the screen.
+    struct Look: Equatable {
+        let card: BoardCard
+        let ringed: Bool
+        let height: CGFloat
+        let over: Bool
+    }
+    var look: Look?
     let content: UIView & UIContentView
     /// Opens the menu on a tap: a menu button pressed in code, so the press of a finger stays free for the long press.
     private let tapMenu = UIButton()

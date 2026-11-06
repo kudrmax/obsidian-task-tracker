@@ -49,6 +49,8 @@ struct DateSheet: View {
     @Bindable var model: BoardModel
     @State private var picked = Date()
     @State private var menu: TaskMenuModel?
+    /// The day shown as the sheet opens, the tasks' own: only another day tapped moves them.
+    @State private var opened: Date?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -74,10 +76,12 @@ struct DateSheet: View {
         .presentationDetents([.medium, .large])
         .task {
             menu = items.count == 1 ? model.snapshot?.menus[items[0].id] : await model.bulkMenu()
-            if let due = menu?.dueDate, let date = LocalDay.date(due) { picked = date }
+            let shown = menu?.dueDate.flatMap(LocalDay.date) ?? picked
+            opened = shown
+            picked = shown
         }
-        .onChange(of: picked) { old, new in
-            guard !Calendar.current.isDate(old, inSameDayAs: new) else { return }
+        .onChange(of: picked) { _, new in
+            guard let opened, !Calendar.current.isDate(opened, inSameDayAs: new) else { return }
             Task { await model.postpone(items, to: LocalDay.string(new)); dismiss() }
         }
     }
@@ -103,6 +107,7 @@ struct RepeatSheet: View {
     @Bindable var model: BoardModel
     @State private var draft: RepeatDraft?
     @State private var touched = false
+    @State private var editing: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -136,14 +141,20 @@ struct RepeatSheet: View {
                     }
                     if draft.detail == "weekdays" {
                         Section("On") {
-                            HStack {
+                            HStack(spacing: 0) {
                                 ForEach(0..<7, id: \.self) { day in
                                     let on = draft.days.contains(day)
-                                    Button(Self.weekdays[day]) { edit(["what": "weekday", "day": .number(Double(day))]) }
-                                        .buttonStyle(.bordered)
-                                        .buttonBorderShape(.circle)
-                                        .tint(on ? .accentColor : .secondary)
-                                        .accessibilityAddTraits(on ? .isSelected : [])
+                                    Button { edit(["what": "weekday", "day": .number(Double(day))]) } label: {
+                                        Text(Self.weekdays[day])
+                                            .font(.body.weight(on ? .semibold : .regular))
+                                            .foregroundStyle(on ? Color.white : Color.primary)
+                                            .frame(width: 38, height: 38)
+                                            .background(on ? AnyShapeStyle(.tint) : AnyShapeStyle(Color(.tertiarySystemFill)), in: .circle)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityLabel(Self.weekdayNames[day])
+                                    .accessibilityAddTraits(on ? .isSelected : [])
                                 }
                             }
                         }
@@ -162,7 +173,7 @@ struct RepeatSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", systemImage: "checkmark") { Task { await save(); dismiss() } }
+                    Button("Save", systemImage: "checkmark") { Task { await editing?.value; await save(); dismiss() } }
                         .buttonStyle(.glassProminent)
                 }
             }
@@ -171,9 +182,12 @@ struct RepeatSheet: View {
         .task { draft = try? await model.rule("rules.repeatDraft", [.string(item.repeatDay), item.repeatRule]) }
     }
 
+    /// Each change is made over the draft the one before it left: quick taps add up.
     private func edit(_ change: JSONValue) {
-        guard let current = draft else { return }
-        Task {
+        let before = editing
+        editing = Task {
+            await before?.value
+            guard let current = draft else { return }
             if let next: RepeatDraft = try? await model.rule("rules.editRepeat", [current.json, change]) {
                 draft = next
                 touched = true
@@ -190,6 +204,7 @@ struct RepeatSheet: View {
     }
 
     static let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
+    static let weekdayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     static func unit(_ unit: String, every: Int) -> String {
         let one = every == 1

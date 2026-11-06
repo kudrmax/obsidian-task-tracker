@@ -306,7 +306,11 @@ struct BulkActions: View {
     var body: some View {
         let items = model.pickedItems
         Group {
-            Button("Done", systemImage: "checkmark.circle") { Task { await model.pickStatus(items, "done") } }
+            Button("Done", systemImage: "checkmark.circle") {
+                guard let done = menu?.statuses.first(where: { $0.id == "done" }) else { return }
+                if done.confirm { question = .status(items, done.id) } else { Task { await model.pickStatus(items, done.id) } }
+            }
+            .disabled(menu?.statuses.contains { $0.id == "done" } != true)
             Menu("Priority", systemImage: "flag") {
                 if let menu, !menu.levels.disabled {
                     ForEach(menu.levels.tiles, id: \.mark) { tile in
@@ -331,12 +335,12 @@ struct BulkActions: View {
             Menu("More", systemImage: "ellipsis.circle") {
                 if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
             }
-            Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
-                .foregroundStyle(.red)
-                .disabled(menu?.remove == nil)
         }
         .tint(.primary)
         .disabled(items.isEmpty)
         .task(id: model.picked) { menu = items.isEmpty ? nil : await model.bulkMenu() }
+        Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
+            .tint(.red)
+            .disabled(items.isEmpty || menu?.remove == nil)
     }
 }

@@ -29,6 +29,9 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// animate it to its new place instead of drawing a new card.
     public let id: String
 
+    /// The card goes by `id`: its own, or its task's.
+    public func names(_ id: String) -> Bool { self.id == id || item.id == id }
+
     public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, id: String? = nil) {
         self.id = id ?? item.id
         self.item = item
@@ -145,21 +148,21 @@ public struct BoardSnapshot: Sendable {
     public let statuses: [SourceStatus]
     public let calendarsStale: Bool
     public let canUndo: Bool
-    /// Each card's menu by its id, as opened from where the card stands.
+    /// Each card's menu by its task's id (`TaskItem.id`), as opened from where the card stands.
     public let menus: [String: TaskMenuModel]
     /// The tasks file's text it was read from: the screen reads again only when it changes.
     public let tasksText: String?
 
-    /// The task the screen shows under `id`, anywhere.
+    /// The task the screen shows under `id`, a card's (`BoardCard.id`) or its task's (`TaskItem.id`), anywhere.
     public func item(_ id: String) -> TaskItem? {
-        for list in lists.values { if let card = list.cards.first(where: { $0.id == id }) { return card.item } }
-        return timeline.slots.first { $0.id == id }?.card.item
+        for list in lists.values { if let card = list.cards.first(where: { $0.names(id) }) { return card.item } }
+        return timeline.slots.first { $0.card.names(id) }?.card.item
     }
 
-    /// Which list or the calendar a card is drawn in.
+    /// Which list or the calendar a card is drawn in, by the card's id or its task's.
     public func column(of id: String) -> String? {
-        for (column, list) in lists where list.cards.contains(where: { $0.id == id }) { return column.rawValue }
-        return timeline.slots.contains { $0.id == id } ? "timeline" : nil
+        for (column, list) in lists where list.cards.contains(where: { $0.names(id) }) { return column.rawValue }
+        return timeline.slots.contains { $0.card.names(id) } ? "timeline" : nil
     }
 }
 
@@ -205,9 +208,9 @@ extension TaskBoard {
         let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
         var menus: [String: TaskMenuModel] = [:]
         for (column, list) in lists {
-            for card in list.cards { menus[card.id] = try read("tasks.menu", [card.item.json, .string(column.rawValue), menuScreen], over: settingsOnly) }
+            for card in list.cards { menus[card.item.id] = try read("tasks.menu", [card.item.json, .string(column.rawValue), menuScreen], over: settingsOnly) }
         }
-        for slot in timeline.slots { menus[slot.id] = try read("tasks.menu", [slot.card.item.json, "timeline", menuScreen], over: settingsOnly) }
+        for slot in timeline.slots { menus[slot.card.item.id] = try read("tasks.menu", [slot.card.item.json, "timeline", menuScreen], over: settingsOnly) }
         return BoardSnapshot(
             today: today,
             day: day,
