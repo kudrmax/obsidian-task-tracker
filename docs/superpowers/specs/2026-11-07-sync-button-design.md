@@ -9,15 +9,24 @@ and Obsidian sends him back.
 
 ## What Max sees
 
+Approved on the iPhone canvas (https://claude.ai/artifact/TW5RCK9KbJcq68BkY4G2om, page «Синхронизация»): «Вариант 1 —
+кнопка рядом с «⋯»», «Что происходит после тапа», «Если не получилось». The app's name on screen is **Tasks**
+(`CFBundleDisplayName`); the link scheme stays `taskcalendar`, nobody sees it.
+
 1. The app's top bar, right side: a **Sync** button (SF Symbol `arrow.triangle.2.circlepath`) before «⋯», stock iOS 26
-   toolbar glass, the two in one group as iOS 26 groups trailing items. Present in Inbox, Soon and Today; not in Select
+   toolbar glass, the two in one capsule as iOS 26 groups trailing items. Present in Inbox, Soon and Today; not in Select
    Tasks' bar.
-2. A tap opens Obsidian on the vault. Obsidian's own sync icon spins; the plugin adds nothing on screen while it works.
-3. When Sync has finished, Obsidian hands the phone back to the app on its own. The app reads the file again (the board
-   shows the Mac's changes) and rebuilds the reminders, as after any refresh.
-4. Sync could not finish (paused, off in this vault, an error, no network, or 45 s passed): Obsidian still hands the phone
-   back, and the app shows a stock alert: title «Not Synced», the reason as its message, an OK button.
-5. Obsidian can't be opened (not installed): the same alert, reason «Obsidian isn't installed».
+2. A tap opens Obsidian on the vault, wherever it was. iOS shows «‹ Tasks» in the status bar by itself.
+3. While it waits, the plugin shows an Obsidian notice at the top: **«Syncing… back to Tasks when done»**, kept until the
+   wait ends (then hidden). Phone only.
+4. When Sync has finished, Obsidian hands the phone back to the app on its own. The app reads the file again (the board
+   shows the Mac's changes) and rebuilds the reminders, as after any refresh. No alert, no toast on success.
+5. Sync could not finish (paused, off in this vault, an error, or 45 s passed): Obsidian still hands the phone back, and
+   the app shows a stock alert: title «Not Synced», the reason as its message, an OK button.
+6. Obsidian can't be opened (not installed): the same alert at once, reason «Obsidian isn't installed».
+7. Max leaves Obsidian before the end («‹ Tasks», the home screen, another app): the wait is cancelled at once and the
+   notice hidden; nothing hands the phone back later, when Obsidian wakes up again. The app reads the file as it always
+   does when it comes to the front.
 
 ## The links (the contract between the two frontends)
 
