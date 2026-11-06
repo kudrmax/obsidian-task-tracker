@@ -4,6 +4,7 @@ import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsS
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
+import { ArrivingCard } from "./drag/ArrivingCard";
 import { SearchWindow } from "./search/SearchWindow";
 import { BulkController } from "./BulkController";
 import type { Theme } from "./eventColors";
@@ -101,6 +102,7 @@ export class TaskCalendarView extends ItemView {
 	/** The task on the whole screen, while one is. */
 	private full: FullScreen | null = null;
 	private readonly found = new FoundCard();
+	private readonly arriving = new ArrivingCard();
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
 	private backlogList: TaskList | null = null;
@@ -198,7 +200,10 @@ export class TaskCalendarView extends ItemView {
 			haptics: this.haptics,
 			arbiter: this.arbiter,
 			onDragging: (active) => {
-				if (!active) this.bulk.settled();
+				if (!active) {
+					this.bulk.settled();
+					this.arriving.arrived();
+				}
 				this.quick?.onDragging(active);
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
@@ -347,6 +352,7 @@ export class TaskCalendarView extends ItemView {
 			onResize: () => this.fitWholeDay(),
 			onBlock: (block, item) => {
 				this.found.attach(block, item);
+				this.arriving.attach(block, item);
 				this.drag.attachBlock(block, item);
 			},
 			onEvent: (block, event) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) })),
@@ -699,6 +705,7 @@ export class TaskCalendarView extends ItemView {
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
 	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
 		this.found.attach(card, item);
+		this.arriving.attach(card, item);
 		card.addEventListener("click", (e) => {
 			if (!this.fold(item, e.target)) this.showMenu(item, card);
 		});
@@ -846,14 +853,17 @@ export class TaskCalendarView extends ItemView {
 	/** A list's card: its gestures. */
 	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
 		this.found.attach(card, item);
+		this.arriving.attach(card, item);
 		this.bulk.attach({ item, card, column, subtree });
 		this.drag.attachCard(card, item, column, subtree);
 	}
 
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
-	private applyDrop(drag: TaskDragPayload, result: DropResult): Promise<void> {
+	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
+	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null> {
 		this.bulk.dropping(drag);
-		return this.act(() => this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate));
+		await this.act(async () => this.arriving.expect((await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate))[0] ?? null));
+		return this.arriving.shown;
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */

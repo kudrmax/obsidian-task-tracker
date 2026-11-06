@@ -610,8 +610,10 @@ export class DemoTaskService implements TaskService {
 	}
 	async applyAll(): Promise<void> {}
 
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
-		return runDrop(this, tasks, to, day);
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
+		const moved = tasks.map((t) => this.taskOf(t.key));
+		await runDrop(this, tasks, to, day);
+		return moved.flatMap((t) => this.keyOf(t) ?? []);
 	}
 
 	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {

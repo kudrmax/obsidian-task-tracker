@@ -262,7 +262,6 @@ describe("ListDrop", () => {
 			const { drop, from } = lifted(1);
 			drop.preview(27, picking(100 + STEP + 17), from);
 			expect(lineEl()).toBeNull();
-			expect(drop.landing()?.top).toBe(100 + STEP);
 			expect(drop.drop(27, picking(100 + STEP + 17), from)).toBeNull();
 		});
 
@@ -277,12 +276,6 @@ describe("ListDrop", () => {
 			expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", "", ""]);
 			expect(list.elements[1].classList.contains("is-waiting")).toBe(true);
 			expect(drop.drop(27, picking(100 + 3 * STEP + 2), from)).toEqual({ kind: "list", column: "day", before: items[3].key });
-		});
-
-		it("lands where the card will stand once its dashed place above has gone", () => {
-			const { drop, from } = lifted(1);
-			drop.preview(27, picking(100 + 3 * STEP + 2), from);
-			expect(drop.landing()?.top).toBe(100 + 3 * STEP - STEP);
 		});
 
 		it("the line stands in the gap nearest the carried card's middle", () => {

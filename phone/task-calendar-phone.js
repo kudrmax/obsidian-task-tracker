@@ -954,6 +954,24 @@ ${key.title}`.toLowerCase();
       const inserted = insertedLines(before.lines, this.lines);
       return flatten(this.allTasks()).find((entry) => inserted.has(this.lineOf(entry)));
     }
+    /**
+     * Where each of `moved`, tasks of `before`, stands after a change moved them: the task line an ordered diff finds only
+     * here with its text, as a line the move rewrote is; else its very line, when this document has it once. Undefined when
+     * neither finds it.
+     */
+    movedSince(before, moved) {
+      const inserted = insertedLines(before.lines, this.lines);
+      const all = flatten(this.allTasks());
+      const fresh = all.filter((entry) => inserted.has(this.lineOf(entry)));
+      const taken = /* @__PURE__ */ new Set();
+      const take = (entry) => (entry && taken.add(entry), entry);
+      return moved.map((entry) => {
+        const rewritten = fresh.find((candidate) => !taken.has(candidate) && candidate.task.text === entry.task.text);
+        if (rewritten) return take(rewritten);
+        const same = all.filter((candidate) => !taken.has(candidate) && candidate.raw === entry.raw);
+        return take(same.length === 1 ? same[0] : void 0);
+      });
+    }
     insert(section, position, task) {
       const line = this.insertionLine(section, position);
       return this.withLines(this.splice(line, 0, this.linesOf("", "-", task)));

@@ -28,6 +28,11 @@ export class PlusFloat implements Float {
 		return this.fly(`translate3d(${rect.left}px, ${rect.top}px, 0)`);
 	}
 
+	/** Shrinks away where it is. */
+	vanish(): Promise<void> {
+		return this.fly(`${this.el.style.transform} scale(0)`);
+	}
+
 	remove(): void {
 		this.el.remove();
 	}

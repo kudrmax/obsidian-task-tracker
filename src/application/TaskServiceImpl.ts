@@ -592,8 +592,12 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate(this.rules.applyAll(steps));
 	}
 
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
-		return runDrop(this, tasks, to, day);
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
+		const { doc: before } = await this.readNormalized();
+		const moved = tasks.map((task) => this.rules.entryOf(before, task.key));
+		await runDrop(this, tasks, to, day);
+		const { doc: after } = await this.readNormalized();
+		return after.movedSince(before, moved).flatMap((entry) => (entry ? [{ section: entry.section, index: entry.index, path: entry.path, raw: entry.raw }] : []));
 	}
 
 	async normalize(): Promise<void> {

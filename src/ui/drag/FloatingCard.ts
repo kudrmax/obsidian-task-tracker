@@ -80,6 +80,15 @@ export class FloatingCard implements Float {
 		await new Promise((resolve) => window.setTimeout(resolve, tokenMs(this.el, DURATION.fly) + SETTLE_MS));
 	}
 
+	async vanish(): Promise<void> {
+		for (const layer of this.stack) layer.classList.add("is-gone");
+		this.count?.classList.add("is-gone");
+		this.el.classList.add("is-flying");
+		void this.el.offsetWidth;
+		this.el.classList.add("is-gone");
+		await new Promise((resolve) => window.setTimeout(resolve, tokenMs(this.el, DURATION.fly) + SETTLE_MS));
+	}
+
 	remove(): void {
 		for (const layer of this.stack) layer.remove();
 		this.count?.remove();
