@@ -13,7 +13,7 @@ enum SigningWarnings {
         guard let expiration = AppSignature.expiration else { return }
         for (index, warning) in SigningExpiry.warnings(expiration: expiration, now: now).enumerated() {
             let content = UNMutableNotificationContent()
-            content.title = "Task Calendar Stops in \(SigningText.left(warning.left))"
+            content.title = "Tasks Stops in \(SigningText.left(warning.left))"
             content.body = "Its signature ends \(SigningText.end(expiration)). Install the app from the Mac again before then."
             content.sound = nil
             content.interruptionLevel = .active
