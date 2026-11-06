@@ -400,7 +400,7 @@ describe("the menu", () => {
 		});
 
 		it("writes an Inbox task's weekdays once, as the page leaves them, when the menu closes", () => {
-			const actions = open(item({ key: { section: "inbox", index: 0, path: [], raw: "- [ ] A" } }), undefined, THURSDAY);
+			const actions = open(item({ key: { section: "inbox", index: 0, path: [], raw: "- [ ] A" }, repeatDay: THURSDAY }), undefined, THURSDAY);
 			row("Repeat").click();
 			const day = (name: string) => [...panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-day")].find((b) => b.textContent === name)!;
 			day("Mon").click();
@@ -419,8 +419,8 @@ describe("the menu", () => {
 			expect(actions.setRepeat).toHaveBeenCalledWith({ kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null });
 		});
 
-		it("starts a new rule from the task's due date", () => {
-			const actions = open(item({ dueDate: "2026-11-04" }));
+		it("starts a new rule from the day the service gives: the weekday and the month's day are that day's", () => {
+			const actions = open(item({ dueDate: null, repeatDay: "2026-11-04" }));
 			row("Repeat").click();
 			panel().querySelectorAll<HTMLButtonElement>(".tc-repeat-seg-btn")[0].click();
 			panel().querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();

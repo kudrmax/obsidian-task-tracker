@@ -3,7 +3,9 @@ import { descriptionMarkdown } from "../domain/description";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
 import { markChoices } from "../domain/Marks";
-import { hasOpenSubtask, marksOfTask } from "../domain/operations";
+import { DayBoundary } from "../domain/DayBoundary";
+import { dayOf, hasOpenSubtask, marksOfTask } from "../domain/operations";
+import { repeatDay } from "../domain/RepeatDraft";
 import { repeatable } from "../domain/queries";
 import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
@@ -37,12 +39,12 @@ export function itemLevels(levels: readonly PriorityLevel[], labels: readonly La
 	};
 }
 
-/** The task as the UI sees it on `today`; `parent`, the task a subtask sits under. */
-export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null): TaskItem {
+/** The task as the UI sees it on `today`; `parent`, the task a subtask sits under; `boundary`, where the day begins. */
+export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null, boundary: DayBoundary = DayBoundary.MIDNIGHT): TaskItem {
 	const marks = marksOfTask(entry.task);
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
-	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry));
+	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
 	const description = descriptionMarkdown(entry);
 	return {
 		key: keyOf(entry),
@@ -62,6 +64,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
 		day: dayOfTask(entry.section, entry.task, today),
+		repeatDay: repeatDay(dayOf(entry.task, boundary), today),
 		can: {
 			postpone: canPostpone(entry.section),
 			removeDue: canRemoveDue(entry.task.dueDate, today),

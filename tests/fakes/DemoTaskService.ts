@@ -174,6 +174,7 @@ export class DemoTaskService implements TaskService {
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
+			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
 			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false },
 		};
 	}

@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type DraftMarks, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type EntryState, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, repeatDraft, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -11,22 +11,8 @@ import { repeatPanel } from "../repeat/RepeatPanel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
 
-export interface QuickBarState {
-	/** The field can move one level in or out; a button that cannot is greyed. */
-	readonly canIndent: boolean;
-	readonly canOutdent: boolean;
-	/** The field shifts at all: a field on the calendar does not, and has no shift buttons. */
-	readonly indents: boolean;
-	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. */
-	readonly marks: DraftMarks;
-	/** Where the field stands; null for a field with no place of its own (a subtask, a slot): no place button. */
-	readonly place: Placement | null;
-	readonly repeat: RepeatRule | null;
-	/** The field may repeat: one on the calendar may not, and has no repeat button. */
-	readonly repeatable: boolean;
-	/** The field writes a section's name, not a task; null where it cannot (no column with sections, a rename): no section button. */
-	readonly section: boolean | null;
-}
+/** What the bar shows: the session's answer for the field, what each button shows and whether it shows at all. */
+export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "marks" | "place" | "places" | "repeat" | "repeatable" | "repeatDay" | "section">;
 
 /** Where the field stands, for the bar to stand by it. */
 export interface BarAnchor {
@@ -53,10 +39,11 @@ export interface QuickBarDeps {
 	onIndent(delta: 1 | -1): void;
 	/** The section button: the field switches between a task and a section's name. */
 	onSection(): void;
-	/** A level's prefix, or null to take the level off. */
-	onPriority(prefix: string | null): void;
-	/** The labels' names the field now has. */
-	onLabels(names: readonly string[]): void;
+	/** A level's tile tapped, by its prefix. */
+	onPriority(prefix: string): void;
+	/** A label's tile tapped, by its name. */
+	onLabel(name: string): void;
+	/** A place picked: a list's tile, or a day in the picker. */
 	onPlace(placement: Placement): void;
 	/** A rule set in the repeat panel, or null to take it off. */
 	onRepeat(rule: RepeatRule | null): void;
@@ -78,8 +65,6 @@ interface OpenPanel {
 type BarPosition = Partial<Record<"left" | "top" | "width" | "bottom", string>>;
 
 const POSITION = ["left", "top", "width", "bottom"] as const;
-
-const FIXED_PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
 
 const GLIDING = "is-gliding";
 
@@ -334,14 +319,8 @@ export class QuickBar implements EntryPart {
 	 */
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
-		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, this.repeatDay()]);
+		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, state?.repeatDay ?? null]);
 		return JSON.stringify([kind, this.levels(), this.deps.labels(), state?.marks ?? null, state?.place ?? null, this.deps.today()]);
-	}
-
-	/** The day a new rule starts from: the field's own, else today. */
-	private repeatDay(): LocalDate {
-		const place = this.state?.place;
-		return place?.kind === "date" ? place.date : this.deps.today();
 	}
 
 	private renderPanel(): void {
@@ -378,12 +357,12 @@ export class QuickBar implements EntryPart {
 		const chosen = marks?.labels.map((l) => l.name) ?? [];
 		const levels = this.levels().map((level): MenuTileSpec => {
 			const on = level.prefix === current?.prefix;
-			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: !(marks?.can.setPriority ?? true), onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
+			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: !(marks?.can.setPriority ?? true), onPick: this.picked(() => this.deps.onPriority(level.prefix)) };
 		});
 		if (levels.length > 0) markLongLabels(tileGroup(parent, "is-priority", tileRows(levels)));
 		const labels = this.deps.labels().map((label): MenuTileSpec => {
 			const on = chosen.includes(label.name);
-			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: !(marks?.can.setLabels ?? true), onPick: () => this.deps.onLabels(on ? chosen.filter((n) => n !== label.name) : [...chosen, label.name]) };
+			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: !(marks?.can.setLabels ?? true), onPick: () => this.deps.onLabel(label.name) };
 		});
 		if (labels.length > 0) markLongLabels(tileGroup(parent, "is-labels", tileRows(labels)));
 	}
@@ -397,8 +376,7 @@ export class QuickBar implements EntryPart {
 	private renderRepeat(parent: HTMLElement): void {
 		const rule = this.state?.repeat ?? null;
 		repeatPanel(parent, {
-			rule,
-			day: this.repeatDay(),
+			draft: repeatDraft(this.state?.repeatDay ?? this.deps.today(), rule),
 			onChange: (changed) => {
 				this.deps.onRepeat(changed);
 				this.restand();
@@ -409,10 +387,9 @@ export class QuickBar implements EntryPart {
 
 	private renderPlaces(parent: HTMLElement): void {
 		const current = this.state?.place ?? null;
-		const fixed = FIXED_PLACES.map((kind): MenuTileSpec => {
+		const fixed = (this.state?.places ?? []).map((kind: GroupedList): MenuTileSpec => {
 			const placement: Placement = { kind };
-			const on = current?.kind === kind;
-			return { label: this.deps.listName(kind), icon: kind, on, onPick: this.picked(() => (on ? undefined : this.deps.onPlace(placement))) };
+			return { label: this.deps.listName(kind), icon: kind, on: current?.kind === kind, onPick: this.picked(() => this.deps.onPlace(placement)) };
 		});
 		const date: MenuTileSpec = {
 			label: "Date",
@@ -435,10 +412,7 @@ export class QuickBar implements EntryPart {
 			month: chosen ?? today,
 			today,
 			selected: chosen,
-			onPick: (day) => {
-				const placement = this.deps.placementOfDay(day);
-				this.picked(() => (current && samePlacement(current, placement) ? undefined : this.deps.onPlace(placement)))();
-			},
+			onPick: (day) => this.picked(() => this.deps.onPlace(this.deps.placementOfDay(day)))(),
 		});
 	}
 }

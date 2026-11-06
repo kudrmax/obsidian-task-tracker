@@ -1,7 +1,7 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
 import { markChoices, typedMarks } from "../domain/Marks";
-import { priorityOfText, withPriority } from "../domain/Priority";
+import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
 import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
@@ -109,7 +109,7 @@ export class TaskServiceImpl implements TaskService {
 
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
 		const levels = this.priorityLevels();
-		const parsed = priorityOfText(text, levels.map((l) => l.prefix));
+		const parsed = priorityOfTitle(text, levels.map((l) => l.prefix));
 		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
 	}
 
@@ -384,7 +384,7 @@ export class TaskServiceImpl implements TaskService {
 		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
 		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
-		return toItem(entry, today, levels, parent);
+		return toItem(entry, today, levels, parent, this.rules.moment().boundary);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
@@ -584,7 +584,8 @@ export class TaskServiceImpl implements TaskService {
 
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
 		const levels = this.itemLevels();
-		return (entry) => toItem(entry, today, levels);
+		const { boundary } = this.rules.moment();
+		return (entry) => toItem(entry, today, levels, null, boundary);
 	}
 
 	private itemLevels(): ItemLevels {

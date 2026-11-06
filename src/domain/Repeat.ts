@@ -32,6 +32,25 @@ function ordinal(n: number): string {
 	return `${n}${suffix}`;
 }
 
+/** The parts a rule is worded with, in the file's grammar. */
+export interface RepeatParts {
+	/** `every day`, `every 3 weeks`. */
+	readonly every: string;
+	/** The days a schedule falls on: `on Mon, Wed` for weeks, `on the 5th` for months; null for days and after done. */
+	readonly on: string | null;
+	/** A weekly schedule's weekdays; null for any other rule. */
+	readonly days: readonly Weekday[] | null;
+	readonly afterDone: boolean;
+}
+
+export function repeatParts({ kind, every, unit, days, dayOfMonth }: RepeatRule): RepeatParts {
+	const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
+	const schedule = kind === "schedule";
+	const weekly = schedule && unit === "week";
+	const on = weekly ? `on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : schedule && unit === "month" ? `on the ${ordinal(dayOfMonth ?? 1)}` : null;
+	return { every: head, on, days: weekly ? days : null, afterDone: kind === "afterDone" };
+}
+
 function monthIndexOf(date: LocalDate): number {
 	const { year, month } = partsOf(date);
 	return year * 12 + month - 1;
@@ -51,7 +70,13 @@ export class Repeat {
 		return new Repeat(rule);
 	}
 
-	private static problemWith({ kind, every, unit, days, dayOfMonth, from }: RepeatRule): string | null {
+	/** A schedule of every few units counts from `date`; any other rule as it is. */
+	static anchored(rule: RepeatRule, date: LocalDate): RepeatRule {
+		return rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule;
+	}
+
+	/** What keeps the rule from being written, or null: every from 1, weekdays for a weekly schedule only and at least one, a month's day for a monthly one only, `from` for a schedule of every few units only. */
+	static problemWith({ kind, every, unit, days, dayOfMonth, from }: RepeatRule): string | null {
 		if (!Number.isInteger(every) || every < 1) return "every must be a whole number from 1";
 		const wantsDays = kind === "schedule" && unit === "week";
 		const wantsDayOfMonth = kind === "schedule" && unit === "month";
@@ -100,11 +125,10 @@ export class Repeat {
 	}
 
 	format(): string {
-		const { kind, every, unit, days, dayOfMonth, from } = this.rule;
-		const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
-		if (kind === "afterDone") return `${head} when done`;
-		const on = unit === "week" ? ` on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : unit === "month" ? ` on the ${ordinal(dayOfMonth ?? 1)}` : "";
-		return `${head}${on}${from ? ` from ${from}` : ""}`;
+		const { every, on, afterDone } = repeatParts(this.rule);
+		if (afterDone) return `${every} when done`;
+		const from = this.rule.from;
+		return `${every}${on ? ` ${on}` : ""}${from ? ` from ${from}` : ""}`;
 	}
 
 	/** Spec §3.2: strictly after max(today, taskDate); afterDone: today + N. */
@@ -125,8 +149,8 @@ export class Repeat {
 
 	/** The same rule anchored: `from` set to `date` when every > 1, else unchanged. */
 	anchoredAt(date: LocalDate): Repeat {
-		const { kind, every } = this.rule;
-		return kind === "schedule" && every > 1 ? new Repeat({ ...this.rule, from: date }) : this;
+		const rule = Repeat.anchored(this.rule, date);
+		return rule === this.rule ? this : new Repeat(rule);
 	}
 
 	private firstAfter(anchor: LocalDate, base: LocalDate): LocalDate {

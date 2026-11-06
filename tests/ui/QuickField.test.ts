@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import type { PriorityLevel } from "../../src/application/contracts";
-import type { PendingText } from "../../src/ui/quick/QuickEntry";
+import type { PendingText } from "../../src/application/contracts";
 import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
 import { priorityTitles } from "../fakes/FakePriorityTitles";

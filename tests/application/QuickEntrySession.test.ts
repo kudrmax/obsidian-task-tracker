@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type NewTaskPlace, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey } from "../../src/application/contracts";
-import type { PlacedCard } from "../../src/ui/drag/listPlace";
-import { type EntrySpot, type EntryState, QuickEntry } from "../../src/ui/quick/QuickEntry";
-import { WriteQueue } from "../../src/ui/quick/WriteQueue";
+import { type DropColumn, type EntrySpot, type EntryState, type ListCard, type NewTaskPlace, QuickEntrySession, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type WriteLine } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { onDay } from "../fakes/itemOnDay";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
-const card = (name: string, level = 0): PlacedCard => ({ key: key(name), level, top: 0, height: 0, group: null });
+const card = (name: string, level = 0): ListCard => ({ key: key(name), level, group: null });
 const at = (index: number, level = 0): EntrySpot => ({ kind: "list", column: "left", place: { kind: "gap", index, level, group: null } });
 const inSoon = (index: number): EntrySpot => ({ kind: "list", column: "soon", place: { kind: "gap", index, level: 0, group: null } });
 const WEEKLY: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null };
@@ -36,6 +33,28 @@ function item(name: string, subtasks: TaskItem[] = []): TaskItem {
 	}, SLOT.date);
 }
 
+/** The writes one at a time, as the frontend's queue runs them; a failing one is noted and the next one runs. */
+class SerialWrites implements WriteLine {
+	private tail: Promise<void> = Promise.resolve();
+
+	constructor(private readonly onError: (error: unknown) => void) {}
+
+	push(job: () => Promise<void>): void {
+		this.tail = this.tail.then(job).catch((error: unknown) => this.onError(error));
+	}
+
+	async idle(): Promise<void> {
+		let tail: Promise<void>;
+		do {
+			tail = this.tail;
+			await tail;
+		} while (tail !== this.tail);
+	}
+}
+
+/** The day the day column shows in these tests. */
+const DAY = SLOT.date;
+
 function deferred(): { promise: Promise<void>; resolve(): void } {
 	let resolve!: () => void;
 	const promise = new Promise<void>((r) => (resolve = r));
@@ -47,7 +66,7 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
  * key the lists hand out now.
  */
 class FakeTasks {
-	cards: PlacedCard[];
+	cards: ListCard[];
 	readonly created: { text: string; priority: string | null; place: NewTaskPlace }[] = [];
 	readonly edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	readonly changes: (EntryState | null)[] = [];
@@ -71,7 +90,7 @@ class FakeTasks {
 	readonly sectionsMade: { name: string; place: NewTaskPlace }[] = [];
 	/** The lists show a write only once they read the file afresh, as Obsidian's do. */
 	lagging = false;
-	private written: PlacedCard[] | null = null;
+	private written: ListCard[] | null = null;
 	/** At each change: the card names the lists show, then the texts waiting under them. */
 	readonly seen: string[][] = [];
 
@@ -79,51 +98,71 @@ class FakeTasks {
 		this.cards = names.map((n) => (typeof n === "string" ? card(n) : card(...n)));
 	}
 
-	entry(): QuickEntry {
-		return new QuickEntry({
-			cards: () => this.cards,
-			placeOf: (_column, result) =>
-				result.kind === "task"
-					? { kind: "list", list: "now", group: result.group, before: result.before }
-					: { kind: "subtask", parent: result.parent, before: result.before },
-			fresh: async (beforeShow) => {
-				await this.gate;
-				if (this.failingReads.has(++this.reads)) throw new Error("no read");
-				const coming = this.written ?? this.cards;
-				beforeShow?.(() => coming);
-				this.cards = coming;
-				this.written = null;
-				if (beforeShow) this.see(this.lastState);
-			},
-			createInPlace: async (text, priority, place, repeat) => {
-				if (this.failing.has(text)) throw new Error(`no ${text}`);
-				this.created.push({ text, priority, place });
-				// A schedule gives the task its first day: it leaves a column of tasks without one.
-				if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
-				return this.land(text, place);
-			},
-			createSection: async (name, place) => {
-				this.sectionsMade.push({ name, place });
-				return null;
-			},
-			sectioned: () => this.sectioned,
-			edit: async (k, draft) => {
-				if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
-				this.edits.push({ key: k, draft });
-			},
-			placement: () => ({ kind: "now" }),
-			isBlank: priorityTitles([
+	/** The sections the lists draw, the last one where a field at the end of a column stands. */
+	sections: string[] = [];
+	mode: "calendar" | "soon" | "inbox" = "calendar";
+	/** The day the day column shows. */
+	day = DAY;
+	/** Columns that show other cards than `cards`. */
+	columns: Partial<Record<DropColumn, ListCard[]>> = {};
+	/** Labels the settings hold. */
+	labels: { name: string; color: "red" | "orange" }[] = [];
+
+	entry(): QuickEntrySession {
+		const titles = priorityTitles(
+			[
 				{ prefix: "!!", color: "red" },
 				{ prefix: "p1", color: "orange" },
-			]).isBlank,
-			onChange: (state, drawnNext) => {
-				this.changes.push(state);
-				this.drawnNext.push(drawnNext === true);
-				this.lastState = state;
-				if (drawnNext !== true) this.see(state);
+			],
+			this.labels,
+		);
+		return new QuickEntrySession(
+			{
+				...titles,
+				createInPlace: async (text, priority, place, repeat) => {
+					if (this.failing.has(text)) throw new Error(`no ${text}`);
+					this.created.push({ text, priority, place });
+					// A schedule gives the task its first day: it leaves a column of tasks without one.
+					if (this.elsewhere || (this.undated && repeat?.kind === "schedule")) return { section: "soon", index: 0, path: [], raw: text };
+					return this.land(text, place);
+				},
+				createSection: async (name, place) => {
+					this.sectionsMade.push({ name, place });
+					return null;
+				},
+				edit: async (k, draft) => {
+					if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
+					this.edits.push({ key: k, draft });
+				},
+				placementOf: () => ({ kind: "now" }),
+				placementOfDay: (date) => (date === DAY ? { kind: "now" } : { kind: "date", date }),
+				dayOfPlacement: (placement) => (placement.kind === "now" ? DAY : placement.kind === "date" ? placement.date : null),
 			},
-			onError: (e) => this.errors.push(e),
-		});
+			{
+				cards: (column) => this.columns[column] ?? this.cards,
+				sections: () => this.sections,
+				sectioned: () => this.sectioned,
+				day: () => this.day,
+				today: () => DAY,
+				mode: () => this.mode,
+				fresh: async (beforeShow) => {
+					await this.gate;
+					if (this.failingReads.has(++this.reads)) throw new Error("no read");
+					const coming = this.written ?? this.cards;
+					beforeShow?.(() => coming);
+					this.cards = coming;
+					this.written = null;
+					if (beforeShow) this.see(this.lastState);
+				},
+				onChange: (state, drawnNext) => {
+					this.changes.push(state);
+					this.drawnNext.push(drawnNext === true);
+					this.lastState = state;
+					if (drawnNext !== true) this.see(state);
+				},
+			},
+			new SerialWrites((e) => this.errors.push(e)),
+		);
 	}
 
 	private see(state: EntryState | null): void {
@@ -156,7 +195,7 @@ class FakeTasks {
 	}
 }
 
-describe("QuickEntry", () => {
+describe("QuickEntrySession", () => {
 	it("enter creates at the place and moves the field down", async () => {
 		const tasks = new FakeTasks(["A", "B"]);
 		const entry = tasks.entry();
@@ -166,7 +205,7 @@ describe("QuickEntry", () => {
 		entry.enter();
 		expect(entry.state).toMatchObject({ text: "", priority: null, pending: [{ text: "New", level: 0 }], spot: at(1) });
 		await entry.idle();
-		expect(tasks.created).toEqual([{ text: "New", priority: "!", place: { kind: "list", list: "now", group: null, before: key("B") } }]);
+		expect(tasks.created).toEqual([{ text: "New", priority: "!", place: { kind: "day", date: DAY, group: null, before: key("B") } }]);
 		expect(tasks.names).toEqual(["A:0", "New:0", "B:0"]);
 		expect(entry.state).toMatchObject({ text: "", pending: [], spot: at(2) });
 		expect(tasks.changes[tasks.changes.length - 1]).toEqual(entry.state);
@@ -234,7 +273,7 @@ describe("QuickEntry", () => {
 		entry.open(at(2));
 		entry.type("1");
 		entry.enter();
-		entry.moveTo(at(0));
+		entry.moveToEnd("soon");
 		const after = tasks.changes.length;
 		gate.resolve();
 		await entry.idle();
@@ -289,7 +328,7 @@ describe("QuickEntry", () => {
 		gate.resolve();
 		await entry.idle();
 		expect(tasks.created.map((c) => c.text)).toEqual(["1", "2", "3", "4", "5"]);
-		expect(tasks.created.map((c) => c.place)).toEqual(Array(5).fill({ kind: "list", list: "now", group: null, before: key("B") }));
+		expect(tasks.created.map((c) => c.place)).toEqual(Array(5).fill({ kind: "day", date: DAY, group: null, before: key("B") }));
 		expect(tasks.names).toEqual(["A:0", "1:0", "2:0", "3:0", "4:0", "5:0", "B:0", "C:0"]);
 		expect(entry.state).toMatchObject({ pending: [], spot: at(6) });
 	});
@@ -396,15 +435,16 @@ describe("QuickEntry", () => {
 		expect(tasks.names).toEqual(["kept:0"]);
 	});
 
-	it("moveTo keeps text and priority", () => {
+	it("a place chosen keeps the text and priority, and stands the field at the end of that place's column, in its last section", () => {
 		const tasks = new FakeTasks(["A"]);
+		tasks.sections = ["Home", "Work"];
 		const entry = tasks.entry();
 		entry.open(at(1));
 		entry.type("Call");
 		entry.setPriority("!");
-		const soonEnd: EntrySpot = { kind: "list", column: "soon", place: { kind: "gap", index: 0, level: 0, group: "Work" } };
-		entry.moveTo(soonEnd);
-		expect(entry.state).toMatchObject({ spot: soonEnd, text: "Call", priority: "!", pending: [] });
+		expect(entry.choosePlace({ kind: "soon" })).toEqual({ column: "soon", day: null });
+		const soonEnd: EntrySpot = { kind: "list", column: "soon", place: { kind: "gap", index: 1, level: 0, group: "Work" } };
+		expect(entry.state).toMatchObject({ spot: soonEnd, text: "Call", priority: "!", pending: [], place: { kind: "soon" } });
 	});
 
 	it("moveTo leaves the writes queued at the old place there", async () => {
@@ -417,12 +457,12 @@ describe("QuickEntry", () => {
 		entry.enter();
 		entry.type("two");
 		entry.enter();
-		entry.moveTo(at(0));
-		expect(entry.state).toMatchObject({ pending: [], spot: at(0) });
+		entry.moveToEnd("soon");
+		expect(entry.state).toMatchObject({ pending: [], spot: inSoon(2) });
 		gate.resolve();
 		await entry.idle();
 		expect(tasks.names).toEqual(["A:0", "one:0", "two:0", "B:0"]);
-		expect(entry.state).toMatchObject({ spot: at(0) });
+		expect(entry.state).toMatchObject({ spot: inSoon(2) });
 	});
 
 	it("indent at the range edge does nothing and canIndent is false", () => {
@@ -608,7 +648,7 @@ describe("QuickEntry", () => {
 	});
 
 	/** Types each text and Enter; "tab" and "shiftTab" move the field instead. */
-	const typeLines = (entry: QuickEntry, lines: readonly string[]) => {
+	const typeLines = (entry: QuickEntrySession, lines: readonly string[]) => {
 		for (const line of lines) {
 			if (line === "tab") entry.indent(1);
 			else if (line === "shiftTab") entry.indent(-1);
@@ -635,7 +675,7 @@ describe("QuickEntry", () => {
 		await entry.idle();
 		expect(tasks.names).toEqual(["A:0", "P:0", "c1:1", "c2:1"]);
 		expect(tasks.created.map((c) => c.place)).toEqual([
-			{ kind: "list", list: "now", group: null, before: null },
+			{ kind: "day", date: DAY, group: null, before: null },
 			{ kind: "subtask", parent: key("P"), before: null },
 			{ kind: "subtask", parent: key("P"), before: null },
 		]);
@@ -835,48 +875,6 @@ describe("QuickEntry", () => {
 		expect(tasks.names).toEqual(["X:0", "A:0", "B:0"]);
 		expect(tasks.edits).toEqual([{ key: tasks.cards[2].key, draft: { text: "B2", placement: { kind: "now" }, priority: "!" } }]);
 	});
-});
-
-describe("WriteQueue", () => {
-	it("runs one job at a time, in order, past a failing one", async () => {
-		const errors: unknown[] = [];
-		const queue = new WriteQueue((e) => errors.push(e));
-		const log: string[] = [];
-		const first = deferred();
-		queue.push(async () => {
-			log.push("1 start");
-			await first.promise;
-			log.push("1 end");
-		});
-		queue.push(async () => {
-			throw new Error("2");
-		});
-		queue.push(async () => {
-			log.push("3");
-		});
-		await Promise.resolve();
-		expect(log).toEqual(["1 start"]);
-		first.resolve();
-		await queue.idle();
-		expect(log).toEqual(["1 start", "1 end", "3"]);
-		expect(errors).toHaveLength(1);
-	});
-
-	it("goes on when the error handler itself throws", async () => {
-		const queue = new WriteQueue(() => {
-			throw new Error("handler");
-		});
-		const log: string[] = [];
-		queue.push(async () => {
-			throw new Error("job");
-		});
-		queue.push(async () => {
-			log.push("next");
-		});
-		await queue.idle();
-		expect(log).toEqual(["next"]);
-	});
-
 	it("the field switched to a section writes `### name` where it stands and closes", async () => {
 		const tasks = new FakeTasks(["A", "B"]);
 		const entry = tasks.entry();
@@ -888,7 +886,7 @@ describe("WriteQueue", () => {
 		entry.enter();
 		expect(entry.state).toBeNull();
 		await entry.idle();
-		expect(tasks.sectionsMade).toEqual([{ name: "Evening", place: { kind: "list", list: "now", group: null, before: key("B") } }]);
+		expect(tasks.sectionsMade).toEqual([{ name: "Evening", place: { kind: "day", date: DAY, group: null, before: key("B") } }]);
 		expect(tasks.created).toEqual([]);
 	});
 
@@ -926,5 +924,173 @@ describe("WriteQueue", () => {
 		entry.blur();
 		await entry.idle();
 		expect(tasks.sectionsMade.map((s) => s.name)).toEqual(["Later"]);
+	});
+
+	describe("where a task written in a column goes", () => {
+		const task = { kind: "task", group: "Work", before: key("B") } as const;
+
+		it("the day column: the day it shows, today, a later or a past one; the service gives its list and due date", () => {
+			for (const day of [DAY, "2026-11-05", "2026-10-28"]) {
+				const tasks = new FakeTasks([]);
+				tasks.day = day;
+				expect(tasks.entry().placeOf("left", task)).toEqual({ kind: "day", date: day, group: "Work", before: key("B") });
+			}
+		});
+
+		it("Soon, Inbox and Backlog: their own lists", () => {
+			const entry = new FakeTasks([]).entry();
+			for (const list of ["soon", "inbox", "backlog"] as const) expect(entry.placeOf(list, task)).toEqual({ kind: "list", list, group: "Work", before: key("B") });
+		});
+
+		it("a subtask: under its task, wherever the column", () => {
+			expect(new FakeTasks([]).entry().placeOf("inbox", { kind: "subtask", parent: key("A"), before: null })).toEqual({ kind: "subtask", parent: key("A"), before: null });
+		});
+	});
+
+	describe("what the bar shows and what its taps write", () => {
+		it("a level tapped is chosen, tapped again taken off; a prefix typed gives way to the level chosen", () => {
+			const entry = new FakeTasks([]).entry();
+			entry.open(at(0));
+			entry.type("p1 Call");
+			expect(entry.state?.marks.priority?.prefix).toBe("p1");
+			entry.togglePriority("!!");
+			expect(entry.state).toMatchObject({ text: "Call", priority: "!!" });
+			entry.togglePriority("!!");
+			expect(entry.state).toMatchObject({ text: "Call", priority: null });
+			entry.type("p1 Call");
+			entry.togglePriority("p1");
+			expect(entry.state).toMatchObject({ text: "Call", priority: null, marks: { priority: null } });
+		});
+
+		it("a label tapped goes on, tapped again comes off, the others kept", () => {
+			const tasks = new FakeTasks([]);
+			tasks.labels = [
+				{ name: "home", color: "red" },
+				{ name: "work", color: "orange" },
+			];
+			const entry = tasks.entry();
+			entry.open(at(0));
+			entry.toggleLabel("work");
+			entry.toggleLabel("home");
+			expect(entry.state?.labels).toEqual(["work", "home"]);
+			entry.toggleLabel("work");
+			expect(entry.state?.labels).toEqual(["home"]);
+		});
+
+		it("the place: the column's for a task at the top level; none for a subtask, a slot or a stack", () => {
+			const entry = new FakeTasks(["A"]).entry();
+			entry.open(at(1));
+			expect(entry.state).toMatchObject({ place: { kind: "now" }, places: ["inbox", "backlog", "soon", "now"] });
+			entry.open(inSoon(0));
+			expect(entry.state?.place).toEqual({ kind: "soon" });
+			entry.open(at(1, 1));
+			expect(entry.state?.place).toBeNull();
+			entry.open({ kind: "slot", slot: SLOT });
+			expect(entry.state?.place).toBeNull();
+			entry.open({ kind: "stack", parent: key("A") });
+			expect(entry.state?.place).toBeNull();
+		});
+
+		it("a renamed task shows where it is until a place is chosen; a renamed subtask shows none", () => {
+			const tasks = new FakeTasks(["A"]);
+			const entry = tasks.entry();
+			entry.open(inSoon(0), item("A"));
+			expect(entry.state?.place).toEqual({ kind: "now" });
+			entry.choosePlace({ kind: "inbox" });
+			expect(entry.state?.place).toEqual({ kind: "inbox" });
+			entry.open(at(0), { ...item("A"), isSubtask: true });
+			expect(entry.state?.place).toBeNull();
+		});
+
+		it("the place the field already has changes nothing; another day asks the day column to open it", () => {
+			const entry = new FakeTasks(["A"]).entry();
+			entry.open(at(1));
+			const changes = entry.state;
+			expect(entry.choosePlace({ kind: "now" })).toBeNull();
+			expect(entry.state).toEqual(changes);
+			expect(entry.choosePlace({ kind: "date", date: "2026-11-05" })).toEqual({ column: "left", day: "2026-11-05" });
+			expect(entry.choosePlace({ kind: "backlog" })).toEqual({ column: "backlog", day: null });
+		});
+
+		it("a new rule starts from the field's day, else today; a slot takes none; only a list's field shifts", () => {
+			const tasks = new FakeTasks(["A"]);
+			tasks.day = "2026-11-05";
+			const entry = tasks.entry();
+			entry.open(at(1));
+			expect(entry.state).toMatchObject({ repeatDay: "2026-11-05", repeatable: true, indents: true });
+			entry.open(inSoon(0));
+			expect(entry.state).toMatchObject({ repeatDay: DAY });
+			entry.open({ kind: "slot", slot: SLOT });
+			expect(entry.state).toMatchObject({ repeatable: false, indents: false });
+			entry.open({ kind: "stack", parent: key("A") });
+			expect(entry.state).toMatchObject({ repeatable: true, indents: false });
+		});
+	});
+
+	describe("where the field opens", () => {
+		/** A card whose key tells it apart from the others by its place, as the file's keys do. */
+		const placed = (name: string, index: number, level = 0): ListCard => ({ key: { section: "now", index, path: [], raw: name }, level, group: null });
+
+		it("the plus: the end of the day column, of Inbox while the window shows Inbox; in the last section, at the top level", () => {
+			const tasks = new FakeTasks(["A", ["A1", 1]]);
+			tasks.sections = ["Home", "Work"];
+			const entry = tasks.entry();
+			entry.openFromPlus();
+			expect(entry.state?.spot).toEqual({ kind: "list", column: "left", place: { kind: "gap", index: 2, level: 0, group: "Work" } });
+			tasks.mode = "inbox";
+			entry.openFromPlus();
+			expect(entry.state?.spot).toMatchObject({ kind: "list", column: "inbox" });
+		});
+
+		it("an empty section's plate: the gap of that section", () => {
+			const tasks = new FakeTasks([]);
+			tasks.cards = [{ key: key("A"), level: 0, group: "Home" }];
+			const entry = tasks.entry();
+			entry.openIn("soon", "Work");
+			expect(entry.state?.spot).toEqual({ kind: "list", column: "soon", place: { kind: "gap", index: 1, level: 0, group: "Work" } });
+		});
+
+		it("the plus let go: where the drop showed, in a list or a slot; nowhere else", () => {
+			const tasks = new FakeTasks([]);
+			tasks.cards = [placed("A", 0), placed("B", 1)];
+			const entry = tasks.entry();
+			expect(entry.openAtDrop("soon", { kind: "list", column: "soon", before: tasks.cards[1].key })).toBe(true);
+			expect(entry.state?.spot).toEqual(inSoon(1));
+			expect(entry.openAtDrop("left", { kind: "nest", parent: tasks.cards[0].key, before: null })).toBe(true);
+			expect(entry.state?.spot).toEqual(at(1, 1));
+			expect(entry.openAtDrop(null, { kind: "slot", slot: SLOT })).toBe(true);
+			expect(entry.state?.spot).toEqual({ kind: "slot", slot: SLOT });
+			entry.escape();
+			expect(entry.openAtDrop(null, null)).toBe(false);
+			expect(entry.openAtDrop(null, { kind: "clearSlot" })).toBe(false);
+			expect(entry.state).toBeNull();
+		});
+
+		it("a task is looked for in the columns the window shows first", () => {
+			const tasks = new FakeTasks([]);
+			const found = placed("A", 1);
+			tasks.columns = { left: [placed("Y", 0), found], soon: [placed("X", 0), found], inbox: [], backlog: [] };
+			const entry = tasks.entry();
+			expect(entry.subtaskSpot(found.key)).toMatchObject({ kind: "list", column: "left" });
+			tasks.mode = "soon";
+			expect(entry.subtaskSpot(found.key)).toEqual({ kind: "list", column: "soon", place: { kind: "gap", index: 2, level: 1, group: null } });
+		});
+
+		it("a subtask of a task no list shows: in its menu's stack", () => {
+			const entry = new FakeTasks([]).entry();
+			expect(entry.subtaskSpot(key("A"))).toEqual({ kind: "stack", parent: key("A") });
+		});
+
+		it("a rename: before its card in a list; else in the menu's stack it was opened from; else over its card on the timeline; else nowhere", () => {
+			const tasks = new FakeTasks([]);
+			tasks.cards = [placed("X", 0), placed("A", 1, 1)];
+			const entry = tasks.entry();
+			const renamed = { ...item("A"), key: tasks.cards[1].key };
+			expect(entry.renameSpot(renamed, true)).toEqual(at(1, 1));
+			tasks.cards = [];
+			expect(entry.renameSpot(renamed, true)).toEqual({ kind: "stack", parent: renamed.key });
+			expect(entry.renameSpot({ ...item("A"), slot: SLOT }, false)).toEqual({ kind: "slot", slot: SLOT });
+			expect(entry.renameSpot(item("A"), false)).toBeNull();
+		});
 	});
 });
