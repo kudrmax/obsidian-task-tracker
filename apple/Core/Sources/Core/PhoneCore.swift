@@ -44,8 +44,8 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         try Self.action(call("silence", text, settingsJSON, id, Self.ms(now)))
     }
 
-    public func capture(list: CaptureList, title: String, description: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult {
-        try Self.action(call("capture", text, settingsJSON, list.rawValue, title, description, Self.ms(now)))
+    public func capture(list: CaptureList, title: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult {
+        try Self.action(call("capture", text, settingsJSON, list.rawValue, title, Self.ms(now)))
     }
 
     public func calendarFiles(settingsJSON: String) throws -> [String] {

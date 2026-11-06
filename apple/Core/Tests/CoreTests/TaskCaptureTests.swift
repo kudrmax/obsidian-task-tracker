@@ -20,7 +20,7 @@ import Testing
 }
 
 @Suite struct TaskCaptureTests {
-    static let file = "## Inbox\n\n- [ ] Old\n\n## Now\n\n## Soon\n\n## Done\n"
+    static let file = "## Inbox\n\n- [ ] Old\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n"
     let at = Fixtures.date(6, 14, 32)
 
     func capture(_ vault: FakeVault) throws -> TaskCapture {
@@ -45,19 +45,39 @@ import Testing
         #expect(vault.text.contains("- [ ] Call the bank\n"))
     }
 
-    @Test func aRecordingIsSavedAndEmbeddedUnderTheTask() throws {
+    @Test func backlogAndSoonTakeNoDate() throws {
+        let vault = FakeVault(Self.file)
+        _ = try capture(vault).capture(list: .backlog, text: "Learn Go", recording: nil)
+        _ = try capture(vault).capture(list: .soon, text: "Book a table", recording: nil)
+        #expect(vault.text.contains("## Soon\n\n- [ ] Book a table\n"))
+        #expect(vault.text.contains("## Backlog\n\n- [ ] Learn Go\n"))
+    }
+
+    @Test func aRecordingIsSavedAndLinkedWithTheTag() throws {
         let vault = FakeVault(Self.file)
         vault.files[".obsidian/app.json"] = #"{"attachmentFolderPath":"Audio"}"#
         let sound = Data([1, 2, 3])
-        #expect(try capture(vault).capture(list: .inbox, text: "", recording: sound) == .saved)
+        #expect(try capture(vault).capture(list: .inbox, text: "", recording: sound, tag: "#transcribe") == .saved)
         #expect(vault.saved["Audio/Recording 20261106143200.m4a"] == sound)
-        #expect(vault.text.contains("- [ ] Voice note 14:32\n\t![[Recording 20261106143200.m4a]]\n"))
+        #expect(vault.text.contains("- [ ] Old\n- [ ] [[Recording 20261106143200.m4a]] #transcribe\n"))
     }
 
     @Test func textAndRecordingTogether() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .now, text: "Idea", recording: Data([1]))
-        #expect(vault.text.contains("- [ ] Idea 📅 2026-11-06\n\t![[Recording 20261106143200.m4a]]\n"))
+        _ = try capture(vault).capture(list: .now, text: "Idea", recording: Data([1]), tag: "transcribe")
+        #expect(vault.text.contains("- [ ] Idea [[Recording 20261106143200.m4a]] #transcribe 📅 2026-11-06\n"))
+    }
+
+    @Test func noTagWhenNoneIsSet() throws {
+        let vault = FakeVault(Self.file)
+        _ = try capture(vault).capture(list: .inbox, text: "", recording: Data([1]), tag: " ")
+        #expect(vault.text.contains("- [ ] [[Recording 20261106143200.m4a]]\n"))
+    }
+
+    @Test func theTagIsOnlyForARecording() throws {
+        let vault = FakeVault(Self.file)
+        _ = try capture(vault).capture(list: .inbox, text: "Typed", recording: nil, tag: "#transcribe")
+        #expect(vault.text.contains("- [ ] Typed\n"))
     }
 
     @Test func nothingToWrite() throws {

@@ -1,8 +1,8 @@
 import Foundation
 
-/// The lists a task is written into from the phone: Inbox to sort out later, Now for today.
+/// The lists a task is written into from the phone.
 public enum CaptureList: String, CaseIterable, Sendable {
-    case inbox, now
+    case inbox, now, soon, backlog
 }
 
 public enum CaptureOutcome: Equatable, Sendable {
@@ -42,7 +42,7 @@ public enum AttachmentFolder {
 }
 
 /// A task typed or spoken on the phone: the recording goes into the vault as Obsidian's own recorder would save it,
-/// the task into the list with the recording as its description.
+/// the task into the list with a link to the recording and the tag that has it transcribed.
 public final class TaskCapture: Sendable {
     static let recordingExtension = "m4a"
 
@@ -56,23 +56,23 @@ public final class TaskCapture: Sendable {
         self.now = now
     }
 
-    /// `recording`: an `m4a` file's bytes, or none. Nothing to write when both are empty.
-    public func capture(list: CaptureList, text: String, recording: Data?) -> CaptureOutcome {
+    /// `recording`: an `m4a` file's bytes, or none; `tag` follows its link, empty for none. Nothing to write when both are empty.
+    public func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
         let at = now()
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !typed.isEmpty || recording != nil else { return .saved }
         do {
-            var description = ""
+            var parts = typed.isEmpty ? [] : [Self.oneLine(typed)]
             if let recording {
                 let folder = AttachmentFolder.path(appJSON: vault.read(path: AttachmentFolder.appSettingsPath), notePath: try vault.tasksFilePath())
-                let name = try vault.save(recording, in: folder, named: Self.recordingName(at))
-                description = "![[\(name)]]"
+                parts.append("[[\(try vault.save(recording, in: folder, named: Self.recordingName(at)))]]")
+                if let tag = Self.tag(tag) { parts.append(tag) }
             }
-            let title = typed.isEmpty ? Self.voiceNoteTitle(at) : Self.oneLine(typed)
+            let title = parts.joined(separator: " ")
             // A second try reads again: the file may have changed between the read and the write.
             for _ in 0..<2 {
                 let file = try vault.read()
-                guard case .changed(let written) = try rules.capture(list: list, title: title, description: description, text: file.tasks, settingsJSON: file.settingsJSON, now: at) else {
+                guard case .changed(let written) = try rules.capture(list: list, title: title, text: file.tasks, settingsJSON: file.settingsJSON, now: at) else {
                     return .failed(Self.failure)
                 }
                 if try vault.write(tasks: written, expecting: file.tasks) { return .saved }
@@ -94,8 +94,10 @@ public final class TaskCapture: Sendable {
         "Recording \(format("yyyyMMddHHmmss", at)).\(recordingExtension)"
     }
 
-    static func voiceNoteTitle(_ at: Date) -> String {
-        "Voice note \(format("HH:mm", at))"
+    /// `#name` from what was typed in the settings, with or without the `#`; nil for nothing.
+    static func tag(_ typed: String) -> String? {
+        let name = typed.trimmingCharacters(in: .whitespaces).drop { $0 == "#" }
+        return name.isEmpty ? nil : "#\(name)"
     }
 
     /// A task is one line: the lines typed are joined by spaces.

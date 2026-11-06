@@ -76,7 +76,8 @@ struct CaptureView: View {
         let recording = recorder.take()
         let typed = text
         let target = list.core
-        let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording) }.value
+        let tag = AppSettings.recordingTag
+        let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag) }.value
         switch outcome {
         case .saved:
             recorder.discard()
@@ -184,6 +185,8 @@ extension CaptureListOption {
         switch self {
         case .inbox: "tray"
         case .now: "sun.max"
+        case .soon: "calendar"
+        case .backlog: "archivebox"
         }
     }
 }

@@ -4,7 +4,7 @@ import Core
 /// A task said to Siri or passed by a shortcut, written without opening the app.
 struct AddTaskIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Task"
-    static let description = IntentDescription("Adds a task to Inbox or Now in the tasks file.")
+    static let description = IntentDescription("Adds a task to Inbox, Now, Soon or Backlog in the tasks file.")
     static let supportedModes: IntentModes = .background
 
     @Parameter(title: "Task", requestValueDialog: "What's the task?") var text: String
@@ -37,6 +37,8 @@ extension CaptureListOption {
         switch self {
         case .inbox: .inbox
         case .now: .now
+        case .soon: .soon
+        case .backlog: .backlog
         }
     }
 
@@ -44,6 +46,8 @@ extension CaptureListOption {
         switch self {
         case .inbox: "Inbox"
         case .now: "Now"
+        case .soon: "Soon"
+        case .backlog: "Backlog"
         }
     }
 }

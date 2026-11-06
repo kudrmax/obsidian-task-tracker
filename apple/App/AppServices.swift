@@ -16,8 +16,8 @@ final class AppServices: Sendable {
         tasks = TaskCapture(vault: vault, rules: rules)
     }
 
-    func capture(list: CaptureList, text: String, recording: Data?) -> CaptureOutcome {
-        tasks.capture(list: list, text: text, recording: recording)
+    func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
+        tasks.capture(list: list, text: text, recording: recording, tag: tag)
     }
 
     @discardableResult

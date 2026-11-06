@@ -20,6 +20,10 @@ final class SettingsModel {
         }
     }
 
+    var recordingTag = AppSettings.recordingTag {
+        didSet { AppSettings.recordingTag = recordingTag }
+    }
+
     var alarmSnooze = AppSettings.alarmSnooze {
         didSet { AppSettings.alarmSnooze = alarmSnooze }
     }
