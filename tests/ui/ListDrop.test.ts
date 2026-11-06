@@ -80,7 +80,7 @@ describe("ListDrop", () => {
 	it("in a grouped list a card from another column takes a gap", () => {
 		const b = item("soon", 1, "B", "Morning");
 		const { drop, list } = setup([item("soon", 0, "A", null), b, item("soon", 2, "C", "Morning")], "soon", "soon");
-		const from = drag("left", item("now", 0, "N", null));
+		const from = drag("day", item("now", 0, "N", null));
 		drop.preview(50, picking(100 + 3 * 40 + 2), from);
 		expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", "", "", ""]);
 		expect(list.el.querySelector(".tc-list-drop.is-shown .tc-drop-line")).not.toBeNull();
@@ -90,19 +90,19 @@ describe("ListDrop", () => {
 	});
 
 	it("the gap above the first header is the hidden No section", () => {
-		const { drop } = setup([item("now", 0, "A", "X")], "left", "now");
+		const { drop } = setup([item("now", 0, "A", "X")], "day", "now");
 		expect(drop.drop(50, 95, drag("soon", item("soon", 0, "S", null)))).toEqual({ kind: "group", list: "now", date: null, group: null, before: null });
 	});
 
 	it("the day column of a later day drops into Soon's sections with that day", () => {
-		const { drop } = setup([item("soon", 0, "M", "Morning")], "left", "soon", "2026-10-31");
+		const { drop } = setup([item("soon", 0, "M", "Morning")], "day", "soon", "2026-10-31");
 		expect(drop.drop(50, 95, drag("soon", item("soon", 1, "S", null)))).toEqual({ kind: "group", list: "soon", date: "2026-10-31", group: null, before: null });
 	});
 
 	it("a finger above the list, over the column's title, still drops into it: on top of the first header", () => {
 		const only = item("now", 0, "A", "X");
-		const { drop } = setup([only], "left", "now");
-		const from = drag("left", only);
+		const { drop } = setup([only], "day", "now");
+		const from = drag("day", only);
 		expect(drop.hitTest(50, 60, from)).toBe(true);
 		expect(drop.drop(50, 60, from)).toEqual({ kind: "group", list: "now", date: null, group: null, before: null });
 		expect(drop.hitTest(50, 20, from)).toBe(false);
@@ -121,7 +121,7 @@ describe("ListDrop", () => {
 
 	it("under the list the column takes nothing", () => {
 		const only = item("now", 0, "A", null);
-		const { drop, list } = setup([only], "left", "now");
+		const { drop, list } = setup([only], "day", "now");
 		list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 300);
 		const from = drag("soon", item("soon", 0, "S", null));
 		expect(drop.hitTest(50, 399, from)).toBe(true);
@@ -130,8 +130,8 @@ describe("ListDrop", () => {
 
 	it("the left column of a past day drops into the list, with no section", () => {
 		const a = item("now", 0, "A", null);
-		const { drop } = setup([a, item("now", 1, "B", null)], "left", null);
-		expect(drop.drop(50, 101, drag("left", item("now", 1, "B", null)))).toEqual({ kind: "list", column: "left", before: a.key });
+		const { drop } = setup([a, item("now", 1, "B", null)], "day", null);
+		expect(drop.drop(50, 101, drag("day", item("now", 1, "B", null)))).toEqual({ kind: "list", column: "day", before: a.key });
 	});
 
 	describe("the left column of a past day, its tasks in sections it does not show", () => {
@@ -140,18 +140,18 @@ describe("ListDrop", () => {
 
 		it("a new task let go between cards of two sections goes before the one under it", () => {
 			const items = two();
-			const { drop } = setup(items, "left", null);
+			const { drop } = setup(items, "day", null);
 			const y = 100 + 40 + 2;
 			drop.preview(50, y, fresh);
 			const line = drop.landing()!;
 			expect(line.height).toBe(0);
 			expect(line.top).toBeGreaterThan(135);
 			expect(line.top).toBeLessThan(140);
-			expect(drop.drop(50, y, fresh)).toEqual({ kind: "list", column: "left", before: items[1].key });
+			expect(drop.drop(50, y, fresh)).toEqual({ kind: "list", column: "day", before: items[1].key });
 		});
 
 		it("gives each card the section it is drawn in: none", () => {
-			const { list } = setup(two(), "left", null);
+			const { list } = setup(two(), "day", null);
 			expect(list.listCards.map((card) => card.group)).toEqual([null, null]);
 		});
 	});
@@ -218,10 +218,10 @@ describe("ListDrop", () => {
 
 		it("never goes into a card: over its middle it takes the nearer gap", () => {
 			const items = three();
-			const { drop } = setup(items, "left", null);
-			expect(drop.drop(50, 140 + 17, fresh)).toEqual({ kind: "list", column: "left", before: items[1].key });
+			const { drop } = setup(items, "day", null);
+			expect(drop.drop(50, 140 + 17, fresh)).toEqual({ kind: "list", column: "day", before: items[1].key });
 			drop.clear();
-			expect(drop.drop(50, 140 + 18, fresh)).toEqual({ kind: "list", column: "left", before: items[2].key });
+			expect(drop.drop(50, 140 + 18, fresh)).toEqual({ kind: "list", column: "day", before: items[2].key });
 		});
 
 		it("takes the gap of a section in a list that shows sections", () => {
@@ -231,8 +231,8 @@ describe("ListDrop", () => {
 		});
 
 		it("is refused by a list that does not accept it", () => {
-			const { drop, list } = setup(three(), "left", null);
-			const refusing = new ListDrop(list, list.el.parentElement!, "left", (origins) => !origins.includes("new"));
+			const { drop, list } = setup(three(), "day", null);
+			const refusing = new ListDrop(list, list.el.parentElement!, "day", (origins) => !origins.includes("new"));
 			expect(refusing.hitTest(50, 120, fresh)).toBe(false);
 			expect(refusing.drop(50, 120, fresh)).toBeNull();
 			expect(drop.hitTest(50, 120, fresh)).toBe(true);
@@ -247,12 +247,12 @@ describe("ListDrop", () => {
 		/** Cards a step apart, as drawn: the lifted one waits where it stood, a dashed place as tall as a card. */
 		function lifted(at: number) {
 			const items = four();
-			const { list, drop } = setup(items, "left", null);
+			const { list, drop } = setup(items, "day", null);
 			list.el.style.setProperty("--tc-subtask-indent", "20px");
 			standAt(list.elements, STEP);
 			list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
 			list.elements[at].classList.add("is-lifted", "is-waiting");
-			return { list, drop, items, from: drag("left", items[at]) };
+			return { list, drop, items, from: drag("day", items[at]) };
 		}
 
 		beforeEach(() => document.body.replaceChildren());
@@ -276,7 +276,7 @@ describe("ListDrop", () => {
 			expect(top).toBeLessThanOrEqual(3 * STEP);
 			expect(list.elements.map((n) => n.style.transform)).toEqual(["", "", "", ""]);
 			expect(list.elements[1].classList.contains("is-waiting")).toBe(true);
-			expect(drop.drop(27, picking(100 + 3 * STEP + 2), from)).toEqual({ kind: "list", column: "left", before: items[3].key });
+			expect(drop.drop(27, picking(100 + 3 * STEP + 2), from)).toEqual({ kind: "list", column: "day", before: items[3].key });
 		});
 
 		it("lands where the card will stand once its dashed place above has gone", () => {
@@ -296,7 +296,7 @@ describe("ListDrop", () => {
 
 		it("the card's middle over a card's upper half puts it before that card", () => {
 			const { drop, items, from } = lifted(0);
-			expect(drop.drop(27, picking(100 + 2 * STEP + 8), from)).toEqual({ kind: "list", column: "left", before: items[2].key });
+			expect(drop.drop(27, picking(100 + 2 * STEP + 8), from)).toEqual({ kind: "list", column: "day", before: items[2].key });
 		});
 
 		it("never goes into a card: over its middle the line stands in the gap nearer, the card unlit", () => {
@@ -304,13 +304,13 @@ describe("ListDrop", () => {
 			drop.preview(27, picking(100 + 2 * STEP + 26), from);
 			expect(list.elements.some((node) => node.classList.contains("is-target"))).toBe(false);
 			expect(lineEl()).not.toBeNull();
-			expect(drop.drop(27, picking(100 + 2 * STEP + 26), from)).toEqual({ kind: "list", column: "left", before: items[3].key });
+			expect(drop.drop(27, picking(100 + 2 * STEP + 26), from)).toEqual({ kind: "list", column: "day", before: items[3].key });
 		});
 
 		it("takes its level from the list's middle (97.5), as a new task does, wherever the card is held", () => {
 			const { drop, items, from } = lifted(3);
 			const y = picking(100 + 2 * STEP + 2);
-			expect(drop.drop(90, y, from)).toEqual({ kind: "list", column: "left", before: items[2].key });
+			expect(drop.drop(90, y, from)).toEqual({ kind: "list", column: "day", before: items[2].key });
 			drop.clear();
 			expect(drop.drop(118, y, from)).toEqual({ kind: "nest", parent: items[1].key, before: null });
 		});
@@ -347,10 +347,10 @@ describe("ListDrop", () => {
 		it("several cards carried: let go at the place of one of them, they still move there", () => {
 			const { list, drop, items } = lifted(1);
 			list.elements[3].classList.add("is-lifted", "is-waiting");
-			const many: DragPayload = { item: items[1], from: "left", durationMin: null, grabPx: 17, carried: [{ item: items[3], from: "left" }] };
+			const many: DragPayload = { item: items[1], from: "day", durationMin: null, grabPx: 17, carried: [{ item: items[3], from: "day" }] };
 			drop.preview(27, picking(100 + STEP + 17), many);
 			expect(lineEl()).not.toBeNull();
-			expect(drop.drop(27, picking(100 + STEP + 17), many)).toEqual({ kind: "list", column: "left", before: items[2].key });
+			expect(drop.drop(27, picking(100 + STEP + 17), many)).toEqual({ kind: "list", column: "day", before: items[2].key });
 		});
 
 		it("scrolls the list under a finger held near its bottom edge, the place following", () => {
@@ -373,9 +373,9 @@ describe("ListDrop", () => {
 		const thirty = () => Array.from({ length: 30 }, (_, i) => item("now", i, `T${i}`, null));
 		function liftedOf30(at: number) {
 			const items = thirty();
-			const made = setup(items, "left", null);
+			const made = setup(items, "day", null);
 			made.list.elements[at].classList.add("is-lifted");
-			return { ...made, from: drag("left", items[at]) };
+			return { ...made, from: drag("day", items[at]) };
 		}
 
 		afterEach(() => {

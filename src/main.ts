@@ -6,20 +6,23 @@ import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type Clock, type SettingsStore } from "./application/ports";
 import { SettingsServiceImpl } from "./application/SettingsServiceImpl";
-import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
+import { ScreenSettingsImpl } from "./application/ScreenSettingsImpl";
 import { createServices, type Services, type ServicesHost } from "./compose";
-import type { TaskCalendarSettings } from "./settings";
+import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
+import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
 
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
 const OPEN_ACTION = "task-calendar-open";
 
-/** The plugin is the settings store the view sees; PluginSettings keeps them. */
+/** The plugin is the settings store the services and the view see; PluginSettings keeps them. */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
-	private pluginSettings!: PluginSettings;
+	private pluginSettings!: PluginSettings<StoredSettings>;
+	/** The view's own settings, kept in the same file. */
+	protected readonly viewSettings = new ViewSettingsStore(this);
 	/** The real services, once built (the demo build has none): open for a look from the console. */
 	services: Services | null = null;
 
@@ -32,6 +35,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				saveLocalStorage: (key, data) => this.app.saveLocalStorage(key, data),
 			},
 			`${this.pluginDir}/data.json`,
+			SETTINGS_FILE,
 		);
 		this.pluginSettings.onChange(() => {
 			showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap });
@@ -67,7 +71,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		});
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.addSettingTab(
-			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars }),
+			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), view: this.viewSettings, google: services.google, work: services.work, calendars: services.calendars }),
 		);
 		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => window.open(url), runScript: runAppleScript });
 		return {
@@ -75,10 +79,15 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			days: services.days,
 			undo: services.undo,
 			calendars: services.calendars,
-			settings: new ViewSettingsImpl(this),
+			settings: this.shownSettings(),
 			clock,
 			openInCalendar: (event) => calendarApp.open(event),
 		};
+	}
+
+	/** What the screen reads: the shared settings it draws and the view's own. */
+	protected shownSettings(): ShownSettingsStore {
+		return new ShownSettingsStore(new ScreenSettingsImpl(this), this.viewSettings);
 	}
 
 	private get pluginDir(): string {
@@ -126,11 +135,11 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		return watcher;
 	}
 
-	get(): TaskCalendarSettings {
+	get(): StoredSettings {
 		return this.pluginSettings.get();
 	}
 
-	update(patch: Partial<TaskCalendarSettings>): Promise<void> {
+	update(patch: Partial<StoredSettings>): Promise<void> {
 		return this.pluginSettings.update(patch);
 	}
 

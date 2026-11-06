@@ -5,7 +5,7 @@ import type { DropResult, DropTarget } from "../../src/ui/drag/DropTarget";
 import { DragController, type DragControllerDeps } from "../../src/ui/drag/DragController";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { DESIGN } from "../../src/ui/design";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { VIEW_DEFAULTS } from "../../src/ui/viewSettings";
 
 const rect = (x: number, y: number) => new DOMRect(x, y, 44, 36);
 const landing = new DOMRect(100, 200, 150, 40);
@@ -282,7 +282,7 @@ describe("DragController: a tap on a list card", () => {
 		const card = document.body.appendChild(document.createElement("div"));
 		const count = card.appendChild(document.createElement("span"));
 		count.className = "tc-count";
-		new DragController(deps).attachCard(card, { key: { section: "now", index: 0, path: [], raw: "- [ ] A" } } as unknown as TaskItem, "left");
+		new DragController(deps).attachCard(card, { key: { section: "now", index: 0, path: [], raw: "- [ ] A" } } as unknown as TaskItem, "day");
 		on(card).dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
 		card.dispatchEvent(Object.assign(new Event("pointerup", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, pointerType: "touch" }));
 		return { onMenu, count };
@@ -355,7 +355,7 @@ describe("DragController: stretching a block (block 3)", () => {
 		haptics.tap.mockClear();
 		pointer("pointermove", 50, 720);
 		pointer("pointerup", 50, 720);
-		await vi.waitFor(() => expect(deps.onResize).toHaveBeenCalledWith(item, "end", 720, ((DEFAULT_SETTINGS.cardHeight + DESIGN.itemGap) / 56) * 60));
+		await vi.waitFor(() => expect(deps.onResize).toHaveBeenCalledWith(item, "end", 720, ((VIEW_DEFAULTS.cardHeight + DESIGN.itemGap) / 56) * 60));
 		await vi.waitFor(() => expect(haptics.tap).toHaveBeenCalledTimes(1));
 	});
 

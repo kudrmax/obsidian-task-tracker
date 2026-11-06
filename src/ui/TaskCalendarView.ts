@@ -1,5 +1,6 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock, LIST_WIDTH_MIN, type RightMode, type ScreenSettings, type ViewSettingsStore, type ZoomLevel } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock } from "../application/contracts";
+import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
@@ -15,6 +16,7 @@ import { ListDrop } from "./drag/ListDrop";
 import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
+import { failureText } from "./failureText";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
@@ -76,7 +78,7 @@ export interface ViewDeps {
 	/** The plugin's own changes of the tasks file, taken back by the corner button and Cmd+Z. */
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
-	readonly settings: ViewSettingsStore;
+	readonly settings: ShownSettingsStore;
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
@@ -125,7 +127,7 @@ export class TaskCalendarView extends ItemView {
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	/** The settings the screen last followed: a change is weighed against them. */
-	private seen: ScreenSettings;
+	private seen: ShownSettings;
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -255,17 +257,17 @@ export class TaskCalendarView extends ItemView {
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
-			grouped: () => this.sectionsOf("left") !== null,
-			sections: () => this.listSectionsOf("left"),
-			onPlate: (plate, group) => this.attachPlate(plate, "left", group),
-			pending: () => this.namingIn("left"),
-			entry: () => this.quick?.entryIn("left") ?? null,
+			grouped: () => this.sectionsOf("day") !== null,
+			sections: () => this.listSectionsOf("day"),
+			onPlate: (plate, group) => this.attachPlate(plate, "day", group),
+			pending: () => this.namingIn("day"),
+			entry: () => this.quick?.entryIn("day") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
+			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", (origins) => acceptsDrop("left", origins), () => this.sectionsOf("left"), true, () => this.haptics.tap());
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap());
 		this.doneEl = el(root, "div", "tc-done");
 		this.doneList = new TaskList(el(this.doneEl, "div"), {
 			items: () => this.data.done,
@@ -367,7 +369,7 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx) => this.settleZoom(hourPx),
 		});
-		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("left"));
+		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("day"));
 		new FreeRoomDoubleClick([this.soonEl, this.soonList.el], () => this.quick?.openAtEnd("soon"));
 		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
 		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
@@ -769,7 +771,7 @@ export class TaskCalendarView extends ItemView {
 			if ((await change()) === false) return;
 		} catch (error) {
 			if (!(error instanceof StaleTaskError)) throw error;
-			new Notice(error.message);
+			new Notice(failureText(error));
 		}
 		await this.data.tasks();
 	}
@@ -791,7 +793,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A write the screen did not wait for failed: said as any failed change is, and the lists show the file as it is. */
 	private reportFailure(error: unknown): void {
-		new Notice(error instanceof Error ? error.message : String(error));
+		new Notice(failureText(error));
 		void this.data.tasks();
 	}
 
@@ -872,7 +874,7 @@ export class TaskCalendarView extends ItemView {
 			onDone: (name) => {
 				this.naming = null;
 				this.arbiter.release(NAMING);
-				if (name) void this.act(() => this.deps.tasks.toSection([item.key], name));
+				if (name !== null) void this.act(() => this.deps.tasks.toSection([item.key], name));
 				else this.render();
 			},
 		});
@@ -924,20 +926,20 @@ export class TaskCalendarView extends ItemView {
 	 * column Now's for today and Soon's for a later day, whose tasks lie in Soon with that day; a past day's none.
 	 */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
-		if (column !== "left") return { list: column, date: null };
+		if (column !== "day") return { list: column, date: null };
 		const { list, date, sections } = this.deps.tasks.dayColumn(this.selectedDate);
 		return sections ? { list, date } : null;
 	}
 
 	/** The list column a card stands in, when that column shows its sections: there a task's menu offers them, and the task waits for a new section's name. */
 	private sectionColumn(card: HTMLElement): ListColumn | null {
-		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
+		const columns: ListColumn[] = ["day", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
 		return column && this.sectionsOf(column) ? column : null;
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
-		return { left: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
+		return { day: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
 	}
 
 	/** The lists leave out the card waiting for its section's name; its own list draws it last. */

@@ -5,7 +5,7 @@ import { DragSession, type DragPayload, type DropResult, type DropTarget, type F
 import { onDay } from "../fakes/itemOnDay";
 
 const item: TaskItem = onDay({ key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-11-01");
-const payload: DragPayload = { item, from: "left", durationMin: null, grabPx: 20 };
+const payload: DragPayload = { item, from: "day", durationMin: null, grabPx: 20 };
 const rect = (x: number, y: number) => ({ x, y, width: 100, height: 40, top: y, left: x, right: x + 100, bottom: y + 40, toJSON: () => "" }) as DOMRect;
 
 class FakeTarget implements DropTarget {

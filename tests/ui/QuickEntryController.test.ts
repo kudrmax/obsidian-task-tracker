@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { LabelLevel, NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
-import type { RightMode } from "../../src/application/contracts";
+import type { RightMode } from "../../src/ui/viewSettings";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
 import { type ColumnDrop, QuickEntryController } from "../../src/ui/quick/QuickEntryController";
@@ -18,7 +18,7 @@ import { withShownSpan } from "../fakes/timelineDeps";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const TODAY = "2026-11-01";
-const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
+const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox"];
 
 const key = (section: TaskKey["section"], index: number, path: number[] = []): TaskKey => ({ section, index, path, raw: `${section}${index}${path.join("")}` });
 
@@ -95,7 +95,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		lists[column] = new TaskList(root.appendChild(document.createElement("div")), {
 			items: () => items[column] ?? [],
 			day: () => null,
-			grouped: () => column !== "left" || dayColumn(day, TODAY).sections,
+			grouped: () => column !== "day" || dayColumn(day, TODAY).sections,
 			entry: () => controller?.entryIn(column) ?? null,
 			renaming: () => controller?.renaming() ?? null,
 		});
@@ -118,9 +118,9 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		for (const column of COLUMNS) lists[column].render();
 		timeline.render();
 		controller?.rendered();
-		drawnLeft.push(rowsOf("left"));
+		drawnLeft.push(rowsOf("day"));
 	};
-	let shownLeft = (items.left ?? []).length;
+	let shownLeft = (items.day ?? []).length;
 	controller = new QuickEntryController({
 		root,
 		tasks: {
@@ -128,8 +128,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			createInPlace: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;
-				const added = item(text, key("now", (items.left ?? []).length));
-				(items.left ??= []).push(added);
+				const added = item(text, key("now", (items.day ?? []).length));
+				(items.day ??= []).push(added);
 				return added.key;
 			},
 			createSection: async () => null,
@@ -171,7 +171,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		fresh: async (beforeShow) => {
 			if (holdFresh) await new Promise<void>((resolve) => freshWaiting.push(resolve));
 			beforeShow?.();
-			const left = (items.left ?? []).length;
+			const left = (items.day ?? []).length;
 			if (drawsOnFresh && left !== shownLeft) render();
 			shownLeft = left;
 		},
@@ -245,13 +245,13 @@ afterEach(() => {
 
 describe("QuickEntryController", () => {
 	describe("the plus", () => {
-		const items = { left: [item("A", key("now", 0))], inbox: [item("I", key("inbox", 0), "Home"), item("J", key("inbox", 1), "Work")] };
+		const items = { day: [item("A", key("now", 0))], inbox: [item("I", key("inbox", 0), "Home"), item("J", key("inbox", 1), "Work")] };
 
 		it("tapped, opens the field at the end of the day column while it shows", () => {
 			for (const mode of ["calendar", "soon"] as const) {
 				const { controller, rowsOf, field } = setUp({ mode, items });
 				controller.openFromPlus();
-				expect(rowsOf("left")).toEqual(["A", "field"]);
+				expect(rowsOf("day")).toEqual(["A", "field"]);
 				expect(document.activeElement).toBe(field());
 			}
 		});
@@ -260,7 +260,7 @@ describe("QuickEntryController", () => {
 			const { controller, rowsOf } = setUp({ mode: "inbox", items });
 			controller.openFromPlus();
 			expect(rowsOf("inbox")).toEqual(["Home", "I", "Work", "J", "field"]);
-			expect(rowsOf("left")).toEqual(["A"]);
+			expect(rowsOf("day")).toEqual(["A"]);
 		});
 
 		it("hides while the field is open, and comes back when it closes", () => {
@@ -306,7 +306,7 @@ describe("QuickEntryController", () => {
 
 		it("carried, starts the drag of a new task over its ring and the lists, hides, and comes back when let go off them", () => {
 			const { controller, plus, beginNew, drops } = setUp({ items });
-			drops.push(stubDrop("left", { kind: "list", column: "left", before: null }));
+			drops.push(stubDrop("day", { kind: "list", column: "day", before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			expect(beginNew).toHaveBeenCalledOnce();
 			expect(beginNew.mock.calls[0][2]).toHaveLength(2);
@@ -374,41 +374,41 @@ describe("QuickEntryController", () => {
 		});
 
 		it("let go on a list, opens the field where the drop showed", () => {
-			const { controller, plus, beginNew, drops, rowsOf } = setUp({ items: { left: [item("A", key("now", 0)), item("B", key("now", 1))] } });
-			const result: DropResult = { kind: "list", column: "left", before: key("now", 1) };
-			drops.push(stubDrop("left", result));
+			const { controller, plus, beginNew, drops, rowsOf } = setUp({ items: { day: [item("A", key("now", 0)), item("B", key("now", 1))] } });
+			const result: DropResult = { kind: "list", column: "day", before: key("now", 1) };
+			drops.push(stubDrop("day", result));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
 			const dropped = targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult;
 			onDrop(dropped);
-			expect(rowsOf("left")).toEqual(["A", "field", "B"]);
+			expect(rowsOf("day")).toEqual(["A", "field", "B"]);
 		});
 
 		it("let go over a card's middle, opens the field as its last subtask", () => {
 			const parent = item("A", key("now", 0), null, [item("A1", key("now", 0, [0]))]);
-			const { controller, plus, beginNew, drops, lists } = setUp({ items: { left: [parent, item("B", key("now", 1))] } });
-			drops.push(stubDrop("left", { kind: "nest", parent: parent.key, before: null }));
+			const { controller, plus, beginNew, drops, lists } = setUp({ items: { day: [parent, item("B", key("now", 1))] } });
+			drops.push(stubDrop("day", { kind: "nest", parent: parent.key, before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
 			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult);
-			const rows = [...lists.left.el.children] as HTMLElement[];
+			const rows = [...lists.day.el.children] as HTMLElement[];
 			expect(rows[2].className).toBe("tc-quick-row");
 			expect(rows[2].style.getPropertyValue("--tc-level")).toBe("1");
 		});
 	});
 
 	it("writes the task typed at the place of the field on Enter, and opens the next field under it", async () => {
-		const { controller, type, press, created, rowsOf } = setUp({ items: { left: [item("A", key("now", 0))] } });
-		controller.openAtEnd("left");
+		const { controller, type, press, created, rowsOf } = setUp({ items: { day: [item("A", key("now", 0))] } });
+		controller.openAtEnd("day");
 		type("Buy milk");
 		press("Enter");
-		expect(rowsOf("left")).toEqual(["A", "Buy milk", "field"]);
+		expect(rowsOf("day")).toEqual(["A", "Buy milk", "field"]);
 		await vi.waitFor(() => expect(created).toEqual([{ text: "Buy milk", priority: null, place: { kind: "day", date: TODAY, group: null, before: null } }]));
 	});
 
 	it("keeps its one title field, focused, across Enter and the redraws, and lets it go when the entry ends", () => {
-		const { controller, type, press, titleFields } = setUp({ items: { left: [item("A", key("now", 0))] } });
-		controller.openAtEnd("left");
+		const { controller, type, press, titleFields } = setUp({ items: { day: [item("A", key("now", 0))] } });
+		controller.openAtEnd("day");
 		type("Buy milk");
 		press("Enter");
 		type("Bread");
@@ -420,13 +420,13 @@ describe("QuickEntryController", () => {
 	});
 
 	it("lets the next field move in under the task just written once the list shows it", async () => {
-		const items: Partial<Record<ListColumn, TaskItem[]>> = { left: [item("A", key("now", 0))] };
+		const items: Partial<Record<ListColumn, TaskItem[]>> = { day: [item("A", key("now", 0))] };
 		const { controller, root, type, press, created, render } = setUp({ items });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		type("Buy milk");
 		press("Enter");
 		await vi.waitFor(() => expect(created).toHaveLength(1));
-		items.left = [item("A", key("now", 0)), item("Buy milk", key("now", 1))];
+		items.day = [item("A", key("now", 0)), item("Buy milk", key("now", 1))];
 		render();
 		expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
 	});
@@ -535,22 +535,22 @@ describe("QuickEntryController", () => {
 
 	describe("Enter", () => {
 		const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
-		const twoCards = () => ({ left: [item("X", key("now", 0)), item("Y", key("now", 1))] });
+		const twoCards = () => ({ day: [item("X", key("now", 0)), item("Y", key("now", 1))] });
 
 		it("Enter draws the lists twice: the line moving up at once, and once with its card", async () => {
 			const { controller, type, press, draws, resetDraws, rowsOf } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("A");
 			resetDraws();
 			press("Enter");
 			await settled();
 			expect(draws()).toBe(2);
-			expect(rowsOf("left")).toEqual(["X", "Y", "A", "field"]);
+			expect(rowsOf("day")).toEqual(["X", "Y", "A", "field"]);
 		});
 
 		it("no drawing shows the line twice or the field over its card", async () => {
 			const { controller, type, press, drawnLeft, resetDraws } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("A");
 			resetDraws();
 			press("Enter");
@@ -564,7 +564,7 @@ describe("QuickEntryController", () => {
 
 		it("Enter keeps the field's own element, focused, with no blur", async () => {
 			const { controller, type, press, field } = setUp({ items: twoCards(), drawsOnFresh: "grows" });
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("A");
 			const before = field()!;
 			let blurs = 0;
@@ -581,14 +581,14 @@ describe("QuickEntryController", () => {
 
 		it("a write whose read draws nothing redraws the lists itself", async () => {
 			const { controller, type, press, draws, resetDraws, rowsOf, created } = setUp({ items: twoCards(), drawsOnFresh: "same" });
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("A");
 			resetDraws();
 			press("Enter");
 			await settled();
 			expect(created.map((c) => c.text)).toEqual(["A"]);
 			expect(draws()).toBe(2);
-			expect(rowsOf("left")).toEqual(["X", "Y", "field"]);
+			expect(rowsOf("day")).toEqual(["X", "Y", "field"]);
 		});
 	});
 
@@ -735,11 +735,11 @@ describe("QuickEntryController", () => {
 
 	describe("settling before the screen shows another day or column", () => {
 		const later = "2026-11-03";
-		const items = { left: [item("A", key("soon", 0)), item("B", key("soon", 1))] };
+		const items = { day: [item("A", key("soon", 0)), item("B", key("soon", 1))] };
 
 		it("writes the text typed, Enter not pressed, for the day and place it was typed at, then lets the day change", async () => {
 			const { controller, type, created, field, switchDay, holdWrites, releaseWrites, day } = setUp({ day: later, items });
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("Call");
 			holdWrites();
 			const switched = switchDay("2026-11-04");
@@ -755,7 +755,7 @@ describe("QuickEntryController", () => {
 		it("writes a line sent by Enter as a subtask of the old day's task, not of whatever stands there on the new day", async () => {
 			const { controller, type, press, created, switchDay, holdWrites, releaseWrites, day } = setUp({ day: later, items });
 			holdWrites();
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			press("Tab");
 			type("c");
 			press("Enter");
@@ -770,7 +770,7 @@ describe("QuickEntryController", () => {
 
 		it("keeps the field the bar's place moved when the wheel turns for it", () => {
 			const { controller, root, field } = setUp();
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			root.querySelector<HTMLElement>(".tc-bar-place")!.click();
 			tile(root, "Inbox").click();
 			expect(field()).not.toBeNull();
@@ -788,9 +788,9 @@ describe("QuickEntryController", () => {
 
 	it("renames a card in place: the field with its text stands for it, and Enter saves it", async () => {
 		const a = item("A", key("now", 0));
-		const { controller, lists, field, type, press, edits } = setUp({ items: { left: [a, item("B", key("now", 1))] } });
+		const { controller, lists, field, type, press, edits } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
 		controller.rename(a);
-		const rows = [...lists.left.el.children] as HTMLElement[];
+		const rows = [...lists.day.el.children] as HTMLElement[];
 		expect(rows[0].className).toBe("tc-quick-row");
 		expect(rows[1].classList.contains("is-renaming")).toBe(true);
 		expect(field()!.value).toBe("A");
@@ -801,11 +801,11 @@ describe("QuickEntryController", () => {
 
 	it("keeps the dot of a task in progress on the field that renames it, and none on the field of a new task", () => {
 		const a: TaskItem = { ...item("A", key("now", 0)), status: "inProgress" };
-		const { controller, lists } = setUp({ items: { left: [a, item("B", key("now", 1))] } });
+		const { controller, lists } = setUp({ items: { day: [a, item("B", key("now", 1))] } });
 		controller.rename(a);
-		const row = () => lists.left.el.querySelector(".tc-quick-row")!;
+		const row = () => lists.day.el.querySelector(".tc-quick-row")!;
 		expect(row().querySelector(":scope > .tc-progress-dot")).not.toBeNull();
-		lists.left.render();
+		lists.day.render();
 		expect(row().querySelectorAll(":scope > .tc-progress-dot")).toHaveLength(1);
 	});
 
@@ -822,7 +822,7 @@ describe("QuickEntryController", () => {
 
 		it("writes the task typed with the rule chosen, lights the button, and the next field starts without one", async () => {
 			const { controller, root, type, press, created } = setUp();
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("Gym");
 			chooseThursday(root);
 			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
@@ -833,7 +833,7 @@ describe("QuickEntryController", () => {
 
 		it("Remove repeat takes the chosen rule off before the task is written", async () => {
 			const { controller, root, type, press, created } = setUp();
-			controller.openAtEnd("left");
+			controller.openAtEnd("day");
 			type("Gym");
 			chooseThursday(root);
 			document.querySelector<HTMLElement>(".tc-repeat-remove")!.click();
@@ -844,8 +844,8 @@ describe("QuickEntryController", () => {
 
 		it("is on a subtask's field too: the rule goes with the subtask's write", async () => {
 			const parent = item("A", key("now", 0));
-			const { controller, root, type, press, created } = setUp({ items: { left: [parent] } });
-			controller.openAtEnd("left");
+			const { controller, root, type, press, created } = setUp({ items: { day: [parent] } });
+			controller.openAtEnd("day");
 			chooseThursday(root);
 			press("Tab");
 			expect(repeatButton(root).hidden).toBe(false);
@@ -865,7 +865,7 @@ describe("QuickEntryController", () => {
 
 		it("a rename of a task that repeats opens with its rule and leaves it as it is when it is not touched", async () => {
 			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
-			const { controller, root, type, press, edits } = setUp({ items: { left: [a] } });
+			const { controller, root, type, press, edits } = setUp({ items: { day: [a] } });
 			controller.rename(a);
 			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
 			type("A2");
@@ -877,7 +877,7 @@ describe("QuickEntryController", () => {
 
 		it("a rename saves the rule changed in the bar through the edit", async () => {
 			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
-			const { controller, root, press, edits } = setUp({ items: { left: [a] } });
+			const { controller, root, press, edits } = setUp({ items: { day: [a] } });
 			controller.rename(a);
 			repeatButton(root).click();
 			weekday("Mon").click();
@@ -887,7 +887,7 @@ describe("QuickEntryController", () => {
 
 		it("a rename saves Remove repeat as the rule taken off", async () => {
 			const a: TaskItem = { ...item("A", key("now", 0)), repeat: WEEKLY_THU };
-			const { controller, root, press, edits } = setUp({ items: { left: [a] } });
+			const { controller, root, press, edits } = setUp({ items: { day: [a] } });
 			controller.rename(a);
 			repeatButton(root).click();
 			document.querySelector<HTMLElement>(".tc-repeat-remove")!.click();
@@ -899,7 +899,7 @@ describe("QuickEntryController", () => {
 	describe("a rename the bar's place moves to another column", () => {
 		const a = item("A", key("now", 0));
 		const movedToSoon = () => {
-			const s = setUp({ mode: "soon", items: { left: [a, item("B", key("now", 1))], soon: [item("S", key("soon", 0))] } });
+			const s = setUp({ mode: "soon", items: { day: [a, item("B", key("now", 1))], soon: [item("S", key("soon", 0))] } });
 			s.controller.rename(a);
 			s.root.querySelector<HTMLElement>(".tc-bar-place")!.click();
 			tile(s.root, "Soon").click();
@@ -911,7 +911,7 @@ describe("QuickEntryController", () => {
 			const { rowsOf, lists, field } = movedToSoon();
 			expect(rowsOf("soon")).toEqual(["S", "field"]);
 			expect(field()!.value).toBe("A");
-			expect(hiddenIn(lists.left)).toEqual(["A"]);
+			expect(hiddenIn(lists.day)).toEqual(["A"]);
 			expect(hiddenIn(lists.soon)).toEqual([]);
 		});
 
@@ -925,7 +925,7 @@ describe("QuickEntryController", () => {
 			const { edits, field, lists } = movedToSoon();
 			document.body.click();
 			expect(field()).toBeNull();
-			expect(hiddenIn(lists.left)).toEqual([]);
+			expect(hiddenIn(lists.day)).toEqual([]);
 			await vi.waitFor(() => expect(edits).toEqual([{ key: a.key, draft: { text: "A", placement: { kind: "soon" }, priority: null } }]));
 		});
 	});
@@ -935,21 +935,21 @@ describe("QuickEntryController", () => {
 		const work = () => [item("A", key("now", 0), "Work"), item("B", key("now", 1), "Work")];
 
 		it("Tab at the end of the list makes the field a subtask of the last card", () => {
-			const { controller, lists, press, root } = setUp({ day: PAST, items: { left: work() } });
-			controller.openAtEnd("left");
+			const { controller, lists, press, root } = setUp({ day: PAST, items: { day: work() } });
+			controller.openAtEnd("day");
 			expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
 			press("Tab");
-			const row = lists.left.el.querySelector<HTMLElement>(".tc-quick-row")!;
+			const row = lists.day.el.querySelector<HTMLElement>(".tc-quick-row")!;
 			expect(row.style.getPropertyValue("--tc-level")).toBe("1");
 		});
 
 		it("the plus let go at the end of the list opens the field there, and Enter writes the task at the end of Now", async () => {
-			const { controller, plus, beginNew, drops, rowsOf, type, press, created } = setUp({ day: PAST, items: { left: work() } });
-			drops.push(stubDrop("left", { kind: "list", column: "left", before: null }));
+			const { controller, plus, beginNew, drops, rowsOf, type, press, created } = setUp({ day: PAST, items: { day: work() } });
+			drops.push(stubDrop("day", { kind: "list", column: "day", before: null }));
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
 			const [, , targets, onDrop] = beginNew.mock.calls[0];
 			onDrop(targets[1].drop(0, 0, { from: "new" } as DragPayload) as DropResult);
-			expect(rowsOf("left")).toEqual(["A", "B", "field"]);
+			expect(rowsOf("day")).toEqual(["A", "B", "field"]);
 			type("C");
 			press("Enter");
 			await vi.waitFor(() => expect(created).toEqual([{ text: "C", priority: null, place: { kind: "day", date: PAST, group: null, before: null } }]));
@@ -957,9 +957,9 @@ describe("QuickEntryController", () => {
 	});
 
 	it("reads what the field may do from the cards without measuring them as the text is typed", () => {
-		const { controller, lists, type } = setUp({ items: { left: [item("A", key("now", 0)), item("B", key("now", 1))] } });
-		controller.openAtEnd("left");
-		const measured = lists.left.cards.map(({ card }) => vi.spyOn(card, "getBoundingClientRect"));
+		const { controller, lists, type } = setUp({ items: { day: [item("A", key("now", 0)), item("B", key("now", 1))] } });
+		controller.openAtEnd("day");
+		const measured = lists.day.cards.map(({ card }) => vi.spyOn(card, "getBoundingClientRect"));
 		type("C");
 		type("Ca");
 		for (const spy of measured) expect(spy).not.toHaveBeenCalled();
@@ -967,13 +967,13 @@ describe("QuickEntryController", () => {
 
 	it("moves the field to the end of the place chosen in the bar, turning the wheel to show it", () => {
 		const { controller, root, rowsOf, turned, field } = setUp({ items: { soon: [item("S", key("soon", 0))] } });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		type(root, "Call");
 		root.querySelector<HTMLElement>(".tc-bar-place")!.click();
 		tile(root, "Soon").click();
 		expect(turned).toEqual(["soon"]);
 		expect(rowsOf("soon")).toEqual(["S", "field"]);
-		expect(rowsOf("left")).toEqual([]);
+		expect(rowsOf("day")).toEqual([]);
 		expect(field()!.value).toBe("Call");
 	});
 
@@ -985,7 +985,7 @@ describe("QuickEntryController", () => {
 		[...root.querySelectorAll<HTMLElement>(".tc-day:not(.is-other)")].find((d) => d.textContent === "5")!.click();
 		expect(turned).toEqual(["soon"]);
 		await vi.waitFor(() => expect(day()).toBe("2026-11-05"));
-		expect(rowsOf("left")).toEqual(["field"]);
+		expect(rowsOf("day")).toEqual(["field"]);
 	});
 
 	describe("on the timeline", () => {
@@ -1113,9 +1113,9 @@ describe("QuickEntryController", () => {
 
 		it("renames a task that is also in a list in the list", () => {
 			const task = onTimeline("Report", 0);
-			const { controller, root, rowsOf } = setUp({ items: { left: [task] }, slotted: [task] });
+			const { controller, root, rowsOf } = setUp({ items: { day: [task] }, slotted: [task] });
 			controller.rename(task);
-			expect(rowsOf("left")).toEqual(["field", "Report"]);
+			expect(rowsOf("day")).toEqual(["field", "Report"]);
 			expect(timelineField(root)).toBeNull();
 		});
 
@@ -1220,10 +1220,10 @@ describe("QuickEntryController", () => {
 
 			it("a task also in a list gets its field in the list, and the menu closes", () => {
 				const task = onTimeline("Report", 0);
-				const { controller, rowsOf } = setUp({ items: { left: [task] }, slotted: [task] });
+				const { controller, rowsOf } = setUp({ items: { day: [task] }, slotted: [task] });
 				const menu = openMenu(task);
 				controller.addSubtask(task, menu);
-				expect(rowsOf("left")).toEqual(["Report", "field"]);
+				expect(rowsOf("day")).toEqual(["Report", "field"]);
 				expect(document.querySelector(".tc-panel.is-task")!.classList.contains("is-closing")).toBe(true);
 			});
 		});
@@ -1250,7 +1250,7 @@ describe("QuickEntryController: the field switched to a section", () => {
 
 	it("Option+Tab switches it and back, the section button pressed with it", () => {
 		const { controller, root, field } = setUp({ sections: true });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		altTab(field()!);
 		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("true");
 		altTab(field()!);
@@ -1259,14 +1259,14 @@ describe("QuickEntryController: the field switched to a section", () => {
 
 	it("on the desktop the section button stands in its own capsule, apart from the task's", () => {
 		const { controller, root } = setUp({ sections: true, desktop: { chromeTop: 476 } });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		expect(sectionButton(root).closest(".tc-quick-mode")).not.toBeNull();
 		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(false);
 	});
 
 	it("a click on the desktop's section capsule switches the field and keeps it open", () => {
 		const { controller, root, field } = setUp({ sections: true, desktop: { chromeTop: 476 } });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		sectionButton(root).click();
 		expect(field()).not.toBeNull();
 		expect(sectionButton(root).getAttribute("aria-pressed")).toBe("true");
@@ -1274,7 +1274,7 @@ describe("QuickEntryController: the field switched to a section", () => {
 
 	it("on the phone it stays first in the bar over the keyboard", () => {
 		const { controller, root } = setUp({ sections: true });
-		controller.openAtEnd("left");
+		controller.openAtEnd("day");
 		expect(sectionButton(root).parentElement?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(root.querySelector<HTMLElement>(".tc-quick-mode")!.hidden).toBe(true);
 	});

@@ -1,5 +1,6 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarService, type CountField, type GoogleAccount, hexColor, isPresetColor, LABEL_PAINTS, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
+import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, formatZoomLevels, LABEL_PAINTS, type LabelPaint, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -10,6 +11,8 @@ import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
+	/** This view's own settings: the cards' size, how several labels paint a card, the zoom levels. */
+	readonly view: ViewSettingsStore;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
@@ -76,6 +79,10 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 
 	private get service(): SettingsService {
 		return this.deps.settings;
+	}
+
+	private get view(): ViewSettings {
+		return this.deps.view.get();
 	}
 
 	/** The set-up-once part, each on a page of its own behind a row. */
@@ -149,7 +156,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc("How a card of several labels is painted.")
 			.addDropdown((d) => {
 				for (const paint of LABEL_PAINTS) d.addOption(paint, PAINT_NAMES[paint]);
-				d.setValue(this.settings.labelPaint).onChange((value) => this.service.setLabelPaint(value as LabelPaint));
+				d.setValue(this.view.labelPaint).onChange((value) => this.deps.view.set({ labelPaint: value as LabelPaint }));
 			});
 	}
 
@@ -223,11 +230,10 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return document.body.hasClass("theme-light") ? "light" : "dark";
 	}
 
-	/** A code read as a level's colour: a preset's own shade in this theme is that preset, so it keeps its other shade. */
+	/** A code read as a level's colour by the shades the presets take in this theme. */
 	private colorOf(text: string): PriorityColor | null {
-		const hex = hexColor(text);
-		if (!hex) return null;
-		return PRIORITY_COLORS.find((preset) => inkOf(preset, this.theme) === hex) ?? hex;
+		const shades = Object.fromEntries(PRIORITY_COLORS.map((preset) => [preset, inkOf(preset, this.theme)])) as Record<PresetColor, string>;
+		return this.service.colourOf(text, shades);
 	}
 
 	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */
@@ -257,8 +263,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
 	private cardsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Cards").setHeading();
-		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.settings.cardHeight, (px) => this.service.setCardSize("cardHeight", px));
-		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.settings.cardGap, (px) => this.service.setCardSize("cardGap", px));
+		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.view.cardHeight, (px) => this.deps.view.set({ cardHeight: px }));
+		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.view.cardGap, (px) => this.deps.view.set({ cardGap: px }));
 	}
 
 	private dayPage(el: HTMLElement): void {
@@ -274,7 +280,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		new Setting(el)
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
-			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
+			.addText((t) => t.setValue(formatZoomLevels(this.view.zoomLevels)).onChange((text) => this.deps.view.setZoomLevels(text)));
 	}
 
 	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */
@@ -322,13 +328,13 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const calendars = await this.deps.calendars.known();
 		const el = place.ownerDocument.createElement("div");
 		if (calendars.length > 0) new Setting(el).setName("Calendars shown").setDesc("Which calendars the timeline and the iPhone's reminders show. A new calendar is shown.").setHeading();
-		let account: string | null = null;
+		let heading: string | null = null;
 		for (const calendar of calendars) {
-			if (calendar.account !== account) {
-				account = calendar.account;
-				new Setting(el).setName(account === "" ? "iPhone" : account).setHeading();
+			if (calendar.accountName !== heading) {
+				heading = calendar.accountName;
+				new Setting(el).setName(heading).setHeading();
 			}
-			new Setting(el).setName(calendar.account === "" ? calendar.title.replace(/^iPhone · /, "") : calendar.title).addToggle((t) =>
+			new Setting(el).setName(calendar.name).addToggle((t) =>
 				t.setValue(calendar.shown).onChange((shown) => this.deps.calendars.setShown(calendar.account, calendar.title, shown)),
 			);
 		}

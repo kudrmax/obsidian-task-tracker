@@ -165,6 +165,7 @@ describe("CalendarChoice", () => {
 			work: file(5, [{ title: "Календарь", calendarId: "unknown" }], []),
 		}).known();
 		expect(calendars.map((c) => c.key)).toContainEqual({ account: "", title: "iPhone · Календарь" });
+		expect(calendars.find((c) => c.key.account === "")).toMatchObject({ accountName: "iPhone", name: "Календарь" });
 	});
 
 	it("an old Scriptable file covers the days of its events", () => {

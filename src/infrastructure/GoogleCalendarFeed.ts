@@ -1,6 +1,6 @@
 import { calendarFileText, type FileCalendar, GOOGLE_CALENDAR_FILE, readCalendarFile } from "../application/calendarFile";
 import type { CalendarEvent } from "../application/contracts";
-import type { EventFeed } from "../application/EventSource";
+import { type EventFeed, SourceProblemError } from "../application/EventSource";
 import type { Clock, SettingsStore } from "../application/ports";
 import type { GoogleAuth } from "./GoogleAuth";
 import type { GoogleCalendarApi } from "./GoogleCalendarApi";
@@ -54,7 +54,7 @@ export class GoogleCalendarFeed implements EventFeed {
 		const to = daysFrom(now, FUTURE_DAYS + 1);
 		if (!this.auth.isLoggedIn()) {
 			if (await this.adapter.exists(this.path)) await this.write([], [], now, from, to);
-			throw new Error("not logged in");
+			throw new SourceProblemError({ kind: "loggedOut" }, "not logged in");
 		}
 		const exported = await this.api.export(from, to);
 		await this.write(exported.calendars, exported.events, now, from, to);

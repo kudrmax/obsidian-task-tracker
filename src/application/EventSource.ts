@@ -1,10 +1,21 @@
 import type { CalendarFile } from "./calendarFile";
-import type { CalendarSource } from "./contracts";
+import type { CalendarSource, SourceProblem } from "./contracts";
+
+/** A feed or a file that knows why it has nothing fresh; any other error it throws is `failed`, its message the detail. */
+export class SourceProblemError extends Error {
+	constructor(
+		readonly problem: Exclude<SourceProblem, { readonly kind: "failed" }>,
+		message: string,
+	) {
+		super(message);
+		this.name = "SourceProblemError";
+	}
+}
 
 /** One calendar's file in the vault: what the calendar shows of the source. */
 export interface EventFile {
 	readonly name: CalendarSource;
-	/** Throws when the file is missing or unreadable; the message becomes the source's status. */
+	/** Throws when the file is missing (`SourceProblemError`) or unreadable: the source's status says why. */
 	read(): Promise<CalendarFile>;
 	/** The file was written: by Scriptable, by a feed, or by Sync from another device. */
 	onChange(listener: () => void): () => void;

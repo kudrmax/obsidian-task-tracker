@@ -1,22 +1,10 @@
 import type { GroupSettings } from "./domain/Groups";
-import type { LabelLevel, LabelPaint } from "./domain/Label";
+import type { LabelLevel } from "./domain/Label";
 import type { PriorityLevel } from "./domain/Priority";
 
 export type { GroupSettings } from "./domain/Groups";
-export { LABEL_PAINTS, type LabelLevel, type LabelPaint, sameLabels, usableLabels } from "./domain/Label";
+export { type LabelLevel, sameLabels, usableLabels } from "./domain/Label";
 export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "./domain/Priority";
-
-/** Which pair of neighbouring columns the window shows: Inbox and Soon, Soon and Now, or Now and the calendar. */
-export type RightMode = "calendar" | "soon" | "inbox";
-
-/** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
-export interface ZoomLevel {
-	/** Height of one hour on the timeline, CSS px. */
-	readonly hourPx: number;
-}
-
-/** Where the timeline was zoomed to: an hour's height, or the whole day, whatever the screen's height. */
-export type Zoom = number | "wholeDay";
 
 export interface SectionNames {
 	readonly inbox: string;
@@ -61,24 +49,11 @@ export interface FileFormatSettings {
 	readonly dayStartHour: number;
 }
 
-/** How the screen looks and answers: the columns, the zoom, the cards, the touch. */
-export interface ViewSettings {
-	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
-	readonly listShare: number;
-	/** What the right column shows; the segmented control in the day row sets it. */
-	readonly rightMode: RightMode;
-	/** The zoom a pinch last settled on: the timeline opens at it. */
-	readonly zoom: Zoom;
-	readonly zoomLevels: readonly ZoomLevel[];
-	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
-	readonly cardHeight: number;
-	/** Between two cards, px: in the list and in a stack on the timeline alike. */
-	readonly cardGap: number;
+/** What every frontend's screen does alike: when a touch becomes a drag, and the hour another day opens at. */
+export interface ScreenBehaviour {
 	readonly longPressMs: number;
 	/** The hour a day other than today scrolls to when opened. */
 	readonly scrollToHour: number;
-	/** How a card of several labels is painted. */
-	readonly labelPaint: LabelPaint;
 }
 
 /** Where the events come from: the work file, Google, and when a source counts as stale. */
@@ -95,14 +70,8 @@ export interface SourceSettings {
 	readonly staleAfterMinutes: number;
 }
 
-/** data.json: one object, its parts typed apart. */
-export type TaskCalendarSettings = FileFormatSettings & ViewSettings & SourceSettings;
-
-export const LIST_WIDTH_MIN = 110;
-export const LIST_WIDTH_MAX = 280;
-export const CARD_HEIGHT_MIN = 28;
-export const CARD_HEIGHT_MAX = 40;
-export const CARD_GAP_MAX = 10;
+/** The settings every frontend shares: the plugin's data.json holds them, with the TS view's own beside them. */
+export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings;
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -120,17 +89,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	calendarsMigrated: false,
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
 	longPressMs: 250,
-	zoom: 56,
-	zoomLevels: [
-		{ hourPx: 28 },
-		{ hourPx: 56 },
-		{ hourPx: 112 },
-		{ hourPx: 224 },
-	],
 	scrollToHour: 9,
 	dayStartHour: 5,
-	listShare: 0.5,
-	rightMode: "calendar",
 	staleAfterMinutes: 180,
 	priorities: [
 		{ prefix: "p1", color: "red" },
@@ -138,34 +98,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	labelTag: "label",
 	labels: [],
-	labelPaint: "stripes",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-	cardHeight: 35,
-	cardGap: 2,
 };
-
-/** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
-export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const;
-export type DeviceKey = (typeof DEVICE_KEYS)[number];
-export type DeviceState = Pick<TaskCalendarSettings, DeviceKey>;
-export type SharedSettings = Omit<TaskCalendarSettings, DeviceKey>;
-
-/** Splits a patch into the part that goes to the device and the part that goes to the synced file. */
-export function partition(patch: Partial<TaskCalendarSettings>): { device: Partial<DeviceState>; shared: Partial<SharedSettings> } {
-	const device: Partial<Record<DeviceKey, unknown>> = {};
-	const shared: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(patch)) {
-		if ((DEVICE_KEYS as readonly string[]).includes(key)) device[key as DeviceKey] = value;
-		else shared[key] = value;
-	}
-	return { device: device as Partial<DeviceState>, shared: shared as Partial<SharedSettings> };
-}
-
-/** The settings without the device's part: what the synced file holds. */
-export function sharedOf(settings: TaskCalendarSettings): SharedSettings {
-	const { listShare: _s, rightMode: _m, zoom: _z, ...shared } = settings;
-	return shared;
-}
 
 /** Merges saved data over the defaults, one level deep for the nested objects. */
 export function settingsFrom(saved: unknown): TaskCalendarSettings {

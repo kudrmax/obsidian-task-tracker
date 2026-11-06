@@ -43,8 +43,8 @@ describe("readsAnew", () => {
 		expect(after({ priorities: [{ prefix: "p9", color: "blue" }] })).toBe(true);
 	});
 
-	it("not for the card size, the hour the day starts at, the divider, the column shown or the zoom", () => {
-		for (const patch of [{ cardHeight: 36 }, { cardGap: 8 }, { dayStartHour: 3 }, { listShare: 0.3 }, { rightMode: "soon" as const }, { zoom: 112 }]) expect(after(patch)).toBe(false);
+	it("not for the hour the day starts at, the long press or the hour a day opens at", () => {
+		for (const patch of [{ dayStartHour: 3 }, { longPressMs: 400 }, { scrollToHour: 7 }]) expect(after(patch)).toBe(false);
 	});
 
 	it("not for the same settings copied", () => {

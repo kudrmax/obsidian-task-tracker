@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RightMode } from "../../src/application/contracts";
+import type { RightMode } from "../../src/ui/viewSettings";
 import type { Place } from "../../src/ui/screens";
 import { ColumnSwitch } from "../../src/ui/ColumnSwitch";
 import { GestureArbiter } from "../../src/ui/gestures";

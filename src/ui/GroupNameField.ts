@@ -2,7 +2,7 @@ import { el } from "./dom";
 
 export interface GroupNameFieldOptions {
 	readonly value: string;
-	/** The trimmed name on Enter; null for an empty one, Escape, or a tap elsewhere. Called once. */
+	/** The name as typed on Enter; null for Escape or a tap elsewhere. Called once. */
 	onDone(name: string | null): void;
 }
 
@@ -25,8 +25,7 @@ export const GroupNameField = {
 			if (e.key !== "Enter" && e.key !== "Escape") return;
 			e.preventDefault();
 			e.stopPropagation();
-			const name = e.key === "Enter" ? input.value.trim() : "";
-			finish(name === "" ? null : name);
+			finish(e.key === "Enter" ? input.value : null);
 		});
 		input.addEventListener("blur", () => finish(null));
 		input.focus();

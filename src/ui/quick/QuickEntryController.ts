@@ -1,4 +1,5 @@
-import { type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type RightMode, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -70,7 +71,7 @@ interface MenuField {
 }
 
 
-const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
+const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", day: "now" };
 
 /** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
 function movesRows(before: EntryState | null, after: EntryState): boolean {

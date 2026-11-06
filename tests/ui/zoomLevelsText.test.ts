@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatZoomLevels, parseZoomLevels } from "../../src/application/zoomLevelsText";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { formatZoomLevels, parseZoomLevels, VIEW_DEFAULTS } from "../../src/ui/viewSettings";
 
 describe("zoom levels text", () => {
 	it("formats the defaults as the hour's heights", () => {
-		expect(formatZoomLevels(DEFAULT_SETTINGS.zoomLevels)).toBe("28, 56, 112, 224");
+		expect(formatZoomLevels(VIEW_DEFAULTS.zoomLevels)).toBe("28, 56, 112, 224");
 	});
 
 	it("parses what it formats", () => {
-		expect(parseZoomLevels("28, 56, 112, 224")).toEqual(DEFAULT_SETTINGS.zoomLevels);
+		expect(parseZoomLevels("28, 56, 112, 224")).toEqual(VIEW_DEFAULTS.zoomLevels);
 		expect(parseZoomLevels(" 40 ")).toEqual([{ hourPx: 40 }]);
 	});
 

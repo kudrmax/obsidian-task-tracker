@@ -472,6 +472,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
 		const operation = this.rules.renameGroup(list, group, name);
+		if (!operation) return false;
 		const { doc, today, boundary } = await this.readNormalized();
 		if (operation(doc, today, this.settings.get(), boundary) === doc) return false;
 		await this.mutate(operation);

@@ -1,4 +1,5 @@
-import { sameLabels, sameLevels, type ScreenSettings } from "../application/contracts";
+import { sameLabels, sameLevels } from "../application/contracts";
+import type { ShownSettings } from "./viewSettings";
 
 /** What a change of the settings asks of the screen. */
 export interface SettingsEffect {
@@ -12,7 +13,7 @@ export interface SettingsEffect {
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-export function settingsEffect(before: ScreenSettings, after: ScreenSettings): SettingsEffect {
+export function settingsEffect(before: ShownSettings, after: ShownSettings): SettingsEffect {
 	return {
 		restack: before.cardHeight !== after.cardHeight || before.cardGap !== after.cardGap,
 		frame: before.rightMode !== after.rightMode || before.listShare !== after.listShare,
