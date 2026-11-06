@@ -44,6 +44,11 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Task Calendar")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Task", systemImage: "plus") { CaptureRouter.shared.open(list: .inbox, voice: false) }
+                }
+            }
             .refreshable { await model.refresh() }
             .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { picked in
                 Task { await model.choose(picked) }

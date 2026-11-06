@@ -7,10 +7,17 @@ final class AppServices: Sendable {
 
     let vault: Vault
     private let sync: ReminderSync
+    private let tasks: TaskCapture
 
     private init() {
         vault = Vault(bookmarks: UserDefaultsBookmarks())
-        sync = ReminderSync(vault: vault, rules: Self.rules(), notifications: UserNotifications(), alarms: Alarms(), cards: Cards())
+        let rules = Self.rules()
+        sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards())
+        tasks = TaskCapture(vault: vault, rules: rules)
+    }
+
+    func capture(list: CaptureList, text: String, recording: Data?) -> CaptureOutcome {
+        tasks.capture(list: list, text: text, recording: recording)
     }
 
     @discardableResult

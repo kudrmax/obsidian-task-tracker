@@ -38,6 +38,7 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: Alarms for tasks set to a time
+        NSMicrophoneUsageDescription: Records a task you say instead of typing
         NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]
@@ -49,6 +50,7 @@ targets:
       - path: App/Cards/TaskCardAttributes.swift
       - path: App/Cards/CardIntents.swift
       - path: App/Reminders/ReminderButton.swift
+      - path: App/Capture/CaptureIntents.swift
     configFiles:
       Debug: App/Config/Base.xcconfig
       Release: App/Config/Base.xcconfig

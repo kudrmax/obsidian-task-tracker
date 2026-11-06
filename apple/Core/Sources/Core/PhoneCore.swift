@@ -44,6 +44,10 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         try Self.action(call("silence", text, settingsJSON, id, Self.ms(now)))
     }
 
+    public func capture(list: CaptureList, title: String, description: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult {
+        try Self.action(call("capture", text, settingsJSON, list.rawValue, title, description, Self.ms(now)))
+    }
+
     public func calendarFiles(settingsJSON: String) throws -> [String] {
         guard let paths = try call("calendarFiles", settingsJSON).toArray() as? [String] else { throw PhoneCoreError.scriptFailed("calendarFiles: not a list") }
         return paths

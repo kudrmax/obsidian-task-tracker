@@ -14,6 +14,12 @@ final class FakeVault: TasksVault, @unchecked Sendable {
         if let error = readFails { throw error }
         return (text, "")
     }
+    var saved: [String: Data] = [:]
+    func tasksFilePath() throws -> String { "TODOs Tasks.md" }
+    func save(_ data: Data, in folder: String, named name: String) throws -> String {
+        saved[folder.isEmpty ? name : "\(folder)/\(name)"] = data
+        return name
+    }
     func write(tasks: String, expecting old: String) throws -> Bool {
         if writeFails { throw CocoaError(.fileWriteNoPermission) }
         if let changed = changeBeforeWrite { text = changed; changeBeforeWrite = nil }

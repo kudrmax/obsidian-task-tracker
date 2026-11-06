@@ -6,6 +6,7 @@ struct TaskCalendarApp: App {
     private static let notifications = NotificationDelegate()
 
     @Environment(\.scenePhase) private var scenePhase
+    @State private var router = CaptureRouter.shared
 
     init() {
         Task { await UserNotifications.registerCategories() }
@@ -15,6 +16,9 @@ struct TaskCalendarApp: App {
     var body: some Scene {
         WindowGroup {
             SettingsView()
+                .fullScreenCover(item: $router.request) { request in
+                    CaptureView(request: request) { router.request = nil }
+                }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { Refresh.schedule() }
