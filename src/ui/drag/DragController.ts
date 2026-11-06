@@ -14,7 +14,6 @@ import type { DropResult, DropTarget, NewTaskPayload, TaskDragPayload, TaskOrigi
 import { FloatingCard } from "./FloatingCard";
 import { PlusFloat } from "./PlusFloat";
 import { LongPress } from "./LongPress";
-import { snapMinutes } from "./snap";
 import type { PickedCard } from "../TaskSelection";
 
 /** A lifted card stays where it stood as a dashed place, its subtasks folded away under it. */
@@ -25,7 +24,8 @@ export interface DragControllerDeps {
 	longPressMs(): number;
 	/** The day on screen: the card under the finger leaves out a due date on it, as the list does. */
 	day(): LocalDate;
-	step(): number;
+	/** The minute on the grid nearest `minute` at the timeline's zoom (`TaskService.snap`). */
+	snap(minute: number): number;
 	timeline(): Timeline | null;
 	/** Where `drag` may land: the lists and the timeline shown, and the place that cancels several cards carried at once. */
 	targets(drag: TaskDragPayload): readonly DropTarget[];
@@ -393,17 +393,16 @@ export class DragController {
 	 */
 	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
 		const timeline = this.deps.timeline();
-		if (!timeline || !item.slot || !this.deps.arbiter.claim(RESIZE)) return;
+		if (!timeline || !item.can.resize || !this.deps.arbiter.claim(RESIZE)) return;
 		const shown = timeline.shownSpan(item);
 		this.deps.haptics.tap();
 		capturePointer(block, e.pointerId);
-		const step = this.deps.step();
 		let minute = edge === "end" ? (shown.end ?? shown.start) : shown.start;
 		/** The span last shown: the stack is laid out again only when a grid step changes it. */
 		let span = this.deps.stretch(item, edge, minute);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
-			minute = snapMinutes(timeline.minutesAt(ev.clientY), step);
+			minute = this.deps.snap(timeline.minutesAt(ev.clientY));
 			const next = this.deps.stretch(item, edge, minute);
 			if (next.start === span.start && next.end === span.end) return;
 			span = next;

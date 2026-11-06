@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../src/application/contracts";
 import type { DragPayload, ListColumn, NewTaskPayload } from "../../src/ui/drag/DropTarget";
 import { ListDrop } from "../../src/ui/drag/ListDrop";
+import { readDrop } from "../../src/application/drops";
+import type { ColumnSections } from "../../src/application/contracts";
 import { TaskList } from "../../src/ui/TaskList";
 import { shownCardSize } from "../../src/ui/cardSize";
 import { onDay } from "../fakes/itemOnDay";
@@ -61,8 +63,20 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	area.getBoundingClientRect = () => new DOMRect(0, 100, 187, 554);
 	list.el.getBoundingClientRect = () => new DOMRect(10, 100, 175, 554);
 	standAt(list.elements, 40);
-	const drop = new ListDrop(list, area, column, () => true, () => (grouped ? { list: grouped, date } : null), true, onNewPlace);
+	const sections = () => (grouped ? { list: grouped, date } : null);
+	const drop = read(new ListDrop(list, area, column, () => true, sections, true, onNewPlace), sections);
 	return { list, drop };
+}
+
+/** The drop's answers as the service reads them, the column showing `sections`: the list answers only a place in a column. */
+function read(drop: ListDrop, sections: () => ColumnSections | null): ListDrop {
+	const answer = drop.drop.bind(drop);
+	drop.drop = (x, y, drag) => {
+		const place = answer(x, y, drag);
+		expect(place === null || place.kind === "place").toBe(true);
+		return place && readDrop(place, () => sections());
+	};
+	return drop;
 }
 
 const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, grabPx: 17 });
@@ -89,6 +103,16 @@ describe("ListDrop", () => {
 		expect(drop.drop(50, picking(100 + 5 * 40), from)).toEqual({ kind: "group", list: "soon", date: null, group: "Morning", before: null });
 	});
 
+	it("answers the place in its column, never which kind of list drop it is: that is the service's", () => {
+		const b = item("soon", 1, "B", "Morning");
+		const { list } = setup([item("soon", 0, "A", null), b], "soon", "soon");
+		const raw = new ListDrop(list, list.el.parentElement!, "soon", () => true, () => ({ list: "soon", date: null }));
+		expect(raw.drop(50, picking(100 + 3 * 40 + 2), drag("day", item("now", 0, "N", null)))).toEqual({ kind: "place", column: "soon", place: { kind: "task", group: "Morning", before: b.key } });
+		const plain = setup([item("now", 0, "A", null)], "inbox", null).list;
+		const end = new ListDrop(plain, plain.el.parentElement!, "inbox", () => true);
+		expect(end.drop(50, 101, drag("day", item("now", 5, "N", null)))).toEqual({ kind: "place", column: "inbox", place: null });
+	});
+
 	it("the gap above the first header is the hidden No section", () => {
 		const { drop } = setup([item("now", 0, "A", "X")], "day", "now");
 		expect(drop.drop(50, 95, drag("soon", item("soon", 0, "S", null)))).toEqual({ kind: "group", list: "now", date: null, group: null, before: null });
@@ -112,7 +136,7 @@ describe("ListDrop", () => {
 		const only = item("backlog", 0, "L", null);
 		const { list } = setup([only], "backlog", "backlog");
 		const area = list.el.parentElement!;
-		const drop = new ListDrop(list, area, "backlog", () => true, () => ({ list: "backlog", date: null }), false);
+		const drop = read(new ListDrop(list, area, "backlog", () => true, () => ({ list: "backlog", date: null }), false), () => ({ list: "backlog", date: null }));
 		const from = drag("inbox", item("inbox", 0, "I", null));
 		expect(drop.hitTest(50, 99, from)).toBe(false);
 		expect(drop.hitTest(50, 101, from)).toBe(true);

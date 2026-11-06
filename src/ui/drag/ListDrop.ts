@@ -154,15 +154,11 @@ export class ListDrop implements DropTarget {
 
 	drop(x: number, y: number, drag: DragPayload): DropResult | null {
 		if (!this.takes(drag)) return null;
-		const sections = this.sections();
-		if (!this.placesAnywhere(drag)) return { kind: "list", column: this.column, before: null };
+		if (!this.placesAnywhere(drag)) return { kind: "place", column: this.column, place: null };
 		if (!this.place) this.preview(x, y, drag);
 		if (!this.place) return null;
-		const result = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
-		if (!result) return null;
-		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
-		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
-		return { kind: "list", column: this.column, before: result.before };
+		const place = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
+		return place && { kind: "place", column: this.column, place };
 	}
 
 	/** The place a card carried alone was lifted from, at its level; several cards carried have none. */

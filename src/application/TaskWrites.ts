@@ -17,7 +17,7 @@ import type {
 	TaskKey,
 	TaskStep,
 } from "./contracts";
-import { dropMoves, type DropMove } from "./drops";
+import { dropMoves, type DropMove, readDrop } from "./drops";
 import { tileStatus, toggledLabels, toggledPriority } from "./menus";
 import type { Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
@@ -170,6 +170,10 @@ export class TaskWrites {
 		return nothing(this.rules.setCollapsed(key, collapsed));
 	}
 
+	toggleCollapsed(key: TaskKey): Write<void> {
+		return nothing(this.rules.toggleCollapsed(key));
+	}
+
 	unfoldAbove(key: TaskKey): Write<void> {
 		return nothing(this.rules.unfoldAbove(key));
 	}
@@ -307,7 +311,7 @@ export class TaskWrites {
 	 * the tasks' keys as the file now has them, in their order; one not found again is left out.
 	 */
 	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): { readonly reads: boolean; plan(s: Snapshot | null): Write<readonly TaskKey[]> } {
-		const moves = dropMoves(tasks, to, day);
+		const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
 		return {
 			reads: moves.kind === "one" && moves.move.kind === "toTime",
 			plan: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),

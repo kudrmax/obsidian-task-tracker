@@ -23,6 +23,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	private pluginSettings!: PluginSettings<StoredSettings>;
 	/** The view's own settings, kept in the same file. */
 	protected readonly viewSettings = new ViewSettingsStore(this);
+	/** The shared settings as a screen reads them: the levels and labels it paints. */
+	private readonly screenSettings = new ScreenSettingsImpl(this);
 	/** The real services, once built (the demo build has none): open for a look from the console. */
 	services: Services | null = null;
 
@@ -38,9 +40,11 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			SETTINGS_FILE,
 		);
 		this.pluginSettings.onChange(() => {
-			showCardSize({ height: this.get().cardHeight, gap: this.get().cardGap });
-			showPriorityColors(this.get().priorities, this.get().labels);
-			showLabelPaint(this.get().labelPaint);
+			const screen = this.screenSettings.get();
+			const view = this.viewSettings.get();
+			showCardSize({ height: view.cardHeight, gap: view.cardGap });
+			showPriorityColors(screen.priorities, screen.labels);
+			showLabelPaint(view.labelPaint);
 		});
 		await this.pluginSettings.load();
 		this.register(clearCardSize);
@@ -87,7 +91,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 
 	/** What the screen reads: the shared settings it draws and the view's own. */
 	protected shownSettings(): ShownSettingsStore {
-		return new ShownSettingsStore(new ScreenSettingsImpl(this), this.viewSettings);
+		return new ShownSettingsStore(this.screenSettings, this.viewSettings);
 	}
 
 	private get pluginDir(): string {

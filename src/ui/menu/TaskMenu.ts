@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuStatus, type MenuStatusId, type PriorityLevel, REMINDER_KINDS, type ReminderKind, repeatDraft, repeatParts, type RepeatRule, sameRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, repeatParts, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -161,8 +161,8 @@ export class TaskMenu extends LiftedMenu {
 	private peek: DescriptionPeek | null = null;
 	/** What the menu asks about now, if anything; Enter confirms it, as its button does. */
 	private asking: Asking | null = null;
-	/** The rule the repeat page holds, written once as the menu closes; none untouched. */
-	private repeatDraft: RepeatRule | null = null;
+	/** The repeat page shown, which writes what it holds as the menu closes. */
+	private repeatPage: RepeatPage | null = null;
 	private confirmAsked: (() => void) | null = null;
 	private readonly onEnter = (e: KeyboardEvent) => {
 		if (e.key !== "Enter" || !this.confirmAsked) return;
@@ -431,8 +431,8 @@ export class TaskMenu extends LiftedMenu {
 		const { item, actions } = this.context;
 		backRow(this.panel, "Reminder", () => this.showMenu());
 		const group = menuGroup(this.panel, []);
-		for (const kind of REMINDER_KINDS)
-			menuRow(group, { label: REMINDER_NAMES[kind], icon: kind === item.reminder ? "check" : undefined, choice: true, quiet: kind === "none", onPick: this.pick(() => actions.setReminder(kind)) });
+		for (const { kind, checked } of this.context.menu(item).reminders)
+			menuRow(group, { label: REMINDER_NAMES[kind], icon: checked ? "check" : undefined, choice: true, quiet: kind === "none", onPick: this.pick(() => actions.setReminder(kind)) });
 		this.place();
 	}
 
@@ -445,26 +445,20 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		const { item, actions } = this.context;
-		const remove = this.pick(() => actions.setRepeat(null));
+		const page = (this.repeatPage ??= new RepeatPage(item, (rule) => void actions.setRepeat(rule)));
+		const close = this.pick(() => undefined);
 		repeatPanel(this.panel, {
-			draft: repeatDraft(item.repeatDay, item.repeat),
+			draft: page.draft,
 			onChange: (rule) => {
-				this.repeatDraft = rule;
+				page.change(rule);
 				this.place();
 			},
 			onRemove: () => {
-				this.repeatDraft = null;
-				remove();
+				page.remove();
+				close();
 			},
 		});
 		this.place();
-	}
-
-	/** The repeat page's rule, unless it came back to the one the task had. */
-	private writeRepeat(): void {
-		const draft = this.repeatDraft;
-		this.repeatDraft = null;
-		if (draft && !sameRule(draft, this.context.item.repeat)) void this.context.actions.setRepeat(draft);
 	}
 
 	private showPicker(): void {
@@ -505,7 +499,7 @@ export class TaskMenu extends LiftedMenu {
 
 	protected override closed(how: CloseHow): void {
 		document.removeEventListener("keydown", this.onEnter, true);
-		this.writeRepeat();
+		this.repeatPage?.close();
 		this.fieldClosed?.(how);
 	}
 }

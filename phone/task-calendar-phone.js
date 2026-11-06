@@ -2382,8 +2382,9 @@ ${key.title}`.toLowerCase();
     get state() {
       const field = this.session.field;
       if (!field) return null;
-      const marks = this.tasks.draftMarks(field.text, field.priority, field.labels);
       const task = !field.section;
+      const typed2 = this.tasks.draftMarks(field.text, field.priority, field.labels);
+      const marks = task ? typed2 : { ...typed2, tint: null };
       const place = task ? this.shownPlace(field) : null;
       const run = this.run(field.run);
       return {
@@ -2832,6 +2833,8 @@ ${key.title}`.toLowerCase();
         return { kind: "task", group: result.group, before: result.before };
       case "nest":
         return { kind: "subtask", parent: result.parent, before: result.before };
+      case "place":
+        return result.place ?? { kind: "task", group: null, before: null };
       default:
         return null;
     }
@@ -2852,6 +2855,29 @@ ${key.title}`.toLowerCase();
   function sectionNameEnd(ended, event, text) {
     if (ended) return { ended: true };
     return { ended: true, end: { name: event === "enter" ? text : null } };
+  }
+
+  // src/application/RepeatPage.ts
+  function repeatPageEnd(own, held) {
+    if (held === null) return null;
+    if (held.rule === null) return own === null ? null : held;
+    return sameRule(held.rule, own) ? null : held;
+  }
+
+  // src/application/DescriptionDraft.ts
+  function descriptionOpen(description) {
+    return { state: { file: description, typed: false }, text: description ?? DESCRIPTION_TEMPLATE };
+  }
+  function descriptionTyped(state) {
+    return { ...state, typed: true };
+  }
+  function descriptionSave(state) {
+    return { state: { ...state, typed: false }, write: state.typed };
+  }
+  function descriptionRead(state, description, editor) {
+    const elsewhere = description !== state.file;
+    if (!elsewhere || editor.focused || editor.pending) return { state: { ...state, file: description }, replace: null };
+    return { state: { file: description, typed: false }, replace: description ?? DESCRIPTION_TEMPLATE };
   }
 
   // src/application/sections.ts
@@ -2905,6 +2931,16 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/drops.ts
+  function readDrop(to, sections) {
+    if (to.kind !== "place") return to;
+    return listDrop(to.column, to.place, to.place ? sections(to.column) : null);
+  }
+  function listDrop(column, place, sections) {
+    if (!place) return { kind: "list", column, before: null };
+    if (place.kind === "subtask") return { kind: "nest", parent: place.parent, before: place.before };
+    if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before };
+    return { kind: "list", column, before: place.before };
+  }
   function acceptsDrop(target, origins) {
     switch (target) {
       case "timeline":
@@ -2969,6 +3005,7 @@ ${key.title}`.toLowerCase();
     const n = Number(text);
     return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
   }
+  var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
   var SettingsServiceImpl = class {
     constructor(store) {
       this.store = store;
@@ -2999,7 +3036,9 @@ ${key.title}`.toLowerCase();
         googleClientId: s.google.clientId,
         refreshSeconds: s.google.refreshSeconds,
         workCalendarFile: s.workCalendarFile,
-        workCalendars: s.workCalendarTitles.join(", ")
+        workCalendars: s.workCalendarTitles.join(", "),
+        dayStartHours: DAY_START_HOURS,
+        googleClientReady: s.google.clientId !== ""
       };
     }
     setTasksFile(tasksFile) {
@@ -3065,6 +3104,11 @@ ${key.title}`.toLowerCase();
       const hex = hexColor(text);
       if (!hex) return null;
       return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
+    }
+    typedColour(of, index, text, shades) {
+      const color = this.colourOf(text, shades);
+      const own = (of === "level" ? this.settings.priorities : this.settings.labels)[index]?.color;
+      return color === own ? null : color;
     }
     renamePreset(index, name) {
       return this.savePresets(this.presets.map((preset, i) => i === index ? name.trim() : preset));
@@ -3367,6 +3411,7 @@ ${key.title}`.toLowerCase();
   }
   function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD) {
     const sections = menuSections(items, offer, of);
+    const edits = menuEdits(items, of, sections);
     return {
       statuses: menuStatuses(items, of),
       levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
@@ -3375,7 +3420,8 @@ ${key.title}`.toLowerCase();
       removeDue: items.some((item) => item.can.removeDue),
       dueDate: sharedDueDate(items),
       sections,
-      edits: menuEdits(items, of, sections),
+      edits,
+      reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
       remove: { confirm: of.kind === "task" }
     };
   }
@@ -3454,7 +3500,8 @@ ${key.title}`.toLowerCase();
         setLabels: choices.labels,
         stop: entry.task.repeat !== null && repeatable(entry),
         addDescription: description === null,
-        fold: hasOpenSubtask(entry)
+        fold: hasOpenSubtask(entry),
+        resize: entry.task.slot !== null
       },
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
@@ -3972,6 +4019,12 @@ ${key.title}`.toLowerCase();
     setCollapsed(key, collapsed) {
       return (doc) => setCollapsed(doc, this.entryOf(doc, key), collapsed);
     }
+    toggleCollapsed(key) {
+      return (doc) => {
+        const entry = this.entryOf(doc, key);
+        return setCollapsed(doc, entry, !entry.task.collapsed);
+      };
+    }
     unfoldAbove(key) {
       return (doc) => unfoldAbove(doc, this.entryOf(doc, key));
     }
@@ -4264,6 +4317,9 @@ ${key.title}`.toLowerCase();
     setCollapsed(key, collapsed) {
       return nothing(this.rules.setCollapsed(key, collapsed));
     }
+    toggleCollapsed(key) {
+      return nothing(this.rules.toggleCollapsed(key));
+    }
     unfoldAbove(key) {
       return nothing(this.rules.unfoldAbove(key));
     }
@@ -4376,7 +4432,7 @@ ${key.title}`.toLowerCase();
      * the tasks' keys as the file now has them, in their order; one not found again is left out.
      */
     drop(tasks, to, day) {
-      const moves = dropMoves(tasks, to, day);
+      const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
       return {
         reads: moves.kind === "one" && moves.move.kind === "toTime",
         plan: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps))
@@ -4638,6 +4694,18 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/application/snapGrid.ts
+  var MINUTES_PER_HOUR = 60;
+  var SNAP_STEPS = [5, 15, 30, 60];
+  var SNAP_STEP_PX = 9;
+  function snapStep(hourPx) {
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= SNAP_STEP_PX) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+  }
+  function snapMinute(minute, hourPx) {
+    const step = snapStep(hourPx);
+    return Math.min(MINUTES_PER_DAY, Math.max(0, Math.round(minute / step) * step));
+  }
+
   // src/application/PhoneCalls.ts
   var DoorError = class extends Error {
     constructor(code, message) {
@@ -4783,6 +4851,7 @@ ${key.title}`.toLowerCase();
     removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys)),
     carried: (c, [lifted, picked]) => c.reads.carried(lifted, picked),
     setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key, collapsed)),
+    toggleCollapsed: (c, [key]) => c.run(c.writes.toggleCollapsed(key)),
     unfoldAbove: (c, [key]) => c.run(c.writes.unfoldAbove(key)),
     setRepeat: (c, [key, rule]) => c.run(c.writes.setRepeat(key, rule ?? null)),
     stop: (c, [key]) => c.run(c.writes.stop(key)),
@@ -4801,6 +4870,7 @@ ${key.title}`.toLowerCase();
     shownSpan: (c, [item, day]) => c.reads.shownSpan(item, day),
     dropSpan: (c, [item, from, start]) => c.reads.dropSpan(item ?? null, from, start),
     newSlot: (c, [day, start]) => c.reads.newSlot(day, start),
+    snap: (_c, [minute, hourPx]) => snapMinute(minute, hourPx),
     stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item, day, edge, minute),
     resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key, day, edge, minute, min)),
     clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key, place ?? void 0)),
@@ -4914,6 +4984,7 @@ ${key.title}`.toLowerCase();
     "addLabel",
     "moveLabel",
     "colourOf",
+    "typedColour",
     "renamePreset",
     "removePreset",
     "addPreset",
@@ -5031,6 +5102,15 @@ ${key.title}`.toLowerCase();
   var SECTION_NAME = {
     end: (_c, [ended, event, text]) => sectionNameEnd(ended === true, event, text ?? "")
   };
+  var REPEAT_PAGE = {
+    end: (_c, [own, held]) => repeatPageEnd(own ?? null, held ?? null)
+  };
+  var DESCRIPTION = {
+    open: (_c, [description]) => descriptionOpen(description ?? null),
+    typed: (_c, [state]) => descriptionTyped(state),
+    save: (_c, [state]) => descriptionSave(state),
+    read: (_c, [state, description, editor]) => descriptionRead(state, description ?? null, editor)
+  };
   var SPACES = {
     tasks: TASKS,
     days: DAYS,
@@ -5040,6 +5120,8 @@ ${key.title}`.toLowerCase();
     settings: SETTINGS,
     entry: ENTRY,
     sectionName: SECTION_NAME,
+    repeatPage: REPEAT_PAGE,
+    description: DESCRIPTION,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
   function doorMethods() {

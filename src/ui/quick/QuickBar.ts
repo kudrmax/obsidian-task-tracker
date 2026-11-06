@@ -354,9 +354,10 @@ export class QuickBar implements EntryPart {
 
 	/** Every change is reported at once and the panel stays, standing again as it grows or shrinks; Remove repeat is a pick. */
 	private renderRepeat(parent: HTMLElement): void {
-		const rule = this.state?.repeat ?? null;
+		const state = this.state;
+		if (!state) return;
 		repeatPanel(parent, {
-			draft: repeatDraft(this.state?.repeatDay ?? this.deps.today(), rule),
+			draft: repeatDraft(state.repeatDay, state.repeat),
 			onChange: (changed) => {
 				this.deps.onRepeat(changed);
 				this.restand();

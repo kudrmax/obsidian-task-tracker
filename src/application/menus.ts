@@ -1,7 +1,7 @@
 import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
-import { type LocalDate, nextProgress, type TaskStatus } from "../domain/Task";
+import { type LocalDate, nextProgress, REMINDER_KINDS, type TaskStatus } from "../domain/Task";
 import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
@@ -129,6 +129,7 @@ function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
 export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
+	const edits = menuEdits(items, of, sections);
 	return {
 		statuses: menuStatuses(items, of),
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
@@ -137,7 +138,8 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		removeDue: items.some((item) => item.can.removeDue),
 		dueDate: sharedDueDate(items),
 		sections,
-		edits: menuEdits(items, of, sections),
+		edits,
+		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		remove: { confirm: of.kind === "task" },
 	};
 }

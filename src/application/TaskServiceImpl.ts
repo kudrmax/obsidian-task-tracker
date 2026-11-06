@@ -44,6 +44,7 @@ import { type Snapshot, TaskReads } from "./TaskReads";
 import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
 import type { UndoHistory } from "./UndoHistory";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
+import { snapMinute } from "./snapGrid";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -278,6 +279,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.setCollapsed(key, collapsed));
 	}
 
+	toggleCollapsed(key: TaskKey): Promise<void> {
+		return this.run(this.writes.toggleCollapsed(key));
+	}
+
 	unfoldAbove(key: TaskKey): Promise<void> {
 		return this.run(this.writes.unfoldAbove(key));
 	}
@@ -339,6 +344,10 @@ export class TaskServiceImpl implements TaskService {
 
 	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan {
 		return this.reads.dropSpan(item, from, start);
+	}
+
+	snap(minute: number, hourPx: number): number {
+		return snapMinute(minute, hourPx);
 	}
 
 	newSlot(day: LocalDate, start: number): Slot {

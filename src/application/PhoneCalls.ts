@@ -28,6 +28,9 @@ import { type Snapshot, TaskReads } from "./TaskReads";
 import { TaskRules } from "./TaskRules";
 import { TaskWrites, type Write } from "./TaskWrites";
 import { type UndoState, UndoSteps } from "./UndoSteps";
+import { snapMinute } from "./snapGrid";
+import { repeatPageEnd } from "./RepeatPage";
+import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
 
 /**
  * What one call of the door reads: the files' texts as the host has them now, the plugin's settings and the moment. The
@@ -276,6 +279,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys as A)),
 	carried: (c, [lifted, picked]) => c.reads.carried(lifted as A, picked as A),
 	setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key as A, collapsed as boolean)),
+	toggleCollapsed: (c, [key]) => c.run(c.writes.toggleCollapsed(key as A)),
 	unfoldAbove: (c, [key]) => c.run(c.writes.unfoldAbove(key as A)),
 	setRepeat: (c, [key, rule]) => c.run(c.writes.setRepeat(key as A, (rule ?? null) as A)),
 	stop: (c, [key]) => c.run(c.writes.stop(key as A)),
@@ -294,6 +298,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	shownSpan: (c, [item, day]) => c.reads.shownSpan(item as A, day as string),
 	dropSpan: (c, [item, from, start]) => c.reads.dropSpan((item ?? null) as A, from as A, start as number),
 	newSlot: (c, [day, start]) => c.reads.newSlot(day as string, start as number),
+	snap: (_c, [minute, hourPx]) => snapMinute(minute as number, hourPx as number),
 	stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item as A, day as string, edge as A, minute as number),
 	resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key as A, day as string, edge as A, minute as number, min as number)),
 	clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key as A, (place ?? undefined) as A)),
@@ -430,6 +435,7 @@ const SETTINGS_METHODS: readonly string[] = [
 	"addLabel",
 	"moveLabel",
 	"colourOf",
+	"typedColour",
 	"renamePreset",
 	"removePreset",
 	"addPreset",
@@ -573,6 +579,19 @@ const SECTION_NAME: Readonly<Record<string, Handler>> = {
 	end: (_c, [ended, event, text]) => sectionNameEnd(ended === true, event as A, (text ?? "") as string),
 };
 
+/** A task menu's repeat page closed: what it writes (`RepeatPage`). */
+const REPEAT_PAGE: Readonly<Record<string, Handler>> = {
+	end: (_c, [own, held]) => repeatPageEnd((own ?? null) as A, (held ?? null) as A),
+};
+
+/** The full screen's description editor (`DescriptionDraft`): the host keeps `state` between calls and hands it in. */
+const DESCRIPTION: Readonly<Record<string, Handler>> = {
+	open: (_c, [description]) => descriptionOpen((description ?? null) as string | null),
+	typed: (_c, [state]) => descriptionTyped(state as A),
+	save: (_c, [state]) => descriptionSave(state as A),
+	read: (_c, [state, description, editor]) => descriptionRead(state as A, (description ?? null) as string | null, editor as A),
+};
+
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	tasks: TASKS,
 	days: DAYS,
@@ -582,6 +601,8 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	settings: SETTINGS,
 	entry: ENTRY,
 	sectionName: SECTION_NAME,
+	repeatPage: REPEAT_PAGE,
+	description: DESCRIPTION,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 

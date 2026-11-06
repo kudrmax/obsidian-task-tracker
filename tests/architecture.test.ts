@@ -178,6 +178,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	sameGap: "./nesting",
 	QuickEntrySession: "./QuickEntrySession",
 	SectionNameEntry: "./SectionNameEntry",
+	RepeatPage: "./RepeatPage",
+	DescriptionDraft: "./DescriptionDraft",
 	listView: "./sections",
 	sectionChoice: "./sections",
 	cardDue: "./cardDue",
@@ -209,6 +211,8 @@ const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
 	DayBoundary: "boundary.dayOf",
 	QuickEntrySession: "entry.enter",
 	SectionNameEntry: "sectionName.end",
+	RepeatPage: "repeatPage.end",
+	DescriptionDraft: "description.read",
 };
 
 /** Every runtime value contracts.ts re-exports, as `name ← module`: `export { … } from`, or a value imported and exported again. */

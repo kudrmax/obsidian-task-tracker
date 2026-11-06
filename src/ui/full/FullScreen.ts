@@ -1,4 +1,4 @@
-import { DESCRIPTION_TEMPLATE, type EntryState, type FullPlace, type FullTree, QuickEntrySession, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../application/contracts";
+import { DescriptionDraft, type EntryState, type FullPlace, type FullTree, QuickEntrySession, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../application/contracts";
 import { BottomCapsule } from "../BottomCapsule";
 import { SHOWN_LISTS } from "../screens";
 import { DURATION, tokenMs } from "../design";
@@ -56,10 +56,8 @@ export class FullScreen {
 	private readonly done: Button;
 	private readonly capsule: BottomCapsule;
 	private editing: MarkdownEditing | null = null;
-	/** The description as the file had it when last drawn; the editor follows a change made elsewhere. */
-	private fileDescription: string | null = null;
-	/** Something was typed in the description since it was last written: only then is there something to send. */
-	private typed = false;
+	/** When the editor writes and when a change made elsewhere replaces it: the rules are the draft's, the timing the screen's. */
+	private draft: DescriptionDraft | null = null;
 	private saveTimer: number | null = null;
 	/** Typing a subtask or a title: what it means is the session's, the screen draws its state. */
 	private readonly entry: QuickEntrySession;
@@ -252,23 +250,17 @@ export class FullScreen {
 	}
 
 	private showDescription(item: TaskItem): void {
-		if (!this.editing) {
-			const markdown = item.description ?? DESCRIPTION_TEMPLATE;
-			this.typed = false;
-			this.fileDescription = item.description;
-			this.editing = this.deps.surface.edit(this.descEl, markdown, () => this.stopTyping(), () => this.descriptionTyped());
+		if (!this.editing || !this.draft) {
+			const draft = (this.draft = new DescriptionDraft(item.description));
+			this.editing = this.deps.surface.edit(this.descEl, draft.text, () => this.stopTyping(), () => this.descriptionTyped());
 			return;
 		}
-		const changedElsewhere = item.description !== this.fileDescription;
-		this.fileDescription = item.description;
-		if (changedElsewhere && !this.editing.focused && this.saveTimer === null) {
-			this.typed = false;
-			this.editing.setValue(item.description ?? DESCRIPTION_TEMPLATE);
-		}
+		const replace = this.draft.read(item.description, { focused: this.editing.focused, pending: this.saveTimer !== null });
+		if (replace !== null) this.editing.setValue(replace);
 	}
 
 	private descriptionTyped(): void {
-		this.typed = true;
+		this.draft?.typed();
 		if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
 		this.saveTimer = window.setTimeout(() => void this.saveDescription(), DESCRIPTION_PAUSE_MS);
 	}
@@ -281,8 +273,7 @@ export class FullScreen {
 		if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
 		this.saveTimer = null;
 		const current = this.current;
-		if (!this.editing || !current || !this.typed) return;
-		this.typed = false;
+		if (!this.editing || !current || !this.draft?.save()) return;
 		const markdown = this.editing.value;
 		await this.deps.act(() => this.deps.tasks.setDescription(current.key, markdown));
 	}
@@ -292,6 +283,7 @@ export class FullScreen {
 		void this.saveDescription();
 		this.editing?.destroy();
 		this.editing = null;
+		this.draft = null;
 		clear(this.descEl);
 		this.entry.escape();
 	}
@@ -377,11 +369,9 @@ export class FullScreen {
 		const state = this.state;
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
-			parseTitle: (text) => this.deps.tasks.parseTitle(text),
-			priority: state?.marks.priority ?? null,
+			tint: state?.marks.tint ?? null,
 			titleField: this.deps.titleField,
 			onInput: (text) => this.entry.type(text),
-			onPriority: () => this.state && this.sync(this.state),
 			onKey: (key) => this.typedKey(key),
 			onBlur: () => this.blurred(handle),
 		});

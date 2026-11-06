@@ -1,31 +1,24 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
-import type { PriorityLevel } from "../../src/application/contracts";
+import type { PriorityColor } from "../../src/application/contracts";
 import type { PendingText } from "../../src/application/contracts";
 import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
-import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
 
-const URGENT: PriorityLevel = { prefix: "p1", color: "red" };
-const LATER: PriorityLevel = { prefix: "p2", color: "blue" };
-
-function open(value = "", priority: PriorityLevel | null = null) {
+function open(value = "", tint: PriorityColor | null = null) {
 	const parent = document.createElement("div");
 	document.body.appendChild(parent);
 	const keys: QuickKey[] = [];
 	const texts: string[] = [];
-	const priorities: (PriorityLevel | null)[] = [];
 	let blurs = 0;
 	const handle = QuickField.open(parent, {
 		value,
-		priority,
-		parseTitle: priorityTitles([URGENT, LATER]).parseTitle,
+		tint,
 		titleField: fakeTitleField,
 		onInput: (t) => texts.push(t),
-		onPriority: (p) => priorities.push(p),
 		onKey: (k) => keys.push(k),
 		onBlur: () => blurs++,
 	});
@@ -34,7 +27,7 @@ function open(value = "", priority: PriorityLevel | null = null) {
 		field.value = text;
 		field.dispatchEvent(new Event("input", { bubbles: true }));
 	};
-	return { handle, field, keys, texts, priorities, type, blurs: () => blurs };
+	return { handle, field, keys, texts, type, blurs: () => blurs };
 }
 
 const press = (field: HTMLElement, init: KeyboardEventInit) => {
@@ -82,12 +75,10 @@ describe("QuickField", () => {
 		expect(enter.defaultPrevented).toBe(false);
 	});
 
-	it("takes a text set from outside, its prefix reported again only when typed over", () => {
-		const { handle, field, priorities, type } = open("p1 buy", URGENT);
+	it("takes a text set from outside", () => {
+		const { handle, field } = open("p1 buy", "red");
 		handle.setValue("");
 		expect(field.value).toBe("");
-		type("p1 milk");
-		expect(priorities).toEqual([URGENT]);
 	});
 
 	it("reports the text as typed, and a blur", () => {
@@ -105,42 +96,23 @@ describe("QuickField", () => {
 		expect(texts).toEqual(["buy milk"]);
 	});
 
-	describe("priority from the prefix", () => {
-		it("takes the colour of the level whose prefix and a space start the text, and says so once", () => {
-			const { field, priorities, type } = open();
-			type("p1");
-			expect(field.hasAttribute("data-priority")).toBe(false);
-			type("p1 ");
-			type("p1 buy");
+	describe("its colour", () => {
+		it("starts in the tint given, and takes only the tint the session gives, never one of its own from the text", () => {
+			const { field, type, handle } = open("p1 buy", "red");
 			expect(field.dataset.priority).toBe("red");
-			expect(priorities).toEqual([URGENT]);
 			type("p2 buy");
-			expect(field.dataset.priority).toBe("blue");
-			expect(priorities).toEqual([URGENT, LATER]);
-		});
-
-		it("lets go of the colour when the prefix goes, leaving the text as typed", () => {
-			const { field, priorities, type } = open();
-			type("p1 buy");
-			type("p1buy");
-			expect(field.hasAttribute("data-priority")).toBe(false);
-			expect(field.value).toBe("p1buy");
-			expect(priorities).toEqual([URGENT, null]);
-		});
-
-		it("says nothing for a text with no prefix on a field whose level was chosen elsewhere", () => {
-			const { field, priorities, type, handle } = open("", null);
-			handle.setTint(LATER.color);
-			type("buy");
-			expect(field.dataset.priority).toBe("blue");
-			expect(priorities).toEqual([]);
-		});
-
-		it("starts with the level given, and does not announce a prefix it already had", () => {
-			const { field, priorities, type } = open("p1 buy", URGENT);
 			expect(field.dataset.priority).toBe("red");
-			type("p1 buy milk");
-			expect(priorities).toEqual([]);
+			handle.setTint("blue");
+			expect(field.dataset.priority).toBe("blue");
+			handle.setTint(null);
+			expect(field.hasAttribute("data-priority")).toBe(false);
+		});
+
+		it("keeps the tint as a section's name: the session gives a section none", () => {
+			const { field, handle } = open("", "red");
+			handle.setSection(true);
+			expect(field.dataset.priority).toBe("red");
+			expect(field.classList.contains("is-section")).toBe(true);
 		});
 	});
 
@@ -196,7 +168,7 @@ describe("TaskList with a task being typed", () => {
 			entry: () => ({
 				place: { kind: "gap", index, level, group: null },
 				pending,
-				field: (parent) => QuickField.open(parent, { value: "", parseTitle: priorityTitles([]).parseTitle, priority: null, titleField: fakeTitleField, onInput() {}, onPriority() {}, onKey() {}, onBlur() {} }).el,
+				field: (parent) => QuickField.open(parent, { value: "", tint: null, titleField: fakeTitleField, onInput() {}, onKey() {}, onBlur() {} }).el,
 			}),
 		});
 		l.render();

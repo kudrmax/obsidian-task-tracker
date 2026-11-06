@@ -496,6 +496,28 @@ describe("priority", () => {
 		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n");
 	});
 
+	it("toggleCollapsed folds a task's subtasks away, and shows them again", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n");
+		await svc.toggleCollapsed((await svc.dayView(T)).list[0].key);
+		expect(store.text).toContain("- [ ] A 📁\n\t- [ ] B\n");
+		await svc.toggleCollapsed((await svc.dayView(T)).list[0].key);
+		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n");
+	});
+
+	it("can.resize: a task on the timeline only", async () => {
+		const { svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B ⏰ 2026-10-30 10:00-11:00\n\n## Soon\n\n## Done\n");
+		const day = await svc.dayView(T);
+		expect(day.list[0].can.resize).toBe(false);
+		expect(day.slotted[0].can.resize).toBe(true);
+	});
+
+	it("snap: a minute to the nearest step of the zoom, within the day", () => {
+		const { svc } = setup("");
+		expect(svc.snap(617, 56)).toBe(615);
+		expect(svc.snap(617, 28)).toBe(630);
+		expect(svc.snap(2000, 112)).toBe(1440);
+	});
+
 	it("unfoldAbove shows the subtasks of every task a subtask sits under", async () => {
 		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A 📁\n\t- [ ] B 📁\n\t\t- [ ] C\n\n## Soon\n\n## Done\n");
 		await svc.unfoldAbove((await svc.dayView(T)).list[0].subtasks[0].subtasks[0].key);
