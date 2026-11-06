@@ -241,8 +241,8 @@ final class BoardModel {
         picked = []
     }
 
-    func togglePick(_ item: TaskItem) {
-        if picked.contains(item.id) { picked.remove(item.id) } else { picked.insert(item.id) }
+    func togglePick(_ id: String) {
+        if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
     }
 
     /// Every card of the lists: the calendar's cannot be picked, as in the plugin.
@@ -260,26 +260,17 @@ final class BoardModel {
     }
 
     var newTaskAt: NewTaskSpot?
+    /// A card or the plus is being carried: the cards lie under a cover then, so every drop lands on the lists' own targets.
+    var carrying = false
 
-    /// A card or the plus let go in a list: before card `index` of its cards (past the last: the end of section `group`,
-    /// or of the list) at `level`.
-    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int, endOf group: Int? = nil) async {
+    /// A card or the plus let go in a list: before card `index` of its cards (past the last: the list's end) at `level`,
+    /// past the headers `passed` (the section it lands in is the last of them).
+    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int, passed: [String?]) async {
         guard let snapshot, let list = snapshot.lists[column] else { return }
         let others = list.cards.filter { $0.id != id && !isUnder($0.item, id) }
         let cards = JSONValue.array(others.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
-        let target = group == nil ? list.cards[safe: index] : nil
-        let at: Int
-        if let group, let last = list.groups[safe: group]?.cards.last(where: { card in others.contains { $0.id == card.id } }) {
-            at = (others.firstIndex { $0.id == last.id } ?? others.count - 1) + 1
-        } else if let group, let first = list.groups[(group + 1)...].lazy.compactMap({ $0.cards.first { card in others.contains { $0.id == card.id } } }).first {
-            at = others.firstIndex { $0.id == first.id } ?? others.count
-        } else {
-            at = others.firstIndex { $0.id == target?.id } ?? others.count
-        }
-        // The headers the gap is past: down to the section it stands in, or all of them at the end.
-        let groups = list.groups.map(\.name)
-        let through = group ?? target.flatMap { card in list.groups.firstIndex { $0.cards.contains { $0.id == card.id } } } ?? groups.count - 1
-        let passed = list.showsHeaders && through >= 0 ? Array(groups.prefix(through + 1)) : []
+        let target = list.cards[index...].first { card in others.contains { $0.id == card.id } }
+        let at = others.firstIndex { $0.id == target?.id } ?? others.count
         do {
             let gap: JSONValue = try await rule("rules.gapAt", [cards, .number(Double(at)), .number(Double(level)), .array(passed.map(\.json)), .bool(list.showsHeaders)])
             guard case .object = gap else { return }
@@ -289,7 +280,7 @@ final class BoardModel {
                 let look: JSONValue = ["cards": [:], "day": .string(snapshot.day), "shown": [], "sections": [:], "sectioned": [:]]
                 let entry: [String: JSONValue] = try await read("entry.placeOf", [.null, look, .string(column.rawValue), place])
                 if let spot = entry["value"], !spot.isNull { newTaskAt = NewTaskSpot(place: spot) }
-            } else if let item = snapshot.item(id), let from = snapshot.column(of: id) {
+            } else if !place.isNull, let item = snapshot.item(id), let from = snapshot.column(of: id) {
                 await drop(item, from: from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
             }
         } catch {

@@ -80,8 +80,16 @@ struct TimelineColumn: View {
         if model.selecting {
             TaskCapsule(card: slot.card, height: tall, over: slot.box.overlay).opacity(0.5)
         } else {
-            CardButton(card: slot.card, menu: { model.cardMenu(slot.card.item) { question = $0 } }, ringed: model.found == slot.id, height: tall, over: slot.box.overlay) { model.found = nil }
+            CardButton(
+                card: slot.card,
+                menu: { model.cardMenu(slot.card.item) { question = $0 } },
+                ringed: model.found == slot.id,
+                height: tall,
+                over: slot.box.overlay,
+                onTouch: { model.found = nil },
+                onCarry: { model.carrying = $0 })
                 .frame(height: tall)
+                .overlay { if model.carrying { Color.clear.contentShape(.rect) } }
         }
     }
 

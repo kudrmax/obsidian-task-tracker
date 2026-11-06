@@ -32,13 +32,17 @@ struct BoardScreen: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
-        .overlay(alignment: .bottomTrailing) {
-            if !model.selecting, model.fullScreen.isEmpty {
-                PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme))
-                    .frame(width: PlusButton.side, height: PlusButton.side)
-                    .padding([.trailing, .bottom], PlusButton.inset)
-                    .ignoresSafeArea()
+        .overlay {
+            // Measured from the screen's edges, as the tab bar's own round button stands.
+            ZStack(alignment: .bottomTrailing) {
+                Color.clear
+                if !model.selecting, model.fullScreen.isEmpty {
+                    PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme)) { model.carrying = $0 }
+                        .frame(width: PlusButton.side, height: PlusButton.side)
+                        .padding([.trailing, .bottom], PlusButton.inset)
+                }
             }
+            .ignoresSafeArea()
         }
         .alert("New Task", isPresented: Binding(get: { model.newTaskAt != nil }, set: { if !$0 { model.newTaskAt = nil } }), presenting: model.newTaskAt) { spot in
             TextField("Task", text: $newTitle)

@@ -7,6 +7,7 @@ import UIKit
 struct PlusButton: UIViewRepresentable {
     let open: () -> Void
     let accent: Color
+    var onCarry: (Bool) -> Void = { _ in }
 
     /// Where iOS 26 puts the tab bar's trailing round button: its size, and its gap to the screen's edges.
     static let side: CGFloat = 62
@@ -16,18 +17,21 @@ struct PlusButton: UIViewRepresentable {
         let control = PlusControl()
         control.open = open
         control.accent = UIColor(accent)
+        control.onCarry = onCarry
         return control
     }
 
     func updateUIView(_ control: PlusControl, context: Context) {
         control.open = open
         control.accent = UIColor(accent)
+        control.onCarry = onCarry
     }
 }
 
 final class PlusControl: UIControl, UIDragInteractionDelegate {
     var open: () -> Void = {}
     var accent = UIColor.tintColor
+    var onCarry: (Bool) -> Void = { _ in }
 
     init() {
         super.init(frame: .zero)
@@ -62,6 +66,10 @@ final class PlusControl: UIControl, UIDragInteractionDelegate {
         let target = UIDragPreviewTarget(container: self, center: CGPoint(x: bounds.midX, y: bounds.midY))
         return UITargetedDragPreview(view: Self.carried(accent), parameters: parameters, target: target)
     }
+
+    func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) { onCarry(true) }
+
+    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) { onCarry(false) }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
 

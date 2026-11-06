@@ -25,9 +25,12 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let due: DueLabel?
     public let repeats: Bool
     public let shades: Themed<Shades>?
-    public var id: String { item.id }
+    /// The card's identity on the screen: its line as the file has it, so a card moved or ticked keeps it and the lists
+    /// animate it to its new place instead of drawing a new card.
+    public let id: String
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, id: String? = nil) {
+        self.id = id ?? item.id
         self.item = item
         self.level = level
         self.branch = branch
@@ -228,7 +231,8 @@ extension TaskBoard {
                 branch: row.level == 0 ? nil : Self.branch(of: index, in: rows),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
-                shades: try row.item.colors.first.map { try painter.shades($0) })
+                shades: try row.item.colors.first.map { try painter.shades($0) },
+                id: painter.identity(row.item))
         }
     }
 
@@ -265,7 +269,7 @@ extension TaskBoard {
             let span: JSONValue = ["start": .number(Double(pair.1.start)), "end": pair.1.end.map { .number(Double($0)) } ?? .null]
             let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
             let corner: [String]? = try rule("rules.stackCorner", [flags, .number(Double(pair.0.slot?.start ?? pair.1.start)), span])
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: corner.map { DueLabel(day: $0[0], month: $0[1]) }, repeats: pair.0.repeats, shades: try pair.0.colors.first.map { try painter.shades($0) })
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: corner.map { DueLabel(day: $0[0], month: $0[1]) }, repeats: pair.0.repeats, shades: try pair.0.colors.first.map { try painter.shades($0) }, id: painter.identity(pair.0))
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -279,6 +283,15 @@ struct Painter {
     let board: TaskBoard
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
+    private var seen: [String: Int] = [:]
+
+    /// A card's identity: its line, and which of the same lines it is when the file has two alike.
+    mutating func identity(_ item: TaskItem) -> String {
+        let line = "\(item.list)|\(item.key.raw)"
+        let count = seen[line, default: 0]
+        seen[line] = count + 1
+        return count == 0 ? line : "\(line)#\(count)"
+    }
 
     init(board: TaskBoard) {
         self.board = board

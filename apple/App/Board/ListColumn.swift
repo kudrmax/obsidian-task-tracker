@@ -9,36 +9,43 @@ struct ListColumn: View {
     var dayArrows = false
     @Binding var question: MenuQuestion?
 
+    @State private var width: CGFloat = 0
+    /// Where each card and header stands in the list, as a carry reads its place: taken as the carry begins, so the gap
+    /// opening under the finger never moves the places it is read against.
+    @State private var cardFrames: [String: CGRect] = [:]
+    @State private var headerFrames: [Int: CGRect] = [:]
+    @State private var frozen: (cards: [String: CGRect], headers: [Int: CGRect])?
+    /// The card a carry held over the list would land before; past the last card, the list's end.
+    @State private var gap: Int?
+
+    private static let space = "list"
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: CardMetrics.gap) {
+                VStack(alignment: .leading, spacing: CardMetrics.gap) {
                     ForEach(Array(list.groups.enumerated()), id: \.element.id) { groupIndex, group in
                         if let header = group.header {
                             SectionHeader(title: header, group: group, column: list.column, model: model)
-                                .landing(list: list.column, model: model, gap: false) { id, x in
-                                    await model.drop(id, in: list.column, before: firstIndex(of: group), level: 0, endOf: group.cards.isEmpty ? groupIndex : nil)
-                                }
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { headerFrames[groupIndex] = $0 }
                         }
-                        if group.empty {
-                            EmptyPlate()
-                                .landing(list: list.column, model: model) { id, x in
-                                    await model.drop(id, in: list.column, before: .max, level: 0, endOf: groupIndex)
-                                }
-                        }
+                        if group.empty { EmptyPlate() }
                         ForEach(group.cards) { card in
-                            CardRow(card: card, column: list.column, index: index(of: card), width: width - CardMetrics.columnInset * 2, model: model, question: $question)
+                            let index = index(of: card)
+                            CardRow(card: card, model: model, question: $question)
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { cardFrames[card.id] = $0 }
+                                .padding(.top, gap == index ? CardMetrics.height + CardMetrics.gap : 0)
                         }
                     }
-                    Color.clear
-                        .frame(height: 160)
-                        .contentShape(.rect)
-                        .landing(list: list.column, model: model) { id, x in
-                            await model.drop(id, in: list.column, before: .max, level: Self.level(x, width: width - CardMetrics.columnInset * 2))
-                        }
+                    Color.clear.frame(height: 160)
                 }
                 .padding(.horizontal, CardMetrics.columnInset)
+                .coordinateSpace(.named(Self.space))
+                .contentShape(.rect)
+                .onDrop(of: [.plainText], delegate: ListDrop(list: self))
+                .animation(.snappy(duration: 0.25), value: gap)
+                .animation(.snappy(duration: 0.3), value: list)
                 .animation(.snappy(duration: 0.3), value: model.selecting)
             }
             .scrollIndicators(.hidden)
@@ -46,22 +53,72 @@ struct ListColumn: View {
         }
     }
 
-    @State private var width: CGFloat = 0
-
     /// How deep a card let go at `x` goes: left of the list's middle a task, then one level deeper for each indent past it.
     static func level(_ x: CGFloat, width: CGFloat) -> Int {
         let middle = width / 2
         return x <= middle ? 0 : 1 + Int((x - middle) / CardMetrics.indent)
     }
 
-    private func firstIndex(of group: BoardGroup) -> Int {
-        group.cards.first.map(index(of:)) ?? list.cards.count
-    }
-
     private func index(of card: BoardCard) -> Int { list.cards.firstIndex { $0.id == card.id } ?? list.cards.count }
 
+    // MARK: A carry over the list
 
+    fileprivate func hover(at point: CGPoint) {
+        if frozen == nil { frozen = (cardFrames, headerFrames) }
+        let place = place(at: point)
+        if place != gap {
+            UISelectionFeedbackGenerator().selectionChanged()
+            gap = place
+        }
+    }
 
+    fileprivate func leave() {
+        gap = nil
+        frozen = nil
+    }
+
+    fileprivate func land(_ id: String, at point: CGPoint) {
+        let before = place(at: point)
+        let passed = passedHeaders(at: point)
+        let level = Self.level(point.x, width: width - CardMetrics.columnInset * 2)
+        leave()
+        Task { await model.drop(id, in: list.column, before: before, level: level, passed: passed) }
+    }
+
+    /// The card a point stands before: the first whose middle is under it.
+    private func place(at point: CGPoint) -> Int {
+        let frames = frozen?.cards ?? cardFrames
+        return list.cards.firstIndex { (frames[$0.id]?.midY ?? .infinity) > point.y } ?? list.cards.count
+    }
+
+    /// The headers above a point, in their order: the section a drop lands in is the last of them.
+    private func passedHeaders(at point: CGPoint) -> [String?] {
+        guard list.showsHeaders else { return [] }
+        let frames = frozen?.headers ?? headerFrames
+        return list.groups.enumerated().filter { (frames[$0.offset]?.midY ?? .infinity) < point.y }.map(\.element.name)
+    }
+}
+
+/// The list taking a carried card or the plus: the gap follows the finger, and letting go drops it there.
+private struct ListDrop: DropDelegate {
+    let list: ListColumn
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        list.hover(at: info.location)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) { list.leave() }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let point = info.location
+        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let id = object as? String else { return }
+            Task { @MainActor in list.land(id, at: point) }
+        }
+        return true
+    }
 }
 
 /// A column's title, 20 points bold; the day list's has the arrows that turn the day, and a tap on it comes back to today.
@@ -150,14 +207,10 @@ struct EmptyPlate: View {
     }
 }
 
-/// One card in a list: at its depth, with its branch. A tap opens its menu, a long press lifts it to carry; while a card
-/// is carried over it, the rows part above it. Select Tasks puts the system's selection circle before it.
+/// One card in a list: at its depth, with its branch. A tap opens its menu, a long press lifts it to carry. Select Tasks
+/// puts the system's selection circle before it, as Mail and Reminders do.
 struct CardRow: View {
     let card: BoardCard
-    let column: BoardColumn
-    let index: Int
-    /// The list's width, which a drop's level is read against.
-    let width: CGFloat
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
 
@@ -175,21 +228,24 @@ struct CardRow: View {
         .onTapGesture {
             guard model.selecting else { return }
             UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.item) }
-        }
-        .landing(list: column, model: model) { id, x in
-            await model.drop(id, in: column, before: index, level: ListColumn.level(x, width: width))
+            withAnimation(.snappy(duration: 0.2)) { model.togglePick(card.id) }
         }
     }
 
     @ViewBuilder
     private var capsule: some View {
-        let ringed = model.found == card.id
         if model.selecting {
             TaskCapsule(card: card)
         } else {
-            CardButton(card: card, menu: { model.cardMenu(card.item) { question = $0 } }, ringed: ringed) { model.found = nil }
+            CardButton(
+                card: card,
+                menu: { model.cardMenu(card.item) { question = $0 } },
+                ringed: model.found == card.id,
+                onTouch: { model.found = nil },
+                onCarry: { model.carrying = $0 })
                 .frame(height: CardMetrics.height)
+                // While something is carried the card lies under a cover: the list's own target takes the drop.
+                .overlay { if model.carrying { Color.clear.contentShape(.rect) } }
         }
     }
 }
@@ -205,33 +261,5 @@ struct SelectionCircle: View {
             .foregroundStyle(on ? AnyShapeStyle(.white) : AnyShapeStyle(Color(.tertiaryLabel)), AnyShapeStyle(.tint))
             .contentTransition(.symbolEffect(.replace))
             .accessibilityLabel(on ? "Selected" : "Not selected")
-    }
-}
-
-/// Where a carried card or the plus can be let go: the rows part over it while one is held above it.
-private struct Landing: ViewModifier {
-    let list: BoardColumn
-    let model: BoardModel
-    let gap: Bool
-    let land: (String, CGFloat) async -> Void
-    @State private var targeted = false
-
-    func body(content: Content) -> some View {
-        content
-            .padding(.top, gap && targeted ? CardMetrics.height + CardMetrics.gap : 0)
-            .animation(.snappy(duration: 0.25), value: targeted)
-            .dropDestination(for: String.self) { ids, at in
-                guard let id = ids.first else { return false }
-                Task { await land(id, at.x) }
-                return true
-            } isTargeted: { over in
-                targeted = over
-            }
-    }
-}
-
-extension View {
-    fileprivate func landing(list: BoardColumn, model: BoardModel, gap: Bool = true, land: @escaping (String, CGFloat) async -> Void) -> some View {
-        modifier(Landing(list: list, model: model, gap: gap, land: land))
     }
 }

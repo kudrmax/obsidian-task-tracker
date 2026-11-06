@@ -9,9 +9,9 @@ enum Carried {
     static func provider(_ id: String) -> NSItemProvider { NSItemProvider(object: id as NSString) }
 }
 
-/// A card as iOS draws a row with a menu: a tap lifts the card over the dimmed screen and grows the menu under it; a long
-/// press lifts it to carry, the system's drag that the lists and the calendar take. Both are UIKit's own, so the lift, the
-/// haptics and the hand-over from the menu to the drag are the system's.
+/// A card as the design has it: a tap opens its menu, the system's menu growing from the card; a long press lifts it to
+/// carry, the system's drag that the lists and the calendar take, as in the plugin. Both are UIKit's own, so the lift,
+/// the haptics and the drop's animation are the system's.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
     let menu: () -> UIMenu?
@@ -19,6 +19,8 @@ struct CardButton: UIViewRepresentable {
     var height: CGFloat = CardMetrics.height
     var over = false
     var onTouch: () -> Void = {}
+    /// The card was lifted to carry (true), or the carry ended (false).
+    var onCarry: (Bool) -> Void = { _ in }
 
     func makeUIView(context: Context) -> CardControl {
         let control = CardControl(content: configuration.makeContentView())
@@ -43,14 +45,16 @@ struct CardButton: UIViewRepresentable {
         control.content.configuration = configuration
         control.menuMaker = menu
         control.onTouch = onTouch
+        control.onCarry = onCarry
         control.accessibilityLabel = card.item.title
     }
 }
 
-final class CardControl: UIView, UIDragInteractionDelegate, UIContextMenuInteractionDelegate {
+final class CardControl: UIView, UIDragInteractionDelegate {
     var id = ""
     var menuMaker: () -> UIMenu? = { nil }
     var onTouch: () -> Void = {}
+    var onCarry: (Bool) -> Void = { _ in }
     let content: UIView & UIContentView
     /// Opens the menu on a tap: a menu button pressed in code, so the press of a finger stays free for the long press.
     private let tapMenu = UIButton()
@@ -74,7 +78,6 @@ final class CardControl: UIView, UIDragInteractionDelegate, UIContextMenuInterac
             done(self?.menuMaker()?.children ?? [])
         }])
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
-        addInteraction(UIContextMenuInteraction(delegate: self))
         let drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
@@ -95,26 +98,6 @@ final class CardControl: UIView, UIDragInteractionDelegate, UIContextMenuInterac
         return true
     }
 
-    private var preview: UITargetedPreview {
-        let parameters = UIPreviewParameters()
-        parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
-        parameters.backgroundColor = .clear
-        return UITargetedPreview(view: content, parameters: parameters)
-    }
-
-    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
-        onTouch()
-        return UIContextMenuConfiguration(identifier: "card" as NSString, previewProvider: nil) { [weak self] _ in self?.menuMaker() }
-    }
-
-    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        preview
-    }
-
-    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        preview
-    }
-
     func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
         let item = UIDragItem(itemProvider: Carried.provider(id))
         item.localObject = id
@@ -131,6 +114,10 @@ final class CardControl: UIView, UIDragInteractionDelegate, UIContextMenuInterac
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
 
+    func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
+        onCarry(true)
+    }
+
     func dragInteraction(_ interaction: UIDragInteraction, willAnimateLiftWith animator: UIDragAnimating, session: UIDragSession) {
         animator.addCompletion { [weak self] position in
             if position == .end { self?.alpha = 0.35 }
@@ -138,6 +125,7 @@ final class CardControl: UIView, UIDragInteractionDelegate, UIContextMenuInterac
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
+        onCarry(false)
         UIView.animate(withDuration: 0.2) { self.alpha = 1 }
     }
 }
