@@ -24,6 +24,9 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 7. **An untaken project task is in Backlog.** Whatever is written in a project note and not taken yet is the project's
    backlog, so the plugin shows it in Backlog, grouped by project (a nested project: its own group). Taking it is the same
    move as for any Backlog task: to Soon, Now, a day or the calendar.
+8. **A project task never leaves its note.** Taken, moved or done, its line stays in the project note; the plugin writes
+   where it is in the lane on that line. Done, it stays in the note as `- [x]` and leaves the screen like any done task:
+   the note keeps the project's history. The general Done of `TODOs Tasks.md` holds only tasks of that file.
 
 ## Open (being planned now)
 
