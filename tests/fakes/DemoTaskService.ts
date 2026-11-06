@@ -1,4 +1,5 @@
-import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService } from "../../src/application/contracts";
+import { carriedWith, taskMenu, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { fullTree } from "../../src/application/fullTree";
@@ -174,7 +175,7 @@ export class DemoTaskService implements TaskService {
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false },
 		};
 	}
 
@@ -378,6 +379,29 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
+	async togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void> {
+		const priority = toggledPriority(keys.map((key) => this.item(key.section, key.index)), prefix);
+		for (const key of keys) this.taskOf(key).priority = priority;
+		this.changed();
+	}
+
+	async toggleLabel(keys: readonly TaskKey[]): Promise<readonly (TaskItem | null)[]> {
+		return keys.map((key) => this.item(key.section, key.index));
+	}
+
+	async removeDue(keys: readonly TaskKey[]): Promise<void> {
+		for (const key of keys) if (this.item(key.section, key.index).can.removeDue) this.taskOf(key).dueDate = null;
+		this.changed();
+	}
+
+	menu(items: readonly TaskItem[], today: LocalDate, offer: SectionOffer | null = null): TaskMenuModel {
+		return taskMenu(items, today, this.priorityLevels(), this.labelLevels(), offer);
+	}
+
+	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
+		return carriedWith(lifted, picked);
+	}
+
 	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
 		this.taskOf(key).repeat = rule;
 		this.changed();
@@ -514,7 +538,9 @@ export class DemoTaskService implements TaskService {
 
 	async moveGroup(): Promise<void> {}
 
-	async renameGroup(): Promise<void> {}
+	async renameGroup(): Promise<boolean> {
+		return false;
+	}
 
 	async removeGroup(): Promise<void> {}
 

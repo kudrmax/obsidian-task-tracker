@@ -2034,6 +2034,9 @@ ${key.title}`.toLowerCase();
   function sameLine(a, b) {
     return a.raw === b.raw;
   }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
 
   // src/application/contracts.ts
   var StaleTaskError = class extends Error {
@@ -2090,9 +2093,6 @@ ${key.title}`.toLowerCase();
   }
   function sameKey(a, b) {
     return samePlace2(a, b) && sameLine(a, b);
-  }
-  function isAncestor(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length < b.path.length && a.path.every((i, k) => b.path[k] === i);
   }
   function columnOfPlace(place, today) {
     if (place.kind === "day") return { kind: "day", date: place.date };
@@ -2357,7 +2357,7 @@ ${key.title}`.toLowerCase();
           return at >= 0 ? at : named.push(key) - 1;
         };
         const lineOf = (key) => doc.lineOf(this.entryOf(doc, key));
-        const plan = steps.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isAncestor(other.key, step.key)))).sort((a, b) => lineOf(a.key) - lineOf(b.key)).map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => ref === null ? null : tagOf(ref)) }));
+        const plan = steps.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key)))).sort((a, b) => lineOf(a.key) - lineOf(b.key)).map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => ref === null ? null : tagOf(ref)) }));
         const { doc: tagged, tags } = EntryTags.tag(doc, named.map((key) => this.entryOf(doc, key)));
         let current = tagged;
         for (const { change, own, refs } of plan) {

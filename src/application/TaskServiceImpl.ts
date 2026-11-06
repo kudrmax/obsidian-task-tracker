@@ -32,9 +32,11 @@ import {
 	type TaskDraft,
 	type TaskItem,
 	type TaskKey,
+	type TaskMenuModel,
 	type TaskService,
 	type TaskStep,
 } from "./contracts";
+import { carriedWith, taskMenu, toggledLabels, toggledPriority } from "./menus";
 import { runDrop } from "./drops";
 import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { parseText } from "./documentText";
@@ -286,6 +288,46 @@ export class TaskServiceImpl implements TaskService {
 		return labelled.places().map((place) => (place ? this.itemAt(change.after, place, today, levels) : null));
 	}
 
+	async togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void> {
+		if (keys.length === 0) return;
+		const priority = toggledPriority(await this.itemsAt(keys), prefix);
+		if (keys.length === 1) return this.setPriority(keys[0], priority);
+		await this.applyAll(keys.map((key) => ({ key, change: { kind: "priority", priority } })));
+	}
+
+	async toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]> {
+		if (keys.length === 0) return [];
+		const labels = toggledLabels(await this.itemsAt(keys), name);
+		return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+	}
+
+	async removeDue(keys: readonly TaskKey[]): Promise<void> {
+		const items = await this.itemsAt(keys);
+		const steps = items.flatMap((item): TaskStep[] => (item.can.removeDue ? [{ key: item.key, change: { kind: "dueDate", date: null } }] : []));
+		if (steps.length === 0) return;
+		if (keys.length === 1) return this.setDueDate(steps[0].key, null);
+		await this.applyAll(steps);
+	}
+
+	menu(items: readonly TaskItem[], today: LocalDate, offer: SectionOffer | null = null): TaskMenuModel {
+		return taskMenu(items, today, this.priorityLevels(), this.labelLevels(), offer);
+	}
+
+	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
+		return carriedWith(lifted, picked);
+	}
+
+	/** The tasks the keys name as the file now has them, in their order; rejects with StaleTaskError when one is gone. */
+	private async itemsAt(keys: readonly TaskKey[]): Promise<readonly TaskItem[]> {
+		const { doc, today } = await this.readNormalized();
+		const levels = this.itemLevels();
+		return keys.map((key) => {
+			const entry = this.rules.entryOf(doc, key);
+			const parent = key.path.length > 0 ? (doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null) : null;
+			return toItem(entry, today, levels, parent);
+		});
+	}
+
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
 		await this.mutate(this.rules.setReminder(key, reminder));
 	}
@@ -428,8 +470,13 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate(this.rules.moveGroup(list, group, place));
 	}
 
-	async renameGroup(list: GroupedList, group: string, name: string): Promise<void> {
-		await this.mutate(this.rules.renameGroup(list, group, name));
+	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
+		const operation = this.rules.renameGroup(list, group, name);
+		if (!operation) return false;
+		const { doc, today, boundary } = await this.readNormalized();
+		if (operation(doc, today, this.settings.get(), boundary) === doc) return false;
+		await this.mutate(operation);
+		return true;
 	}
 
 	async removeGroup(list: GroupedList, group: string): Promise<void> {

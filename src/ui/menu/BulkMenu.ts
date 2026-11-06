@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, type TaskItem } from "../../application/contracts";
+import type { GroupName, TaskItem, TaskMenuModel } from "../../application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -10,68 +10,20 @@ import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup,
 import { datePage } from "./DatePage";
 import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
-import { type MoveTile, type MoveTileId, moveTiles } from "./quickMoves";
-import { type LevelTile, progressLabel, type SectionChoice } from "./TaskMenu";
+import { moveTiles } from "./quickMoves";
+import { labelTiles, priorityTiles, progressLabel } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
 	return count === 1 ? "1 task" : `${count} tasks`;
 }
 
-/** The progress tile for every task at once: what `nextProgress` sets on them all, and its name. */
-export function bulkProgress(items: readonly TaskItem[]): { readonly label: string; readonly status: TaskStatus } {
-	const status = nextProgress(items.map((item) => item.status));
-	return { label: progressLabel(status), status };
-}
-
-/** The levels, the one every task shares on; with mixed levels none is. */
-export function bulkLevelTiles(items: readonly TaskItem[], levels: readonly PriorityLevel[]): readonly LevelTile[] {
-	const shared = items[0]?.priority?.prefix ?? null;
-	const same = items.every((item) => (item.priority?.prefix ?? null) === shared);
-	return levels.map((level) => ({ prefix: level.prefix, color: level.color, on: same && level.prefix === shared }));
-}
-
-/** The labels: one is on when every task that may carry labels has it; off while none may. */
-export function bulkLabelTiles(items: readonly TaskItem[], labels: readonly LabelLevel[]): readonly { readonly name: string; readonly title: string; readonly color: LabelLevel["color"]; readonly on: boolean; readonly disabled: boolean }[] {
-	const open = items.filter((item) => item.can.setLabels);
-	return labels.map((label) => ({ name: label.name, title: labelTitle(label.name), color: label.color, on: open.length > 0 && open.every((item) => item.labels.some((l) => l.name === label.name)), disabled: open.length === 0 }));
-}
-
-/** A tap on a label every such task has takes it off them all; otherwise it goes on each that lacks it. The tasks that may carry none keep theirs. */
-export function bulkNextLabels(items: readonly TaskItem[], name: string): readonly (readonly string[])[] {
-	const open = items.filter((item) => item.can.setLabels);
-	const all = open.length > 0 && open.every((item) => item.labels.some((l) => l.name === name));
-	return items.map((item) => {
-		const names = item.labels.map((l) => l.name);
-		if (!item.can.setLabels) return names;
-		if (all) return names.filter((n) => n !== name);
-		return names.includes(name) ? names : [...names, name];
-	});
-}
-
-/** A tap on the level every task shares takes it off them all; any other level goes on all. */
-export function bulkNextPriority(items: readonly TaskItem[], prefix: string): string | null {
-	return items.every((item) => item.priority?.prefix === prefix) ? null : prefix;
-}
-
-/** Today and Tomorrow, unless every task already stands on that day, and Pick a date. */
-export function bulkMoveTiles(items: readonly TaskItem[], today: LocalDate): readonly MoveTile[] {
-	const offered = items.flatMap((item) => moveTiles(item, today));
-	return MOVE_ORDER.flatMap((id) => offered.find((tile) => tile.id === id) ?? []);
-}
-
-const MOVE_ORDER: readonly MoveTileId[] = ["today", "tomorrow", "pick"];
-
-/** Remove due date, when some task has one to take off. */
-export function bulkCanRemoveDue(items: readonly TaskItem[]): boolean {
-	return items.some((item) => item.can.removeDue);
-}
-
 export interface BulkActions {
 	setStatus(status: TaskStatus): Promise<void>;
-	setPriority(prefix: string | null): Promise<void>;
-	/** Each task's labels become the names at its index; the tasks as they then stand, null once one is gone. */
-	setLabels(names: readonly (readonly string[])[]): Promise<readonly TaskItem[] | null>;
+	/** A tap on a level (`TaskService.togglePriority`). */
+	togglePriority(prefix: string): Promise<void>;
+	/** A tap on a label (`TaskService.toggleLabel`); the tasks as they then stand, null once one is gone. */
+	toggleLabel(name: string): Promise<readonly TaskItem[] | null>;
 	postpone(date: LocalDate): Promise<void>;
 	removeDue(): Promise<void>;
 	toSection(name: GroupName): Promise<void>;
@@ -87,11 +39,8 @@ export interface BulkMenuContext {
 	readonly at: "beside" | "over";
 	readonly today: LocalDate;
 	readonly day: LocalDate;
-	readonly levels: readonly PriorityLevel[];
-	/** The labels the menu offers, after the levels; none without them. */
-	readonly labels?: readonly LabelLevel[];
-	/** The sections the tasks can go to, only when they all stand in one list that shows them; `shared`: all stand in its current one. */
-	readonly sections?: { readonly choice: SectionChoice; readonly shared: boolean };
+	/** The menu's groups for the tasks as they stand (`TaskService.menu`): asked again once a label changed them. */
+	readonly menu: (items: readonly TaskItem[]) => TaskMenuModel;
 	readonly actions: BulkActions;
 	onClose(): void;
 }
@@ -159,22 +108,22 @@ export class BulkMenu {
 	}
 
 	private buildMenu(panel: HTMLElement): void {
-		const { items, actions, levels, today } = this.context;
+		const { items, actions } = this.context;
+		const model = this.context.menu(items);
 		el(panel, "div", "tc-menu-title", countLabel(items.length));
-		const progress = bulkProgress(items);
 		const statuses: MenuTileSpec[] = [
 			{ label: "Done", icon: "done", onPick: this.pick(() => actions.setStatus("done")) },
-			{ label: progress.label, icon: "progress", onPick: this.pick(() => actions.setStatus(progress.status)) },
+			{ label: progressLabel(model.progress), icon: "progress", onPick: this.pick(() => actions.setStatus(model.progress)) },
 			{ label: "Won’t do", icon: "wontdo", onPick: this.pick(() => actions.setStatus("cancelled")) },
 		];
 		tileGroup(panel, "is-status", [statuses]);
-		const levelTiles = bulkLevelTiles(items, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: items.every((item) => !item.can.setPriority), onPick: this.pick(() => actions.setPriority(bulkNextPriority(items, tile.prefix))) }));
-		if (levelTiles.length > 0) tileGroup(panel, "is-priority", tileRows(levelTiles));
-		const labelTiles = bulkLabelTiles(items, this.context.labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: tile.disabled, onPick: () => void this.toggleLabel(tile.name) }));
-		if (labelTiles.length > 0) tileGroup(panel, "is-labels", tileRows(labelTiles));
-		const moves = bulkMoveTiles(items, today).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
+		const levels = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
+		if (levels.length > 0) tileGroup(panel, "is-priority", tileRows(levels));
+		const labels = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
+		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
+		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		tileGroup(panel, "is-move", [moves]);
-		if (this.context.sections) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
+		if (model.sections) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
 		menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: this.pick(() => actions.remove()) });
 	}
 
@@ -183,7 +132,7 @@ export class BulkMenu {
 		if (this.labelling) return;
 		this.labelling = true;
 		try {
-			const next = await this.context.actions.setLabels(bulkNextLabels(this.context.items, name));
+			const next = await this.context.actions.toggleLabel(name);
 			if (this.overlay.isClosed) return;
 			if (!next) return this.close();
 			this.context = { ...this.context, items: next };
@@ -195,8 +144,9 @@ export class BulkMenu {
 
 	/** The sections of the tasks' list; the one they all stand in checked. */
 	private showSections(): void {
-		if (!this.context.sections) return;
-		const { choice, shared } = this.context.sections;
+		const sections = this.context.menu(this.context.items).sections;
+		if (!sections) return;
+		const { choice, shared } = sections;
 		const { actions } = this.context;
 		this.panel.replace((panel) =>
 			sectionChooser(panel, {
@@ -210,13 +160,13 @@ export class BulkMenu {
 
 	private showPicker(): void {
 		const { items, actions, today } = this.context;
-		const shared = items.every((item) => item.dueDate === items[0].dueDate) ? items[0].dueDate : null;
+		const model = this.context.menu(items);
 		this.panel.replace((panel) =>
 			datePage(panel, {
 				today,
-				selected: shared,
+				selected: model.dueDate,
 				onPick: (date) => this.pick(() => actions.postpone(date))(),
-				onRemove: bulkCanRemoveDue(items) ? this.pick(() => actions.removeDue()) : undefined,
+				onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
 			}),
 		);
 	}

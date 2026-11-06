@@ -24,7 +24,7 @@ import {
 } from "./contracts";
 import { boundaryOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
 import type { Clock, SettingsStore } from "./ports";
-import { sameLine, samePlace } from "./taskKeys";
+import { isUnder, sameLine, samePlace } from "./taskKeys";
 
 /** An action's change of the document read at `today`; it throws `StaleTaskError` when a task or section it names is gone. */
 export type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary) => TaskDocument;
@@ -64,11 +64,6 @@ function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
 /** The same task as read: its place and its line. */
 function sameKey(a: TaskKey, b: TaskKey): boolean {
 	return samePlace(a, b) && sameLine(a, b);
-}
-
-/** `a` is a task `b` sits under, at any depth. */
-function isAncestor(a: TaskKey, b: TaskKey): boolean {
-	return a.section === b.section && a.index === b.index && a.path.length < b.path.length && a.path.every((i, k) => b.path[k] === i);
 }
 
 function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
@@ -392,7 +387,7 @@ export class TaskRules {
 			};
 			const lineOf = (key: TaskKey) => doc.lineOf(this.entryOf(doc, key));
 			const plan = steps
-				.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isAncestor(other.key, step.key))))
+				.filter((step) => !(MOVES.has(step.change.kind) && steps.some((other) => MOVES.has(other.change.kind) && isUnder(step.key, other.key))))
 				.sort((a, b) => lineOf(a.key) - lineOf(b.key))
 				.map((step) => ({ change: step.change, own: tagOf(step.key), refs: refsOf(step.change).map((ref) => (ref === null ? null : tagOf(ref))) }));
 			const { doc: tagged, tags } = EntryTags.tag(doc, named.map((key) => this.entryOf(doc, key)));
