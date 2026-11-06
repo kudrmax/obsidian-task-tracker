@@ -15,8 +15,8 @@ struct TaskFullScreen: View {
     @State private var saving: Task<Void, Never>?
     @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
-    /// The text is being put in the editor from the file, not typed.
-    @State private var placing = false
+    /// The text last put in the editor from the file: a change to anything else is typing.
+    @State private var placed = ""
 
     private var task: TaskItem { current ?? item }
 
@@ -40,7 +40,7 @@ struct TaskFullScreen: View {
                     .scrollDisabled(true)
                     .frame(minHeight: 200)
                     .scrollContentBackground(.hidden)
-                    .onChange(of: text) { if !placing { typed() } }
+                    .onChange(of: text) { if text != placed { typed() } }
             }
             .padding(.horizontal, Layout.margin)
         }
@@ -73,19 +73,19 @@ struct TaskFullScreen: View {
 
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
 
-    /// A subtask as the same capsule as on the main screen, at its depth; a tap opens its own menu.
+    /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { menu(for: row.item) })
+        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
     }
 
-    private func menu(for item: TaskItem) -> UIMenu? {
+    private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private static func branch(_ index: Int, _ rows: [FullRow]) -> Branch {
@@ -121,9 +121,8 @@ struct TaskFullScreen: View {
     }
 
     private func place(_ new: String) {
-        placing = true
+        placed = new
         text = new
-        Task { @MainActor in placing = false }
     }
 
     private func typed() {

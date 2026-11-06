@@ -52,6 +52,10 @@ public final class Vault: TasksVault, @unchecked Sendable {
     /// A file changed this recently may still be being written: wait this long and read it again.
     private let settle: Duration
     private let wait: @Sendable (Duration) -> Void
+    /// The tasks file's text as this app last wrote it: a read finding exactly that needs no settling, the write was ours.
+    private let own = OwnWrite()
+    /// The watch on the tasks file: the app's own reads and writes are made as it, so it is never told of them.
+    private let watching = Watching()
 
     /// `wait`: how a read waits out a file still being written.
     public init(bookmarks: BookmarkStore, rule: TasksFileRule, settle: Duration = .seconds(1), wait: (@Sendable (Duration) -> Void)? = nil) {
@@ -84,16 +88,20 @@ public final class Vault: TasksVault, @unchecked Sendable {
             var written = false
             var failure: Error?
             var coordination: NSError?
-            NSFileCoordinator().coordinate(writingItemAt: file, options: .forMerging, error: &coordination) { url in
+            coordinator().coordinate(writingItemAt: file, options: .forMerging, error: &coordination) { url in
                 do {
                     guard try String(contentsOf: url, encoding: .utf8) == old else { return }
                     try tasks.write(to: url, atomically: true, encoding: .utf8)
+                    own.text = tasks
                     written = true
                 } catch {
                     failure = error
                 }
             }
             if let error = coordination ?? failure { throw error }
+            // The app's own write is coordinated as the watch, so the system does not tell it: told here, for the
+            // screen when a reminder's button or Siri wrote in the app's process.
+            if written { watching.watch?.presentedItemOperationQueue.addOperation { [watch = watching.watch] in watch?.presentedItemDidChange() } }
             return written
         }
     }
@@ -113,7 +121,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
             let free = Self.availableName(name, in: folder)
             var failure: Error?
             var coordination: NSError?
-            NSFileCoordinator().coordinate(writingItemAt: folder.appendingPathComponent(free), options: [], error: &coordination) { url in
+            coordinator().coordinate(writingItemAt: folder.appendingPathComponent(free), options: [], error: &coordination) { url in
                 do { try data.write(to: url, options: .withoutOverwriting) } catch { failure = error }
             }
             if let error = coordination ?? failure { throw error }
@@ -122,7 +130,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
     }
 
     public func read(path: String) -> String? {
-        try? withFolder { folder in try Self.coordinatedRead(folder.appendingPathComponent(path)) }
+        try? withFolder { folder in try coordinatedRead(folder.appendingPathComponent(path)) }
     }
 
     public func write(path: String, text: String) throws {
@@ -131,12 +139,24 @@ public final class Vault: TasksVault, @unchecked Sendable {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             var failure: Error?
             var coordination: NSError?
-            NSFileCoordinator().coordinate(writingItemAt: file, options: .forReplacing, error: &coordination) { url in
+            coordinator().coordinate(writingItemAt: file, options: .forReplacing, error: &coordination) { url in
                 do { try text.write(to: url, atomically: true, encoding: .utf8) } catch { failure = error }
             }
             if let error = coordination ?? failure { throw error }
+            if path == (try? tasksFile(settings(in: folder))) { own.text = text }
         }
     }
+
+    /// Tells `changed` whenever the tasks file is written through file coordination (iCloud, a reminder's button, another
+    /// of the app's processes) while the watch is kept.
+    public func watchTasksFile(_ changed: @escaping @Sendable () -> Void) -> FileWatch? {
+        guard let file = try? withFolder({ folder in folder.appendingPathComponent(try tasksFile(settings(in: folder))) }) else { return nil }
+        let watch = FileWatch(file, changed)
+        watching.watch = watch
+        return watch
+    }
+
+    private func coordinator() -> NSFileCoordinator { NSFileCoordinator(filePresenter: watching.watch) }
 
     private func withFolder<T>(_ body: (URL) throws -> T) throws -> T {
         guard let data = bookmarks.load() else { throw VaultError.noAccess }
@@ -154,11 +174,12 @@ public final class Vault: TasksVault, @unchecked Sendable {
     }
 
     private func settledRead(_ file: URL) throws -> String {
-        var text = try Self.coordinatedRead(file)
+        var text = try coordinatedRead(file)
+        if text == own.text { return text }
         for _ in 0..<5 {
             guard let modified = Self.modified(file), Date().timeIntervalSince(modified) < settle.seconds else { break }
             wait(settle)
-            text = try Self.coordinatedRead(file)
+            text = try coordinatedRead(file)
         }
         return text
     }
@@ -187,17 +208,60 @@ public final class Vault: TasksVault, @unchecked Sendable {
     /// The plugin's `data.json`, empty for none: the plugin's defaults.
     private func settings(in folder: URL) -> String {
         guard let path = try? rule.settingsFile() else { return "" }
-        return (try? Self.coordinatedRead(folder.appendingPathComponent(path))) ?? ""
+        return (try? coordinatedRead(folder.appendingPathComponent(path))) ?? ""
     }
 
-    private static func coordinatedRead(_ file: URL) throws -> String {
+    private func coordinatedRead(_ file: URL) throws -> String {
         var result: Result<String, Error> = .failure(CocoaError(.fileReadNoSuchFile))
         var coordination: NSError?
-        NSFileCoordinator().coordinate(readingItemAt: file, options: [], error: &coordination) { url in
+        coordinator().coordinate(readingItemAt: file, options: [], error: &coordination) { url in
             result = Result { try String(contentsOf: url, encoding: .utf8) }
         }
         if let coordination { throw coordination }
         return try result.get()
+    }
+}
+
+/// A file presented to the system's file coordination: told of every coordinated change to it, until it goes.
+public final class FileWatch: NSObject, NSFilePresenter, @unchecked Sendable {
+    public let presentedItemURL: URL?
+    public let presentedItemOperationQueue = OperationQueue()
+    private let changed: @Sendable () -> Void
+
+    init(_ file: URL, _ changed: @escaping @Sendable () -> Void) {
+        presentedItemURL = file
+        self.changed = changed
+        super.init()
+        presentedItemOperationQueue.maxConcurrentOperationCount = 1
+        NSFileCoordinator.addFilePresenter(self)
+    }
+
+    public func presentedItemDidChange() { changed() }
+
+    public func cancel() { NSFileCoordinator.removeFilePresenter(self) }
+
+    deinit { NSFileCoordinator.removeFilePresenter(self) }
+}
+
+/// The tasks file's watch while it is kept.
+private final class Watching: @unchecked Sendable {
+    private let lock = NSLock()
+    private weak var kept: FileWatch?
+
+    var watch: FileWatch? {
+        get { lock.withLock { kept } }
+        set { lock.withLock { kept = newValue } }
+    }
+}
+
+/// The text of the app's own last write, shared by the threads that read and write.
+private final class OwnWrite: @unchecked Sendable {
+    private let lock = NSLock()
+    private var kept: String?
+
+    var text: String? {
+        get { lock.withLock { kept } }
+        set { lock.withLock { kept = newValue } }
     }
 }
 

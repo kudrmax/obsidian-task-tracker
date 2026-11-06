@@ -1,59 +1,38 @@
 import Core
 import SwiftUI
+import UIKit
 
-/// What the tab bar selects: a place of the ribbon, or the plus, which opens a new task and selects nothing.
-enum BoardTab: Hashable {
-    case place(RibbonPlace)
-    case newTask
-}
-
-/// The main screen: the plugin's ribbon of lists beside the calendar under the system tab bar, Inbox, Soon and Today
-/// the three places it stands at; the plus beside the tab bar opens a new task.
+/// The main screen: the plugin's ribbon of lists beside the calendar, one ribbon for Inbox, Soon and Today, the three
+/// places it stands at; the system tab bar under it only says where it stands and moves it there, and the plus beside
+/// the tab bar opens a new task.
 struct BoardScreen: View {
     @State private var model = BoardModel()
     @State private var router = CaptureRouter.shared
     @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
-    @State private var newTitle = ""
     @Environment(\.scenePhase) private var scene
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        TabView(selection: tab) {
-            ForEach(RibbonPlace.allCases, id: \.self) { place in
-                Tab(place.title, systemImage: place.symbol, value: BoardTab.place(place)) {
-                    BoardPage(place: place, model: model, question: $question, sheet: $sheet)
+        NavigationStack(path: $model.fullScreen) {
+            content
+                .toolbar {
+                    if model.selecting { selectionBar } else { mainBar }
                 }
-            }
-            // The plus is an action, not a place: iOS 26 gives the trailing round button beside the tab bar to it, and
-            // choosing it opens a new task over the screen and leaves the tab where it was.
-            Tab("New Task", systemImage: "plus", value: BoardTab.newTask, role: .search) {
-                Color.clear
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
+        }
+        .overlay(alignment: .bottom) {
+            if !model.selecting, model.fullScreen.isEmpty {
+                bottomBar.transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .tabBarMinimizeBehavior(.never)
-        .overlay {
-            // Measured from the screen's edges, as the tab bar's own round button stands.
-            ZStack(alignment: .bottomTrailing) {
-                Color.clear
-                if !model.selecting, model.fullScreen.isEmpty, !router.capturing {
-                    PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme)) { model.carrying = $0 }
-                        .frame(width: PlusButton.side, height: PlusButton.side)
-                        .padding([.trailing, .bottom], PlusButton.inset)
-                }
-            }
-            .ignoresSafeArea()
+        .animation(.snappy, value: model.selecting)
+        .background { DropAnchor(drop: model.dropping) }
+        .sheet(item: Binding(get: { model.newTaskAt }, set: { model.newTaskAt = $0 })) { spot in
+            NameSheet(title: "New Task", action: "Add") { title in Task { await model.create(title, at: spot) } }
         }
-        .alert("New Task", isPresented: Binding(get: { model.newTaskAt != nil }, set: { if !$0 { model.newTaskAt = nil } }), presenting: model.newTaskAt) { spot in
-            TextField("Task", text: $newTitle)
-            Button("Cancel", role: .cancel) { newTitle = "" }
-            Button("Add") {
-                let title = newTitle
-                newTitle = ""
-                Task { await model.create(title, at: spot) }
-            }
-        }
-        .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reload() } }) {
+        .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reloadIfChanged() } }) {
             CaptureView()
         }
         .sheet(item: $sheet) { sheet in
@@ -66,53 +45,32 @@ struct BoardScreen: View {
         .boardSheets(model: model)
         .menuQuestions($question, model: model)
         .task { await model.reload() }
-        .onChange(of: scene) { if scene == .active { Task { await model.reload() } } }
-        .task(id: scene) {
-            // The tasks file changes outside the app too: Obsidian, Sync, a reminder's button. Watched while the app is
-            // in front; the task starts again with every change of the scene.
-            guard scene == .active else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                await model.reloadIfChanged()
+        .onChange(of: scene, initial: true) {
+            // The tasks file changes outside the app too: back in front, the screen reads it again if it did; while in
+            // front, a coordinated write (iCloud, a reminder's button) tells the watch.
+            if scene == .active {
+                model.watchFile()
+                Task { await model.reloadIfChanged() }
+            } else {
+                model.stopWatching()
             }
         }
     }
 
-    private var tab: Binding<BoardTab> {
-        Binding(
-            get: { .place(model.place) },
-            set: { chosen in
-                switch chosen {
-                case .place(let place): withAnimation(.snappy) { model.place = place }
-                case .newTask: router.capturing = true
-                }
-            })
-    }
-}
-
-enum BoardSheet: String, Identifiable {
-    case search, settings, calendars
-    var id: String { rawValue }
-}
-
-/// One tab's page: the ribbon under the top bar, Undo on the left and «⋯» on the right.
-struct BoardPage: View {
-    let place: RibbonPlace
-    @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
-    @Binding var sheet: BoardSheet?
-
-    var body: some View {
-        NavigationStack(path: path) {
-            content
-                .toolbar {
-                    if model.selecting { selectionBar } else { mainBar }
-                }
-                .navigationBarTitleDisplayMode(.inline)
-                // Select Tasks' actions take the tab bar's place, as in Mail and Files.
-                .toolbar(model.selecting ? .hidden : .automatic, for: .tabBar)
-                .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
+    /// The tab bar beside the plus, measured from the screen's edges as the design stands them.
+    private var bottomBar: some View {
+        HStack(spacing: 10) {
+            // The bar draws its glass inside its own margins: the glass, not the bar, lines up with the screen's edge.
+            PlaceBar(place: model.place) { model.go(to: $0) }
+                .frame(width: PlaceBar.glass + 2 * PlaceBar.margin, height: PlusButton.side)
+                .padding(.horizontal, -PlaceBar.margin)
+            Spacer(minLength: 0)
+            PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarry(Carried.plus) }, onCancel: { model.cancelCarry() })
+                .frame(width: PlusButton.side, height: PlusButton.side)
         }
+        .padding(.horizontal, PlusButton.inset)
+        .padding(.bottom, PlusButton.bottom)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     @ViewBuilder
@@ -154,11 +112,6 @@ struct BoardPage: View {
         }
     }
 
-    /// Only the tab shown follows the path: a task opened full screen shows in that tab alone.
-    private var path: Binding<[TaskItem]> {
-        Binding(get: { model.place == place ? model.fullScreen : [] }, set: { if model.place == place { model.fullScreen = $0 } })
-    }
-
     @ToolbarContentBuilder
     private var mainBar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -197,59 +150,132 @@ struct BoardPage: View {
     }
 }
 
-/// The ribbon: four columns, Inbox over Backlog, Soon, the day list and the calendar, standing at one of three places;
-/// a swipe moves it, and the tab bar follows. Inbox–Soon and Soon–day share the screen evenly; at Today the divider
-/// between the day list and the calendar is dragged to make the list wider or narrower, as in the plugin, and the
-/// widths flow from even to that split as the ribbon moves there.
+enum BoardSheet: String, Identifiable {
+    case search, settings, calendars
+    var id: String { rawValue }
+}
+
+/// The system tab bar, standing alone beside the plus: its items are the ribbon's places, the selected one where the
+/// ribbon stands, and a tap moves the ribbon there.
+struct PlaceBar: UIViewRepresentable {
+    /// How far inside its bounds a standalone tab bar draws its glass, and the widest glass it draws for three items.
+    static let margin: CGFloat = 21
+    static let glass: CGFloat = 273
+
+    let place: RibbonPlace
+    let choose: (RibbonPlace) -> Void
+
+    func makeUIView(context: Context) -> UITabBar {
+        let bar = UITabBar()
+        bar.items = RibbonPlace.allCases.map { place in
+            UITabBarItem(title: place.name, image: UIImage(systemName: place.symbol), tag: place.rawValue)
+        }
+        bar.delegate = context.coordinator
+        bar.selectedItem = bar.items?[place.rawValue]
+        return bar
+    }
+
+    func updateUIView(_ bar: UITabBar, context: Context) {
+        context.coordinator.choose = choose
+        if bar.selectedItem?.tag != place.rawValue { bar.selectedItem = bar.items?[place.rawValue] }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(choose: choose) }
+
+    final class Coordinator: NSObject, UITabBarDelegate {
+        var choose: (RibbonPlace) -> Void
+
+        init(choose: @escaping (RibbonPlace) -> Void) { self.choose = choose }
+
+        func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+            if let place = RibbonPlace(rawValue: item.tag) { choose(place) }
+        }
+    }
+}
+
+/// The ribbon: four columns side by side, Inbox over Backlog, Soon, the day list and the calendar, each a fixed width the
+/// whole time, as if the ones off the screen stood just past its edges. The day list and Inbox are as wide as the
+/// divider leaves the day list, Soon and the calendar the rest; so Inbox–Soon, Soon–day and day–calendar each fill the
+/// screen, at offsets 0, the day list's width and the screen's. A swipe is the system's paging scroll between them.
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
-    @State private var leading: Int?
-    /// How far the ribbon has come from Soon to Today, 0 to 1.
+    @State private var position = ScrollPosition(idType: RibbonPlace.self)
+    /// How far the ribbon has come from Soon to Today, 0 to 1: the divider's handle shows at Today.
     @State private var toToday: CGFloat = 0
     @AppStorage("listShare") private var listShare: Double = 0.5
     @State private var dragStart: CGFloat?
+    @State private var phase = ScrollPhase.idle
 
     var body: some View {
         GeometryReader { box in
             let width = box.size.width
-            let half = width / 2
-            let day = half + (listWidth(width) - half) * toToday
+            let list = listWidth(width)
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
-                    column(0, half) {
+                    column(.inbox, list) {
                         VStack(spacing: 12) {
-                            list(.inbox)
-                            list(.backlog)
+                            lists(.inbox)
+                            lists(.backlog)
                         }
                     }
-                    column(1, half) { list(.soon) }
-                    column(2, day) { list(.day, dayArrows: true) }
-                    column(3, width - day) {
-                        TimelineColumn(timeline: snapshot.timeline, model: model, question: $question)
-                            .overlay(alignment: .leading) { divider(width) }
+                    column(.soon, width - list) { lists(.soon) }
+                    // The day list and the calendar are one day: they slide together when it changes.
+                    dayPart {
+                        HStack(spacing: 0) {
+                            lists(.day, dayArrows: true)
+                                .frame(width: list)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                            TimelineColumn(timeline: snapshot.timeline, model: model, question: $question)
+                                .frame(width: width - list)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                        }
                     }
+                    .overlay(alignment: .leading) { divider(width).offset(x: list) }
+                    .frame(width: width)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .id(RibbonPlace.today)
                 }
                 .scrollTargetLayout()
             }
             .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
-            .scrollPosition(id: $leading, anchor: .leading)
+            .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                min(1, max(0, geometry.contentOffset.x / half - 1))
-            } action: { _, progress in
-                toToday = progress
+                geometry.contentOffset.x
+            } action: { _, x in
+                toToday = min(1, max(0, (x - list) / max(1, width - list)))
+                // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
+                guard phase == .interacting || phase == .decelerating else { return }
+                let near = nearest(x, list: list, width: width)
+                if near != model.place { model.place = near }
             }
-            .onAppear { leading = model.place.rawValue }
-            .onChange(of: model.place) { withAnimation(.snappy) { leading = model.place.rawValue } }
-            .onChange(of: leading) {
-                if let leading, let place = RibbonPlace(rawValue: min(leading, 2)), place != model.place { model.place = place }
+            .onScrollPhaseChange { _, new in phase = new }
+            .onAppear { position.scrollTo(id: model.place, anchor: .leading) }
+            .onChange(of: model.asked) {
+                guard let asked = model.asked else { return }
+                withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
             }
         }
     }
 
-    /// The day list's width at Today: its share of the screen, within the plugin's bounds for a phone.
+    /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe.
+    private func nearest(_ x: CGFloat, list: CGFloat, width: CGFloat) -> RibbonPlace {
+        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, list), (.today, width)]
+        return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
+    }
+
+    /// The day list and the calendar change days together: the new day slides in from the side the arrow points to.
+    private func dayPart(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .id(snapshot.day)
+            .transition(.push(from: model.dayMotion > 0 ? .trailing : .leading))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipShape(.rect)
+    }
+
+    /// The day list's width: its share of the screen, within the plugin's bounds for a phone.
     private func listWidth(_ width: CGFloat) -> CGFloat {
         min(Self.maxList, width - Self.minList, max(Self.minList, listShare * width))
     }
@@ -283,15 +309,15 @@ struct Ribbon: View {
             .accessibilityHint("Drag to make the list wider or narrower")
     }
 
-    private func column(_ index: Int, _ width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
+    private func column(_ place: RibbonPlace, _ width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
         content()
             .frame(width: width)
             .frame(maxHeight: .infinity, alignment: .top)
-            .id(index)
+            .id(place)
     }
 
     @ViewBuilder
-    private func list(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
+    private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
             ListColumn(list: list, model: model, dayArrows: dayArrows, question: $question)
         }

@@ -1,79 +1,175 @@
 import Core
 import SwiftUI
 
-/// The calendar beside the day list, as the plugin's: the hours of the day from its start, the events in their calendars'
-/// colours (past ones paler), the tasks on a time as the same capsules, and the red now line.
+/// The calendar beside the day list, as the plugin's: the hours of the day from its start with finer marks as it zooms,
+/// the events in their calendars' colours (grey once over), each with its title only, the tasks on a time as the same
+/// capsules stacked by the core, and the red now line. A pinch zooms it, keeping the minute under the fingers in place.
 struct TimelineColumn: View {
     let timeline: BoardTimeline
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
     @State private var position = ScrollPosition(y: 0)
-    @State private var opened: String?
-    /// The minute a carried card would start at, shown as a line while it is held over the calendar.
-    @State private var landing: Int?
-    /// The last minute the line stood at: SwiftUI ends the hover before the drop, and the drop writes what was shown.
-    @State private var last = LastMinute()
+    @State private var opened = false
+    /// The hour's height drawn now; nil until the column knows its height.
+    @State private var hour: CGFloat?
+    @State private var visible: CGFloat = 0
+    @State private var pinch: Pinch?
+    @State private var scroll = ScrollSpot()
+    /// The zoom a pinch last settled on, kept on the device: `wholeDay`, or the hour's height.
+    @AppStorage("timelineZoom") private var savedZoom: String = ""
 
     @Environment(\.colorScheme) private var scheme
 
-    private let hour = CardMetrics.hour
-    private let labelWidth: CGFloat = 26
-    /// Where the items area starts, right of the hours: blocks stand in it by the core's insets.
-    private let itemsLeft: CGFloat = 31
+    /// The plugin's measures of the timeline (`styles.css`, `.tc-hour-label`, `.tc-items`, `.tc-item`).
+    private enum Measure {
+        static let labelWidth: CGFloat = 22
+        static let labelLift: CGFloat = 7
+        static let minorLift: CGFloat = 4
+        static let lineLeft: CGFloat = 26
+        static let itemsLeft: CGFloat = 28
+        static let itemsRight: CGFloat = 4
+        static let itemInset: CGFloat = 1
+        static let itemGap: CGFloat = 2
+        static let nowHeight: CGFloat = 16
+        static let nowWidth: CGFloat = 34
+        static let allDayHeight: CGFloat = 22
+        static let allDayGap: CGFloat = 4
+        static let grid = GridMeasures(divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16)
+    }
+
+    private struct Pinch {
+        let hour: CGFloat
+        let minute: Double
+        let screenY: CGFloat
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Measure.allDayGap) {
             ForEach(timeline.allDay) { event in
-                EventBlock(event: event, height: 24, showsTime: false)
-                    .padding(.horizontal, 8)
+                AllDayRow(event: event, paint: paint(event))
+                    .padding(.leading, Measure.itemsLeft)
+                    .padding(.trailing, Measure.itemsRight)
             }
             GeometryReader { box in
+                let hour = hour ?? CGFloat(timeline.zoomLevels.first ?? 56)
                 ScrollView {
-                    ZStack(alignment: .topLeading) {
-                        grid
-                        ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
-                            EventBlock(event: event, height: height(event.start, event.end), showsTime: height(event.start, event.end) >= 36)
-                                .padding(.leading, itemsLeft + CGFloat(event.left))
-                                .padding(.trailing, 8)
-                                .offset(y: y(event.start) + 1)
-                        }
-                        ForEach(timeline.slots) { slot in
-                            slotCard(slot)
-                                .padding(.leading, itemsLeft + CGFloat(slot.box.left))
-                                .padding(.trailing, 8)
-                                .offset(y: y(0) + CGFloat(slot.box.top))
-                        }
-                        if let now = timeline.now { nowLine(now) }
-                        if let minute = landing { landingLine(minute) }
-                    }
-                    .frame(width: box.size.width, height: y(24 * 60), alignment: .topLeading)
-                    .contentShape(.rect)
-                    .onDrop(of: [.plainText], delegate: TimeLanding(model: model, minute: $landing, last: last, minuteAt: minute(at:)))
+                    canvas(hour: hour, width: box.size.width)
                 }
                 .scrollPosition($position)
                 .scrollIndicators(.hidden)
-                .onAppear { open(visible: box.size.height) }
-                .onChange(of: model.snapshot?.day) { open(visible: box.size.height) }
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
+                .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
+                    visible = height
+                    settleZoom()
+                    open()
+                }
+                .simultaneousGesture(zoom)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }
         }
         .overlay(alignment: .leading) {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
+        .onDisappear { model.dropping.remove(Self.key) }
     }
 
-    private var grid: some View {
-        ForEach(timeline.hours, id: \.minute) { mark in
-            HStack(alignment: .center, spacing: 4) {
-                Text(mark.label)
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: labelWidth - 4, alignment: .trailing)
-                Rectangle().fill(Color(.separator).opacity(0.6)).frame(height: 1)
+    private func canvas(hour: CGFloat, width: CGFloat) -> some View {
+        let slots = model.stacked(timeline, hour: hour)
+        let height = max(y(24 * 60, hour) + Measure.labelLift, slots.map { y(0, hour) + CGFloat($0.box.top + $0.box.height) }.max() ?? 0)
+        return ZStack(alignment: .topLeading) {
+            grid(hour: hour)
+            ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
+                let top = y(event.start, hour) + Measure.itemInset
+                let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
+                EventBlock(event: event, paint: paint(event), height: max(length, 1))
+                    .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
+                    .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                    .offset(y: top)
             }
-            .frame(height: 14)
-            .offset(y: y(mark.minute) - 7)
+            ForEach(slots) { slot in
+                slotCard(slot)
+                    .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
+                    .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                    .offset(y: y(0, hour) + CGFloat(slot.box.top))
+            }
+            if let now = timeline.now { nowLine(now, hour: hour) }
+            if let minute = model.landing { landingLine(minute, hour: hour) }
         }
+        .frame(width: width, height: height, alignment: .topLeading)
+        .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(Self.key, origin: $0) }
+        .onChange(of: hour, initial: true) { register(hour: hour, width: width) }
+        .onChange(of: width) { register(hour: hour, width: width) }
+    }
+
+    private static let key = "timeline"
+
+    /// The calendar as a place to drop on: the line follows the finger on the grid's steps at this zoom, and a card let
+    /// go settles at the time it shows.
+    private func register(hour: CGFloat, width: CGFloat) {
+        let model = model
+        model.dropping.register(Self.key, DropPlace(
+            hover: { model.hover(minute: Double(max(0, $0.y - Measure.labelLift) / hour * 60), hourHeight: hour) },
+            leave: { model.leaveCalendar() },
+            land: {
+                guard let id = model.carried, let minute = model.landing else { return nil }
+                Task { await model.dropOnCalendar(id, hourHeight: hour) }
+                guard id != Carried.plus else { return nil }
+                let top = CGFloat(minute) / 60 * hour + Measure.labelLift
+                return CGRect(x: Measure.itemsLeft, y: top, width: width - Measure.itemsLeft - Measure.itemsRight, height: CardMetrics.height)
+            }))
+    }
+
+    // MARK: The grid
+
+    private func grid(hour: CGFloat) -> some View {
+        let nowY = timeline.now.map { y($0, hour) }
+        let marks = model.gridMarks(hour: hour, measures: Measure.grid)
+        return ZStack(alignment: .topLeading) {
+            ForEach(marks, id: \.minute) { mark in
+                let at = y(mark.minute, hour)
+                line(Palette.minorLine(scheme), at: at)
+                if let label = mark.label, !nearNow(at, nowY, lift: Measure.minorLift) {
+                    hourLabel(label, size: 7, leading: 8, color: Palette.minorLabel(scheme))
+                        .offset(y: at - Measure.minorLift)
+                }
+            }
+            ForEach(timeline.hours, id: \.minute) { mark in
+                let at = y(mark.minute, hour)
+                line(Palette.hourLine(scheme), at: at)
+                if !nearNow(at, nowY, lift: Measure.labelLift) {
+                    hourLabel(mark.label, size: 11, leading: 14, color: Palette.muted)
+                        .offset(y: at - Measure.labelLift)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func line(_ color: Color, at y: CGFloat) -> some View {
+        Rectangle().fill(color).frame(height: 1)
+            .padding(.leading, Measure.lineLeft)
+            .offset(y: y)
+    }
+
+    private func hourLabel(_ text: String, size: CGFloat, leading: CGFloat, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: size))
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .frame(width: Measure.labelWidth, height: leading, alignment: .trailing)
+    }
+
+    /// A label next to the now pill hides, as the plugin hides it.
+    private func nearNow(_ y: CGFloat, _ now: CGFloat?, lift: CGFloat) -> Bool {
+        guard let now else { return false }
+        return abs(y - now) < lift + Measure.nowHeight / 2
+    }
+
+    // MARK: Blocks
+
+    private func paint(_ event: BoardEvent) -> EventPaint {
+        let themed = event.event.past == true ? timeline.pastPaint : event.paint
+        return scheme == .dark ? themed.dark : themed.light
     }
 
     @ViewBuilder
@@ -84,132 +180,178 @@ struct TimelineColumn: View {
         } else {
             CardButton(
                 card: slot.card,
-                menu: { model.cardMenu(slot.card.item) { question = $0 } },
+                menu: { later in model.cardMenu(slot.card.item, ask: { question = $0 }, later: later) },
                 ringed: model.found == slot.id,
                 height: tall,
                 over: slot.box.overlay,
+                carried: model.isCarried(slot.card),
                 onTouch: { model.found = nil },
-                onCarry: { model.carrying = $0 })
-                .frame(height: tall)
-                .overlay { if model.carrying { Color.clear.contentShape(.rect) } }
+                onCarry: { model.startCarry(slot.card.id) },
+                onCancel: { model.cancelCarry() })
+                .frame(height: max(tall, CardMetrics.height))
         }
     }
 
     /// Where a carried card would land: the line at its start and the time in the accent, as Calendar draws a moved event.
-    private func landingLine(_ minute: Int) -> some View {
-        HStack(spacing: 2) {
+    private func landingLine(_ minute: Int, hour: CGFloat) -> some View {
+        HStack(spacing: 0) {
             Text(BoardTime.label(minute, hours: timeline.hours))
                 .font(.system(size: 10, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .padding(.horizontal, 4)
-                .frame(height: 17)
+                .frame(width: Measure.nowWidth, height: Measure.nowHeight)
                 .background(.tint, in: .capsule)
             Rectangle().fill(.tint).frame(height: 2)
         }
-        .offset(y: y(minute) - 8.5)
+        .offset(y: y(minute, hour) - Measure.nowHeight / 2)
         .allowsHitTesting(false)
-        .transition(.opacity)
     }
 
-    /// The minute of the day at `y` in the calendar's own height.
-    private func minute(at y: CGFloat) -> Double { Double(max(0, y - self.y(0)) / hour * 60) }
-
-    private func nowLine(_ minute: Int) -> some View {
-        ZStack(alignment: .leading) {
-            Rectangle().fill(Color(.systemRed)).frame(height: 2).padding(.leading, labelWidth)
+    private func nowLine(_ minute: Int, hour: CGFloat) -> some View {
+        HStack(spacing: 0) {
             Text(Date.now, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
                 .font(.system(size: 10, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .padding(.horizontal, 4)
-                .frame(height: 17)
-                .background(Color(.systemRed), in: .capsule)
-                .padding(.leading, 1)
+                .frame(width: Measure.nowWidth, height: Measure.nowHeight)
+                .background(Palette.now(scheme), in: .capsule)
+            Rectangle().fill(Palette.now(scheme)).frame(height: 2)
         }
-        .offset(y: y(minute) - 8.5)
+        .offset(y: y(minute, hour) - Measure.nowHeight / 2)
         .allowsHitTesting(false)
     }
 
-    private func y(_ minute: Int) -> CGFloat { CGFloat(minute) / 60 * hour + 7 }
-    private func height(_ start: Int, _ end: Int) -> CGFloat { max(18, CGFloat(end - start) / 60 * hour - 2) }
+    // MARK: Zoom
+
+    private func y(_ minute: Int, _ hour: CGFloat) -> CGFloat { CGFloat(minute) / 60 * hour + Measure.labelLift }
+
+    /// The minute of the day at `y` in the calendar's own height.
+    private func minute(at y: CGFloat, _ hour: CGFloat) -> Double { Double(max(0, y - Measure.labelLift) / hour * 60) }
+
+    /// The hour's height at which the whole day, from its first label to its last, fills the column.
+    private var wholeDay: Double? { visible > 0 ? Double((visible - 2 * Measure.labelLift) / 24) : nil }
+
+    private var saved: JSONValue {
+        if savedZoom == "wholeDay" { return "wholeDay" }
+        return Double(savedZoom).map(JSONValue.number) ?? .null
+    }
+
+    /// The zoom kept on the device, at this height of the screen: the whole day stays the whole day.
+    private func settleZoom() {
+        guard pinch == nil else { return }
+        hour = CGFloat(model.zoomShown(saved: saved, wholeDay: wholeDay, levels: timeline.zoomLevels))
+    }
+
+    private var zoom: some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.01)
+            .onChanged { value in
+                guard let shown = hour, let wholeDay else { return }
+                // The gesture is the scroll view's: its points are on the screen, the minute under them in the content.
+                let start = pinch ?? Pinch(hour: shown, minute: minute(at: value.startLocation.y + scroll.y, shown), screenY: value.startLocation.y)
+                pinch = start
+                let range = model.zoomRange(wholeDay: wholeDay, levels: timeline.zoomLevels)
+                let next = min(CGFloat(range.last ?? wholeDay), max(CGFloat(range.first ?? wholeDay), start.hour * value.magnification))
+                var instant = Transaction()
+                instant.disablesAnimations = true
+                withTransaction(instant) {
+                    hour = next
+                    position.scrollTo(y: max(0, CGFloat(start.minute) / 60 * next + Measure.labelLift - start.screenY))
+                }
+            }
+            .onEnded { _ in
+                pinch = nil
+                guard let shown = hour, let wholeDay else { return }
+                let settled = model.zoomAfterPinch(hour: Double(shown), wholeDay: wholeDay, levels: timeline.zoomLevels)
+                savedZoom = settled.map { String($0) } ?? "wholeDay"
+                if settled == nil { hour = CGFloat(wholeDay) }
+            }
+    }
 
     /// The day opens where the core says: today on the now line at half the height, another day at its hour on top.
-    private func open(visible: CGFloat) {
-        guard let day = model.snapshot?.day, opened != day else { return }
-        opened = day
-        let top = y(timeline.opening) - (timeline.now != nil ? visible / 2 : 0)
+    private func open() {
+        guard !opened, visible > 0, let hour else { return }
+        opened = true
+        let top = y(timeline.opening, hour) - (timeline.now != nil ? visible / 2 : 0)
         position.scrollTo(y: max(0, top))
     }
 }
 
-/// A calendar's event: a tinted block with a bar in the calendar's colour, its title and, when it has room, its time.
+/// Where the timeline stands scrolled: read by a pinch as it starts, never drawn.
+@Observable
+final class ScrollSpot {
+    @ObservationIgnored var y: CGFloat = 0
+}
+
+/// A calendar's event, as the plugin draws it: a block in its calendar's colour over the ground with a bar on the left and
+/// its title only; the title stays at the top of what shows of the block while the block is scrolled partly out of view.
 struct EventBlock: View {
     let event: BoardEvent
+    let paint: EventPaint
     let height: CGFloat
-    let showsTime: Bool
-    @Environment(\.colorScheme) private var scheme
+
+    /// Shorter than this, a block takes the small type and no padding over its title (`tinyItemHeight`).
+    private static let tiny: CGFloat = 24
+    private var isTiny: Bool { height < Self.tiny }
+    private var titleHeight: CGFloat { isTiny ? max(height - 2, 10) : 15 }
 
     var body: some View {
-        let paint = scheme == .dark ? event.paint.dark : event.paint.light
-        VStack(alignment: .leading, spacing: 0) {
-            Text(event.event.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-            if showsTime {
-                Text(start ..< end, format: .interval.hour().minute()).font(.system(size: 11)).lineLimit(1)
-            }
+        HStack(spacing: 0) {
+            Rectangle().fill(Color(hex: paint.bar)).frame(width: 3)
+            Text(event.event.title)
+                .font(.system(size: isTiny ? 10 : 12, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize()
+                .frame(maxWidth: .infinity, minHeight: titleHeight, maxHeight: titleHeight, alignment: .leading)
+                .mask(FadeEnd(width: 16))
+                .foregroundStyle(Color(hex: paint.text))
+                .padding(.horizontal, isTiny ? 5 : 6)
+                .padding(.top, isTiny ? 0 : 4)
+                .visualEffect { [height, titleHeight, isTiny] content, geometry in
+                    let top = geometry.frame(in: .scrollView).minY
+                    return content.offset(y: min(max(0, -top), max(0, height - titleHeight - (isTiny ? 0 : 8))))
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
         }
-        .foregroundStyle(Color(hex: paint.text))
-        .padding(.leading, 9)
-        .padding(.trailing, 6)
-        .padding(.top, showsTime ? 4 : 1)
-        .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
-        .background(alignment: .leading) { Rectangle().fill(Color(hex: paint.bar)).frame(width: 3) }
+        .frame(height: height)
         .background(Color(hex: paint.bg))
-        .clipShape(.rect(cornerRadius: 7))
-        .opacity(event.event.past == true ? 0.5 : 1)
+        .background(Color(.systemBackground))
+        .clipShape(.rect(cornerRadius: 6))
+        .accessibilityElement(children: .combine)
     }
-
-    private var start: Date { Date(timeIntervalSince1970: event.event.startMs / 1000) }
-    private var end: Date { Date(timeIntervalSince1970: max(event.event.endMs, event.event.startMs) / 1000) }
 }
 
-/// The calendar taking a carried card or the plus: the line follows the finger on the grid's steps, and letting go drops
-/// it at that time.
-final class LastMinute {
-    var minute: Int?
+/// An event of the whole day over the hours: a row in its calendar's colour, its title in the middle of it.
+struct AllDayRow: View {
+    let event: BoardEvent
+    let paint: EventPaint
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(Color(hex: paint.bar)).frame(width: 3)
+            Text(event.event.title)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .mask(FadeEnd(width: 16))
+                .foregroundStyle(Color(hex: paint.text))
+                .padding(.horizontal, 6)
+        }
+        .frame(height: 22)
+        .background(Color(hex: paint.bg))
+        .clipShape(.rect(cornerRadius: 6))
+    }
 }
 
-private struct TimeLanding: DropDelegate {
-    let model: BoardModel
-    @Binding var minute: Int?
-    let last: LastMinute
-    let minuteAt: (CGFloat) -> Double
+/// A mask that fades its content out over its last points, as the plugin's titles fade.
+struct FadeEnd: View {
+    let width: CGFloat
 
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        let snapped = model.snap(minuteAt(info.location.y), hourHeight: CardMetrics.hour)
-        last.minute = snapped
-        if snapped != minute {
-            if minute != nil { UISelectionFeedbackGenerator().selectionChanged() }
-            withAnimation(.snappy(duration: 0.15)) { minute = snapped }
+    var body: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: width)
         }
-        return DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        withAnimation(.snappy(duration: 0.15)) { minute = nil }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        // The time written is the one the line showed.
-        let at = (minute ?? last.minute).map(Double.init) ?? minuteAt(info.location.y)
-        minute = nil
-        last.minute = nil
-        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
-        _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let id = object as? String else { return }
-            Task { @MainActor in await model.drop(id, atMinute: at, hourHeight: CardMetrics.hour) }
-        }
-        return true
     }
 }
 
