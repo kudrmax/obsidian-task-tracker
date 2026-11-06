@@ -73,7 +73,7 @@ describe("CalendarFileSource", () => {
 		expect(device).toBe("iPhone");
 	});
 
-	it("maps the fields, with the default color when the file has none", async () => {
+	it("maps the fields, the color left null when the file has none: the frontend picks", async () => {
 		const { events } = await source().read();
 		expect(events[0]).toEqual({
 			id: "1",
@@ -87,8 +87,8 @@ describe("CalendarFileSource", () => {
 			account: null,
 			calendarId: null,
 		});
-		expect(events[1].color).toBe("#0A84FF");
-		expect(events[2]).toMatchObject({ allDay: true, color: "#0A84FF" });
+		expect(events[1].color).toBeNull();
+		expect(events[2]).toMatchObject({ allDay: true, color: null });
 	});
 
 	it("throws 'file missing' when the file is not there", async () => {

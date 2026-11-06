@@ -118,14 +118,6 @@ describe("GoogleCalendarApi", () => {
 		expect(http.lists).toBe(2);
 	});
 
-	it("the settings page always asks for the list and refreshes the one kept", async () => {
-		const { google, http } = source();
-		expect(await google.listCalendars()).toEqual([{ id: "work", title: "Work", color: "#123456" }]);
-		await google.export(START, END);
-		await google.listCalendars();
-		expect(http.lists).toBe(2);
-	});
-
 	it("follows nextPageToken to the last page", async () => {
 		const { google, http } = source();
 		http.pages = new Map([

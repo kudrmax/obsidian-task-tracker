@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../src/application/contracts";
-import { callDoor, type DoorAnswer, type DoorContext, doorMethods, HOST_CALENDAR_METHODS, HOST_DAY_METHODS, HOST_SETTINGS_METHODS, HOST_TASK_METHODS } from "../../src/application/PhoneCalls";
+import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../src/application/PhoneCalls";
+import { ScreenSettingsImpl } from "../../src/application/ScreenSettingsImpl";
 import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
@@ -221,22 +222,67 @@ describe("the door's tasks.* calls", () => {
 	});
 });
 
-/** The method names of an interface of contracts.ts. */
-function interfaceMethods(name: string): string[] {
-	const text = readFileSync("src/application/contracts.ts", "utf8");
-	const body = text.slice(text.indexOf(`export interface ${name} {`));
-	const block = body.slice(0, body.indexOf("\n}\n"));
-	return [...block.matchAll(/^\t([a-zA-Z]+)\(/gm)].map((m) => m[1]);
+const CONTRACTS = readFileSync("src/application/contracts.ts", "utf8");
+
+/** Each interface a text declares, by name, with its body. */
+function interfaces(text: string): Map<string, string> {
+	const found = new Map<string, string>();
+	for (const m of text.matchAll(/^export interface (\w+)(?:<[^\n{]*>)?(?: extends [^\n{]+)? \{\n([\s\S]*?)^\}$/gm)) found.set(m[1], m[2]);
+	return found;
 }
 
-describe("the door's other services", () => {
-	it("cover DayService and CalendarService but what the host watches", () => {
-		const offered = (space: string) => doorMethods().filter((m) => m.startsWith(`${space}.`)).map((m) => m.slice(space.length + 1));
-		expect(interfaceMethods("DayService").filter((m) => !offered("days").includes(m)).sort()).toEqual([...HOST_DAY_METHODS].sort());
-		expect(interfaceMethods("CalendarService").filter((m) => !offered("calendars").includes(m)).sort()).toEqual([...HOST_CALENDAR_METHODS].sort());
-		expect(interfaceMethods("UndoService").filter((m) => !offered("history").includes(m))).toEqual(["onChange"]);
-		expect(interfaceMethods("SettingsService").filter((m) => !offered("settings").includes(m)).sort()).toEqual([...HOST_SETTINGS_METHODS].sort());
-		expect(offered("settings").filter((m) => !interfaceMethods("SettingsService").includes(m))).toEqual([]);
+/** The members of an interface body that are functions: methods, generic methods, and properties of a function type. */
+function methodsOf(body: string): string[] {
+	const names = new Set<string>();
+	for (const m of body.matchAll(/^\t(?:readonly )?([A-Za-z_$][\w$]*)\??\s*(?:<[^\n]*?>)?\s*\(/gm)) names.add(m[1]);
+	for (const m of body.matchAll(/^\t(?:readonly )?([A-Za-z_$][\w$]*)\??:\s*\(*\s*(?:<[^\n]*?>)?\s*\([^\n]*=>/gm)) names.add(m[1]);
+	return [...names];
+}
+
+/** The method names of an interface of contracts.ts. */
+function interfaceMethods(name: string): string[] {
+	const body = interfaces(CONTRACTS).get(name);
+	if (body === undefined) throw new Error(`no interface ${name} in contracts.ts`);
+	return methodsOf(body);
+}
+
+describe("reading contracts.ts's interfaces", () => {
+	it("finds methods, generic methods and properties of a function type, and nothing else", () => {
+		const text = ["export interface Sample<T> extends Base {", "\tplain(a: number): void;", "\tgeneric<K extends string>(key: K): T;", "\toptional?(): void;", "\treadonly callback: (value: string) => void;", "\treadonly maybe: (() => Promise<void>) | null;", "\treadonly data: readonly string[];", "\tcount: number;", "}", ""].join("\n");
+		expect(methodsOf(interfaces(text).get("Sample")!).sort()).toEqual(["callback", "generic", "maybe", "optional", "plain"]);
+	});
+});
+
+describe("the door's coverage", () => {
+	const offered = (space: string) => doorMethods().filter((m) => m.startsWith(`${space}.`)).map((m) => m.slice(space.length + 1));
+
+	it("names every interface of contracts.ts with a method, and only those", () => {
+		const withMethods = [...interfaces(CONTRACTS).entries()].filter(([, body]) => methodsOf(body).length > 0).map(([name]) => name);
+		expect(Object.keys(DOOR_COVERAGE).sort()).toEqual(withMethods.sort());
+	});
+
+	it("answers each service's every method but the host's, in its space, and nothing it does not declare", () => {
+		for (const [name, coverage] of Object.entries(DOOR_COVERAGE)) {
+			if (!("space" in coverage)) {
+				expect({ name, reason: coverage.hostOwned.length > 20 }).toEqual({ name, reason: true });
+				continue;
+			}
+			const declared = interfaceMethods(name);
+			expect({ name, methods: [...offered(coverage.space), ...coverage.host].sort() }).toEqual({ name, methods: [...declared].sort() });
+		}
+	});
+
+	it("answers in no space no interface names", () => {
+		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
+		const own = ["boundary", "entry", "sectionName", "rules"];
+		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
+	});
+});
+
+describe("the door's screen settings", () => {
+	it("answer what ScreenSettingsStore gives a screen over the same settings", () => {
+		const door = callDoor("screenSettings.get", [], { tasks: null, settings: DATA, nowMs: NOW.getTime() });
+		expect(door).toEqual({ ok: true, result: wire(new ScreenSettingsImpl(new FakeSettingsStore(settingsFrom(JSON.parse(DATA)))).get()) });
 	});
 });
 
@@ -280,7 +326,6 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setUngrouped", "  "],
 	["setGoogleClientId", "client.apps.googleusercontent.com"],
 	["setWorkCalendarFile", "cal/work.json"],
-	["setWorkCalendars", "Work, , Dentist "],
 ];
 
 describe("the door's settings.* calls", () => {
@@ -298,6 +343,14 @@ describe("the door's settings.* calls", () => {
 	});
 });
 
+describe("a settings write", () => {
+	it("works with no settings in the context: the defaults, written over nothing", () => {
+		const door = callDoor("settings.setDayStartHour", [4], { tasks: null, nowMs: NOW.getTime() }) as Extract<DoorAnswer, { ok: true }>;
+		expect(door.ok).toBe(true);
+		expect(JSON.parse(door.settings!)).toEqual({ dayStartHour: 4 });
+	});
+});
+
 const iso = (day: number, h: number) => new Date(2026, 10, day, h).toISOString();
 const CALENDARS = {
 	google: JSON.stringify({
@@ -311,6 +364,25 @@ const CALENDARS = {
 	iphone: null,
 	work: "{",
 };
+
+describe("the door's calendars", () => {
+	const files = { google: JSON.stringify({ exportedAt: iso(4, 8), device: "Mac", events: [] }), work: JSON.stringify({ exportedAt: iso(4, 8), device: "iPhone", events: [] }) };
+	const detail = (fetched?: DoorContext["fetched"]) => {
+		const door = callDoor("calendars.events", [T], context(FILE, { calendars: files, ...(fetched ? { fetched } : {}) })) as Extract<DoorAnswer, { ok: true }>;
+		return Object.fromEntries((door.result as { statuses: { source: string; detail: string | null }[] }).statuses.map((st) => [st.source, st.detail]));
+	};
+
+	it("name the device of a file the host does not fetch itself; Google's alone is fetched when the context does not say", () => {
+		expect(detail()).toEqual({ google: null, iphone: null, work: "iPhone" });
+		expect(detail(["google", "work"])).toEqual({ google: null, iphone: null, work: null });
+		expect(detail([])).toEqual({ google: "Mac", iphone: null, work: "iPhone" });
+	});
+
+	it("grey an event as CalendarDay does: over once its end has come", () => {
+		const past = (endMs: number) => (callDoor("calendars.isPast", [{ endMs }], context()) as Extract<DoorAnswer, { ok: true }>).result;
+		expect([past(NOW.getTime() - 1), past(NOW.getTime()), past(NOW.getTime() + 1)]).toEqual([true, true, false]);
+	});
+});
 
 /** One call of every method the door answers, with arguments of its kind: each answer must survive JSON unchanged. */
 function everyCall(screen: ScreenView): { method: string; args: unknown[]; context: DoorContext }[] {
@@ -344,6 +416,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("calendars.isPast", { endMs: NOW.getTime() }),
 		plain("calendars.known"),
 		plain("calendars.setShown", "max@gmail.com", "Personal", false),
+		plain("screenSettings.get"),
 		...SETTINGS_CASES.map(([m, ...a]) => ({ method: `settings.${m}`, args: a, context: context(FILE, { settings: DATA }) })),
 		plain("history.undo"),
 		plain("history.redo"),
@@ -409,6 +482,7 @@ describe("every answer of the door", () => {
 		for (const { method, args, context } of calls) {
 			const answer = callDoor(method, wire(args), context);
 			expect({ method, answer }).toStrictEqual({ method, answer: JSON.parse(JSON.stringify(answer)) });
+			expect(JSON.parse(callDoorJson(method, JSON.stringify(args), JSON.stringify(context), true))).toStrictEqual(answer);
 			if (!answer.ok) expect({ method, code: answer.error.code }).toEqual({ method, code: expect.stringMatching(/^(staleTask|tasksFileMissing)$/) });
 		}
 	});
@@ -418,6 +492,24 @@ describe("every answer of the door", () => {
 		expect(callDoor("tasks.setStatus", [{ section: "now", index: 0, path: [], raw: "- [ ] Nothing" }, "done"], context())).toMatchObject({ ok: false, error: { code: "staleTask" } });
 		expect(callDoor("tasks.onChange", [], context())).toMatchObject({ ok: false, error: { code: "unknownMethod" } });
 		expect(callDoor("tasks.toString", [], context())).toMatchObject({ ok: false, error: { code: "unknownMethod" } });
+	});
+});
+
+describe("the door's JSON, strict", () => {
+	class Box {
+		readonly n = 1;
+	}
+
+	it("refuses what JSON would change on the way", () => {
+		for (const bad of [{ at: new Date(0) }, { gone: undefined }, [() => 1], { box: new Box() }, { m: new Map() }, { n: Number.NaN }, [Infinity]]) {
+			expect(() => plainJson(bad, true)).toThrow();
+			expect(() => plainJson(bad)).not.toThrow();
+		}
+	});
+
+	it("passes plain JSON as JSON.stringify writes it", () => {
+		const value = { a: [1, "two", null, true, { b: Object.create(null) }] };
+		expect(plainJson(value, true)).toBe(JSON.stringify(value));
 	});
 });
 

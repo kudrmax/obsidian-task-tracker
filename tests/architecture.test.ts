@@ -146,6 +146,11 @@ describe("domain and application run on any host", () => {
 	it("still need every temporary exception", () => {
 		expect(TEMPORARY_HOST_GLOBALS.filter((e) => !errors.some((line) => excused(line, e)))).toEqual([]);
 	});
+	it("read the device's own clock and nothing of its locale: no Intl, localeCompare or toLocale… (Electron and JavaScriptCore differ there)", () => {
+		const core = [...files("src/domain"), ...files("src/application"), "src/settings.ts"].filter(isSource);
+		const LOCALE = /\bIntl\b|\.localeCompare\s*\(|\.toLocale\w*\s*\(/;
+		expect(core.filter((file) => LOCALE.test(withoutComments(readFileSync(join(ROOT, file), "utf8"))))).toEqual([]);
+	});
 });
 
 /**

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { eventColors } from "../../src/ui/eventColors";
+import { eventColors, eventHex } from "../../src/ui/eventColors";
+
+describe("eventHex", () => {
+	it("is the calendar's own colour, or its source's when the file gives none", () => {
+		expect(eventHex({ color: "#123456", source: "work" })).toBe("#123456");
+		expect(eventHex({ color: null, source: "google" })).toBe("#4285F4");
+		expect(eventHex({ color: null, source: "iphone" })).toBe("#0A84FF");
+		expect(eventHex({ color: null, source: "work" })).toBe("#0A84FF");
+	});
+});
 
 describe("eventColors", () => {
 	it("builds the block's ground, bar and text from the calendar's colour", () => {

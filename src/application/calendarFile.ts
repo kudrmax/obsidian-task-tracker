@@ -17,9 +17,6 @@ export function calendarPath(source: CalendarSource, settings: TaskCalendarSetti
 	return settings.workCalendarFile;
 }
 
-/** The colour of an event whose calendar gave none. */
-const DEFAULT_COLOR: Readonly<Record<CalendarSource, string>> = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
-
 interface FileEvent {
 	id: string;
 	title: string;
@@ -88,7 +85,7 @@ export function readCalendarFile(text: string, source: CalendarSource): Calendar
 		end: new Date(e.end),
 		allDay: e.allDay,
 		calendar: e.calendar,
-		color: e.color ?? DEFAULT_COLOR[source],
+		color: e.color ?? null,
 		source,
 		account: e.account ?? null,
 		calendarId: e.calendarId ?? null,
@@ -117,7 +114,7 @@ function eventCalendars(events: readonly FileEvent[]): FileCalendarRow[] {
 
 /** The file's text, in the format every writer uses. */
 /** An event as a writer writes it: a phone's calendar may have no colour of its own. */
-type WrittenEvent = Omit<CalendarEvent, "color" | "source"> & { readonly color: string | null };
+type WrittenEvent = Omit<CalendarEvent, "source">;
 
 export function calendarFileText(file: Omit<CalendarFile, "device" | "events"> & { readonly device: string | null; readonly events: readonly WrittenEvent[] }): string {
 	const iso = (d: Date | null) => (d ? d.toISOString() : null);

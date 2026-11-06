@@ -43,9 +43,10 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | Field | |
 |---|---|
 | `tasks` | the tasks file's text; `null` when there is no file |
-| `settings` | `data.json`'s text; `""` for the defaults |
+| `settings` | `data.json`'s text; `""` or left out for the defaults |
 | `nowMs` | the moment of the call; the day, today and everything by the clock follow from it and `dayStartHour` |
 | `calendars` | `{ google?, iphone?, work? }`: each calendar file's text, `null` or left out for none (`calendarFiles` says where they are) |
+| `fetched` | the calendar sources the host fetches itself (a status names no device for them); `["google"]` when left out |
 | `history` | the undo steps as the last answer gave them; left out before the first |
 
 **Answer** (`DoorAnswer`):
@@ -57,7 +58,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 - `result` is the method's answer, `null` for none. It is plain JSON: no `Date`, no function, no class, no field set to
   `undefined`; what the host parses is exactly what the core answered (`tests/application/PhoneCalls.test.ts` checks
-  every method).
+  every method, through `callDoorJson` strict: a `Date`, an `undefined` field, a class's instance or a number JSON cannot
+  hold in an answer fails it).
 - `tasks`: the call changed the file. The host writes this text, only if the file still holds the text it handed in;
   otherwise it reads the file again and calls again. A read can change the file too: `tasks.screen` and `tasks.lineOf`
   tidy it for today first (yesterday's slots go, closed tasks go to Done), as the plugin does.
@@ -104,7 +106,8 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
   polling (`keepFresh`) are the host's.
 - `known()`: every calendar the files list, and whether it is shown.
 - `setShown(account, title, shown)`: answers the new `data.json` in `settings`.
-- `isPast(event)`: by `event.endMs`.
+- `isPast(event)`: by `event.endMs`, as CalendarDay greys an event (over once its end has come); `past` on each event is the same.
+- An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
 
 ### `settings.*`: `SettingsService`
 
@@ -115,13 +118,19 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `setLabelTag(tag)`, `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
-`setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `setWorkCalendars(text)`.
+`setGoogleClientId(id)`, `setWorkCalendarFile(path)`.
 
 A write answers the new `data.json` in `settings` (every key the plugin's settings do not name, such as a device's own,
 kept); a value the service refuses (a count that is no number of zero or more, a label tag of two words) answers none.
 Each check is made against the settings handed in, so one edit never undoes the one before it as long as the host hands
 in the `data.json` the last answer gave. `bindClientSecret` is the host's: it binds an Obsidian text field to Google's
 client secret, which the phone does not edit.
+
+### `screenSettings.get()`: what a screen reads of the settings
+
+`ScreenSettings`: the tasks file, the sections' names, the name over tasks outside a section, the priority levels and the
+labels, when a touch becomes a drag (`longPressMs`) and the hour another day opens at (`scrollToHour`). Every frontend's
+screen behaves by them alike. `onChange` is the host's: it watches `data.json`.
 
 ### `history.*`: undo
 
@@ -180,6 +189,26 @@ What the plugin's UI calls itself, by the names in `contracts.ts`: `nextProgress
 `isPresetColor`, `acceptsDrop`, `placesInGap`; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS` and `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
+
+## What the door leaves to the host
+
+`DOOR_COVERAGE` in `src/application/PhoneCalls.ts` names every interface of `contracts.ts` with a method: the space the door
+answers it in and the methods the host keeps (subscriptions, the clock, fetching and polling, binding a text field), or
+why the host owns it whole. `tests/application/PhoneCalls.test.ts` reads the interfaces from `contracts.ts` and fails on
+one the table misses.
+
+- `GoogleAccount` (`isLoggedIn`, `login`, `logout`): the login is a browser's consent and a token fetched over the network;
+  the door makes no request.
+- `WorkCalendarSetup` (`scriptableLoader`, `export`): the Scriptable script and the Shortcuts export are the Obsidian
+  plugin's fallback on the iPhone; an app writes `calendar/iphone.json` itself (`iphoneCalendarText`).
+- `DayEventsAsk`, `PolledScreen`, `CalendarPoll`, `SecretField`: the halves of `events`' fetch, `keepFresh` and
+  `bindClientSecret`, which are the host's.
+
+## Time
+
+The core reads the device's local time: a day, an hour and a slot are the clock's readings where the device is. The door's
+and the phone's answer tests run also under `TZ=Asia/Novosibirsk` and `TZ=America/New_York` (`vitest.config.mts`), and the
+core uses nothing of the locale (`Intl`, `localeCompare`, `toLocale…`: `tests/architecture.test.ts`).
 
 ## What the iOS app no longer needs of its own
 
