@@ -20,7 +20,10 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    changes the principle «everything the plugin knows is in one file»: open questions below.
 5. **A project's step is never «the whole project in Soon».** Each task of a project moves through the lane on its own,
    or stays in the note untaken.
-6. **Project mark on a card.** A task from a project shows which project it belongs to; a tap opens the project note.
+6. **Project mark on a card**: a folder icon in the caption colour at the right of the card, in the date's place and of
+   its width; the card's height does not change. A tap on the icon opens the project note, a tap on the rest of the card
+   opens the menu as always. The project's name is in the task menu («Project») and, on the Mac, in a tooltip on hover.
+   Board: `docs/design/canvas/Proj2V1.dc.html`.
 7. **An untaken project task is in Backlog.** Whatever is written in a project note and not taken yet is the project's
    backlog, so the plugin shows it in Backlog, grouped by project. Taking it is the same
    move as for any Backlog task: to Soon, Now, a day or the calendar.
@@ -32,7 +35,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 10. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project note; the
     Backlog tasks of `TODOs Tasks.md` are one more group, «No project», always last. A group is the section header with
     two additions: it folds (a chevron; a tap on the title folds or unfolds it, the fold is kept on the device; folded, it
-    shows how many untaken tasks it holds) and an arrow button beside the title opens the project note.
+    shows how many untaken tasks it holds) and an arrow button beside the title opens the project note. Board:
+    `docs/design/canvas/Proj1.dc.html`.
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
     `TODOs Tasks.md` into that project's note (the end of its `## Tasks`), keeping where it is in the
@@ -60,7 +64,7 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 ## Open (being planned now)
 
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
-- The project mark on a card and the task menu's «Project»: boards, phone and desktop, dark and light.
+- The task menu's «Project»: board.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
 
