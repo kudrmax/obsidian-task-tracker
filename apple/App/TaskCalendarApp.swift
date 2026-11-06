@@ -7,7 +7,6 @@ struct TaskCalendarApp: App {
     private static let notifications = NotificationDelegate()
 
     @Environment(\.scenePhase) private var scenePhase
-    @State private var router = CaptureRouter.shared
 
     init() {
         Task { await UserNotifications.registerCategories() }
@@ -16,7 +15,7 @@ struct TaskCalendarApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SettingsView()
+            RootView()
                 .onOpenURL { url in
                     if let back = RefreshLink.back(from: url) {
                         Task {
@@ -24,11 +23,8 @@ struct TaskCalendarApp: App {
                             await UIApplication.shared.open(back)
                         }
                     } else {
-                        router.open(url)
+                        CaptureRouter.shared.open(url)
                     }
-                }
-                .sheet(item: $router.request) { _ in
-                    CaptureView { router.request = nil }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
