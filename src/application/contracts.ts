@@ -23,6 +23,11 @@ export { DayBoundary } from "../domain/DayBoundary";
 export { clampSlot } from "../domain/DayBoundary";
 /** Minutes in a day: the timeline's length. */
 export { MINUTES_PER_DAY } from "../domain/LocalDate";
+/** Minutes from the start of the shown day to a card's start and end; a null end for a task without a duration. */
+export type { Span as DaySpan } from "../domain/DayBoundary";
+import type { Span as DaySpan } from "../domain/DayBoundary";
+import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
+export type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */
 export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
@@ -98,6 +103,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** How long its slot lasts in minutes; null without a slot or without a duration. */
+	readonly durationMin: number | null;
 	/** How the phone reminds of the task at its slot's start; a task without a slot keeps the default. */
 	readonly reminder: ReminderKind;
 	/** The rule after the task's repeat marker; null for a task that does not repeat. */
@@ -368,6 +375,25 @@ export interface TaskService {
 	 * not today. This and the moves below take a subtask out of its task first: it goes on as a task.
 	 */
 	setSlot(key: TaskKey, slot: Slot): Promise<void>;
+	/**
+	 * Where the card of slotted `item` stands on the timeline of `day`, by the clock: on its time, or on today, an open
+	 * task whose start has passed rides the now line, its duration kept. The file keeps its time.
+	 */
+	shownSpan(item: TaskItem, day: LocalDate): DaySpan;
+	/**
+	 * The card of slotted `item` while its `edge` dot is held at `minute` of `day`: the end no earlier than the start nor
+	 * past the day; the start no earlier than the day nor past the end, and on a task without a duration no later than its
+	 * start, which becomes the end.
+	 */
+	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan;
+	/**
+	 * The `edge` dot let go at `minute` of `day`, a card being `minDurationMin` minutes tall: writes the task's new time as
+	 * `setSlot` does. A span no longer than a card loses its duration and stands at its start; a task without one whose start
+	 * dot was pulled keeps its start. The bottom dot changes only how long the task lasts, so a card riding the now line
+	 * ends where the finger let go while the file keeps its own start; the top dot is a new start and writes it.
+	 * Resolves false, writing nothing, when the time stays as shown.
+	 */
+	resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean>;
 	/** Drop from the timeline back on the list: the slot goes, due date stays; with `place`, the task moves there as `moveBefore` would. */
 	clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void>;
 

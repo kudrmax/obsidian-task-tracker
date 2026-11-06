@@ -70,6 +70,7 @@ export class DayPeek {
 			boundary: () => deps.boundary(),
 			hourPx: () => deps.hourPx(),
 			tasks: () => this.day?.slotted ?? [],
+			shownSpan: (item) => deps.tasks.shownSpan(item, date),
 			events: () => this.events,
 			now: () => deps.now(),
 		});

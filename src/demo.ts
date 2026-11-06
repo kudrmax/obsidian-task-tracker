@@ -13,9 +13,10 @@ const NO_UNDO: UndoService = { undo: async () => "nothing", redo: async () => "n
 export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 	protected override createDeps(): ViewDeps {
 		const clock = new FixedClock(DEMO_NOW);
+		const days = new DemoDayService(clock, this);
 		return {
-			tasks: new DemoTaskService(clock),
-			days: new DemoDayService(clock, this),
+			tasks: new DemoTaskService(clock, () => days.boundary()),
+			days,
 			undo: NO_UNDO,
 			calendars: new DemoCalendarService(),
 			settings: new ViewSettingsImpl(this),

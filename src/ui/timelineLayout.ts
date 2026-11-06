@@ -142,12 +142,6 @@ export function stackTasks(tasks: readonly TaskSpan[], events: readonly PlacedSp
 	return boxes;
 }
 
-/** A task left open past its start rides the now line, its duration kept; the file keeps its time. */
-export function followNow(span: TaskSpan, now: number): TaskSpan {
-	if (span.start >= now) return span;
-	return { start: now, end: span.end === null ? null : now + span.end - span.start };
-}
-
 /** A duration as the card writes it: a number over its unit. */
 export function durationParts(minutes: number): [string, string] {
 	if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];
@@ -163,16 +157,6 @@ export function timeParts(minutes: number): [string, string] {
 
 function pad(n: number): string {
 	return String(n).padStart(2, "0");
-}
-
-/**
- * Where a stretch lets go: no taller than a card (`cardHeight`) at this zoom, the task loses its duration and stands at its start; a task
- * without one (`from.end` null) whose start dot was pulled keeps its start, the pull having come to nothing.
- */
-export function stretchedSpan(from: TaskSpan, span: Span, edge: "start" | "end", hourPx: number, cardHeight: number): TaskSpan {
-	if (minutesToPx(span.end - span.start, hourPx) - DESIGN.itemGap > cardHeight) return { start: span.start, end: span.end };
-	const unmoved = edge === "start" && from.end === null;
-	return { start: unmoved ? from.start : span.start, end: null };
 }
 
 /** Puts a minute `fraction` down the visible height; one too near the day's first or last hour gets empty room beyond it to stand there all the same. */

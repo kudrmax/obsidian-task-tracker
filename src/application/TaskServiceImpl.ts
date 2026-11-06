@@ -14,6 +14,7 @@ import {
 	StaleTaskError,
 	TasksFileMissingError,
 	type DayColumn,
+	type DaySpan,
 	type DayView,
 	type DroppedTask,
 	type DropTo,
@@ -44,6 +45,7 @@ import { readsAnew } from "./readingSettings";
 import { itemLevels, toItem } from "./taskItems";
 import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
+import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -390,6 +392,23 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.setSlot(doc, this.entryOf(doc, key), slot, today, boundary));
 	}
 
+	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
+		return this.timeline().shown(slotted(item), day);
+	}
+
+	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {
+		return this.timeline().stretched(slotted(item), day, edge, minute);
+	}
+
+	async resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean> {
+		const { doc, boundary } = await this.readNormalized();
+		const { slot, status } = this.entryOf(doc, key).task;
+		const next = slot && new TimelineSpans(boundary, this.clock.now()).resized({ slot, open: isOpen(status) }, day, edge, minute, minDurationMin);
+		if (!next) return false;
+		await this.setSlot(key, next);
+		return true;
+	}
+
 	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
 		await this.mutate((doc, today) => {
 			const entry = this.entryOf(doc, key);
@@ -695,6 +714,11 @@ export class TaskServiceImpl implements TaskService {
 		return this.boundary(this.settings.get()).dayOf(this.clock.now());
 	}
 
+	/** The timeline's rules by the clock and the day's boundary now. */
+	private timeline(): TimelineSpans {
+		return new TimelineSpans(this.boundary(this.settings.get()), this.clock.now());
+	}
+
 	private boundary(settings: TaskCalendarSettings): DayBoundary {
 		return boundaryOf(settings);
 	}
@@ -706,4 +730,10 @@ export class TaskServiceImpl implements TaskService {
 	private emit(): void {
 		for (const listener of this.listeners) listener();
 	}
+}
+
+/** A task on the timeline as its rules read it; one without a slot has no place there. */
+function slotted(item: TaskItem): SlottedTask {
+	if (!item.slot) throw new Error("Task Calendar: the task has no slot on the timeline");
+	return { slot: item.slot, open: item.open };
 }

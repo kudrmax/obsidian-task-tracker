@@ -4,6 +4,8 @@ import type { TaskItem } from "../../src/application/contracts";
 import type { DropResult, DropTarget } from "../../src/ui/drag/DropTarget";
 import { DragController, type DragControllerDeps } from "../../src/ui/drag/DragController";
 import { GestureArbiter } from "../../src/ui/gestures";
+import { DESIGN } from "../../src/ui/design";
+import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const rect = (x: number, y: number) => new DOMRect(x, y, 44, 36);
 const landing = new DOMRect(100, 200, 150, 40);
@@ -321,21 +323,59 @@ describe("DragController: a finger held on a calendar event", () => {
 describe("DragController: stretching a block (block 3)", () => {
 	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, labels: [], subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
 
-	function stretching(onResize: () => Promise<void> = async () => undefined) {
+	function stretching(onResize: () => Promise<boolean> = async () => true) {
 		const arbiter = new GestureArbiter();
 		const timeline = {
 			minutesAt: (y: number) => y,
 			shownSpan: () => ({ start: 600, end: 660 }),
 			stretchTo: vi.fn(),
-			slotAt: (start: number, end: number | null) => ({ date: "2026-11-01", start, end }),
 			hourPx: 56,
 			endStretch: vi.fn(),
 		};
-		const deps = { step: () => 15, timeline: () => timeline, haptics: { tap: () => {} }, arbiter, onResize: vi.fn(onResize) } as unknown as DragControllerDeps;
+		const stretch = vi.fn((_item: TaskItem, _edge: string, minute: number) => ({ start: 600, end: Math.max(600, minute) }));
+		const haptics = { tap: vi.fn() };
+		const deps = { step: () => 15, timeline: () => timeline, haptics, arbiter, stretch, onResize: vi.fn(onResize) } as unknown as DragControllerDeps;
 		const block = document.body.appendChild(document.createElement("div"));
 		new DragController(deps).grip(block, item, "end", down(50, 660));
-		return { arbiter, timeline, deps };
+		return { arbiter, timeline, deps, haptics };
 	}
+
+	it("starts from the card as shown and asks the service for each step's span", () => {
+		const { timeline, deps } = stretching();
+		expect(deps.stretch).toHaveBeenCalledWith(item, "end", 660);
+		expect(timeline.stretchTo).toHaveBeenLastCalledWith(expect.anything(), { start: 600, end: 660 }, "end");
+		pointer("pointermove", 50, 722);
+		expect(deps.stretch).toHaveBeenLastCalledWith(item, "end", 720);
+		expect(timeline.stretchTo).toHaveBeenLastCalledWith(expect.anything(), { start: 600, end: 720 }, "end");
+		pointer("pointercancel", 50, 722);
+	});
+
+	it("hands the service the minute let go at and how many minutes a card is tall", async () => {
+		const { deps, haptics } = stretching();
+		haptics.tap.mockClear();
+		pointer("pointermove", 50, 720);
+		pointer("pointerup", 50, 720);
+		await vi.waitFor(() => expect(deps.onResize).toHaveBeenCalledWith(item, "end", 720, ((DEFAULT_SETTINGS.cardHeight + DESIGN.itemGap) / 56) * 60));
+		await vi.waitFor(() => expect(haptics.tap).toHaveBeenCalledTimes(1));
+	});
+
+	it("puts the card back, with no tap, when the service writes nothing", async () => {
+		const { arbiter, timeline, haptics } = stretching(async () => false);
+		haptics.tap.mockClear();
+		pointer("pointerup", 50, 660);
+		await vi.waitFor(() => expect(arbiter.busy).toBe(false));
+		expect(timeline.stretchTo).toHaveBeenLastCalledWith(expect.anything(), null, "end");
+		expect(timeline.endStretch).not.toHaveBeenCalled();
+		expect(haptics.tap).not.toHaveBeenCalled();
+	});
+
+	it("writes nothing when the stretch is cancelled", async () => {
+		const { arbiter, deps } = stretching();
+		pointer("pointermove", 50, 720);
+		pointer("pointercancel", 50, 720);
+		await vi.waitFor(() => expect(arbiter.busy).toBe(false));
+		expect(deps.onResize).not.toHaveBeenCalled();
+	});
 
 	it("stretches the block once per grid step, not per pixel", () => {
 		const { timeline } = stretching();
@@ -348,7 +388,7 @@ describe("DragController: stretching a block (block 3)", () => {
 
 	it("holds the screen until the change is written: no second grab starts from the old time", async () => {
 		let written = () => {};
-		const { arbiter, timeline } = stretching(() => new Promise<void>((resolve) => (written = resolve)));
+		const { arbiter, timeline } = stretching(() => new Promise<boolean>((resolve) => (written = () => resolve(true))));
 		pointer("pointermove", 50, 720);
 		pointer("pointerup", 50, 720);
 		expect(arbiter.busy).toBe(true);
