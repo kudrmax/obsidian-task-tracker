@@ -25,6 +25,8 @@ window's column pairs, and the app copied rules (the tasks file's default, the i
   the window's own; `SHOWN_LISTS` (ui/screens.ts) maps a place to its lists. `DropColumn` stays: it names the product's
   lists (the day's list, Soon, Inbox, Backlog), not a layout.
 - `SectionNameEntry` over the pure `sectionNameEnd`.
+- `settings.*`: SettingsServiceImpl itself over the `data.json` handed in, through a store that applies each update at
+  once; a write answers the new `data.json`, unknown keys kept. `bindClientSecret` (an Obsidian text field) is the host's.
 - **`UndoSteps`** (new, sync): the steps as patches, `UndoState` as plain data (`TextPatch.hunks` / `TextPatch.of`);
   `UndoHistory` keeps one while the plugin runs.
 - `tasksFilePath(settings)` (documentText.ts): the setting, none for a blank one; compose.ts reads the file by it.
@@ -50,8 +52,8 @@ the lists always agree (its read-count test says so).
 ## Guards
 
 - `tests/application/PhoneCalls.test.ts`: every `tasks.*` call answers as TaskServiceImpl does over the same text and
-  writes the same file; the door covers every method of TaskService, DayService, CalendarService and UndoService but the
-  host's own (listed); every door method's answer survives a JSON round trip unchanged (`toStrictEqual`).
+  writes the same file; every `settings.*` call answers and writes as SettingsServiceImpl does; the door covers every
+  method of TaskService, DayService, CalendarService, UndoService and SettingsService but the host's own (listed); every door method's answer survives a JSON round trip unchanged (`toStrictEqual`).
 - `tests/architecture.test.ts`: the phone imports only contracts.ts and the door; every runtime value contracts.ts hands
   the UI has its door method (`DOOR_OF_RUNTIME`).
 - `tests/phone/build.test.ts`: the bundle's functions, `call` and the new ones, with nothing of the host.

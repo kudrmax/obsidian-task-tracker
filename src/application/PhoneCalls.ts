@@ -21,6 +21,7 @@ import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, p
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
+import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { type Snapshot, TaskReads } from "./TaskReads";
@@ -118,7 +119,11 @@ interface Effects {
 
 /** One call's world: the rules under the settings given, at the moment given, over the texts given. */
 class Call {
-	readonly settings: TaskCalendarSettings;
+	/** The settings as they stand in this call: those handed in, with what the call changed. */
+	private current: TaskCalendarSettings;
+	/** What the call changed of the settings, every key it wrote. */
+	private changed: Partial<TaskCalendarSettings> = {};
+	readonly store: SettingsStore;
 	readonly rules: TaskRules;
 	readonly reads: TaskReads;
 	readonly writes: TaskWrites;
@@ -126,13 +131,22 @@ class Call {
 	private text: string | null;
 
 	constructor(readonly context: DoorContext) {
-		this.settings = settingsOf(context.settings ?? "");
+		this.current = settingsOf(context.settings ?? "");
 		const clock: Clock = { now: () => new Date(context.nowMs) };
-		const store: SettingsStore = { get: () => this.settings, update: async () => undefined, onChange: () => () => undefined };
+		const store: SettingsStore = {
+			get: () => this.current,
+			update: async (patch) => this.saveSettings(patch),
+			onChange: () => () => undefined,
+		};
+		this.store = store;
 		this.rules = new TaskRules(store, clock);
 		this.reads = new TaskReads(this.rules, store, clock);
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
+	}
+
+	get settings(): TaskCalendarSettings {
+		return this.current;
 	}
 
 	get now(): Date {
@@ -178,10 +192,12 @@ class Call {
 		return outcome;
 	}
 
-	/** Settings merged into the `data.json` handed in, every other key kept, written as Obsidian writes it. */
+	/** A change of the settings, at once: the rest of the call reads it, and the answer's `data.json` has it, every other key kept, written as Obsidian writes it. */
 	saveSettings(patch: Partial<TaskCalendarSettings>): void {
+		this.current = { ...this.current, ...patch };
+		this.changed = { ...this.changed, ...patch };
 		const raw = this.context.settings.trim() === "" ? {} : (JSON.parse(this.context.settings) as Record<string, unknown>);
-		this.effects.settings = JSON.stringify({ ...raw, ...patch }, null, 2);
+		this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
 	}
 
 	private setText(text: string, step: boolean): void {
@@ -376,7 +392,7 @@ function calendarDay(c: Call): CalendarDay {
 	const carried = day.carryOver(true);
 	if (!carried) return day;
 	c.saveSettings(carried);
-	return new CalendarDay(reading, { ...c.settings, ...carried }, c.now);
+	return new CalendarDay(reading, c.settings, c.now);
 }
 
 const CALENDARS: Readonly<Record<string, Handler>> = {
@@ -384,14 +400,58 @@ const CALENDARS: Readonly<Record<string, Handler>> = {
 	isPast: (c, [event]) => (event as { endMs: number }).endMs <= c.context.nowMs,
 	known: (c) => calendarDay(c).known(),
 	setShown: (c, [account, title, shown]) => {
-		const day = calendarDay(c);
-		const settings = c.effects.settings ? (JSON.parse(c.effects.settings) as Partial<TaskCalendarSettings>) : {};
-		c.saveSettings({ ...settings, ...day.shownChange(account as string, title as string, shown as boolean) });
+		c.saveSettings(calendarDay(c).shownChange(account as string, title as string, shown as boolean));
 	},
 };
 
 /** The CalendarService methods the door leaves to the host: it fetches, polls and watches the files, and calls `events` again. */
 export const HOST_CALENDAR_METHODS: readonly string[] = ["onChange", "keepFresh"];
+
+/**
+ * The settings screen's reads and writes, SettingsServiceImpl's own over the `data.json` handed in: a write answers the
+ * new `data.json` in `settings`; one the service refuses (a bad count, a tag of two words) answers none.
+ */
+const SETTINGS_METHODS: readonly string[] = [
+	"form",
+	"setTasksFile",
+	"setSection",
+	"setMarker",
+	"setCount",
+	"setDayStartHour",
+	"renameLevel",
+	"recolourLevel",
+	"removeLevel",
+	"addLevel",
+	"moveLevel",
+	"setLabelTag",
+	"renameLabel",
+	"recolourLabel",
+	"removeLabel",
+	"addLabel",
+	"moveLabel",
+	"colourOf",
+	"renamePreset",
+	"removePreset",
+	"addPreset",
+	"movePreset",
+	"setUngrouped",
+	"setGoogleClientId",
+	"setWorkCalendarFile",
+	"setWorkCalendars",
+];
+
+const SETTINGS: Readonly<Record<string, Handler>> = Object.fromEntries(
+	SETTINGS_METHODS.map((name) => [
+		name,
+		(c: Call, args: unknown[]) => {
+			const answer = (new SettingsServiceImpl(c.store) as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
+			return answer instanceof Promise ? null : answer;
+		},
+	]),
+);
+
+/** The SettingsService methods the door leaves to the host: the client secret's field binds an Obsidian text field to the saved secret. */
+export const HOST_SETTINGS_METHODS: readonly string[] = ["bindClientSecret"];
 
 const HISTORY: Readonly<Record<string, Handler>> = {
 	undo: (c) => c.undo("undo"),
@@ -519,6 +579,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	boundary: BOUNDARY,
 	calendars: CALENDARS,
 	history: HISTORY,
+	settings: SETTINGS,
 	entry: ENTRY,
 	sectionName: SECTION_NAME,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },

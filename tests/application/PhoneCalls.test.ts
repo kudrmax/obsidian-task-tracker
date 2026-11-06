@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../src/application/contracts";
-import { callDoor, type DoorAnswer, type DoorContext, doorMethods, HOST_CALENDAR_METHODS, HOST_DAY_METHODS, HOST_TASK_METHODS } from "../../src/application/PhoneCalls";
+import { callDoor, type DoorAnswer, type DoorContext, doorMethods, HOST_CALENDAR_METHODS, HOST_DAY_METHODS, HOST_SETTINGS_METHODS, HOST_TASK_METHODS } from "../../src/application/PhoneCalls";
+import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { UndoHistory } from "../../src/application/UndoHistory";
@@ -234,6 +235,66 @@ describe("the door's other services", () => {
 		expect(interfaceMethods("DayService").filter((m) => !offered("days").includes(m)).sort()).toEqual([...HOST_DAY_METHODS].sort());
 		expect(interfaceMethods("CalendarService").filter((m) => !offered("calendars").includes(m)).sort()).toEqual([...HOST_CALENDAR_METHODS].sort());
 		expect(interfaceMethods("UndoService").filter((m) => !offered("history").includes(m))).toEqual(["onChange"]);
+		expect(interfaceMethods("SettingsService").filter((m) => !offered("settings").includes(m)).sort()).toEqual([...HOST_SETTINGS_METHODS].sort());
+		expect(offered("settings").filter((m) => !interfaceMethods("SettingsService").includes(m))).toEqual([]);
+	});
+});
+
+/** A data.json as the plugin writes it, with a key of the device's own the door must keep. */
+const DATA = JSON.stringify(
+	{ tasksFile: "Tasks.md", priorities: [{ prefix: "p1", color: "red" }, { prefix: "p2", color: "orange" }], labels: [{ name: "Fast", color: "green" }], groups: { presets: ["Home", "Work"], ungrouped: "No section" }, zoom: 3 },
+	null,
+	2,
+);
+const SHADES = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#64D2FF", blue: "#0A84FF" };
+
+/** Every SettingsService method the door answers, with arguments a settings screen sends. */
+const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
+	["form"],
+	["setTasksFile", "Work/Tasks.md"],
+	["setSection", "soon", "Скоро"],
+	["setMarker", "slotMarker", "at:"],
+	["setCount", "longPressMs", "450"],
+	["setCount", "refreshSeconds", "120"],
+	["setCount", "staleAfterMinutes", "-1"],
+	["setDayStartHour", 4],
+	["renameLevel", 1, " !! "],
+	["recolourLevel", 0, "#123456"],
+	["removeLevel", 0],
+	["addLevel"],
+	["moveLevel", 1, 0],
+	["setLabelTag", " tags "],
+	["setLabelTag", "two words"],
+	["renameLabel", 0, " Very fast "],
+	["recolourLabel", 0, "blue"],
+	["removeLabel", 0],
+	["addLabel"],
+	["moveLabel", 0, 0],
+	["colourOf", "#ff453a", SHADES],
+	["colourOf", "#abcdef", SHADES],
+	["colourOf", "nope", SHADES],
+	["renamePreset", 0, " Дом "],
+	["removePreset", 1],
+	["addPreset"],
+	["movePreset", 1, 0],
+	["setUngrouped", "  "],
+	["setGoogleClientId", "client.apps.googleusercontent.com"],
+	["setWorkCalendarFile", "cal/work.json"],
+	["setWorkCalendars", "Work, , Dentist "],
+];
+
+describe("the door's settings.* calls", () => {
+	it("answer and write as SettingsServiceImpl does, every key of data.json it does not touch kept", async () => {
+		for (const [method, ...args] of SETTINGS_CASES) {
+			const store = new FakeSettingsStore(settingsFrom(JSON.parse(DATA)));
+			let writes = 0;
+			store.onChange(() => writes++);
+			const result = await (new SettingsServiceImpl(store) as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
+			const door = callDoor(`settings.${method}`, wire(args), { tasks: null, settings: DATA, nowMs: NOW.getTime() }) as Extract<DoorAnswer, { ok: true }>;
+			const written = door.settings === undefined ? null : (JSON.parse(door.settings) as Record<string, unknown>);
+			expect({ method, result: door.result, written: written && settingsFrom(written) }).toEqual({ method, result: wire(result ?? null), written: writes > 0 ? store.get() : null });
+			if (written) expect({ method, zoom: written.zoom }).toEqual({ method, zoom: 3 });
+		}
 	});
 });
 
@@ -283,6 +344,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("calendars.isPast", { endMs: NOW.getTime() }),
 		plain("calendars.known"),
 		plain("calendars.setShown", "max@gmail.com", "Personal", false),
+		...SETTINGS_CASES.map(([m, ...a]) => ({ method: `settings.${m}`, args: a, context: context(FILE, { settings: DATA }) })),
 		plain("history.undo"),
 		plain("history.redo"),
 		plain("history.canUndo"),

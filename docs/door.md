@@ -104,6 +104,23 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - `setShown(account, title, shown)`: answers the new `data.json` in `settings`.
 - `isPast(event)`: by `event.endMs`.
 
+### `settings.*`: `SettingsService`
+
+The settings screen, every read and write but one, answered by the plugin's own SettingsServiceImpl over
+`context.settings`: `form()` (`SettingsForm`, the fields as the screen shows them), `setTasksFile(path)`,
+`setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
+`renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
+`setLabelTag(tag)`, `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+`moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
+`renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
+`setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `setWorkCalendars(text)`.
+
+A write answers the new `data.json` in `settings` (every key the plugin's settings do not name, such as a device's own,
+kept); a value the service refuses (a count that is no number of zero or more, a label tag of two words) answers none.
+Each check is made against the settings handed in, so one edit never undoes the one before it as long as the host hands
+in the `data.json` the last answer gave. `bindClientSecret` is the host's: it binds an Obsidian text field to Google's
+client secret, which the phone does not edit.
+
 ### `history.*`: undo
 
 The steps live with the host. Every write that is a step answers `history`; hand it in again in the next context.

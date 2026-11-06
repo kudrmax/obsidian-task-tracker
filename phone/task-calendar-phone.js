@@ -80,8 +80,8 @@
   function clampSlot(start, end) {
     const duration = end === null ? null : end - start;
     const latest = MINUTES_PER_DAY - (duration ?? MIN_SLOT_MINUTES);
-    const moved = Math.min(latest, Math.max(0, start));
-    return { start: moved, end: duration === null ? null : moved + duration };
+    const moved2 = Math.min(latest, Math.max(0, start));
+    return { start: moved2, end: duration === null ? null : moved2 + duration };
   }
   var DayBoundary = class _DayBoundary {
     static {
@@ -188,6 +188,11 @@
   var PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"];
   function isPresetColor(color) {
     return PRIORITY_COLORS.includes(color);
+  }
+  var HEX_RE = /^#?([0-9a-f]{6})$/i;
+  function hexColor(text) {
+    const m = HEX_RE.exec(text.trim());
+    return m ? `#${m[1].toUpperCase()}` : null;
   }
   function usablePrefix(prefix) {
     return /^\S+$/.test(prefix);
@@ -450,6 +455,9 @@
   // src/domain/Label.ts
   function labelTitle(name) {
     return name.replace(/_/g, " ");
+  }
+  function labelNameOf(title) {
+    return title.trim().replace(/\s+/g, "_");
   }
   function usableLabelName(name) {
     return /^[^\s#]+$/.test(name);
@@ -789,10 +797,10 @@
     /** A subtask moved here leaves its task and becomes a task of `section`. The section it leaves empty goes, as with `removeEntry`. */
     moveEntry(entry, section, position) {
       const span = this.spanOf(entry);
-      const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
+      const moved2 = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
       const without = this.withLines(this.splice(span.line, span.lineCount, []));
       const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
-      return this.leftBy(entry, without.withLines(without.splice(target, 0, moved)));
+      return this.leftBy(entry, without.withLines(without.splice(target, 0, moved2)));
     }
     /** An empty `### name` before group `before`; `before` equal to the number of groups puts it last. */
     addGroup(section, name, before) {
@@ -803,15 +811,15 @@
      * The `moved` tasks of group `index`, with their subtasks and in their order, go under a new `### name` right after the
      * group's last line that stays; the rest of the group stays as it is, even when nothing is left in it. Nothing to move is `addGroup` after the group.
      */
-    splitGroup(section, index, name, moved) {
-      if (moved.length === 0) return this.addGroup(section, name, index + 1);
+    splitGroup(section, index, name, moved2) {
+      if (moved2.length === 0) return this.addGroup(section, name, index + 1);
       const block = this.blockOf(section, index);
-      const spans = moved.map((entry) => this.spanOf(entry));
+      const spans = moved2.map((entry) => this.spanOf(entry));
       const inMoved = (line) => spans.some((span) => line >= span.line && line < span.line + span.lineCount);
       let at = block.end;
       while (at > block.start && (this.lines[at - 1].trim() === "" || inMoved(at - 1))) at--;
       if (at === block.start) at = Math.min(...spans.map((span) => span.line));
-      const lines = moved.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
+      const lines = moved2.flatMap((entry, i) => reindented(this.lines.slice(spans[i].line, spans[i].line + spans[i].lineCount), entry.indent, ""));
       const kept = this.lines.filter((_, line) => !inMoved(line));
       kept.splice(at - spans.filter((span) => span.line < at).reduce((sum, span) => sum + span.lineCount, 0), 0, `### ${name}`, ...lines);
       return this.withLines(kept);
@@ -827,8 +835,8 @@
       const cut = this.cutOf(section, from);
       const apart2 = Array(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
       const last = before === this.blockLists.get(section).length;
-      const moved = last ? [...apart2, ...core] : [...core, ...apart2];
-      return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved));
+      const moved2 = last ? [...apart2, ...core] : [...core, ...apart2];
+      return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved2));
     }
     renameGroup(section, index, name) {
       const line = this.blockOf(section, index).headingLine;
@@ -839,8 +847,8 @@
     mergeGroup(section, from, into, at) {
       if (from === into) throw new Error("A group merges into another one");
       const content = this.contentOf(this.blockOf(section, from));
-      const moved = this.lines.slice(content.first, content.last);
-      return this.withLines(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved));
+      const moved2 = this.lines.slice(content.first, content.last);
+      return this.withLines(this.cutAndInsert(this.cutOf(section, from), this.groupInsertionLine(section, into, at), moved2));
     }
     /** A group with nothing but blank lines goes, its blank lines with it unless they part the list from the next one. */
     deleteGroup(section, index) {
@@ -855,9 +863,9 @@
       if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
       const span = this.spanOf(entry);
       const target = before ? this.spanOf(before).line : this.endOf(parent);
-      const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
+      const moved2 = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
       const without = this.splice(span.line, span.lineCount, []);
-      without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
+      without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved2);
       return this.leftBy(entry, this.withLines(without));
     }
     /**
@@ -1040,10 +1048,10 @@
       return { from, to: Math.max(start, content.last) };
     }
     /** Removes the cut and puts `moved` in at `target`, a line of the document before the cut. */
-    cutAndInsert(cut, target, moved) {
+    cutAndInsert(cut, target, moved2) {
       const size = cut.to - cut.from;
       const lines = this.splice(cut.from, size, []);
-      lines.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved);
+      lines.splice(target >= cut.to ? target - size : Math.min(target, cut.from), 0, ...moved2);
       return lines;
     }
     /** The first line under the block's heading that is not blank; its end when there is none. */
@@ -1216,9 +1224,9 @@
   function leavingItsTask(operation) {
     return (doc, entry, ...rest) => {
       if (entry.path.length === 0) return operation(doc, entry, ...rest);
-      const moved = doc.moveEntry(entry, entry.section, "end");
-      const ungrouped = moved.groups(entry.section)[ungroupedIndex(moved.groups(entry.section))].entries;
-      return operation(moved, ungrouped[ungrouped.length - 1], ...rest);
+      const moved2 = doc.moveEntry(entry, entry.section, "end");
+      const ungrouped = moved2.groups(entry.section)[ungroupedIndex(moved2.groups(entry.section))].entries;
+      return operation(moved2, ungrouped[ungrouped.length - 1], ...rest);
     };
   }
   function moveInto(doc, entry, section, index, today) {
@@ -1493,8 +1501,8 @@
     const before = place === "end" ? doc.groups(list).length : groupIndex(doc, list, place.before);
     if (before === from) return doc;
     if (before > 0) return doc.moveGroup(list, from, before);
-    const moved = doc.moveGroup(list, from, 1);
-    return doc.groups(list)[0].entries.length === 0 ? moved : moved.moveGroup(list, 0, 2);
+    const moved2 = doc.moveGroup(list, from, 1);
+    return doc.groups(list)[0].entries.length === 0 ? moved2 : moved2.moveGroup(list, 0, 2);
   }
   function renameGroup(doc, list, from, to, ungrouped) {
     const name = to.trim();
@@ -2938,6 +2946,171 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/application/SettingsServiceImpl.ts
+  function countOf(text) {
+    const n = Number(text);
+    return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  var SettingsServiceImpl = class {
+    constructor(store) {
+      this.store = store;
+    }
+    form() {
+      const s = this.settings;
+      return {
+        tasksFile: s.tasksFile,
+        sections: s.sections,
+        markers: {
+          dueDateMarker: s.dueDateMarker,
+          slotMarker: s.slotMarker,
+          alarmSlotMarker: s.alarmSlotMarker,
+          liveSlotMarker: s.liveSlotMarker,
+          silentSlotMarker: s.silentSlotMarker,
+          repeatMarker: s.repeatMarker,
+          collapsedMarker: s.collapsedMarker
+        },
+        priorities: s.priorities,
+        labelTag: s.labelTag,
+        labels: s.labels,
+        presets: s.groups.presets,
+        ungrouped: s.groups.ungrouped,
+        longPressMs: s.longPressMs,
+        dayStartHour: s.dayStartHour,
+        scrollToHour: s.scrollToHour,
+        staleAfterMinutes: s.staleAfterMinutes,
+        googleClientId: s.google.clientId,
+        refreshSeconds: s.google.refreshSeconds,
+        workCalendarFile: s.workCalendarFile,
+        workCalendars: s.workCalendarTitles.join(", ")
+      };
+    }
+    setTasksFile(tasksFile) {
+      return this.store.update({ tasksFile });
+    }
+    setSection(key, name) {
+      return this.store.update({ sections: { ...this.settings.sections, [key]: name } });
+    }
+    setMarker(marker, text) {
+      return this.store.update({ [marker]: text });
+    }
+    async setCount(field, text) {
+      const n = countOf(text);
+      if (n === null) return;
+      await this.store.update(field === "refreshSeconds" ? this.google({ refreshSeconds: n }) : { [field]: n });
+    }
+    setDayStartHour(dayStartHour) {
+      return this.store.update({ dayStartHour });
+    }
+    renameLevel(index, prefix) {
+      return this.patchLevel(index, { prefix: prefix.trim() });
+    }
+    recolourLevel(index, color) {
+      return this.patchLevel(index, { color });
+    }
+    removeLevel(index) {
+      return this.saveLevels(this.settings.priorities.filter((_, i) => i !== index));
+    }
+    addLevel() {
+      const levels = this.settings.priorities;
+      let n = levels.length + 1;
+      while (levels.some((l) => l.prefix === `p${n}`)) n++;
+      const color = PRIORITY_COLORS.find((c) => !levels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+      return this.saveLevels([...levels, { prefix: `p${n}`, color }]);
+    }
+    moveLevel(from, to) {
+      return this.saveLevels(moved(this.settings.priorities, from, to));
+    }
+    async setLabelTag(tag) {
+      const labelTag = tag.trim();
+      if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+    }
+    renameLabel(index, title) {
+      return this.patchLabel(index, { name: labelNameOf(title) });
+    }
+    recolourLabel(index, color) {
+      return this.patchLabel(index, { color });
+    }
+    removeLabel(index) {
+      return this.saveLabels(this.settings.labels.filter((_, i) => i !== index));
+    }
+    addLabel() {
+      const labels = this.settings.labels;
+      let n = labels.length + 1;
+      while (labels.some((l) => l.name === `Label_${n}`)) n++;
+      const color = PRIORITY_COLORS.find((c) => !labels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+      return this.saveLabels([...labels, { name: `Label_${n}`, color }]);
+    }
+    moveLabel(from, to) {
+      return this.saveLabels(moved(this.settings.labels, from, to));
+    }
+    colourOf(text, shades) {
+      const hex = hexColor(text);
+      if (!hex) return null;
+      return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
+    }
+    renamePreset(index, name) {
+      return this.savePresets(this.presets.map((preset, i) => i === index ? name.trim() : preset));
+    }
+    removePreset(index) {
+      return this.savePresets(this.presets.filter((_, i) => i !== index));
+    }
+    addPreset() {
+      return this.savePresets([...this.presets, ""]);
+    }
+    movePreset(from, to) {
+      return this.savePresets(moved(this.presets, from, to));
+    }
+    setUngrouped(name) {
+      return this.store.update(this.groups({ ungrouped: name.trim() || DEFAULT_SETTINGS.groups.ungrouped }));
+    }
+    setGoogleClientId(clientId) {
+      return this.store.update(this.google({ clientId }));
+    }
+    bindClientSecret(field) {
+      field.setValue(this.settings.google.clientSecret);
+      field.onChange((clientSecret) => void this.store.update(this.google({ clientSecret })));
+    }
+    setWorkCalendarFile(workCalendarFile) {
+      return this.store.update({ workCalendarFile });
+    }
+    setWorkCalendars(text) {
+      return this.store.update({ workCalendarTitles: text.split(",").map((t) => t.trim()).filter((t) => t !== "") });
+    }
+    get settings() {
+      return this.store.get();
+    }
+    get presets() {
+      return this.settings.groups.presets;
+    }
+    patchLevel(index, patch2) {
+      return this.saveLevels(this.settings.priorities.map((level, i) => i === index ? { ...level, ...patch2 } : level));
+    }
+    saveLevels(priorities) {
+      return this.store.update({ priorities });
+    }
+    patchLabel(index, patch2) {
+      return this.saveLabels(this.settings.labels.map((label, i) => i === index ? { ...label, ...patch2 } : label));
+    }
+    saveLabels(labels) {
+      return this.store.update({ labels });
+    }
+    savePresets(presets) {
+      return this.store.update(this.groups({ presets }));
+    }
+    groups(patch2) {
+      return { groups: { ...this.settings.groups, ...patch2 } };
+    }
+    google(patch2) {
+      return { google: { ...this.settings.google, ...patch2 } };
+    }
+  };
+  function moved(list, from, to) {
+    const items = [...list];
+    const [item] = items.splice(from, 1);
+    items.splice(to, 0, item);
+    return items;
+  }
+
   // src/domain/search.ts
   var SNIPPET_LEAD = 24;
   var ELLIPSIS = "…";
@@ -3734,8 +3907,8 @@ ${key.title}`.toLowerCase();
         const { doc: tagged, tags } = EntryTags.tag(doc, [this.entryOf(doc, key)]);
         const entry = tags.find(tagged, 0);
         const edited = placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, void 0, boundary);
-        const moved = tags.find(edited, 0);
-        place = moved && { section: moved.section, index: moved.index, path: moved.path, raw: "" };
+        const moved2 = tags.find(edited, 0);
+        place = moved2 && { section: moved2.section, index: moved2.index, path: moved2.path, raw: "" };
         return tags.untag(edited);
       };
       return { operation, place: () => place };
@@ -4446,14 +4619,24 @@ ${key.title}`.toLowerCase();
   var Call = class {
     constructor(context) {
       this.context = context;
+      /** What the call changed of the settings, every key it wrote. */
+      this.changed = {};
       this.effects = {};
-      this.settings = settingsOf(context.settings ?? "");
+      this.current = settingsOf(context.settings ?? "");
       const clock = { now: () => new Date(context.nowMs) };
-      const store = { get: () => this.settings, update: async () => void 0, onChange: () => () => void 0 };
+      const store = {
+        get: () => this.current,
+        update: async (patch2) => this.saveSettings(patch2),
+        onChange: () => () => void 0
+      };
+      this.store = store;
       this.rules = new TaskRules(store, clock);
       this.reads = new TaskReads(this.rules, store, clock);
       this.writes = new TaskWrites(this.rules, this.reads);
       this.text = context.tasks ?? null;
+    }
+    get settings() {
+      return this.current;
     }
     get now() {
       return new Date(this.context.nowMs);
@@ -4491,10 +4674,12 @@ ${key.title}`.toLowerCase();
       if (text !== this.text) this.setText(text, false);
       return outcome;
     }
-    /** Settings merged into the `data.json` handed in, every other key kept, written as Obsidian writes it. */
+    /** A change of the settings, at once: the rest of the call reads it, and the answer's `data.json` has it, every other key kept, written as Obsidian writes it. */
     saveSettings(patch2) {
+      this.current = { ...this.current, ...patch2 };
+      this.changed = { ...this.changed, ...patch2 };
       const raw = this.context.settings.trim() === "" ? {} : JSON.parse(this.context.settings);
-      this.effects.settings = JSON.stringify({ ...raw, ...patch2 }, null, 2);
+      this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
     }
     setText(text, step) {
       const before = this.text;
@@ -4668,18 +4853,53 @@ ${key.title}`.toLowerCase();
     const carried = day.carryOver(true);
     if (!carried) return day;
     c.saveSettings(carried);
-    return new CalendarDay(reading, { ...c.settings, ...carried }, c.now);
+    return new CalendarDay(reading, c.settings, c.now);
   }
   var CALENDARS = {
     events: (c, [date]) => wireDay(calendarDay(c).events(date), c.now),
     isPast: (c, [event]) => event.endMs <= c.context.nowMs,
     known: (c) => calendarDay(c).known(),
     setShown: (c, [account, title, shown]) => {
-      const day = calendarDay(c);
-      const settings = c.effects.settings ? JSON.parse(c.effects.settings) : {};
-      c.saveSettings({ ...settings, ...day.shownChange(account, title, shown) });
+      c.saveSettings(calendarDay(c).shownChange(account, title, shown));
     }
   };
+  var SETTINGS_METHODS = [
+    "form",
+    "setTasksFile",
+    "setSection",
+    "setMarker",
+    "setCount",
+    "setDayStartHour",
+    "renameLevel",
+    "recolourLevel",
+    "removeLevel",
+    "addLevel",
+    "moveLevel",
+    "setLabelTag",
+    "renameLabel",
+    "recolourLabel",
+    "removeLabel",
+    "addLabel",
+    "moveLabel",
+    "colourOf",
+    "renamePreset",
+    "removePreset",
+    "addPreset",
+    "movePreset",
+    "setUngrouped",
+    "setGoogleClientId",
+    "setWorkCalendarFile",
+    "setWorkCalendars"
+  ];
+  var SETTINGS = Object.fromEntries(
+    SETTINGS_METHODS.map((name) => [
+      name,
+      (c, args) => {
+        const answer = new SettingsServiceImpl(c.store)[name](...args);
+        return answer instanceof Promise ? null : answer;
+      }
+    ])
+  );
   var HISTORY = {
     undo: (c) => c.undo("undo"),
     redo: (c) => c.undo("redo"),
@@ -4785,6 +5005,7 @@ ${key.title}`.toLowerCase();
     boundary: BOUNDARY,
     calendars: CALENDARS,
     history: HISTORY,
+    settings: SETTINGS,
     entry: ENTRY,
     sectionName: SECTION_NAME,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
