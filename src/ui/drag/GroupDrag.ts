@@ -57,7 +57,7 @@ export class GroupDrag {
 		const grab = { dx: e.clientX - head.getBoundingClientRect().left, dy: e.clientY - head.getBoundingClientRect().top };
 		const float = this.float(group);
 		const plate = taskList.plateOf(group.name);
-		const cards = [...taskList.cards.filter((entry) => entry.item.group === group.name).map((entry) => entry.card), ...(plate ? [plate] : [])];
+		const cards = [...taskList.cardsOf(group), ...(plate ? [plate] : [])];
 		for (const node of [head, ...cards]) node.classList.add(FOLDED);
 		const mark = el(null, "div", "tc-group-drop");
 		let slot = lifted;

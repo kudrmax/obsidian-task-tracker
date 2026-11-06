@@ -513,9 +513,9 @@ describe("priority", () => {
 
 	it("snap: a minute to the nearest step of the zoom, within the day", () => {
 		const { svc } = setup("");
-		expect(svc.snap(617, 56)).toBe(615);
-		expect(svc.snap(617, 28)).toBe(630);
-		expect(svc.snap(2000, 112)).toBe(1440);
+		expect(svc.snap(617, 56, 9)).toBe(615);
+		expect(svc.snap(617, 28, 9)).toBe(630);
+		expect(svc.snap(2000, 112, 9)).toBe(1440);
 	});
 
 	it("unfoldAbove shows the subtasks of every task a subtask sits under", async () => {

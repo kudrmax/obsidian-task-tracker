@@ -99,6 +99,7 @@ export class CalendarDay {
 			events: shown,
 			updatedAt,
 			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
+			updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
 			stale: problem !== null || this.isOld(updatedAt),
 		};

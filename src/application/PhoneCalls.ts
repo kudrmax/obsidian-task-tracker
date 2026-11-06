@@ -3,7 +3,7 @@ import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
 import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import { DESCRIPTION_TEMPLATE } from "../domain/description";
-import { isPresetColor, PRIORITY_COLORS } from "../domain/Priority";
+import { isPresetColor, PRIORITY_COLORS, usableColor } from "../domain/Priority";
 import { labelTitle, sameLabels } from "../domain/Label";
 import { sameRule, repeatParts } from "../domain/Repeat";
 import { editRepeat, repeatDraft } from "../domain/RepeatDraft";
@@ -43,6 +43,7 @@ import { TaskReminders } from "./TaskReminders";
 import { TaskWrites, type Write } from "./TaskWrites";
 import { type UndoState, UndoSteps, type UndoWay } from "./UndoSteps";
 import { snapMinute } from "./snapGrid";
+import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
 
@@ -349,7 +350,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	shownSpan: (c, [item, day]) => c.reads.shownSpan(item as A, day as string),
 	dropSpan: (c, [item, from, start]) => c.reads.dropSpan((item ?? null) as A, from as A, start as number),
 	newSlot: (c, [day, start]) => c.reads.newSlot(day as string, start as number),
-	snap: (_c, [minute, hourPx]) => snapMinute(minute as number, hourPx as number),
+	snap: (_c, [minute, hourPx, tolerancePx]) => snapMinute(minute as number, hourPx as number, tolerancePx as number),
 	stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item as A, day as string, edge as A, minute as number),
 	resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key as A, day as string, edge as A, minute as number, min as number)),
 	clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key as A, (place ?? undefined) as A)),
@@ -384,6 +385,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	today: (c) => c.rules.today(),
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
+	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
 };
@@ -618,6 +620,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	labelTitle,
 	sameLabels,
 	isPresetColor,
+	usableColor,
 	acceptsDrop,
 	placesInGap,
 };

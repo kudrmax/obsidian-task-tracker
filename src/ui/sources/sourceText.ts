@@ -1,5 +1,5 @@
 import type { SourceProblem, SourceStatus } from "../../application/contracts";
-import { dayMonth, formatTime, localDateOf, minutesOf } from "../dates";
+import { dayMonth, formatTime, minutesOf } from "../dates";
 
 export interface SourceText {
 	readonly name: "Google Calendar" | "iPhone calendars" | "Work calendar";
@@ -29,9 +29,10 @@ function problemText(problem: SourceProblem): string {
 export function sourceText(status: SourceStatus): SourceText {
 	const names = NAMES[status.source];
 	const at = status.updatedAt;
-	const relative = !at ? "" : status.updatedDay === "today" ? "today" : status.updatedDay === "yesterday" ? "yesterday" : dayMonth(localDateOf(at));
+	const date = status.updatedDate === null ? "" : dayMonth(status.updatedDate);
+	const relative = !at ? "" : status.updatedDay === "today" ? "today" : status.updatedDay === "yesterday" ? "yesterday" : date;
 	const clock = at ? formatTime(minutesOf(at)) : "";
-	const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${dayMonth(localDateOf(at))} ${clock}`;
+	const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${date} ${clock}`;
 	const sub = status.problem ? problemText(status.problem) : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
 	return { name: names.name, short: names.short, sub, time, stale: status.stale };
 }

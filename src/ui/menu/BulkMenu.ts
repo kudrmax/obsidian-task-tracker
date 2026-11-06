@@ -125,8 +125,9 @@ export class BulkMenu {
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
 		if (model.edits.includes("section")) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
+		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete");
-		else menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: model.remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
 	}
 
 	/** A pick the model says asks first asks in place of what was pressed, the rest of the menu as it is. */

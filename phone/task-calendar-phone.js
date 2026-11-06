@@ -189,6 +189,9 @@
   function isPresetColor(color) {
     return PRIORITY_COLORS.includes(color);
   }
+  function usableColor(color) {
+    return isPresetColor(color) || hexColor(color) === color;
+  }
   var HEX_RE = /^#?([0-9a-f]{6})$/i;
   function hexColor(text) {
     const m = HEX_RE.exec(text.trim());
@@ -2294,6 +2297,7 @@ ${key.title}`.toLowerCase();
         events: shown,
         updatedAt,
         updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
+        updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
         detail: this.reading.fed(source) ? null : file?.device ?? null,
         stale: problem !== null || this.isOld(updatedAt)
       };
@@ -2931,7 +2935,7 @@ ${key.title}`.toLowerCase();
   }
   function groupOf(name, items) {
     const section = name !== null;
-    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, can: { rename: section, remove: section } };
+    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
@@ -3063,6 +3067,8 @@ ${key.title}`.toLowerCase();
     const n = Number(text);
     return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
   }
+  var SECTION_ORDER = ["inbox", "now", "soon", "backlog", "done"];
+  var MARKER_ORDER = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
   var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
   var SettingsServiceImpl = class {
     constructor(store) {
@@ -3073,6 +3079,8 @@ ${key.title}`.toLowerCase();
       return {
         tasksFile: s.tasksFile,
         sections: s.sections,
+        sectionOrder: SECTION_ORDER,
+        markerOrder: MARKER_ORDER,
         markers: {
           dueDateMarker: s.dueDateMarker,
           slotMarker: s.slotMarker,
@@ -4820,13 +4828,17 @@ ${key.title}`.toLowerCase();
   // src/application/snapGrid.ts
   var MINUTES_PER_HOUR = 60;
   var SNAP_STEPS = [5, 15, 30, 60];
-  var SNAP_STEP_PX = 9;
-  function snapStep(hourPx) {
-    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= SNAP_STEP_PX) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+  function snapStep(hourPx, tolerance) {
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
   }
-  function snapMinute(minute, hourPx) {
-    const step = snapStep(hourPx);
+  function snapMinute(minute, hourPx, tolerance) {
+    const step = snapStep(hourPx, tolerance);
     return Math.min(MINUTES_PER_DAY, Math.max(0, Math.round(minute / step) * step));
+  }
+
+  // src/application/DayServiceImpl.ts
+  function dayOpening(date, boundary, today, now, hour) {
+    return date === today ? { kind: "now", minute: boundary.offsetOf(date, now) } : { kind: "hour", minute: boundary.offsetOfHour(hour) };
   }
 
   // src/application/PhoneCalls.ts
@@ -5000,7 +5012,7 @@ ${key.title}`.toLowerCase();
     shownSpan: (c, [item, day]) => c.reads.shownSpan(item, day),
     dropSpan: (c, [item, from, start]) => c.reads.dropSpan(item ?? null, from, start),
     newSlot: (c, [day, start]) => c.reads.newSlot(day, start),
-    snap: (_c, [minute, hourPx]) => snapMinute(minute, hourPx),
+    snap: (_c, [minute, hourPx, tolerancePx]) => snapMinute(minute, hourPx, tolerancePx),
     stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item, day, edge, minute),
     resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key, day, edge, minute, min)),
     clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key, place ?? void 0)),
@@ -5030,6 +5042,7 @@ ${key.title}`.toLowerCase();
     today: (c) => c.rules.today(),
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
+    openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
@@ -5212,6 +5225,7 @@ ${key.title}`.toLowerCase();
     labelTitle,
     sameLabels,
     isPresetColor,
+    usableColor,
     acceptsDrop,
     placesInGap
   };

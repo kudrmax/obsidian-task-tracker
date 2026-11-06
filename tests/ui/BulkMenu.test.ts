@@ -104,6 +104,11 @@ describe("the bulk menu draws its model", () => {
 		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
 	});
 
+	it("draws Delete only where the model offers it", () => {
+		open({ remove: null });
+		expect(document.body.textContent).not.toContain("Delete");
+	});
+
 	it("draws no moves group when no picked task may be put off", () => {
 		open({ moves: [] });
 		expect(document.querySelector(".tc-menu-tiles.is-move")).toBeNull();

@@ -234,6 +234,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	labelTitle: "../domain/Label",
 	sameLabels: "../domain/Label",
 	isPresetColor: "../domain/Priority",
+	usableColor: "../domain/Priority",
 	PRIORITY_COLORS: "../domain/Priority",
 	acceptsDrop: "./drops",
 	placesInGap: "./drops",

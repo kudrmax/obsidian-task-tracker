@@ -51,6 +51,13 @@ describe("DayServiceImpl", () => {
 		expect(days.relation("2026-11-06")).toBe("other");
 	});
 
+	it("opens today's timeline on the now line, another day's at the hour the settings name, both from the day's start", () => {
+		const { days } = setUp(new Date(2026, 10, 5, 3, 30), 4);
+		expect(days.openAt("2026-11-04")).toEqual({ kind: "now", minute: 23 * 60 + 30 });
+		expect(days.openAt("2026-11-05")).toEqual({ kind: "hour", minute: 5 * 60 });
+		expect(days.openAt("2026-10-30")).toEqual({ kind: "hour", minute: 5 * 60 });
+	});
+
 	it("steps days on and back, across months and years", () => {
 		const { days } = setUp(new Date(2026, 10, 5, 12, 0));
 		expect(days.step("2026-11-30", 1)).toBe("2026-12-01");

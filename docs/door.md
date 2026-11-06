@@ -19,7 +19,7 @@ Built from `src/phone/main.ts` → `src/application/PhoneDoor.ts` (the functions
 | `iphoneCalendarFile()` | — | `"calendar/iphone.json"`: where the app writes the phone's calendars |
 | `iphoneCalendarText(exportJson)` | `PhoneExport` as JSON (below) | that file's text, in the format every calendar writer uses |
 | `oneLine(text)` | a title | the title on one line: a line break reads as one space |
-| `reminders`, `complete`, `silence`, `snooze`, `capture`, `calendarFiles`, `meetings` | as before | as before (kept for the app as it is) |
+| `reminders`, `complete`, `silence`, `snooze`, `capture`, `calendarFiles`, `meetings` | as before | as before, byte for byte (kept for the app as it is): each is a wrapper over its method of `call` (below); a blank title and a task gone answer `{ changed: false, reason: "stale" }`, any other error throws |
 
 `tasksFile` follows the plugin: the setting as saved, `TODOs Tasks.md` when `data.json` has none, no file for a blank
 one. The app's own default for a blank setting goes.
@@ -53,7 +53,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 ```
 { "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>" }
-{ "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
+{ "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
 ```
 
 - `result` is the method's answer, `null` for none. It is plain JSON: no `Date`, no function, no class, no field set to
@@ -67,7 +67,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 - `settings`: the call changed the settings (a calendar shown or hidden; the phone carrying the old choice of calendars
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
-  `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one.
+  `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
+  write has no title (`capture.add`).
 
 ## Methods
 
@@ -86,13 +87,16 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
   reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
-- `tasks.snap(minute, hourPx)`: the minute a drag, a drop or a stretch on the timeline stands at, the timeline drawn
-  `hourPx` points an hour (30, 15 or 5 minutes by the zoom); a resize is offered while `item.can.resize`.
+- `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
+  timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`
+  for, the host's own touch tolerance in the same points (the plugin passes 9). A resize is offered while `item.can.resize`.
 - Subscriptions are the host's: it watches the files and calls again after a change.
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `boundary()` (`{ startHour }`). `onDayChange` and `catchUp` are the
+`today()`, `relation(date)`, `step(date, days)`, `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
+timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
+at half the height), `{ kind: "hour", minute }` for another day (the settings' `scrollToHour`, at the top). `onDayChange` and `catchUp` are the
 host's: it checks the clock (once a minute while a screen is open), and when `days.today` answers another day it calls
 `tasks.normalize` and draws the day anew.
 
@@ -111,8 +115,31 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
   polling (`keepFresh`) are the host's.
 - `known()`: every calendar the files list, and whether it is shown.
 - `setShown(account, title, shown)`: answers the new `data.json` in `settings`.
+- `files()`: the calendars' files by path from the vault folder, Google's, the phone's and the work file, in that order.
+- `meetings(fromMs, toMs)`: the timed events of the calendars shown that overlap `from`–`to`, `{ title, startMs, endMs }`,
+  over the files in `context.calendars` (a file missing or broken adds none), by the same reading as `events`: the old
+  choice of calendars is carried over the same way, answering the new `data.json` in `settings` once.
+- A status's `updatedDate` is the calendar date of `updatedAtMs` by the clock: the date shown for an update before
+  yesterday (`updatedDay` "other").
 - `isPast(event)`: by `event.endMs`, as CalendarDay greys an event (over once its end has come); `past` on each event is the same.
 - An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
+
+### `reminders.*`: the phone's reminders
+
+Over `context.tasks` (`tasksFileMissing` without it), at `context.nowMs`:
+
+- `list()`: the open tasks on a time that remind, until their day ends, by start: `WireReminder` `{ id, title, body,
+  kind, date, startMs, dayEndMs }`. `id` is the task's line as read; `body` its time (`10:00`, `10:00–11:00`); `dayEndMs`
+  the next day's start by the clock and `dayStartHour`.
+- `complete(id)`, `silence(id)` (it stays on its time and no longer reminds), `snooze(id, minutes)`: the new text in
+  `tasks`, a step of the history; `staleTask` when no reminding task has that line. A reminder still shown after its day
+  ended is found in the file as it is, before today's tidying erased its slot.
+
+### `capture.add(list, title)`: a task typed or spoken on the phone
+
+Written last in `list` (`rules.constants().LISTS`), as the plugin's quick entry puts it, on one line; in Now with
+today's date. A blank title answers `blank`. A title that is only a priority prefix (`p1`) is written as the task's
+text: the phone's capture writes what it was told, unlike the plugin's quick entry, which writes nothing for it.
 
 ### `settings.*`: `SettingsService`
 
@@ -125,7 +152,9 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
 level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
-`dayStartHours` (what Day starts at offers) and `googleClientReady` (Log in has a client id to go with).
+`dayStartHours` (what Day starts at offers), `googleClientReady` (Log in has a client id to go with), and
+`sectionOrder` and `markerOrder`: the sections' names and the line markers the screen edits, in its order (the words
+for each are the host's).
 
 A write answers the new `data.json` in `settings` (every key the plugin's settings do not name, such as a device's own,
 kept); a value the service refuses (a count that is no number of zero or more, a label tag of two words) answers none.
@@ -165,7 +194,13 @@ Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSl
 dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `open(spot, renaming?)`, `type(text)`,
 `setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`,
 `indent(1 | -1)`, `toggleSection()`, `enter()`, `blur()`, `escape()`, `choosePlace(placement)`, `moveToEnd(column)`,
-`placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column)`.
+`placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column, drawn?)`.
+
+`listEntry` answers what a list draws for the field: `{ place, pending, section, at }`, `at` where among the cards and
+sections the list is about to draw (`drawn`: `{ cards, sections }`, the look's when left out) the field stands:
+`{ kind: "top" }` before the first header, `{ kind: "in", section, card, keepsPlate }` in the section at that index
+before the card at that index (the section's end for a place outside its cards), its No tasks plate kept only when
+`keepsPlate`, or `{ kind: "end" }` after everything.
 
 **Writes are jobs.** Enter queues a job and opens the next field at once. The host runs the session's jobs one at a time,
 in order, each once its lists show every write before it:
@@ -209,7 +244,8 @@ What the plugin's UI calls itself, by the names in `contracts.ts`: `nextProgress
 `repeatParts`, `repeatDraft`, `editRepeat`, `samePlacement`, `keyId`, `sameLine`, `samePlace`, `sameTaskTree`,
 `fitLevel`, `gapOfPlace`, `levelRange`, `placeOfGap`, `shiftLevel`, `gapAt`, `groupPlaceOf`, `placeOfDrop`, `sameGap`,
 `listView`, `sectionChoice`, `cardDue`, `textParts`, `oneLine`, `sameLevels`, `labelTitle`, `sameLabels`,
-`isPresetColor`, `acceptsDrop`, `placesInGap`; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
+`isPresetColor`, `usableColor` (a colour a level or a label may be drawn in: a preset or `#RRGGBB`), `acceptsDrop`,
+`placesInGap`; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS` and `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
@@ -219,6 +255,12 @@ value the door does not offer.
 answers it in and the methods the host keeps (subscriptions, the clock, fetching and polling, binding a text field), or
 why the host owns it whole. `tests/application/PhoneCalls.test.ts` reads the interfaces from `contracts.ts` and fails on
 one the table misses.
+
+`listView`'s groups carry `menu`: what a section's header menu offers (`{ section, rename, remove }`), null for the
+tasks outside any section. A task's and the bulk menu's `remove` is null when Delete is not offered; the plugin's
+Open full screen and Open in Obsidian are its own rows, outside the model.
+
+`DOOR_COVERAGE`'s `own` names a space's methods beside its interface's: `calendars.files` and `calendars.meetings`.
 
 - `GoogleAccount` (`isLoggedIn`, `login`, `logout`): the login is a browser's consent and a token fetched over the network;
   the door makes no request.
@@ -231,12 +273,17 @@ one the table misses.
 
 The core reads the device's local time: a day, an hour and a slot are the clock's readings where the device is. The door's
 and the phone's answer tests run also under `TZ=Asia/Novosibirsk` and `TZ=America/New_York` (`vitest.config.mts`), and the
-core uses nothing of the locale (`Intl`, `localeCompare`, `toLocale…`: `tests/architecture.test.ts`).
+core uses nothing of the locale (`Intl`, `localeCompare`, `toLocale…`) nor reads a date from text the engine's own way
+(`Date.parse`, `new Date(text)`, `toString`, `toDateString`): a calendar file's times go through `isoMoment`
+(`src/domain/IsoMoment.ts`), field by field (`tests/architecture.test.ts`). `tests/application/PhoneDoor.daylight.test.ts`
+crosses New York's changes of the clocks (2026-03-08, 2026-11-01): a day ends at its next start by the clock.
 
 ## What the iOS app no longer needs of its own
 
 - `Vault.defaultTasksFile` and `Vault.tasksFile(in:)`: `tasksFile(settingsJson)` (a blank setting is no file, as in the plugin).
 - `CalendarExport.path` and `CalendarExport.text(...)`: `iphoneCalendarFile()` and `iphoneCalendarText(...)`.
   `CalendarExport.adds` compares parsed files and keeps working.
+- The old functions: `call` answers each (`reminders.*`, `capture.add`, `calendars.files`, `calendars.meetings`) with
+  error codes, strict JSON and the old calendar choice carried over.
 - `TaskCapture.oneLine`: `capture` writes the title on one line already; `oneLine` where the app shows it before.
 - `CaptureList`'s cases: `rules.constants().LISTS`, the lists `capture` takes.

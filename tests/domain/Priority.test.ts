@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hexColor, isBlankTitle, isPresetColor, type PriorityLevel, priorityOfText, priorityOfTitle, sameLevels, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
+import { hexColor, isBlankTitle, isPresetColor, type PriorityLevel, priorityOfText, priorityOfTitle, sameLevels, usableColor, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -66,6 +66,13 @@ describe("a priority prefix in a text", () => {
 		expect(withPriority("p1  x", null, PREFIXES)).toBe("x");
 		expect(withPriority("x", "p1", PREFIXES)).toBe("p1 x");
 		expect(withPriority("p3 x", null, PREFIXES)).toBe("p3 x");
+	});
+});
+
+describe("a colour a level may be drawn in", () => {
+	it("is a preset or a code as the settings write it", () => {
+		expect(["red", "#FF6A00"].map(usableColor)).toEqual([true, true]);
+		expect(["#ff6a00", "FF6A00", " #FF6A00", "purple", "#FFF", "red; x"].map(usableColor)).toEqual([false, false, false, false, false, false]);
 	});
 });
 

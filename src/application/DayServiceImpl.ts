@@ -2,11 +2,16 @@ import type { DayBoundary } from "../domain/DayBoundary";
 import { type DayRelation, dayRelation } from "../domain/Days";
 import { addDays } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
-import type { DayChange, DayService, TaskService } from "./contracts";
+import type { DayChange, DayOpening, DayService, TaskService } from "./contracts";
 import { boundaryOf } from "./documentText";
 import type { Clock, SettingsStore, Ticker } from "./ports";
 
 const MINUTE_MS = 60_000;
+
+/** Where `date`'s timeline opens: today on the now line, another day at `hour`. */
+export function dayOpening(date: LocalDate, boundary: DayBoundary, today: LocalDate, now: Date, hour: number): DayOpening {
+	return date === today ? { kind: "now", minute: boundary.offsetOf(date, now) } : { kind: "hour", minute: boundary.offsetOfHour(hour) };
+}
 
 type Listener = (change: DayChange) => void;
 
@@ -42,6 +47,10 @@ export class DayServiceImpl implements DayService {
 
 	step(date: LocalDate, days: number): LocalDate {
 		return addDays(date, days);
+	}
+
+	openAt(date: LocalDate): DayOpening {
+		return dayOpening(date, this.boundary(), this.today(), this.clock.now(), this.settings.get().scrollToHour);
 	}
 
 	onDayChange(listener: Listener, ready: () => boolean = () => true): () => void {

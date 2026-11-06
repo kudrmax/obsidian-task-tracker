@@ -1,4 +1,4 @@
-import { isPresetColor, type LabelLevel, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../application/contracts";
+import { isPresetColor, type LabelLevel, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel, usableColor } from "../application/contracts";
 import type { LabelPaint } from "./viewSettings";
 import type { Theme } from "./eventColors";
 
@@ -80,8 +80,6 @@ export const LABEL_SLOTS = [
 	{ attribute: "data-label3", fill: "--tc-label-fill-3" },
 ] as const;
 
-const usable = (color: string): color is PriorityColor => isPresetColor(color) || /^#[0-9A-F]{6}$/.test(color);
-
 const themed = (marked: string, theme: "dark" | "light"): string => (theme === "light" ? marked.split(", ").map((s) => `body.theme-light ${s}`).join(", ") : marked);
 
 /**
@@ -91,7 +89,7 @@ const themed = (marked: string, theme: "dark" | "light"): string => (theme === "
  */
 export function priorityRules(levels: readonly (PriorityLevel | LabelLevel)[]): string {
 	const colors = new Set<PriorityColor>(PRIORITY_COLORS);
-	for (const level of levels) if (usable(level.color)) colors.add(level.color);
+	for (const level of levels) if (usableColor(level.color)) colors.add(level.color);
 	const rules: string[] = [];
 	for (const color of colors) {
 		const marked = `[data-priority="${color}"], .tc-quick-row:has(> [data-priority="${color}"])`;

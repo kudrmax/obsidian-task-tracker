@@ -68,6 +68,10 @@ export class TaskList {
 	private entries: ListEntry[] = [];
 	private rendered: readonly ListGroup[] = [];
 	private nodes: HTMLElement[] = [];
+	/** Each empty section's No tasks plate drawn, by its name. */
+	private plates = new Map<GroupName, HTMLElement>();
+	/** Each section's cards as drawn, its subtasks' among them. */
+	private sectionCards = new Map<ListGroup, HTMLElement[]>();
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
@@ -96,6 +100,8 @@ export class TaskList {
 		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
 		this.nodes = [];
+		this.plates = new Map();
+		this.sectionCards = new Map();
 		this.rendered = view.groups;
 		this.withHeaders = view.showsHeaders;
 		const rows: { node: HTMLElement; level: number }[] = [];
@@ -137,6 +143,7 @@ export class TaskList {
 			if (group.empty && !platesField) this.nodes.push(this.plate(group));
 			const groupStart = this.entries.length;
 			for (const row of group.rows) add(row, group.name);
+			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
 			enterAtCard();
 		});
@@ -230,7 +237,12 @@ export class TaskList {
 
 	/** The No tasks plate of empty section `name`; null when none is drawn. */
 	plateOf(name: GroupName): HTMLElement | null {
-		return this.nodes.find((node) => node.classList.contains(PLATE) && node.dataset.group === name) ?? null;
+		return this.plates.get(name) ?? null;
+	}
+
+	/** The cards drawn in `group`, one of `groups`, its subtasks' among them. */
+	cardsOf(group: ListGroup): readonly HTMLElement[] {
+		return this.sectionCards.get(group) ?? [];
 	}
 
 	/** Headers, plates and cards in the order they stand. */
@@ -248,6 +260,7 @@ export class TaskList {
 	private plate(group: ListGroup): HTMLElement {
 		const plate = el(this.el, "div", PLATE, "No tasks");
 		plate.dataset.group = group.name ?? "";
+		this.plates.set(group.name, plate);
 		this.deps.onPlate?.(plate, group);
 		return plate;
 	}

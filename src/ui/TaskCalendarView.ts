@@ -188,7 +188,7 @@ export class TaskCalendarView extends ItemView {
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
 			day: () => this.selectedDate,
-			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx),
+			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx, LAYOUT.snapTolerance),
 			timeline: () => this.timeline,
 			targets: (drag) => [...this.bulk.targets(drag), ...this.shownDrops()],
 			pick: (_item, card, e, how) => {
@@ -360,7 +360,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		el(root, "div", "tc-fade");
 		this.timelineDrop = new TimelineDrop(this.timeline, {
-			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx),
+			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx, LAYOUT.snapTolerance),
 			span: (item, from, start) => this.deps.tasks.dropSpan(item, from, start),
 			newSlot: (start) => this.deps.tasks.newSlot(this.selectedDate, start),
 		});
@@ -890,12 +890,13 @@ export class TaskCalendarView extends ItemView {
 
 	/** A section's menu, with what the group may be given; none for a group that may be given nothing (No section). */
 	private showGroupMenu(head: HTMLElement, list: GroupedList, group: ListGroup): void {
-		const name = group.name;
-		if (name === null || !(group.can.rename || group.can.remove)) return;
+		const menu = group.menu;
+		if (!menu || !(menu.rename || menu.remove)) return;
+		const name = menu.section;
 		GroupMenu.open(head, {
 			name,
-			onRename: group.can.rename ? () => this.renameInPlace(head, list, name) : undefined,
-			onRemove: group.can.remove ? () => void this.act(() => this.deps.tasks.removeGroup(list, name)) : undefined,
+			onRename: menu.rename ? () => this.renameInPlace(head, list, name) : undefined,
+			onRemove: menu.remove ? () => void this.act(() => this.deps.tasks.removeGroup(list, name)) : undefined,
 		});
 	}
 
@@ -1133,11 +1134,10 @@ export class TaskCalendarView extends ItemView {
 		this.timeline.holdScroll(at.scroll + this.timeline.el.getBoundingClientRect().top - at.top);
 	}
 
-	/** Today opens on the now line, another day at the hour the settings name. */
+	/** The timeline opens where the day service says: on the now line, held at its fraction of the height, or at an hour, at the top. */
 	private scrollToOpen(timeline: Timeline, date: LocalDate): void {
-		const boundary = this.boundary();
-		if (this.deps.days.relation(date) === "today") timeline.scrollTo(boundary.offsetOf(date, this.deps.clock.now()), LAYOUT.nowFraction);
-		else timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
+		const open = this.deps.days.openAt(date);
+		timeline.scrollTo(open.minute, open.kind === "now" ? LAYOUT.nowFraction : 0);
 	}
 
 	private renderMissing(root: HTMLElement): void {

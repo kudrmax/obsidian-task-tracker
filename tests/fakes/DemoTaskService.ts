@@ -397,8 +397,8 @@ export class DemoTaskService implements TaskService {
 
 	async toggleCollapsed(): Promise<void> {}
 
-	snap(minute: number, hourPx: number): number {
-		return snapMinute(minute, hourPx);
+	snap(minute: number, hourPx: number, tolerancePx: number): number {
+		return snapMinute(minute, hourPx, tolerancePx);
 	}
 
 	async unfoldAbove(): Promise<void> {}

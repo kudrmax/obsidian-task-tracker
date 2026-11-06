@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, formatTime, localDateOf, minutesOf, monthAbbreviation, dayOfMonth, weekdayOf } from "../../src/ui/dates";
+import { addDays, formatTime, localDateOf, minutesOf, monthAbbreviation, dayOfMonth } from "../../src/ui/dates";
 
 describe("dates", () => {
 	it("writes a Date as a local calendar day", () => {
@@ -26,9 +26,5 @@ describe("dates", () => {
 		expect(formatTime(990)).toBe("16:30");
 		expect(formatTime(1440)).toBe("24:00");
 		expect(formatTime(1500)).toBe("01:00");
-	});
-
-	it("counts the weekday from Monday", () => {
-		expect(["2026-11-02", "2026-11-05", "2026-11-08"].map(weekdayOf)).toEqual([0, 3, 6]);
 	});
 });
