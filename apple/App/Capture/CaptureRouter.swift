@@ -5,7 +5,7 @@ enum AppTab: Hashable {
     case newTask, settings
 }
 
-/// Which tab is shown, and a new task asked for from outside the app: the lock screen widget, a control, Siri.
+/// Which tab is shown, and a new task asked for from outside the app: the app icon (the app comes back on New Task), the lock screen widget, a control, Siri.
 @MainActor
 @Observable
 final class CaptureRouter {
