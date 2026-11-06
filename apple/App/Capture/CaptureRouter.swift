@@ -1,11 +1,6 @@
 import Foundation
 
-/// The app's two tabs.
-enum AppTab: Hashable {
-    case newTask, settings
-}
-
-/// Which tab is shown, and a new task asked for from outside the app: the app icon (the app comes back on New Task), the lock screen widget, a control, Siri.
+/// A new task asked for: the plus beside the tab bar, the lock screen widget, a control, Siri. It opens over the main screen.
 @MainActor
 @Observable
 final class CaptureRouter {
@@ -13,10 +8,10 @@ final class CaptureRouter {
     /// What the lock screen widget opens.
     static let url = URL(string: "taskcalendar://new-task")!
 
-    var tab = AppTab.newTask
+    var capturing = false
 
     func open() {
-        tab = .newTask
+        capturing = true
     }
 
     func open(_ url: URL) {

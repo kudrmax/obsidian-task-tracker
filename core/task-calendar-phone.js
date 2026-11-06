@@ -2357,6 +2357,167 @@ ${key.title}`.toLowerCase();
     return date === null && !repeats ? null : { date, repeats };
   }
 
+  // core/application/dayLabels.ts
+  var WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var WORDS = { today: "Today", tomorrow: "Tomorrow", yesterday: "Yesterday" };
+  function dayTitle(date, relation, today) {
+    if (relation !== "other") return WORDS[relation];
+    const { year, month, day } = partsOf(date);
+    const base = `${WEEKDAYS[weekdayOf(date)]}, ${day} ${MONTHS[month - 1]}`;
+    return year === partsOf(today).year ? base : `${base} ${year}`;
+  }
+  function dueLabel(date) {
+    const { month, day } = partsOf(date);
+    return { day: String(day), month: MONTHS[month - 1].toUpperCase() };
+  }
+
+  // core/application/eventLevels.ts
+  function eventLevels(spans) {
+    const order = spans.map((span, index) => ({ span, index })).sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
+    const levels = new Array(spans.length);
+    const placed = [];
+    for (const { span, index } of order) {
+      const under = placed.filter((p) => p.start <= span.start && span.start < p.end).pop();
+      const level = under ? under.level + 1 : 0;
+      levels[index] = { level, layer: placed.length };
+      placed.push({ ...span, level });
+    }
+    return levels;
+  }
+
+  // core/application/timelineStack.ts
+  var MINUTES_PER_HOUR = 60;
+  var STACK_SLACK = 0.5;
+  function overlayLeft(level, insets) {
+    return level === 0 ? insets.itemInset : level * insets.overlayInset;
+  }
+  function eventLeft(level, insets) {
+    return overlayLeft(level.level, insets);
+  }
+  function stackTasks(tasks, events, hourPx, card, insets) {
+    const head = card.height;
+    const y = (minutes) => minutes / MINUTES_PER_HOUR * hourPx;
+    const eventsUnder = (top, bottom) => events.filter((e) => top < y(e.end) && bottom > y(e.start));
+    const order = tasks.map((task, index) => ({ task, index })).sort((a, b) => a.task.start - b.task.start || a.index - b.index);
+    const boxes = new Array(tasks.length);
+    const bodies = [];
+    let previous = null;
+    let headBottom = -Infinity;
+    for (const { task, index } of order) {
+      const natural = y(task.start) + insets.itemInset;
+      const top = Math.max(natural, headBottom + card.gap);
+      const height = task.end === null ? head : Math.max(head, y(task.end) - insets.itemInset - top);
+      headBottom = top + head;
+      const parent = bodies.filter((b) => top < b.bottom && top + head > b.top).pop();
+      const under = eventsUnder(top, top + height);
+      const overlay = !!parent || under.length > 0;
+      const eventLeft2 = under.length ? overlayLeft(Math.max(...under.map((e) => e.level)) + 1, insets) : insets.itemInset;
+      const left = Math.max(parent ? parent.left + insets.overlayInset : insets.itemInset, eventLeft2);
+      if (height > head) bodies.push({ top: top + head, bottom: top + height, left });
+      const stacked = top - natural > STACK_SLACK;
+      if (stacked && previous) previous.stacked = true;
+      const hiddenDuration = task.end !== null && y(task.end - task.start) - insets.itemGap < head;
+      previous = boxes[index] = { top, height, left, overlay, stacked, hiddenDuration };
+    }
+    return boxes;
+  }
+  function durationParts(minutes) {
+    if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];
+    const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+    const rest = minutes % MINUTES_PER_HOUR;
+    return [rest ? `${hours}:${pad(rest)}` : String(hours), "H"];
+  }
+  function timeParts(minutes) {
+    return [String(Math.floor(minutes / MINUTES_PER_HOUR)), pad(minutes % MINUTES_PER_HOUR)];
+  }
+  function pad(n) {
+    return String(n).padStart(2, "0");
+  }
+  function stackCorner(box, slotStart, span) {
+    if (box.stacked) return timeParts(slotStart);
+    if (box.hiddenDuration && span.end !== null) return durationParts(span.end - span.start);
+    return null;
+  }
+
+  // core/application/paints.ts
+  var PRESET_INK = {
+    red: { dark: "#FF453A", light: "#FF3B30" },
+    orange: { dark: "#FF9F0A", light: "#FF9500" },
+    yellow: { dark: "#FFD60A", light: "#FFCC00" },
+    green: { dark: "#30D158", light: "#34C759" },
+    teal: { dark: "#40C8E0", light: "#30B0C7" },
+    blue: { dark: "#0A84FF", light: "#007AFF" }
+  };
+  var THEMES = {
+    dark: { card: [28, 28, 30], share: 0.26, pole: [255, 255, 255] },
+    light: { card: [242, 242, 247], share: 0.16, pole: [0, 0, 0] }
+  };
+  var GREY = [142, 142, 147];
+  var META_GREY_SHARE = 0.5;
+  var SEARCH_STEPS = 24;
+  var rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  var hexOf = (c) => `#${c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+  var mix = (a, b, share) => a.map((v, i) => v + (b[i] - v) * share);
+  var linear = (v) => v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4;
+  var luminance = ([r, g, b]) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+  function contrast(a, b) {
+    const [high, low] = [luminance(rgbOf(a)), luminance(rgbOf(b))].sort((x, y) => y - x);
+    return (high + 0.05) / (low + 0.05);
+  }
+  function inkOf(color, theme) {
+    return isPresetColor(color) ? PRESET_INK[color][theme] : color;
+  }
+  function shadesOf(color, theme) {
+    const { card, share, pole } = THEMES[theme];
+    const ink = rgbOf(inkOf(color, theme));
+    const fill = hexOf(mix(card, ink, share));
+    const target = contrast(hexOf(GREY), hexOf(card));
+    const half = mix(ink, GREY, META_GREY_SHARE);
+    let [low, high] = [0, 1];
+    for (let step = 0; step < SEARCH_STEPS; step++) {
+      const mid = (low + high) / 2;
+      if (contrast(hexOf(mix(half, pole, mid)), fill) < target) low = mid;
+      else high = mid;
+    }
+    return { ink: hexOf(ink), fill, meta: hexOf(mix(half, pole, high)) };
+  }
+  var EVENT_BG_ALPHA = 0.22;
+  var WORK_BG_ALPHA = 0.24;
+  var TEXT_MIX = 0.5;
+  var WHITE = 255;
+  var LIGHT_BRIGHT_LUMINANCE = 0.33;
+  var LIGHT_BG_ALPHA = { deep: 0.13, bright: 0.16 };
+  var LIGHT_TEXT_SCALE = { deep: 0.72, bright: 0.6 };
+  function channels(hex) {
+    const h = hex.replace("#", "");
+    const full = h.length === 3 ? [...h].map((c) => c + c).join("") : h;
+    return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  }
+  var toHex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+  var gammaLinear = (v) => Math.pow(v / WHITE, 2.2);
+  var gammaLuminance = ([r, g, b]) => 0.2126 * gammaLinear(r) + 0.7152 * gammaLinear(g) + 0.0722 * gammaLinear(b);
+  var SOURCE_COLORS = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
+  function eventHex(event) {
+    return event.color ?? SOURCE_COLORS[event.source];
+  }
+  function bgAlphaFor(source) {
+    return source === "work" ? WORK_BG_ALPHA : EVENT_BG_ALPHA;
+  }
+  function eventColors(hex, bgAlpha = EVENT_BG_ALPHA, theme = "dark") {
+    const rgb = channels(hex);
+    const [r, g, b] = rgb;
+    if (theme === "light") {
+      const kind = gammaLuminance(rgb) < LIGHT_BRIGHT_LUMINANCE ? "deep" : "bright";
+      return { bg: `rgba(${r}, ${g}, ${b}, ${LIGHT_BG_ALPHA[kind]})`, bar: toHex(rgb), text: toHex(rgb.map((v) => v * LIGHT_TEXT_SCALE[kind])) };
+    }
+    return {
+      bg: `rgba(${r}, ${g}, ${b}, ${bgAlpha})`,
+      bar: toHex(rgb),
+      text: toHex(rgb.map((v) => v + (WHITE - v) * TEXT_MIX))
+    };
+  }
+
   // core/application/taskKeys.ts
   function samePlace2(a, b) {
     return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
@@ -4864,10 +5025,10 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/snapGrid.ts
-  var MINUTES_PER_HOUR = 60;
+  var MINUTES_PER_HOUR2 = 60;
   var SNAP_STEPS = [5, 15, 30, 60];
   function snapStep(hourPx, tolerance) {
-    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR2 * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
   }
   function snapMinute(minute, hourPx, tolerance) {
     const step = snapStep(hourPx, tolerance);
@@ -5269,9 +5430,24 @@ ${key.title}`.toLowerCase();
     isPresetColor,
     usableColor,
     acceptsDrop,
-    placesInGap
+    placesInGap,
+    shadesOf,
+    inkOf,
+    contrast,
+    eventHex,
+    bgAlphaFor,
+    eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
+    dayTitle,
+    dueLabel,
+    eventLevels,
+    stackTasks,
+    overlayLeft,
+    eventLeft,
+    stackCorner,
+    timeParts,
+    durationParts
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, LISTS: GROUPED_LISTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
   function lookOf(c, look) {
     return {
       cards: (column) => look.cards[column] ?? [],

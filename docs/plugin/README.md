@@ -103,6 +103,7 @@
 
 - [Рабочий календарь на iPhone](work-calendar.md) — Scriptable, команда `Export Work Calendar`, автоматизации, проверка.
 - [Напоминания на iPhone](notifications.md) — приложение Tasks для iPhone: установка, автоматизация, проверка.
+- [Приложение Tasks на iPhone](app.md) — тот же экран, что в плагине: Inbox, Soon и Today в таб-баре, меню задачи, день и повтор, поиск, выбор нескольких задач, настройки.
 - [Быстрый ввод с iPhone](capture.md) — задача текстом или голосом в Inbox, Now, Soon или Backlog: кнопка на экране блокировки, Siri, кнопка действия, проверка.
 - [Google Calendar](../../README.md#google-calendar) — проект в Google Cloud, вход, как не дать входу протухнуть.
 

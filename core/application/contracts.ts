@@ -72,6 +72,14 @@ export type { Clock } from "./ports";
 export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
 export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel, usableColor } from "../domain/Priority";
 export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placement, TaskDraft, TaskScreen };
+/** How a level's or a label's colour paints a card, and a calendar's an event, in either theme: every frontend draws the same shades. */
+export { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, type EventColors, eventHex, inkOf, type PriorityShades, shadesOf, type Theme } from "./paints";
+/** A day as the screens name it (`Today`, `Tue, 3 Nov`), and a due date as a card's corner writes it. */
+export { dayTitle, type DueLabel, dueLabel } from "./dayLabels";
+/** How deep each event of a day lies over the others on the timeline. */
+export { type EventLevel, eventLevels, type EventSpan } from "./eventLevels";
+/** The stack of task cards on the timeline: tasks never share the width, each on its time or one gap under the card before. */
+export { durationParts, eventLeft, type LevelledSpan, overlayLeft, stackCorner, timeParts, type StackBox, type StackCard, stackTasks, type TaskSpan, type TimelineInsets } from "./timelineStack";
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the
