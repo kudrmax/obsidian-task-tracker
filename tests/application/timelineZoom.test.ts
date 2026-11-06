@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "../../core/application/timelineZoom";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "../../core/application/timelineZoom";
 
 const MEASURES = { divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16 };
 
@@ -135,5 +135,17 @@ describe("zoomShown", () => {
 
 	it("opens at the default zoom when nothing that reads was saved", () => {
 		for (const saved of [null, undefined, 0, -5, Number.NaN, "x"]) expect(zoomShown(saved, 30, levels)).toBe(DEFAULT_ZOOM_HOUR);
+	});
+});
+
+describe("labelHidesNearNow", () => {
+	it("hides a label closer to the now pill than its lift and half the pill", () => {
+		expect(labelHidesNearNow(100, 110, 6, 18)).toBe(true);
+		expect(labelHidesNearNow(100, 115, 6, 18)).toBe(false);
+		expect(labelHidesNearNow(120, 105, 6, 18)).toBe(false);
+	});
+
+	it("hides nothing on a day with no now line", () => {
+		expect(labelHidesNearNow(100, null, 6, 18)).toBe(false);
 	});
 });

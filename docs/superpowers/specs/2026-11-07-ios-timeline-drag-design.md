@@ -249,3 +249,14 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   keystroke (the door leaves the debounce to the host), search reads 150 ms after the last keystroke, `Vault`'s settle
   wait for another app's write, the recorder's meter timer.
 
+- backend (round 2): the list drop's finger rules are in the core, `core/application/listDrop.ts`: `rules.levelAt(x, { left,
+  width }, indent)`, `rules.carriedMiddle(y, grabPx, cardHeight)` and the plugin's whole `placeAt` (gap by the cards'
+  middles, headers, the open room's shift and the hysteresis), moved as it is so the plugin keeps its behaviour exactly;
+  `obsidian/ui/drag/listPlace.ts` is now a copy and should become a re-export of `placeAt`/`PlacedCard`/`PlacedHead` from
+  contracts (frontend-obsidian), with `ListDrop.levelAt`/`cardY` calling the core's.
+- backend (round 2): branch lines answer `{ last, through }`, richer than mid/last: `rules.branchOf(levels, index)` is the
+  plugin's `linesOf` (a row's), `rules.gapBranch(cards, gap)` the open gap's as a row of its level before `cards[gap.index]`;
+  `null` at level 0. `last: false` is the Swift `.mid`. The plugin's `TaskList.linesOf` and Swift's `BoardSnapshot.branch`
+  / `TaskFullScreen.branch` / `ListColumn`'s gap branch can all switch to them.
+- backend (round 2): `rules.labelHidesNearNow(y, nowY, lift, pillHeight)` in `timelineZoom.ts`; `nowY` `null` stands for
+  a day that is not today, so the host doesn't decide that part either.

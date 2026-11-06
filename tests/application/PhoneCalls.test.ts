@@ -514,6 +514,12 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.gridMarks", { labels: 30, lines: 15 }, 2),
 		plain("rules.zoomAfterPinch", 25, 30, [{ hourPx: 28 }, { hourPx: 56 }]),
 		plain("rules.zoomShown", "wholeDay", null, [{ hourPx: 28 }, { hourPx: 56 }]),
+		plain("rules.labelHidesNearNow", 100, 110, 6, 18),
+		plain("rules.levelAt", 227, { left: 100, width: 200 }, 18),
+		plain("rules.carriedMiddle", 300, 10, 35),
+		plain("rules.placeAt", [{ level: 0, group: null, top: 0, height: 35 }, { level: 1, group: null, top: 37, height: 35 }], 60, 1.4, 0, null, [], { kind: "gap", index: 1, level: 1, group: null }, 6),
+		plain("rules.branchOf", [0, 1, 1], 1),
+		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("timeline.zoomLevels"),
 		...[
 			["openAtEnd", "soon"],

@@ -274,7 +274,19 @@ moves between at this screen's height, the whole day first), `gridAt(hourPx, mea
 `"wholeDay"` at or under the whole day's height, else `hourPx`; save it as the device's zoom), `zoomShown(saved,
 wholeDayPx, levels)` (the hour height a saved zoom opens at: `"wholeDay"` → the whole day's height, a number kept
 between the whole day and the largest level, anything else `DEFAULT_ZOOM_HOUR` kept the same way). In both
-`wholeDayPx` is `null` while the timeline has no height yet: the smallest level stands for the whole day; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
+`wholeDayPx` is `null` while the timeline has no height yet: the smallest level stands for the whole day;
+`labelHidesNearNow(y, nowY, lift, pillHeight)` (whether a grid label at `y` hides under the now pill: closer than its
+`lift` and half the pill; `nowY` `null` on a day with no now line; the lifts and the pill's height are the frontend's);
+a drop in a list: `levelAt(x, { left, width }, indent)` (the fractional level the finger's `x` asks for: 0 at the list's
+middle, one more per `indent` right of it, below zero left of it), `carriedMiddle(y, grabPx, cardHeight)` (where a
+carried card's middle stands: a card is placed by it, a new task by the finger's `y`), `placeAt(cards, y, level, shift,
+room, heads, held, hysteresis)` (the `GapPlace` under the finger: `cards` `[{ level, group, top, height }]` as they stand
+without the lifted ones, `shift` how far the open gap `room` pushes the cards after it, `heads` the section headers
+`[{ group, firstCard, top, height }]`, `held` the place shown now and `hysteresis` how far past its edge the finger must go
+to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`); the branch lines: `branchOf(levels, index)`
+(the row's `{ last, through }`: `last` its line bends in, `through[k]` the line of level `k + 1` goes on past it; `null`
+for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of its level before `cards[gap.index]`);
+`constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.

@@ -103,3 +103,8 @@ export function zoomShown(saved: unknown, wholeDayPx: number | null, levels: rea
 	const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
 	return Math.min(max, Math.max(min, hourPx));
 }
+
+/** Whether a grid label at `y` hides under the now pill at `nowY` (null on a day with no now line): closer than its lift and half the pill. */
+export function labelHidesNearNow(y: number, nowY: number | null, lift: number, pillHeight: number): boolean {
+	return nowY !== null && Math.abs(y - nowY) < lift + pillHeight / 2;
+}

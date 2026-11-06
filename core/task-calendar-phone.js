@@ -2585,6 +2585,9 @@ ${key.title}`.toLowerCase();
     const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
     return Math.min(max, Math.max(min, hourPx));
   }
+  function labelHidesNearNow(y, nowY, lift, pillHeight) {
+    return nowY !== null && Math.abs(y - nowY) < lift + pillHeight / 2;
+  }
 
   // core/application/taskKeys.ts
   function samePlace2(a, b) {
@@ -3244,6 +3247,43 @@ ${key.title}`.toLowerCase();
     const list = first?.list;
     if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
     return { names: offer.lists[list], current: first.group, ungrouped: offer.ungrouped };
+  }
+
+  // core/application/listDrop.ts
+  function levelAt(x, list, indent) {
+    return indent > 0 ? (x - (list.left + list.width / 2)) / indent : 0;
+  }
+  function carriedMiddle(y, grabPx, cardHeight) {
+    return y - grabPx + cardHeight / 2;
+  }
+  function orderOf(heads, group) {
+    return heads.findIndex((h) => h.group === group);
+  }
+  function placeAt(cards, y, level, shift, room, heads = [], held = null, hysteresis = 0) {
+    const at = (finger) => rawPlaceAt(cards, finger, level, shift, room, heads);
+    const place = at(y);
+    if (!held || hysteresis <= 0 || sameGap(place, held)) return place;
+    if (!sameGap(at(y - hysteresis), held) && !sameGap(at(y + hysteresis), held)) return place;
+    return fitLevel(cards, { ...held, level: Math.round(level) });
+  }
+  function rawPlaceAt(cards, y, level, shift, gap, heads) {
+    const top = (i) => cards[i].top + (gap && i >= gap.index ? shift : 0);
+    const headAfterGap = (h) => gap !== null && (h.firstCard > gap.index || h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, gap.group));
+    const headEdge = (h, i) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
+    const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
+    const passed = heads.filter((head, i) => head.firstCard === index && y > headEdge(head, i)).map((head) => head.group);
+    return gapAt(cards, index, level, passed, heads.length > 0);
+  }
+  function branchOf(levels, index) {
+    const level = levels[index];
+    if (level <= 0) return null;
+    const goesOn = (l) => levels.slice(index + 1).find((next) => next <= l) === l;
+    return { last: !goesOn(level), through: Array.from({ length: level - 1 }, (_, k) => goesOn(k + 1)) };
+  }
+  function gapBranch(cards, gap) {
+    const levels = cards.map((card) => card.level);
+    levels.splice(gap.index, 0, gap.level);
+    return branchOf(levels, gap.index);
   }
 
   // core/application/drops.ts
@@ -5521,7 +5561,13 @@ ${key.title}`.toLowerCase();
     gridAt,
     gridMarks,
     zoomAfterPinch: (hourPx, wholeDayPx, levels) => zoomAfterPinch(hourPx, wholeDayPx ?? null, levels),
-    zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels)
+    zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels),
+    labelHidesNearNow: (y, nowY, lift, pillHeight) => labelHidesNearNow(y, nowY ?? null, lift, pillHeight),
+    levelAt,
+    carriedMiddle,
+    placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
+    branchOf,
+    gapBranch
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
   var TIMELINE = {
