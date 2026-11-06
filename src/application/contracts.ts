@@ -473,7 +473,7 @@ export interface UndoService {
 	onChange(listener: () => void): () => void;
 }
 
-export type CalendarSource = "google" | "work";
+export type CalendarSource = "google" | "iphone" | "work";
 
 export interface CalendarEvent {
 	readonly id: string;
@@ -485,6 +485,10 @@ export interface CalendarEvent {
 	/** `#RRGGBB`. The source supplies one; a source without colors falls back to a per-calendar default. */
 	readonly color: string;
 	readonly source: CalendarSource;
+	/** The calendar's account as its writer knows it (an email for Google and Exchange); null when the writer does not say. */
+	readonly account: string | null;
+	/** The writer's own id of the calendar (Google's calendar id, iOS's calendarIdentifier); null when it does not say. */
+	readonly calendarId: string | null;
 }
 
 /** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */
@@ -507,6 +511,16 @@ export interface SourceStatus {
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
 	readonly statuses: readonly SourceStatus[];
+	/** A calendar shown on the day comes from a file no longer fresh: the orange dot, Refresh now would help. */
+	readonly stale: boolean;
+}
+
+/** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */
+export interface ShownCalendar {
+	readonly account: string;
+	readonly title: string;
+	readonly color: string | null;
+	readonly shown: boolean;
 }
 
 /**
@@ -534,6 +548,9 @@ export interface CalendarService {
 	onChange(listener: () => void): () => void;
 	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */
 	keepFresh(screen: PolledScreen): CalendarPoll;
+	/** Every calendar the files list, Google's first, each once. A new one is shown. */
+	known(): Promise<readonly ShownCalendar[]>;
+	setShown(account: string, title: string, shown: boolean): Promise<void>;
 }
 
 /** What the polling asks of the screen. */

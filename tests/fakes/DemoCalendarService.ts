@@ -38,7 +38,7 @@ export class DemoCalendarService implements CalendarService {
 
 	private async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const events: CalendarEvent[] = date === DEMO_DATE
-			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source }))
+			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source, account: null, calendarId: null }))
 			: [];
 		const count = (source: CalendarSource) => `${events.filter((e) => e.source === source).length} events`;
 		const result: DayEvents = {
@@ -47,12 +47,19 @@ export class DemoCalendarService implements CalendarService {
 				{ source: "google", kind: "synced", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
 				{ source: "work", kind: "exported", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
+			stale: true,
 		};
 		this.last.set(date, result);
 		return result;
 	}
 
 	/** Every day's events come at once, the board's day only has any; a peek at a day shown before takes them as they were. */
+	async known() {
+		return [];
+	}
+
+	async setShown(): Promise<void> {}
+
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
 		const cached = this.last.get(date) ?? null;
 		return { cached, fresh: reason === "peek" && cached ? null : () => this.eventsOn(date) };

@@ -11,6 +11,8 @@ const event: CalendarEvent = {
 	calendar: "Авито",
 	color: "#FFE29A",
 	source: "work",
+	account: null,
+	calendarId: null,
 };
 
 describe("Apple's Calendar at an event", () => {

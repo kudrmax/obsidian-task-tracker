@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from "vitest";
 import type { App, Plugin } from "obsidian";
-import type { GoogleAccount, WorkCalendarSetup } from "../../src/application/contracts";
+import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../src/application/contracts";
 import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS, sharedOf, type SharedSettings } from "../../src/settings";
@@ -59,6 +59,19 @@ const loggedOut: GoogleAccount = {
 };
 const work: WorkCalendarSetup = { scriptableLoader: () => "loader", export: () => undefined };
 
+/** The calendars the files list, and what the tab asked to show or hide. */
+class KnownCalendars implements Pick<CalendarService, "known" | "setShown"> {
+	readonly asked: [string, string, boolean][] = [];
+	list: ShownCalendar[] = [];
+	async known(): Promise<readonly ShownCalendar[]> {
+		return this.list;
+	}
+	async setShown(account: string, title: string, shown: boolean): Promise<void> {
+		this.asked.push([account, title, shown]);
+	}
+}
+let calendars: KnownCalendars;
+
 let disk: Disk;
 let settings: PluginSettings;
 let tab: TaskCalendarSettingsTab;
@@ -72,7 +85,7 @@ async function open(file: unknown = START, google: GoogleAccount = loggedOut): P
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars });
 	tab.display();
 }
 
@@ -137,6 +150,7 @@ async function rejects(change: () => void): Promise<void> {
 
 beforeEach(async () => {
 	document.body.className = "";
+	calendars = new KnownCalendars();
 	await open();
 });
 
@@ -360,12 +374,63 @@ describe("the settings tab: the calendar sources", () => {
 		await writes(() => type(input("Refresh interval"), "0"), { google: { ...START.google, refreshSeconds: 0 } });
 	});
 
-	it("writes the work calendar's path as typed and its calendars split at the commas", async () => {
+	it("writes the work calendar's path as typed", async () => {
 		await writes(() => type(input("File path"), "cal.json"), { workCalendarFile: "cal.json" });
-		await writes(() => type(input("Calendar titles"), " Work ,, Team ,"), { workCalendarFile: "cal.json", workCalendarTitles: ["Work", "Team"] });
-		await open({ ...START, workCalendarTitles: ["A", "B"] });
+	});
+
+	it("no longer asks for titles to take from the work file", () => {
+		expect(rows("Calendar titles")).toEqual([]);
+	});
+});
+
+describe("the settings tab: the calendars shown", () => {
+	it("lists every known calendar under its account on the Calendars page, with a toggle that hides it", async () => {
+		calendars.list = [
+			{ account: "max@gmail.com", title: "Personal", color: null, shown: true },
+			{ account: "max@company.ru", title: "Календарь", color: null, shown: false },
+		];
+		await open();
+		await settled();
+		expect(rows("Personal")).toHaveLength(0);
 		page("Calendars");
-		expect(input("Calendar titles").value).toBe("A, B");
+		await settled();
+		expect(rows("Calendars shown")).toHaveLength(1);
+		expect(rows("max@gmail.com")).toHaveLength(1);
+		expect(rows("max@company.ru")).toHaveLength(1);
+		const personal = rows("Personal")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+		expect(personal.checked).toBe(true);
+		expect(rows("Календарь")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!.checked).toBe(false);
+		personal.checked = false;
+		personal.dispatchEvent(new Event("change"));
+		await settled();
+		expect(calendars.asked).toEqual([["max@gmail.com", "Personal", false]]);
+	});
+
+	it("names a calendar under the iPhone heading without repeating iPhone", async () => {
+		calendars.list = [{ account: "", title: "iPhone · Календарь", color: null, shown: true }];
+		await open();
+		page("Calendars");
+		await settled();
+		expect(rows("iPhone")).toHaveLength(1);
+		expect(rows("Календарь")).toHaveLength(1);
+	});
+
+	it("lays the calendars out as rows of the page, so the next heading keeps its space", async () => {
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		await open();
+		page("Calendars");
+		await settled();
+		expect(rows("Календарь")[0].parentElement).toBe(rows("Google Calendar")[0].parentElement);
+		expect(rows("Calendars shown")[0].nextElementSibling).toBe(rows("max@company.ru")[0]);
+		expect(rows("Календарь")[0].nextElementSibling).toBe(rows("Google Calendar")[0]);
+	});
+
+	it("shows the calendars whether or not Google is logged in", async () => {
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		await open();
+		page("Calendars");
+		await settled();
+		expect(rows("Календарь")).toHaveLength(1);
 	});
 });
 
@@ -389,7 +454,7 @@ describe("the settings tab: the order", () => {
 		expect(rows("Client id")).toHaveLength(0);
 	});
 
-	it("shows the account and its calendars on the Calendars page only, and draws the page anew on logging out", async () => {
+	it("draws the Calendars page anew on logging out", async () => {
 		let loggedIn = true;
 		const google: GoogleAccount = {
 			...loggedOut,
@@ -397,18 +462,13 @@ describe("the settings tab: the order", () => {
 			logout: async () => {
 				loggedIn = false;
 			},
-			listCalendars: async () => [{ id: "a", title: "Timetable", color: "#3366ff" }, { id: "b", title: "Deadlines", color: "#ff3300" }],
 		};
 		await open(START, google);
-		await settled();
-		expect(rows("Timetable")).toHaveLength(0);
 		page("Calendars");
 		await settled();
-		expect(rows("Shown calendars")).toHaveLength(1);
-		expect(rows("Timetable")).toHaveLength(1);
+		expect(rows("Account")[0].querySelector(".setting-item-description")!.textContent).toContain("Logged in");
 		rows("Account")[0].querySelector<HTMLElement>("button")!.click();
 		await settled();
-		expect(rows("Timetable")).toHaveLength(0);
 		expect(rows("Account")[0].querySelector(".setting-item-description")!.textContent).toContain("Not logged in");
 	});
 

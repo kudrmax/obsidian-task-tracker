@@ -34,7 +34,7 @@ const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 /** No sections to offer: no file, or nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
-const NO_EVENTS: DayEvents = { events: [], statuses: [] };
+const NO_EVENTS: DayEvents = { events: [], statuses: [], stale: false };
 
 const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: true } as const;
 
@@ -106,6 +106,11 @@ export class DayData {
 		return this.missing ? [] : this.dayEvents.statuses;
 	}
 
+	/** A calendar shown on the day comes from a file no longer fresh: the switch's dot. */
+	get stale(): boolean {
+		return !this.missing && this.dayEvents.stale;
+	}
+
 	/**
 	 * The view opens: resolves once the tasks are read, with the events last fetched for the day. The fresh events are
 	 * fetched in the background and redraw when they come: the phone keeps Obsidian's splash until the view has opened.
@@ -132,7 +137,7 @@ export class DayData {
 
 	/** Another day is selected: its tasks, the events last fetched for it until the fresh ones come. */
 	selectDay(): Promise<void> {
-		this.showCached({ events: [], statuses: this.dayEvents.statuses });
+		this.showCached({ events: [], statuses: this.dayEvents.statuses, stale: this.dayEvents.stale });
 		return this.fetchBoth();
 	}
 
@@ -175,6 +180,6 @@ export class DayData {
 	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; a missing file shows none. */
 	private drawnOf(part: DayPart): string {
 		if (part === "tasks") return JSON.stringify(this.state);
-		return JSON.stringify([this.missing, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale)]);
+		return JSON.stringify([this.missing, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale), this.dayEvents.stale]);
 	}
 }

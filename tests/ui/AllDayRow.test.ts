@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../../src/application/contracts";
 import { renderAllDayRows } from "../../src/ui/AllDayRow";
 
-const day = (date: number): CalendarEvent => ({ id: String(date), title: "Trip", start: new Date(2026, 9, date), end: new Date(2026, 9, date + 1), allDay: true, calendar: "Home", color: "#FF9F0A", source: "google" });
+const day = (date: number): CalendarEvent => ({ id: String(date), title: "Trip", start: new Date(2026, 9, date), end: new Date(2026, 9, date + 1), allDay: true, calendar: "Home", color: "#FF9F0A", source: "google", account: null, calendarId: null });
 
 describe("all-day rows", () => {
 	it("grey an all-day event that is over and keep one still going in its colour", () => {

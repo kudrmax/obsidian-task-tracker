@@ -1,5 +1,5 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarOption, type CountField, type GoogleAccount, hexColor, isPresetColor, LABEL_PAINTS, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarService, type CountField, type GoogleAccount, hexColor, isPresetColor, LABEL_PAINTS, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -12,6 +12,7 @@ export interface SettingsTabDeps {
 	readonly settings: SettingsService;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
+	readonly calendars: Pick<CalendarService, "known" | "setShown">;
 }
 
 const HOURS_PER_DAY = 24;
@@ -80,7 +81,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The set-up-once part, each on a page of its own behind a row. */
 	private moreGroup(el: HTMLElement): void {
 		new Setting(el).setName("More").setHeading();
-		this.pageRow(el, "Calendars", "Google account and which calendars show, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
+		this.pageRow(el, "Calendars", "Which calendars show, the Google account, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
 		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels.", (page) => this.dayPage(page));
 		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
 	}
@@ -276,11 +277,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
-	/** The account and its calendars first, then the client they need; the work calendar; when a source counts as stale. */
+	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */
 	private calendarsPage(el: HTMLElement, redraw: () => void): void {
+		void this.shownGroup(el.createDiv());
 		new Setting(el).setName("Google Calendar").setHeading();
 		this.loginRow(el, redraw);
-		if (this.deps.google.isLoggedIn()) void this.calendarRows(el.createDiv());
 		this.text(el, "Client id", "OAuth client of type Web application with the redirect URI from the README.", this.settings.googleClientId, (id) => this.service.setGoogleClientId(id));
 		new Setting(el)
 			.setName("Client secret")
@@ -290,8 +291,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			});
 		this.count(el, "refreshSeconds", "Refresh interval", "Seconds between calendar fetches while the view is open; 0 turns the timer off. Coming back to Obsidian fetches at once.");
 		this.workGroup(el);
-		new Setting(el).setName("Both sources").setHeading();
-		this.count(el, "staleAfterMinutes", "Stale after", "Minutes without an update before a source gets the orange dot.");
+		new Setting(el).setName("All sources").setHeading();
+		this.count(el, "staleAfterMinutes", "Stale after", "Minutes before a calendar file gives way to the next source; with none fresh, the orange dot.");
 	}
 
 	private loginRow(el: HTMLElement, redraw: () => void): void {
@@ -313,26 +314,30 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		);
 	}
 
-	private async calendarRows(el: HTMLElement): Promise<void> {
-		let calendars: readonly CalendarOption[];
-		try {
-			calendars = await this.deps.google.listCalendars();
-		} catch (e) {
-			new Setting(el).setName("Shown calendars").setDesc(`Could not load: ${e instanceof Error ? e.message : String(e)}`);
-			return;
-		}
-		new Setting(el).setName("Shown calendars").setDesc("Which calendars to show. All of them when none is unchecked.");
+	/**
+	 * Every calendar the sources' files list, under its account: a calendar new to them is shown until switched off here.
+	 * The rows take the place held for them on the page, unwrapped, so the page's next heading keeps its space.
+	 */
+	private async shownGroup(place: HTMLElement): Promise<void> {
+		const calendars = await this.deps.calendars.known();
+		const el = place.ownerDocument.createElement("div");
+		if (calendars.length > 0) new Setting(el).setName("Calendars shown").setDesc("Which calendars the timeline and the iPhone's reminders show. A new calendar is shown.").setHeading();
+		let account: string | null = null;
 		for (const calendar of calendars) {
-			new Setting(el).setName(calendar.title).addToggle((t) =>
-				t.setValue(this.deps.google.isShown(calendar.id)).onChange((shown) => this.deps.google.setShown(calendars, calendar.id, shown)),
+			if (calendar.account !== account) {
+				account = calendar.account;
+				new Setting(el).setName(account === "" ? "iPhone" : account).setHeading();
+			}
+			new Setting(el).setName(calendar.account === "" ? calendar.title.replace(/^iPhone · /, "") : calendar.title).addToggle((t) =>
+				t.setValue(calendar.shown).onChange((shown) => this.deps.calendars.setShown(calendar.account, calendar.title, shown)),
 			);
 		}
+		place.replaceWith(...el.children);
 	}
 
 	private workGroup(el: HTMLElement): void {
 		new Setting(el).setName("Work calendar").setDesc("The iPhone's calendars, exported by Scriptable.").setHeading();
 		this.text(el, "File path", "JSON written by the Scriptable export.", this.settings.workCalendarFile, (path) => this.service.setWorkCalendarFile(path));
-		this.text(el, "Calendar titles", "Titles to take from the file, comma-separated. Empty means all.", this.settings.workCalendars, (text) => this.service.setWorkCalendars(text));
 		new Setting(el)
 			.setName("Scriptable script")
 			.setDesc("Paste once into a Scriptable script named Export Work Calendar. The export it runs comes with the plugin and updates with it.")

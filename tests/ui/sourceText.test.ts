@@ -16,6 +16,11 @@ describe("sourceText", () => {
 		expect(t).toEqual({ name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: "Yesterday 08:02", stale: true });
 	});
 
+	it("names the iPhone's calendars and says which phone wrote them", () => {
+		const t = sourceText(status({ source: "iphone", kind: "exported", updatedAt: new Date(2026, 9, 30, 8, 0), detail: "iPhone Макса" }), now);
+		expect([t.name, t.short, t.sub]).toEqual(["iPhone calendars", "iPhone", "Exported from iPhone Макса"]);
+	});
+
 	it("dates an older update, and shows an error's text with no time", () => {
 		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2) }), now).time).toBe("3 Oct 08:02");
 		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2) }), now).sub).toBe("Updated 3 Oct");

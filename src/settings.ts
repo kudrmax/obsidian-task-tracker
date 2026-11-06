@@ -30,7 +30,7 @@ export interface GoogleSettings {
 	readonly clientId: string;
 	readonly clientSecret: string;
 	readonly refreshToken: string;
-	/** Calendar ids to show; empty means every calendar selected in Google. */
+	/** Google calendar ids once shown (empty: all). Read only to carry the choice over into `hiddenCalendars`. */
 	readonly calendarIds: readonly string[];
 	readonly refreshSeconds: number;
 }
@@ -84,8 +84,12 @@ export interface ViewSettings {
 /** Where the events come from: the work file, Google, and when a source counts as stale. */
 export interface SourceSettings {
 	readonly workCalendarFile: string;
-	/** Calendar titles to take from the work file; empty means all. */
+	/** Calendar titles to take from the work file; empty means all. Read only to carry the choice over into `hiddenCalendars`. */
 	readonly workCalendarTitles: readonly string[];
+	/** The calendars not shown, by account and title; a calendar not listed is shown, a new one too. */
+	readonly hiddenCalendars: readonly { readonly account: string; readonly title: string }[];
+	/** The old choice (Google's calendar ids, the work file's titles) has been carried over into `hiddenCalendars`. */
+	readonly calendarsMigrated: boolean;
 	readonly google: GoogleSettings;
 	/** A calendar source whose last update is older than this gets the orange dot. */
 	readonly staleAfterMinutes: number;
@@ -112,6 +116,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	collapsedMarker: "📁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
+	hiddenCalendars: [],
+	calendarsMigrated: false,
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
 	longPressMs: 250,
 	zoom: 56,

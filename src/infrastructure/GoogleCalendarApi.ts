@@ -1,3 +1,4 @@
+import type { FileCalendar } from "../application/calendarFile";
 import type { CalendarEvent } from "../application/contracts";
 import type { Clock, SettingsStore } from "../application/ports";
 import type { GoogleAuth } from "./GoogleAuth";
@@ -20,7 +21,7 @@ interface CalendarListEntry {
 	id: string;
 	summary: string;
 	backgroundColor?: string;
-	selected?: boolean;
+	primary?: boolean;
 }
 
 interface GoogleEvent {
@@ -37,7 +38,14 @@ function dateOf(point: { dateTime?: string; date?: string }): Date {
 	return new Date(y, m - 1, d);
 }
 
-/** Google's Calendar API, read only: the events of the calendars the settings show, and the list of calendars. */
+/** What the account holds for a span: its email, every calendar, their events. */
+export interface GoogleExport {
+	readonly account: string;
+	readonly calendars: FileCalendar[];
+	readonly events: CalendarEvent[];
+}
+
+/** Google's Calendar API, read only: every calendar of the account and their events, whichever the settings show. */
 export class GoogleCalendarApi {
 	private list: { readonly key: string; readonly at: number; readonly calendars: Promise<CalendarListEntry[]> } | null = null;
 
@@ -48,13 +56,14 @@ export class GoogleCalendarApi {
 		private readonly http: Http,
 	) {}
 
-	async eventsBetween(start: Date, end: Date): Promise<CalendarEvent[]> {
+	async export(start: Date, end: Date): Promise<GoogleExport> {
 		if (!this.auth.isLoggedIn()) throw new Error("not logged in");
-		const wanted = this.settings.get().google.calendarIds;
-		const calendars = (await this.calendarList()).filter((c) => c.selected !== false && (wanted.length === 0 || wanted.includes(c.id)));
+		const list = await this.calendarList();
+		const account = list.find((c) => c.primary)?.id ?? list[0]?.id ?? "";
 		try {
-			const perCalendar = await Promise.all(calendars.map((c) => this.eventsOf(c, start, end)));
-			return perCalendar.flat();
+			const perCalendar = await Promise.all(list.map((c) => this.eventsOf(c, account, start, end)));
+			const calendars = list.map((c) => ({ title: c.summary, account, calendarId: c.id, color: c.backgroundColor ?? DEFAULT_COLOR }));
+			return { account, calendars, events: perCalendar.flat() };
 		} catch (e) {
 			// A calendar removed in Google answers 404: the list is asked again, not kept failing for half an hour.
 			this.list = null;
@@ -82,7 +91,7 @@ export class GoogleCalendarApi {
 		return calendars;
 	}
 
-	private async eventsOf(calendar: CalendarListEntry, start: Date, end: Date): Promise<CalendarEvent[]> {
+	private async eventsOf(calendar: CalendarListEntry, account: string, start: Date, end: Date): Promise<CalendarEvent[]> {
 		const items: GoogleEvent[] = [];
 		let pageToken: string | undefined;
 		do {
@@ -108,6 +117,8 @@ export class GoogleCalendarApi {
 				calendar: calendar.summary,
 				color: calendar.backgroundColor ?? DEFAULT_COLOR,
 				source: "google",
+				account,
+				calendarId: calendar.id,
 			}));
 	}
 

@@ -368,7 +368,7 @@ export class TaskCalendarView extends ItemView {
 		const switcher = new ColumnSwitch(root, {
 			value: () => this.place(),
 			onChange: (mode) => void this.afterEntry(() => this.leaveDone(mode)),
-			dot: () => this.data.statuses.some((s) => s.stale),
+			dot: () => this.data.stale,
 			onSources: () => this.showSources(switcher.el),
 			longPressMs: () => this.settings.longPressMs,
 			arbiter: this.arbiter,

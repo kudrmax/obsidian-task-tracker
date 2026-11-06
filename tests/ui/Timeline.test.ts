@@ -309,7 +309,7 @@ describe("tasks the now line has passed", () => {
 describe("the minute's tick", () => {
 	const hourPx = 56;
 	const task = (start: number): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "" }, text: "T", status: "todo", dueDate: null, slot: { date: "2026-10-31", start, end: null }, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
-	const meeting: CalendarEvent = { id: "m", title: "Meeting", start: new Date(2026, 9, 31, 9), end: new Date(2026, 9, 31, 10), allDay: false, calendar: "Work", color: "#0A84FF", source: "google" };
+	const meeting: CalendarEvent = { id: "m", title: "Meeting", start: new Date(2026, 9, 31, 9), end: new Date(2026, 9, 31, 10), allDay: false, calendar: "Work", color: "#0A84FF", source: "google", account: null, calendarId: null };
 
 	function ticking(tasks: TaskItem[]) {
 		const clock = { now: new Date(2026, 9, 31, 12, 0) };
@@ -562,7 +562,7 @@ describe("a timeline beside another day's", () => {
 });
 
 describe("an event at the day's edges", () => {
-	const event = (start: Date, end: Date): CalendarEvent => ({ id: "e", title: "E", start, end, allDay: false, calendar: "Work", color: "#0A84FF", source: "google" });
+	const event = (start: Date, end: Date): CalendarEvent => ({ id: "e", title: "E", start, end, allDay: false, calendar: "Work", color: "#0A84FF", source: "google", account: null, calendarId: null });
 
 	function spans(boundary: DayBoundary, events: CalendarEvent[]): { start: number; end: number }[] {
 		const view = new Timeline(document.createElement("div"), {

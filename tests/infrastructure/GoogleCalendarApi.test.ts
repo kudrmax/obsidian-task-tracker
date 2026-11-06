@@ -26,6 +26,7 @@ function event(id: string) {
 class FakeHttp {
 	readonly requests: URL[] = [];
 	eventsStatus = 200;
+	list: unknown[] = [{ id: "work", summary: "Work", backgroundColor: "#123456" }];
 	pages = new Map<string, { items: unknown[]; nextPageToken?: string }>([["", { items: [event("e1")] }]]);
 
 	get lists(): number {
@@ -40,7 +41,7 @@ class FakeHttp {
 		const url = new URL(request.url);
 		this.requests.push(url);
 		await Promise.resolve();
-		if (url.pathname.endsWith("/users/me/calendarList")) return ok({ items: [{ id: "work", summary: "Work", backgroundColor: "#123456" }] });
+		if (url.pathname.endsWith("/users/me/calendarList")) return ok({ items: this.list });
 		if (this.eventsStatus >= 400) return { status: this.eventsStatus, json: null, text: "Not Found" };
 		return ok(this.pages.get(url.searchParams.get("pageToken") ?? "") ?? { items: [] });
 	};
@@ -59,49 +60,68 @@ function source() {
 }
 
 describe("GoogleCalendarApi", () => {
+	it("exports every calendar, the unselected too, under the primary calendar's account", async () => {
+		const { google, http, settings } = source();
+		await settings.update({ google: { ...settings.get().google, calendarIds: ["work"] } });
+		http.list = [
+			{ id: "max@gmail.com", summary: "max@gmail.com", primary: true, backgroundColor: "#111111" },
+			{ id: "work", summary: "Work", backgroundColor: "#123456", selected: false },
+		];
+		const exported = await google.export(START, END);
+		expect(exported.account).toBe("max@gmail.com");
+		expect(exported.calendars).toEqual([
+			{ title: "max@gmail.com", account: "max@gmail.com", calendarId: "max@gmail.com", color: "#111111" },
+			{ title: "Work", account: "max@gmail.com", calendarId: "work", color: "#123456" },
+		]);
+		expect(exported.events.map((e) => [e.calendar, e.account, e.calendarId])).toEqual([
+			["max@gmail.com", "max@gmail.com", "max@gmail.com"],
+			["Work", "max@gmail.com", "work"],
+		]);
+	});
+
 	it("asks for the calendar list once for two fetches in a row", async () => {
 		const { google, http } = source();
-		await google.eventsBetween(START, END);
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
+		await google.export(START, END);
 		expect(http.lists).toBe(1);
 		expect(http.eventRequests).toHaveLength(2);
 	});
 
 	it("two fetches at once share one list request", async () => {
 		const { google, http } = source();
-		await Promise.all([google.eventsBetween(START, END), google.eventsBetween(START, END)]);
+		await Promise.all([google.export(START, END), google.export(START, END)]);
 		expect(http.lists).toBe(1);
 	});
 
 	it("asks for the list again after 30 minutes", async () => {
 		const { google, http, clock } = source();
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		clock.pass(30 * 60_000);
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		expect(http.lists).toBe(2);
 	});
 
 	it("asks for the list again after another login", async () => {
 		const { google, http, settings } = source();
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		await settings.update({ google: { ...settings.get().google, refreshToken: "r2" } });
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		expect(http.lists).toBe(2);
 	});
 
 	it("a failed events request drops the list", async () => {
 		const { google, http } = source();
 		http.eventsStatus = 404;
-		await expect(google.eventsBetween(START, END)).rejects.toThrow("404");
+		await expect(google.export(START, END)).rejects.toThrow("404");
 		http.eventsStatus = 200;
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		expect(http.lists).toBe(2);
 	});
 
 	it("the settings page always asks for the list and refreshes the one kept", async () => {
 		const { google, http } = source();
 		expect(await google.listCalendars()).toEqual([{ id: "work", title: "Work", color: "#123456" }]);
-		await google.eventsBetween(START, END);
+		await google.export(START, END);
 		await google.listCalendars();
 		expect(http.lists).toBe(2);
 	});
@@ -112,7 +132,7 @@ describe("GoogleCalendarApi", () => {
 			["", { items: [event("e1")], nextPageToken: "p2" }],
 			["p2", { items: [event("e2")] }],
 		]);
-		const events = await google.eventsBetween(START, END);
+		const { events } = await google.export(START, END);
 		expect(events.map((e) => e.id)).toEqual(["google:work:e1", "google:work:e2"]);
 		const [first, second] = http.eventRequests;
 		expect(first.searchParams.get("pageToken")).toBeNull();

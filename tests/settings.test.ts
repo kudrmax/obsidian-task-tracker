@@ -10,6 +10,10 @@ describe("settingsFrom", () => {
 		expect(settingsFrom(null)).toMatchObject({ slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕" });
 	});
 
+	it("shows every calendar and has carried nothing over unless set", () => {
+		expect(settingsFrom({ workCalendarTitles: ["Work"] })).toMatchObject({ hiddenCalendars: [], calendarsMigrated: false });
+	});
+
 	it("starts the day at 5 unless set", () => {
 		expect(settingsFrom(null).dayStartHour).toBe(5);
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
