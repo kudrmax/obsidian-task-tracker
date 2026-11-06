@@ -155,6 +155,16 @@ const SINGLE: readonly DropCase[] = [
 	{ name: "a task → under a subtask", day: T, tasks: [["N3", "day"]], to: (k) => ({ kind: "nest", parent: k("N1a"), before: null }) },
 ];
 
+/** A gap of a column as the list gives it (`kind: "place"`), and the drop the service reads it as: each writes what that drop writes. */
+const PLACES: readonly (readonly [string, DropCase["to"], DropCase["to"]])[] = [
+	["a section of today's list", (k) => ({ kind: "place", column: "day", place: { kind: "task", group: "Work", before: k("N3") } }), (k) => ({ kind: "group", list: "now", date: null, group: "Work", before: k("N3") })],
+	["a later day's list in a section", () => ({ kind: "place", column: "day", place: { kind: "task", group: "Later", before: null } }), () => ({ kind: "group", list: "soon", date: D, group: "Later", before: null })],
+	["a past day's list, with no sections", (k) => ({ kind: "place", column: "day", place: { kind: "task", group: "Work", before: k("NP") } }), (k) => ({ kind: "list", column: "day", before: k("NP") })],
+	["under a task", (k) => ({ kind: "place", column: "soon", place: { kind: "subtask", parent: k("N1"), before: k("N1b") } }), (k) => ({ kind: "nest", parent: k("N1"), before: k("N1b") })],
+	["Inbox's section", () => ({ kind: "place", column: "inbox", place: { kind: "task", group: "Ideas", before: null } }), () => ({ kind: "group", list: "inbox", date: null, group: "Ideas", before: null })],
+	["a column's end, where it places nothing in a gap", () => ({ kind: "place", column: "inbox", place: null }), () => ({ kind: "list", column: "inbox", before: null })],
+];
+
 const SEVERAL: readonly DropCase[] = [
 	{ name: "the day and Soon → before a task of a past day's list", day: P, tasks: [["NP2", "day"], ["S1", "soon"]], to: (k) => ({ kind: "list", column: "day", before: k("NP") }) },
 	{ name: "the day and Soon → a past day's list's end", day: P, tasks: [["NP", "day"], ["S2", "soon"]], to: () => ({ kind: "list", column: "day", before: null }) },
@@ -178,6 +188,15 @@ describe("what a drop writes (spec §5.1)", () => {
 
 	describe("several tasks", () => {
 		for (const c of SEVERAL) it(c.name, async () => expect(await dropped(c)).toMatchSnapshot());
+	});
+
+	describe("a gap of a column, read by the sections it shows on the day", () => {
+		for (const [name, place, read] of PLACES)
+			for (const day of name.includes("later") ? [D] : name.includes("past") ? [P] : [T])
+				it(name, async () => {
+					const tasks: DropCase["tasks"] = [[name.includes("past") ? "NP2" : "S1", name.includes("past") ? "day" : "soon"]];
+					expect(await dropped({ name, day, tasks, to: place })).toBe(await dropped({ name, day, tasks, to: read }));
+				});
 	});
 });
 

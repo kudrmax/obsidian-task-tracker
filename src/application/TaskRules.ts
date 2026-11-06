@@ -272,6 +272,13 @@ export class TaskRules {
 		return (doc) => ops.setCollapsed(doc, this.entryOf(doc, key), collapsed);
 	}
 
+	toggleCollapsed(key: TaskKey): Operation {
+		return (doc) => {
+			const entry = this.entryOf(doc, key);
+			return ops.setCollapsed(doc, entry, !entry.task.collapsed);
+		};
+	}
+
 	unfoldAbove(key: TaskKey): Operation {
 		return (doc) => ops.unfoldAbove(doc, this.entryOf(doc, key));
 	}

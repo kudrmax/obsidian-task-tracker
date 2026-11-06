@@ -35,7 +35,7 @@ function setup() {
 	const deps = {
 		longPressMs: () => 300,
 		day: () => "2026-11-01",
-		step: () => 15,
+		snap: (minute: number) => Math.min(1440, Math.max(0, Math.round(minute / 15) * 15)),
 		timeline: () => null,
 		targets: () => [],
 		haptics: { tap: () => calls.push("tap") },
@@ -195,7 +195,7 @@ describe("DragController: a drop that changes nothing", () => {
 		const deps = {
 			longPressMs: () => 300,
 			day: () => "2026-11-01",
-			step: () => 15,
+			snap: (minute: number) => Math.min(1440, Math.max(0, Math.round(minute / 15) * 15)),
 			timeline: () => null,
 			targets: () => [target],
 			haptics: { tap: () => {} },
@@ -230,7 +230,7 @@ describe("DragController: a finger held on a timeline block", () => {
 		const deps = {
 			longPressMs: () => 300,
 			day: () => "2026-11-01",
-			step: () => 15,
+			snap: (minute: number) => Math.min(1440, Math.max(0, Math.round(minute / 15) * 15)),
 			timeline: () => null,
 			targets: () => [],
 			haptics: { tap: () => {} },
@@ -321,7 +321,7 @@ describe("DragController: a finger held on a calendar event", () => {
 });
 
 describe("DragController: stretching a block (block 3)", () => {
-	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, labels: [], colors: [], subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false } as unknown as TaskItem;
+	const item = { key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: { date: "2026-11-01", start: 600, end: 660 }, priority: null, labels: [], colors: [], subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false, can: { resize: true } } as unknown as TaskItem;
 
 	function stretching(onResize: () => Promise<boolean> = async () => true) {
 		const arbiter = new GestureArbiter();
@@ -334,7 +334,7 @@ describe("DragController: stretching a block (block 3)", () => {
 		};
 		const stretch = vi.fn((_item: TaskItem, _edge: string, minute: number) => ({ start: 600, end: Math.max(600, minute) }));
 		const haptics = { tap: vi.fn() };
-		const deps = { step: () => 15, timeline: () => timeline, haptics, arbiter, stretch, onResize: vi.fn(onResize) } as unknown as DragControllerDeps;
+		const deps = { snap: (minute: number) => Math.min(1440, Math.max(0, Math.round(minute / 15) * 15)), timeline: () => timeline, haptics, arbiter, stretch, onResize: vi.fn(onResize) } as unknown as DragControllerDeps;
 		const block = document.body.appendChild(document.createElement("div"));
 		new DragController(deps).grip(block, item, "end", down(50, 660));
 		return { arbiter, timeline, deps, haptics };

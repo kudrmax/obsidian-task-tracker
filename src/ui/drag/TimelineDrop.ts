@@ -3,10 +3,10 @@ import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
 import { acceptsDrop, type DaySpan, type DropOrigin, type TaskItem } from "../../application/contracts";
 import { type DragPayload, type DropResult, type DropTarget, originsOf } from "./DropTarget";
-import { snapMinutes } from "./snap";
 
 export interface TimelineDropOptions {
-	step(): number;
+	/** The minute on the grid nearest `minute` at the timeline's zoom (`TaskService.snap`). */
+	snap(minute: number): number;
 	/** Where a card from `from` let go at `start` stands (`TaskService.dropSpan`). */
 	span(item: TaskItem | null, from: DropOrigin, start: number): DaySpan;
 	/** The slot a new task takes at `start` (`TaskService.newSlot`). */
@@ -56,7 +56,7 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	private show(wanted: number, item: TaskItem | null, from: DropOrigin): void {
-		this.start = snapMinutes(wanted, this.opts.step());
+		this.start = this.opts.snap(wanted);
 		this.timeline.showDrop(this.opts.span(item, from, this.start));
 	}
 

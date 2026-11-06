@@ -560,7 +560,7 @@ export class QuickEntryController {
 	private sync(state: EntryState): void {
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setSection(state.section === true);
-		if (!state.section) this.field?.setTint(state.marks.tint);
+		this.field?.setTint(state.marks.tint);
 		this.bar.show(state);
 	}
 
@@ -595,18 +595,12 @@ export class QuickEntryController {
 		const state = this.state;
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
-			parseTitle: (text) => this.deps.tasks.parseTitle(text),
-			priority: state?.marks.priority ?? null,
+			tint: state?.marks.tint ?? null,
 			titleField: this.deps.titleField,
 			onInput: (text) => {
 				this.entry.type(text);
 				this.follow = true;
 				this.revealing = true;
-				this.pass.ask();
-			},
-			onPriority: () => {
-				if (!this.state) return;
-				this.sync(this.state);
 				this.pass.ask();
 			},
 			onKey: (key) => this.key(key),

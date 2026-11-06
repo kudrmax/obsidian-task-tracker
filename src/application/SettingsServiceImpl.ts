@@ -10,6 +10,9 @@ function countOf(text: string): number | null {
 	return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/** Day starts at: any hour of the day. */
+const DAY_START_HOURS: readonly number[] = Array.from({ length: 24 }, (_, hour) => hour);
+
 /** The settings tab's commands over the settings store; see SettingsService. */
 export class SettingsServiceImpl implements SettingsService {
 	constructor(private readonly store: SettingsStore) {}
@@ -40,6 +43,8 @@ export class SettingsServiceImpl implements SettingsService {
 			googleClientId: s.google.clientId,
 			refreshSeconds: s.google.refreshSeconds,
 			workCalendarFile: s.workCalendarFile,
+			dayStartHours: DAY_START_HOURS,
+			googleClientReady: s.google.clientId !== "",
 		};
 	}
 
@@ -122,6 +127,12 @@ export class SettingsServiceImpl implements SettingsService {
 		const hex = hexColor(text);
 		if (!hex) return null;
 		return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
+	}
+
+	typedColour(of: "level" | "label", index: number, text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null {
+		const color = this.colourOf(text, shades);
+		const own = (of === "level" ? this.settings.priorities : this.settings.labels)[index]?.color;
+		return color === own ? null : color;
 	}
 
 	renamePreset(index: number, name: string): Promise<void> {

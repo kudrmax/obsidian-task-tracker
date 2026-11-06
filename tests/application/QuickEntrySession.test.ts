@@ -935,6 +935,19 @@ describe("QuickEntrySession", () => {
 		expect(entry.state).toMatchObject(task);
 	});
 
+	it("a section's name has no tint, though its text starts with a level's prefix; back to a task, the tint comes back", () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const entry = tasks.entry();
+		entry.open(at(1));
+		entry.type("p1 Errands");
+		const tint = entry.state?.marks.tint;
+		expect(tint).not.toBeNull();
+		entry.toggleSection();
+		expect(entry.state?.marks.tint).toBeNull();
+		entry.toggleSection();
+		expect(entry.state?.marks.tint).toBe(tint);
+	});
+
 	it("a section's field among subtasks goes past them, to the top level", () => {
 		const tasks = new FakeTasks(["A", ["A1", 1], ["A2", 1], "B"]);
 		const entry = tasks.entry();

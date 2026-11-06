@@ -75,14 +75,19 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 Every method of `TaskService` but `onChange`, by its name and with its arguments: `tasks.screen(date)`,
 `tasks.search(query)`, `tasks.menu(item, from, screen)`, `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
-priority, place, repeat?, labels?)`, … (81 methods; `methods()` lists them). The answers are those of the plugin's
+priority, place, repeat?, labels?)`, … (83 methods; `methods()` lists them). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
 - `tasks.drop(tasks, to, day)` answers the dropped tasks' keys as the file now has them: the screen settles the card on
-  its task where it stands.
+  its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
+  (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
+  reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
+- `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
+- `tasks.snap(minute, hourPx)`: the minute a drag, a drop or a stretch on the timeline stands at, the timeline drawn
+  `hourPx` points an hour (30, 15 or 5 minutes by the zoom); a resize is offered while `item.can.resize`.
 - Subscriptions are the host's: it watches the files and calls again after a change.
 
 ### `days.*`: `DayService`
@@ -118,7 +123,9 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `setLabelTag(tag)`, `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
-`setGoogleClientId(id)`, `setWorkCalendarFile(path)`.
+`setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
+level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
+`dayStartHours` (what Day starts at offers) and `googleClientReady` (Log in has a client id to go with).
 
 A write answers the new `data.json` in `settings` (every key the plugin's settings do not name, such as a device's own,
 kept); a value the service refuses (a count that is no number of zero or more, a label tag of two words) answers none.
@@ -179,6 +186,22 @@ After a rename's `edit`, the task as it now stands is its answer (the plugin kee
 A section's name typed in place: `event` is `"enter"`, `"escape"` or `"blur"`. Answers `{ ended: true, end?: { name } }`:
 Enter gives the name as typed (`tasks.renameGroup` or `tasks.createSection` trim it), Escape and a tap elsewhere give
 `null` (the old name stays); once ended, nothing more (`end` missing).
+
+### `repeatPage.end(own, held)`
+
+A task menu's repeat page writes once, as the menu closes: `held` is what the page holds (`null` untouched, `{ rule }`
+after a change, `{ rule: null }` after Remove repeat), `own` the task's rule. Answers `{ rule }` to write with
+`tasks.setRepeat`, or `null` for nothing (back to the task's own rule, or untouched). The quick entry's panel writes
+nothing: its session holds the rule.
+
+### `description.*`: the full screen's description editor
+
+The host keeps `state` (`{ file, typed }`) between calls and debounces the typing itself:
+`open(description)` → `{ state, text }` (the text to edit, the template for none); `typed(state)` → `state`;
+`save(state)` → `{ state, write }` (write what the editor holds now with `tasks.setDescription` only when `write`: an
+editor left untouched never writes an old text back); `read(state, description, { focused, pending })` after the file
+was read again → `{ state, replace }` (the text to put in the editor, or `null` to keep it: a change made elsewhere
+replaces it only while it has no focus and no write waits).
 
 ### `rules.*`: the pure rules
 

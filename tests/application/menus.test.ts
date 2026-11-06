@@ -116,6 +116,18 @@ describe("the rest of the menu", () => {
 		expect(taskMenu([soon({ dueDate: "2026-11-05", can: { ...item().can, removeDue: false } })], T, [], [], null).removeDue).toBe(false);
 	});
 
+	it("offers the Reminder page's kinds, Off last, the task's own checked; none without the Reminder row", () => {
+		const slot = { date: T, start: 600, end: null };
+		expect(taskMenu([item({ slot, reminder: "alarm" })], T, [], [], null, { kind: "task", from: "timeline" }).reminders).toEqual([
+			{ kind: "live", checked: false },
+			{ kind: "notification", checked: false },
+			{ kind: "alarm", checked: true },
+			{ kind: "none", checked: false },
+		]);
+		expect(taskMenu([item()], T, [], [], null, { kind: "task", from: "day" }).reminders).toEqual([]);
+		expect(taskMenu([item({ slot }), item({ slot })], T, [], [], null, { kind: "bulk" }).reminders).toEqual([]);
+	});
+
 	it("shows picked the due date every task has, none when they differ", () => {
 		expect(taskMenu([soon({ dueDate: "2026-11-05" }), soon({ dueDate: "2026-11-05" })], T, [], [], null).dueDate).toBe("2026-11-05");
 		expect(taskMenu([soon({ dueDate: "2026-11-05" }), soon()], T, [], [], null).dueDate).toBeNull();

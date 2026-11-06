@@ -32,7 +32,7 @@ import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
-import { levelsFor, stepFor } from "./zoomLevels";
+import { levelsFor } from "./zoomLevels";
 import { dayTitle } from "./dayTitle";
 import { DESIGN, DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { Divider } from "./Divider";
@@ -188,7 +188,7 @@ export class TaskCalendarView extends ItemView {
 		this.drag = new DragController({
 			longPressMs: () => this.settings.longPressMs,
 			day: () => this.selectedDate,
-			step: () => stepFor(this.hourPx),
+			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx),
 			timeline: () => this.timeline,
 			targets: (drag) => [...this.bulk.targets(drag), ...this.shownDrops()],
 			pick: (_item, card, e, how) => {
@@ -360,7 +360,7 @@ export class TaskCalendarView extends ItemView {
 		});
 		el(root, "div", "tc-fade");
 		this.timelineDrop = new TimelineDrop(this.timeline, {
-			step: () => stepFor(this.hourPx),
+			snap: (minute) => this.deps.tasks.snap(minute, this.hourPx),
 			span: (item, from, start) => this.deps.tasks.dropSpan(item, from, start),
 			newSlot: (start) => this.deps.tasks.newSlot(this.selectedDate, start),
 		});
@@ -719,7 +719,7 @@ export class TaskCalendarView extends ItemView {
 	private fold(item: TaskItem, target: EventTarget | null): boolean {
 		if (!item.can.fold || !onCounter(target)) return false;
 		this.haptics.tap();
-		void this.act(() => this.deps.tasks.setCollapsed(item.key, !item.collapsed));
+		void this.act(() => this.deps.tasks.toggleCollapsed(item.key));
 		return true;
 	}
 

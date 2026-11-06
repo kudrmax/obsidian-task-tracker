@@ -51,7 +51,7 @@ describe("toItem", () => {
 			isSubtask: false,
 			day: T,
 			repeatDay: T,
-			can: { postpone: true, removeDue: false, remind: true, setPriority: true, setLabels: true, stop: false, addDescription: true, fold: false },
+			can: { postpone: true, removeDue: false, remind: true, setPriority: true, setLabels: true, stop: false, addDescription: true, fold: false, resize: true },
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,

@@ -143,6 +143,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "removeAll", args: (s) => [[key(s, "Idea"), key(s, "Someday")]] },
 	{ method: "carried", args: (s) => [key(s, "Parent"), [key(s, "Parent"), key(s, "Child one"), key(s, "Idea")]] },
 	{ method: "setCollapsed", args: (s) => [key(s, "Parent"), true] },
+	{ method: "toggleCollapsed", args: (s) => [key(s, "Parent")] },
 	{ method: "unfoldAbove", args: (s) => [key(s, "Child one")] },
 	{ method: "setRepeat", args: (s) => [key(s, "Later"), { kind: "schedule", every: 2, unit: "week", days: [0], dayOfMonth: null, from: null }] },
 	{ method: "stop", args: (s) => [key(s, "Lunch")] },
@@ -160,6 +161,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "dropSpan", args: (s) => [named(s, "Morning run"), "timeline", 600] },
 	{ method: "dropSpan", args: () => [null, "new", 1430] },
 	{ method: "newSlot", args: () => [T, 615] },
+	{ method: "snap", args: () => [617, 56] },
 	{ method: "stretch", args: (s) => [named(s, "Morning run"), T, "end", 540] },
 	{ method: "resize", args: (s) => [key(s, "Morning run"), T, "end", 540, 15] },
 	{ method: "resize", args: (s) => [key(s, "Morning run"), T, "end", 480, 15] },
@@ -181,6 +183,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "applyAll", args: (s) => [[{ key: key(s, "Idea"), change: { kind: "moveToEnd", section: "soon" } }, { key: key(s, "Shop"), change: { kind: "status", status: "done" } }]] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Later"), from: "soon" }], { kind: "time", start: 660 }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }, { key: key(s, "Someday"), from: "backlog" }], { kind: "list", column: "soon", before: null }, T] },
+	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "soon", place: { kind: "task", group: null, before: key(s, "Later") } }, T] },
 	{ method: "normalize", args: () => [] },
 	{ method: "normalize", args: () => [], text: "## Now\n\n- [ ] Old ⏰ 2026-10-01 10:00\n" },
 	{ method: "createFile", args: () => [], text: null },
@@ -274,7 +277,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "rules"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -319,6 +322,8 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["colourOf", "#ff453a", SHADES],
 	["colourOf", "#abcdef", SHADES],
 	["colourOf", "nope", SHADES],
+	["typedColour", "level", 0, "#123456", SHADES],
+	["typedColour", "label", 0, "nope", SHADES],
 	["renamePreset", 0, " Дом "],
 	["removePreset", 1],
 	["addPreset"],
@@ -423,6 +428,11 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("history.canUndo"),
 		plain("history.canRedo"),
 		plain("sectionName.end", false, "enter", " Name "),
+		plain("repeatPage.end", rule, { rule: null }),
+		plain("description.open", null),
+		plain("description.typed", { file: "- a", typed: false }),
+		plain("description.save", { file: "- a", typed: true }),
+		plain("description.read", { file: "- a", typed: true }, "- b", { focused: false, pending: false }),
 		plain("rules.constants"),
 		plain("rules.nextProgress", ["todo", "inProgress"]),
 		plain("rules.sameSlot", { date: T, start: 1, end: null }, { date: T, start: 1, end: null }),

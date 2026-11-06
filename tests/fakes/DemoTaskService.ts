@@ -1,7 +1,8 @@
 import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
-import { dropMoves } from "../../src/application/drops";
+import { dropMoves, readDrop } from "../../src/application/drops";
+import { snapMinute } from "../../src/application/snapGrid";
 import { fullTree } from "../../src/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
@@ -171,7 +172,7 @@ export class DemoTaskService implements TaskService {
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null },
 		};
 	}
 
@@ -393,6 +394,12 @@ export class DemoTaskService implements TaskService {
 	async setReminder(): Promise<void> {}
 
 	async setCollapsed(): Promise<void> {}
+
+	async toggleCollapsed(): Promise<void> {}
+
+	snap(minute: number, hourPx: number): number {
+		return snapMinute(minute, hourPx);
+	}
 
 	async unfoldAbove(): Promise<void> {}
 
@@ -617,7 +624,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	private move(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
-		const moves = dropMoves(tasks, to, day);
+		const moves = dropMoves(tasks, readDrop(to, (column) => this.columnSections(column, day)), day);
 		if (moves.kind === "many") return this.applyAll();
 		const { key, move } = moves;
 		switch (move.kind) {

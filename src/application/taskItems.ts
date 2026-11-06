@@ -77,6 +77,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 			stop: entry.task.repeat !== null && repeatable(entry),
 			addDescription: description === null,
 			fold: hasOpenSubtask(entry),
+			resize: entry.task.slot !== null,
 		},
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,

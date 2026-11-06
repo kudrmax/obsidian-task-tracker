@@ -1,21 +1,16 @@
 import type { EntryPart } from "./EntryPart";
-import type { PriorityColor, PriorityLevel, TaskService } from "../../application/contracts";
-import { markPriority } from "../TaskCard";
+import type { PriorityColor } from "../../application/contracts";
 import type { TitleFieldFactory } from "./TitleField";
 
 export type QuickKey = "enter" | "escape" | "tab" | "shiftTab" | "altTab";
 
 export interface QuickFieldOptions {
 	readonly value: string;
-	/** The level a prefix at the start of the text stands for. */
-	readonly parseTitle: TaskService["parseTitle"];
-	/** The level the field starts with. */
-	readonly priority: PriorityLevel | null;
+	/** The colour the field starts in: the session's tint (`DraftMarks.tint`). */
+	readonly tint: PriorityColor | null;
 	/** The field the text is typed in. */
 	readonly titleField: TitleFieldFactory;
 	onInput(text: string): void;
-	/** The level the text's prefix now stands for, null once it no longer starts with one; only when that changes. */
-	onPriority(level: PriorityLevel | null): void;
 	onKey(key: QuickKey): void;
 	onBlur(): void;
 }
@@ -30,9 +25,9 @@ export interface QuickFieldHandle extends EntryPart {
 	refocus(): void;
 	/** The field writes a section's name: it looks like the section name field, and its hint says so. */
 	setSection(on: boolean): void;
-	/** The colour of a level or the first label chosen elsewhere; the field takes it, none takes it away. */
+	/** The colour the session gives the text as typed (`DraftMarks.tint`); none takes it away. */
 	setTint(color: PriorityColor | null): void;
-	/** A text set by the owner: a prefix in it counts as already reported. */
+	/** A text set by the owner. */
 	setValue(text: string): void;
 	/** Part of the typing: the field, or what its editor shows for it elsewhere on the page. */
 	owns(target: Element): boolean;
@@ -45,21 +40,11 @@ export interface QuickFieldHandle extends EntryPart {
  */
 export const QuickField = {
 	open(parent: HTMLElement, opts: QuickFieldOptions): QuickFieldHandle {
-		const levelOf = (text: string) => opts.parseTitle(text).priority;
-		let fromText = levelOf(opts.value);
 		const title = opts.titleField(parent, {
 			text: opts.value,
 			placeholder: "New task",
 			events: {
-				onInput: () => {
-					const text = title.text;
-					opts.onInput(text);
-					const level = levelOf(text);
-					if (level?.prefix === fromText?.prefix) return;
-					fromText = level;
-					markPriority(title.el, level);
-					opts.onPriority(level);
-				},
+				onInput: () => opts.onInput(title.text),
 				onEnter: () => opts.onKey("enter"),
 				onEscape: () => opts.onKey("escape"),
 				onTab: (shift) => opts.onKey(shift ? "shiftTab" : "tab"),
@@ -68,7 +53,11 @@ export const QuickField = {
 			},
 		});
 		title.el.classList.add("tc-quick-field");
-		markPriority(title.el, opts.priority);
+		const tint = (color: PriorityColor | null) => {
+			if (color) title.el.dataset.priority = color;
+			else delete title.el.dataset.priority;
+		};
+		tint(opts.tint);
 		return {
 			el: title.el,
 			get text() {
@@ -86,15 +75,10 @@ export const QuickField = {
 			setSection(on) {
 				title.setPlaceholder(on ? "Section name" : "New task");
 				title.el.classList.toggle("is-section", on);
-				markPriority(title.el, on ? null : levelOf(title.text));
 			},
-			setTint(color) {
-				if (color) title.el.dataset.priority = color;
-				else delete title.el.dataset.priority;
-			},
+			setTint: tint,
 			setValue(text) {
 				title.setText(text);
-				fromText = levelOf(text);
 			},
 			owns(target) {
 				return title.owns(target);

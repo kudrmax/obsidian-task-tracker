@@ -18,7 +18,6 @@ export interface SettingsTabDeps {
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
 }
 
-const HOURS_PER_DAY = 24;
 const MINUTES_PER_HOUR = 60;
 
 const MARKERS: readonly (readonly [Marker, string, string])[] = [
@@ -39,6 +38,8 @@ interface ColourRows {
 	readonly nameClass: string;
 	rename(index: number, name: string): Promise<void>;
 	recolour(index: number, color: PriorityColor): Promise<void>;
+	/** A code typed for its colour and left: the colour to write, null for none (`SettingsService.typedColour`). */
+	typed(index: number, text: string): PriorityColor | null;
 	remove(index: number): Promise<void>;
 	move(from: number, to: number): Promise<void>;
 	/** The colour being picked, on the screen and in the menus, before it is saved. */
@@ -124,6 +125,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			nameClass: "tc-level-prefix",
 			rename: (index, name) => this.service.renameLevel(index, name),
 			recolour: (index, color) => this.service.recolourLevel(index, color),
+			typed: (index, text) => this.service.typedColour("level", index, text, this.shades),
 			remove: (index) => this.service.removeLevel(index),
 			move: (from, to) => this.service.moveLevel(from, to),
 			preview: (index, color) => showPriorityColors(levels.map((level, i) => (i === index ? { ...level, color } : level)), this.settings.labels),
@@ -143,6 +145,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			nameClass: "tc-label-name",
 			rename: (index, name) => this.service.renameLabel(index, name),
 			recolour: (index, color) => this.service.recolourLabel(index, color),
+			typed: (index, text) => this.service.typedColour("label", index, text, this.shades),
 			remove: (index) => this.service.removeLabel(index),
 			move: (from, to) => this.service.moveLabel(from, to),
 			preview: (index, color) => showPriorityColors(this.settings.priorities, labels.map((label, i) => (i === index ? { ...label, color } : label))),
@@ -216,8 +219,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				if (color) show(color);
 			});
 			code.inputEl.addEventListener("blur", () => {
-				const color = this.colorOf(code.getValue());
-				if (color && color !== level.color) void this.redrawn(spec.recolour(index, color));
+				const color = spec.typed(index, code.getValue());
+				if (color) void this.redrawn(spec.recolour(index, color));
 				else show(level.color, code);
 			});
 			code.inputEl.addEventListener("keydown", (e) => {
@@ -232,8 +235,12 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 
 	/** A code read as a level's colour by the shades the presets take in this theme. */
 	private colorOf(text: string): PriorityColor | null {
-		const shades = Object.fromEntries(PRIORITY_COLORS.map((preset) => [preset, inkOf(preset, this.theme)])) as Record<PresetColor, string>;
-		return this.service.colourOf(text, shades);
+		return this.service.colourOf(text, this.shades);
+	}
+
+	/** The shade each preset takes in this theme. */
+	private get shades(): Record<PresetColor, string> {
+		return Object.fromEntries(PRIORITY_COLORS.map((preset) => [preset, inkOf(preset, this.theme)])) as Record<PresetColor, string>;
 	}
 
 	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */
@@ -272,7 +279,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName("Day starts at")
 			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
 			.addDropdown((d) => {
-				for (let hour = 0; hour < HOURS_PER_DAY; hour++) d.addOption(String(hour), formatTime(hour * MINUTES_PER_HOUR));
+				for (const hour of this.settings.dayStartHours) d.addOption(String(hour), formatTime(hour * MINUTES_PER_HOUR));
 				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.service.setDayStartHour(Number(value)));
 			});
 		this.count(el, "scrollToHour", "Scroll to hour", "Hour another day opens at.");
@@ -305,7 +312,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const loggedIn = this.deps.google.isLoggedIn();
 		const row = new Setting(el).setName("Account");
 		if (loggedIn) row.setDesc("Logged in. The token syncs to your other devices.");
-		else if (!this.settings.googleClientId) row.setDesc("Not logged in. Fill in the client id and secret below first.");
+		else if (!this.settings.googleClientReady) row.setDesc("Not logged in. Fill in the client id and secret below first.");
 		else row.setDesc("Not logged in. Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {

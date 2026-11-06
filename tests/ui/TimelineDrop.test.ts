@@ -29,7 +29,7 @@ describe("the timeline as a place to drop", () => {
 		const fake = fakeTimeline();
 		const asked: [TaskItem | null, DropOrigin, number][] = [];
 		const drop = new TimelineDrop(fake.timeline, {
-			step: () => step,
+			snap: (minute) => Math.min(1440, Math.max(0, Math.round(minute / step) * step)),
 			span: (item, from, start) => {
 				asked.push([item, from, start]);
 				return { start: start + 1, end: null };

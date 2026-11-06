@@ -24,6 +24,10 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "whether a task is a subtask", pattern: /\.isSubtask\b/g },
 	{ name: "a task's due date compared", pattern: /\.dueDate\s*[!=]==/g },
 	{ name: "a day compared with today", pattern: /[!=]==\s*(?:this\.)?(?:deps\.)?today\(\)|\btoday\(\)\s*[!=]==/g },
+	{ name: "a task's status switched on", pattern: /\bswitch\s*\(\s*[\w.]*\.status\s*\)/g },
+	{ name: "whether a task's list is one of these", pattern: /\.includes\(\s*[\w.]*\.list\s*\)/g },
+	{ name: "whether a task is closed", pattern: /!\s*(?:\w+\.)*(?:item|task|subtask)\.open\b/g },
+	{ name: "a task's fields taken apart to decide", pattern: /\{[^}]*\b(?:list|status|priority|dueDate|isSubtask|open)\b[^}]*\}\s*=\s*(?:\w+\.)*(?:item|task)\b/g },
 ];
 
 /**
@@ -32,7 +36,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
 	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
-	"src/ui/full/FullScreen.ts": { count: 1, removedBy: "none: it draws a done subtask crossed out; it stays" },
+	"src/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
 };
 
 function files(dir: string): string[] {
@@ -87,5 +91,10 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("const shown = item.dueDate !== opts.day;")).toEqual(["1: a task's due date compared"]);
 		expect(hitsIn("if (date === this.today()) a(); if (this.deps.today() !== day) b();")).toEqual(["1: a day compared with today", "1: a day compared with today"]);
 		expect(hitsIn("this.select(this.today());")).toEqual([]);
+		expect(hitsIn("switch (item.status) {")).toEqual(["1: a task's status switched on"]);
+		expect(hitsIn("if (LISTS.includes(item.list)) go();")).toEqual(["1: whether a task's list is one of these"]);
+		expect(hitsIn("if (!item.open) go(); if (!this.panel.open) stay();")).toEqual(["1: whether a task is closed"]);
+		expect(hitsIn("const { list, status } = item;")).toEqual(["1: a task's fields taken apart to decide"]);
+		expect(hitsIn("const { day, onSubtask } = this.context;")).toEqual([]);
 	});
 });

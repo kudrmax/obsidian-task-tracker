@@ -46,7 +46,7 @@ export interface EntryState {
 	readonly canOutdent: boolean;
 	/** The field writes a section's name; null where it cannot (a rename, a slot, a stack, a column without sections). */
 	readonly section: boolean | null;
-	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. */
+	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. A section's name has no tint. */
 	readonly marks: DraftMarks;
 	/** The flag shows: there is a level or a label to choose, and the field writes a task, not a section's name. */
 	readonly markable: boolean;
@@ -186,8 +186,9 @@ export class QuickEntry {
 	get state(): EntryState | null {
 		const field = this.session.field;
 		if (!field) return null;
-		const marks = this.tasks.draftMarks(field.text, field.priority, field.labels);
 		const task = !field.section;
+		const typed = this.tasks.draftMarks(field.text, field.priority, field.labels);
+		const marks = task ? typed : { ...typed, tint: null };
 		const place = task ? this.shownPlace(field) : null;
 		const run = this.run(field.run);
 		return {
@@ -697,6 +698,8 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 			return { kind: "task", group: result.group, before: result.before };
 		case "nest":
 			return { kind: "subtask", parent: result.parent, before: result.before };
+		case "place":
+			return result.place ?? { kind: "task", group: null, before: null };
 		default:
 			return null;
 	}

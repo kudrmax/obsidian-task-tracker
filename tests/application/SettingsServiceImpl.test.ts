@@ -11,6 +11,24 @@ function service(start: Partial<TaskCalendarSettings> = {}) {
 	return { svc: new SettingsServiceImpl(store), now: () => store.get(), writes: () => writes };
 }
 
+describe("the form's answers", () => {
+	it("offers every hour of the day for its start, and says whether Log in has a client id to go with", () => {
+		expect(service().svc.form().dayStartHours).toEqual(Array.from({ length: 24 }, (_, h) => h));
+		expect(service().svc.form().googleClientReady).toBe(false);
+		expect(service({ google: { ...DEFAULT_SETTINGS.google, clientId: "id" } }).svc.form().googleClientReady).toBe(true);
+	});
+
+	it("reads a colour code typed and left: none for no colour or the one the level or label has", () => {
+		const shades = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#40C8E0", blue: "#0A84FF" } as const;
+		const { svc } = service({ priorities: [{ prefix: "p1", color: "red" }], labels: [{ name: "A", color: "#123456" }] });
+		expect(svc.typedColour("level", 0, "#ff453a", shades)).toBeNull();
+		expect(svc.typedColour("level", 0, "0a84ff", shades)).toBe("blue");
+		expect(svc.typedColour("level", 0, "nope", shades)).toBeNull();
+		expect(svc.typedColour("label", 0, "#123456", shades)).toBeNull();
+		expect(svc.typedColour("label", 0, "#654321", shades)).toBe("#654321");
+	});
+});
+
 describe("editing the labels", () => {
 	it("writes a name typed with spaces as one word of a tag, adds one in a colour no label has", async () => {
 		const { svc, now } = service({ labels: [{ name: "Важное", color: "red" }] });

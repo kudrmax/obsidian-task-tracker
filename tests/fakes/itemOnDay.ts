@@ -16,7 +16,7 @@ export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title"
 		durationMin: item.slot && item.slot.end !== null ? item.slot.end - item.slot.start : null,
 		day: dayOfTask(item.list, item, today),
 		repeatDay: item.dueDate ?? item.slot?.date ?? today,
-		can: { postpone: canPostpone(item.list), removeDue: canRemoveDue(item.dueDate, today), remind: canRemind(item.slot), setPriority: (item.labels ?? []).length === 0, setLabels: item.priority === null, stop: item.repeat !== null && item.repeatable, addDescription: item.description === null, fold: item.subtasks.length > 0 },
+		can: { postpone: canPostpone(item.list), removeDue: canRemoveDue(item.dueDate, today), remind: canRemind(item.slot), setPriority: (item.labels ?? []).length === 0, setLabels: item.priority === null, stop: item.repeat !== null && item.repeatable, addDescription: item.description === null, fold: item.subtasks.length > 0, resize: item.slot !== null },
 		...item,
 	};
 }

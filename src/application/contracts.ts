@@ -7,6 +7,7 @@ import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priori
 import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
+import type { ListPlace } from "./nesting";
 
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses. */
@@ -46,6 +47,10 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
+/** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
+export { RepeatPage } from "./RepeatPage";
+/** When the full screen's description editor writes, and when a change made elsewhere replaces what it shows. */
+export { DescriptionDraft } from "./DescriptionDraft";
 /** A list in its sections, and whether it shows their headers. */
 export { listView, type ListGroup, type ListRow, type ListView } from "./sections";
 /** What the corner of a card shows on a column's day: the due date unless it is that day, and the repeat icon. */
@@ -156,6 +161,8 @@ export interface TaskItem {
 		readonly stop: boolean;
 		readonly addDescription: boolean;
 		readonly fold: boolean;
+		/** Its time stretched by the dots on its edges: a task on the timeline. */
+		readonly resize: boolean;
 	};
 
 	/** The open subtasks right under this one, in file order, each with its own. */
@@ -291,7 +298,13 @@ export type DropTo =
 	| { readonly kind: "list"; readonly column: DropColumn; readonly before: TaskKey | null }
 	/** A gap of a list that shows sections: right before `before`, or at the end of `group`; `date`, the later day of the column. */
 	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
-	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
+	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
+	/**
+	 * A gap of a list column as the gesture found it: what it means there (`ListPlace`), or null for the column's end where
+	 * it places nothing in a gap (`placesInGap`). The service reads it as one of the three above by whose sections the
+	 * column shows on the drop's day (`columnSections`): a frontend never picks between them.
+	 */
+	| { readonly kind: "place"; readonly column: DropColumn; readonly place: ListPlace | null };
 
 /** A task let go, and where it was dragged from. */
 export interface DroppedTask {
@@ -367,6 +380,12 @@ export interface MenuStatus {
 	readonly confirm: boolean;
 }
 
+/** A row of the Reminder page: a kind, in the order the menu offers them; `checked` on the task's own. */
+export interface MenuReminder {
+	readonly kind: ReminderKind;
+	readonly checked: boolean;
+}
+
 /** A row of the edit group. */
 export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
 
@@ -397,6 +416,8 @@ export interface TaskMenuModel {
 	 * Section (with `sections`); Add subtask, except for a subtask of a timeline card's stack. The bulk menu's: Section alone.
 	 */
 	readonly edits: readonly MenuEditId[];
+	/** The Reminder page's rows, Off last; none without the Reminder row. */
+	readonly reminders: readonly MenuReminder[];
 	/** Delete asks first in one task's menu; the bulk menu's Delete N tasks writes at once. */
 	readonly remove: { readonly confirm: boolean };
 }
@@ -584,6 +605,8 @@ export interface TaskService {
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[];
 	/** Folds the task's subtasks away on the screen, or shows them again: the marker on its line. A task without an open subtask has nothing to fold. */
 	setCollapsed(key: TaskKey, collapsed: boolean): Promise<void>;
+	/** A tap on a card's subtask counter: its subtasks fold away, or show again when they were folded. */
+	toggleCollapsed(key: TaskKey): Promise<void>;
 	/** The tasks a subtask sits under show their subtasks again, so its card stands in the list. */
 	unfoldAbove(key: TaskKey): Promise<void>;
 	/**
@@ -639,6 +662,12 @@ export interface TaskService {
 	 * a card as long as it is, one without a duration starting a step before the end at the latest.
 	 */
 	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan;
+	/**
+	 * The minute a drag, a drop or a stretch on the timeline stands at, `minute` minutes from the day's start, the timeline
+	 * drawn `hourPx` pixels an hour: the nearest step, within the day. The step is the finest of 5, 15, 30 and 60 minutes a
+	 * finger still moves by without jitter (9 px): 30 at 28 px an hour, 15 at 56, 5 from 112 on.
+	 */
+	snap(minute: number, hourPx: number): number;
 	/** The slot of a new task let go or long-tapped on the timeline of `day` at `start`: no duration, as `dropSpan` places it. */
 	newSlot(day: LocalDate, start: number): Slot;
 	/**
@@ -949,6 +978,10 @@ export interface SettingsForm {
 	readonly googleClientId: string;
 	readonly refreshSeconds: number;
 	readonly workCalendarFile: string;
+	/** The hours a day may start at, in order: Day starts at offers them. */
+	readonly dayStartHours: readonly number[];
+	/** A client id is filled in, so Log in can open Google; without one the account asks for it first. */
+	readonly googleClientReady: boolean;
 }
 
 /** A field the service fills with a secret and takes typed text from: the UI never asks for the secret. */
@@ -992,6 +1025,11 @@ export interface SettingsService {
 	 * preset's own shade is that preset, so it keeps its other shade; any other code is itself. Null for text that is no colour.
 	 */
 	colourOf(text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
+	/**
+	 * A code typed for the colour of level or label `index` and left: the colour to write (`colourOf`), or null when it is
+	 * no colour or the one it has already; the field then shows its colour's code again.
+	 */
+	typedColour(of: "level" | "label", index: number, text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/** The name trimmed. */
 	renamePreset(index: number, name: string): Promise<void>;
 	removePreset(index: number): Promise<void>;
