@@ -167,6 +167,7 @@ export class QuickBar implements EntryPart {
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
 		this.place.el.hidden = state.place === null || section;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
+		if (!this.place.el.hidden) this.fadeLongPlace();
 		if (section) this.closePanel();
 		else this.refreshPanel();
 	}
@@ -288,6 +289,12 @@ export class QuickBar implements EntryPart {
 		this.shownPlace = place;
 		this.place.setIcon(placeIcon(place));
 		this.place.setText(place.kind === "date" ? dayMonth(place.date) : this.deps.listName(place.kind));
+	}
+
+	/** A section's name may be longer than the button: its end fades, as a card's title does. */
+	private fadeLongPlace(): void {
+		const label = this.place.el.querySelector<HTMLElement>(".tc-btn-label");
+		label?.classList.toggle("is-long", label.scrollWidth > label.clientWidth);
 	}
 
 	private toggle(kind: PanelKind): void {

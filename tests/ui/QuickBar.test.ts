@@ -147,6 +147,21 @@ describe("QuickBar", () => {
 		expect(label()).toBe("5 Nov");
 	});
 
+	it("fades the end of a place name too long for the button, and only then", () => {
+		listNames = RENAMED;
+		const scroll = vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+			return (this.textContent?.length ?? 0) * 10;
+		});
+		const client = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(60);
+		const { parent, bar } = setup({ place: { kind: "inbox" } });
+		const label = () => q<HTMLElement>(parent, ".tc-bar-place .tc-btn-label");
+		expect(label().classList.contains("is-long")).toBe(true);
+		bar.show({ ...STATE, place: { kind: "soon" } });
+		expect(label().classList.contains("is-long")).toBe(false);
+		scroll.mockRestore();
+		client.mockRestore();
+	});
+
 	it("keeps the field focused: pointerdown on the bar and on a panel is cancelled", () => {
 		const { parent } = setup();
 		const down = () => new Event("pointerdown", { bubbles: true, cancelable: true });
