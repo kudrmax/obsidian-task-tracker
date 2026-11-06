@@ -175,7 +175,7 @@ export class BulkMenu {
 		const moves = bulkMoveTiles(items, today).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		tileGroup(panel, "is-move", [moves]);
 		if (this.context.sections) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
-		menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, size: "tall", apart: true, onPick: this.pick(() => actions.remove()) });
+		menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: this.pick(() => actions.remove()) });
 	}
 
 	/** A label goes on or off the tasks and the menu stays, drawn again for them as the file now has them; one gone closes it. */

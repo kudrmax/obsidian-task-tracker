@@ -28,7 +28,7 @@ describe("the event menu", () => {
 		expect([...panel().querySelectorAll(".tc-menu-row .tc-menu-label")].map((n) => n.textContent)).toEqual(["Open in Calendar"]);
 		expect(panel().querySelector(".tc-menu-row svg")).not.toBeNull();
 		expect(panel().classList.contains("is-menu")).toBe(true);
-		expect(panel().querySelector(".tc-menu-row")!.className).toBe("tc-btn tc-menu-row is-tall");
+		expect(panel().querySelector(".tc-menu-row")!.className).toBe("tc-btn tc-menu-row");
 	});
 
 	it("opens the calendar and closes", () => {

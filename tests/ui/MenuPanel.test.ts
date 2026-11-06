@@ -117,9 +117,9 @@ describe("placePanel", () => {
 describe("menuRow", () => {
 	const shape = (row: HTMLElement) => [...row.childNodes].map((node) => (node instanceof Element ? `${node.tagName.toLowerCase()}${node.className && typeof node.className === "string" ? `.${node.className}` : ""}` : "#text"));
 
-	it("a tall row apart that adds: its kinds as classes, the label then the icon", () => {
-		const row = menuRow(document.body, { label: "New section", icon: "plus", size: "tall", apart: true, add: true, onPick: () => undefined });
-		expect(row.className).toBe("tc-btn tc-menu-row is-tall is-apart is-add");
+	it("a row apart that adds: its kinds as classes, the label then the icon", () => {
+		const row = menuRow(document.body, { label: "New section", icon: "plus", apart: true, add: true, onPick: () => undefined });
+		expect(row.className).toBe("tc-btn tc-menu-row is-apart is-add");
 		expect(shape(row)).toEqual(["span.tc-menu-label", "svg"]);
 	});
 
@@ -130,7 +130,7 @@ describe("menuRow", () => {
 
 	it("a purpose class after the kinds, danger last", () => {
 		expect(menuRow(document.body, { label: "Remove due date", icon: "removeDue", cls: "tc-picker-remove", onPick: () => undefined }).className).toBe("tc-btn tc-menu-row tc-picker-remove");
-		expect(menuRow(document.body, { label: "Delete", danger: true, size: "tall", apart: true, onPick: () => undefined }).className).toBe("tc-btn tc-menu-row is-tall is-apart is-danger");
+		expect(menuRow(document.body, { label: "Delete", danger: true, apart: true, onPick: () => undefined }).className).toBe("tc-btn tc-menu-row is-apart is-danger");
 	});
 
 	it("the back row: its own root, the icon first, the title as text", () => {

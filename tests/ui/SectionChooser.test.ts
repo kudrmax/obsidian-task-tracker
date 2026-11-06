@@ -25,7 +25,7 @@ describe("sectionChooser", () => {
 		let added = 0;
 		sectionChooser(panel, { choice, checked: () => false, onBack: () => undefined, onPick: () => undefined, onNew: () => added++ });
 		const last = panel.lastElementChild as HTMLElement;
-		expect([last.className, last.textContent]).toEqual(["tc-btn tc-menu-row is-tall is-apart is-add", "New section"]);
+		expect([last.className, last.textContent]).toEqual(["tc-btn tc-menu-row is-apart is-add", "New section"]);
 		last.click();
 		expect(added).toBe(1);
 	});
