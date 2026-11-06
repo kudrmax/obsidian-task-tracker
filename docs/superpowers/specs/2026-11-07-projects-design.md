@@ -1,6 +1,6 @@
 # Projects
 
-Status: brainstorm. The core is being planned with Max; nothing is built yet.
+Status: planned with Max; nothing is built yet.
 
 ## Why
 
@@ -44,8 +44,11 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     place in the lane; «No project» moves it back into the file. A project group has no plus of its own: the plus at the bottom right,
     taken to a project group (the way it is taken to any place), writes the new task into that project's note.
     Everything inside a project group is that project's: tasks, their subtasks and descriptions.
-12. **Plain checkboxes stay out.** A checkbox outside the note's lane sections is a plain checklist the plugin never
-    reads. A section the plugin needs and the note lacks is added when it first writes there.
+12. **A lane section is any H2 with its name, anywhere in the note**: `## Inbox`, `## Now`, `## Soon`, `## Backlog`,
+    `## Done`, in any order, between Max's own headings, under an H1 of his or not. It lasts to the next heading of level
+    1 or 2. A checkbox outside these sections is a plain checklist the plugin never reads. A section the plugin needs and
+    the note lacks is added at the note's end when it first writes there.
+13. **«No project» keeps the file's Backlog as it is**: its sections show inside the group as they do in Backlog today.
 
 ## How it is used
 
@@ -61,10 +64,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 
 The task menu's «Project»: board `docs/design/canvas/Proj3Flow.dc.html` (approved).
 
-## Open (being planned now)
+## Open (technical, for the backend)
 
-- How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
-- Where the lane sections stand in a project note: right in the note as `## Inbox`… or under one `## Tasks`.
 - How the iPhone app reads tasks spread over many files.
 
 ## Ideas for later
