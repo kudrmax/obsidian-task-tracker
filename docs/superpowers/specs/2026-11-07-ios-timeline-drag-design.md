@@ -124,6 +124,39 @@ last minute because the hover ends before the drop, polling the file every 2 s w
 (`NSFilePresenter`) or the scene's phase tells of a change, alerts used as text fields where a system sheet or an inline
 field is the iOS way. Each one replaced by the system's way, or kept with a one-line reason in «Decisions».
 
+### Typing tasks in place, the plugin's quick entry (Max's finding 10 — a blocker)
+
+The app now asks a new task's title (plus dropped, Add Subtask) and a rename in a small sheet with a field. Max: a
+blocker, never in production. The plugin writes a task **right where it will stand**: a field opens in the list at the
+task's place, as if filling in the markdown file itself; **Enter saves it and opens the next empty field right under
+it**, so a batch is typed in a row; the bar over the keyboard turns the field into a subtask of the task above and back,
+and more. All of it must come over, exactly: `docs/plugin/tasks.md` «Новая задача: быстрый ввод» is the behaviour
+(every row of its tables and lists), the board «5 — Новая задача» (`project/NewTask.dc.html`, `project/KeyBar.dc.html`)
+is the look on the phone, and the core already holds every rule of it: the door's `entry.*` (`docs/door.md`, «entry.*:
+the quick entry» — the session, the look, `openAtDrop`, `openSlot`, `subtaskSpot`, `renameSpot`, `open`, `type`,
+`setPriority`/`togglePriority`, `setLabels`/`toggleLabel`, `setRepeat`, `indent(±1)`, `toggleSection`, `enter`, `blur`,
+`escape`, `choosePlace`, `listEntry`, and the jobs: `entry.call` → `tasks.<method>` → `entry.shown`/`unshown` →
+`entry.done`). The plugin's frontend is the reference for driving it: `obsidian/ui/quick/QuickEntryController.ts`,
+`QuickBar.ts`, `MarkdownTitleField.ts`.
+
+- **Where the field opens:** the plus dropped between cards (at the level the drop shows), on the calendar (that time,
+  only the flag on its bar), Add Subtask (last subtask), Rename (over the card, its text in the field), a tap on a «No
+  tasks» plate (that section). A tap on the plus itself keeps opening the voice/typing capture sheet (Max's earlier
+  decision for the phone), unless Max says otherwise.
+- **The field** is the capsule at the task's place, no frame, the accent cursor, the list scrolled so it stays above the
+  keyboard; the rows below it part for it. A `p1 ` prefix sets the priority as typed, the field tinted.
+- **Enter** writes (a job) and opens the next empty field right under the written task at once — the written card
+  appears in its place the moment the file has it, the field never jumps. Enter on an empty field ends (a subtask's
+  first steps one level left). A tap elsewhere saves and ends. The top bar's «⋯» becomes the accent check that ends
+  typing (board note 5); undo stays.
+- **The bar over the keyboard** (board «5», `KeyBar.dc.html`): left the section button and the outdent/indent pair, right
+  the priority flag, repeat and the place menu (Inbox, Backlog, Soon, Today, Date…), as glass groups of iOS 26
+  (`UIToolbar`/keyboard accessory or `.toolbar(placement: .keyboard)` with glass); the tab bar hides while typing. What
+  each shows and allows is the session's state (`EntryState`): a subtask has no place button, a calendar field only the
+  flag, the section field only the section button.
+- **Sheets for titles go**: Rename, Add Subtask and the plus's drop use the field in place; New Section uses the
+  section field (the section button) where it applies.
+
 **Quality bar.** This branch is reviewed as a release of an App Store app: before reporting, the Swift agent goes
 through every gesture and screen on the simulator itself — swipes between the places, taps on the tabs, the day arrows,
 a tap and a long press on a card, a drag inside a list, to a subtask, to another column, to the calendar, onto the cancel
