@@ -11,6 +11,8 @@ struct TimelineColumn: View {
     @State private var opened: String?
     /// The minute a carried card would start at, shown as a line while it is held over the calendar.
     @State private var landing: Int?
+    /// The last minute the line stood at: SwiftUI ends the hover before the drop, and the drop writes what was shown.
+    @State private var last = LastMinute()
 
     @Environment(\.colorScheme) private var scheme
 
@@ -46,7 +48,7 @@ struct TimelineColumn: View {
                     }
                     .frame(width: box.size.width, height: y(24 * 60), alignment: .topLeading)
                     .contentShape(.rect)
-                    .onDrop(of: [.plainText], delegate: TimeLanding(model: model, minute: $landing, minuteAt: minute(at:)))
+                    .onDrop(of: [.plainText], delegate: TimeLanding(model: model, minute: $landing, last: last, minuteAt: minute(at:)))
                 }
                 .scrollPosition($position)
                 .scrollIndicators(.hidden)
@@ -173,13 +175,19 @@ struct EventBlock: View {
 
 /// The calendar taking a carried card or the plus: the line follows the finger on the grid's steps, and letting go drops
 /// it at that time.
+final class LastMinute {
+    var minute: Int?
+}
+
 private struct TimeLanding: DropDelegate {
     let model: BoardModel
     @Binding var minute: Int?
+    let last: LastMinute
     let minuteAt: (CGFloat) -> Double
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         let snapped = model.snap(minuteAt(info.location.y), hourHeight: CardMetrics.hour)
+        last.minute = snapped
         if snapped != minute {
             if minute != nil { UISelectionFeedbackGenerator().selectionChanged() }
             withAnimation(.snappy(duration: 0.15)) { minute = snapped }
@@ -192,8 +200,10 @@ private struct TimeLanding: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        let at = minuteAt(info.location.y)
+        // The time written is the one the line showed.
+        let at = (minute ?? last.minute).map(Double.init) ?? minuteAt(info.location.y)
         minute = nil
+        last.minute = nil
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         _ = provider.loadObject(ofClass: NSString.self) { object, _ in
             guard let id = object as? String else { return }
