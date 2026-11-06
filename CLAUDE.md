@@ -16,6 +16,10 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 `src/domain` (pure: the file, the tasks, the rules), `src/application` (`contracts.ts` is the API the UI talks to; services), `src/infrastructure` (vault, Google, the work file), `src/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `src/settings.ts` and `src/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.
 
+**The UI decides nothing.** A second frontend in Swift is coming (`../task-calendar-ios`). Everything it would have to repeat lives in `application`: what is offered and what is disabled, what a tap writes, defaults, where a new task goes, what counts as the same, empty or overdue. The UI gets the decision ready (a field in `TaskItem.can`, a service method, a ready menu model) and only draws and turns gestures into minutes and places. The test: if the Swift version would have to write this line, it doesn't belong here.
+
+`domain` and `application` are pure: no host globals (`window`, `document`, `setTimeout`, `localStorage`…), they get the clock and timers through ports. `src/phone` is the iOS app's door, `globalThis.TaskCalendarPhone`: its functions keep their names, arguments and results (adding is fine), the app calls them. `tests/architecture.test.ts` guards the imports, the host globals (`tsconfig.core.json`) and what `contracts.ts` re-exports; `tests/uiDecides.test.ts` trips on task fields compared in `src/ui`. Don't loosen them or raise a baseline: move the decision into `application`.
+
 ## One design system
 
 - `styles.css`: the `body { … }` block at the top holds every token (`--tc-…`): colours, radii, sizes, type, spacing, motion. Component rules only read `var(--tc-…)`. `tests/styles.test.ts` fails on a bare number, colour or radius in a rule, on an unused or undefined token, and on `DESIGN` in `src/ui/design.ts` disagreeing with the CSS. Don't loosen it: move the value into a token.
