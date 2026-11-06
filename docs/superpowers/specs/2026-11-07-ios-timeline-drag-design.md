@@ -188,3 +188,8 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   named in a comment beside `PAST_SHARES` in `paints.ts`.
 - backend: `rules.formatZoomLevels` is offered too (the plugin's settings field uses it; the app may show the levels the
   same way).
+- backend: `rules.zoomAfterPinch(hourPx, wholeDayPx, levels)` → `"wholeDay" | hourPx` and `rules.zoomShown(saved,
+  wholeDayPx, levels)` → the hour height to open at (`"wholeDay"` → the whole day; a number clamped to `levelsFor`'s ends;
+  an unreadable saved zoom → `DEFAULT_ZOOM_HOUR`, clamped). `wholeDayPx` is `null` before the timeline has a height, and
+  then the smallest level stands for the whole day. The `Zoom` type (`number | "wholeDay"`) is exported from contracts;
+  `obsidian/ui/viewSettings.ts` still declares its own and may switch to it.

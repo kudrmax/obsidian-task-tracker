@@ -258,6 +258,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	levelsFor: "./timelineZoom",
 	gridAt: "./timelineZoom",
 	gridMarks: "./timelineZoom",
+	zoomAfterPinch: "./timelineZoom",
+	zoomShown: "./timelineZoom",
 	dayTitle: "./dayLabels",
 	dueLabel: "./dayLabels",
 	eventLevels: "./eventLevels",

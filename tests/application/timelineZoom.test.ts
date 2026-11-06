@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, levelsFor, parseZoomLevels, zoomLevelsOf } from "../../core/application/timelineZoom";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "../../core/application/timelineZoom";
 
 const MEASURES = { divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16 };
 
@@ -96,5 +96,44 @@ describe("gridMarks", () => {
 
 	it("writes a label in two digits", () => {
 		expect(gridMarks({ labels: 5, lines: 5 }, 1)[0]).toEqual({ minute: 5, label: ":05" });
+	});
+});
+
+describe("zoomAfterPinch", () => {
+	const levels = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }];
+
+	it("is the whole day for a pinch let go at or under the whole day's height", () => {
+		expect(zoomAfterPinch(30, 30, levels)).toBe("wholeDay");
+		expect(zoomAfterPinch(25, 30, levels)).toBe("wholeDay");
+	});
+
+	it("is the height itself above it", () => {
+		expect(zoomAfterPinch(31, 30, levels)).toBe(31);
+		expect(zoomAfterPinch(80, 30, levels)).toBe(80);
+	});
+
+	it("takes the smallest level for the whole day before the timeline has a height", () => {
+		expect(zoomAfterPinch(28, null, levels)).toBe("wholeDay");
+		expect(zoomAfterPinch(29, null, [{ hourPx: 56 }, { hourPx: 28 }])).toBe(29);
+	});
+});
+
+describe("zoomShown", () => {
+	const levels = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }];
+
+	it("opens the whole day at its height, or the smallest level's before the timeline has one", () => {
+		expect(zoomShown("wholeDay", 30, levels)).toBe(30);
+		expect(zoomShown("wholeDay", null, levels)).toBe(28);
+	});
+
+	it("opens a saved height as it was, between the whole day and the closest level", () => {
+		expect(zoomShown(80, 30, levels)).toBe(80);
+		expect(zoomShown(20, 30, levels)).toBe(30);
+		expect(zoomShown(500, 30, levels)).toBe(112);
+		expect(zoomShown(300, 300, levels)).toBe(300);
+	});
+
+	it("opens at the default zoom when nothing that reads was saved", () => {
+		for (const saved of [null, undefined, 0, -5, Number.NaN, "x"]) expect(zoomShown(saved, 30, levels)).toBe(DEFAULT_ZOOM_HOUR);
 	});
 });

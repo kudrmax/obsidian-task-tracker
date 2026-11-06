@@ -512,6 +512,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.levelsFor", 30, [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }]),
 		plain("rules.gridAt", 192, { divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16 }),
 		plain("rules.gridMarks", { labels: 30, lines: 15 }, 2),
+		plain("rules.zoomAfterPinch", 25, 30, [{ hourPx: 28 }, { hourPx: 56 }]),
+		plain("rules.zoomShown", "wholeDay", null, [{ hourPx: 28 }, { hourPx: 56 }]),
 		plain("timeline.zoomLevels"),
 		...[
 			["openAtEnd", "soon"],

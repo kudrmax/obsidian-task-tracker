@@ -81,3 +81,25 @@ export function zoomLevelsOf(saved: unknown): ZoomLevel[] {
 	if (!levels.every((hourPx): hourPx is number => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
 	return levels.map((hourPx) => ({ hourPx }));
 }
+
+/** Where a timeline was left: an hour's height, or the whole day, whatever the screen's height. */
+export type Zoom = number | "wholeDay";
+
+/** The whole day's hour height, or the smallest level's while the timeline has no height to fit the day in. */
+function wholeDayOr(wholeDayPx: number | null, levels: readonly ZoomLevel[]): number {
+	return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
+}
+
+/** The zoom a pinch let go at `hourPx` settles on: the whole day at or under its height, else the height itself. */
+export function zoomAfterPinch(hourPx: number, wholeDayPx: number | null, levels: readonly ZoomLevel[]): Zoom {
+	return hourPx <= levelsFor(wholeDayOr(wholeDayPx, levels), levels)[0].hourPx ? "wholeDay" : hourPx;
+}
+
+/** The hour height a saved zoom opens at: the whole day's, or the saved height kept between the pinch's ends; the default zoom for a saved one that doesn't read. */
+export function zoomShown(saved: unknown, wholeDayPx: number | null, levels: readonly ZoomLevel[]): number {
+	const ends = levelsFor(wholeDayOr(wholeDayPx, levels), levels);
+	const [min, max] = [ends[0].hourPx, ends[ends.length - 1].hourPx];
+	if (saved === "wholeDay") return min;
+	const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
+	return Math.min(max, Math.max(min, hourPx));
+}

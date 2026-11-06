@@ -270,7 +270,11 @@ bgAlpha, theme)` (an event's `bg`, `bar`, `text`); `dayTitle(date, relation, tod
 moves between at this screen's height, the whole day first), `gridAt(hourPx, measures)` (`measures`:
 `{ divisions, labelGap, tickMinutes, tickGap }`, the frontend's own; answers `{ labels, lines }`, minutes),
 `gridMarks(grid, dayHours)` (every line between the hours: `{ minute, label }`, `minute` from the day's start, `label`
-`":30"` or `null`); `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
+`":30"` or `null`), `zoomAfterPinch(hourPx, wholeDayPx, levels)` (where a pinch let go at `hourPx` settles:
+`"wholeDay"` at or under the whole day's height, else `hourPx`; save it as the device's zoom), `zoomShown(saved,
+wholeDayPx, levels)` (the hour height a saved zoom opens at: `"wholeDay"` → the whole day's height, a number kept
+between the whole day and the largest level, anything else `DEFAULT_ZOOM_HOUR` kept the same way). In both
+`wholeDayPx` is `null` while the timeline has no height yet: the smallest level stands for the whole day; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
