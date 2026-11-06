@@ -1,14 +1,19 @@
 import type { SyncControl, SyncSnapshot, SyncStatus } from "../../obsidian/infrastructure/SyncWait";
 
 /**
- * Obsidian Sync driven by hand, behaving as the real one does: `request` starts a run at once (and fires the change)
- * unless one is going, paused or off; `finish` ends the current run with the status it leaves.
+ * Obsidian Sync driven by hand, behaving as the real one does, only synchronously. `request` does nothing while a run is
+ * going; while off, loading or paused it flips the run on and off (two changes) and the status stays; otherwise a run
+ * starts and `finish` ends it with the status it leaves. The server: `heardAt` grows when a run talks to it (`finish`
+ * by default) or when it answers a ping (`pong`).
  */
 export class FakeSync implements SyncControl {
 	requests = 0;
+	probes = 0;
 	private status: SyncStatus;
 	private running = false;
 	private ready: boolean;
+	private connected = true;
+	private heardAt = 100;
 	private readonly listeners = new Set<() => void>();
 
 	constructor(status: SyncStatus = "synced", { ready = true, running = false } = {}) {
@@ -23,13 +28,29 @@ export class FakeSync implements SyncControl {
 	}
 
 	snapshot(): SyncSnapshot {
-		return { status: this.status, running: this.running, ready: this.ready };
+		return { status: this.status, running: this.running, ready: this.ready, connected: this.connected, heardAt: this.heardAt };
 	}
 
 	request(): void {
 		this.requests++;
-		if (this.running || this.status === "off" || this.status === "paused") return;
+		if (this.running) return;
+		if (this.status === "off" || this.status === "loading" || this.status === "paused") {
+			this.running = true;
+			this.emit();
+			this.running = false;
+			this.emit();
+			return;
+		}
 		this.startRun();
+	}
+
+	probe(): void {
+		this.probes++;
+	}
+
+	/** The server answers the ping. */
+	pong(): void {
+		this.heardAt++;
 	}
 
 	onChange(listener: () => void): () => void {
@@ -49,9 +70,12 @@ export class FakeSync implements SyncControl {
 		this.emit();
 	}
 
-	finish(status: SyncStatus = "synced", { ready = this.ready } = {}): void {
+	/** Ends the run; `heard: false` is a run that sent nothing, `connected: false` one whose socket is gone. */
+	finish(status: SyncStatus = "synced", { ready = this.ready, heard = true, connected = this.connected } = {}): void {
 		this.running = false;
 		this.ready = ready;
+		this.connected = connected;
+		if (heard) this.heardAt++;
 		this.status = status;
 		this.emit();
 	}

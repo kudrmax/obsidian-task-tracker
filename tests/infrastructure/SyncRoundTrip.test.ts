@@ -23,7 +23,7 @@ function roundTrip(isPhone: boolean) {
 		wait: {
 			run: () => {
 				waits++;
-				return new Promise((resolve) => (answer = resolve));
+				return { outcome: new Promise((resolve) => (answer = resolve)), cancel: () => answer({ kind: "left" }) };
 			},
 		},
 	});
@@ -55,6 +55,16 @@ describe("SyncRoundTrip", () => {
 		r.trip.run();
 		await r.answer({ kind: "failed", reason: SYNC_REASONS.timeout });
 		expect(r.opened).toEqual(["taskcalendar://synced?error=Obsidian%20Sync%20didn't%20finish%20in%2045%20seconds"]);
+	});
+
+	it("drops the wait when the plugin unloads: the notice goes, nothing hands back, a new tap starts afresh", async () => {
+		const r = roundTrip(true);
+		r.trip.run();
+		r.trip.stop();
+		await r.answer({ kind: "synced" });
+		expect([r.opened, r.hidden()]).toEqual([[], 1]);
+		r.trip.run();
+		expect([r.waits(), r.notices.length]).toEqual([2, 2]);
 	});
 
 	it("joins a second tap to the wait going", async () => {

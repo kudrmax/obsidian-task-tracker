@@ -39,10 +39,14 @@ Reasons the plugin sends:
 
 | Sync's state | `error` |
 |---|---|
-| no Sync in this vault (plugin off, or no remote vault: `uninitialized` / `disconnected`) | `Obsidian Sync is off in this vault` |
+| no Sync in this vault (the core plugin disabled, or no remote vault: `disconnected`) | `Obsidian Sync is off in this vault` |
 | `paused` | `Obsidian Sync is paused` |
 | `error` | `Obsidian Sync reported an error` |
-| not finished after 45 s | `Obsidian Sync didn't finish in 45 seconds` |
+| not finished after 45 s, the status `error` at that moment (files Sync keeps retrying) | `Obsidian Sync reported an error` |
+| not finished after 45 s otherwise | `Obsidian Sync didn't finish in 45 seconds` |
+
+`uninitialized` is not off: Sync hasn't loaded its data yet (a cold start, when iOS had evicted Obsidian). The plugin
+waits; Sync runs by itself once loaded, and then reads `disconnected` if the vault has no remote.
 
 ## In Obsidian (plugin, phone only)
 
@@ -80,14 +84,29 @@ phone learns of the Mac's changes only after leaving Obsidian: the button is the
   new run starts within 3 s; a run in that time restarts the count when it ends. Obsidian-only.
 - **Obsidian: a run already going when the link comes doesn't count.** The plugin lets it end, then calls
   `requestSync()` itself, and that run is the one judged. Obsidian-only.
-- **Obsidian: only the status a run ends with is judged.** An `error` shown mid-run (a file retry) or left over from
-  before the link is ignored (`requestSync()` clears it). A run that ends with `ready` false (the reconnect hadn't had the
-  server's answer) is not judged either: the plugin waits for the next run, which Sync starts on the server's answer or
-  on its own 30-second timer, inside the 45 s. Outside a run, `paused` or off end the wait at once. Obsidian-only.
+- **Obsidian: only the status a run ends with is judged.** An `error` shown mid-run is ignored, and so is one left over
+  from before the link: `requestSync()` clears Sync's `error` flag (not its list of files to retry, see the timeout
+  entry). `paused` and `error` are judged whatever `ready` says (offline: the connect fails, the run ends `error`). A run
+  that ends `synced` without a proven server (next entry) is not judged: the plugin asks for another run a second later.
+  Outside a run, `paused` or off end the wait at once. Obsidian-only.
+- **Obsidian: a `synced` end counts only with a proven server**: `ready` true, the socket open
+  (`server.isConnected()`), and the server heard from since the link (`server.lastMessageTs` grew past its value at the
+  link; any message counts, a ping's answer too, and a fresh socket sets it on opening). An open socket not heard from
+  gets one `{op: "ping"}` per wait, as Sync's own heartbeat sends; a dead socket left from before the phone slept never
+  answers, so the wait ends at 45 s instead of handing back without the Mac's changes. Not open → another run reconnects.
+  A run that ends unproven is followed by `requestSync()` 1 s later, until the proof or the 45 s. Obsidian-only.
+- **Obsidian: `uninitialized` with the core plugin enabled is «not yet»**, not off: the wait goes on inside the 45 s.
+  Obsidian-only.
+- **Obsidian: the timeout tells an error apart**: at 45 s the status `error` (files in Sync's retry list keep it there
+  while its loop goes on) sends `Obsidian Sync reported an error`, anything else the 45-seconds reason. Obsidian-only.
+- **Obsidian: the plugin unloading ends the wait** (a reload after Sync brought a release, a disable): the notice is
+  hidden and nothing hands back. Obsidian-only.
 - **Obsidian: a second link while waiting joins the first wait**: one notice, one hand-back. Obsidian-only.
 - **Obsidian: the adapter's defaults.** Without `getStatus`, `requestSync`, `on` or `offref` (or with the core plugin
   disabled, or a status it doesn't know) Sync is off. `syncing` missing → a run is going when the status is `syncing`;
-  `ready` missing → taken as true, so a renamed field can't hold every tap to the 45 s. Obsidian-only.
+  `ready` missing → taken as true, so a renamed field can't hold every tap to the 45 s. No `server` field, or a server
+  without `isConnected` / `lastMessageTs` → connected and heard, as before they were read; `server` null → not connected.
+  Obsidian-only.
 - **Obsidian: leaving is the page's `visibilitychange` with `document.hidden` true** (what iOS fires on «‹ Tasks», home,
   another app); the wait ends with nothing opened. Obsidian-only.
 - **Obsidian: on the Mac the handler only calls `requestSync()`**: no notice, no wait, nothing opened.

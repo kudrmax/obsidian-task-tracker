@@ -76,6 +76,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		});
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
+		this.register(() => services.stopSyncForApp());
 		this.addSettingTab(
 			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), view: this.viewSettings, google: services.google, work: services.work, calendars: services.calendars }),
 		);

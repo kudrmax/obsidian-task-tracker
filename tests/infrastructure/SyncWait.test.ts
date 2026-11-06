@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SYNC_QUIET_MS, SYNC_REASONS, SYNC_TIMEOUT_MS, SyncWait, type SyncOutcome } from "../../obsidian/infrastructure/SyncWait";
+import { SYNC_QUIET_MS, SYNC_REASONS, SYNC_RETRY_MS, SYNC_TIMEOUT_MS, SyncWait, type SyncOutcome } from "../../obsidian/infrastructure/SyncWait";
 import { FakeSync } from "../fakes/FakeSync";
 import { FakeTimers } from "../fakes/FakeTimers";
 
@@ -22,9 +22,11 @@ function waiting(sync: FakeSync) {
 	const timers = new FakeTimers();
 	const screen = new FakeScreen();
 	let outcome: SyncOutcome | null = null;
-	void new SyncWait(sync, timers, screen).run().then((o) => (outcome = o));
+	const wait = new SyncWait(sync, timers, screen).run();
+	void wait.outcome.then((o) => (outcome = o));
 	return {
 		timers,
+		cancel: () => wait.cancel(),
 		screen,
 		outcome: async () => {
 			await Promise.resolve();
@@ -86,11 +88,72 @@ describe("SyncWait", () => {
 		const sync = new FakeSync("synced", { ready: false });
 		const w = waiting(sync);
 		sync.finish("synced", { ready: false });
-		expect(w.timers.delays).toEqual([SYNC_TIMEOUT_MS]);
+		expect(w.timers.delays).toEqual([SYNC_TIMEOUT_MS, SYNC_RETRY_MS]);
 		sync.startRun();
 		sync.finish("synced", { ready: true });
 		w.pass(SYNC_QUIET_MS);
 		expect(await w.outcome()).toEqual(SYNCED);
+	});
+
+	it("pings a socket not heard from since the link, and counts the run after its answer", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		sync.finish("synced", { heard: false });
+		expect([sync.probes, w.timers.delays]).toEqual([1, [SYNC_TIMEOUT_MS, SYNC_RETRY_MS]]);
+		sync.pong();
+		w.pass(SYNC_RETRY_MS);
+		expect(sync.requests).toBe(2);
+		sync.finish("synced", { heard: false });
+		w.pass(SYNC_QUIET_MS);
+		expect(await w.outcome()).toEqual(SYNCED);
+		expect(sync.probes).toBe(1);
+	});
+
+	it("never counts a dead socket left from before the phone slept: no answer, no hand-back as synced", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		for (let run = 0; run < 3; run++) {
+			sync.finish("synced", { heard: false });
+			w.pass(SYNC_RETRY_MS);
+		}
+		expect(sync.probes).toBe(1);
+		w.pass(SYNC_TIMEOUT_MS);
+		expect(await w.outcome()).toEqual(failed(SYNC_REASONS.timeout));
+	});
+
+	it("asks again when the run ended with the socket closed, and counts the reconnected run", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		sync.finish("synced", { connected: false, heard: false });
+		expect(sync.probes).toBe(0);
+		w.pass(SYNC_RETRY_MS);
+		sync.finish("synced", { connected: true });
+		w.pass(SYNC_QUIET_MS);
+		expect(await w.outcome()).toEqual(SYNCED);
+	});
+
+	it("waits for Sync still loading after a cold start: it runs by itself once loaded", async () => {
+		const sync = new FakeSync("loading");
+		const w = waiting(sync);
+		expect([sync.requests, await w.outcome(), w.timers.delays]).toEqual([1, null, [SYNC_TIMEOUT_MS]]);
+		sync.startRun();
+		sync.finish("synced");
+		w.pass(SYNC_QUIET_MS);
+		expect(await w.outcome()).toEqual(SYNCED);
+	});
+
+	it("says Sync is off when it loads without a remote vault", async () => {
+		const sync = new FakeSync("loading");
+		const w = waiting(sync);
+		sync.set("off");
+		expect(await w.outcome()).toEqual(failed(SYNC_REASONS.off));
+	});
+
+	it("says Sync is paused when the run going at the link ends paused", async () => {
+		const sync = new FakeSync("synced", { running: true });
+		const w = waiting(sync);
+		sync.finish("paused");
+		expect([await w.outcome(), sync.requests]).toEqual([failed(SYNC_REASONS.paused), 1]);
 	});
 
 	it("says Sync is off in a vault without it", async () => {
@@ -156,6 +219,23 @@ describe("SyncWait", () => {
 		expect(sync.listening).toBe(0);
 		sync.finish("synced");
 		expect(w.timers.delays).toEqual([]);
+	});
+
+	it("reports an error, not the clock, when files Sync keeps retrying hold it past 45 seconds", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		sync.set("error");
+		w.pass(SYNC_TIMEOUT_MS);
+		expect(await w.outcome()).toEqual(failed(SYNC_REASONS.error));
+	});
+
+	it("ends as left when cancelled, the plugin unloading", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		sync.finish("synced", { heard: false });
+		w.cancel();
+		expect(await w.outcome()).toEqual(LEFT);
+		expect([w.timers.delays, sync.listening, w.screen.listening]).toEqual([[], 0, 0]);
 	});
 
 	it("ends at once when Max leaves Obsidian, and stays ended when Sync finishes later", async () => {

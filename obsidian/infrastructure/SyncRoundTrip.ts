@@ -1,4 +1,4 @@
-import type { SyncControl, SyncOutcome } from "./SyncWait";
+import type { SyncControl, SyncOutcome, SyncWaiting } from "./SyncWait";
 
 /** obsidian://task-calendar-sync: the Tasks app's Sync button. */
 export const SYNC_ACTION = "task-calendar-sync";
@@ -17,31 +17,36 @@ export interface SyncRoundTripHost {
 export interface SyncRoundTripDeps {
 	readonly host: SyncRoundTripHost;
 	readonly sync: SyncControl;
-	readonly wait: { run(): Promise<SyncOutcome> };
+	readonly wait: { run(): SyncWaiting };
 }
 
 /**
  * The app sends the phone to Obsidian to sync; once Sync has finished or can't, Obsidian sends it back with the result.
- * Max leaving Obsidian first ends the round trip with no answer.
+ * Max leaving Obsidian first, or the plugin unloading, ends the round trip with no answer.
  */
 export class SyncRoundTrip {
-	private waiting: Promise<void> | null = null;
+	private waiting: SyncWaiting | null = null;
 
 	constructor(private readonly deps: SyncRoundTripDeps) {}
 
 	/** A second tap while one wait is going joins it: the app gets one answer. */
 	run(): void {
 		if (!this.deps.host.isPhone) return this.deps.sync.request();
-		this.waiting ??= this.waitAndHandBack();
+		if (this.waiting) return;
+		const hide = this.deps.host.notice(SYNC_NOTICE);
+		const waiting = (this.waiting = this.deps.wait.run());
+		void waiting.outcome.then((outcome) => {
+			hide();
+			if (this.waiting === waiting) this.waiting = null;
+			const link = backLink(outcome);
+			if (link) this.deps.host.open(link);
+		});
 	}
 
-	private async waitAndHandBack(): Promise<void> {
-		const hide = this.deps.host.notice(SYNC_NOTICE);
-		const outcome = await this.deps.wait.run();
-		hide();
+	/** The plugin unloads: the wait ends here, its notice goes, and nothing hands back later. */
+	stop(): void {
+		this.waiting?.cancel();
 		this.waiting = null;
-		const link = backLink(outcome);
-		if (link) this.deps.host.open(link);
 	}
 }
 

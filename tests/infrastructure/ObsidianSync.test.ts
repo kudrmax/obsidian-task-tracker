@@ -28,7 +28,7 @@ function obsidianSync(fields: Record<string, unknown> = {}, enabled = true) {
 describe("ObsidianSync", () => {
 	it("reads the status, the run and the server's answer", () => {
 		const o = obsidianSync({ status: "syncing", syncing: true, ready: false });
-		expect(new ObsidianSync(o.app).snapshot()).toEqual({ status: "syncing", running: true, ready: false });
+		expect(new ObsidianSync(o.app).snapshot()).toEqual({ status: "syncing", running: true, ready: false, connected: true, heardAt: null });
 	});
 
 	it("keeps the run apart from the status: an error shown mid-run is still a run", () => {
@@ -36,7 +36,11 @@ describe("ObsidianSync", () => {
 		expect(new ObsidianSync(o.app).snapshot()).toMatchObject({ status: "error", running: true });
 	});
 
-	it.each(["uninitialized", "disconnected", "something new"])("counts %s as off", (status) => {
+	it("reads uninitialized as still loading, not off: Sync hasn't read its data yet after a cold start", () => {
+		expect(new ObsidianSync(obsidianSync({ status: "uninitialized" }).app).snapshot().status).toBe("loading");
+	});
+
+	it.each(["disconnected", "something new"])("counts %s as off", (status) => {
 		expect(new ObsidianSync(obsidianSync({ status }).app).snapshot().status).toBe("off");
 	});
 
@@ -50,7 +54,29 @@ describe("ObsidianSync", () => {
 
 	it("falls back on the status when the run and the answer flags are gone", () => {
 		const o = obsidianSync({ status: "syncing", syncing: undefined, ready: undefined });
-		expect(new ObsidianSync(o.app).snapshot()).toEqual({ status: "syncing", running: true, ready: true });
+		expect(new ObsidianSync(o.app).snapshot()).toEqual({ status: "syncing", running: true, ready: true, connected: true, heardAt: null });
+	});
+
+	it("reads the server's socket and its last word", () => {
+		const open = { isConnected: () => true, lastMessageTs: 1234 };
+		expect(new ObsidianSync(obsidianSync({ server: open }).app).snapshot()).toMatchObject({ connected: true, heardAt: 1234 });
+		const closed = { isConnected: () => null, lastMessageTs: 1234 };
+		expect(new ObsidianSync(obsidianSync({ server: closed }).app).snapshot()).toMatchObject({ connected: false, heardAt: 1234 });
+		expect(new ObsidianSync(obsidianSync({ server: null }).app).snapshot()).toMatchObject({ connected: false, heardAt: 0 });
+		expect(new ObsidianSync(obsidianSync({ server: {} }).app).snapshot()).toMatchObject({ connected: true, heardAt: null });
+	});
+
+	it("pings an open socket only", () => {
+		const sent: unknown[] = [];
+		let connected = true;
+		const server = { isConnected: () => connected, send: (message: unknown) => sent.push(message), lastMessageTs: 0 };
+		const sync = new ObsidianSync(obsidianSync({ server }).app);
+		sync.probe();
+		connected = false;
+		sync.probe();
+		expect(sent).toEqual([{ op: "ping" }]);
+		expect(() => new ObsidianSync(obsidianSync({ server: { isConnected: () => true, send: () => { throw new Error("closed"); } } }).app).probe()).not.toThrow();
+		expect(() => new ObsidianSync({}).probe()).not.toThrow();
 	});
 
 	it("asks for a run and swallows its failure", async () => {

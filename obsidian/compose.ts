@@ -30,6 +30,8 @@ export interface Services extends Core {
 	keepWorkExportInstalled(): () => void;
 	/** The iPhone app's Sync button: runs Obsidian Sync and, on the phone, hands back to the app with the result. */
 	syncForApp(): void;
+	/** Drops a wait under way, when the plugin unloads. */
+	stopSyncForApp(): void;
 }
 
 export interface ServicesHost {
@@ -70,6 +72,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
 		syncForApp: () => syncRoundTrip.run(),
+		stopSyncForApp: () => syncRoundTrip.stop(),
 	};
 }
 
