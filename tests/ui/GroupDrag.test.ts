@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GroupName, TaskItem } from "../../src/application/contracts";
-import { GroupDrag, nearestSlot } from "../../src/ui/drag/GroupDrag";
-import { GestureArbiter } from "../../src/ui/gestures";
-import { TaskList } from "../../src/ui/TaskList";
+import type { GroupName, TaskItem } from "../../core/application/contracts";
+import { GroupDrag, nearestSlot } from "../../obsidian/ui/drag/GroupDrag";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
 
 

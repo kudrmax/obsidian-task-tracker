@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostpone, canRemoveDue, dayColumn, dayOfPlacement, dayOfTask, dayRelation, placementOfDay, taskScreen } from "../../src/domain/Days";
+import { canPostpone, canRemoveDue, dayColumn, dayOfPlacement, dayOfTask, dayRelation, placementOfDay, taskScreen } from "../../core/domain/Days";
 
 const TODAY = "2026-11-01";
 

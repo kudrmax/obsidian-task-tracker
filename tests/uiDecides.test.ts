@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * A tripwire, not a parser: it trips when a file of src/ui compares a task's fields, the usual sign of a product
+ * A tripwire, not a parser: it trips when a file of obsidian/ui compares a task's fields, the usual sign of a product
  * decision made in the view (CLAUDE.md, «The UI decides nothing»). The Swift frontend would have to write the same
  * line again, so the decision moves to application: a field in TaskItem.can, a service method, a ready menu model.
  */
@@ -48,10 +48,10 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  * here when a hit goes, delete the file's line when it reaches zero. Never raise one or add a file.
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
-	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
-	"src/ui/drag/ListDrop.ts": { count: 2, removedBy: "none: a gap's rectangle is drawn under the header of the section its place names, among that section's cards; it stays" },
-	"src/ui/drag/listPlace.ts": { count: 2, removedBy: "none: where a finger stands among the headers drawn, each header found by the section it heads; it stays" },
-	"src/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
+	"obsidian/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
+	"obsidian/ui/drag/ListDrop.ts": { count: 2, removedBy: "none: a gap's rectangle is drawn under the header of the section its place names, among that section's cards; it stays" },
+	"obsidian/ui/drag/listPlace.ts": { count: 2, removedBy: "none: where a finger stands among the headers drawn, each header found by the section it heads; it stays" },
+	"obsidian/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
 };
 
 function files(dir: string): string[] {
@@ -73,7 +73,7 @@ function hitsIn(text: string): string[] {
 }
 
 const HITS: Readonly<Record<string, string[]>> = Object.fromEntries(
-	files("src/ui")
+	files("obsidian/ui")
 		.map((file) => [file, hitsIn(readFileSync(join(ROOT, file), "utf8"))] as const)
 		.filter(([, hits]) => hits.length > 0),
 );

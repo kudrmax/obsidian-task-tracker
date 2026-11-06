@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { columnGroups, inboxList, dayList, openSlotted, repeatable, slottedOn, soonWithoutDate } from "../../src/domain/queries";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { columnGroups, inboxList, dayList, openSlotted, repeatable, slottedOn, soonWithoutDate } from "../../core/domain/queries";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };

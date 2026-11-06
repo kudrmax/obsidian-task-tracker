@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { RepeatRule } from "../../src/application/contracts";
-import { RepeatPage, repeatPageEnd } from "../../src/application/RepeatPage";
+import type { RepeatRule } from "../../core/application/contracts";
+import { RepeatPage, repeatPageEnd } from "../../core/application/RepeatPage";
 
 const daily: RepeatRule = { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null };
 const weekly: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [1], dayOfMonth: null, from: null };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { phoneDoor as door } from "../../src/application/PhoneDoor";
+import { phoneDoor as door } from "../../core/application/PhoneDoor";
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).getTime();
 const file = (...now: string[]) => ["## Now", "", ...now, "", "## Soon", "", "## Done", ""].join("\n");

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import { ArrivingCard } from "../../src/ui/drag/ArrivingCard";
+import type { TaskItem } from "../../core/application/contracts";
+import { ArrivingCard } from "../../obsidian/ui/drag/ArrivingCard";
 
 const task = (raw: string, index = 0) => ({ key: { section: "now", index, path: [], raw } }) as unknown as TaskItem;
 const key = (raw: string, index = 0) => task(raw, index).key;

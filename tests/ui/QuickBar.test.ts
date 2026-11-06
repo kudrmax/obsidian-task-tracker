@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GroupedList, Placement, RepeatRule } from "../../src/application/contracts";
-import type { DraftMarks, LabelLevel, PriorityLevel } from "../../src/application/contracts";
-import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
-import { placementOfDay } from "../../src/domain/Days";
-import { draftMarksOf } from "../../src/application/marks";
+import type { GroupedList, Placement, RepeatRule } from "../../core/application/contracts";
+import type { DraftMarks, LabelLevel, PriorityLevel } from "../../core/application/contracts";
+import { QuickBar, type QuickBarState } from "../../obsidian/ui/quick/QuickBar";
+import { placementOfDay } from "../../core/domain/Days";
+import { draftMarksOf } from "../../core/application/marks";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },

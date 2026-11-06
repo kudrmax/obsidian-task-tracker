@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { readCalendarFile } from "../../src/application/calendarFile";
-import type { CalendarEvent } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import { type FeedAdapter, GoogleCalendarFeed } from "../../src/infrastructure/GoogleCalendarFeed";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { readCalendarFile } from "../../core/application/calendarFile";
+import type { CalendarEvent } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import { type FeedAdapter, GoogleCalendarFeed } from "../../obsidian/infrastructure/GoogleCalendarFeed";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 const PATH = "calendar/google.json";

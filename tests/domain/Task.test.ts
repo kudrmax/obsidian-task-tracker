@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canRemind, DEFAULT_REMINDER, isOpen, nextProgress, REMINDER_KINDS } from "../../src/domain/Task";
+import { canRemind, DEFAULT_REMINDER, isOpen, nextProgress, REMINDER_KINDS } from "../../core/domain/Task";
 
 describe("an open task", () => {
 	it("is one to do or in progress, not one done or given up", () => {

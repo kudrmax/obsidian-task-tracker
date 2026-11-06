@@ -7,7 +7,7 @@ enum Fixtures {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("phone/task-calendar-phone.js")
+            .appendingPathComponent("core/task-calendar-phone.js")
         return try! String(contentsOf: url, encoding: .utf8)
     }()
 

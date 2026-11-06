@@ -1,10 +1,10 @@
-import type { DayBoundary, DayOpening, DayService } from "../../src/application/contracts";
-import { dayOpening } from "../../src/application/DayServiceImpl";
-import type { Clock, SettingsStore } from "../../src/application/ports";
-import { DayBoundary as Boundary } from "../../src/domain/DayBoundary";
-import { type DayRelation, dayRelation } from "../../src/domain/Days";
-import { addDays } from "../../src/domain/LocalDate";
-import type { LocalDate } from "../../src/domain/Task";
+import type { DayBoundary, DayOpening, DayService } from "../../core/application/contracts";
+import { dayOpening } from "../../core/application/DayServiceImpl";
+import type { Clock, SettingsStore } from "../../core/application/ports";
+import { DayBoundary as Boundary } from "../../core/domain/DayBoundary";
+import { type DayRelation, dayRelation } from "../../core/domain/Days";
+import { addDays } from "../../core/domain/LocalDate";
+import type { LocalDate } from "../../core/domain/Task";
 
 /** The board's day: the clock stands still, so today never passes. */
 export class DemoDayService implements DayService {

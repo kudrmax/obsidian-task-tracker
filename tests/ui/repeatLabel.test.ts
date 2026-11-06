@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { RepeatRule } from "../../src/application/contracts";
-import { onTheDay, repeatValue } from "../../src/ui/repeat/repeatLabel";
+import type { RepeatRule } from "../../core/application/contracts";
+import { onTheDay, repeatValue } from "../../obsidian/ui/repeat/repeatLabel";
 
 const rule = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });
 

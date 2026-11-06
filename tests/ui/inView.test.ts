@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clipTo, scrollIntoColumn, scrollToShow, topInside } from "../../src/ui/menu/inView";
+import { clipTo, scrollIntoColumn, scrollToShow, topInside } from "../../obsidian/ui/menu/inView";
 
 const box = { top: 200, bottom: 700 };
 

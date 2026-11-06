@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STATUS_BAR_SHOWN, StatusBarRoom } from "../../src/ui/StatusBarRoom";
+import { STATUS_BAR_SHOWN, StatusBarRoom } from "../../obsidian/ui/StatusBarRoom";
 
 /** Lets the mutation observer's records arrive. */
 const delivered = () => new Promise((resolve) => setTimeout(resolve, 0));

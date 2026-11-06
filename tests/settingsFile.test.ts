@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../src/infrastructure/PluginSettings";
-import { SETTINGS_FILE } from "../src/settingsFile";
+import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../obsidian/infrastructure/PluginSettings";
+import { SETTINGS_FILE } from "../obsidian/settingsFile";
 
 /** data.json as 0.4.155 wrote it for the defaults, the device's part left out. */
 const OLD_FILE = `{

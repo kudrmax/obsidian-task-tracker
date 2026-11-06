@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { DayChange } from "../../src/application/contracts";
-import { DayServiceImpl } from "../../src/application/DayServiceImpl";
-import type { Clock, Ticker } from "../../src/application/ports";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import type { DayChange } from "../../core/application/contracts";
+import { DayServiceImpl } from "../../core/application/DayServiceImpl";
+import type { Clock, Ticker } from "../../core/application/ports";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 
 class MovingClock implements Clock {

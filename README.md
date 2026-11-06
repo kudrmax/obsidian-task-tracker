@@ -74,13 +74,18 @@ The export itself comes with the plugin and updates with it; Scriptable holds on
 
 ## Reminders (iPhone)
 
-A task put on a time reminds at its start, on the phone, through the Task Calendar iPhone app in [`apple/`](apple/), which reads the tasks file with the plugin's own rules: it runs the same core (`phone/task-calendar-phone.js`, built from `src/phone`) in JavaScriptCore. The marker before the time picks the kind: `⏰` a quiet notification that repeats until Done or a snooze, `🚨` an alarm, `🔕` none. Due dates alone do not remind.
+A task put on a time reminds at its start, on the phone, through the Task Calendar iPhone app in [`apple/`](apple/), which reads the tasks file with the plugin's own rules: it runs the same core (`core/task-calendar-phone.js`, built from `core/phone`) in JavaScriptCore. The marker before the time picks the kind: `⏰` a quiet notification that repeats until Done or a snooze, `🚨` an alarm, `🔕` none. Due dates alone do not remind.
 
 Setup, step by step: [docs/plugin/notifications.md](docs/plugin/notifications.md).
 
 ## Development
 
-One repository, one core, several frontends. The core (`src/domain`, `src/application`, the door in `src/phone`) is TypeScript; the Obsidian plugin bundles it into `main.js`, and the Apple apps in `apple/` run it in JavaScriptCore as `phone/task-calendar-phone.js`. The rules of the tasks file exist once, in the core.
+One repository, one core, several frontends. The rules of the tasks file exist once, in the core.
+
+- `core/` — the core, TypeScript: the tasks file and every rule about it, and the door the Apple apps call. Built for them into `core/task-calendar-phone.js`.
+- `obsidian/` — the Obsidian plugin, a frontend of the core; bundled with it into `main.js`.
+- `apple/` — the Swift apps (iPhone, later Mac), frontends of the same core: they run `core/task-calendar-phone.js` in JavaScriptCore.
+- The root keeps what Obsidian and BRAT read from a plugin's repository: `manifest.json`, `versions.json`, `styles.css`.
 
 ```bash
 npm install

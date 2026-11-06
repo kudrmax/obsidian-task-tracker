@@ -1,6 +1,6 @@
-import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import type { LocalDate } from "../../src/ui/types";
+import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import type { LocalDate } from "../../obsidian/ui/types";
 import { DEMO_NOW, FixedClock } from "./DemoClock";
 
 const DEMO_DATE = "2026-10-30";

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventMenu } from "../../src/ui/menu/EventMenu";
+import { EventMenu } from "../../obsidian/ui/menu/EventMenu";
 
 describe("the event menu", () => {
 	afterEach(() => {

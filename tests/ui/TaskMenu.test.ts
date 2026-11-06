@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LabelLevel, MenuFrom, PriorityLevel, RepeatRule, SectionChoice, SectionOffer, TaskItem, TaskMenuModel } from "../../src/application/contracts";
-import { taskMenu } from "../../src/application/menus";
-import { tileRows } from "../../src/ui/menu/MenuPanel";
-import { editRows, labelTiles, priorityTiles, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
+import type { LabelLevel, MenuFrom, PriorityLevel, RepeatRule, SectionChoice, SectionOffer, TaskItem, TaskMenuModel } from "../../core/application/contracts";
+import { taskMenu } from "../../core/application/menus";
+import { tileRows } from "../../obsidian/ui/menu/MenuPanel";
+import { editRows, labelTiles, priorityTiles, statusTiles, TaskMenu } from "../../obsidian/ui/menu/TaskMenu";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, "2026-11-01");

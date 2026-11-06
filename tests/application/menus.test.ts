@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SectionOffer, TaskItem, TaskKey } from "../../src/application/contracts";
-import { carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../src/application/menus";
+import type { SectionOffer, TaskItem, TaskKey } from "../../core/application/contracts";
+import { carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../core/application/menus";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";

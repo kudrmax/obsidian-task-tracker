@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DESCRIPTION_TEMPLATE, type SearchGroup, StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { UndoHistory } from "../../src/application/UndoHistory";
-import { TaskDocument } from "../../src/domain/TaskDocument";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { DESCRIPTION_TEMPLATE, type SearchGroup, StaleTaskError, TasksFileMissingError } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { UndoHistory } from "../../core/application/UndoHistory";
+import { TaskDocument } from "../../core/domain/TaskDocument";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 

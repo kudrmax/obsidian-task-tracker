@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type GroupName, listView, type TaskItem } from "../../src/application/contracts";
+import { type GroupName, listView, type TaskItem } from "../../core/application/contracts";
 import { onDay } from "../fakes/itemOnDay";
 
 let n = 0;

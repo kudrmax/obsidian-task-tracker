@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GoogleRedirectLogin, REDIRECT_URI, type RedirectLoginDeps } from "../../src/infrastructure/GoogleRedirectLogin";
+import { GoogleRedirectLogin, REDIRECT_URI, type RedirectLoginDeps } from "../../obsidian/infrastructure/GoogleRedirectLogin";
 
 function deps(overrides: Partial<RedirectLoginDeps> = {}) {
 	const opened: string[] = [];

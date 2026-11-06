@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { normalize } from "../../src/domain/normalize";
-import { recurClosed } from "../../src/domain/recurrence";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { normalize } from "../../core/domain/normalize";
+import { recurClosed } from "../../core/domain/recurrence";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰", repeat: "🔁", priorities: ["p1", "p2"] };
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done", ungrouped: "No section" };

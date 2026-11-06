@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import { TaskList } from "../../src/ui/TaskList";
+import type { TaskItem } from "../../core/application/contracts";
+import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
-import { entryAt } from "../../src/application/QuickEntry";
+import { entryAt } from "../../core/application/QuickEntry";
 
 const task = (text: string, index: number): TaskItem => onDay({
 	key: { section: "now", index, path: [], raw: text },

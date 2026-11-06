@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WorkCalendarShortcut } from "../../src/infrastructure/WorkCalendarShortcut";
+import { WorkCalendarShortcut } from "../../obsidian/infrastructure/WorkCalendarShortcut";
 
 function shortcut(isPhone: boolean) {
 	const opened: string[] = [];

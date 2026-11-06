@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { acceptsDrop, type DropColumn, type DropFrom, type DropOrigin, type DropTo, placesInGap, type TaskItem, type TaskKey } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
+import { acceptsDrop, type DropColumn, type DropFrom, type DropOrigin, type DropTo, placesInGap, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 
 /** Today, a later day, a past day. */
 const T = "2026-10-30";

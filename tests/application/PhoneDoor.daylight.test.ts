@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callDoor, type DoorAnswer, type DoorContext } from "../../src/application/PhoneCalls";
+import { callDoor, type DoorAnswer, type DoorContext } from "../../core/application/PhoneCalls";
 
 /**
  * Days that are 23 and 25 hours long where the clocks change (America/New_York: 2026-03-08 springs forward at 02:00,

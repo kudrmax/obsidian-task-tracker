@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskItem, TaskMenuModel } from "../../src/application/contracts";
-import { taskMenu } from "../../src/application/menus";
-import { BulkMenu, type BulkActions } from "../../src/ui/menu/BulkMenu";
+import type { TaskItem, TaskMenuModel } from "../../core/application/contracts";
+import { taskMenu } from "../../core/application/menus";
+import { BulkMenu, type BulkActions } from "../../obsidian/ui/menu/BulkMenu";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (index: number, marks: Partial<Pick<TaskItem, "priority" | "labels">> = {}): TaskItem => onDay({

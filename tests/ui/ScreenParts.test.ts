@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ScreenPart, ScreenParts } from "../../src/ui/ScreenParts";
+import { type ScreenPart, ScreenParts } from "../../obsidian/ui/ScreenParts";
 
 function setup() {
 	let busy = false;

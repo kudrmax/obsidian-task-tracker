@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dayRelation } from "../../src/domain/Days";
-import { addDays } from "../../src/domain/LocalDate";
-import { placeIndex, stepScreen } from "../../src/ui/screens";
+import { dayRelation } from "../../core/domain/Days";
+import { addDays } from "../../core/domain/LocalDate";
+import { placeIndex, stepScreen } from "../../obsidian/ui/screens";
 
 const TODAY = "2026-11-01";
 /** The days as DayService tells them, with TODAY for today. */

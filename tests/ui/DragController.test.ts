@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import type { DropResult, DropTarget } from "../../src/ui/drag/DropTarget";
-import { DragController, type DragControllerDeps } from "../../src/ui/drag/DragController";
-import { GestureArbiter } from "../../src/ui/gestures";
-import { DESIGN } from "../../src/ui/design";
-import { VIEW_DEFAULTS } from "../../src/ui/viewSettings";
+import type { TaskItem } from "../../core/application/contracts";
+import type { DropResult, DropTarget } from "../../obsidian/ui/drag/DropTarget";
+import { DragController, type DragControllerDeps } from "../../obsidian/ui/drag/DragController";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import { DESIGN } from "../../obsidian/ui/design";
+import { VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
 
 const rect = (x: number, y: number) => new DOMRect(x, y, 44, 36);
 const landing = new DOMRect(100, 200, 150, 40);

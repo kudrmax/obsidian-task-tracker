@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampSlot, DayBoundary } from "../../src/domain/DayBoundary";
+import { clampSlot, DayBoundary } from "../../core/domain/DayBoundary";
 
 const AT_FOUR = new DayBoundary(4);
 const D = "2026-10-30";

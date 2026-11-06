@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FramePass, type Frames } from "../../src/ui/FramePass";
+import { FramePass, type Frames } from "../../obsidian/ui/FramePass";
 
 function manualFrames() {
 	const queue = new Map<number, () => void>();

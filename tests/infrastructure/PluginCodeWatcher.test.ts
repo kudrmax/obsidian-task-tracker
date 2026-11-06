@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { type PluginCodeHost, PluginCodeWatcher, SETTLE_MS } from "../../src/infrastructure/PluginCodeWatcher";
+import { type PluginCodeHost, PluginCodeWatcher, SETTLE_MS } from "../../obsidian/infrastructure/PluginCodeWatcher";
 
 const DIR = ".obsidian/plugins/task-calendar";
 

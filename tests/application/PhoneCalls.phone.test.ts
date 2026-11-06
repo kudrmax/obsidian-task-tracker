@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { callDoor, type DoorAnswer, type DoorContext, plainJson } from "../../src/application/PhoneCalls";
-import { phoneDoor } from "../../src/application/PhoneDoor";
+import { callDoor, type DoorAnswer, type DoorContext, plainJson } from "../../core/application/PhoneCalls";
+import { phoneDoor } from "../../core/application/PhoneDoor";
 
 /** The phone's own calls through `call`: reminders, capture, the calendars' files and meetings; the functions before `call` wrap them. */
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { backRow, groupsAbove, menuRow, type MenuRoom, placePanel } from "../../src/ui/menu/MenuPanel";
+import { backRow, groupsAbove, menuRow, type MenuRoom, placePanel } from "../../obsidian/ui/menu/MenuPanel";
 
 /** A panel 250 wide of groups this tall in layout, drawn smaller on screen while it grows in from scale(0.94). */
 function growingPanel(heights: readonly number[] = [300]): HTMLElement {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Repeat, type RepeatRule, repeatParts, sameRule } from "../../src/domain/Repeat";
+import { Repeat, type RepeatRule, repeatParts, sameRule } from "../../core/domain/Repeat";
 
 const cases = [
 	"every week on Mon, Wed, Fri",

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { StaleTaskError } from "../../src/application/contracts";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { StaleTaskError } from "../../core/application/contracts";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, addMonths, daysInMonth, weekdayOf, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../src/domain/LocalDate";
+import { addDays, addMonths, daysInMonth, weekdayOf, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../core/domain/LocalDate";
 
 describe("LocalDate", () => {
 	it("formats the machine's local date", () => {

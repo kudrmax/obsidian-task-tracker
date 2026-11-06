@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, gridAt, itemBox, layoutEvents, scrollPlace, stackTasks, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, gridAt, itemBox, layoutEvents, scrollPlace, stackTasks, timeParts } from "../../obsidian/ui/timelineLayout";
 
 describe("layoutEvents", () => {
 	it("lays a lone event on the ground across the whole width", () => {

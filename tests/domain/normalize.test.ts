@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { normalize } from "../../src/domain/normalize";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { normalize } from "../../core/domain/normalize";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const AT_FOUR = new DayBoundary(4);
 

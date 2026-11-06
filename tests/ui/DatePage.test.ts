@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import { datePage } from "../../src/ui/menu/DatePage";
+import { datePage } from "../../obsidian/ui/menu/DatePage";
 
 afterEach(() => document.body.replaceChildren());
 

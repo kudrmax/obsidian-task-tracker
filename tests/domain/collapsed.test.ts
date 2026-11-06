@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalize } from "../../src/domain/normalize";
-import { createInPlace, createSubtask, moveToSoon, nest, remove, setCollapsed, setSlot, setStatus, unfoldAbove } from "../../src/domain/operations";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { TaskDocument } from "../../src/domain/TaskDocument";
-import { formatTaskLine, type Markers, parseTaskLine } from "../../src/domain/TaskLine";
+import { normalize } from "../../core/domain/normalize";
+import { createInPlace, createSubtask, moveToSoon, nest, remove, setCollapsed, setSlot, setStatus, unfoldAbove } from "../../core/domain/operations";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { TaskDocument } from "../../core/domain/TaskDocument";
+import { formatTaskLine, type Markers, parseTaskLine } from "../../core/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰", repeat: "🔁", collapsed: "📁", priorities: ["p1"], labelTag: "label", labels: ["Важное"] };
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };

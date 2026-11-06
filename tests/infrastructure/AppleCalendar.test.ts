@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CalendarEvent } from "../../src/application/contracts";
-import { AppleCalendar, calshowUrl, SHOW_EVENT_SCRIPT, showEventArgs } from "../../src/infrastructure/AppleCalendar";
+import type { CalendarEvent } from "../../core/application/contracts";
+import { AppleCalendar, calshowUrl, SHOW_EVENT_SCRIPT, showEventArgs } from "../../obsidian/infrastructure/AppleCalendar";
 
 const event: CalendarEvent = {
 	id: "x",

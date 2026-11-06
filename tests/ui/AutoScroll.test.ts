@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { AutoScroll, edgeVelocity, type Frames } from "../../src/ui/drag/AutoScroll";
-import { LAYOUT } from "../../src/ui/design";
+import { AutoScroll, edgeVelocity, type Frames } from "../../obsidian/ui/drag/AutoScroll";
+import { LAYOUT } from "../../obsidian/ui/design";
 
 const EDGE = LAYOUT.autoScrollEdge;
 const SPEED = LAYOUT.autoScrollSpeed;

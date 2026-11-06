@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LiftedCopy } from "../../../src/ui/kit/LiftedCopy";
-import { Overlay } from "../../../src/ui/menu/Overlay";
+import { LiftedCopy } from "../../../obsidian/ui/kit/LiftedCopy";
+import { Overlay } from "../../../obsidian/ui/menu/Overlay";
 
 afterEach(() => {
 	vi.useRealTimers();

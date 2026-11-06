@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelsFor } from "../../src/ui/zoomLevels";
+import { levelsFor } from "../../obsidian/ui/zoomLevels";
 
 const levels = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { pinTo } from "../../src/ui/dom";
+import { pinTo } from "../../obsidian/ui/dom";
 
 describe("pinTo", () => {
 	const rect = new DOMRect(10, 20, 30, 40);

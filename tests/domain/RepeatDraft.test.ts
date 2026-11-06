@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Repeat, type RepeatRule } from "../../src/domain/Repeat";
-import { editRepeat, type RepeatChange, type RepeatDraft, repeatDay, repeatDraft } from "../../src/domain/RepeatDraft";
+import { Repeat, type RepeatRule } from "../../core/domain/Repeat";
+import { editRepeat, type RepeatChange, type RepeatDraft, repeatDay, repeatDraft } from "../../core/domain/RepeatDraft";
 
 const THURSDAY = "2026-11-05";
 const rule = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TaskKey } from "../../src/application/contracts";
-import { keyId, sameLine, samePlace, sameTaskTree } from "../../src/application/taskKeys";
+import type { TaskKey } from "../../core/application/contracts";
+import { keyId, sameLine, samePlace, sameTaskTree } from "../../core/application/taskKeys";
 
 const key = (extra: Partial<TaskKey> = {}): TaskKey => ({ section: "now", index: 1, path: [], raw: "- [ ] A", ...extra });
 

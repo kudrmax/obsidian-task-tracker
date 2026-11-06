@@ -33,10 +33,10 @@ import {
 	snoozedSlot,
 	stop,
 	toggleDone,
-} from "../../src/domain/operations";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { normalize } from "../../src/domain/normalize";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+} from "../../core/domain/operations";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { normalize } from "../../core/domain/normalize";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };

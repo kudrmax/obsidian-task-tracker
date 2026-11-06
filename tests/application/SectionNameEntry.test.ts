@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SectionNameEntry } from "../../src/application/SectionNameEntry";
+import { SectionNameEntry } from "../../core/application/SectionNameEntry";
 
 function entry() {
 	const ends: (string | null)[] = [];

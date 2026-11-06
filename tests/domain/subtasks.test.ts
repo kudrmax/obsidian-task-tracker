@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalize } from "../../src/domain/normalize";
-import { createSubtask, moveBefore, newTask, moveToList, moveToSoon, nest, placeTask, postpone, remove, setSlot, setStatus } from "../../src/domain/operations";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { normalize } from "../../core/domain/normalize";
+import { createSubtask, moveBefore, newTask, moveToList, moveToSoon, nest, placeTask, postpone, remove, setSlot, setStatus } from "../../core/domain/operations";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", now: "Now", soon: "Soon", done: "Done" };

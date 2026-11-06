@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Task } from "../../src/domain/Task";
-import { TaskDocument, ungroupedIndex } from "../../src/domain/TaskDocument";
-import type { Markers } from "../../src/domain/TaskLine";
+import type { Task } from "../../core/domain/Task";
+import { TaskDocument, ungroupedIndex } from "../../core/domain/TaskDocument";
+import type { Markers } from "../../core/domain/TaskLine";
 
 const M: Markers = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };

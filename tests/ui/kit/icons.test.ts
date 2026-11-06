@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { ICONS, icon, type IconName } from "../../../src/ui/kit/icons";
+import { ICONS, icon, type IconName } from "../../../obsidian/ui/kit/icons";
 
 describe("the icon set", () => {
 	const names = Object.keys(ICONS) as IconName[];

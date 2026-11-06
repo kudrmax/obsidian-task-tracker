@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayTitle } from "../../src/ui/dayTitle";
+import { dayTitle } from "../../obsidian/ui/dayTitle";
 
 describe("dayTitle", () => {
 	it("names today and its neighbours by how the day stands to today", () => {

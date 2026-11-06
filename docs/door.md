@@ -1,13 +1,13 @@
 # The door: `globalThis.TaskCalendarPhone`
 
-`phone/task-calendar-phone.js` is the plugin's core built for JavaScriptCore. A host (the Apple apps in `apple/`) evaluates it once
+`core/task-calendar-phone.js` is the plugin's core built for JavaScriptCore. A host (the Apple apps in `apple/`) evaluates it once
 and calls the functions of `globalThis.TaskCalendarPhone` synchronously (`JSValue.invokeMethod`). Every rule of the
 task manager lives behind this door: a host draws, reads and writes its files, and asks the door for everything else.
 The door keeps nothing between calls; what must last (the undo steps, a quick entry being typed) the door hands back
 to the host as plain JSON, and the host hands it in again.
 
-Built from `src/phone/main.ts` → `src/application/PhoneDoor.ts` (the functions) and `src/application/PhoneCalls.ts`
-(`call`). TypeScript types named below are in `src/application/contracts.ts` unless said otherwise.
+Built from `core/phone/main.ts` → `core/application/PhoneDoor.ts` (the functions) and `core/application/PhoneCalls.ts`
+(`call`). TypeScript types named below are in `core/application/contracts.ts` unless said otherwise.
 
 ## The functions
 
@@ -186,7 +186,7 @@ The steps live with the host. Every write that is a step answers `history`; hand
 
 ### `entry.*`: the quick entry
 
-Typing tasks in place, every rule of it (`src/application/QuickEntry.ts`). Each call is
+Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each call is
 `entry.<method>(session, look, ...args)`:
 
 - `session`: the `EntrySession` the last answer gave, `null` to start.
@@ -260,7 +260,7 @@ value the door does not offer.
 
 ## What the door leaves to the host
 
-`DOOR_COVERAGE` in `src/application/PhoneCalls.ts` names every interface of `contracts.ts` with a method: the space the door
+`DOOR_COVERAGE` in `core/application/PhoneCalls.ts` names every interface of `contracts.ts` with a method: the space the door
 answers it in and the methods the host keeps (subscriptions, the clock, fetching and polling, binding a text field), or
 why the host owns it whole. `tests/application/PhoneCalls.test.ts` reads the interfaces from `contracts.ts` and fails on
 one the table misses.
@@ -284,7 +284,7 @@ The core reads the device's local time: a day, an hour and a slot are the clock'
 and the phone's answer tests run also under `TZ=Asia/Novosibirsk` and `TZ=America/New_York` (`vitest.config.mts`), and the
 core uses nothing of the locale (`Intl`, `localeCompare`, `toLocale…`) nor reads a date from text the engine's own way
 (`Date.parse`, `new Date(text)`, `toString`, `toDateString`): a calendar file's times go through `isoMoment`
-(`src/domain/IsoMoment.ts`), field by field (`tests/architecture.test.ts`). `tests/application/PhoneDoor.daylight.test.ts`
+(`core/domain/IsoMoment.ts`), field by field (`tests/architecture.test.ts`). `tests/application/PhoneDoor.daylight.test.ts`
 crosses New York's changes of the clocks (2026-03-08, 2026-11-01): a day ends at its next start by the clock.
 
 ## The iOS app

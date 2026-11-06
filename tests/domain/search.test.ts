@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FuzzyQuery, matchParts, plainDescription, snippetParts } from "../../src/domain/search";
+import { FuzzyQuery, matchParts, plainDescription, snippetParts } from "../../core/domain/search";
 
 function query(text: string): FuzzyQuery {
 	return FuzzyQuery.of(text)!;

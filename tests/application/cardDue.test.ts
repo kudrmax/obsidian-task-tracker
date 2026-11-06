@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardDue, type RepeatRule } from "../../src/application/contracts";
+import { cardDue, type RepeatRule } from "../../core/application/contracts";
 
 const weekly = { unit: "week", every: 1 } as unknown as RepeatRule;
 

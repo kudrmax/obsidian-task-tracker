@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { Button, roundShape } from "../../../src/ui/kit/Button";
+import { Button, roundShape } from "../../../obsidian/ui/kit/Button";
 
 const parent = () => document.createElement("div");
 

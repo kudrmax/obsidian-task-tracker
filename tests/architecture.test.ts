@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { doorMethods } from "../src/application/PhoneCalls";
+import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
@@ -12,24 +12,27 @@ type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "set
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
 
 function layerOf(file: string): Layer | null {
-	if (["src/main.ts", "src/demo.ts", "src/compose.ts", "src/settingsFile.ts"].includes(file)) return "root";
-	if (file === "src/settings.ts") return "settings";
-	const m = /^src\/(domain|application|infrastructure|ui|phone)\//.exec(file);
+	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
+	if (file === "core/settings.ts") return "settings";
+	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
 }
 
-const under = (target: string, dir: string): boolean => target.startsWith(`src/${dir}/`);
+/** The folder each layer lives in: the core (`core/`) or the Obsidian frontend (`obsidian/`). */
+const HOME: Readonly<Record<string, string>> = { domain: "core", application: "core", phone: "core", ui: "obsidian", infrastructure: "obsidian" };
+
+const under = (target: string, dir: string): boolean => target.startsWith(`${HOME[dir]}/${dir}/`);
 
 /** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
-const PHONE_DOOR = "src/application/PhoneDoor.ts";
+const PHONE_DOOR = "core/application/PhoneDoor.ts";
 
 /** What a layer may import: a path in the repository, or a package's name. */
 const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	domain: (t) => under(t, "domain"),
-	application: (t) => under(t, "domain") || under(t, "application") || t === "src/settings.ts",
+	application: (t) => under(t, "domain") || under(t, "application") || t === "core/settings.ts",
 	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && layerOf(t) !== "root",
-	ui: (t) => under(t, "ui") || t === "src/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
-	phone: (t) => under(t, "phone") || t === "src/application/contracts.ts" || t === PHONE_DOOR,
+	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
+	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
 	root: () => true,
 };
@@ -71,7 +74,9 @@ function importsOf(file: string): string[] {
 	return [...new Set(found)];
 }
 
-const FILES = files("src").filter(isSource);
+/** The sources: the core but its build (`core/build.mjs`, `core/task-calendar-phone.js`), and the Obsidian frontend. */
+const SOURCE_DIRS = ["core/domain", "core/application", "core/phone", "obsidian"];
+const FILES = [...SOURCE_DIRS.flatMap(files), "core/settings.ts"].filter(isSource);
 
 function violations(): string[] {
 	return FILES.flatMap((file) => {
@@ -88,9 +93,9 @@ describe("the layers", () => {
 	});
 
 	it("reads every form of import it guards", () => {
-		expect(importsOf("src/application/contracts.ts")).toContain("src/domain/Repeat.ts");
-		expect(importsOf("src/main.ts")).toEqual(expect.arrayContaining(["obsidian", "child_process", "src/ui/SettingsTab.ts"]));
-		expect(importsOf("src/infrastructure/WorkCalendarExportScript.ts")).toContain("scriptable/work-calendar-export.js");
+		expect(importsOf("core/application/contracts.ts")).toContain("core/domain/Repeat.ts");
+		expect(importsOf("obsidian/main.ts")).toEqual(expect.arrayContaining(["obsidian", "child_process", "obsidian/ui/SettingsTab.ts"]));
+		expect(importsOf("obsidian/infrastructure/WorkCalendarExportScript.ts")).toContain("scriptable/work-calendar-export.js");
 	});
 
 	it("crosses no layer", () => {
@@ -99,21 +104,21 @@ describe("the layers", () => {
 });
 
 describe("the guard itself", () => {
-	it("scans every file of src: a source of a known layer, or a declaration", () => {
-		expect(files("src").filter((file) => !isSource(file) && !DECLARATION.test(file))).toEqual([]);
+	it("scans every file of the sources: a source of a known layer, or a declaration", () => {
+		expect([...SOURCE_DIRS.flatMap(files), "core/settings.ts"].filter((file) => !isSource(file) && !DECLARATION.test(file))).toEqual([]);
 	});
 
 	it("keeps the doors narrow", () => {
-		expect(MAY_IMPORT.phone("src/application/TaskServiceImpl.ts")).toBe(false);
-		expect(MAY_IMPORT.phone("src/settings.ts")).toBe(false);
-		expect(MAY_IMPORT.phone("src/application/contracts.ts")).toBe(true);
-		expect(MAY_IMPORT.phone("src/application/PhoneDoor.ts")).toBe(true);
-		expect(MAY_IMPORT.phone("src/application/TaskRules.ts")).toBe(false);
-		expect(MAY_IMPORT.phone("src/application/composeCore.ts")).toBe(false);
-		expect(MAY_IMPORT.infrastructure("src/phone/main.ts")).toBe(false);
-		expect(MAY_IMPORT.infrastructure("src/compose.ts")).toBe(false);
-		expect(MAY_IMPORT.infrastructure("src/ui/TaskCard.ts")).toBe(false);
-		expect(target("src/ui/x.ts", "./TaskCard")).toBe("src/ui/TaskCard.ts");
+		expect(MAY_IMPORT.phone("core/application/TaskServiceImpl.ts")).toBe(false);
+		expect(MAY_IMPORT.phone("core/settings.ts")).toBe(false);
+		expect(MAY_IMPORT.phone("core/application/contracts.ts")).toBe(true);
+		expect(MAY_IMPORT.phone("core/application/PhoneDoor.ts")).toBe(true);
+		expect(MAY_IMPORT.phone("core/application/TaskRules.ts")).toBe(false);
+		expect(MAY_IMPORT.phone("core/application/composeCore.ts")).toBe(false);
+		expect(MAY_IMPORT.infrastructure("core/phone/main.ts")).toBe(false);
+		expect(MAY_IMPORT.infrastructure("obsidian/compose.ts")).toBe(false);
+		expect(MAY_IMPORT.infrastructure("obsidian/ui/TaskCard.ts")).toBe(false);
+		expect(target("obsidian/ui/x.ts", "./TaskCard")).toBe("obsidian/ui/TaskCard.ts");
 	});
 });
 
@@ -123,10 +128,10 @@ describe("the guard itself", () => {
  */
 const TEMPORARY_HOST_GLOBALS: readonly { readonly file: string; readonly name: string; readonly until: string }[] = [];
 
-/** What `tsc -p tsconfig.core.json` reports: domain, application and settings without DOM and Node, one line per error. */
+/** What `tsc -p core/tsconfig.json` reports: domain, application and settings without DOM and Node, one line per error. */
 function coreErrors(): string[] {
 	try {
-		execFileSync(join(ROOT, "node_modules/.bin/tsc"), ["-p", "tsconfig.core.json", "--pretty", "false"], { cwd: ROOT, encoding: "utf8" });
+		execFileSync(join(ROOT, "node_modules/.bin/tsc"), ["-p", "core/tsconfig.json", "--pretty", "false"], { cwd: ROOT, encoding: "utf8" });
 		return [];
 	} catch (error) {
 		const out = (error as { stdout?: string }).stdout ?? String(error);
@@ -147,12 +152,12 @@ describe("domain and application run on any host", () => {
 		expect(TEMPORARY_HOST_GLOBALS.filter((e) => !errors.some((line) => excused(line, e)))).toEqual([]);
 	});
 	it("read the device's own clock and nothing of its locale: no Intl, localeCompare or toLocale… (Electron and JavaScriptCore differ there)", () => {
-		const core = [...files("src/domain"), ...files("src/application"), "src/settings.ts"].filter(isSource);
+		const core = [...files("core/domain"), ...files("core/application"), "core/settings.ts"].filter(isSource);
 		const LOCALE = /\bIntl\b|\.localeCompare\s*\(|\.toLocale\w*\s*\(/;
 		expect(core.filter((file) => LOCALE.test(withoutComments(readFileSync(join(ROOT, file), "utf8"))))).toEqual([]);
 	});
 	it("read no date from text the engine's own way: no Date.parse, no Date's toString or toDateString, new Date of one argument only of epoch ms (a text goes through isoMoment)", () => {
-		const core = [...files("src/domain"), ...files("src/application"), "src/settings.ts"].filter(isSource);
+		const core = [...files("core/domain"), ...files("core/application"), "core/settings.ts"].filter(isSource);
 		const ENGINE = /\bDate\.parse\s*\(|\.to(?:Date|Time|UTC|GMT)?String\s*\(\s*\)/;
 		const found = core.flatMap((file) => {
 			const text = withoutComments(readFileSync(join(ROOT, file), "utf8"));
@@ -291,7 +296,7 @@ function names(list: string): string[] {
 describe("contracts.ts", () => {
 	it("re-exports types, and only the runtime values listed on purpose", () => {
 		const listed = Object.entries(CONTRACT_RUNTIME).map(([name, from]) => `${name} ← ${from}`);
-		expect(contractRuntimeReexports(readFileSync(join(ROOT, "src/application/contracts.ts"), "utf8")).sort()).toEqual(listed.sort());
+		expect(contractRuntimeReexports(readFileSync(join(ROOT, "core/application/contracts.ts"), "utf8")).sort()).toEqual(listed.sort());
 	});
 
 	it("hands the UI nothing the phone's door does not offer", () => {

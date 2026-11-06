@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RightMode } from "../../src/ui/viewSettings";
-import type { Place } from "../../src/ui/screens";
-import { ColumnSwitch } from "../../src/ui/ColumnSwitch";
-import { GestureArbiter } from "../../src/ui/gestures";
+import type { RightMode } from "../../obsidian/ui/viewSettings";
+import type { Place } from "../../obsidian/ui/screens";
+import { ColumnSwitch } from "../../obsidian/ui/ColumnSwitch";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
 
 const LONG_PRESS = 250;
 const STEP = 38;

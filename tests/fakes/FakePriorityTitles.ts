@@ -1,7 +1,7 @@
-import type { LabelLevel, PriorityLevel, TaskService } from "../../src/application/contracts";
-import { draftMarksOf } from "../../src/application/marks";
-import { typedMarks } from "../../src/domain/Marks";
-import { isBlankTitle, priorityOfText, usableLevels, withPriority } from "../../src/domain/Priority";
+import type { LabelLevel, PriorityLevel, TaskService } from "../../core/application/contracts";
+import { draftMarksOf } from "../../core/application/marks";
+import { typedMarks } from "../../core/domain/Marks";
+import { isBlankTitle, priorityOfText, usableLevels, withPriority } from "../../core/domain/Priority";
 
 /** What the task service answers about the levels and a typed title, over `levels` and `labels` as the settings hold them. */
 export function priorityTitles(levels: readonly PriorityLevel[], labels: readonly LabelLevel[] = []): Pick<TaskService, "priorityLevels" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks"> {

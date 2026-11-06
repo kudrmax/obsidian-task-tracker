@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type ScreenView, type TaskService } from "../../src/application/contracts";
-import { DayData, type DayPart } from "../../src/ui/DayData";
-import type { LocalDate } from "../../src/ui/types";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type ScreenView, type TaskService } from "../../core/application/contracts";
+import { DayData, type DayPart } from "../../obsidian/ui/DayData";
+import type { LocalDate } from "../../obsidian/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
 
 const TODAY = "2026-10-30";

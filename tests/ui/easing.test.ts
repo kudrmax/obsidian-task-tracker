@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cubicBezier, easingOf } from "../../src/ui/easing";
+import { cubicBezier, easingOf } from "../../obsidian/ui/easing";
 
 describe("easing", () => {
 	it("starts at 0, ends at 1 and never runs back", () => {

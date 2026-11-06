@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { GroupMenu } from "../../src/ui/menu/GroupMenu";
+import { GroupMenu } from "../../obsidian/ui/menu/GroupMenu";
 
 function open() {
 	document.body.innerHTML = "";

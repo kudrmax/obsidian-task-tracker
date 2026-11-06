@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 type Fn = (...args: unknown[]) => unknown;
 const sandbox: { TaskCalendarPhone?: Record<string, Fn> } = {};
-runInNewContext(readFileSync("phone/task-calendar-phone.js", "utf8"), sandbox);
+runInNewContext(readFileSync("core/task-calendar-phone.js", "utf8"), sandbox);
 const phone = sandbox.TaskCalendarPhone!;
 
 const pad = (n: number) => String(n).padStart(2, "0");

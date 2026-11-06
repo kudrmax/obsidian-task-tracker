@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GestureArbiter } from "../../src/ui/gestures";
-import type { Shift } from "../../src/ui/screens";
-import { Swipe, swipeStartsAt, type SwipeTarget } from "../../src/ui/Swipe";
+import { GestureArbiter } from "../../obsidian/ui/gestures";
+import type { Shift } from "../../obsidian/ui/screens";
+import { Swipe, swipeStartsAt, type SwipeTarget } from "../../obsidian/ui/Swipe";
 
 const SLOW_STEP_MS = 1000;
 let now = 0;

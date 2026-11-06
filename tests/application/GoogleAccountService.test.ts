@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { GoogleAccountService } from "../../src/application/GoogleAccountService";
-import type { GoogleLogin } from "../../src/application/ports";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { GoogleAccountService } from "../../core/application/GoogleAccountService";
+import type { GoogleLogin } from "../../core/application/ports";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 /** Logged in the way GoogleAuth is: the refresh token in the settings. */
 class FakeLogin implements GoogleLogin {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TasksFileMissingError } from "../../src/application/contracts";
-import { VaultTaskFileStore } from "../../src/infrastructure/VaultTaskFileStore";
+import { TasksFileMissingError } from "../../core/application/contracts";
+import { VaultTaskFileStore } from "../../obsidian/infrastructure/VaultTaskFileStore";
 import { FakeVault } from "../fakes/FakeVault";
 
 function setup(path = "TODOs Tasks.md") {

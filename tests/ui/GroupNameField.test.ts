@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { GroupNameField } from "../../src/ui/GroupNameField";
+import { GroupNameField } from "../../obsidian/ui/GroupNameField";
 
 function open(value = "") {
 	const parent = document.createElement("div");

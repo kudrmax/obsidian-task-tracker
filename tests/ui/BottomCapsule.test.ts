@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UndoService } from "../../src/application/contracts";
-import { BottomCapsule } from "../../src/ui/BottomCapsule";
-import { MoreMenu } from "../../src/ui/menu/MoreMenu";
+import type { UndoService } from "../../core/application/contracts";
+import { BottomCapsule } from "../../obsidian/ui/BottomCapsule";
+import { MoreMenu } from "../../obsidian/ui/menu/MoreMenu";
 
 function service(steps: number) {
 	const listeners = new Set<() => void>();

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DayBoundary } from "../../src/domain/DayBoundary";
-import { createAtTime, createInList, createInPlace, createInSoon, createSubtask, placeTask, rename } from "../../src/domain/operations";
-import { oneLine, taskTitle } from "../../src/domain/TaskTitle";
-import { TaskDocument } from "../../src/domain/TaskDocument";
+import { DayBoundary } from "../../core/domain/DayBoundary";
+import { createAtTime, createInList, createInPlace, createInSoon, createSubtask, placeTask, rename } from "../../core/domain/operations";
+import { oneLine, taskTitle } from "../../core/domain/TaskTitle";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
 const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };

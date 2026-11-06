@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TextPatch } from "../../src/domain/TextPatch";
+import { TextPatch } from "../../core/domain/TextPatch";
 
 const text = (...lines: string[]) => lines.join("\n");
 

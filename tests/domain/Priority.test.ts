@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hexColor, isBlankTitle, isPresetColor, type PriorityLevel, priorityOfText, priorityOfTitle, sameLevels, usableColor, usableLevels, usablePrefix, withPriority } from "../../src/domain/Priority";
+import { hexColor, isBlankTitle, isPresetColor, type PriorityLevel, priorityOfText, priorityOfTitle, sameLevels, usableColor, usableLevels, usablePrefix, withPriority } from "../../core/domain/Priority";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },

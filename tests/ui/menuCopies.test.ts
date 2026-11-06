@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const root = join(__dirname, "..", "..", "src", "ui");
+const root = join(__dirname, "..", "..", "obsidian", "ui");
 
 function sources(dir: string): { path: string; code: string }[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

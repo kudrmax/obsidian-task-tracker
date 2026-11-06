@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, formatTime, localDateOf, minutesOf, monthAbbreviation, dayOfMonth } from "../../src/ui/dates";
+import { addDays, formatTime, localDateOf, minutesOf, monthAbbreviation, dayOfMonth } from "../../obsidian/ui/dates";
 
 describe("dates", () => {
 	it("writes a Date as a local calendar day", () => {

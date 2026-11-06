@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventColors, eventHex } from "../../src/ui/eventColors";
+import { eventColors, eventHex } from "../../obsidian/ui/eventColors";
 
 describe("eventHex", () => {
 	it("is the calendar's own colour, or its source's when the file gives none", () => {

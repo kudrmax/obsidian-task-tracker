@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { DayBoundary } from "../../src/application/contracts";
-import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
-import { Timeline } from "../../src/ui/Timeline";
-import { VIEW_DEFAULTS } from "../../src/ui/viewSettings";
+import { DayBoundary } from "../../core/application/contracts";
+import type { CalendarEvent, TaskItem } from "../../core/application/contracts";
+import { Timeline } from "../../obsidian/ui/Timeline";
+import { VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
 import { onDay } from "../fakes/itemOnDay";
 import { withShownSpan } from "../fakes/timelineDeps";
 

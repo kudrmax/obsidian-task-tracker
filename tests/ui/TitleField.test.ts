@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { composingKey } from "../../src/ui/quick/TitleField";
+import { composingKey } from "../../obsidian/ui/quick/TitleField";
 
 describe("composingKey", () => {
 	it("is a key of an input method composing, or the one iOS sends as it commits a candidate", () => {

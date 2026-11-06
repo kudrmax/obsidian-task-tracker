@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readsAnew } from "../../src/application/readingSettings";
-import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../src/settings";
+import { readsAnew } from "../../core/application/readingSettings";
+import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../core/settings";
 
 const before = DEFAULT_SETTINGS;
 const after = (patch: Partial<TaskCalendarSettings>) => readsAnew(before, { ...before, ...patch });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { screenSettingsOf } from "../../src/application/ScreenSettingsImpl";
-import { type StoredSettings, storedSettingsFrom } from "../../src/settingsFile";
-import { settingsEffect } from "../../src/ui/settingsEffect";
-import { viewSettingsFrom } from "../../src/ui/viewSettings";
+import { screenSettingsOf } from "../../core/application/ScreenSettingsImpl";
+import { type StoredSettings, storedSettingsFrom } from "../../obsidian/settingsFile";
+import { settingsEffect } from "../../obsidian/ui/settingsEffect";
+import { viewSettingsFrom } from "../../obsidian/ui/viewSettings";
 
 const before = storedSettingsFrom(null);
 const shown = (settings: StoredSettings) => ({ ...screenSettingsOf(settings), ...viewSettingsFrom(settings) });

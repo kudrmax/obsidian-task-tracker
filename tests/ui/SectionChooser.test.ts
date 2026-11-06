@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import { sectionChooser } from "../../src/ui/menu/SectionChooser";
+import { sectionChooser } from "../../obsidian/ui/menu/SectionChooser";
 
 afterEach(() => document.body.replaceChildren());
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveTiles } from "../../src/ui/menu/quickMoves";
+import { moveTiles } from "../../obsidian/ui/menu/quickMoves";
 
 describe("moveTiles", () => {
 	it("names and draws the moves the menu's model offers, in its order, with their days", () => {

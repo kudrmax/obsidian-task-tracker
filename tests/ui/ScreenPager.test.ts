@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScreenPager, type ScreenTrack } from "../../src/ui/ScreenPager";
-import type { Shift } from "../../src/ui/screens";
-import { edgeGive, edgeParts } from "../../src/ui/ScreenTracks";
+import { ScreenPager, type ScreenTrack } from "../../obsidian/ui/ScreenPager";
+import type { Shift } from "../../obsidian/ui/screens";
+import { edgeGive, edgeParts } from "../../obsidian/ui/ScreenTracks";
 
 const WIDTH = 400;
 const SLIDE_MS = 300;

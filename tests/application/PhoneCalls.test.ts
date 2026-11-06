@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { ScreenView, TaskItem } from "../../src/application/contracts";
-import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../src/application/PhoneCalls";
-import { ScreenSettingsImpl } from "../../src/application/ScreenSettingsImpl";
-import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
-import type { Clock } from "../../src/application/ports";
-import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
-import { UndoHistory } from "../../src/application/UndoHistory";
-import { settingsFrom } from "../../src/settings";
+import type { ScreenView, TaskItem } from "../../core/application/contracts";
+import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../core/application/PhoneCalls";
+import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
+import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
+import type { Clock } from "../../core/application/ports";
+import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
+import { UndoHistory } from "../../core/application/UndoHistory";
+import { settingsFrom } from "../../core/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 
@@ -227,7 +227,7 @@ describe("the door's tasks.* calls", () => {
 	});
 });
 
-const CONTRACTS = readFileSync("src/application/contracts.ts", "utf8");
+const CONTRACTS = readFileSync("core/application/contracts.ts", "utf8");
 
 /** Each interface a text declares, by name, with its body. */
 function interfaces(text: string): Map<string, string> {

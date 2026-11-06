@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ScreenSettingsImpl } from "../../src/application/ScreenSettingsImpl";
-import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
-import { SETTINGS_FILE, type StoredSettings } from "../../src/settingsFile";
-import { ShownSettingsStore, VIEW_DEFAULTS, ViewSettingsStore, viewSettingsFrom } from "../../src/ui/viewSettings";
+import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
+import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../obsidian/infrastructure/PluginSettings";
+import { SETTINGS_FILE, type StoredSettings } from "../../obsidian/settingsFile";
+import { ShownSettingsStore, VIEW_DEFAULTS, ViewSettingsStore, viewSettingsFrom } from "../../obsidian/ui/viewSettings";
 
 class Disk implements SettingsPersistence {
 	text = "{}";

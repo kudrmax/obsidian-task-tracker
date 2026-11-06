@@ -1,5 +1,5 @@
-import type { SettingsStore } from "../../src/application/ports";
-import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../src/settings";
+import type { SettingsStore } from "../../core/application/ports";
+import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../../core/settings";
 
 export class FakeSettingsStore implements SettingsStore {
 	private readonly listeners = new Set<() => void>();

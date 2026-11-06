@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
-import { markColours, renderTaskCard } from "../../src/ui/TaskCard";
-import { TaskList } from "../../src/ui/TaskList";
+import type { TaskItem } from "../../core/application/contracts";
+import { markColours, renderTaskCard } from "../../obsidian/ui/TaskCard";
+import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({

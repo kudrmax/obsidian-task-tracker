@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { SourceStatus } from "../../src/application/contracts";
-import { sourceText } from "../../src/ui/sources/sourceText";
+import type { SourceStatus } from "../../core/application/contracts";
+import { sourceText } from "../../obsidian/ui/sources/sourceText";
 
 const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", problem: null, events: 7, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: false, ...extra });
 

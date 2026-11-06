@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { FreeRoomDoubleClick } from "../../src/ui/FreeRoomDoubleClick";
+import { FreeRoomDoubleClick } from "../../obsidian/ui/FreeRoomDoubleClick";
 
 function setUp() {
 	const column = document.createElement("div");

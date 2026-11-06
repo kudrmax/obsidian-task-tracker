@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { KnownCalendar } from "../../src/application/calendarChoice";
-import { migratedHidden } from "../../src/application/calendarMigration";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import type { KnownCalendar } from "../../core/application/calendarChoice";
+import { migratedHidden } from "../../core/application/calendarMigration";
+import { DEFAULT_SETTINGS } from "../../core/settings";
 
 const GMAIL = "max@gmail.com";
 const known: KnownCalendar[] = [

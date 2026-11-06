@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CarefulPace } from "../../src/ui/CarefulPace";
+import { CarefulPace } from "../../obsidian/ui/CarefulPace";
 
 const walk = (pace: CarefulPace, from: number, px: number, ms: number, steps: number, t0 = 0) => {
 	for (let i = 1; i <= steps; i++) pace.update(from + i * px, t0 + i * ms);
