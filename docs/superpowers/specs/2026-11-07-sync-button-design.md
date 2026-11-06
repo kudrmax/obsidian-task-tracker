@@ -60,11 +60,12 @@ A protocol handler `task-calendar-sync`, registered on every platform; it hands 
 - `instance.ready`: false from (re)connecting until the server's first answer, which itself calls `requestSync()`.
   After the phone wakes, the old socket is dead and the next run reconnects first.
 
-Finished means: a run that started after the link came has ended, with `ready` true and the status `synced`, and no new
-run started for a short quiet time (Obsidian on the phone notices the app's own writes to the file only after it wakes,
-which may start one more run). These internals are not a public API: everything goes through one adapter in
-`obsidian/infrastructure` that reads them defensively (a missing field is «Sync is off»), and the waiting rule is a
-class with tests over a fake Sync.
+Finished means: a run that started after the link came has ended with the status `synced`, `ready` true, the socket
+open and the server heard from since the link (see «Decisions»), and no new run started for a short quiet time
+(Obsidian on the phone notices the app's own writes to the file only after it wakes, which may start one more run).
+These internals are not a public API: everything goes through one adapter in `obsidian/infrastructure` that reads them
+defensively (its defaults for missing fields are in «Decisions»), and the waiting rule is a class with tests over a fake
+Sync.
 
 ## In the app
 
