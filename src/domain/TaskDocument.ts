@@ -103,6 +103,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
+		a.collapsed === b.collapsed &&
 		sameLines(a.children, b.children)
 	);
 }

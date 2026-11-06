@@ -48,6 +48,7 @@ import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
 import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
+import { onCounter } from "./TaskCard";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -193,6 +194,7 @@ export class TaskCalendarView extends ItemView {
 				const picked = this.bulk.selection.cardOf(card);
 				return picked !== undefined && this.bulk.pick(picked, e, how);
 			},
+			fold: (item, pressed) => this.fold(item, pressed),
 			carried: (item) => this.bulk.carried(item),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
@@ -678,11 +680,21 @@ export class TaskCalendarView extends ItemView {
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
 	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
 		this.found.attach(card, item);
-		card.addEventListener("click", () => this.showMenu(item, card));
+		card.addEventListener("click", (e) => {
+			if (!this.fold(item, e.target)) this.showMenu(item, card);
+		});
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
 			this.showMenu(item, card);
 		});
+	}
+
+	/** A tap on a card's subtask counter folds its open subtasks away, or shows them again; true when it did, in place of the menu. */
+	private fold(item: TaskItem, target: EventTarget | null): boolean {
+		if (item.subtasks.length === 0 || !onCounter(target)) return false;
+		this.haptics.tap();
+		void this.act(() => this.deps.tasks.setCollapsed(item.key, !item.collapsed));
+		return true;
 	}
 
 	private openSearch(): void {
@@ -705,9 +717,10 @@ export class TaskCalendarView extends ItemView {
 	/**
 	 * The screen goes where the found task stands, as the switch and the arrows would take it, and its card wears the ring:
 	 * Done to its own place left of Inbox, Inbox and Backlog to Inbox and Soon, Soon to Soon and Now, a task of a day to
-	 * that day beside its calendar.
+	 * that day beside its calendar. A found subtask's tasks show their subtasks, so its card is there.
 	 */
 	private async reveal(item: TaskItem): Promise<void> {
+		if (item.isSubtask) await this.act(() => this.deps.tasks.unfoldAbove(item.key));
 		this.found.mark(item);
 		if (item.list === "done") {
 			this.atDone = true;

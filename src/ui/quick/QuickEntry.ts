@@ -426,10 +426,11 @@ export class QuickEntry {
 		});
 	}
 
-	/** Right under a renamed task at its level, or its first subtask when it has some: nothing may stand between a task and them. */
+	/** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
 	private under(spot: Extract<EntrySpot, { kind: "list" }>, item: TaskItem): EntrySpot {
 		const { place } = spot;
-		return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (item.subtasks.length > 0 ? 1 : 0) } };
+		const shown = item.subtasks.length > 0 && !item.collapsed;
+		return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
 	}
 
 	/** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */

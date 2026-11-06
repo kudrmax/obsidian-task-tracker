@@ -5,14 +5,14 @@ import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { Repeat, type RepeatRule } from "./Repeat";
-import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { DEFAULT_REMINDER, isOpen, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -171,10 +171,37 @@ export function moveBefore(
 	return moveInto(doc, entry, before.section, before.index, today);
 }
 
+/** A task with an open subtask may fold its subtasks away; one without has nothing to fold. */
+export function hasOpenSubtask(entry: TaskEntry): boolean {
+	return entry.subtasks.some((sub) => isOpen(sub.task.status));
+}
+
+/** Folds the task's subtasks away, or shows them again; a task without an open subtask stays as it is. */
+export function setCollapsed(doc: TaskDocument, entry: TaskEntry, collapsed: boolean): TaskDocument {
+	if (collapsed && !hasOpenSubtask(entry)) return doc;
+	return patch(doc, entry, { collapsed });
+}
+
+/** The tasks the entry sits under show their subtasks, so its card stands on the screen. */
+export function unfoldAbove(doc: TaskDocument, entry: TaskEntry): TaskDocument {
+	const folded = entry.path.map((_, depth) => doc.find(entry.section, entry.index, entry.path.slice(0, depth))!).filter((above) => above.task.collapsed);
+	return doc.replaceAll(folded.map((above) => [above, { ...above.task, collapsed: false }] as const));
+}
+
+/**
+ * `operation` on the document with `parent` showing its subtasks: a task given a new subtask unfolds, so the subtask is
+ * seen. Opening the parent rewrites its line alone, so the entries keep their places.
+ */
+function intoUnfolded(doc: TaskDocument, parent: TaskEntry, operation: (doc: TaskDocument, same: (entry: TaskEntry) => TaskEntry) => TaskDocument): TaskDocument {
+	if (!parent.task.collapsed) return operation(doc, (entry) => entry);
+	const opened = patch(doc, parent, { collapsed: false });
+	return operation(opened, (entry) => sameEntryIn(opened, entry));
+}
+
 /** Under `parent`, right before its subtask `before` or last, with all the entry's own subtasks. */
 export function nest(doc: TaskDocument, entry: TaskEntry, parent: TaskEntry, before: TaskEntry | null): TaskDocument {
 	if (before && samePlace(before, entry)) return doc;
-	return doc.nestEntry(entry, parent, before);
+	return intoUnfolded(doc, parent, (d, same) => d.nestEntry(same(entry), same(parent), before && same(before)));
 }
 
 /** The due date a subtask takes from the sheet: none for the place it would have anyway, today's for Now, the day for Date. */
@@ -186,7 +213,8 @@ function subtaskDueDate(placement: Placement, inherited: Placement, today: Local
 
 export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
 	const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
-	return doc.insertUnder(parent, newTask(draft.text, { dueDate, ...marksOf(draft.priority, draft.labels ?? []) }));
+	const task = newTask(draft.text, { dueDate, ...marksOf(draft.priority, draft.labels ?? []) });
+	return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
 }
 
 function placeOnTimeline(doc: TaskDocument, entry: TaskEntry, slot: Slot, today: LocalDate, boundary = DayBoundary.MIDNIGHT): TaskDocument {
@@ -350,7 +378,9 @@ export function createInPlace(doc: TaskDocument, text: string, priority: string 
 	const marks = marksOf(priority, labels);
 	switch (place.kind) {
 		case "subtask":
-			return doc.insertUnder(place.parent, withRepeat(newTask(text, marks), repeat, today, boundary), place.before);
+			return intoUnfolded(doc, place.parent, (d, same) =>
+				d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before)),
+			);
 		case "slot":
 			return createInSlot(doc, place.slot, text, marks, today, boundary);
 		case "list": {

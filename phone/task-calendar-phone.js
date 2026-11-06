@@ -52,6 +52,7 @@
     liveSlotMarker: "📌",
     silentSlotMarker: "🔕",
     repeatMarker: "🔁",
+    collapsedMarker: "📁",
     workCalendarFile: "calendar/work.json",
     workCalendarTitles: [],
     google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
@@ -487,6 +488,7 @@
       this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
       this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.dueDate)}\\s+${DATE}$`);
       this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
+      this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.collapsed)}$`) : null;
     }
     slice(body) {
       let text = body;
@@ -494,6 +496,7 @@
       let slot = null;
       let reminder = DEFAULT_REMINDER;
       let repeat = null;
+      let collapsed = false;
       for (; ; ) {
         const slotMatch = slot === null ? this.slotRe.exec(text) : null;
         if (slotMatch) {
@@ -511,6 +514,12 @@
           text = text.slice(0, dueMatch.index);
           continue;
         }
+        const collapsedMatch = collapsed ? null : this.collapsedRe?.exec(text) ?? null;
+        if (collapsedMatch) {
+          collapsed = true;
+          text = text.slice(0, collapsedMatch.index);
+          continue;
+        }
         const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
         if (repeatMatch) {
           const parsed = Repeat.parse(repeatMatch[1]);
@@ -521,7 +530,7 @@
         }
         break;
       }
-      return { text: text.trim(), dueDate, slot, reminder, repeat };
+      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed };
     }
     slotOf(m) {
       const date = m[2];
@@ -535,7 +544,7 @@
   };
   var slicers = /* @__PURE__ */ new Map();
   function fieldSlicerFor(markers) {
-    const key = [markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\0");
+    const key = [markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? "", markers.collapsed ?? ""].join("\0");
     let slicer = slicers.get(key);
     if (!slicer) {
       slicer = new FieldSlicer(markers);
@@ -559,6 +568,7 @@
     const { indent, bullet, task } = parsed;
     let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
     if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
+    if (task.collapsed && markers.collapsed) line += ` ${markers.collapsed}`;
     if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
     if (task.slot) {
       const { date, start, end } = task.slot;
@@ -583,7 +593,7 @@
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && sameLines(a.children, b.children);
   }
   function insertedLines(before, after) {
     let start = 0;
@@ -1108,7 +1118,7 @@
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1143,6 +1153,9 @@
   }
   function setReminder(doc, entry, reminder) {
     return patch(doc, entry, { reminder });
+  }
+  function hasOpenSubtask(entry) {
+    return entry.subtasks.some((sub) => isOpen(sub.task.status));
   }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
@@ -1202,9 +1215,11 @@
       const { task } = entry;
       const copy = newTask(task.text, {
         priority: task.priority,
+        labels: task.labels,
         children: doc.freshChildren(entry),
         dueDate: task.repeat.next(dayOf(task, boundary), today),
-        repeat: task.repeat
+        repeat: task.repeat,
+        collapsed: task.collapsed
       });
       doc = intoSoon(doc.replace(entry, { ...task, repeat: null }), entry.group, copy);
     }
@@ -1332,9 +1347,14 @@
   function normalizeGroups(doc, today) {
     return placeUngrouped(dropEmptyUngroupedHeading(mergeDuplicates(misplacedOutOfGroups(doc, today))));
   }
+  function unfoldEmpty(doc) {
+    const empty = flatten(doc.allTasks()).filter((e) => e.task.collapsed && !hasOpenSubtask(e));
+    if (empty.length === 0) return doc;
+    return doc.replaceAll(empty.map((e) => [e, { ...e.task, collapsed: false }]));
+  }
   function normalize(doc, today, boundary = DayBoundary.MIDNIGHT, presets = []) {
     const listed2 = dueToNow(datedOutOfUndated(closedToDone(recurClosed(pastDatesToToday(erasePastSlots(doc, today, boundary), today), today, boundary))), today, boundary, presets);
-    const result = normalizeGroups(listed2, today).spacedHeadings();
+    const result = unfoldEmpty(normalizeGroups(listed2, today)).spacedHeadings();
     if (result === doc) return doc;
     return result.serialize() === doc.serialize() ? doc : result;
   }
@@ -1348,6 +1368,7 @@
       liveSlot: settings.liveSlotMarker,
       silentSlot: settings.silentSlotMarker,
       repeat: settings.repeatMarker,
+      collapsed: settings.collapsedMarker,
       priorities: usableLevels(settings.priorities).map((l) => l.prefix),
       labelTag: settings.labelTag,
       labels: usableLabels(settings.labels).map((l) => l.name)

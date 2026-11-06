@@ -24,6 +24,7 @@ const MARKERS: readonly (readonly [Marker, string, string])[] = [
 	["liveSlotMarker", "Live Activity marker", "Precedes the time slot of a task the phone shows as a Live Activity on the lock screen."],
 	["silentSlotMarker", "No-reminder marker", "Precedes the time slot of a task the phone does not remind of."],
 	["repeatMarker", "Repeat marker", "Precedes the repeat rule on a task line."],
+	["collapsedMarker", "Collapsed marker", "Marks a task whose subtasks are hidden."],
 ];
 
 const PAINT_NAMES: Readonly<Record<LabelPaint, string>> = { stripes: "Stripes", blend: "Blend" };

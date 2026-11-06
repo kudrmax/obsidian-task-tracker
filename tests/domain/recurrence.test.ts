@@ -137,3 +137,11 @@ describe("freshChildren", () => {
 		expect(doc.serialize()).toBe(file({ soon: `- [ ] Зал 📅 2026-11-06 ${ZAL}`, done: "- [x] Зал 🚨 2026-11-05 07:00" }));
 	});
 });
+
+describe("the next copy keeps the task's labels", () => {
+	it("as it keeps its priority", () => {
+		const labelled = { ...M, labelTag: "label", labels: ["Важное"] };
+		const doc = TaskDocument.parse("## Now\n- [x] Зал #label/Важное 📅 2026-10-30 🔁 every day\n\n## Soon\n\n## Done\n", SECTIONS, labelled);
+		expect(recurClosed(doc, "2026-10-30", DayBoundary.MIDNIGHT).serialize()).toContain("## Soon\n- [ ] Зал #label/Важное 📅 2026-10-31 🔁 every day\n");
+	});
+});

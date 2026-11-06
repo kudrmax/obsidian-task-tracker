@@ -50,6 +50,7 @@ describe("toItem", () => {
 			can: { postpone: true, removeDue: false, remind: true },
 			subtasks: [],
 			progress: null,
+			collapsed: false,
 			parentText: null, description: null,
 		});
 	});
@@ -79,6 +80,12 @@ describe("toItem", () => {
 		expect(item.progress).toEqual({ done: 1, total: 2 });
 		expect(item.subtasks.map((s) => [s.text, s.parentText, s.key.path])).toEqual([["D", "A", [2]]]);
 		expect(toItem(parse(TRIP).tasks("now")[1], T).progress).toBeNull();
+	});
+
+	it("tells a task is collapsed only while it has an open subtask to fold", () => {
+		const d = TaskDocument.parse("## Now\n- [ ] A 📁\n  - [ ] B\n- [ ] C 📁\n  - [x] D\n- [ ] E\n  - [ ] F\n", SECTIONS, { ...M, collapsed: "📁" });
+		expect(d.tasks("now").map((e) => toItem(e, T).collapsed)).toEqual([true, false, false]);
+		expect(toItem(d.tasks("now")[0], T).subtasks.map((s) => s.text)).toEqual(["B"]);
 	});
 
 	it("carries the description of the task and of its subtasks", () => {

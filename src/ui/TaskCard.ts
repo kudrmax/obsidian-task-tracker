@@ -11,7 +11,7 @@ export interface TaskCardOptions {
 	readonly day: LocalDate | null;
 }
 
-/** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date. */
+/** A card of the list: the dot of a task in progress, the title fading out on the right, the subtask counter over the description mark, the due date; a card peeking out under it while its subtasks are folded away. */
 export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts: TaskCardOptions): HTMLElement {
 	const card = el(parent, "div", "tc-card");
 	fillCard(card, item, opts);
@@ -34,6 +34,7 @@ export function showProgressDot(parent: HTMLElement, item: TaskItem): void {
 
 export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOptions): void {
 	markColours(card, item);
+	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
@@ -61,6 +62,11 @@ export function showMeta(card: HTMLElement, item: TaskItem): void {
 	card.querySelector(":scope > .tc-meta")?.remove();
 	const meta = metaOf(item);
 	if (meta) card.querySelector(":scope > .tc-card-title")?.after(meta);
+}
+
+/** A tap on the subtask counter of a card folds the task's subtasks away or shows them again, in place of its menu. */
+export function onCounter(target: EventTarget | null): boolean {
+	return target instanceof Element && target.closest(".tc-count") !== null;
 }
 
 function metaOf(item: TaskItem): HTMLElement | null {
