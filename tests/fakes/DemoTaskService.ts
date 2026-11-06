@@ -1,12 +1,13 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService } from "../../src/application/contracts";
-import { carriedWith, taskMenu, toggledPriority } from "../../src/application/menus";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
+import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { fullTree } from "../../src/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../src/domain/Days";
-import { markChoices, typedMarks } from "../../src/domain/Marks";
+import { typedMarks } from "../../src/domain/Marks";
+import { draftMarksOf, markColors } from "../../src/application/marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
@@ -109,13 +110,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
-		const marks = typedMarks(text, priority, labels, this.prefixes());
-		const choices = markChoices(marks);
-		return {
-			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
-			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
-			can: { setPriority: choices.priority, setLabels: choices.labels },
-		};
+		return draftMarksOf(typedMarks(text, priority, labels, this.prefixes()), this.priorityLevels(), this.labelLevels());
 	}
 
 	isBlank(text: string): boolean {
@@ -163,6 +158,7 @@ export class DemoTaskService implements TaskService {
 			repeatable: section !== "done" && (t.status === "todo" || t.status === "inProgress"),
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			labels: [],
+			colors: markColors(DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null, []),
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,
@@ -368,7 +364,7 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
+	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
 		const t = this.taskOf(key);
 		t.text = draft.text.trim() || t.text;
 		t.priority = draft.priority;
@@ -376,6 +372,7 @@ export class DemoTaskService implements TaskService {
 		const current = this.placementOf(this.item(key.section, key.index));
 		if (JSON.stringify(current) !== JSON.stringify(draft.placement)) this.place(this.take(key), draft.placement);
 		this.changed();
+		return null;
 	}
 
 	async setStatus(key: TaskKey, status: TaskStatus): Promise<void> {
@@ -419,8 +416,33 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	menu(items: readonly TaskItem[], today: LocalDate, offer: SectionOffer | null = null): TaskMenuModel {
-		return taskMenu(items, today, this.priorityLevels(), this.labelLevels(), offer);
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
+		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+	}
+
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
+		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+	}
+
+	/** Last in the file first, so a task taken out moves none still to come. */
+	private async eachKey(keys: readonly TaskKey[], act: (key: TaskKey) => Promise<void>): Promise<void> {
+		for (const key of [...keys].sort((a, b) => b.index - a.index)) await act(key);
+	}
+
+	async pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void> {
+		const status = tileStatus(id);
+		await this.eachKey(keys, (key) => (status === null ? this.stop(key) : this.setStatus(key, status)));
+	}
+
+	async postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void> {
+		const can = keys.filter((key) => this.item(key.section, key.index).can.postpone);
+		await this.eachKey(can, (key) => this.postpone(key, date));
+	}
+
+	async removeAll(keys: readonly TaskKey[]): Promise<void> {
+		await this.eachKey(keys, (key) => this.remove(key));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {

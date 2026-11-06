@@ -1,3 +1,4 @@
+import { SectionNameEntry } from "../application/contracts";
 import { el } from "./dom";
 
 export interface GroupNameFieldOptions {
@@ -6,7 +7,7 @@ export interface GroupNameFieldOptions {
 	onDone(name: string | null): void;
 }
 
-/** A section's name typed in place of its header: a capsule like a card, ringed in the accent, the keyboard up. */
+/** A section's name typed in place of its header: a capsule like a card, ringed in the accent, the keyboard up. What its keys mean is SectionNameEntry's. */
 export const GroupNameField = {
 	open(parent: HTMLElement, opts: GroupNameFieldOptions): HTMLElement {
 		const field = el(parent, "div", "tc-group-field");
@@ -15,19 +16,15 @@ export const GroupNameField = {
 		input.placeholder = "Section name";
 		input.value = opts.value;
 		input.enterKeyHint = "done";
-		let done = false;
-		const finish = (name: string | null) => {
-			if (done) return;
-			done = true;
-			opts.onDone(name);
-		};
+		const entry = new SectionNameEntry((name) => opts.onDone(name));
 		input.addEventListener("keydown", (e) => {
 			if (e.key !== "Enter" && e.key !== "Escape") return;
 			e.preventDefault();
 			e.stopPropagation();
-			finish(e.key === "Enter" ? input.value : null);
+			if (e.key === "Enter") entry.enter(input.value);
+			else entry.escape();
 		});
-		input.addEventListener("blur", () => finish(null));
+		input.addEventListener("blur", () => entry.blur());
 		input.focus();
 		input.setSelectionRange(input.value.length, input.value.length);
 		return field;

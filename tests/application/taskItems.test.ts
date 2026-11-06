@@ -45,6 +45,7 @@ describe("toItem", () => {
 			repeatable: true,
 			priority: null,
 			labels: [],
+			colors: [],
 			group: null,
 			list: "now",
 			isSubtask: false,
@@ -165,11 +166,11 @@ describe("toItem with labels", () => {
 
 	it("gives the task's labels in the settings' order, whatever order the line has them in", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] A #label/Срочное #label/Важное\n", SECTIONS, markers);
-		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ text: "A", labels: [IMPORTANT, URGENT], priority: null });
+		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ text: "A", labels: [IMPORTANT, URGENT], priority: null, colors: [IMPORTANT.color, URGENT.color] });
 	});
 
 	it("gives a task with a priority no labels, though its line has both", () => {
 		const d = TaskDocument.parse("## Now\n- [ ] p1 A #label/Срочное\n", SECTIONS, markers);
-		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ priority: RED, labels: [] });
+		expect(toItem(d.tasks("now")[0], T, levels)).toMatchObject({ priority: RED, labels: [], colors: [RED.color] });
 	});
 });

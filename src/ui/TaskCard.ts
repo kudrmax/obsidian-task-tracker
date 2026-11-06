@@ -80,11 +80,11 @@ function metaOf(item: TaskItem): HTMLElement | null {
 }
 
 /**
- * Gives a card the colours of its task: a priority's, or its labels'. The first colour tints it as a priority does; a
- * card of several labels also carries each colour, up to four, which the stylesheet paints as stripes or a blend.
+ * Gives a card the colours of its task, as the service lists them. The first colour tints it as a priority does; a card
+ * of several colours also carries each, up to four, which the stylesheet paints as stripes or a blend.
  */
-export function markColours(card: HTMLElement, item: Pick<TaskItem, "priority" | "labels">): void {
-	const colours = item.priority ? [item.priority.color] : item.labels.slice(0, LABEL_SLOTS.length).map((label) => label.color);
+export function markColours(card: HTMLElement, item: Pick<TaskItem, "colors">): void {
+	const colours = item.colors.slice(0, LABEL_SLOTS.length);
 	if (colours.length > 0) card.dataset.priority = colours[0];
 	else delete card.dataset.priority;
 	LABEL_SLOTS.forEach((slot, i) => {

@@ -43,7 +43,9 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
-export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
+export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
+/** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
+export { SectionNameEntry } from "./SectionNameEntry";
 /** A list in its sections, and whether it shows their headers. */
 export { listView, type ListGroup, type ListRow, type ListView } from "./sections";
 /** What the corner of a card shows on a column's day: the due date unless it is that day, and the repeat icon. */
@@ -128,6 +130,8 @@ export interface TaskItem {
 	readonly priority: PriorityLevel | null;
 	/** The labels the task is tagged with, in the settings' order; none while it has a priority, which wins on a line with both. */
 	readonly labels: readonly LabelLevel[];
+	/** The colours its card is drawn in: its priority's alone, else each label's in the settings' order; the first tints it. None without either. */
+	readonly colors: readonly PriorityColor[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
 	/** The list the task is in, its task's for a subtask. */
@@ -257,6 +261,7 @@ export type TaskChange =
 	| { readonly kind: "dueDate"; readonly date: LocalDate | null }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	| { readonly kind: "remove" }
+	| { readonly kind: "stop" }
 	| { readonly kind: "moveBefore"; readonly before: TaskKey | null; readonly date: LocalDate }
 	| { readonly kind: "moveToList"; readonly date: LocalDate }
 	| { readonly kind: "moveToSoon"; readonly date: LocalDate }
@@ -324,19 +329,63 @@ export interface MenuLabel {
 	readonly on: boolean;
 }
 
-/** Where in their list's sections the tasks can go; `shared`: they all stand in `choice.current`, which is then checked. */
+/** A section a menu's Section page offers; `checked` on the one every task stands in. */
+export interface MenuSectionOption {
+	/** Null: the tasks outside any section, named `SectionChoice.ungrouped`. */
+	readonly name: GroupName;
+	readonly checked: boolean;
+}
+
+/** Where in their list's sections the tasks can go. */
 export interface MenuSections {
 	readonly choice: SectionChoice;
-	readonly shared: boolean;
+	/** The page's rows: the list's sections in `choice.names`' order, then the tasks outside any. */
+	readonly options: readonly MenuSectionOption[];
+	/** The page ends in New section, which asks for a name: one task's menu only. */
+	readonly create: boolean;
 }
 
 /**
- * The menu of one task, or of several picked at once, as `TaskService.menu` reads it: what its groups offer, what is on and
- * what can't be pressed. A tap on a level writes `togglePriority`, on a label `toggleLabel`, Remove due date `removeDue`.
+ * Where a task's menu was opened: a card of a list column (`DropColumn`), of the timeline, of Done, a subtask in the stack
+ * under a timeline card's menu, or the task on the whole screen.
+ */
+export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full";
+
+/** A picked task of the bulk menu and the column its card stands in. */
+export interface PickedTask {
+	readonly item: TaskItem;
+	readonly from: MenuFrom;
+}
+
+/** The screen a menu opens over: today, the day it shows, and the sections its menus offer (`ScreenView.offer`). */
+export interface MenuScreen {
+	readonly today: LocalDate;
+	readonly day: LocalDate;
+	readonly offer: SectionOffer;
+}
+
+/** A status tile: Done, In progress or Stop progress (todo again, when every task is in progress), Won't do, Stop. */
+export type MenuStatusId = "done" | "inProgress" | "stopProgress" | "wontDo" | "stop";
+
+export interface MenuStatus {
+	readonly id: MenuStatusId;
+	/** The menu asks first, in place of the group, and writes once it is confirmed. */
+	readonly confirm: boolean;
+}
+
+/** A row of the edit group. */
+export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
+
+/**
+ * The menu of one task, or of several picked at once, as `TaskService.menu` and `bulkMenu` read it: what its groups offer,
+ * what is on, what can't be pressed, and what asks first. A status tile writes `pickStatus`, a level `togglePriority`, a
+ * label `toggleLabel`, a move `postpone` (`postponeAll`), Remove due date `removeDue`, Delete `remove` (`removeAll`). A tap
+ * on a label keeps the menu open, drawn again for the tasks as they then stand, and the bulk menu its picked tasks; any
+ * other pick closes it and lets the picked tasks go.
  */
 export interface TaskMenuModel {
-	/** What the progress tile sets on them all: In progress, or todo (Stop progress) when every one is in progress. */
-	readonly progress: TaskStatus;
+	/** Done, the progress tile, Won't do, in this order; Stop last on one task that may be stopped. A task done or given up has them all too. */
+	readonly statuses: readonly MenuStatus[];
 	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */
 	readonly levels: { readonly tiles: readonly MenuLevel[]; readonly disabled: boolean };
 	/** In the settings' order; `disabled` while none of the tasks may carry labels (they have a priority). */
@@ -347,8 +396,15 @@ export interface TaskMenuModel {
 	readonly removeDue: boolean;
 	/** The due date they all have, which Pick a date shows picked; null when they differ or have none. */
 	readonly dueDate: LocalDate | null;
-	/** Only when a section offer was given and the tasks can go among one list's sections. */
+	/** Only where the cards stand in columns that show their list's sections, and the tasks can go among one list's sections. */
 	readonly sections: MenuSections | null;
+	/**
+	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
+	 * Section (with `sections`); Add subtask, except for a subtask of a timeline card's stack. The bulk menu's: Section alone.
+	 */
+	readonly edits: readonly MenuEditId[];
+	/** Delete asks first in one task's menu; the bulk menu's Delete N tasks writes at once. */
+	readonly remove: { readonly confirm: boolean };
 }
 
 /** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
@@ -377,6 +433,17 @@ export interface DraftMarks {
 	/** In the settings' order; none while there is a priority. */
 	readonly labels: readonly LabelLevel[];
 	readonly can: { readonly setPriority: boolean; readonly setLabels: boolean };
+	/** The colour the field and the flag take: the priority's, else the first label's; none without either. */
+	readonly tint: PriorityColor | null;
+	/** Every level and then every label, as the flag's panel offers them: on when the task is written with it, enabled while it may be chosen. */
+	readonly tiles: { readonly levels: readonly MarkTile<PriorityLevel>[]; readonly labels: readonly MarkTile<LabelLevel>[] };
+}
+
+/** A level or a label offered for a task being typed. */
+export interface MarkTile<T> {
+	readonly mark: T;
+	readonly on: boolean;
+	readonly enabled: boolean;
 }
 
 export interface TaskService {
@@ -464,9 +531,10 @@ export interface TaskService {
 	 * The task sheet on an existing task: new text and placement in one write. The slot stays. A placement equal to the
 	 * task's current one leaves its position in the file alone; a different one moves it as `create` would place it.
 	 * Inbox takes the slot away too. A subtask stays where it is: a different placement only sets its due date, as for
-	 * `createSubtask`.
+	 * `createSubtask`. A blank text (a level's prefix alone too) writes nothing. The task as it now stands, its key fresh;
+	 * null when nothing was written.
 	 */
-	edit(key: TaskKey, draft: TaskDraft): Promise<void>;
+	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null>;
 	/** The placement the sheet shows for a task: `now` when it is due today, `date` when it has another due date, else its section (a subtask's is its task's). */
 	placementOf(item: TaskItem): Placement;
 	/** What the day column stands for on `date`: today is Now with its sections, a later day Soon with that day, a past day Now with that day and no sections. */
@@ -506,10 +574,18 @@ export interface TaskService {
 	/** Remove due date in a menu of these tasks: the due date goes from each that can lose it (not today's); the rest stay as they are. One write. */
 	removeDue(keys: readonly TaskKey[]): Promise<void>;
 	/**
-	 * The menu of one task, or of several picked at once, on `today` (see `TaskMenuModel`). With `offer`, the tasks stand
-	 * where their list's sections are shown and the menu offers them (`sectionChoice`).
+	 * The menu of one task, opened `from` a place of `screen` (see `TaskMenuModel`): a card of a column that shows its
+	 * list's sections offers them (`sectionChoice`); a timeline card, Done, a stack's subtask and the whole screen none.
 	 */
-	menu(items: readonly TaskItem[], today: LocalDate, offer?: SectionOffer | null): TaskMenuModel;
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel;
+	/** The bulk menu of the picked tasks: sections only when every card stands in a column that shows its list's. */
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel;
+	/** A status tile of a menu of these tasks (`MenuStatusId`): Won't do gives them up, Stop stops them as `stop` does. One write. */
+	pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void>;
+	/** A move of a menu of these tasks: each that may be put off is, as `postpone` does; the rest stay as they are. One write. */
+	postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void>;
+	/** Delete in a menu of these tasks: each goes, as `remove` does. One write. */
+	removeAll(keys: readonly TaskKey[]): Promise<void>;
 	/** The picked tasks that go along when `lifted`, one of them, is carried: all but itself and those under another picked one, which go with it. */
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[];
 	/** Folds the task's subtasks away on the screen, or shows them again: the marker on its line. A task without an open subtask has nothing to fold. */

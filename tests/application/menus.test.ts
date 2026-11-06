@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SectionOffer, TaskItem, TaskKey } from "../../src/application/contracts";
-import { carriedWith, labelOn, levelOn, quickMoves, taskMenu, toggledLabels, toggledPriority } from "../../src/application/menus";
+import { carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../src/application/menus";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";
@@ -103,9 +103,11 @@ describe("the labels", () => {
 });
 
 describe("the rest of the menu", () => {
-	it("sets In progress unless every task already is, then Stop progress takes them back to todo", () => {
-		expect(taskMenu([item({ status: "inProgress" }), item()], T, [], [], null).progress).toBe("inProgress");
-		expect(taskMenu([item({ status: "inProgress" })], T, [], [], null).progress).toBe("todo");
+	it("offers In progress unless every task already is, then Stop progress, which takes them back to todo", () => {
+		expect(taskMenu([item({ status: "inProgress" }), item()], T, [], [], null).statuses[1].id).toBe("inProgress");
+		expect(taskMenu([item({ status: "inProgress" })], T, [], [], null).statuses[1].id).toBe("stopProgress");
+		expect(tileStatus("stopProgress")).toBe("todo");
+		expect(tileStatus("inProgress")).toBe("inProgress");
 	});
 
 	it("offers Remove due date when some task may lose its date, as the item tells", () => {
@@ -121,10 +123,97 @@ describe("the rest of the menu", () => {
 
 	it("offers the sections of the tasks' one list, checked only when they all stand in one, and none without an offer", () => {
 		const offer: SectionOffer = { lists: { now: ["Work", "Home"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
-		expect(taskMenu([item({ group: "Work" }), item({ group: "Work" })], T, [], [], offer).sections).toEqual({ choice: { names: ["Work", "Home"], current: "Work", ungrouped: "No section" }, shared: true });
-		expect(taskMenu([item({ group: "Work" }), item({ group: null })], T, [], [], offer).sections?.shared).toBe(false);
+		expect(taskMenu([item({ group: "Work" }), item({ group: "Work" })], T, [], [], offer, { kind: "bulk" }).sections).toEqual({
+			choice: { names: ["Work", "Home"], current: "Work", ungrouped: "No section" },
+			options: [{ name: "Work", checked: true }, { name: "Home", checked: false }, { name: null, checked: false }],
+			create: false,
+		});
+		expect(taskMenu([item({ group: "Work" }), item({ group: null })], T, [], [], offer, { kind: "bulk" }).sections?.options.some((o) => o.checked)).toBe(false);
+		expect(taskMenu([item({ group: null })], T, [], [], offer).sections?.options[2]).toEqual({ name: null, checked: true });
+		expect(taskMenu([item({ group: "Work" })], T, [], [], offer).sections?.create).toBe(true);
 		expect(taskMenu([item(), soon()], T, [], [], offer).sections).toBeNull();
 		expect(taskMenu([item()], T, [], [], null).sections).toBeNull();
+	});
+});
+
+describe("the status group", () => {
+	const statuses = (items: TaskItem[], of: Parameters<typeof taskMenu>[5] = { kind: "task", from: "day" }) => taskMenu(items, T, [], [], null, of).statuses;
+	const EVERY_DAY = { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null } as const;
+
+	it("offers one task Done, In progress and Won’t do, asking before Won’t do; a task done or given up too", () => {
+		const expected = [{ id: "done", confirm: false }, { id: "inProgress", confirm: false }, { id: "wontDo", confirm: true }];
+		expect(statuses([item()])).toEqual(expected);
+		expect(statuses([item({ status: "done", open: false, list: "done" })])).toEqual(expected);
+		expect(statuses([item({ status: "cancelled", open: false, list: "done" })])).toEqual(expected);
+	});
+
+	it("adds Stop last for one task that may be stopped, and asks before it", () => {
+		expect(statuses([item({ repeat: EVERY_DAY, can: { ...item().can, stop: true } })])[3]).toEqual({ id: "stop", confirm: true });
+		expect(statuses([item({ repeat: EVERY_DAY, can: { ...item().can, stop: false } })]).map((s) => s.id)).not.toContain("stop");
+	});
+
+	it("offers the picked tasks no Stop, and asks before nothing", () => {
+		const can = { ...item().can, stop: true };
+		expect(statuses([item({ can }), item({ can })], { kind: "bulk" })).toEqual([{ id: "done", confirm: false }, { id: "inProgress", confirm: false }, { id: "wontDo", confirm: false }]);
+	});
+
+	it("writes Done, In progress, todo again and given up; Stop stops", () => {
+		expect((["done", "inProgress", "stopProgress", "wontDo", "stop"] as const).map(tileStatus)).toEqual(["done", "inProgress", "todo", "cancelled", null]);
+	});
+});
+
+describe("the edit group", () => {
+	const offer: SectionOffer = { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
+	const edits = (task: TaskItem, of: Parameters<typeof taskMenu>[5] = { kind: "task", from: "day" }, sections: SectionOffer | null = null) => taskMenu([task], T, [], [], sections, of).edits;
+
+	it("offers Rename, Add description, Repeat and Add subtask to a task without a time or a description", () => {
+		expect(edits(item())).toEqual(["rename", "description", "repeat", "subtask"]);
+	});
+
+	it("offers the reminder of a task on a time, after Rename, by what the task may have", () => {
+		expect(edits(item({ description: "- note", can: { ...item().can, remind: true, addDescription: false } }))).toEqual(["rename", "reminder", "repeat", "subtask"]);
+	});
+
+	it("offers no Add description to a task that has one, no Repeat to one that may not repeat", () => {
+		expect(edits(item({ can: { ...item().can, addDescription: false }, repeatable: false }))).toEqual(["rename", "subtask"]);
+	});
+
+	it("offers Section before Add subtask where the sections are offered", () => {
+		expect(edits(item({ description: "- note", can: { ...item().can, addDescription: false } }), { kind: "task", from: "day" }, offer)).toEqual(["rename", "repeat", "section", "subtask"]);
+	});
+
+	it("offers no Add subtask to a subtask opened from a timeline card's stack", () => {
+		const sub = item({ key: { section: "now", index: 0, path: [0], raw: "  - [ ] S" } });
+		expect(edits(sub, { kind: "task", from: "stack" })).not.toContain("subtask");
+		expect(edits(sub, { kind: "task", from: "timeline" })).toContain("subtask");
+		expect(edits(sub, { kind: "task", from: "full" })).toContain("subtask");
+	});
+
+	it("gives the picked tasks Section alone, where it is offered", () => {
+		expect(edits(item(), { kind: "bulk" })).toEqual([]);
+		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section"]);
+	});
+});
+
+describe("Delete", () => {
+	it("asks first in one task's menu, not in the bulk menu", () => {
+		expect(taskMenu([item()], T, [], [], null).remove).toEqual({ confirm: true });
+		expect(taskMenu([item(), item()], T, [], [], null, { kind: "bulk" }).remove).toEqual({ confirm: false });
+	});
+});
+
+describe("where a menu offers sections", () => {
+	const offer: SectionOffer = { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
+	const screen = { today: T, day: T, offer };
+	const sectioned = (column: string) => (column === "day" ? null : { list: "soon" as const, date: null });
+
+	it("from cards that all stand in columns showing their list's sections", () => {
+		expect(menuOffer(["soon", "inbox"], screen, sectioned)).toBe(offer);
+		expect(menuOffer(["soon", "day"], screen, sectioned)).toBeNull();
+	});
+
+	it("never from the timeline, Done, a stack or the whole screen", () => {
+		for (const from of ["timeline", "done", "stack", "full"] as const) expect(menuOffer([from], screen, () => ({ list: "soon", date: null }))).toBeNull();
 	});
 });
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import type { TaskItem } from "../../src/application/contracts";
+import type { PickedTask, TaskItem } from "../../src/application/contracts";
 import { BulkController, type BulkDeps } from "../../src/ui/BulkController";
 import { carriedWith, taskMenu } from "../../src/application/menus";
 import { countLabel } from "../../src/ui/menu/BulkMenu";
@@ -74,8 +74,10 @@ describe("the selection", () => {
 function controller(extra: Partial<BulkDeps> = {}): BulkController {
 	const bulk = new BulkController({
 		root: document.body,
-		apply: async () => {},
-		menu: (items) => taskMenu(items, T, LEVELS, [], null),
+		pickStatus: async () => {},
+		postpone: async () => {},
+		remove: async () => {},
+		menu: (picked) => taskMenu(picked.map((p) => p.item), T, LEVELS, [], null, { kind: "bulk" }),
 		togglePriority: async () => {},
 		toggleLabel: async (keys) => keys.map(() => null),
 		removeDue: async () => {},
@@ -135,14 +137,14 @@ describe("bulk actions", () => {
 
 	it("sends the picked tasks to a section in one call and lets them go", async () => {
 		const toSection = vi.fn(async () => {});
-		const menu = vi.fn((items: readonly TaskItem[]) => ({ ...taskMenu(items, T, LEVELS, [], null), sections: { choice: { names: ["Work"], current: null, ungrouped: "No section" }, shared: true } }));
+		const menu = vi.fn((picked: readonly PickedTask[]) => ({ ...taskMenu(picked.map((p) => p.item), T, LEVELS, [], null, { kind: "bulk" }), edits: ["section" as const], sections: { choice: { names: ["Work"], current: null, ungrouped: "No section" }, options: [{ name: "Work", checked: false }, { name: null, checked: true }], create: false } }));
 		const bulk = controller({ menu, toSection });
 		const [a, b] = cards([item(), item()]);
 		for (const card of [a, b]) document.body.append(card.card);
 		bulk.selection.toggle(a);
 		bulk.selection.toggle(b);
 		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(true);
-		expect(menu).toHaveBeenCalledWith([a.item, b.item], [a, b]);
+		expect(menu).toHaveBeenCalledWith([{ item: a.item, from: "day" }, { item: b.item, from: "day" }]);
 		const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
 		row("Section").click();
 		row("Work").click();
@@ -234,8 +236,8 @@ describe("Select tasks", () => {
 	});
 
 	it("opens the menu for them all from «⋯» where the plus stands, and an action ends Select tasks", async () => {
-		const apply = vi.fn(async () => {});
-		const bulk = controller({ desktop: () => false, apply });
+		const pickStatus = vi.fn(async () => {});
+		const bulk = controller({ desktop: () => false, pickStatus });
 		const [a, b] = cards([item(), item()]);
 		bulk.start();
 		bulk.pick(a, new MouseEvent("click"), "tap");
@@ -244,9 +246,33 @@ describe("Select tasks", () => {
 		expect(document.querySelector(".tc-panel.is-bulk.is-over .tc-menu-title")?.textContent).toBe("2 tasks");
 		document.querySelector<HTMLButtonElement>(".tc-panel.is-bulk .tc-menu-tile")!.click();
 		await Promise.resolve();
-		expect(apply).toHaveBeenCalledWith([a, b].map((c) => ({ key: c.item.key, change: { kind: "status", status: "done" } })));
+		expect(pickStatus).toHaveBeenCalledWith([a.item.key, b.item.key], "done");
 		expect(bulk.selection.size).toBe(0);
 		expect(document.body.classList.contains("is-selecting")).toBe(false);
+		document.body.replaceChildren();
+	});
+
+	it("hands a move and Delete to the service with every picked task, and lets them go", async () => {
+		const postpone = vi.fn(async () => {});
+		const remove = vi.fn(async () => {});
+		const open = () => {
+			const bulk = controller({ postpone, remove });
+			const picked = cards([item({ key: { section: "soon", index: 90, path: [], raw: "- [ ] S" } }), item()]);
+			for (const card of picked) bulk.selection.toggle(card);
+			bulk.pick(picked[0], new MouseEvent("click"), "tap");
+			return { bulk, keys: picked.map((p) => p.item.key) };
+		};
+		const first = open();
+		document.querySelector<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile")!.click();
+		await Promise.resolve();
+		expect(postpone).toHaveBeenCalledWith(first.keys, T);
+		expect(first.bulk.selection.size).toBe(0);
+		document.body.replaceChildren();
+		const second = open();
+		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Delete 2 tasks"))!.click();
+		await Promise.resolve();
+		expect(remove).toHaveBeenCalledWith(second.keys);
+		expect(second.bulk.selection.size).toBe(0);
 		document.body.replaceChildren();
 	});
 
