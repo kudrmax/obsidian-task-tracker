@@ -22,6 +22,13 @@ struct CaptureView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
+                Picker("List", selection: $list) {
+                    ForEach(CaptureListOption.allCases, id: \.self) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 TextField("New task", text: $text, axis: .vertical)
                     .font(.title3)
                     .focused($typing)
@@ -38,6 +45,7 @@ struct CaptureView: View {
                 RecorderBar(recorder: recorder)
                     .padding()
             }
+            .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -45,15 +53,6 @@ struct CaptureView: View {
                         recorder.discard()
                         close()
                     }
-                }
-                ToolbarItem(placement: .principal) {
-                    Picker("List", selection: $list) {
-                        ForEach(CaptureListOption.allCases, id: \.self) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add", systemImage: "checkmark") { Task { await send() } }
