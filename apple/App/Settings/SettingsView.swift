@@ -61,7 +61,7 @@ struct SettingsView: View {
                     Text("Goes after a recording's link in its task, for the plugin that transcribes it. Empty for none.")
                 }
             }
-            .navigationTitle("Task Calendar")
+            .navigationTitle("Tasks")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Task", systemImage: "plus") { CaptureRouter.shared.open() }

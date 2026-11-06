@@ -4,7 +4,13 @@ struct Shortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: AddTaskIntent(),
-            phrases: ["Add a task in \(.applicationName)", "Add task in \(.applicationName)"],
+            phrases: [
+                "Add a task to \(.applicationName)",
+                "Add a task in \(.applicationName)",
+                "Add task to \(.applicationName)",
+                "Add task in \(.applicationName)",
+                "New task in \(.applicationName)",
+            ],
             shortTitle: "Add Task",
             systemImageName: "plus.circle")
         AppShortcut(
