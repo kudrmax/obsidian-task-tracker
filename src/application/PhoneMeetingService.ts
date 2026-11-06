@@ -1,4 +1,6 @@
+import { DayBoundary } from "../domain/DayBoundary";
 import { settingsFrom, type TaskCalendarSettings } from "../settings";
+import { CalendarDays } from "./calendarDays";
 import { CalendarChoice } from "./calendarChoice";
 import { type CalendarFile, GOOGLE_CALENDAR_FILE, IPHONE_CALENDAR_FILE, readCalendarFile } from "./calendarFile";
 import { hiddenNow } from "./calendarMigration";
@@ -26,7 +28,7 @@ export class PhoneMeetingService {
 		return this.sources().map((s) => s.path);
 	}
 
-	/** The timed meetings that overlap `from`–`to`, chosen day by day; a file missing (`null`) or unreadable adds none. */
+	/** The timed meetings that overlap `from`–`to`, chosen day by day as the calendar chooses them, its days cut at the day's start; a file missing (`null`) or unreadable adds none. */
 	between(texts: readonly (string | null)[], from: Date, to: Date, now: Date): PhoneMeeting[] {
 		const files = new Map<CalendarSource, CalendarFile>();
 		this.sources().forEach((source, i) => {
@@ -40,15 +42,9 @@ export class PhoneMeetingService {
 		});
 		const known = new CalendarChoice(files, [], this.settings.staleAfterMinutes * MINUTE_MS, now).known();
 		const choice = new CalendarChoice(files, hiddenNow(this.settings, known, files.get("google")), this.settings.staleAfterMinutes * MINUTE_MS, now);
-		const found = new Map<string, PhoneMeeting>();
-		for (let day = new Date(from.getFullYear(), from.getMonth(), from.getDate()); day < to; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
-			const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
-			const start = day < from ? from : day;
-			for (const e of choice.day(start, next < to ? next : to).events) {
-				if (!e.allDay && !found.has(e.id)) found.set(e.id, { title: e.title, start: e.start, end: e.end });
-			}
-		}
-		return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+		return new CalendarDays(choice, new DayBoundary(this.settings.dayStartHour))
+			.timedBetween(from, to)
+			.map((e) => ({ title: e.title, start: e.start, end: e.end }));
 	}
 
 	private sources(): { readonly name: CalendarSource; readonly path: string }[] {
