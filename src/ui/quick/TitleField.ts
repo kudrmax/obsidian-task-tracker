@@ -39,14 +39,6 @@ export interface TitleField {
 
 export type TitleFieldFactory = (parent: HTMLElement, opts: TitleFieldOptions) => TitleField;
 
-/** A line break and the spaces around it: in a title it reads as one space. */
-export const LINE_BREAK = /\s*\n\s*/g;
-
-/** A title on one line: a line break pasted in reads as a space. */
-export function oneLine(text: string): string {
-	return text.replace(LINE_BREAK, " ");
-}
-
 /** The key code iOS sends while an input method commits a candidate, with `isComposing` already false. */
 const COMPOSING_KEY_CODE = 229;
 

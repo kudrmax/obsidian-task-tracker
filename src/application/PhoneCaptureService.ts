@@ -19,7 +19,7 @@ export class PhoneCaptureService {
 	capture(text: string, list: CaptureList, title: string, now: Date): PhoneAction {
 		if (title.trim() === "") return { changed: false, reason: "stale" };
 		const written = applyOperation(text, this.settings, now, (doc, today, boundary) =>
-			ops.createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary),
+			ops.createInPlace(doc, title, null, { kind: "list", list, group: null, before: null, date: null }, today, boundary),
 		);
 		return { changed: true, text: written };
 	}

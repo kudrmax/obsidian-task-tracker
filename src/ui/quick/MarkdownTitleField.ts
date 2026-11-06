@@ -3,7 +3,8 @@ import { EditorView, placeholder } from "@codemirror/view";
 import { type App, Scope } from "obsidian";
 import { el } from "../dom";
 import { type EditorHost, EmbeddedEditor } from "../markdown/EmbeddedEditor";
-import { composingKey, LINE_BREAK, oneLine, type TitleField, type TitleFieldOptions } from "./TitleField";
+import { LINE_BREAK, oneLine } from "../../application/contracts";
+import { composingKey, type TitleField, type TitleFieldOptions } from "./TitleField";
 
 /** What Obsidian's editor shows for the field outside it: the note search, and on the phone its toolbar over the keyboard. */
 const EDITOR_PARTS = ".suggestion-container, .mobile-toolbar";
