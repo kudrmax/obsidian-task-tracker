@@ -64,152 +64,16 @@
     return total > MINUTES_PER_DAY ? null : total;
   }
 
-  // src/domain/Label.ts
-  function usableLabelName(name) {
-    return /^[^\s#]+$/.test(name);
-  }
-  function usableLabels(labels) {
-    return labels.filter((label, i) => usableLabelName(label.name) && labels.findIndex((l) => l.name === label.name) === i);
-  }
-  function usableLabelTag(tag) {
-    return /^[^\s#/]+$/.test(tag);
-  }
-  function escapeRegExp(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-  function labelsOfText(text, tag, names) {
-    if (!usableLabelTag(tag) || names.length === 0) return { labels: [], text };
-    const labels = [];
-    const rest = text.replace(new RegExp(`(^|\\s)#${escapeRegExp(tag)}/(\\S+)(?=\\s|$)`, "g"), (whole, space, name) => {
-      if (!names.includes(name)) return whole;
-      if (!labels.includes(name)) labels.push(name);
-      return space;
-    });
-    return labels.length === 0 ? { labels, text } : { labels, text: rest.replace(/\s{2,}/g, " ").trim() };
-  }
-  function labelTags(tag, labels) {
-    return labels.map((name) => ` #${tag}/${name}`).join("");
-  }
-
-  // src/domain/TaskTitle.ts
-  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
-  function oneLine(text) {
-    return text.replace(LINE_BREAK, " ");
-  }
-  function taskTitle(text) {
-    return oneLine(text).trim();
-  }
-
-  // src/domain/Priority.ts
-  function usablePrefix(prefix) {
-    return /^\S+$/.test(prefix);
-  }
-  function usableLevels(levels) {
-    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
-  }
-  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
-  function priorityOfText(text, prefixes) {
-    const m = FIRST_WORD_RE.exec(text);
-    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
-    return { priority: m[1], text: m[2] };
-  }
-  function priorityOfTitle(text, prefixes) {
-    return priorityOfText(taskTitle(text), prefixes);
-  }
-  function isBlankTitle(text, prefixes) {
-    return priorityOfText(text, prefixes).text.trim() === "";
-  }
-
-  // src/settings.ts
-  var DEFAULT_SETTINGS = {
-    tasksFile: "TODOs Tasks.md",
-    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
-    dueDateMarker: "📅",
-    slotMarker: "⏰",
-    alarmSlotMarker: "🚨",
-    liveSlotMarker: "📌",
-    silentSlotMarker: "🔕",
-    repeatMarker: "🔁",
-    collapsedMarker: "📁",
-    workCalendarFile: "calendar/work.json",
-    workCalendarTitles: [],
-    hiddenCalendars: [],
-    calendarsMigrated: false,
-    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
-    longPressMs: 250,
-    scrollToHour: 9,
-    dayStartHour: 5,
-    staleAfterMinutes: 180,
-    priorities: [
-      { prefix: "p1", color: "red" },
-      { prefix: "p2", color: "orange" }
-    ],
-    labelTag: "label",
-    labels: [],
-    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
-  };
-  function settingsFrom(saved) {
-    const s = saved ?? {};
-    return {
-      ...DEFAULT_SETTINGS,
-      ...s,
-      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
-      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
-      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
-    };
-  }
-
-  // src/application/calendarFile.ts
-  var GOOGLE_CALENDAR_FILE = "calendar/google.json";
-  var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
-  var CALENDAR_SOURCES = ["google", "iphone", "work"];
-  function calendarPath(source, settings) {
-    if (source === "google") return GOOGLE_CALENDAR_FILE;
-    if (source === "iphone") return IPHONE_CALENDAR_FILE;
-    return settings.workCalendarFile;
-  }
-  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
-  var dateOrNull = (text) => text ? new Date(text) : null;
-  function readCalendarFile(text, source) {
-    const content = JSON.parse(text);
-    const events = (content.events ?? []).map((e) => ({
-      id: e.id,
-      title: e.title,
-      start: new Date(e.start),
-      end: new Date(e.end),
-      allDay: e.allDay,
-      calendar: e.calendar,
-      color: e.color ?? DEFAULT_COLOR[source],
-      source,
-      account: e.account ?? null,
-      calendarId: e.calendarId ?? null
-    }));
-    const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
-    return {
-      events,
-      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
-      exportedAt: new Date(content.exportedAt),
-      device: content.device ?? null,
-      from: dateOrNull(content.from),
-      to: dateOrNull(content.to),
-      validUntil: dateOrNull(content.validUntil)
-    };
-  }
-  function eventCalendars(events) {
-    const seen = /* @__PURE__ */ new Map();
-    for (const e of events) {
-      const key = `${e.account ?? ""}
-${e.calendarId ?? ""}
-${e.calendar}`;
-      if (!seen.has(key)) seen.set(key, { calendar: e.calendar, calendarId: e.calendarId ?? null, account: e.account ?? null, color: e.color ?? null });
-    }
-    return [...seen.values()];
-  }
-
   // src/domain/DayBoundary.ts
   var HOUR_MINUTES2 = 60;
   var DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES2;
   var MIN_SLOT_MINUTES = 5;
+  function clampSlot(start, end) {
+    const duration = end === null ? null : end - start;
+    const latest = MINUTES_PER_DAY - (duration ?? MIN_SLOT_MINUTES);
+    const moved = Math.min(latest, Math.max(0, start));
+    return { start: moved, end: duration === null ? null : moved + duration };
+  }
   var DayBoundary = class _DayBoundary {
     static {
       this.MIDNIGHT = new _DayBoundary(0);
@@ -277,244 +141,114 @@ ${e.calendar}`;
     }
   };
 
-  // src/application/calendarDays.ts
-  function localTime(date, plusDays, hour) {
-    const [y, m, d] = date.split("-").map(Number);
-    return new Date(y, m - 1, d + plusDays, hour);
-  }
-  var DayWindow = class {
-    constructor(date, boundary) {
-      this.timedStart = localTime(date, 0, boundary.startHour);
-      this.timedEnd = localTime(date, 1, boundary.startHour);
-      this.dateStart = localTime(date, 0, 0);
-      this.dateEnd = localTime(date, 1, 0);
-    }
-    /** What to choose the events from: both spans. */
-    get fetchStart() {
-      return this.dateStart;
-    }
-    get fetchEnd() {
-      return this.timedEnd;
-    }
-    shows(e) {
-      return e.allDay ? this.touches(e, this.dateStart, this.dateEnd) : this.touches(e, this.timedStart, this.timedEnd);
-    }
-    touches(e, start, end) {
-      const overlaps = e.start < end && e.end > start;
-      const startsInside = e.start >= start && e.start < end;
-      return overlaps || e.allDay && startsInside;
-    }
-  };
-  var CalendarDays = class {
-    constructor(choice, boundary) {
-      this.choice = choice;
-      this.boundary = boundary;
-    }
-    day(date) {
-      const span = new DayWindow(date, this.boundary);
-      const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
-      return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
-    }
-    /** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */
-    timedBetween(from, to) {
-      const found = /* @__PURE__ */ new Map();
-      for (let date = this.boundary.dayOf(from); new DayWindow(date, this.boundary).timedStart < to; date = addDays(date, 1)) {
-        for (const e of this.day(date).events) {
-          if (!e.allDay && e.start < to && e.end > from && !found.has(e.id)) found.set(e.id, e);
-        }
-      }
-      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
-    }
-  };
-
-  // src/application/calendarChoice.ts
-  var keyText = (key) => `${key.account}
-${key.title}`.toLowerCase();
-  var PHONE_ACCOUNT = "iPhone";
-  var apart = (title) => `${PHONE_ACCOUNT} · ${title}`;
-  var GOOGLE_ORDER = ["google", "iphone", "work"];
-  var OTHER_ORDER = ["iphone", "work"];
-  var CalendarChoice = class {
-    constructor(files, hidden, staleAfterMs, now) {
-      this.files = files;
-      this.staleAfterMs = staleAfterMs;
-      this.now = now;
-      this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-      const phone = files.get("iphone")?.calendars ?? [];
-      const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google").calendars, phone);
-      this.phoneGoogleIds = new Set(
-        phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
-      );
-      this.hidden = new Set(hidden.map(keyText));
-    }
-    known() {
-      const found = /* @__PURE__ */ new Map();
-      for (const source of GOOGLE_ORDER) {
-        for (const calendar of this.files.get(source)?.calendars ?? []) {
-          const key = this.keyOf(source, calendar);
-          const text = keyText(key);
-          if (found.has(text)) continue;
-          const name = source === "work" && key.title === apart(calendar.title) ? calendar.title : key.title;
-          found.set(text, { key, accountName: key.account === "" ? PHONE_ACCOUNT : key.account, name, color: calendar.color, google: source === "google" || this.isGoogle(key) });
-        }
-      }
-      return [...found.values()].sort(
-        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || textOrder(a.key.title, b.key.title)
-      );
-    }
-    day(start, end) {
-      const events = [];
-      let stale = false;
-      for (const calendar of this.known()) {
-        if (this.hidden.has(keyText(calendar.key))) continue;
-        const source = this.sourceFor(calendar, start);
-        if (source === null) continue;
-        const file = this.files.get(source);
-        if (!this.fresh(file)) stale = true;
-        const text = keyText(calendar.key);
-        events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
-      }
-      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
-    }
-    sourceFor(calendar, day) {
-      const text = keyText(calendar.key);
-      const candidates = (calendar.google ? GOOGLE_ORDER : OTHER_ORDER).filter((source) => {
-        const file = this.files.get(source);
-        return file !== void 0 && covers(file, day) && file.calendars.some((c) => keyText(this.keyOf(source, c)) === text);
-      });
-      const fresh = candidates.find((source) => this.fresh(this.files.get(source)));
-      if (fresh) return fresh;
-      return candidates.reduce(
-        (best, source) => best === null || this.files.get(source).exportedAt > this.files.get(best).exportedAt ? source : best,
-        null
-      );
-    }
-    fresh(file) {
-      return this.now.getTime() - file.exportedAt.getTime() <= this.staleAfterMs;
-    }
-    isGoogle(key) {
-      return this.googleEmail !== null && key.account === this.googleEmail;
-    }
-    /** The calendar a file's row or event belongs to, the same across the files. */
-    keyOf(source, ref) {
-      if (source === "work") return this.scriptableKey(ref);
-      if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail, title: ref.title };
-      return { account: ref.account ?? "", title: ref.title };
-    }
-    /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
-    scriptableKey(ref) {
-      const phone = this.files.get("iphone")?.calendars.find((c) => ref.calendarId !== null && c.calendarId === ref.calendarId);
-      if (phone) return this.keyOf("iphone", phone);
-      const titled = /* @__PURE__ */ new Map();
-      for (const source of ["google", "iphone"]) {
-        for (const c of this.files.get(source)?.calendars ?? []) {
-          if (c.title !== ref.title) continue;
-          const key = this.keyOf(source, c);
-          titled.set(keyText(key), key);
-        }
-      }
-      if (titled.size === 1) return [...titled.values()][0];
-      return { account: "", title: titled.size === 0 ? ref.title : apart(ref.title) };
-    }
-  };
-  function phoneAccountOf(calendar) {
-    return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
-  }
-  function phoneGoogleAccount(google, phone) {
-    const titles = new Set(google.map((c) => c.title.toLowerCase()));
-    const shared = /* @__PURE__ */ new Map();
-    for (const calendar of phone) {
-      if (!titles.has(calendar.title.toLowerCase())) continue;
-      const account = phoneAccountOf(calendar);
-      shared.set(account, (shared.get(account) ?? 0) + 1);
-    }
-    const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
-    if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
-    return ranked[0][0];
-  }
-  function byAccount(a, b) {
-    if (a === b) return 0;
-    if (a === "") return 1;
-    if (b === "") return -1;
-    return textOrder(a, b);
-  }
-  function textOrder(a, b) {
-    const x = letters(a);
-    const y = letters(b);
-    if (x !== y) return x < y ? -1 : 1;
-    return a === b ? 0 : a < b ? -1 : 1;
-  }
-  function letters(name) {
-    return name.toLowerCase().replace(/ё/g, "е");
-  }
-  function calendarOf(e) {
-    return { title: e.calendar, account: e.account, calendarId: e.calendarId };
-  }
-  function covers(file, day) {
-    if (file.from !== null && file.to !== null) return file.from <= day && day < file.to;
-    if (file.events.length === 0) return false;
-    const first = Math.min(...file.events.map((e) => e.start.getTime()));
-    const last = Math.max(...file.events.map((e) => e.end.getTime()));
-    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
-    return first < dayEnd && day.getTime() <= last;
-  }
-
-  // src/application/calendarMigration.ts
-  function migratedHidden(settings, known, googleIds2) {
-    const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
-    const googleChoice = settings.google.calendarIds.length > 0 && googleIds2.size > 0;
-    const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
-    return known.filter((c) => c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
-  }
-  function hiddenNow(settings, known, google) {
-    return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));
-  }
-  function googleIds(google) {
-    return new Map((google?.calendars ?? []).flatMap((c) => c.calendarId === null ? [] : [[c.calendarId, c.title]]));
-  }
-
-  // src/application/shownCalendars.ts
-  var MINUTE_MS = 6e4;
-  var ShownCalendars = class {
-    constructor(files, settings, now) {
-      this.files = files;
-      this.settings = settings;
-      this.now = now;
-    }
-    /** Every calendar the files hold, hidden or not. */
-    known() {
-      return this.choice([]).known();
-    }
-    /** The calendars the settings hide, the old choice carried over until it is. */
-    hidden() {
-      return hiddenNow(this.settings, this.known(), this.files.get("google"));
-    }
-    /** The calendar's days, cut at the day's start, of the calendars shown. */
-    days() {
-      return new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.dayStartHour));
-    }
-    choice(hidden) {
-      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS, this.now);
-    }
-  };
-
-  // src/domain/Days.ts
-  function dayColumn(day, today) {
-    if (day === today) return { list: "now", date: null, sections: true };
-    return day > today ? { list: "soon", date: day, sections: true } : { list: "now", date: day, sections: false };
-  }
+  // src/domain/Lists.ts
+  var GROUPED_LISTS = ["inbox", "backlog", "now", "soon"];
 
   // src/domain/Task.ts
   function isOpen(status) {
     return status === "todo" || status === "inProgress";
   }
+  function nextProgress(statuses) {
+    return statuses.every((status) => status === "inProgress") ? "todo" : "inProgress";
+  }
+  function sameSlot(a, b) {
+    return a !== null && b !== null && a.date === b.date && a.start === b.start && a.end === b.end;
+  }
+  var REMINDER_KINDS = ["live", "notification", "alarm", "none"];
   var DEFAULT_REMINDER = "live";
+  function canRemind(slot) {
+    return slot !== null;
+  }
   var STATUS_CHARS = {
     todo: " ",
     inProgress: "/",
     done: "x",
     cancelled: "-"
   };
+
+  // src/domain/TaskTitle.ts
+  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
+  function oneLine(text) {
+    return text.replace(LINE_BREAK, " ");
+  }
+  function taskTitle(text) {
+    return oneLine(text).trim();
+  }
+
+  // src/domain/Priority.ts
+  var PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"];
+  function isPresetColor(color) {
+    return PRIORITY_COLORS.includes(color);
+  }
+  function usablePrefix(prefix) {
+    return /^\S+$/.test(prefix);
+  }
+  function sameLevels(a, b) {
+    return a.length === b.length && a.every((level, i) => level.prefix === b[i].prefix && level.color === b[i].color);
+  }
+  function usableLevels(levels) {
+    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+  }
+  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+  function priorityOfText(text, prefixes) {
+    const m = FIRST_WORD_RE.exec(text);
+    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+    return { priority: m[1], text: m[2] };
+  }
+  function priorityOfTitle(text, prefixes) {
+    return priorityOfText(taskTitle(text), prefixes);
+  }
+  function isBlankTitle(text, prefixes) {
+    return priorityOfText(text, prefixes).text.trim() === "";
+  }
+  function withPriority(text, prefix, prefixes) {
+    const rest = priorityOfTitle(text, prefixes).text;
+    return prefix === null ? rest : `${prefix} ${rest}`;
+  }
+
+  // src/domain/Marks.ts
+  function marksOf(priority, labels) {
+    return { priority, labels: priority === null ? labels : [] };
+  }
+  function markChoices(marks) {
+    return { priority: marks.labels.length === 0, labels: marks.priority === null };
+  }
+  function typedMarks(text, priority, labels, prefixes) {
+    const typed2 = priority === null ? priorityOfTitle(text, prefixes) : { text: taskTitle(text), priority };
+    return { text: typed2.text, ...marksOf(typed2.priority, labels) };
+  }
+
+  // src/domain/Days.ts
+  function dayColumn(day, today) {
+    if (day === today) return { list: "now", date: null, sections: true };
+    return day > today ? { list: "soon", date: day, sections: true } : { list: "now", date: day, sections: false };
+  }
+  function placementOfDay(day, today) {
+    return day === today ? { kind: "now" } : { kind: "date", date: day };
+  }
+  function dayOfPlacement(placement, today) {
+    if (placement.kind === "now") return today;
+    return placement.kind === "date" ? placement.date : null;
+  }
+  function dayOfTask(section, task, today) {
+    if (task.slot) return task.slot.date;
+    return section === "now" ? today : task.dueDate;
+  }
+  function canPostpone(section) {
+    return section !== "done";
+  }
+  function canRemoveDue(dueDate, today) {
+    return dueDate !== null && dueDate !== today;
+  }
+  function taskScreen(section, day) {
+    if (section === "done" || section === "inbox" || section === "backlog") return { kind: "list", list: section };
+    return day === null ? { kind: "list", list: "soon" } : { kind: "day", date: day };
+  }
+  function dayRelation(date, today) {
+    if (date === today) return "today";
+    if (date === addDays(today, 1)) return "tomorrow";
+    return date === addDays(today, -1) ? "yesterday" : "other";
+  }
 
   // src/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
@@ -551,6 +285,11 @@ ${key.title}`.toLowerCase();
   }
 
   // src/domain/Repeat.ts
+  function sameRule(a, b) {
+    if (a === null || b === null) return a === b;
+    const days = (rule) => [...rule.days].sort((x, y) => x - y).join();
+    return a.kind === b.kind && a.every === b.every && a.unit === b.unit && a.dayOfMonth === b.dayOfMonth && days(a) === days(b);
+  }
   var WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   var RULE_RE = /^every(?: (\d+))? (day|week|month)(s)?(?: (when done)| on (.+?))?(?: from (\d{4}-\d{2}-\d{2}))?$/;
   var ORDINAL_RE = /^the (\d{1,2})(?:st|nd|rd|th)$/;
@@ -698,6 +437,39 @@ ${key.title}`.toLowerCase();
       }
     }
   };
+
+  // src/domain/Label.ts
+  function labelTitle(name) {
+    return name.replace(/_/g, " ");
+  }
+  function usableLabelName(name) {
+    return /^[^\s#]+$/.test(name);
+  }
+  function usableLabels(labels) {
+    return labels.filter((label, i) => usableLabelName(label.name) && labels.findIndex((l) => l.name === label.name) === i);
+  }
+  function sameLabels(a, b) {
+    return a.length === b.length && a.every((label, i) => label.name === b[i].name && label.color === b[i].color);
+  }
+  function usableLabelTag(tag) {
+    return /^[^\s#/]+$/.test(tag);
+  }
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function labelsOfText(text, tag, names) {
+    if (!usableLabelTag(tag) || names.length === 0) return { labels: [], text };
+    const labels = [];
+    const rest = text.replace(new RegExp(`(^|\\s)#${escapeRegExp(tag)}/(\\S+)(?=\\s|$)`, "g"), (whole, space, name) => {
+      if (!names.includes(name)) return whole;
+      if (!labels.includes(name)) labels.push(name);
+      return space;
+    });
+    return labels.length === 0 ? { labels, text } : { labels, text: rest.replace(/\s{2,}/g, " ").trim() };
+  }
+  function labelTags(tag, labels) {
+    return labels.map((name) => ` #${tag}/${name}`).join("");
+  }
 
   // src/domain/TaskLine.ts
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
@@ -1363,11 +1135,23 @@ ${key.title}`.toLowerCase();
     const shown = (e) => date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
     return listed(doc).filter((e) => shown(e) && !slottedOnDate(e, date, boundary));
   }
+  function slottedOn(doc, date, boundary = DayBoundary.MIDNIGHT) {
+    return listed(doc).filter((e) => slottedOnDate(e, date, boundary));
+  }
   function openSlotted(doc) {
     return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
   }
   function soonWithoutDate(doc) {
     return doc.tasks("soon").filter((e) => e.task.dueDate === null && e.task.slot === null);
+  }
+  function inboxList(doc) {
+    return doc.tasks("inbox");
+  }
+  function backlogList(doc) {
+    return doc.tasks("backlog");
+  }
+  function repeatable(entry) {
+    return isOpen(entry.task.status);
   }
   function columnList(column, today) {
     if (column.kind !== "day") return column.kind;
@@ -1384,142 +1168,9 @@ ${key.title}`.toLowerCase();
     return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
   }
 
-  // src/domain/TaskText.ts
-  var TOKEN_RE = new RegExp(
-    [
-      "(?<code>`[^`]*`)",
-      "(?<escape>\\\\.)",
-      "(?<embed>!\\[\\[[^\\]]*\\]\\]|!\\[[^\\]]*\\]\\([^)]*\\))",
-      "\\[\\[(?<wiki>[^\\[\\]|]+?)(?:\\|(?<alias>[^\\[\\]]+?))?\\]\\]",
-      "\\[(?<label>[^\\[\\]]+)\\]\\((?<href><[^>]+>|[^()\\s]+)\\)",
-      "(?<bare>https?://[^\\s<>]+)"
-    ].join("|"),
-    "gu"
-  );
-  var SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
-  var TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}'"»]+$/u;
-  function textParts(text) {
-    const parts = [];
-    const pushText = (s) => {
-      if (s === "") return;
-      const last = parts[parts.length - 1];
-      if (last?.kind === "text") parts[parts.length - 1] = { kind: "text", text: last.text + s };
-      else parts.push({ kind: "text", text: s });
-    };
-    let at = 0;
-    for (const m of text.matchAll(TOKEN_RE)) {
-      const link = linkOf(m.groups);
-      if (!link) continue;
-      pushText(text.slice(at, m.index));
-      parts.push(link.part);
-      pushText(link.rest);
-      at = m.index + m[0].length;
-    }
-    pushText(text.slice(at));
-    return parts;
-  }
-  function plainText(text) {
-    return textParts(text).map((p) => p.kind === "text" ? p.text : p.label).join("");
-  }
-  function linkOf(g) {
-    if (g.wiki !== void 0) {
-      const target = g.wiki.trim();
-      return { part: { kind: "note", label: g.alias?.trim() || noteLabel(target), target }, rest: "" };
-    }
-    if (g.label !== void 0 && g.href !== void 0) {
-      const href = g.href.startsWith("<") ? g.href.slice(1, -1) : g.href;
-      const part = SCHEME_RE.test(href) ? { kind: "url", label: g.label, target: href } : { kind: "note", label: g.label, target: decoded(href) };
-      return { part, rest: "" };
-    }
-    if (g.bare !== void 0) {
-      const rest = TRAILING_PUNCTUATION_RE.exec(g.bare)?.[0] ?? "";
-      const url = g.bare.slice(0, g.bare.length - rest.length);
-      return { part: { kind: "url", label: url, target: url }, rest };
-    }
-    return null;
-  }
-  function noteLabel(target) {
-    const [note, ...subpath] = target.split("#");
-    if (subpath.length === 0) return note;
-    return note === "" ? subpath.join(" > ") : [note, ...subpath].join(" > ");
-  }
-  function decoded(href) {
-    try {
-      return decodeURI(href);
-    } catch {
-      return href;
-    }
-  }
-
-  // src/application/TaskReminders.ts
-  var HOUR_MINUTES3 = 60;
-  function clockOf(date, minutes) {
-    const [year, month, day] = date.split("-").map(Number);
-    return new Date(year, month - 1, day, 0, minutes);
-  }
-  function keyOf(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-  }
-  var TaskReminders = class {
-    constructor(rules, clock) {
-      this.rules = rules;
-      this.clock = clock;
-    }
-    /** The open tasks on a time that remind, until their day ends, by start. */
-    ringing(text) {
-      const at = this.rules.moment();
-      const now = this.clock.now();
-      return openSlotted(this.rules.read(text, at).doc).filter((e) => e.task.reminder !== "none").map((e) => this.reminder(e, e.task.slot, at)).filter((r) => r.dayEnd > now).sort((a, b) => a.start.getTime() - b.start.getTime());
-    }
-    /**
-     * The text after `action` on the reminding task whose line is `line`, the first of two alike; null when no such task is
-     * left. A reminder still shown after its day ended names a slot that today's normalizing has already erased: it is
-     * found in the file as it is.
-     */
-    act(text, line, action2) {
-      const at = this.rules.moment();
-      const found = this.find(this.rules.read(text, at).doc, line);
-      if (found) return this.rules.change(text, action2(found), at).text;
-      const asRead = this.find(this.rules.asRead(text, at), line);
-      return asRead ? this.rules.changeAsRead(text, action2(asRead), at).text : null;
-    }
-    find(doc, line) {
-      const entry = openSlotted(doc).find((e) => e.raw === line);
-      return entry ? keyOf(entry) : null;
-    }
-    reminder(entry, slot, at) {
-      const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
-      return {
-        key: keyOf(entry),
-        title: plainText(entry.task.text),
-        startMinute: slot.start,
-        endMinute: slot.end,
-        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
-        date: slot.date,
-        start: clockOf(slot.date, slot.start),
-        dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES3)
-      };
-    }
-  };
-
-  // src/domain/Lists.ts
-  var GROUPED_LISTS = ["inbox", "backlog", "now", "soon"];
-
-  // src/domain/Marks.ts
-  function marksOf(priority, labels) {
-    return { priority, labels: priority === null ? labels : [] };
-  }
-  function markChoices(marks) {
-    return { priority: marks.labels.length === 0, labels: marks.priority === null };
-  }
-  function typedMarks(text, priority, labels, prefixes) {
-    const typed2 = priority === null ? priorityOfTitle(text, prefixes) : { text: taskTitle(text), priority };
-    return { text: typed2.text, ...marksOf(typed2.priority, labels) };
-  }
-
   // src/domain/operations.ts
-  var HOUR_MINUTES4 = 60;
-  var MINUTE_MS2 = 6e4;
+  var HOUR_MINUTES3 = 60;
+  var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
     return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
   }
@@ -1636,8 +1287,8 @@ ${key.title}`.toLowerCase();
     return patch(doc, entry, { collapsed });
   }
   function unfoldAbove(doc, entry) {
-    const folded = entry.path.map((_, depth) => doc.find(entry.section, entry.index, entry.path.slice(0, depth))).filter((above) => above.task.collapsed);
-    return doc.replaceAll(folded.map((above) => [above, { ...above.task, collapsed: false }]));
+    const folded2 = entry.path.map((_, depth) => doc.find(entry.section, entry.index, entry.path.slice(0, depth))).filter((above) => above.task.collapsed);
+    return doc.replaceAll(folded2.map((above) => [above, { ...above.task, collapsed: false }]));
   }
   function intoUnfolded(doc, parent, operation) {
     if (!parent.task.collapsed) return operation(doc, (entry) => entry);
@@ -1662,15 +1313,15 @@ ${key.title}`.toLowerCase();
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
     if (boundary.dayOfSlot(clamped) === today || entry.section !== "now") return patch(doc, entry, { slot: clamped });
-    const slotted = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
-    return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
+    const slotted2 = patch(doc, entry, { slot: clamped, dueDate: entry.task.dueDate === today ? null : entry.task.dueDate });
+    return slotted2.moveEntry(sameEntryIn(slotted2, entry), "soon", "end");
   }
   function clearSlot(doc, entry) {
     return patch(doc, entry, { slot: null });
   }
   function snoozedSlot(slot, now, minutes) {
-    const at = new Date(now.getTime() + minutes * MINUTE_MS2);
-    const start = at.getHours() * HOUR_MINUTES4 + at.getMinutes();
+    const at = new Date(now.getTime() + minutes * MINUTE_MS);
+    const start = at.getHours() * HOUR_MINUTES3 + at.getMinutes();
     return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
   }
   function toList(doc, entry, date, today) {
@@ -1707,8 +1358,8 @@ ${key.title}`.toLowerCase();
     }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
     const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {} };
-    const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
+    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {} };
+    const edited = doc.replace(entry, withDraftRepeat(changed2, draft, today, boundary));
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
   }
@@ -1914,8 +1565,8 @@ ${key.title}`.toLowerCase();
     const came = (e) => {
       if (e.section !== "soon" || !isOpen(e.task.status)) return false;
       const due = e.task.dueDate !== null && e.task.dueDate <= today;
-      const slotted = e.task.slot !== null && boundary.dayOfSlot(e.task.slot) <= today;
-      return due || slotted;
+      const slotted2 = e.task.slot !== null && boundary.dayOfSlot(e.task.slot) <= today;
+      return due || slotted2;
     };
     if (!doc.hasSection("now")) return doc;
     for (; ; ) {
@@ -1994,6 +1645,1897 @@ ${key.title}`.toLowerCase();
     return result.serialize() === doc.serialize() ? doc : result;
   }
 
+  // src/settings.ts
+  var DEFAULT_SETTINGS = {
+    tasksFile: "TODOs Tasks.md",
+    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
+    dueDateMarker: "📅",
+    slotMarker: "⏰",
+    alarmSlotMarker: "🚨",
+    liveSlotMarker: "📌",
+    silentSlotMarker: "🔕",
+    repeatMarker: "🔁",
+    collapsedMarker: "📁",
+    workCalendarFile: "calendar/work.json",
+    workCalendarTitles: [],
+    hiddenCalendars: [],
+    calendarsMigrated: false,
+    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
+    longPressMs: 250,
+    scrollToHour: 9,
+    dayStartHour: 5,
+    staleAfterMinutes: 180,
+    priorities: [
+      { prefix: "p1", color: "red" },
+      { prefix: "p2", color: "orange" }
+    ],
+    labelTag: "label",
+    labels: [],
+    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
+  };
+  function settingsFrom(saved) {
+    const s = saved ?? {};
+    return {
+      ...DEFAULT_SETTINGS,
+      ...s,
+      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
+      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
+      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
+    };
+  }
+
+  // src/application/documentText.ts
+  function markersOf(settings) {
+    return {
+      dueDate: settings.dueDateMarker,
+      slot: settings.slotMarker,
+      alarmSlot: settings.alarmSlotMarker,
+      liveSlot: settings.liveSlotMarker,
+      silentSlot: settings.silentSlotMarker,
+      repeat: settings.repeatMarker,
+      collapsed: settings.collapsedMarker,
+      priorities: usableLevels(settings.priorities).map((l) => l.prefix),
+      labelTag: settings.labelTag,
+      labels: usableLabels(settings.labels).map((l) => l.name)
+    };
+  }
+  function tasksFilePath(settings) {
+    return settings.tasksFile.trim() === "" ? null : settings.tasksFile;
+  }
+  function boundaryOf(settings) {
+    return new DayBoundary(settings.dayStartHour);
+  }
+  function sectionNames(settings) {
+    const s = settings.sections;
+    return [s.inbox, s.now, s.soon, s.backlog, s.done];
+  }
+  function parseText(text, settings) {
+    const s = settings.sections;
+    return TaskDocument.parse(
+      text,
+      { inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
+      markersOf(settings)
+    );
+  }
+  function readDocument(text, settings, today, boundary = boundaryOf(settings)) {
+    return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
+  }
+  function readingKey(settings) {
+    return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
+  }
+
+  // src/application/calendarFile.ts
+  var GOOGLE_CALENDAR_FILE = "calendar/google.json";
+  var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
+  var CALENDAR_SOURCES = ["google", "iphone", "work"];
+  function calendarPath(source, settings) {
+    if (source === "google") return GOOGLE_CALENDAR_FILE;
+    if (source === "iphone") return IPHONE_CALENDAR_FILE;
+    return settings.workCalendarFile;
+  }
+  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
+  var dateOrNull = (text) => text ? new Date(text) : null;
+  function readCalendarFile(text, source) {
+    const content = JSON.parse(text);
+    const events = (content.events ?? []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      start: new Date(e.start),
+      end: new Date(e.end),
+      allDay: e.allDay,
+      calendar: e.calendar,
+      color: e.color ?? DEFAULT_COLOR[source],
+      source,
+      account: e.account ?? null,
+      calendarId: e.calendarId ?? null
+    }));
+    const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
+    return {
+      events,
+      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
+      exportedAt: new Date(content.exportedAt),
+      device: content.device ?? null,
+      from: dateOrNull(content.from),
+      to: dateOrNull(content.to),
+      validUntil: dateOrNull(content.validUntil)
+    };
+  }
+  function eventCalendars(events) {
+    const seen = /* @__PURE__ */ new Map();
+    for (const e of events) {
+      const key = `${e.account ?? ""}
+${e.calendarId ?? ""}
+${e.calendar}`;
+      if (!seen.has(key)) seen.set(key, { calendar: e.calendar, calendarId: e.calendarId ?? null, account: e.account ?? null, color: e.color ?? null });
+    }
+    return [...seen.values()];
+  }
+  function calendarFileText(file) {
+    const iso = (d) => d ? d.toISOString() : null;
+    const content = {
+      exportedAt: file.exportedAt.toISOString(),
+      device: file.device,
+      from: iso(file.from),
+      to: iso(file.to),
+      validUntil: iso(file.validUntil),
+      calendars: file.calendars.map((c) => ({ calendar: c.title, calendarId: c.calendarId, account: c.account, color: c.color, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
+      events: file.events.map((e) => ({
+        id: e.id,
+        title: e.title,
+        start: e.start.toISOString(),
+        end: e.end.toISOString(),
+        allDay: e.allDay,
+        calendar: e.calendar,
+        calendarId: e.calendarId,
+        account: e.account,
+        color: e.color
+      }))
+    };
+    return `${JSON.stringify(content, null, "	")}
+`;
+  }
+  function phoneCalendarText(file) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const c of file.calendars) if (!byId.has(c.calendarId)) byId.set(c.calendarId, c);
+    return calendarFileText({
+      exportedAt: new Date(file.exportedAtMs),
+      device: file.device,
+      from: new Date(file.fromMs),
+      to: new Date(file.toMs),
+      validUntil: file.validUntilMs === null || file.validUntilMs === void 0 ? null : new Date(file.validUntilMs),
+      calendars: file.calendars.map((c) => ({ title: c.title, calendarId: c.calendarId, account: c.account, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
+      events: file.events.map((e) => {
+        const calendar = byId.get(e.calendarId);
+        return {
+          id: e.id,
+          title: e.title,
+          start: new Date(e.startMs),
+          end: new Date(e.endMs),
+          allDay: e.allDay,
+          calendar: calendar?.title ?? "",
+          calendarId: e.calendarId,
+          account: calendar?.account ?? null,
+          color: calendar?.color ?? null
+        };
+      })
+    });
+  }
+
+  // src/domain/RepeatDraft.ts
+  var KINDS = ["schedule", "afterDone"];
+  var UNITS = ["day", "week", "month"];
+  function repeatDay(taskDay, today) {
+    return taskDay ?? today;
+  }
+  function ruleOf({ kind, every, unit, days, dayOfMonth }) {
+    const schedule = kind === "schedule";
+    return { kind, every, unit, days: schedule && unit === "week" ? days : [], dayOfMonth: schedule && unit === "month" ? dayOfMonth : null, from: null };
+  }
+  function writable(state) {
+    return Repeat.problemWith(Repeat.anchored(ruleOf(state), state.day)) === null;
+  }
+  function detailOf({ kind, unit }) {
+    if (kind !== "schedule") return null;
+    return unit === "week" ? "weekdays" : unit === "month" ? "monthDay" : null;
+  }
+  function draftOf(state) {
+    return { ...state, kinds: KINDS, units: UNITS, detail: detailOf(state), can: { fewer: writable({ ...state, every: state.every - 1 }) }, rule: ruleOf(state) };
+  }
+  function repeatDraft(day, rule) {
+    return draftOf({
+      kind: rule?.kind ?? "schedule",
+      every: rule?.every ?? 1,
+      unit: rule?.unit ?? "week",
+      days: rule && rule.days.length > 0 ? rule.days : [weekdayOf(day)],
+      dayOfMonth: rule?.dayOfMonth ?? partsOf(day).day,
+      day,
+      removable: rule !== null
+    });
+  }
+  function changed(draft, change) {
+    switch (change.what) {
+      case "kind":
+        return change.to === draft.kind ? null : { ...draft, kind: change.to };
+      case "unit":
+        return change.to === draft.unit ? null : { ...draft, unit: change.to };
+      case "every":
+        return { ...draft, every: draft.every + change.by };
+      case "weekday": {
+        if (draft.detail !== "weekdays") return null;
+        const on = draft.days.includes(change.day);
+        return { ...draft, days: on ? draft.days.filter((d) => d !== change.day) : [...draft.days, change.day].sort((a, b) => a - b) };
+      }
+    }
+  }
+  function editRepeat(draft, change) {
+    const next = changed(draft, change);
+    return next && writable(next) ? draftOf(next) : null;
+  }
+
+  // src/domain/TaskText.ts
+  var TOKEN_RE = new RegExp(
+    [
+      "(?<code>`[^`]*`)",
+      "(?<escape>\\\\.)",
+      "(?<embed>!\\[\\[[^\\]]*\\]\\]|!\\[[^\\]]*\\]\\([^)]*\\))",
+      "\\[\\[(?<wiki>[^\\[\\]|]+?)(?:\\|(?<alias>[^\\[\\]]+?))?\\]\\]",
+      "\\[(?<label>[^\\[\\]]+)\\]\\((?<href><[^>]+>|[^()\\s]+)\\)",
+      "(?<bare>https?://[^\\s<>]+)"
+    ].join("|"),
+    "gu"
+  );
+  var SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
+  var TRAILING_PUNCTUATION_RE = /[.,;:!?)\]}'"»]+$/u;
+  function textParts(text) {
+    const parts = [];
+    const pushText = (s) => {
+      if (s === "") return;
+      const last = parts[parts.length - 1];
+      if (last?.kind === "text") parts[parts.length - 1] = { kind: "text", text: last.text + s };
+      else parts.push({ kind: "text", text: s });
+    };
+    let at = 0;
+    for (const m of text.matchAll(TOKEN_RE)) {
+      const link = linkOf(m.groups);
+      if (!link) continue;
+      pushText(text.slice(at, m.index));
+      parts.push(link.part);
+      pushText(link.rest);
+      at = m.index + m[0].length;
+    }
+    pushText(text.slice(at));
+    return parts;
+  }
+  function plainText(text) {
+    return textParts(text).map((p) => p.kind === "text" ? p.text : p.label).join("");
+  }
+  function linkOf(g) {
+    if (g.wiki !== void 0) {
+      const target = g.wiki.trim();
+      return { part: { kind: "note", label: g.alias?.trim() || noteLabel(target), target }, rest: "" };
+    }
+    if (g.label !== void 0 && g.href !== void 0) {
+      const href = g.href.startsWith("<") ? g.href.slice(1, -1) : g.href;
+      const part = SCHEME_RE.test(href) ? { kind: "url", label: g.label, target: href } : { kind: "note", label: g.label, target: decoded(href) };
+      return { part, rest: "" };
+    }
+    if (g.bare !== void 0) {
+      const rest = TRAILING_PUNCTUATION_RE.exec(g.bare)?.[0] ?? "";
+      const url = g.bare.slice(0, g.bare.length - rest.length);
+      return { part: { kind: "url", label: url, target: url }, rest };
+    }
+    return null;
+  }
+  function noteLabel(target) {
+    const [note, ...subpath] = target.split("#");
+    if (subpath.length === 0) return note;
+    return note === "" ? subpath.join(" > ") : [note, ...subpath].join(" > ");
+  }
+  function decoded(href) {
+    try {
+      return decodeURI(href);
+    } catch {
+      return href;
+    }
+  }
+
+  // src/application/calendarChoice.ts
+  var keyText = (key) => `${key.account}
+${key.title}`.toLowerCase();
+  var PHONE_ACCOUNT = "iPhone";
+  var apart = (title) => `${PHONE_ACCOUNT} · ${title}`;
+  var GOOGLE_ORDER = ["google", "iphone", "work"];
+  var OTHER_ORDER = ["iphone", "work"];
+  var CalendarChoice = class {
+    constructor(files, hidden, staleAfterMs, now) {
+      this.files = files;
+      this.staleAfterMs = staleAfterMs;
+      this.now = now;
+      this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
+      const phone = files.get("iphone")?.calendars ?? [];
+      const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google").calendars, phone);
+      this.phoneGoogleIds = new Set(
+        phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
+      );
+      this.hidden = new Set(hidden.map(keyText));
+    }
+    known() {
+      const found = /* @__PURE__ */ new Map();
+      for (const source of GOOGLE_ORDER) {
+        for (const calendar of this.files.get(source)?.calendars ?? []) {
+          const key = this.keyOf(source, calendar);
+          const text = keyText(key);
+          if (found.has(text)) continue;
+          const name = source === "work" && key.title === apart(calendar.title) ? calendar.title : key.title;
+          found.set(text, { key, accountName: key.account === "" ? PHONE_ACCOUNT : key.account, name, color: calendar.color, google: source === "google" || this.isGoogle(key) });
+        }
+      }
+      return [...found.values()].sort(
+        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || textOrder(a.key.title, b.key.title)
+      );
+    }
+    day(start, end) {
+      const events = [];
+      let stale = false;
+      for (const calendar of this.known()) {
+        if (this.hidden.has(keyText(calendar.key))) continue;
+        const source = this.sourceFor(calendar, start);
+        if (source === null) continue;
+        const file = this.files.get(source);
+        if (!this.fresh(file)) stale = true;
+        const text = keyText(calendar.key);
+        events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
+      }
+      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+    }
+    sourceFor(calendar, day) {
+      const text = keyText(calendar.key);
+      const candidates = (calendar.google ? GOOGLE_ORDER : OTHER_ORDER).filter((source) => {
+        const file = this.files.get(source);
+        return file !== void 0 && covers(file, day) && file.calendars.some((c) => keyText(this.keyOf(source, c)) === text);
+      });
+      const fresh = candidates.find((source) => this.fresh(this.files.get(source)));
+      if (fresh) return fresh;
+      return candidates.reduce(
+        (best, source) => best === null || this.files.get(source).exportedAt > this.files.get(best).exportedAt ? source : best,
+        null
+      );
+    }
+    fresh(file) {
+      return this.now.getTime() - file.exportedAt.getTime() <= this.staleAfterMs;
+    }
+    isGoogle(key) {
+      return this.googleEmail !== null && key.account === this.googleEmail;
+    }
+    /** The calendar a file's row or event belongs to, the same across the files. */
+    keyOf(source, ref) {
+      if (source === "work") return this.scriptableKey(ref);
+      if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail, title: ref.title };
+      return { account: ref.account ?? "", title: ref.title };
+    }
+    /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
+    scriptableKey(ref) {
+      const phone = this.files.get("iphone")?.calendars.find((c) => ref.calendarId !== null && c.calendarId === ref.calendarId);
+      if (phone) return this.keyOf("iphone", phone);
+      const titled = /* @__PURE__ */ new Map();
+      for (const source of ["google", "iphone"]) {
+        for (const c of this.files.get(source)?.calendars ?? []) {
+          if (c.title !== ref.title) continue;
+          const key = this.keyOf(source, c);
+          titled.set(keyText(key), key);
+        }
+      }
+      if (titled.size === 1) return [...titled.values()][0];
+      return { account: "", title: titled.size === 0 ? ref.title : apart(ref.title) };
+    }
+  };
+  function phoneAccountOf(calendar) {
+    return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
+  }
+  function phoneGoogleAccount(google, phone) {
+    const titles = new Set(google.map((c) => c.title.toLowerCase()));
+    const shared = /* @__PURE__ */ new Map();
+    for (const calendar of phone) {
+      if (!titles.has(calendar.title.toLowerCase())) continue;
+      const account = phoneAccountOf(calendar);
+      shared.set(account, (shared.get(account) ?? 0) + 1);
+    }
+    const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
+    if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
+    return ranked[0][0];
+  }
+  function byAccount(a, b) {
+    if (a === b) return 0;
+    if (a === "") return 1;
+    if (b === "") return -1;
+    return textOrder(a, b);
+  }
+  function textOrder(a, b) {
+    const x = letters(a);
+    const y = letters(b);
+    if (x !== y) return x < y ? -1 : 1;
+    return a === b ? 0 : a < b ? -1 : 1;
+  }
+  function letters(name) {
+    return name.toLowerCase().replace(/ё/g, "е");
+  }
+  function calendarOf(e) {
+    return { title: e.calendar, account: e.account, calendarId: e.calendarId };
+  }
+  function covers(file, day) {
+    if (file.from !== null && file.to !== null) return file.from <= day && day < file.to;
+    if (file.events.length === 0) return false;
+    const first = Math.min(...file.events.map((e) => e.start.getTime()));
+    const last = Math.max(...file.events.map((e) => e.end.getTime()));
+    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
+    return first < dayEnd && day.getTime() <= last;
+  }
+
+  // src/application/calendarDays.ts
+  function localTime(date, plusDays, hour) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d + plusDays, hour);
+  }
+  var DayWindow = class {
+    constructor(date, boundary) {
+      this.timedStart = localTime(date, 0, boundary.startHour);
+      this.timedEnd = localTime(date, 1, boundary.startHour);
+      this.dateStart = localTime(date, 0, 0);
+      this.dateEnd = localTime(date, 1, 0);
+    }
+    /** What to choose the events from: both spans. */
+    get fetchStart() {
+      return this.dateStart;
+    }
+    get fetchEnd() {
+      return this.timedEnd;
+    }
+    shows(e) {
+      return e.allDay ? this.touches(e, this.dateStart, this.dateEnd) : this.touches(e, this.timedStart, this.timedEnd);
+    }
+    touches(e, start, end) {
+      const overlaps = e.start < end && e.end > start;
+      const startsInside = e.start >= start && e.start < end;
+      return overlaps || e.allDay && startsInside;
+    }
+  };
+  var CalendarDays = class {
+    constructor(choice, boundary) {
+      this.choice = choice;
+      this.boundary = boundary;
+    }
+    day(date) {
+      const span = new DayWindow(date, this.boundary);
+      const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
+      return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
+    }
+    /** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */
+    timedBetween(from, to) {
+      const found = /* @__PURE__ */ new Map();
+      for (let date = this.boundary.dayOf(from); new DayWindow(date, this.boundary).timedStart < to; date = addDays(date, 1)) {
+        for (const e of this.day(date).events) {
+          if (!e.allDay && e.start < to && e.end > from && !found.has(e.id)) found.set(e.id, e);
+        }
+      }
+      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+  };
+
+  // src/application/calendarMigration.ts
+  function migratedHidden(settings, known, googleIds2) {
+    const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
+    const googleChoice = settings.google.calendarIds.length > 0 && googleIds2.size > 0;
+    const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
+    return known.filter((c) => c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
+  }
+  function hiddenNow(settings, known, google) {
+    return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));
+  }
+  function googleIds(google) {
+    return new Map((google?.calendars ?? []).flatMap((c) => c.calendarId === null ? [] : [[c.calendarId, c.title]]));
+  }
+
+  // src/application/shownCalendars.ts
+  var MINUTE_MS2 = 6e4;
+  var ShownCalendars = class {
+    constructor(files, settings, now) {
+      this.files = files;
+      this.settings = settings;
+      this.now = now;
+    }
+    /** Every calendar the files hold, hidden or not. */
+    known() {
+      return this.choice([]).known();
+    }
+    /** The calendars the settings hide, the old choice carried over until it is. */
+    hidden() {
+      return hiddenNow(this.settings, this.known(), this.files.get("google"));
+    }
+    /** The calendar's days, cut at the day's start, of the calendars shown. */
+    days() {
+      return new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.dayStartHour));
+    }
+    choice(hidden) {
+      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS2, this.now);
+    }
+  };
+
+  // src/application/calendarDay.ts
+  var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
+  var MINUTE_MS3 = 6e4;
+  var CalendarDay = class {
+    constructor(reading, settings, now) {
+      this.reading = reading;
+      this.settings = settings;
+      this.now = now;
+    }
+    /** The day's events as the screen shows them; staleness counts from now. */
+    events(date) {
+      const chosen = this.shown().days().day(date);
+      const events = chosen.events;
+      const shown = (name) => events.filter((e) => e.source === name).length;
+      return {
+        events,
+        allDay: events.filter((e) => e.allDay),
+        timed: events.filter((e) => !e.allDay),
+        statuses: this.reading.sources.map((source) => this.status(source, shown(source))),
+        stale: chosen.stale
+      };
+    }
+    /** The event is over by the clock: it is drawn grey. */
+    isPast(event) {
+      return event.end.getTime() <= this.now.getTime();
+    }
+    /** Every calendar the files list, Google's first, each once; whether each is shown. */
+    known() {
+      const hidden = new Set(this.hidden().map(keyText));
+      return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, accountName: c.accountName, name: c.name, color: c.color, shown: !hidden.has(keyText(c.key)) }));
+    }
+    /** The settings that show or hide one calendar. */
+    shownChange(account, title, shown) {
+      const others = this.hidden().filter((k) => k.account !== account || k.title !== title);
+      return { hiddenCalendars: shown ? others : [...others, { account, title }], calendarsMigrated: true };
+    }
+    /** On the phone, once both Google's and the phone's files are there: the old choice becomes the list of hidden calendars; null when not now. */
+    carryOver(canMigrate) {
+      const google = this.reading.files.get("google");
+      const withIds = google !== void 0 && google.calendars.some((c) => c.calendarId !== null);
+      if (this.settings.calendarsMigrated || !canMigrate || !withIds || !this.reading.files.has("iphone")) return null;
+      return { hiddenCalendars: this.hidden(), calendarsMigrated: true };
+    }
+    hidden() {
+      return this.shown().hidden();
+    }
+    shown() {
+      return new ShownCalendars(this.reading.files, this.settings, this.now);
+    }
+    status(source, shown) {
+      const problem = this.reading.problem(source);
+      const file = this.reading.files.get(source);
+      const updatedAt = file?.exportedAt ?? null;
+      return {
+        source,
+        kind: KINDS2[source],
+        problem,
+        events: shown,
+        updatedAt,
+        updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
+        detail: this.reading.fed(source) ? null : file?.device ?? null,
+        stale: problem !== null || this.isOld(updatedAt)
+      };
+    }
+    /** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
+    relationOf(at) {
+      return dayRelation(localDateOf(at), localDateOf(this.now));
+    }
+    isOld(updatedAt) {
+      if (updatedAt === null) return true;
+      return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS3;
+    }
+  };
+
+  // src/application/cardDue.ts
+  function cardDue(item, day) {
+    const date = item.dueDate !== null && item.dueDate !== day ? item.dueDate : null;
+    const repeats = item.repeat !== null;
+    return date === null && !repeats ? null : { date, repeats };
+  }
+
+  // src/application/taskKeys.ts
+  function samePlace2(a, b) {
+    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
+  }
+  function sameLine(a, b) {
+    return a.raw === b.raw;
+  }
+  function sameTaskTree(a, b) {
+    return a.section === b.section && a.index === b.index;
+  }
+  function keyId(key) {
+    return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
+  }
+  function isUnder(a, b) {
+    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+  }
+
+  // src/application/nesting.ts
+  function levelRange(cards, index, group) {
+    const prev = cards[index - 1]?.group === group ? cards[index - 1] : void 0;
+    const next = cards[index]?.group === group ? cards[index] : void 0;
+    return { min: next?.level ?? 0, max: prev ? prev.level + 1 : 0 };
+  }
+  function fitLevel(cards, place) {
+    const { min, max } = levelRange(cards, place.index, place.group);
+    return { ...place, level: Math.max(min, Math.min(max, place.level)) };
+  }
+  function shiftLevel(cards, place, delta) {
+    const level = place.level + delta;
+    const { min, max } = levelRange(cards, place.index, place.group);
+    return level >= min && level <= max ? { ...place, level } : null;
+  }
+  function placeOfGap(cards, place) {
+    const next = cards[place.index]?.group === place.group ? cards[place.index] : void 0;
+    const before = next && next.level === place.level ? next.key : null;
+    if (place.level === 0) return { kind: "task", group: place.group, before };
+    let parent = place.index - 1;
+    while (cards[parent].level !== place.level - 1) parent--;
+    return { kind: "subtask", parent: cards[parent].key, before };
+  }
+  function gapOfPlace(cards, place) {
+    const at = (key) => cards.findIndex((card) => samePlace2(card.key, key));
+    const before = place.before ? at(place.before) : -1;
+    if (before >= 0) return { kind: "gap", index: before, level: cards[before].level, group: cards[before].group };
+    const parent = place.kind === "subtask" ? at(place.parent) : -1;
+    if (parent >= 0) {
+      let end = parent + 1;
+      while (end < cards.length && cards[end].level > cards[parent].level) end++;
+      return { kind: "gap", index: end, level: cards[parent].level + 1, group: cards[parent].group };
+    }
+    const group = place.kind === "task" ? place.group : null;
+    let last = cards.length - 1;
+    while (last >= 0 && cards[last].group !== group) last--;
+    return { kind: "gap", index: last >= 0 ? last + 1 : group === null ? 0 : cards.length, level: 0, group };
+  }
+  function sameGap(a, b) {
+    return a.index === b.index && a.group === b.group;
+  }
+  function gapAt(cards, index, level, passed, headers) {
+    const above = index > 0 ? cards[index - 1].group : headers ? null : cards[0]?.group ?? null;
+    const group = passed.length > 0 ? passed[passed.length - 1] : above;
+    return fitLevel(cards, { kind: "gap", index, level: Math.round(level), group });
+  }
+  function placeOfDrop(cards, place, home) {
+    if (home && sameGap(place, home) && place.level === home.level) return null;
+    return placeOfGap(cards, place);
+  }
+  function groupPlaceOf(groups, lifted, slot) {
+    if (slot === lifted || slot === lifted + 1) return null;
+    return slot >= groups.length ? "end" : { before: groups[slot] };
+  }
+
+  // src/application/QuickEntry.ts
+  var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
+  function emptySession() {
+    return { field: null, runs: {}, jobs: [], next: 0 };
+  }
+  function listSpot(spot) {
+    return spot.kind === "list" ? spot : null;
+  }
+  var ALL_COLUMNS = ["day", "soon", "inbox", "backlog"];
+  var QuickEntry = class {
+    constructor(tasks, look, session = emptySession(), emit = () => void 0, queued = () => void 0) {
+      this.tasks = tasks;
+      this.look = look;
+      this.session = session;
+      this.emit = emit;
+      this.queued = queued;
+      /** What the field may do, kept while it only changes its text or marks, which do not change where it may go. Not state: worked out again. */
+      this.shifts = null;
+    }
+    get state() {
+      const field = this.session.field;
+      if (!field) return null;
+      const marks = this.tasks.draftMarks(field.text, field.priority, field.labels);
+      const task = !field.section;
+      const place = task ? this.shownPlace(field) : null;
+      const run = this.run(field.run);
+      return {
+        spot: run.spot,
+        text: field.text,
+        priority: field.priority,
+        labels: field.labels,
+        repeat: field.repeat,
+        pending: run.pending.map(({ text, level }) => ({ text, level })),
+        renaming: field.rename?.item ?? null,
+        indents: task && listSpot(run.spot) !== null,
+        ...this.mayShift(field),
+        section: this.maySection(field) ? field.section : null,
+        marks,
+        markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
+        place,
+        places: placeChoices(place),
+        repeatable: task && run.spot.kind !== "slot",
+        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today())
+      };
+    }
+    /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
+    get renaming() {
+      return this.session.field?.rename?.item.key ?? null;
+    }
+    /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
+    listEntry(column) {
+      const state = this.state;
+      const list = state && listSpot(state.spot);
+      if (!state || !list || list.column !== column) return null;
+      return { place: list.place, pending: state.pending, section: state.section === true };
+    }
+    /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
+    openAtEnd(column) {
+      this.open(this.endOf(column));
+    }
+    /** The plus tapped: the end of the day column while it shows, else of Inbox. */
+    openFromPlus() {
+      this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
+    }
+    /** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
+    openIn(column, group) {
+      const cards = this.look.cards(column);
+      this.open({ kind: "list", column, place: { kind: "gap", index: gapOfPlace(cards, { kind: "task", group, before: null }).index, level: 0, group } });
+    }
+    /** A long tap on the timeline's free room let go: the field of a new task in that slot. */
+    openSlot(slot) {
+      this.open({ kind: "slot", slot });
+    }
+    /** The plus came to rest on `column` (null: off the lists) with `result`: the field opens where the drop showed; false where it opens nowhere. */
+    openAtDrop(column, result) {
+      const place = result && column ? placeOfDrop2(result) : null;
+      if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.look.cards(column), place) });
+      else if (result?.kind === "time") this.openSlot(this.tasks.newSlot(this.look.day(), result.start));
+      else return false;
+      return true;
+    }
+    /** Where a new subtask of `parent` is typed: last among its subtasks in the list that shows it, else last in its menu's stack. */
+    subtaskSpot(parent) {
+      const found = this.find(parent);
+      if (!found) return { kind: "stack", parent };
+      return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
+    }
+    /**
+     * Where `item` is renamed: right before its card in the list that shows it; else, opened from a menu's stack, there; else
+     * over its card on the timeline; null when it shows nowhere the field can stand.
+     */
+    renameSpot(item, inStack) {
+      const found = this.find(item.key);
+      if (found) {
+        const card = this.look.cards(found.column)[found.index];
+        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
+      }
+      if (inStack) return { kind: "stack", parent: item.key };
+      return item.slot ? { kind: "slot", slot: item.slot } : null;
+    }
+    /** A field at `spot`; one already open is finished first, as by a tap elsewhere. A rename's spot is the gap right before its own card. */
+    open(spot, renaming) {
+      if (this.session.field) this.save(this.session.field);
+      const rename2 = renaming ? { item: renaming, home: this.newRun(spot), moved: false } : null;
+      this.reset({ run: this.newRun(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename: rename2, section: false });
+    }
+    type(text) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, text }, true);
+    }
+    /** A level chosen takes the place of a prefix typed: the text keeps no prefix, so the file gets one. Null takes the level off. */
+    setPriority(prefix) {
+      const field = this.session.field;
+      if (!field) return;
+      const text = this.tasks.parseTitle(field.text).priority ? this.tasks.withPriority(field.text, null) : field.text;
+      this.reset({ ...field, text, priority: prefix }, true);
+    }
+    /** A level's tile tapped: the level, or none when the task is already written with it. */
+    togglePriority(prefix) {
+      const state = this.state;
+      if (state) this.setPriority(state.marks.priority?.prefix === prefix ? null : prefix);
+    }
+    setLabels(labels) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, labels }, true);
+    }
+    /** A label's tile tapped: on when the task is not written with it, else off. */
+    toggleLabel(name) {
+      const state = this.state;
+      if (!state) return;
+      const chosen = state.marks.labels.map((l) => l.name);
+      this.setLabels(chosen.includes(name) ? chosen.filter((n) => n !== name) : [...chosen, name]);
+    }
+    setRepeat(rule) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, repeat: rule }, true);
+    }
+    indent(delta) {
+      const place = this.shifted(delta);
+      const field = this.session.field;
+      const run = field && this.run(field.run);
+      const list = run && listSpot(run.spot);
+      if (!place || !run || !list) return;
+      run.spot = { ...list, place };
+      this.shifts = null;
+      this.changed();
+    }
+    /**
+     * The field switches between a task and a section's name. A section stands between tasks of the top level: the field
+     * goes there, past the subtasks of the task above it.
+     */
+    toggleSection() {
+      const field = this.session.field;
+      const list = field && listSpot(this.run(field.run).spot);
+      if (!field || !list || !this.maySection(field)) return;
+      const section = !field.section;
+      const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
+      this.reset({ ...field, run, section });
+    }
+    enter() {
+      const field = this.session.field;
+      if (!field) return;
+      if (field.rename) this.enterRename(field, field.rename);
+      else if (field.section) this.enterSection(field);
+      else if (this.blank(field.text)) this.enterBlank();
+      else this.enterTask(field);
+    }
+    /** A tap elsewhere: the text is kept as by Enter, and the field closes. */
+    blur() {
+      const field = this.session.field;
+      if (!field) return;
+      this.save(field);
+      this.reset(null);
+    }
+    /** The field's own text goes; what Enter already sent is still written. */
+    escape() {
+      this.reset(null);
+    }
+    /**
+     * A place chosen in the bar: the field goes to the end of that place's column at once, a renamed task with it. What it
+     * answers: the column, and the day the day column must open when the place is another day than it shows; null when
+     * the place is the one the field already has, which changes nothing.
+     */
+    choosePlace(placement) {
+      const field = this.session.field;
+      if (!field) return null;
+      const shown = this.shownPlace(field);
+      if (shown && samePlacement(shown, placement)) return null;
+      const column = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
+      const rename2 = field.rename && { ...field.rename, moved: true };
+      this.reset({ ...field, rename: rename2, run: this.newRun(this.endOf(column)) });
+      const day = this.tasks.dayOfPlacement(placement);
+      return { column, day: day === null || day === this.look.day() ? null : day };
+    }
+    /** The field, its text and marks, at the end of `column`; what was entered at the old spot is still written there. */
+    moveToEnd(column) {
+      const field = this.session.field;
+      if (field) this.reset({ ...field, run: this.newRun(this.endOf(column)) });
+    }
+    /** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
+    placeOf(column, result) {
+      if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
+      const { group, before } = result;
+      if (column !== "day") return { kind: "list", list: column, group, before };
+      return { kind: "day", date: this.look.day(), group, before };
+    }
+    job(id) {
+      const job = this.session.jobs.find((j) => j.id === id);
+      if (!job) throw new Error(`Task Calendar: no entry job ${id}`);
+      return job;
+    }
+    /**
+     * The service call job `id` is, read when the lists show every write before it: a task at the level it was entered at,
+     * as far as the cards then allow; a rename by the key the lists give the task then; a section at the top level where the
+     * field stood. Null when it is nothing to write. A slot takes no rule.
+     */
+    call(id) {
+      const job = this.job(id);
+      switch (job.kind) {
+        case "create": {
+          const { line } = job;
+          const { spot } = this.run(job.run);
+          job.landing = null;
+          switch (spot.kind) {
+            case "slot":
+              return { method: "createInPlace", args: [line.text, line.priority, { kind: "slot", slot: spot.slot }, null, line.labels] };
+            case "stack":
+              return { method: "createInPlace", args: [line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels] };
+            case "list": {
+              const cards = this.look.cards(spot.column);
+              const place = fitLevel(cards, { ...spot.place, level: line.level });
+              job.landing = spot.column;
+              return { method: "createInPlace", args: [line.text, line.priority, this.placeOf(spot.column, placeOfGap(cards, place)), line.repeat, line.labels] };
+            }
+          }
+          break;
+        }
+        case "rename":
+          return { method: "edit", args: [this.keyAt(job.home, job.item), job.draft] };
+        case "section": {
+          const at = this.placeOf(job.column, placeOfGap(this.look.cards(job.column), { ...job.place, level: 0 }));
+          return at.kind === "list" || at.kind === "day" ? { method: "createSection", args: [job.name, at] } : null;
+        }
+      }
+    }
+    /**
+     * A task job's line is written and the lists are about to draw it (`coming`: the cards each column draws then). It
+     * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
+     * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
+     */
+    shown(id, created, coming) {
+      const job = this.job(id);
+      if (job.kind !== "create") return;
+      const held = this.session.field?.run ?? null;
+      const was = held === null ? null : this.run(held).spot;
+      if (job.landing && created) this.landed(job.landing, created, coming(job.landing));
+      this.run(job.run).pending.shift();
+      job.shown = true;
+      this.shifts = null;
+      if (held !== null && (held === job.run || this.run(held).spot !== was)) this.emit(this.state, true);
+    }
+    /** A task job ended without its line shown (its write failed): the line stops waiting under the cards. */
+    unshown(id) {
+      const job = this.job(id);
+      if (job.kind !== "create" || job.shown) return;
+      this.run(job.run).pending.shift();
+      this.shifts = null;
+      if (job.run === this.session.field?.run) this.changed();
+    }
+    /** Job `id` ended, written or not: its spot no longer follows the cards for it. */
+    done(id) {
+      const job = this.job(id);
+      this.release(job.kind === "rename" ? job.home : job.run);
+      this.session.jobs.splice(this.session.jobs.indexOf(job), 1);
+    }
+    run(id) {
+      return this.session.runs[id];
+    }
+    newRun(spot) {
+      const id = `r${this.session.next++}`;
+      this.session.runs[id] = { spot, pending: [], holds: 0 };
+      return id;
+    }
+    hold(id) {
+      this.run(id).holds++;
+    }
+    release(id) {
+      const run = this.run(id);
+      if (!run) return;
+      run.holds--;
+      if (run.holds <= 0) delete this.session.runs[id];
+    }
+    maySection(field) {
+      const list = listSpot(this.run(field.run).spot);
+      return !field.rename && list !== null && this.look.sectioned(list.column);
+    }
+    /** The gap of the top level at or after `place` in its section: past the subtasks it stands among. */
+    topLevelAfter(column, place) {
+      const cards = this.look.cards(column);
+      let index = place.index;
+      while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
+      return { ...place, index, level: 0 };
+    }
+    mayShift(field) {
+      const list = listSpot(this.run(field.run).spot);
+      if (field.rename || field.section || !list) return { canIndent: false, canOutdent: false };
+      const cards = this.look.cards(list.column);
+      const { spot } = this.run(field.run);
+      const kept = this.shifts;
+      if (kept?.cards === cards && kept.spot === spot) return { canIndent: kept.indent, canOutdent: kept.outdent };
+      const shifts = { cards, spot, indent: this.shiftedRun(field.run, cards, 1) !== null, outdent: this.shiftedRun(field.run, cards, -1) !== null };
+      this.shifts = shifts;
+      return { canIndent: shifts.indent, canOutdent: shifts.outdent };
+    }
+    /** The place button: a subtask's field, new or renamed, has none, nor does one off the lists. */
+    shownPlace(field) {
+      const list = listSpot(this.run(field.run).spot);
+      if (!list) return null;
+      if (field.rename) return field.rename.item.isSubtask ? null : this.placement(field);
+      return list.place.level > 0 ? null : this.columnPlacement(list.column);
+    }
+    /** Where a renamed task goes: where it was, until a place is chosen in the bar. */
+    placement(field) {
+      const item = field.rename?.item ?? null;
+      const list = listSpot(this.run(field.run).spot);
+      if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
+      return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
+    }
+    columnPlacement(column) {
+      return column === "day" ? this.tasks.placementOfDay(this.look.day()) : { kind: column };
+    }
+    /** After the last card, in the last section, at the top level. */
+    endOf(column) {
+      const sections = this.look.sections(column);
+      return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group: sections[sections.length - 1] ?? null } };
+    }
+    find(key) {
+      const shown = this.look.shown();
+      for (const column of [...shown, ...ALL_COLUMNS.filter((c) => !shown.includes(c))]) {
+        const index = this.look.cards(column).findIndex((card) => samePlace2(card.key, key));
+        if (index >= 0) return { column, index };
+      }
+      return null;
+    }
+    /** Saved, then a new line under the task; a blank text cancels the rename. */
+    enterRename(field, rename2) {
+      const list = listSpot(this.run(field.run).spot);
+      if (this.blank(field.text)) this.reset(null);
+      else {
+        this.saveRename(field, rename2);
+        this.reset(list ? { run: this.newRun(this.under(list, rename2.item)), text: "", priority: null, labels: [], repeat: null, rename: null, section: false } : null);
+      }
+    }
+    /** The section goes to the queue and the field closes; a blank name writes nothing. */
+    enterSection(field) {
+      this.createSection(field);
+      this.reset(null);
+    }
+    /** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower. */
+    enterBlank() {
+      if (this.shifted(-1)) this.indent(-1);
+      else this.reset(null);
+    }
+    /** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
+    enterTask(field) {
+      this.create(field);
+      this.reset(this.run(field.run).spot.kind === "slot" ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
+    }
+    /** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
+    reset(field, sameShifts = false) {
+      const old = this.session.field;
+      for (const run of runsOf(field)) this.hold(run);
+      for (const run of runsOf(old)) this.release(run);
+      this.session.field = field;
+      if (!sameShifts) this.shifts = null;
+      this.changed();
+    }
+    save(field) {
+      if (field.section) return this.createSection(field);
+      if (this.blank(field.text)) return;
+      if (field.rename) this.saveRename(field, field.rename);
+      else this.create(field);
+    }
+    /** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
+    saveRename(field, { item, home }) {
+      const draft = { text: field.text, placement: this.placement(field), priority: field.priority, ...!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }, ...!sameRule(field.repeat, item.repeat) && { repeat: field.repeat } };
+      this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
+    }
+    /** `### name` queued where the field stands; always at the top level. */
+    createSection(field) {
+      const name = field.text.trim();
+      const list = listSpot(this.run(field.run).spot);
+      if (name === "" || !list) return;
+      this.queue(field.run, { id: this.jobId(), kind: "section", run: field.run, name, column: list.column, place: list.place });
+    }
+    /** The renamed task's key as the lists show it now: the card at its place while that is still it. */
+    keyAt(home, item) {
+      const run = this.run(home);
+      const list = run && listSpot(run.spot);
+      if (!list) return item.key;
+      const card = this.look.cards(list.column)[list.place.index];
+      return card && sameLine(card.key, item.key) ? card.key : item.key;
+    }
+    /** The field's text queued at its run, waiting under the cards until the lists show it written. */
+    create(field) {
+      const run = this.run(field.run);
+      const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0 };
+      run.pending.push(line);
+      this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
+    }
+    /** A job for `run`, which keeps following the cards that land until the job is done. */
+    queue(run, job) {
+      this.hold(run);
+      this.session.jobs.push(job);
+      this.queued(job);
+    }
+    jobId() {
+      return `j${this.session.next++}`;
+    }
+    /**
+     * The places at or past the created task's card move down, when `column` is to show it among `cards`. A key gone stale
+     * because another write or a sync landed between the create and this read finds no card: the field then stays where it
+     * is, as for a task put elsewhere.
+     */
+    landed(column, created, cards) {
+      const index = cards.findIndex((card) => samePlace2(card.key, created) && sameLine(card.key, created));
+      if (index < 0) return;
+      for (const run of Object.values(this.session.runs)) {
+        const list = listSpot(run.spot);
+        if (!list || list.column !== column || list.place.index < index) continue;
+        run.spot = { ...list, place: { ...list.place, index: list.place.index + 1 } };
+      }
+    }
+    /** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
+    under(spot, item) {
+      const { place } = spot;
+      const shown = item.subtasks.length > 0 && !item.collapsed;
+      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
+    }
+    /** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
+    shifted(delta) {
+      const field = this.session.field;
+      const list = field && listSpot(this.run(field.run).spot);
+      if (!field || field.rename || !list) return null;
+      return this.shiftedRun(field.run, this.look.cards(list.column), delta);
+    }
+    /** The run's place a level deeper or shallower, bound by `cards` with the texts entered there standing in before it. */
+    shiftedRun(id, cards, delta) {
+      const run = this.run(id);
+      const list = listSpot(run.spot);
+      if (!list) return null;
+      const { place } = list;
+      const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group }));
+      const shown = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
+      const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
+      return shifted && { ...place, level: shifted.level };
+    }
+    blank(text) {
+      return this.tasks.isBlank(text);
+    }
+    changed() {
+      this.emit(this.state);
+    }
+  };
+  function placeOfDrop2(result) {
+    switch (result.kind) {
+      case "list":
+        return { kind: "task", group: null, before: result.before };
+      case "group":
+        return { kind: "task", group: result.group, before: result.before };
+      case "nest":
+        return { kind: "subtask", parent: result.parent, before: result.before };
+      default:
+        return null;
+    }
+  }
+  function placeChoices(place) {
+    const lists = ENTRY_PLACES.map((kind) => ({ kind, on: place?.kind === kind }));
+    return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
+  }
+  function runsOf(field) {
+    if (!field) return [];
+    return field.rename ? [field.run, field.rename.home] : [field.run];
+  }
+  function sameNames(a, b) {
+    return a.length === b.length && a.every((name, i) => name === b[i]);
+  }
+
+  // src/application/SectionNameEntry.ts
+  function sectionNameEnd(ended, event, text) {
+    if (ended) return { ended: true };
+    return { ended: true, end: { name: event === "enter" ? text : null } };
+  }
+
+  // src/application/sections.ts
+  function rowsOf(items, level = 0) {
+    return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf(item.subtasks, level + 1)]);
+  }
+  function groupOf(name, items) {
+    const section = name !== null;
+    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, can: { rename: section, remove: section } };
+  }
+  function listView(items, sections, listSections = []) {
+    if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
+    const groups = withEmptySections(byGroup(items), listSections);
+    return { showsHeaders: groups.some((g) => g.name !== null), groups };
+  }
+  function byGroup(items) {
+    const groups = [];
+    for (const item of items) {
+      const group = groups.find((g) => g.name === item.group);
+      if (group) group.items.push(item);
+      else groups.push({ name: item.group, items: [item] });
+    }
+    return groups.map((g) => groupOf(g.name, g.items));
+  }
+  function withEmptySections(groups, sections) {
+    const drawn = [...groups];
+    sections.forEach((section, i) => {
+      if (!section.empty || drawn.some((g) => g.name === section.name)) return;
+      const above = new Set(sections.slice(0, i).map((s) => s.name));
+      let at = 0;
+      drawn.forEach((g, j) => {
+        if (above.has(g.name)) at = j + 1;
+      });
+      drawn.splice(at, 0, groupOf(section.name, []));
+    });
+    return drawn;
+  }
+  function shownSections(groups, sections) {
+    const shown = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
+    return withEmptySections(shown, sections).map((g) => g.name);
+  }
+  function offeredNames(groups, presets, ungrouped) {
+    const names = [...groups.flatMap((group) => group === null ? [] : [group]), ...presets.map((preset) => preset.trim())];
+    return [...new Set(names)].filter((name) => name !== "" && name !== ungrouped);
+  }
+  function sectionChoice(tasks, offer) {
+    const first = tasks[0];
+    const list = first?.list;
+    if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
+    return { names: offer.lists[list], current: first.group, ungrouped: offer.ungrouped };
+  }
+
+  // src/application/drops.ts
+  function acceptsDrop(target, origins) {
+    switch (target) {
+      case "timeline":
+        return origins.length <= 1;
+      case "day":
+        return true;
+      case "soon":
+        return origins.every((from) => from !== "timeline");
+      case "inbox":
+      case "backlog":
+        return origins.every((from) => from === "inbox" || from === "backlog" || from === "soon" || from === "new");
+    }
+  }
+  function placesInGap(column, from, grouped) {
+    return from === "new" || from === column || grouped;
+  }
+  function dropMove(from, to, day) {
+    switch (to.kind) {
+      case "time":
+        return { kind: "toTime", from, start: to.start, day };
+      case "clearSlot":
+        return { kind: "clearSlot" };
+      case "group":
+        return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? void 0 };
+      case "nest":
+        return { kind: "nest", parent: to.parent, before: to.before };
+      case "list":
+        if (from === "timeline") return { kind: "clearSlot", place: { before: to.before, date: day } };
+        if (to.column === "day") return from === "day" ? { kind: "moveBefore", before: to.before, date: day } : { kind: "moveToList", date: day };
+        if (to.before) return { kind: "moveBefore", before: to.before, date: day };
+        return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
+    }
+  }
+  function dropMoves(tasks, to, day) {
+    if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day) };
+    const steps = tasks.flatMap(({ key, from }) => {
+      const move = dropMove(from, to, day);
+      return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
+    });
+    return { kind: "many", steps };
+  }
+
+  // src/application/contracts.ts
+  var StaleTaskError = class extends Error {
+    constructor() {
+      super("stale task");
+      this.code = "staleTask";
+      this.name = "StaleTaskError";
+    }
+  };
+  var TasksFileMissingError = class extends Error {
+    constructor(path) {
+      super(`tasks file missing: ${path}`);
+      this.path = path;
+      this.code = "tasksFileMissing";
+      this.name = "TasksFileMissingError";
+    }
+  };
+
+  // src/domain/search.ts
+  var SNIPPET_LEAD = 24;
+  var ELLIPSIS = "…";
+  var SPACE_RE = /\s/;
+  var PUNCTUATION_RE = /[ -⁯⸀-⹿\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~]/;
+  var WORD_CHAR_RE = /[\p{L}\p{N}]/u;
+  var ACCENTS_RE = /[̀-ͯ]/g;
+  function foldedChar(char) {
+    const lower = char.toLowerCase();
+    const bare = lower.normalize("NFD").replace(ACCENTS_RE, "");
+    if (bare.length === 1) return bare;
+    return lower.length === 1 ? lower : char;
+  }
+  function folded(text) {
+    let out = "";
+    for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
+    return out;
+  }
+  function insideWord(text, at) {
+    if (at === 0) return false;
+    const char = text.charAt(at);
+    const before = text.charAt(at - 1);
+    if (!WORD_CHAR_RE.test(char) || !WORD_CHAR_RE.test(before)) return false;
+    const startsCapital = char !== char.toLowerCase() && before === before.toLowerCase();
+    return !startsCapital;
+  }
+  var FuzzyQuery = class _FuzzyQuery {
+    constructor(length, words, letters2) {
+      this.length = length;
+      this.words = words;
+      this.letters = letters2;
+    }
+    /** Null for a query of spaces: it finds nothing. */
+    static of(query) {
+      const text = folded(query.trim());
+      if (text === "") return null;
+      const words = [];
+      let from = 0;
+      for (let i = 0; i < text.length; i++) {
+        const char = text.charAt(i);
+        if (!SPACE_RE.test(char) && !PUNCTUATION_RE.test(char)) continue;
+        if (from !== i) words.push(text.slice(from, i));
+        if (!SPACE_RE.test(char)) words.push(char);
+        from = i + 1;
+      }
+      if (from !== text.length) words.push(text.slice(from));
+      const letters2 = [...text].filter((char) => !SPACE_RE.test(char));
+      return new _FuzzyQuery(text.length, words, letters2);
+    }
+    /** The words in their order, failing that the letters in theirs. */
+    match(text) {
+      const lower = folded(text);
+      return this.matchPieces(this.words, text, lower, false) ?? this.matchPieces(this.letters, text, lower, true);
+    }
+    /** The words in their order only: letters scattered over a long text would find nearly anything. */
+    matchWords(text) {
+      return this.matchPieces(this.words, text, folded(text), false);
+    }
+    matchPieces(pieces, text, lower, letters2) {
+      if (pieces.length === 0) return null;
+      const found = [];
+      let at = 0;
+      let broken = 0;
+      for (const piece of pieces) {
+        const start = lower.indexOf(piece, at);
+        if (start < 0) return null;
+        const joined = letters2 && start === at;
+        if (!joined && insideWord(text, start)) broken++;
+        const last = found[found.length - 1];
+        if (last && last.end === start) last.end = start + piece.length;
+        else found.push({ start, end: start + piece.length });
+        at = start + piece.length;
+      }
+      return { score: this.score(found, broken, text.length), found };
+    }
+    /** Fewer pieces, fewer of them inside words, tighter, earlier and in a shorter text score higher. */
+    score(found, broken, textLength) {
+      const span = found[found.length - 1].end - found[0].start;
+      return -(found.length - 1) - broken / 10 - (span + 1 - this.length) / 100 - found[0].start / 1e3 - textLength / 1e4;
+    }
+  };
+  function matchParts(text, found) {
+    const parts = [];
+    let at = 0;
+    for (const piece of found) {
+      if (piece.start > at) parts.push({ text: text.slice(at, piece.start), match: false });
+      parts.push({ text: text.slice(piece.start, piece.end), match: true });
+      at = piece.end;
+    }
+    if (at < text.length) parts.push({ text: text.slice(at), match: false });
+    return parts;
+  }
+  var EMBED_RE = /!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)/g;
+  var BLOCK_MARK_RE = /^\s*(?:>\s?)*\s*(?:#{1,6}\s+|(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?)?/;
+  var LITERAL_RE = /`([^`]*)`|\\(.)/gu;
+  var EMPHASIS_RE = /(\*\*|~~|==|\*|(?<![\p{L}\p{N}])__|(?<![\p{L}\p{N}])_)(?=\S)(.+?)(?<=\S)\1(?![\p{L}\p{N}])/gu;
+  function withoutEmphasis(text) {
+    let out = text;
+    for (let before = ""; before !== out; ) {
+      before = out;
+      out = out.replace(EMPHASIS_RE, "$2");
+    }
+    return out;
+  }
+  function plainInline(text) {
+    let out = "";
+    let at = 0;
+    for (const m of text.matchAll(LITERAL_RE)) {
+      out += plainText(withoutEmphasis(text.slice(at, m.index)));
+      out += m[1] ?? m[2];
+      at = m.index + m[0].length;
+    }
+    return out + plainText(withoutEmphasis(text.slice(at)));
+  }
+  function plainDescription(markdown) {
+    return plainInline(
+      markdown.split("\n").map((line) => line.replace(BLOCK_MARK_RE, "")).join(" ").replace(EMBED_RE, "")
+    ).replace(/\s+/g, " ").trim();
+  }
+  function snippetParts(text, found) {
+    const first = found[0].start;
+    if (first <= SNIPPET_LEAD) return matchParts(text, found);
+    const tail = text.slice(first - SNIPPET_LEAD, first);
+    const space = tail.indexOf(" ");
+    const lead = space >= 0 && space < tail.length - 1 ? tail.slice(space + 1) : tail;
+    const cut = first - lead.length;
+    const shifted = found.map((piece) => ({ start: piece.start - cut + 1, end: piece.end - cut + 1 }));
+    return matchParts(ELLIPSIS + text.slice(cut), shifted);
+  }
+
+  // src/application/marks.ts
+  function markColors(priority, labels) {
+    return priority ? [priority.color] : labels.map((label) => label.color);
+  }
+  function draftMarksOf(marks, levels, labels) {
+    const choices = markChoices(marks);
+    const priority = levels.find((l) => l.prefix === marks.priority) ?? null;
+    const chosen = labels.filter((l) => marks.labels.includes(l.name));
+    return {
+      priority,
+      labels: chosen,
+      can: { setPriority: choices.priority, setLabels: choices.labels },
+      tint: markColors(priority, chosen)[0] ?? null,
+      tiles: {
+        levels: levels.map((mark) => ({ mark, on: mark.prefix === priority?.prefix, enabled: choices.priority })),
+        labels: labels.map((mark) => ({ mark, on: chosen.includes(mark), enabled: choices.labels }))
+      }
+    };
+  }
+
+  // src/application/menus.ts
+  function priorityHolders(items) {
+    return items.filter((item) => item.can.setPriority);
+  }
+  function labelHolders(items) {
+    return items.filter((item) => item.can.setLabels);
+  }
+  function levelOn(items, prefix) {
+    const holders = priorityHolders(items);
+    return holders.length > 0 && holders.every((item) => item.priority?.prefix === prefix);
+  }
+  function toggledPriority(items, prefix) {
+    return levelOn(items, prefix) ? null : prefix;
+  }
+  function labelOn(items, name) {
+    const holders = labelHolders(items);
+    return holders.length > 0 && holders.every((item) => item.labels.some((label) => label.name === name));
+  }
+  function toggledLabels(items, name) {
+    const on = labelOn(items, name);
+    return items.map((item) => {
+      const names = item.labels.map((label) => label.name);
+      if (!item.can.setLabels) return names;
+      if (on) return names.filter((n) => n !== name);
+      return names.includes(name) ? names : [...names, name];
+    });
+  }
+  var MOVE_ORDER = ["today", "tomorrow", "pick"];
+  function quickMoves(item, today) {
+    if (!item.can.postpone) return [];
+    const moves = [
+      { id: "today", date: today },
+      { id: "tomorrow", date: addDays(today, 1) },
+      { id: "pick", date: null }
+    ];
+    return moves.filter((move) => move.date === null || move.date !== item.day);
+  }
+  function sharedMoves(items, today) {
+    const offered = items.flatMap((item) => quickMoves(item, today));
+    return MOVE_ORDER.flatMap((id) => offered.find((move) => move.id === id) ?? []);
+  }
+  function sharedDueDate(items) {
+    const first = items[0]?.dueDate ?? null;
+    return items.every((item) => item.dueDate === first) ? first : null;
+  }
+  var A_LIST_CARD = { kind: "task", from: "day" };
+  var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  function menuOffer(froms, screen, columnSections) {
+    const shown = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
+    return shown ? screen.offer : null;
+  }
+  function tileStatus(id) {
+    const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
+    return statuses[id];
+  }
+  function menuStatuses(items, of) {
+    const one = of.kind === "task";
+    const progress = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
+    return [
+      { id: "done", confirm: false },
+      { id: progress, confirm: false },
+      { id: "wontDo", confirm: one },
+      ...one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true }] : []
+    ];
+  }
+  function menuEdits(items, of, sections) {
+    const section = sections ? ["section"] : [];
+    if (of.kind === "bulk") return section;
+    const item = items[0];
+    const edits = [
+      ["rename", true],
+      ["reminder", item.can.remind],
+      ["description", item.can.addDescription],
+      ["repeat", item.repeatable],
+      ["section", sections !== null],
+      ["subtask", of.from !== "stack"]
+    ];
+    return edits.flatMap(([id, offered]) => offered ? [id] : []);
+  }
+  function menuSections(items, offer, of) {
+    const choice = offer ? sectionChoice(items, offer) : null;
+    if (!choice) return null;
+    const shared = items.every((item) => item.group === choice.current);
+    const names = [...choice.names, null];
+    return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
+  }
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD) {
+    const sections = menuSections(items, offer, of);
+    return {
+      statuses: menuStatuses(items, of),
+      levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
+      labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
+      moves: sharedMoves(items, today),
+      removeDue: items.some((item) => item.can.removeDue),
+      dueDate: sharedDueDate(items),
+      sections,
+      edits: menuEdits(items, of, sections),
+      remove: { confirm: of.kind === "task" }
+    };
+  }
+  function carriedWith(lifted, picked) {
+    const id = keyId(lifted);
+    return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
+  }
+
+  // src/application/fullTree.ts
+  function unfolded(items) {
+    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
+  }
+  function rowsOf2(items, level, rows) {
+    for (const item of items) {
+      const at = rows.length;
+      rows.push({ item, level, newSubtask: { index: at + 1, level: level + 1 } });
+      rowsOf2(item.subtasks, level + 1, rows);
+      rows[at] = { ...rows[at], newSubtask: { index: rows.length, level: level + 1 } };
+    }
+  }
+  function fullTree(task) {
+    const subtasks = unfolded(task.allSubtasks);
+    const rows = [];
+    rowsOf2(subtasks, 0, rows);
+    return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 } };
+  }
+
+  // src/application/taskItems.ts
+  function progressOf(entry) {
+    if (entry.subtasks.length === 0) return null;
+    const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
+    return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
+  }
+  function keyOf(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
+  }
+  var NO_LEVELS = { levelOf: () => null, labelsOf: () => [] };
+  function itemLevels(levels, labels) {
+    return {
+      levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
+      labelsOf: (names) => labels.filter((l) => names.includes(l.name))
+    };
+  }
+  function toItem(entry, today, levels = NO_LEVELS, parent = null, boundary = DayBoundary.MIDNIGHT) {
+    const marks = marksOfTask(entry.task);
+    const choices = markChoices(marks);
+    const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
+    const labels = levels.labelsOf(marks.labels);
+    const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
+    const description = descriptionMarkdown(entry);
+    return {
+      key: keyOf(entry),
+      text: entry.task.text,
+      title: plainText(entry.task.text),
+      status: entry.task.status,
+      dueDate: entry.task.dueDate,
+      slot: entry.task.slot,
+      durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
+      reminder: entry.task.reminder,
+      repeat: entry.task.repeat?.rule ?? null,
+      open: isOpen(entry.task.status),
+      repeatable: repeatable(entry),
+      priority,
+      labels,
+      colors: markColors(priority, labels),
+      group: entry.group,
+      list: entry.section,
+      isSubtask: entry.path.length > 0,
+      day: dayOfTask(entry.section, entry.task, today),
+      repeatDay: repeatDay(dayOf(entry.task, boundary), today),
+      can: {
+        postpone: canPostpone(entry.section),
+        removeDue: canRemoveDue(entry.task.dueDate, today),
+        remind: canRemind(entry.task.slot),
+        setPriority: choices.priority,
+        setLabels: choices.labels,
+        stop: entry.task.repeat !== null && repeatable(entry),
+        addDescription: description === null,
+        fold: hasOpenSubtask(entry)
+      },
+      subtasks: allSubtasks.filter((sub) => sub.open),
+      allSubtasks,
+      progress: progressOf(entry),
+      collapsed: entry.task.collapsed && hasOpenSubtask(entry),
+      description,
+      parentText: parent?.task.text ?? null,
+      parentKey: parent ? keyOf(parent) : null
+    };
+  }
+
+  // src/application/TimelineSpans.ts
+  function droppedSpan(start, durationMin) {
+    return clampSlot(start, durationMin === null ? null : start + durationMin);
+  }
+  var TimelineSpans = class {
+    constructor(boundary, now) {
+      this.boundary = boundary;
+      this.now = now;
+    }
+    /** On today, an open task whose start has passed rides the now line, its duration kept; the file keeps its time. */
+    shown(task, day) {
+      const own = this.boundary.spanOf(task.slot, day);
+      const now = this.nowOn(day);
+      if (now === null || !task.open || own.start >= now) return own;
+      return { start: now, end: own.end === null ? null : now + own.end - own.start };
+    }
+    /**
+     * The card while a dot is held at `minute`: the end no earlier than the start nor past the day; the start no earlier
+     * than the day nor past the end, and on a task without a duration no later than its start, which becomes the end.
+     */
+    stretched(task, day, edge, minute) {
+      const shown = this.shown(task, day);
+      if (edge === "end") return { start: shown.start, end: Math.min(MINUTES_PER_DAY, Math.max(shown.start, minute)) };
+      const end = shown.end ?? shown.start;
+      return { start: Math.max(0, Math.min(minute, end)), end };
+    }
+    /**
+     * The slot a dot let go at `minute` writes, null when nothing changes. A span no longer than `minDurationMin` loses
+     * its duration and stands at its start; a task without one whose start dot was pulled keeps its start. The bottom dot
+     * changes only how long the task lasts, so a card riding the now line ends where the finger let go while the file keeps
+     * its own start; the top dot is a new start and writes it.
+     */
+    resized(task, day, edge, minute, minDurationMin) {
+      const shown = this.shown(task, day);
+      const held = this.stretched(task, day, edge, minute);
+      const keepsDuration = held.end - held.start > minDurationMin;
+      const unmoved = edge === "start" && shown.end === null;
+      const next = keepsDuration ? held : { start: unmoved ? shown.start : held.start, end: null };
+      if (next.start === shown.start && next.end === shown.end) return null;
+      if (edge === "start") return this.boundary.slotAt(day, next.start, next.end);
+      const start = this.boundary.spanOf(task.slot, day).start;
+      return this.boundary.slotAt(day, start, next.end === null ? null : start + next.end - next.start);
+    }
+    /** Minutes from the start of `day` to now; null on another day than today. */
+    nowOn(day) {
+      return this.boundary.dayOf(this.now) === day ? this.boundary.offsetOf(day, this.now) : null;
+    }
+  };
+
+  // src/application/TaskReads.ts
+  function sectionsOf(doc, list) {
+    return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+  }
+  var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
+  function byQuality(a, b) {
+    if (a.title === null !== (b.title === null)) return a.title ? -1 : 1;
+    return (b.title ?? b.description).score - (a.title ?? a.description).score;
+  }
+  function slotted(item) {
+    if (!item.slot) throw new Error("Task Calendar: the task has no slot on the timeline");
+    return { slot: item.slot, open: item.open };
+  }
+  var TaskReads = class {
+    constructor(rules, settings, clock) {
+      this.rules = rules;
+      this.settings = settings;
+      this.clock = clock;
+    }
+    priorityLevels() {
+      return this.rules.priorityLevels();
+    }
+    labelLevels() {
+      return usableLabels(this.settings.get().labels);
+    }
+    parseTitle(text) {
+      const levels = this.priorityLevels();
+      const parsed = priorityOfTitle(text, levels.map((l) => l.prefix));
+      return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
+    }
+    draftMarks(text, priority, labels) {
+      const levels = this.priorityLevels();
+      return draftMarksOf(typedMarks(text, priority, labels, levels.map((l) => l.prefix)), levels, this.labelLevels());
+    }
+    isBlank(text) {
+      return this.rules.isBlank(text);
+    }
+    withPriority(text, prefix) {
+      return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
+    }
+    screen(s, date) {
+      return {
+        day: this.dayView(s, date),
+        soon: this.soonWithoutDateView(s),
+        inbox: this.inboxView(s),
+        backlog: this.backlogView(s),
+        done: this.doneView(s),
+        sections: this.listSections(s),
+        offer: this.sectionOffer(s, date),
+        missing: false,
+        calendars: true
+      };
+    }
+    /** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
+    missingScreen(date) {
+      const none = { inbox: [], backlog: [], soon: [], now: [] };
+      return {
+        day: { date, list: [], slotted: [] },
+        soon: [],
+        inbox: [],
+        backlog: [],
+        done: [],
+        sections: none,
+        offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
+        missing: true,
+        calendars: false
+      };
+    }
+    dayView({ doc, today, boundary }, date) {
+      const item = this.itemOf(today);
+      return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+    }
+    soonWithoutDateView({ doc, today }) {
+      return soonWithoutDate(doc).map(this.itemOf(today));
+    }
+    inboxView({ doc, today }) {
+      return inboxList(doc).map(this.itemOf(today));
+    }
+    backlogView({ doc, today }) {
+      return backlogList(doc).map(this.itemOf(today));
+    }
+    doneView({ doc, today }) {
+      return doc.tasks("done").map(this.itemOf(today));
+    }
+    sectionOffer({ doc, today, boundary }, date) {
+      const { presets, ungrouped } = this.settings.get().groups;
+      const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
+      const names = (list) => offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sectionsOf(doc, list)), presets, ungrouped);
+      return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
+    }
+    listSections({ doc }) {
+      return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)]));
+    }
+    search(s, query) {
+      const fuzzy = FuzzyQuery.of(query);
+      if (!fuzzy || !s) return [];
+      const { doc, today } = s;
+      const item = this.itemOf(today);
+      const ranked = [];
+      const visit = (entry) => {
+        const titleText = plainText(entry.task.text);
+        const title = fuzzy.match(titleText);
+        const markdown = descriptionMarkdown(entry);
+        const descriptionText = markdown === null ? "" : plainDescription(markdown);
+        const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
+        if (title || description) {
+          const hit = {
+            item: item(entry),
+            title: title ? matchParts(titleText, title.found) : [],
+            description: description ? snippetParts(descriptionText, description.found) : null
+          };
+          ranked.push({ hit, title, description });
+        }
+        for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
+      };
+      const groups = [];
+      for (const list of SEARCH_ORDER) {
+        ranked.length = 0;
+        for (const entry of doc.tasks(list)) visit(entry);
+        if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
+      }
+      return groups;
+    }
+    /** A query that finds nothing reads no file: the service asks before it reads. */
+    searches(query) {
+      return FuzzyQuery.of(query) !== null;
+    }
+    screenOf({ doc, today }, item) {
+      const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
+      return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
+    }
+    findIn(items, key) {
+      for (const item of items) {
+        if (samePlace2(item.key, key)) return item;
+        const inner = this.findIn(item.subtasks, key);
+        if (inner) return inner;
+      }
+      return null;
+    }
+    find({ doc, today }, key, text) {
+      const atPlace = doc.find(key.section, key.index, key.path);
+      const alike = flatten(doc.allTasks()).filter((entry2) => entry2.raw === key.raw);
+      const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : void 0;
+      return entry ? this.itemAt(doc, entry, today) : null;
+    }
+    /** The tasks the keys name as the file has them, in their order; throws StaleTaskError when one is gone. */
+    itemsAt({ doc, today }, keys) {
+      const levels = this.itemLevels();
+      return keys.map((key) => {
+        const entry = this.rules.entryOf(doc, key);
+        const parent = key.path.length > 0 ? doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null : null;
+        return toItem(entry, today, levels, parent);
+      });
+    }
+    /** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
+    itemAt(doc, place, today) {
+      const entry = doc.find(place.section, place.index, place.path);
+      if (!entry) return null;
+      const parent = place.path.length > 0 ? doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null : null;
+      return toItem(entry, today, this.itemLevels(), parent, this.rules.moment().boundary);
+    }
+    /** The task's line in the file as it stands, unnormalized, from 0. */
+    lineOf(text, key) {
+      const doc = this.rules.parse(text);
+      return doc.lineOf(this.rules.entryOf(doc, key));
+    }
+    placementOf(item) {
+      if (item.dueDate === this.today()) return { kind: "now" };
+      if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
+      if (item.key.section === "inbox" || item.key.section === "backlog") return { kind: item.key.section };
+      return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
+    }
+    dayColumn(date) {
+      return dayColumn(date, this.today());
+    }
+    columnSections(column, date) {
+      if (column !== "day") return { list: column, date: null };
+      const { list, date: day, sections } = this.dayColumn(date);
+      return sections ? { list, date: day } : null;
+    }
+    placementOfDay(date) {
+      return placementOfDay(date, this.today());
+    }
+    listName(list) {
+      return this.settings.get().sections[list];
+    }
+    dayOfPlacement(placement) {
+      return dayOfPlacement(placement, this.today());
+    }
+    menu(item, from, screen) {
+      const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
+      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+    }
+    bulkMenu(picked, screen) {
+      const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
+      return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+    }
+    carried(lifted, picked) {
+      return carriedWith(lifted, picked);
+    }
+    fullTree(item) {
+      return fullTree(item);
+    }
+    shownSpan(item, day) {
+      return this.timeline().shown(slotted(item), day);
+    }
+    dropSpan(item, from, start) {
+      return droppedSpan(start, from === "timeline" ? item?.durationMin ?? null : null);
+    }
+    newSlot(day, start) {
+      return this.rules.moment().boundary.slotAt(day, droppedSpan(start, null).start, null);
+    }
+    stretch(item, day, edge, minute) {
+      return this.timeline().stretched(slotted(item), day, edge, minute);
+    }
+    /** The timeline's rules by the clock and the day's boundary now. */
+    timeline() {
+      return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+    }
+    itemOf(today) {
+      const levels = this.itemLevels();
+      const { boundary } = this.rules.moment();
+      return (entry) => toItem(entry, today, levels, null, boundary);
+    }
+    itemLevels() {
+      const settings = this.settings.get();
+      return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels));
+    }
+    today() {
+      return this.rules.today();
+    }
+  };
+
   // src/domain/EntryTags.ts
   var MARK = 57344;
   var FIRST = 57345;
@@ -2041,63 +3583,6 @@ ${key.title}`.toLowerCase();
     return String.fromCharCode(MARK, FIRST + n);
   }
 
-  // src/application/taskKeys.ts
-  function samePlace2(a, b) {
-    return a.section === b.section && a.index === b.index && a.path.length === b.path.length && a.path.every((i, k) => b.path[k] === i);
-  }
-  function sameLine(a, b) {
-    return a.raw === b.raw;
-  }
-  function isUnder(a, b) {
-    return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
-  }
-
-  // src/application/contracts.ts
-  var StaleTaskError = class extends Error {
-    constructor() {
-      super("stale task");
-      this.code = "staleTask";
-      this.name = "StaleTaskError";
-    }
-  };
-
-  // src/application/documentText.ts
-  function markersOf(settings) {
-    return {
-      dueDate: settings.dueDateMarker,
-      slot: settings.slotMarker,
-      alarmSlot: settings.alarmSlotMarker,
-      liveSlot: settings.liveSlotMarker,
-      silentSlot: settings.silentSlotMarker,
-      repeat: settings.repeatMarker,
-      collapsed: settings.collapsedMarker,
-      priorities: usableLevels(settings.priorities).map((l) => l.prefix),
-      labelTag: settings.labelTag,
-      labels: usableLabels(settings.labels).map((l) => l.name)
-    };
-  }
-  function boundaryOf(settings) {
-    return new DayBoundary(settings.dayStartHour);
-  }
-  function sectionNames(settings) {
-    const s = settings.sections;
-    return [s.inbox, s.now, s.soon, s.backlog, s.done];
-  }
-  function parseText(text, settings) {
-    const s = settings.sections;
-    return TaskDocument.parse(
-      text,
-      { inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
-      markersOf(settings)
-    );
-  }
-  function readDocument(text, settings, today, boundary = boundaryOf(settings)) {
-    return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
-  }
-  function readingKey(settings) {
-    return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
-  }
-
   // src/application/TaskRules.ts
   var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest"]);
   function refsOf(change) {
@@ -2143,8 +3628,8 @@ ${key.title}`.toLowerCase();
       const parsed = parseText(text, settings);
       const whole = parsed.ensureSections(sectionNames(settings));
       const doc = normalize(whole, today, boundary, presets);
-      const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
-      return { doc, changed };
+      const changed2 = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
+      return { doc, changed: changed2 };
     }
     /** The text after `operation` on the document read and normalized; the result is normalized again. */
     change(text, operation, at = this.moment()) {
@@ -2161,6 +3646,14 @@ ${key.title}`.toLowerCase();
     /** The document as the file has it, with every section, not normalized. */
     asRead(text, at = this.moment()) {
       return parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+    }
+    /** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
+    parse(text) {
+      return parseText(text, this.settings.get());
+    }
+    /** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
+    changeOf(doc, operation, at = this.moment()) {
+      return this.written(doc, operation, at);
     }
     emptyFile() {
       return TaskDocument.empty(sectionNames(this.settings.get()));
@@ -2451,6 +3944,917 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/application/TaskWrites.ts
+  var nothing = (operation) => ({ operation, answer: () => void 0 });
+  var TaskWrites = class {
+    constructor(rules, reads) {
+      this.rules = rules;
+      this.reads = reads;
+    }
+    createInList(date, text) {
+      return nothing(this.rules.createInList(date, text));
+    }
+    createInSoon(text) {
+      return nothing(this.rules.createInSoon(text));
+    }
+    createAtTime(date, start, text) {
+      return nothing(this.rules.createAtTime(date, start, text));
+    }
+    createInPlace(text, priority, place, repeat, labels = []) {
+      return {
+        operation: this.rules.createInPlace(text, priority, place, repeat, labels),
+        answer: (change) => {
+          const created = change?.after.insertedSince(change.before);
+          return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+        }
+      };
+    }
+    create(draft, slot) {
+      return nothing(this.rules.create(draft, slot));
+    }
+    createSubtask(parent, draft) {
+      return nothing(this.rules.createSubtask(parent, draft));
+    }
+    edit(key, draft) {
+      const edit = this.rules.edit(key, draft);
+      return {
+        operation: edit?.operation ?? null,
+        answer: (change) => {
+          const place = edit?.place() ?? null;
+          if (!change || !place || change.before.serialize() === change.after.serialize()) return null;
+          return this.reads.itemAt(change.after, place, this.rules.today());
+        }
+      };
+    }
+    setStatus(key, status) {
+      return nothing(this.rules.setStatus(key, status));
+    }
+    toggleDone(key) {
+      return nothing(this.rules.toggleDone(key));
+    }
+    setDueDate(key, date) {
+      return nothing(this.rules.setDueDate(key, date));
+    }
+    setPriority(key, priority) {
+      return nothing(this.rules.setPriority(key, priority));
+    }
+    setLabels(key, labels) {
+      const all = this.setLabelsAll([{ key, labels }]);
+      return { operation: all.operation, answer: (change) => all.answer(change)[0] ?? null };
+    }
+    setLabelsAll(steps) {
+      if (steps.length === 0) return { operation: null, answer: () => [] };
+      const labelled = this.rules.setLabelsAll(steps);
+      return {
+        operation: labelled.operation,
+        answer: (change) => {
+          if (!change) return steps.map(() => null);
+          const today = this.rules.today();
+          return labelled.places().map((place) => place ? this.reads.itemAt(change.after, place, today) : null);
+        }
+      };
+    }
+    setReminder(key, reminder) {
+      return nothing(this.rules.setReminder(key, reminder));
+    }
+    togglePriority(s, keys, prefix) {
+      if (keys.length === 0) return nothing(null);
+      const priority = toggledPriority(this.reads.itemsAt(s, keys), prefix);
+      if (keys.length === 1) return this.setPriority(keys[0], priority);
+      return this.applyAll(keys.map((key) => ({ key, change: { kind: "priority", priority } })));
+    }
+    toggleLabel(s, keys, name) {
+      if (keys.length === 0) return { operation: null, answer: () => [] };
+      const labels = toggledLabels(this.reads.itemsAt(s, keys), name);
+      return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+    }
+    removeDue(s, keys) {
+      const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.can.removeDue ? [{ key: item.key, change: { kind: "dueDate", date: null } }] : []);
+      if (steps.length === 0) return nothing(null);
+      if (keys.length === 1) return this.setDueDate(steps[0].key, null);
+      return this.applyAll(steps);
+    }
+    pickStatus(keys, id) {
+      const status = tileStatus(id);
+      if (keys.length === 1) return status === null ? this.stop(keys[0]) : this.setStatus(keys[0], status);
+      return this.applyAll(keys.map((key) => ({ key, change: status === null ? { kind: "stop" } : { kind: "status", status } })));
+    }
+    postponeAll(s, keys, date) {
+      const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.can.postpone ? [{ key: item.key, change: { kind: "postpone", date } }] : []);
+      if (steps.length === 0) return nothing(null);
+      if (keys.length === 1) return this.postpone(steps[0].key, date);
+      return this.applyAll(steps);
+    }
+    removeAll(keys) {
+      if (keys.length === 1) return this.remove(keys[0]);
+      return this.applyAll(keys.map((key) => ({ key, change: { kind: "remove" } })));
+    }
+    setCollapsed(key, collapsed) {
+      return nothing(this.rules.setCollapsed(key, collapsed));
+    }
+    unfoldAbove(key) {
+      return nothing(this.rules.unfoldAbove(key));
+    }
+    /** What showing a found task writes first: a subtask's tasks show their subtasks; a task, nothing. */
+    revealUnfold(item) {
+      return nothing(item.isSubtask ? this.rules.unfoldAbove(item.key) : null);
+    }
+    setRepeat(key, rule) {
+      return nothing(this.rules.setRepeat(key, rule));
+    }
+    stop(key) {
+      return nothing(this.rules.stop(key));
+    }
+    rename(s, key, text) {
+      if (!this.rules.renameChanges(s.doc, key, text)) return { operation: null, answer: () => null };
+      return { operation: this.rules.rename(key, text), answer: (change) => change && this.reads.itemAt(change.after, key, s.today) };
+    }
+    setDescription(key, markdown) {
+      return nothing(this.rules.setDescription(key, markdown));
+    }
+    remove(key) {
+      return nothing(this.rules.remove(key));
+    }
+    moveBefore(key, before, date) {
+      return nothing(this.rules.moveBefore(key, before, date));
+    }
+    nest(key, parent, before) {
+      return nothing(this.rules.nest(key, parent, before));
+    }
+    setSlot(key, slot) {
+      return nothing(this.rules.setSlot(key, slot));
+    }
+    /** A drop on the timeline of `day` at `start`: the task's own duration from the file when it came from the timeline. */
+    toTime(s, key, from, start, day) {
+      const { slot } = this.rules.entryOf(s.doc, key).task;
+      const span = droppedSpan(start, from === "timeline" && slot && slot.end !== null ? slot.end - slot.start : null);
+      return this.setSlot(key, s.boundary.slotAt(day, span.start, span.end));
+    }
+    resize(s, key, day, edge, minute, minDurationMin) {
+      const { slot, status } = this.rules.entryOf(s.doc, key).task;
+      const next = slot && this.reads.timeline().resized({ slot, open: isOpen(status) }, day, edge, minute, minDurationMin);
+      if (!next) return { operation: null, answer: () => false };
+      return { operation: this.rules.setSlot(key, next), answer: () => true };
+    }
+    clearSlot(key, place) {
+      return nothing(this.rules.clearSlot(key, place));
+    }
+    moveToList(key, date) {
+      return nothing(this.rules.moveToList(key, date));
+    }
+    moveToSoon(key, date) {
+      return nothing(this.rules.moveToSoon(key, date));
+    }
+    postpone(key, date) {
+      return nothing(this.rules.postpone(key, date));
+    }
+    moveToEnd(key, section) {
+      return nothing(this.rules.moveToEnd(key, section));
+    }
+    moveToGroup(key, list, group, before, date) {
+      return nothing(this.rules.moveToGroup(key, list, group, before, date));
+    }
+    createGroup(key, list, name, date) {
+      return nothing(this.rules.createGroup(key, list, name, date));
+    }
+    toSection(s, keys, name) {
+      const steps = keys.flatMap((key2) => {
+        const change2 = this.rules.sectionChange(this.rules.entryOf(s.doc, key2), name);
+        return change2 ? [{ key: key2, change: change2 }] : [];
+      });
+      if (steps.length === 0) return nothing(null);
+      if (keys.length !== 1) return this.applyAll(steps);
+      const { key, change } = steps[0];
+      if (change.kind === "moveToGroup") return this.moveToGroup(key, change.list, change.group, change.before, change.date);
+      if (change.kind === "createGroup") return this.createGroup(key, change.list, change.name, change.date);
+      return nothing(null);
+    }
+    moveGroup(list, group, place) {
+      return nothing(this.rules.moveGroup(list, group, place));
+    }
+    /** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
+    renameGroup(list, group, name) {
+      const operation = this.rules.renameGroup(list, group, name);
+      return {
+        operation,
+        plan: (s) => {
+          if (!operation || operation(s.doc, s.today, this.rules.moment().settings, s.boundary) === s.doc) return { operation: null, answer: () => false };
+          return { operation, answer: () => true };
+        }
+      };
+    }
+    removeGroup(list, group) {
+      return nothing(this.rules.removeGroup(list, group));
+    }
+    createSection(name, place) {
+      const made = this.rules.createSection(name, place);
+      return {
+        operation: made?.operation ?? null,
+        answer: (change) => {
+          if (!made || !change || change.after.serialize() === change.before.serialize()) return null;
+          return { list: made.list, group: made.group };
+        }
+      };
+    }
+    applyAll(steps) {
+      return nothing(this.rules.applyAll(steps));
+    }
+    /** What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. */
+    drop(tasks, to, day) {
+      const moves = dropMoves(tasks, to, day);
+      return {
+        reads: moves.kind === "one" && moves.move.kind === "toTime",
+        plan: (s) => moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)
+      };
+    }
+    moveOne(s, key, move) {
+      switch (move.kind) {
+        case "toTime":
+          return this.toTime(s, key, move.from, move.start, move.day);
+        case "clearSlot":
+          return this.clearSlot(key, move.place);
+        case "moveToGroup":
+          return this.moveToGroup(key, move.list, move.group, move.before, move.date);
+        case "nest":
+          return this.nest(key, move.parent, move.before);
+        case "moveBefore":
+          return this.moveBefore(key, move.before, move.date);
+        case "moveToList":
+          return this.moveToList(key, move.date);
+        case "moveToSoon":
+          return this.moveToSoon(key, move.date);
+        case "moveToEnd":
+          return this.moveToEnd(key, move.section);
+      }
+    }
+  };
+
+  // src/domain/TextPatch.ts
+  var CONTEXT = 2;
+  var TextPatch = class _TextPatch {
+    constructor(changes) {
+      this.changes = changes;
+    }
+    static between(before, after) {
+      return new _TextPatch(hunksOf(before.split("\n"), after.split("\n")));
+    }
+    /** The patch as plain data, for a host that keeps the steps itself; `TextPatch.of` reads it back. */
+    get hunks() {
+      return this.changes;
+    }
+    static of(hunks) {
+      return new _TextPatch(hunks);
+    }
+    get empty() {
+      return this.changes.length === 0;
+    }
+    /** `current` with the change taken back, or null when a changed block is no longer to be found. */
+    revert(current) {
+      return this.swap(current, "added", "removed");
+    }
+    /** `current` with the change made again, or null when a block it changes is no longer to be found. */
+    apply(current) {
+      return this.swap(current, "removed", "added");
+    }
+    swap(current, from, to) {
+      const lines = current.split("\n");
+      const shift = (hunk) => from === "added" ? hunk.after : hunk.before;
+      const places = this.changes.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
+      if (places.some((place, i) => place === null || i > 0 && place <= places[i - 1] + this.changes[i - 1][from].length - 1)) return null;
+      for (let i = this.changes.length - 1; i >= 0; i--) {
+        const hunk = this.changes[i];
+        lines.splice(places[i], hunk[from].length, ...hunk[to]);
+      }
+      return lines.join("\n");
+    }
+  };
+  function find(text, hunk, lines, near) {
+    const block = [...hunk.above, ...lines, ...hunk.below];
+    let best = null;
+    for (let start = 0; start + block.length <= text.length; start++) {
+      if (hunk.atStart && start !== 0) break;
+      if (hunk.atEnd && start + block.length !== text.length) continue;
+      if (!block.every((line, i) => text[start + i] === line)) continue;
+      const at = start + hunk.above.length;
+      if (best === null || Math.abs(at - near) < Math.abs(best - near)) best = at;
+    }
+    return best;
+  }
+  function hunksOf(before, after) {
+    const hunks = [];
+    for (const [b0, b1, a0, a1] of mergedBlocks(changedBlocks(before, after))) {
+      const above = Math.max(0, b0 - CONTEXT);
+      const below = Math.min(before.length, b1 + CONTEXT);
+      hunks.push({
+        before: b0,
+        after: a0,
+        removed: before.slice(b0, b1),
+        added: after.slice(a0, a1),
+        above: before.slice(above, b0),
+        below: before.slice(b1, below),
+        atStart: b0 < CONTEXT,
+        atEnd: before.length - b1 < CONTEXT
+      });
+    }
+    return hunks;
+  }
+  function mergedBlocks(blocks) {
+    const merged = [];
+    for (const block of blocks) {
+      const last = merged[merged.length - 1];
+      if (last && block[0] - last[1] <= 2 * CONTEXT) {
+        last[1] = block[1];
+        last[3] = block[3];
+      } else merged.push([...block]);
+    }
+    return merged;
+  }
+  function changedBlocks(before, after) {
+    let head = 0;
+    while (head < before.length && head < after.length && before[head] === after[head]) head++;
+    let tail = 0;
+    while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+    const b = before.slice(head, before.length - tail);
+    const a = after.slice(head, after.length - tail);
+    const same = sharedLines(b, a);
+    const blocks = [];
+    let i = 0;
+    let j = 0;
+    let open = null;
+    const close = () => {
+      if (open) blocks.push([head + open[0], head + i, head + open[1], head + j]);
+      open = null;
+    };
+    for (const [x, y] of [...same, [b.length, a.length]]) {
+      if (i < x || j < y) {
+        open ??= [i, j];
+        i = x;
+        j = y;
+      }
+      if (x === b.length && y === a.length) break;
+      close();
+      i++;
+      j++;
+    }
+    close();
+    return blocks;
+  }
+  var TABLE_CELLS = 1e6;
+  function sharedLines(b, a) {
+    return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
+  }
+  function tableLines(b, a) {
+    const width = a.length + 1;
+    const common = new Uint16Array((b.length + 1) * width);
+    for (let i2 = b.length - 1; i2 >= 0; i2--) {
+      for (let j2 = a.length - 1; j2 >= 0; j2--) {
+        common[i2 * width + j2] = b[i2] === a[j2] ? common[(i2 + 1) * width + j2 + 1] + 1 : Math.max(common[(i2 + 1) * width + j2], common[i2 * width + j2 + 1]);
+      }
+    }
+    const pairs = [];
+    let i = 0;
+    let j = 0;
+    while (i < b.length || j < a.length) {
+      if (i < b.length && j < a.length && b[i] === a[j]) pairs.push([i++, j++]);
+      else if (j < a.length && (i === b.length || common[i * width + j + 1] >= common[(i + 1) * width + j])) j++;
+      else i++;
+    }
+    return pairs;
+  }
+  function myersLines(b, a) {
+    const n = b.length;
+    const m = a.length;
+    const offset = n + m + 1;
+    const v = new Int32Array(2 * offset + 1);
+    const trace = [];
+    const down = (k, d, at) => k === -d || k !== d && at(k - 1) < at(k + 1);
+    let found = n === 0 && m === 0 ? 0 : -1;
+    for (let d = 0; found < 0; d++) {
+      trace.push(v.slice(offset - d, offset + d + 1));
+      for (let k = -d; k <= d; k += 2) {
+        let x2 = down(k, d, (i) => v[offset + i]) ? v[offset + k + 1] : v[offset + k - 1] + 1;
+        let y2 = x2 - k;
+        while (x2 < n && y2 < m && b[x2] === a[y2]) {
+          x2++;
+          y2++;
+        }
+        v[offset + k] = x2;
+        if (x2 >= n && y2 >= m) {
+          found = d;
+          break;
+        }
+      }
+    }
+    const pairs = [];
+    let x = n;
+    let y = m;
+    for (let d = found; d > 0; d--) {
+      const before = trace[d];
+      const at = (k2) => before[k2 + d];
+      const k = x - y;
+      const prevK = down(k, d, at) ? k + 1 : k - 1;
+      const prevX = at(prevK);
+      const prevY = prevX - prevK;
+      const startX = prevK === k + 1 ? prevX : prevX + 1;
+      while (x > startX) pairs.push([--x, --y]);
+      x = prevX;
+      y = prevY;
+    }
+    while (x > 0) pairs.push([--x, --y]);
+    return pairs.reverse();
+  }
+
+  // src/application/UndoSteps.ts
+  var DEPTH = 100;
+  var UndoSteps = class _UndoSteps {
+    constructor(state = { done: [], undone: [] }) {
+      this.done = state.done.map((h) => TextPatch.of(h));
+      this.undone = state.undone.map((h) => TextPatch.of(h));
+    }
+    get state() {
+      return { done: this.done.map((p) => p.hunks), undone: this.undone.map((p) => p.hunks) };
+    }
+    /** A change just made: a new step, and nothing left to do again. False when it changed no line. */
+    record(before, after) {
+      const patch2 = TextPatch.between(before, after);
+      if (patch2.empty) return false;
+      this.done.push(patch2);
+      if (this.done.length > DEPTH) this.done.shift();
+      this.undone.length = 0;
+      return true;
+    }
+    canUndo() {
+      return this.done.length > 0;
+    }
+    canRedo() {
+      return this.undone.length > 0;
+    }
+    /** The next step that way, taken off; null when there is none. */
+    take(way) {
+      return (way === "undo" ? this.done : this.undone).pop() ?? null;
+    }
+    /** `text` with the step taken back or done again; null when its lines were edited since. */
+    static make(way, patch2, text) {
+      return way === "undo" ? patch2.revert(text) : patch2.apply(text);
+    }
+    /** A step made: it can be made the other way now. A step that could not be made is dropped. */
+    made(way, patch2) {
+      (way === "undo" ? this.undone : this.done).push(patch2);
+    }
+    /** A whole step over `text`, at once: the outcome and the text it leaves. */
+    step(way, text) {
+      const patch2 = this.take(way);
+      if (!patch2) return { outcome: "nothing", text };
+      const next = _UndoSteps.make(way, patch2, text);
+      if (next === null) return { outcome: "conflict", text };
+      this.made(way, patch2);
+      return { outcome: "done", text: next };
+    }
+  };
+
+  // src/application/PhoneCalls.ts
+  var DoorError = class extends Error {
+    constructor(code, message) {
+      super(message);
+      this.code = code;
+    }
+  };
+  function settingsOf(json) {
+    return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
+  }
+  var Call = class {
+    constructor(context) {
+      this.context = context;
+      this.effects = {};
+      this.settings = settingsOf(context.settings ?? "");
+      const clock = { now: () => new Date(context.nowMs) };
+      const store = { get: () => this.settings, update: async () => void 0, onChange: () => () => void 0 };
+      this.rules = new TaskRules(store, clock);
+      this.reads = new TaskReads(this.rules, store, clock);
+      this.writes = new TaskWrites(this.rules, this.reads);
+      this.text = context.tasks ?? null;
+    }
+    get now() {
+      return new Date(this.context.nowMs);
+    }
+    /** The tasks file's text as this call has it now: a write earlier in the call already in it. */
+    tasks() {
+      if (this.text === null) throw new TasksFileMissingError(this.settings.tasksFile);
+      return this.text;
+    }
+    hasTasks() {
+      return this.text !== null;
+    }
+    snapshot() {
+      const at = this.rules.moment();
+      return { doc: this.rules.read(this.tasks(), at).doc, today: at.today, boundary: at.boundary };
+    }
+    /** The file tidied for today, as the plugin's service writes it before a screen: no step. */
+    normalize() {
+      if (this.text === null || !this.rules.read(this.text).changed) return;
+      this.setText(this.rules.change(this.text, (d) => d).text, false);
+    }
+    /** A write as one action: its operation over the text, the new text a step of the history. */
+    run(write) {
+      if (!write.operation) return write.answer(null);
+      const before = this.tasks();
+      const change = this.rules.change(before, write.operation);
+      this.setText(change.text, true);
+      return write.answer({ before: change.before, after: change.after });
+    }
+    /** The tasks text a step back or forward leaves. */
+    undo(way) {
+      const steps = new UndoSteps(this.context.history);
+      const { outcome, text } = steps.step(way, this.tasks());
+      this.effects.history = steps.state;
+      if (text !== this.text) this.setText(text, false);
+      return outcome;
+    }
+    /** Settings merged into the `data.json` handed in, every other key kept, written as Obsidian writes it. */
+    saveSettings(patch2) {
+      const raw = this.context.settings.trim() === "" ? {} : JSON.parse(this.context.settings);
+      this.effects.settings = JSON.stringify({ ...raw, ...patch2 }, null, 2);
+    }
+    setText(text, step) {
+      const before = this.text;
+      if (text === before) return;
+      this.text = text;
+      this.effects.tasks = text;
+      if (!step) return;
+      const steps = new UndoSteps(this.effects.history ?? this.context.history);
+      if (before !== null && steps.record(before, text)) {
+        this.effects.step = true;
+        this.effects.history = steps.state;
+      }
+    }
+  };
+  var KEPT = (call) => call.snapshot();
+  var TASKS = {
+    priorityLevels: (c) => c.reads.priorityLevels(),
+    labelLevels: (c) => c.reads.labelLevels(),
+    parseTitle: (c, [text]) => c.reads.parseTitle(text),
+    isBlank: (c, [text]) => c.reads.isBlank(text),
+    withPriority: (c, [text, prefix]) => c.reads.withPriority(text, prefix ?? null),
+    draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text, priority ?? null, labels ?? []),
+    screen: (c, [date]) => {
+      if (!c.hasTasks()) return c.reads.missingScreen(date);
+      c.normalize();
+      return c.reads.screen(KEPT(c), date);
+    },
+    dayView: (c, [date]) => c.reads.dayView(KEPT(c), date),
+    soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
+    inboxView: (c) => c.reads.inboxView(KEPT(c)),
+    backlogView: (c) => c.reads.backlogView(KEPT(c)),
+    doneView: (c) => c.reads.doneView(KEPT(c)),
+    search: (c, [query]) => c.reads.searches(query) ? c.reads.search(KEPT(c), query) : [],
+    screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item),
+    reveal: (c, [item]) => {
+      c.run(c.writes.revealUnfold(item));
+      return c.reads.screenOf(KEPT(c), item);
+    },
+    findIn: (c, [items, key]) => c.reads.findIn(items, key),
+    listSections: (c) => c.reads.listSections(KEPT(c)),
+    sectionOffer: (c, [date]) => c.reads.sectionOffer(KEPT(c), date),
+    createInList: (c, [date, text]) => c.run(c.writes.createInList(date, text)),
+    createInSoon: (c, [text]) => c.run(c.writes.createInSoon(text)),
+    createAtTime: (c, [date, start, text]) => c.run(c.writes.createAtTime(date, start, text)),
+    createInPlace: (c, [text, priority, place, repeat, labels]) => c.run(c.writes.createInPlace(text, priority ?? null, place, repeat ?? null, labels ?? [])),
+    create: (c, [draft, slot]) => c.run(c.writes.create(draft, slot ?? void 0)),
+    createSubtask: (c, [parent, draft]) => c.run(c.writes.createSubtask(parent, draft)),
+    edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
+    placementOf: (c, [item]) => c.reads.placementOf(item),
+    dayColumn: (c, [date]) => c.reads.dayColumn(date),
+    columnSections: (c, [column, date]) => c.reads.columnSections(column, date),
+    placementOfDay: (c, [date]) => c.reads.placementOfDay(date),
+    listName: (c, [list]) => c.reads.listName(list),
+    dayOfPlacement: (c, [placement]) => c.reads.dayOfPlacement(placement),
+    setStatus: (c, [key, status]) => c.run(c.writes.setStatus(key, status)),
+    toggleDone: (c, [key]) => c.run(c.writes.toggleDone(key)),
+    setDueDate: (c, [key, date]) => c.run(c.writes.setDueDate(key, date ?? null)),
+    setPriority: (c, [key, priority]) => c.run(c.writes.setPriority(key, priority ?? null)),
+    setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key, labels)),
+    setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
+    setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
+    togglePriority: (c, [keys, prefix]) => keys.length === 0 ? void 0 : c.run(c.writes.togglePriority(KEPT(c), keys, prefix)),
+    toggleLabel: (c, [keys, name]) => keys.length === 0 ? [] : c.run(c.writes.toggleLabel(KEPT(c), keys, name)),
+    removeDue: (c, [keys]) => c.run(c.writes.removeDue(KEPT(c), keys)),
+    menu: (c, [item, from, screen]) => c.reads.menu(item, from, screen),
+    bulkMenu: (c, [picked, screen]) => c.reads.bulkMenu(picked, screen),
+    pickStatus: (c, [keys, id]) => c.run(c.writes.pickStatus(keys, id)),
+    postponeAll: (c, [keys, date]) => c.run(c.writes.postponeAll(KEPT(c), keys, date)),
+    removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys)),
+    carried: (c, [lifted, picked]) => c.reads.carried(lifted, picked),
+    setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key, collapsed)),
+    unfoldAbove: (c, [key]) => c.run(c.writes.unfoldAbove(key)),
+    setRepeat: (c, [key, rule]) => c.run(c.writes.setRepeat(key, rule ?? null)),
+    stop: (c, [key]) => c.run(c.writes.stop(key)),
+    rename: (c, [key, text]) => c.run(c.writes.rename(KEPT(c), key, text)),
+    fullTree: (c, [item]) => c.reads.fullTree(item),
+    setDescription: (c, [key, markdown]) => c.run(c.writes.setDescription(key, markdown)),
+    remove: (c, [key]) => c.run(c.writes.remove(key)),
+    lineOf: (c, [key]) => {
+      c.normalize();
+      return c.reads.lineOf(c.tasks(), key);
+    },
+    find: (c, [key, text]) => c.reads.find(KEPT(c), key, text),
+    moveBefore: (c, [key, before, date]) => c.run(c.writes.moveBefore(key, before ?? null, date)),
+    nest: (c, [key, parent, before]) => c.run(c.writes.nest(key, parent, before ?? null)),
+    setSlot: (c, [key, slot]) => c.run(c.writes.setSlot(key, slot)),
+    shownSpan: (c, [item, day]) => c.reads.shownSpan(item, day),
+    dropSpan: (c, [item, from, start]) => c.reads.dropSpan(item ?? null, from, start),
+    newSlot: (c, [day, start]) => c.reads.newSlot(day, start),
+    stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item, day, edge, minute),
+    resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key, day, edge, minute, min)),
+    clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key, place ?? void 0)),
+    moveToList: (c, [key, date]) => c.run(c.writes.moveToList(key, date)),
+    moveToSoon: (c, [key, date]) => c.run(c.writes.moveToSoon(key, date)),
+    postpone: (c, [key, date]) => c.run(c.writes.postpone(key, date)),
+    moveToEnd: (c, [key, section]) => c.run(c.writes.moveToEnd(key, section)),
+    moveToGroup: (c, [key, list, group, before, date]) => c.run(c.writes.moveToGroup(key, list, group ?? null, before ?? null, date ?? void 0)),
+    createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key, list, name, date ?? void 0)),
+    toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys, name ?? null)),
+    moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list, group ?? null, place)),
+    renameGroup: (c, [list, group, name]) => {
+      const rename2 = c.writes.renameGroup(list, group, name);
+      return rename2.operation ? c.run(rename2.plan(KEPT(c))) : false;
+    },
+    removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
+    createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
+    applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
+    drop: (c, [tasks, to, day]) => {
+      const drop = c.writes.drop(tasks, to, day);
+      return c.run(drop.plan(drop.reads ? KEPT(c) : null));
+    },
+    normalize: (c) => c.normalize(),
+    createFile: (c) => {
+      if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
+      c.effects.tasks = c.rules.emptyFile();
+    }
+  };
+  function boundaryOf2(c) {
+    return c.rules.moment().boundary;
+  }
+  var DAYS = {
+    today: (c) => c.rules.today(),
+    relation: (c, [date]) => dayRelation(date, c.rules.today()),
+    step: (_c, [date, days]) => addDays(date, days),
+    /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
+    boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
+  };
+  var BOUNDARY = {
+    startHour: (c) => boundaryOf2(c).startHour,
+    dayOf: (c, [ms]) => boundaryOf2(c).dayOf(new Date(ms)),
+    dayOfSlot: (c, [slot]) => boundaryOf2(c).dayOfSlot(slot),
+    offsetOf: (c, [day, ms]) => boundaryOf2(c).offsetOf(day, new Date(ms)),
+    clipToDay: (c, [day, startMs, endMs]) => boundaryOf2(c).clipToDay(day, new Date(startMs), new Date(endMs)),
+    spanOf: (c, [slot, day]) => boundaryOf2(c).spanOf(slot, day),
+    slotAt: (c, [day, start, end]) => boundaryOf2(c).slotAt(day, start, end ?? null),
+    hourAt: (c, [index]) => boundaryOf2(c).hourAt(index),
+    offsetOfHour: (c, [hour]) => boundaryOf2(c).offsetOfHour(hour),
+    clamp: (c, [slot, step]) => boundaryOf2(c).clamp(slot, step)
+  };
+  function wireEvent(e, now) {
+    const { start, end, ...rest } = e;
+    return { ...rest, startMs: start.getTime(), endMs: end.getTime(), past: end.getTime() <= now.getTime() };
+  }
+  function wireDay(day, now) {
+    const wire = (events) => events.map((e) => wireEvent(e, now));
+    return {
+      events: wire(day.events),
+      allDay: wire(day.allDay),
+      timed: wire(day.timed),
+      statuses: day.statuses.map(({ updatedAt, ...rest }) => ({ ...rest, updatedAtMs: updatedAt === null ? null : updatedAt.getTime() })),
+      stale: day.stale
+    };
+  }
+  function calendarDay(c) {
+    const files = /* @__PURE__ */ new Map();
+    const problems = /* @__PURE__ */ new Map();
+    for (const source of CALENDAR_SOURCES) {
+      const text = c.context.calendars?.[source] ?? null;
+      if (text === null) {
+        problems.set(source, { kind: "fileMissing" });
+        continue;
+      }
+      try {
+        files.set(source, readCalendarFile(text, source));
+      } catch (e) {
+        problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    const reading = { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => s === "google" };
+    const day = new CalendarDay(reading, c.settings, c.now);
+    const carried = day.carryOver(true);
+    if (!carried) return day;
+    c.saveSettings(carried);
+    return new CalendarDay(reading, { ...c.settings, ...carried }, c.now);
+  }
+  var CALENDARS = {
+    events: (c, [date]) => wireDay(calendarDay(c).events(date), c.now),
+    isPast: (c, [event]) => event.endMs <= c.context.nowMs,
+    known: (c) => calendarDay(c).known(),
+    setShown: (c, [account, title, shown]) => {
+      const day = calendarDay(c);
+      const settings = c.effects.settings ? JSON.parse(c.effects.settings) : {};
+      c.saveSettings({ ...settings, ...day.shownChange(account, title, shown) });
+    }
+  };
+  var HISTORY = {
+    undo: (c) => c.undo("undo"),
+    redo: (c) => c.undo("redo"),
+    canUndo: (c) => new UndoSteps(c.context.history).canUndo(),
+    canRedo: (c) => new UndoSteps(c.context.history).canRedo()
+  };
+  var RULES = {
+    nextProgress,
+    sameSlot,
+    sameRule: (a, b) => sameRule(a ?? null, b ?? null),
+    repeatParts,
+    editRepeat,
+    repeatDraft: (day, rule) => repeatDraft(day, rule ?? null),
+    samePlacement,
+    keyId,
+    sameLine,
+    samePlace: samePlace2,
+    sameTaskTree,
+    fitLevel,
+    gapOfPlace,
+    levelRange,
+    placeOfGap,
+    shiftLevel,
+    gapAt,
+    groupPlaceOf,
+    placeOfDrop: (cards, place, home) => placeOfDrop(cards, place, home ?? null),
+    sameGap,
+    listView: (items, sections, listSections) => listView(items, sections, listSections ?? []),
+    sectionChoice,
+    cardDue: (item, day) => cardDue(item, day ?? null),
+    textParts,
+    oneLine,
+    sameLevels,
+    labelTitle,
+    sameLabels,
+    isPresetColor,
+    acceptsDrop,
+    placesInGap
+  };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS };
+  function lookOf(c, look) {
+    return {
+      cards: (column) => look.cards[column] ?? [],
+      sections: (column) => look.sections?.[column] ?? [],
+      sectioned: (column) => look.sectioned?.[column] ?? false,
+      day: () => look.day,
+      today: () => c.rules.today(),
+      shown: () => look.shown
+    };
+  }
+  var ENTRY_METHODS = [
+    "listEntry",
+    "openAtEnd",
+    "openFromPlus",
+    "openIn",
+    "openSlot",
+    "openAtDrop",
+    "subtaskSpot",
+    "renameSpot",
+    "open",
+    "type",
+    "setPriority",
+    "togglePriority",
+    "setLabels",
+    "toggleLabel",
+    "setRepeat",
+    "indent",
+    "toggleSection",
+    "enter",
+    "blur",
+    "escape",
+    "choosePlace",
+    "moveToEnd",
+    "placeOf",
+    "call",
+    "unshown",
+    "done",
+    "job"
+  ];
+  function entryCall(name) {
+    return (c, [session, look, ...args]) => {
+      const changes = [];
+      const jobs = [];
+      const kept = session ?? emptySession();
+      const entry = new QuickEntry(c.reads, lookOf(c, look), kept, (state, drawnNext) => changes.push({ state, drawnNext: drawnNext === true }), (job) => jobs.push(job));
+      let value;
+      if (name === "state") value = entry.state;
+      else if (name === "renaming") value = entry.renaming;
+      else if (name === "shown") {
+        const [id, created, coming] = args;
+        entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
+      } else value = entry[name](...args);
+      return { session: entry.session, state: entry.state, changes, jobs, value: value === void 0 ? null : value };
+    };
+  }
+  var ENTRY = Object.fromEntries([...ENTRY_METHODS, "state", "renaming", "shown"].map((name) => [name, entryCall(name)]));
+  var SECTION_NAME = {
+    end: (_c, [ended, event, text]) => sectionNameEnd(ended === true, event, text ?? "")
+  };
+  var SPACES = {
+    tasks: TASKS,
+    days: DAYS,
+    boundary: BOUNDARY,
+    calendars: CALENDARS,
+    history: HISTORY,
+    entry: ENTRY,
+    sectionName: SECTION_NAME,
+    rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
+  };
+  function doorMethods() {
+    return Object.entries(SPACES).flatMap(([space, handlers]) => Object.keys(handlers).map((name) => `${space}.${name}`));
+  }
+  function callDoor(method, args, context) {
+    try {
+      const [space, name] = method.split(".");
+      const handler = SPACES[space]?.[name];
+      if (!handler || !Object.prototype.hasOwnProperty.call(SPACES, space) || !Object.prototype.hasOwnProperty.call(SPACES[space], name)) throw new DoorError("unknownMethod", `no method ${method}`);
+      if (!Array.isArray(args)) throw new DoorError("badArguments", "the arguments are a list");
+      const call = new Call(context);
+      const result = handler(call, [...args]);
+      return { ok: true, result: result === void 0 ? null : result, ...call.effects };
+    } catch (e) {
+      return { ok: false, error: errorOf(e) };
+    }
+  }
+  function errorOf(e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof DoorError) return { code: e.code, message };
+    if (e instanceof StaleTaskError) return { code: e.code, message };
+    if (e instanceof TasksFileMissingError) return { code: e.code, message };
+    if (e instanceof SyntaxError) return { code: "badArguments", message };
+    return { code: "failed", message };
+  }
+  function callDoorJson(method, argsJson, contextJson) {
+    let args;
+    let context;
+    try {
+      args = argsJson.trim() === "" ? [] : JSON.parse(argsJson);
+      context = JSON.parse(contextJson);
+    } catch (e) {
+      return JSON.stringify({ ok: false, error: { code: "badArguments", message: e instanceof Error ? e.message : String(e) } });
+    }
+    return JSON.stringify(callDoor(method, args, context));
+  }
+
+  // src/application/TaskReminders.ts
+  var HOUR_MINUTES4 = 60;
+  function clockOf(date, minutes) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day, 0, minutes);
+  }
+  function keyOf2(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
+  }
+  var TaskReminders = class {
+    constructor(rules, clock) {
+      this.rules = rules;
+      this.clock = clock;
+    }
+    /** The open tasks on a time that remind, until their day ends, by start. */
+    ringing(text) {
+      const at = this.rules.moment();
+      const now = this.clock.now();
+      return openSlotted(this.rules.read(text, at).doc).filter((e) => e.task.reminder !== "none").map((e) => this.reminder(e, e.task.slot, at)).filter((r) => r.dayEnd > now).sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    /**
+     * The text after `action` on the reminding task whose line is `line`, the first of two alike; null when no such task is
+     * left. A reminder still shown after its day ended names a slot that today's normalizing has already erased: it is
+     * found in the file as it is.
+     */
+    act(text, line, action2) {
+      const at = this.rules.moment();
+      const found = this.find(this.rules.read(text, at).doc, line);
+      if (found) return this.rules.change(text, action2(found), at).text;
+      const asRead = this.find(this.rules.asRead(text, at), line);
+      return asRead ? this.rules.changeAsRead(text, action2(asRead), at).text : null;
+    }
+    find(doc, line) {
+      const entry = openSlotted(doc).find((e) => e.raw === line);
+      return entry ? keyOf2(entry) : null;
+    }
+    reminder(entry, slot, at) {
+      const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
+      return {
+        key: keyOf2(entry),
+        title: plainText(entry.task.text),
+        startMinute: slot.start,
+        endMinute: slot.end,
+        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
+        date: slot.date,
+        start: clockOf(slot.date, slot.start),
+        dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES4)
+      };
+    }
+  };
+
   // src/application/PhoneDoor.ts
   function timeText(start, end) {
     return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
@@ -2459,13 +4863,10 @@ ${key.title}`.toLowerCase();
   function action(text) {
     return text === null ? STALE : { changed: true, text };
   }
-  function settingsOf(json) {
-    return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
-  }
   function fixedSettings(settings) {
     return { get: () => settings, update: async () => void 0, onChange: () => () => void 0 };
   }
-  var Call = class {
+  var Call2 = class {
     constructor(settingsJson, nowMs) {
       const clock = { now: () => new Date(nowMs) };
       this.rules = new TaskRules(fixedSettings(settingsOf(settingsJson)), clock);
@@ -2474,7 +4875,7 @@ ${key.title}`.toLowerCase();
   };
   var phoneDoor = {
     reminders(text, settingsJson, nowMs) {
-      return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
+      return new Call2(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
         id: key.raw,
         title,
         body: timeText(startMinute, endMinute),
@@ -2485,16 +4886,16 @@ ${key.title}`.toLowerCase();
       }));
     },
     complete(text, settingsJson, id, nowMs) {
-      const { rules, reminders } = new Call(settingsJson, nowMs);
+      const { rules, reminders } = new Call2(settingsJson, nowMs);
       return action(reminders.act(text, id, (key) => rules.setStatus(key, "done")));
     },
     /** The task stays on its time; it no longer reminds. */
     silence(text, settingsJson, id, nowMs) {
-      const { rules, reminders } = new Call(settingsJson, nowMs);
+      const { rules, reminders } = new Call2(settingsJson, nowMs);
       return action(reminders.act(text, id, (key) => rules.setReminder(key, "none")));
     },
     snooze(text, settingsJson, id, minutes, nowMs) {
-      const { rules, reminders } = new Call(settingsJson, nowMs);
+      const { rules, reminders } = new Call2(settingsJson, nowMs);
       return action(reminders.act(text, id, (key) => rules.snooze(key, minutes)));
     },
     /**
@@ -2503,7 +4904,7 @@ ${key.title}`.toLowerCase();
      */
     capture(text, settingsJson, list, title, nowMs) {
       if (title.trim() === "") return STALE;
-      const { rules } = new Call(settingsJson, nowMs);
+      const { rules } = new Call2(settingsJson, nowMs);
       return action(rules.change(text, rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
     },
     /** The calendars' files in the vault, in the order `meetings` takes their texts. */
@@ -2523,6 +4924,34 @@ ${key.title}`.toLowerCase();
         }
       });
       return new ShownCalendars(files, settingsOf(settingsJson), new Date(nowMs)).days().timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+    },
+    /**
+     * Every call of the services a frontend makes, by name (`tasks.screen`, `entry.enter`, …: see `docs/door.md`): the
+     * arguments a JSON list, the context the files' texts, the settings and the moment; the answer JSON, the result with the
+     * texts to write back, or the error by its code.
+     */
+    call(method, argsJson, contextJson) {
+      return callDoorJson(method, argsJson, contextJson);
+    },
+    /** Every method `call` answers, `space.name`. */
+    methods() {
+      return doorMethods();
+    },
+    /** The tasks file a host reads, by path from the vault folder, as the plugin reads it: none for a blank setting. */
+    tasksFile(settingsJson) {
+      return tasksFilePath(settingsOf(settingsJson));
+    },
+    /** Where the iOS app writes the phone's calendars, by path from the vault folder. */
+    iphoneCalendarFile() {
+      return IPHONE_CALENDAR_FILE;
+    },
+    /** `iphoneCalendarFile`'s text for the phone's calendars and events (`PhoneExport`, as JSON), in the format every writer of the calendars uses. */
+    iphoneCalendarText(exportJson) {
+      return phoneCalendarText(JSON.parse(exportJson));
+    },
+    /** A task is one line: a line break in its title reads as one space, as the plugin writes it. */
+    oneLine(text) {
+      return oneLine(text);
     }
   };
 

@@ -22,6 +22,11 @@ export function markersOf(settings: TaskCalendarSettings): Markers {
 	};
 }
 
+/** The tasks file, by path from the vault folder: the setting as saved, its default when it was never set; none when it is blank. */
+export function tasksFilePath(settings: TaskCalendarSettings): string | null {
+	return settings.tasksFile.trim() === "" ? null : settings.tasksFile;
+}
+
 export function boundaryOf(settings: TaskCalendarSettings): DayBoundary {
 	return new DayBoundary(settings.dayStartHour);
 }

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { doorMethods } from "../src/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
@@ -193,6 +194,23 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	placesInGap: "./drops",
 };
 
+/**
+ * Where the phone's door offers each runtime value: a function by its name among `rules.*`; a constant in `rules.constants`;
+ * the line break as `rules.oneLine`; a class by the calls that stand for it. A new runtime value is listed here, or the
+ * Swift frontend could not reach it.
+ */
+const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
+	...Object.fromEntries(Object.keys(CONTRACT_RUNTIME).map((name) => [name, `rules.${name}`])),
+	REMINDER_KINDS: "rules.constants",
+	MINUTES_PER_DAY: "rules.constants",
+	DESCRIPTION_TEMPLATE: "rules.constants",
+	PRIORITY_COLORS: "rules.constants",
+	LINE_BREAK: "rules.oneLine",
+	DayBoundary: "boundary.dayOf",
+	QuickEntrySession: "entry.enter",
+	SectionNameEntry: "sectionName.end",
+};
+
 /** Every runtime value contracts.ts re-exports, as `name ← module`: `export { … } from`, or a value imported and exported again. */
 function contractRuntimeReexports(text: string): string[] {
 	const code = withoutComments(text);
@@ -226,6 +244,11 @@ describe("contracts.ts", () => {
 	it("re-exports types, and only the runtime values listed on purpose", () => {
 		const listed = Object.entries(CONTRACT_RUNTIME).map(([name, from]) => `${name} ← ${from}`);
 		expect(contractRuntimeReexports(readFileSync(join(ROOT, "src/application/contracts.ts"), "utf8")).sort()).toEqual(listed.sort());
+	});
+
+	it("hands the UI nothing the phone's door does not offer", () => {
+		const offered = new Set(doorMethods());
+		expect(Object.entries(DOOR_OF_RUNTIME).filter(([, method]) => !offered.has(method))).toEqual([]);
 	});
 
 	it("reads every form of re-export it guards", () => {
