@@ -31,6 +31,22 @@ import Testing
         #expect(try core.complete(id: "- [ ] Gone", text: Fixtures.file(alarm), settingsJSON: "", now: Fixtures.date(4, 9)) == .stale)
     }
 
+    @Test func aSilencedTaskStopsReminding() throws {
+        guard case .changed(let text) = try core.silence(id: alarm, text: Fixtures.file(alarm), settingsJSON: "", now: Fixtures.date(4, 9)) else { Issue.record("stale"); return }
+        #expect(try core.reminders(text: text, settingsJSON: "", now: Fixtures.date(4, 9)).isEmpty)
+    }
+
+    @Test func noTasksFileIsSaidByItsCode() {
+        do {
+            _ = try core.call("reminders.list", context: DoorContext(tasks: nil, now: Fixtures.date(4, 9)))
+            Issue.record("no error")
+        } catch PhoneCoreError.refused(let code, _) {
+            #expect(code == "tasksFileMissing")
+        } catch {
+            Issue.record("\(error)")
+        }
+    }
+
     @Test func scriptErrorsSurface() throws {
         #expect(throws: PhoneCoreError.self) {
             try core.reminders(text: "", settingsJSON: "{not json", now: Fixtures.date(4, 9))

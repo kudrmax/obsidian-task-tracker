@@ -236,16 +236,16 @@ public actor ReminderSync {
     /// left as it is; a write that fails leaves the reminders to be set all the same.
     private func exportCalendars(at: Date) async {
         guard let text = try? await calendar.export(now: at), let path = try? rules.iphoneCalendarFile(),
-              CalendarExport.adds(text, over: vault.read(path: path), at: at) else { return }
+              (try? rules.iphoneCalendarAdds(text, over: vault.read(path: path), now: at)) ?? true else { return }
         try? vault.write(path: path, text: text)
     }
 
     /// The meetings from now to the last reminder's day end, as the plugin's calendar shows them. Meetings that cannot be
     /// read only take the snooze until a meeting away: the reminders are set all the same.
     private func meetings(until end: Date?, settingsJSON: String, at: Date) -> [CalendarEvent] {
-        guard let end, let paths = try? rules.calendarFiles(settingsJSON: settingsJSON) else { return [] }
-        let texts = paths.map { vault.read(path: $0) }
-        return (try? rules.meetings(settingsJSON: settingsJSON, texts: texts, from: at, to: end, now: at)) ?? []
+        guard let end, let files = try? rules.calendarFiles(settingsJSON: settingsJSON) else { return [] }
+        let texts = Dictionary(files.compactMap { file in vault.read(path: file.path).map { (file.source, $0) } }, uniquingKeysWith: { first, _ in first })
+        return (try? rules.meetings(settingsJSON: settingsJSON, calendars: texts, from: at, to: end, now: at)) ?? []
     }
 
     /// Shown notifications to take away: those of reminders that are gone or that cannot be named, and all but the

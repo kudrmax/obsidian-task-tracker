@@ -199,3 +199,41 @@ export function phoneCalendarText(file: PhoneExport): string {
 		}),
 	});
 }
+
+/** The phone's same calendars are written again only to say they are still fresh, at most this often. */
+export const IPHONE_FRESH_MS = 10 * 60_000;
+
+/**
+ * Whether the phone's export `next` is worth writing over `last`, the file as it is: always, but for the same calendars
+ * and events written less than `IPHONE_FRESH_MS` ago. A file missing or unreadable is written over.
+ */
+export function iphoneCalendarAdds(next: string, last: string | null, nowMs: number): boolean {
+	const before = parsedObject(last);
+	const after = parsedObject(next);
+	if (before === null || after === null || typeof before.exportedAt !== "string") return true;
+	const written = isoMoment(before.exportedAt).getTime();
+	if (Number.isNaN(written) || nowMs - written >= IPHONE_FRESH_MS) return true;
+	return !sameJson(withoutExportedAt(before), withoutExportedAt(after));
+}
+
+function parsedObject(text: string | null): Record<string, unknown> | null {
+	if (text === null) return null;
+	try {
+		const value: unknown = JSON.parse(text);
+		return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+	} catch {
+		return null;
+	}
+}
+
+function withoutExportedAt({ exportedAt: _, ...rest }: Record<string, unknown>): Record<string, unknown> {
+	return rest;
+}
+
+/** The same JSON value, whatever order an object's keys come in. */
+function sameJson(a: unknown, b: unknown): boolean {
+	if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameJson(v, b[i]));
+	if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b;
+	const keys = Object.keys(a);
+	return keys.length === Object.keys(b).length && keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}

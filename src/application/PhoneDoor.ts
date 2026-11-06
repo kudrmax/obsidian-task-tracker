@@ -1,6 +1,6 @@
 import { oneLine } from "../domain/TaskTitle";
 import { tasksFilePath } from "./documentText";
-import { IPHONE_CALENDAR_FILE, type PhoneExport, phoneCalendarText } from "./calendarFile";
+import { IPHONE_CALENDAR_FILE, iphoneCalendarAdds, type PhoneExport, phoneCalendarText } from "./calendarFile";
 import type { CalendarSource } from "./contracts";
 import type { GroupedList } from "../domain/Lists";
 import { callDoorJson, type DoorAnswer, type DoorContext, doorMethods, settingsOf, type WireMeeting, type WireReminder } from "./PhoneCalls";
@@ -13,6 +13,9 @@ export type PhoneAction = { readonly changed: true; readonly text: string } | { 
 
 /** The lists the phone writes a new task into. */
 export type CaptureList = GroupedList;
+
+/** The plugin's `data.json` in the vault: Obsidian keeps a plugin's settings in its folder, named by the plugin's id. */
+export const SETTINGS_FILE = ".obsidian/plugins/task-calendar/data.json";
 
 const STALE: PhoneAction = { changed: false, reason: "stale" };
 
@@ -96,6 +99,11 @@ export const phoneDoor = {
 		return tasksFilePath(settingsOf(settingsJson));
 	},
 
+	/** The plugin's settings, `data.json`, by path from the vault folder: what `settings` in a call's context is read from. */
+	settingsFile(): string {
+		return SETTINGS_FILE;
+	},
+
 	/** Where the iOS app writes the phone's calendars, by path from the vault folder. */
 	iphoneCalendarFile(): string {
 		return IPHONE_CALENDAR_FILE;
@@ -104,6 +112,11 @@ export const phoneDoor = {
 	/** `iphoneCalendarFile`'s text for the phone's calendars and events (`PhoneExport`, as JSON), in the format every writer of the calendars uses. */
 	iphoneCalendarText(exportJson: string): string {
 		return phoneCalendarText(JSON.parse(exportJson) as PhoneExport);
+	},
+
+	/** Whether the phone's calendars as `iphoneCalendarText` wrote them now are worth writing over the file as it is (`null`: none). */
+	iphoneCalendarAdds(newText: string, oldText: string | null, nowMs: number): boolean {
+		return iphoneCalendarAdds(newText, oldText, nowMs);
 	},
 
 	/** A task is one line: a line break in its title reads as one space, as the plugin writes it. */

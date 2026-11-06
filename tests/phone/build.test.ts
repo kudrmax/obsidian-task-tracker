@@ -19,6 +19,8 @@ interface Phone {
 	tasksFile(settingsJson: string): string | null;
 	iphoneCalendarFile(): string;
 	iphoneCalendarText(exportJson: string): string;
+	iphoneCalendarAdds(newText: string, oldText: string | null, nowMs: number): boolean;
+	settingsFile(): string;
 	oneLine(text: string): string;
 }
 
@@ -36,7 +38,7 @@ describe(BUNDLE, () => {
 		const sandbox: { TaskCalendarPhone?: Phone } = {};
 		runInNewContext(committed, sandbox);
 		const phone = sandbox.TaskCalendarPhone!;
-		expect(Object.keys(phone).sort()).toEqual(["calendarFiles", "call", "capture", "complete", "iphoneCalendarFile", "iphoneCalendarText", "meetings", "methods", "oneLine", "reminders", "silence", "snooze", "tasksFile"]);
+		expect(Object.keys(phone).sort()).toEqual(["calendarFiles", "call", "capture", "complete", "iphoneCalendarAdds", "iphoneCalendarFile", "iphoneCalendarText", "meetings", "methods", "oneLine", "reminders", "settingsFile", "silence", "snooze", "tasksFile"]);
 		const line = "- [ ] A 🚨 2026-11-04 10:00";
 		const text = `## Now\n\n${line}\n`;
 		const now = new Date(2026, 10, 4, 9).getTime();
@@ -46,6 +48,7 @@ describe(BUNDLE, () => {
 		expect(phone.silence(text, "", line, now).text).not.toContain("🚨");
 		expect(phone.snooze(text, "", line, 15, now).text).toContain("- [ ] A 🚨 2026-11-04 09:15");
 		expect(phone.capture(text, "", "inbox", "B", now).text).toMatch(/## Inbox\n+- \[ \] B/);
+		expect(phone.settingsFile()).toBe(".obsidian/plugins/task-calendar/data.json");
 		expect(phone.calendarFiles("")).toEqual(["calendar/google.json", "calendar/iphone.json", "calendar/work.json"]);
 		const at = (hour: number) => new Date(2026, 10, 4, hour).toISOString();
 		const work = JSON.stringify({ exportedAt: at(8), events: [{ id: "s", title: "Standup", start: at(10), end: at(11), allDay: false, calendar: "Work" }] });

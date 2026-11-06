@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarFileText, readCalendarFile } from "../../src/application/calendarFile";
+import { calendarFileText, iphoneCalendarAdds, phoneCalendarText, readCalendarFile } from "../../src/application/calendarFile";
 
 const event = (title: string, calendar: string, extra: object = {}) => ({
 	id: title,
@@ -60,5 +60,31 @@ describe("readCalendarFile", () => {
 		});
 		const file = readCalendarFile(text, "google");
 		expect(readCalendarFile(calendarFileText(file), "google")).toEqual(file);
+	});
+});
+
+describe("iphoneCalendarAdds", () => {
+	const at = (minute: number, events: object[] = []) =>
+		phoneCalendarText({ calendars: [{ title: "Work", calendarId: "w", account: "max@company.ru" }], events: events as never, fromMs: 0, toMs: 1, exportedAtMs: new Date(2026, 10, 4, 9, minute).getTime(), device: "iPhone" });
+	const now = (minute: number) => new Date(2026, 10, 4, 9, minute).getTime();
+
+	it("the same calendars are not written again within ten minutes of the last write", () => {
+		expect(iphoneCalendarAdds(at(5), at(0), now(5))).toBe(false);
+		expect(iphoneCalendarAdds(at(9), at(0), now(9))).toBe(false);
+	});
+
+	it("are written again once ten minutes have passed: the file says they are still fresh", () => {
+		expect(iphoneCalendarAdds(at(10), at(0), now(10))).toBe(true);
+	});
+
+	it("a change is written at once", () => {
+		const standup = { id: "s", title: "Standup", startMs: now(30), endMs: now(45), allDay: false, calendarId: "w" };
+		expect(iphoneCalendarAdds(at(1, [standup]), at(0), now(1))).toBe(true);
+	});
+
+	it("no file, or one that does not read, is written", () => {
+		expect(iphoneCalendarAdds(at(1), null, now(1))).toBe(true);
+		expect(iphoneCalendarAdds(at(1), "kept", now(1))).toBe(true);
+		expect(iphoneCalendarAdds(at(1), JSON.stringify({ device: "iPhone" }), now(1))).toBe(true);
 	});
 });

@@ -1893,6 +1893,33 @@ ${e.calendar}`;
       })
     });
   }
+  var IPHONE_FRESH_MS = 10 * 6e4;
+  function iphoneCalendarAdds(next, last, nowMs) {
+    const before = parsedObject(last);
+    const after = parsedObject(next);
+    if (before === null || after === null || typeof before.exportedAt !== "string") return true;
+    const written = isoMoment(before.exportedAt).getTime();
+    if (Number.isNaN(written) || nowMs - written >= IPHONE_FRESH_MS) return true;
+    return !sameJson(withoutExportedAt(before), withoutExportedAt(after));
+  }
+  function parsedObject(text) {
+    if (text === null) return null;
+    try {
+      const value = JSON.parse(text);
+      return typeof value === "object" && value !== null && !Array.isArray(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  function withoutExportedAt({ exportedAt: _, ...rest }) {
+    return rest;
+  }
+  function sameJson(a, b) {
+    if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => sameJson(v, b[i]));
+    if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson(a[k], b[k]));
+  }
 
   // src/domain/RepeatDraft.ts
   var KINDS = ["schedule", "afterDone"];
@@ -2311,6 +2338,17 @@ ${key.title}`.toLowerCase();
       return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS4;
     }
   };
+
+  // src/application/captureTitle.ts
+  function captureTitle({ typed: typed2, recording, tag }) {
+    const parts = [typed2.trim()].filter((p) => p !== "");
+    if (recording !== null) {
+      parts.push(`[[${recording}]]`);
+      const name = tag.trim().replace(/^#+/, "");
+      if (name !== "") parts.push(`#${name}`);
+    }
+    return parts.join(" ");
+  }
 
   // src/application/cardDue.ts
   function cardDue(item, day) {
@@ -5110,6 +5148,7 @@ ${key.title}`.toLowerCase();
       c.saveSettings(calendarDay(c).shownChange(account, title, shown));
     },
     files: (c) => calendarFiles(c),
+    sources: (c) => CALENDAR_SOURCES.map((source) => ({ source, path: calendarPath(source, c.settings) })),
     meetings: (c, [fromMs, toMs]) => meetings(c, fromMs, toMs)
   };
   function calendarFiles(c) {
@@ -5183,11 +5222,14 @@ ${key.title}`.toLowerCase();
     silence: (c, [id]) => onReminder(c, id, (key) => c.rules.setReminder(key, "none")),
     snooze: (c, [id, minutes]) => onReminder(c, id, (key) => c.rules.snooze(key, minutes))
   };
+  var CAPTURE_LISTS = ["inbox", "now", "soon", "backlog"];
   var CAPTURE = {
-    add: (c, [list, title]) => {
-      if (title.trim() === "") throw new DoorError("blank", "the task has no title");
+    add: (c, [list, typed2, recording, tag]) => {
+      const title = captureTitle({ typed: typed2, recording: recording ?? null, tag: tag ?? "" });
+      if (title === "") throw new DoorError("blank", "the task has no title");
       c.write(c.rules.change(c.tasks(), c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
-    }
+    },
+    lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] }))
   };
   var HISTORY = {
     undo: (c) => c.undo("undo"),
@@ -5370,6 +5412,7 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/PhoneDoor.ts
+  var SETTINGS_FILE = ".obsidian/plugins/task-calendar/data.json";
   var STALE = { changed: false, reason: "stale" };
   function answerOf(method, args, context) {
     return JSON.parse(callDoorJson(method, JSON.stringify(args), JSON.stringify(context)));
@@ -5431,6 +5474,10 @@ ${key.title}`.toLowerCase();
     tasksFile(settingsJson) {
       return tasksFilePath(settingsOf(settingsJson));
     },
+    /** The plugin's settings, `data.json`, by path from the vault folder: what `settings` in a call's context is read from. */
+    settingsFile() {
+      return SETTINGS_FILE;
+    },
     /** Where the iOS app writes the phone's calendars, by path from the vault folder. */
     iphoneCalendarFile() {
       return IPHONE_CALENDAR_FILE;
@@ -5438,6 +5485,10 @@ ${key.title}`.toLowerCase();
     /** `iphoneCalendarFile`'s text for the phone's calendars and events (`PhoneExport`, as JSON), in the format every writer of the calendars uses. */
     iphoneCalendarText(exportJson) {
       return phoneCalendarText(JSON.parse(exportJson));
+    },
+    /** Whether the phone's calendars as `iphoneCalendarText` wrote them now are worth writing over the file as it is (`null`: none). */
+    iphoneCalendarAdds(newText, oldText, nowMs) {
+      return iphoneCalendarAdds(newText, oldText, nowMs);
     },
     /** A task is one line: a line break in its title reads as one space, as the plugin writes it. */
     oneLine(text) {

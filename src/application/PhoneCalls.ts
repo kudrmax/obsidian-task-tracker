@@ -14,6 +14,7 @@ import { samePlacement } from "../domain/operations";
 import { sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
 import { CalendarDay, type CalendarReading } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
+import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
 import {
 	type CalendarEvent,
@@ -467,6 +468,7 @@ const CALENDARS: Readonly<Record<string, Handler>> = {
 		c.saveSettings(calendarDay(c).shownChange(account as string, title as string, shown as boolean));
 	},
 	files: (c) => calendarFiles(c),
+	sources: (c) => CALENDAR_SOURCES.map((source) => ({ source, path: calendarPath(source, c.settings) })),
 	meetings: (c, [fromMs, toMs]) => meetings(c, fromMs as number, toMs as number),
 };
 
@@ -483,7 +485,7 @@ function meetings(c: Call, fromMs: number, toMs: number): WireMeeting[] {
 }
 
 /** The door's own calendar calls for the phone, beside CalendarService's. */
-const PHONE_CALENDAR_METHODS: readonly string[] = ["files", "meetings"];
+const PHONE_CALENDAR_METHODS: readonly string[] = ["files", "sources", "meetings"];
 
 /** The CalendarService methods the door leaves to the host: it fetches, polls and watches the files, and calls `events` again. */
 export const HOST_CALENDAR_METHODS: readonly string[] = ["onChange", "keepFresh"];
@@ -571,15 +573,21 @@ const REMINDERS: Readonly<Record<string, Handler>> = {
 	snooze: (c, [id, minutes]) => onReminder(c, id as string, (key) => c.rules.snooze(key, minutes as number)),
 };
 
+/** The lists the phone's new task screen offers, in its order: Inbox first, where a task told to Siri goes. */
+const CAPTURE_LISTS: readonly GroupedList[] = ["inbox", "now", "soon", "backlog"];
+
 /**
- * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it. A blank title is `blank`; a
- * title of only a priority is written, unlike the plugin's `createInPlace`: the phone's capture writes what it was told.
+ * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it: the words typed, then the
+ * recording's link and its tag (`captureTitle`). Nothing of either is `blank`; a title of only a priority is written,
+ * unlike the plugin's `createInPlace`: the phone's capture writes what it was told.
  */
 const CAPTURE: Readonly<Record<string, Handler>> = {
-	add: (c, [list, title]) => {
-		if ((title as string).trim() === "") throw new DoorError("blank", "the task has no title");
-		c.write(c.rules.change(c.tasks(), c.rules.placeNew(title as string, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
+	add: (c, [list, typed, recording, tag]) => {
+		const title = captureTitle({ typed: typed as string, recording: (recording ?? null) as string | null, tag: (tag ?? "") as string });
+		if (title === "") throw new DoorError("blank", "the task has no title");
+		c.write(c.rules.change(c.tasks(), c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
 	},
+	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };
 
 const HISTORY: Readonly<Record<string, Handler>> = {

@@ -34,10 +34,23 @@ public enum ActionResult: Equatable, Sendable {
     case stale
 }
 
-/// Which file of the vault holds the tasks, by the plugin's settings.
+/// Which files of the vault hold the tasks and the plugin's settings.
 public protocol TasksFileRule: Sendable {
     /// The tasks file by path from the vault folder; `nil` when the settings name none.
     func tasksFile(settingsJSON: String) throws -> String?
+    /// The plugin's `data.json`, by path from the vault folder.
+    func settingsFile() throws -> String
+}
+
+/// A calendar's file in the vault: `source` is the key its text goes under in `meetings`.
+public struct CalendarFile: Equatable, Sendable {
+    public let source: String
+    public let path: String
+
+    public init(source: String, path: String) {
+        self.source = source
+        self.path = path
+    }
 }
 
 /// The plugin's rules for the tasks file.
@@ -47,16 +60,18 @@ public protocol TaskRules: TasksFileRule {
     func snooze(id: String, minutes: Int, text: String, settingsJSON: String, now: Date) throws -> ActionResult
     /// The task keeps its time and stops reminding.
     func silence(id: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
-    /// The calendars' files in the vault, by path from its folder: the same the plugin's calendar reads.
-    func calendarFiles(settingsJSON: String) throws -> [String]
-    /// The meetings with a time in those files (`texts` in their order, `nil` for one missing) that overlap `from`–`to`.
-    func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date, now: Date) throws -> [CalendarEvent]
-    /// A new task last in `list`.
-    func capture(list: CaptureList, title: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
-    /// The lists a new task is written into.
-    func captureLists() throws -> [CaptureList]
+    /// The calendars' files in the vault: the same the plugin's calendar reads.
+    func calendarFiles(settingsJSON: String) throws -> [CalendarFile]
+    /// The meetings with a time in those files (their texts by `CalendarFile.source`, a missing one left out) that overlap `from`–`to`.
+    func meetings(settingsJSON: String, calendars: [String: String], from: Date, to: Date, now: Date) throws -> [CalendarEvent]
+    /// A new task last in its list.
+    func capture(_ task: CaptureTask, text: String, settingsJSON: String, now: Date) throws -> CaptureWrite
+    /// The lists a new task is written into, in the order the new task screen offers them: the first is where Siri's goes.
+    func captureLists(settingsJSON: String) throws -> [CaptureList]
     /// Where the phone's calendars go in the vault, by path from its folder.
     func iphoneCalendarFile() throws -> String
     /// That file's text for the phone's calendars, in the format every writer of the plugin's calendar files uses.
     func iphoneCalendarText(_ export: PhoneExport) throws -> String
+    /// `new` is worth writing over `old`, the file as it is (`nil`: none).
+    func iphoneCalendarAdds(_ new: String, over old: String?, now: Date) throws -> Bool
 }
