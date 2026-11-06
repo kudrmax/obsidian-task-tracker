@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type DropColumn, type EntrySpot, type EntryState, type ListCard, type NewTaskPlace, QuickEntrySession, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type WriteLine } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
+import { SHOWN_LISTS as SHOWN } from "../../src/ui/screens";
 import { onDay } from "../fakes/itemOnDay";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
@@ -150,7 +151,7 @@ class FakeTasks {
 				sectioned: () => this.sectioned,
 				day: () => this.day,
 				today: () => DAY,
-				mode: () => this.mode,
+				shown: () => SHOWN[this.mode],
 				fresh: async (beforeShow) => {
 					await this.gate;
 					if (this.failingReads.has(++this.reads)) throw new Error("no read");

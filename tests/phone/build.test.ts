@@ -14,6 +14,12 @@ interface Phone {
 	calendarFiles(settingsJson: string): string[];
 	meetings(settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number, nowMs: number): { title: string; startMs: number; endMs: number }[];
 	capture(text: string, settingsJson: string, list: string, title: string, nowMs: number): { changed: boolean; text?: string };
+	call(method: string, argsJson: string, contextJson: string): string;
+	methods(): string[];
+	tasksFile(settingsJson: string): string | null;
+	iphoneCalendarFile(): string;
+	iphoneCalendarText(exportJson: string): string;
+	oneLine(text: string): string;
 }
 
 describe(BUNDLE, () => {
@@ -30,7 +36,7 @@ describe(BUNDLE, () => {
 		const sandbox: { TaskCalendarPhone?: Phone } = {};
 		runInNewContext(committed, sandbox);
 		const phone = sandbox.TaskCalendarPhone!;
-		expect(Object.keys(phone).sort()).toEqual(["calendarFiles", "capture", "complete", "meetings", "reminders", "silence", "snooze"]);
+		expect(Object.keys(phone).sort()).toEqual(["calendarFiles", "call", "capture", "complete", "iphoneCalendarFile", "iphoneCalendarText", "meetings", "methods", "oneLine", "reminders", "silence", "snooze", "tasksFile"]);
 		const line = "- [ ] A 🚨 2026-11-04 10:00";
 		const text = `## Now\n\n${line}\n`;
 		const now = new Date(2026, 10, 4, 9).getTime();
@@ -54,5 +60,57 @@ describe(BUNDLE, () => {
 		const now = new Date(2026, 10, 4, 9).getTime();
 		const written = sandbox.TaskCalendarPhone!.capture("## Inbox\n\n## Now\n", "", "inbox", "Купить\r\nмолоко\u2028и хлеб", now).text!;
 		expect(written).toMatch(/## Inbox\n+- \[ \] Купить молоко и хлеб\n/);
+	});
+
+	it("answers every service call through one door, in JSON: a read, a write with the text to write back, an error by its code", () => {
+		const sandbox: { TaskCalendarPhone?: Phone } = {};
+		runInNewContext(committed, sandbox);
+		const phone = sandbox.TaskCalendarPhone!;
+		const now = new Date(2026, 10, 4, 9).getTime();
+		const context = (tasks: string | null) => JSON.stringify({ tasks, settings: "", nowMs: now });
+		const text = "## Now\n\n- [ ] A\n";
+		const screen = JSON.parse(phone.call("tasks.screen", '["2026-11-04"]', context(text)));
+		expect(screen).toMatchObject({ ok: true, result: { day: { list: [{ text: "A" }] }, missing: false } });
+		expect(screen.tasks).toBeUndefined();
+		const key = screen.result.day.list[0].key;
+		const done = JSON.parse(phone.call("tasks.setStatus", JSON.stringify([key, "done"]), context(text)));
+		expect(done).toMatchObject({ ok: true, result: null, step: true, tasks: expect.stringContaining("- [x] A") });
+		expect(JSON.parse(phone.call("tasks.setStatus", JSON.stringify([key, "done"]), context(null)))).toMatchObject({ ok: false, error: { code: "tasksFileMissing" } });
+		expect(JSON.parse(phone.call("tasks.nothing", "[]", context(text)))).toMatchObject({ ok: false, error: { code: "unknownMethod" } });
+		expect(phone.methods()).toContain("entry.enter");
+	});
+
+	it("says where the host's files are, writes the phone's calendars and keeps a title on one line", () => {
+		const sandbox: { TaskCalendarPhone?: Phone } = {};
+		runInNewContext(committed, sandbox);
+		const phone = sandbox.TaskCalendarPhone!;
+		expect(phone.tasksFile("")).toBe("TODOs Tasks.md");
+		expect(phone.tasksFile(JSON.stringify({ tasksFile: "Work/Tasks.md" }))).toBe("Work/Tasks.md");
+		expect(phone.tasksFile(JSON.stringify({ tasksFile: " " }))).toBeNull();
+		expect(phone.iphoneCalendarFile()).toBe("calendar/iphone.json");
+		const at = (h: number) => new Date(Date.UTC(2026, 10, 4, h)).getTime();
+		const file = JSON.parse(
+			phone.iphoneCalendarText(
+				JSON.stringify({
+					calendars: [{ title: "Personal", calendarId: "ek-p", account: "Gmail", color: "#FF0000", sourceId: "s1" }],
+					events: [{ id: "e", title: "Lunch", startMs: at(12), endMs: at(13), allDay: false, calendarId: "ek-p" }],
+					fromMs: at(0),
+					toMs: at(24),
+					exportedAtMs: at(8),
+					device: "iPhone",
+					validUntilMs: null,
+				}),
+			),
+		);
+		expect(file).toEqual({
+			exportedAt: "2026-11-04T08:00:00.000Z",
+			device: "iPhone",
+			from: "2026-11-04T00:00:00.000Z",
+			to: "2026-11-05T00:00:00.000Z",
+			validUntil: null,
+			calendars: [{ calendar: "Personal", calendarId: "ek-p", account: "Gmail", color: "#FF0000", sourceId: "s1" }],
+			events: [{ id: "e", title: "Lunch", start: "2026-11-04T12:00:00.000Z", end: "2026-11-04T13:00:00.000Z", allDay: false, calendar: "Personal", calendarId: "ek-p", account: "Gmail", color: "#FF0000" }],
+		});
+		expect(phone.oneLine("Купить\r\nмолоко")).toBe("Купить молоко");
 	});
 });

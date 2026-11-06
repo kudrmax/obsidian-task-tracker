@@ -57,8 +57,9 @@ export class TaskReminders {
 	 */
 	act(text: string, line: string, action: (key: TaskKey) => Operation): string | null {
 		const at = this.rules.moment();
-		const found = this.find(this.rules.read(text, at).doc, line);
-		if (found) return this.rules.change(text, action(found), at).text;
+		const { doc } = this.rules.read(text, at);
+		const found = this.find(doc, line);
+		if (found) return this.rules.changeOf(doc, action(found), at).text;
 		const asRead = this.find(this.rules.asRead(text, at), line);
 		return asRead ? this.rules.changeAsRead(text, action(asRead), at).text : null;
 	}

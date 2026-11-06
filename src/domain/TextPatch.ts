@@ -2,7 +2,7 @@
 const CONTEXT = 2;
 
 /** One changed block: the lines it had, the lines it has, where it stood on each side, and the lines around it. */
-interface Hunk {
+export interface Hunk {
 	readonly before: number;
 	readonly after: number;
 	readonly removed: readonly string[];
@@ -22,14 +22,23 @@ type Side = "removed" | "added";
  * there, nothing changes at all.
  */
 export class TextPatch {
-	private constructor(private readonly hunks: readonly Hunk[]) {}
+	private constructor(private readonly changes: readonly Hunk[]) {}
 
 	static between(before: string, after: string): TextPatch {
 		return new TextPatch(hunksOf(before.split("\n"), after.split("\n")));
 	}
 
+	/** The patch as plain data, for a host that keeps the steps itself; `TextPatch.of` reads it back. */
+	get hunks(): readonly Hunk[] {
+		return this.changes;
+	}
+
+	static of(hunks: readonly Hunk[]): TextPatch {
+		return new TextPatch(hunks);
+	}
+
 	get empty(): boolean {
-		return this.hunks.length === 0;
+		return this.changes.length === 0;
 	}
 
 	/** `current` with the change taken back, or null when a changed block is no longer to be found. */
@@ -45,10 +54,10 @@ export class TextPatch {
 	private swap(current: string, from: Side, to: Side): string | null {
 		const lines = current.split("\n");
 		const shift = (hunk: Hunk) => (from === "added" ? hunk.after : hunk.before);
-		const places = this.hunks.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
-		if (places.some((place, i) => place === null || (i > 0 && place <= places[i - 1]! + this.hunks[i - 1][from].length - 1))) return null;
-		for (let i = this.hunks.length - 1; i >= 0; i--) {
-			const hunk = this.hunks[i];
+		const places = this.changes.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
+		if (places.some((place, i) => place === null || (i > 0 && place <= places[i - 1]! + this.changes[i - 1][from].length - 1))) return null;
+		for (let i = this.changes.length - 1; i >= 0; i--) {
+			const hunk = this.changes[i];
 			lines.splice(places[i]!, hunk[from].length, ...hunk[to]);
 		}
 		return lines.join("\n");

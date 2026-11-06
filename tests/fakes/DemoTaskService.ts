@@ -1,7 +1,7 @@
 import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
-import { runDrop } from "../../src/application/drops";
+import { dropMoves } from "../../src/application/drops";
 import { fullTree } from "../../src/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
@@ -612,8 +612,32 @@ export class DemoTaskService implements TaskService {
 
 	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
 		const moved = tasks.map((t) => this.taskOf(t.key));
-		await runDrop(this, tasks, to, day);
+		await this.move(tasks, to, day);
 		return moved.flatMap((t) => this.keyOf(t) ?? []);
+	}
+
+	private move(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		const moves = dropMoves(tasks, to, day);
+		if (moves.kind === "many") return this.applyAll();
+		const { key, move } = moves;
+		switch (move.kind) {
+			case "toTime":
+				return this.toTime(key, move.from, move.start, move.day);
+			case "clearSlot":
+				return this.clearSlot(key, move.place);
+			case "moveToGroup":
+				return this.moveToGroup();
+			case "nest":
+				return this.nest();
+			case "moveBefore":
+				return this.moveBefore(key, move.before, move.date);
+			case "moveToList":
+				return this.moveToList(key, move.date);
+			case "moveToSoon":
+				return this.moveToSoon(key, move.date);
+			case "moveToEnd":
+				return this.moveToEnd(key, move.section);
+		}
 	}
 
 	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {

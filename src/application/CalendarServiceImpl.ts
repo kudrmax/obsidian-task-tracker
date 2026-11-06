@@ -1,8 +1,6 @@
-import { dayRelation, type DayRelation } from "../domain/Days";
-import { localDateOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
-import { type CalendarKey, keyText } from "./calendarChoice";
+import { CalendarDay, type CalendarReading } from "./calendarDay";
 import type { CalendarFile } from "./calendarFile";
 import type {
 	CalendarEvent,
@@ -14,20 +12,13 @@ import type {
 	EventsReason,
 	PolledScreen,
 	ShownCalendar,
-	SourceKind,
 	SourceProblem,
-	SourceStatus,
 	WorkCalendarSetup,
 } from "./contracts";
 import { type EventFeed, type EventFile, SourceProblemError } from "./EventSource";
 import type { Clock, SettingsStore, Timers } from "./ports";
-import { ShownCalendars } from "./shownCalendars";
-
-/** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
-const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", iphone: "exported", work: "exported" };
 
 const SECOND_MS = 1000;
-const MINUTE_MS = 60_000;
 /** A feed silent this long counts as failed: its file keeps what it had, and the next refresh asks afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
 
@@ -59,13 +50,11 @@ export class CalendarServiceImpl implements CalendarService {
 
 	async known(): Promise<readonly ShownCalendar[]> {
 		await this.readFiles();
-		const hidden = new Set(this.hidden().map(keyText));
-		return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, accountName: c.accountName, name: c.name, color: c.color, shown: !hidden.has(keyText(c.key)) }));
+		return this.day().known();
 	}
 
 	async setShown(account: string, title: string, shown: boolean): Promise<void> {
-		const others = this.hidden().filter((k) => k.account !== account || k.title !== title);
-		await this.settings.update({ hiddenCalendars: shown ? others : [...others, { account, title }], calendarsMigrated: true });
+		await this.settings.update(this.day().shownChange(account, title, shown));
 	}
 
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
@@ -76,7 +65,7 @@ export class CalendarServiceImpl implements CalendarService {
 	}
 
 	isPast(event: CalendarEvent): boolean {
-		return event.end.getTime() <= this.clock.now().getTime();
+		return this.day().isPast(event);
 	}
 
 	keepFresh(screen: PolledScreen): CalendarPoll {
@@ -150,18 +139,19 @@ export class CalendarServiceImpl implements CalendarService {
 
 	/** Once, on the phone, when both Google's and the phone's files are there: the old choice becomes the list of hidden calendars. */
 	private async carryOver(): Promise<void> {
-		const google = this.lastRead.get("google");
-		const withIds = google !== undefined && google.calendars.some((c) => c.calendarId !== null);
-		if (this.settings.get().calendarsMigrated || !this.migration.canMigrate() || !withIds || !this.lastRead.has("iphone")) return;
-		await this.settings.update({ hiddenCalendars: this.hidden(), calendarsMigrated: true });
+		const carried = this.day().carryOver(this.migration.canMigrate());
+		if (carried) await this.settings.update(carried);
 	}
 
-	private shown(): ShownCalendars {
-		return new ShownCalendars(this.lastRead, this.settings.get(), this.clock.now());
-	}
-
-	private hidden(): CalendarKey[] {
-		return this.shown().hidden();
+	/** The calendars' rules over the files as last read, at the clock's moment. */
+	private day(): CalendarDay {
+		const reading: CalendarReading = {
+			sources: this.files.map((f) => f.name),
+			files: this.lastRead,
+			problem: (source) => this.fileProblems.get(source) ?? this.feedProblems.get(source) ?? null,
+			fed: (source) => this.feeds.some((f) => f.name === source),
+		};
+		return new CalendarDay(reading, this.settings.get(), this.clock.now());
 	}
 
 	private answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
@@ -175,42 +165,6 @@ export class CalendarServiceImpl implements CalendarService {
 	}
 
 	private dayOf(date: LocalDate): DayEvents {
-		const chosen = this.shown().days().day(date);
-		const events = chosen.events;
-		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
-		return {
-			events,
-			allDay: events.filter((e) => e.allDay),
-			timed: events.filter((e) => !e.allDay),
-			statuses: this.files.map((f) => this.status(f.name, shown(f.name))),
-			stale: chosen.stale,
-		};
-	}
-
-	private status(source: CalendarSource, shown: number): SourceStatus {
-		const problem = this.fileProblems.get(source) ?? this.feedProblems.get(source) ?? null;
-		const file = this.lastRead.get(source);
-		const updatedAt = file?.exportedAt ?? null;
-		const fed = this.feeds.some((f) => f.name === source);
-		return {
-			source,
-			kind: KINDS[source],
-			problem,
-			events: shown,
-			updatedAt,
-			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
-			detail: fed ? null : (file?.device ?? null),
-			stale: problem !== null || this.isOld(updatedAt),
-		};
-	}
-
-	/** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
-	private relationOf(at: Date): DayRelation {
-		return dayRelation(localDateOf(at), localDateOf(this.clock.now()));
-	}
-
-	private isOld(updatedAt: Date | null): boolean {
-		if (updatedAt === null) return true;
-		return this.clock.now().getTime() - updatedAt.getTime() > this.settings.get().staleAfterMinutes * MINUTE_MS;
+		return this.day().events(date);
 	}
 }

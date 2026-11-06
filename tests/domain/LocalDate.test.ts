@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, addMonths, weekdayOf, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../src/domain/LocalDate";
+import { addDays, addMonths, daysInMonth, weekdayOf, isValidLocalDate, localDateOf, minutesToHHMM, parseHHMM } from "../../src/domain/LocalDate";
 
 describe("LocalDate", () => {
 	it("formats the machine's local date", () => {
@@ -25,6 +25,22 @@ describe("LocalDate", () => {
 		expect(isValidLocalDate("2026-13-40")).toBe(false);
 		expect(isValidLocalDate("2026-02-29")).toBe(false);
 		expect(isValidLocalDate("2026-1-5")).toBe(false);
+	});
+
+	it("validates every day of four centuries as the calendar has it, without a Date", () => {
+		const viaDate = (s: string) => {
+			const [y, m, d] = s.split("-").map(Number);
+			return new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10) === s;
+		};
+		const pad = (n: number) => String(n).padStart(2, "0");
+		for (const year of [1000, 1900, 1999, 2000, 2024, 2026, 2100, 2400, 9999])
+			for (let month = 0; month <= 13; month++)
+				for (let day = 0; day <= 32; day++) {
+					const s = `${year}-${pad(month)}-${pad(day)}`;
+					expect([s, isValidLocalDate(s)]).toEqual([s, viaDate(s)]);
+				}
+		expect(isValidLocalDate("0999-01-01")).toBe(false);
+		expect([daysInMonth(2024, 2), daysInMonth(1900, 2), daysInMonth(2000, 2), daysInMonth(2026, 13), daysInMonth(2026, 0)]).toEqual([29, 28, 29, 31, 31]);
 	});
 
 	it("parses HH:MM", () => {
