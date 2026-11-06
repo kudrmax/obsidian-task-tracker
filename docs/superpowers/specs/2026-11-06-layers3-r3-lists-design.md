@@ -19,8 +19,8 @@ noted.
    `sameSlot` moves to `domain/Task.ts` and is re-exported. The timeline draws `DayView.slotted` as given.
    `DayEvents` carries `allDay` and `timed` beside `events`; the all-day rows and the timeline draw them.
    `SearchWindow` no longer trims the query: the service finds nothing for spaces; "No tasks found" shows once
-   anything is typed. `SourceStatus.updatedDay: DayRelation | null`: how the last update's day stands to today, by the
-   day's start hour (the wording stays in the UI). `listName` takes any `SectionKey`: the Done header and the search
+   anything is typed. `SourceStatus.updatedDay: DayRelation | null`: how the last update's calendar date stands to the
+   clock's — a timestamp's today and yesterday are calendar days, not the plugin's day (the wording stays in the UI). `listName` takes any `SectionKey`: the Done header and the search
    group headers ask it.
 5. **Timeline drop.** `DropTo` `{ kind: "time", start }` replaces `{ kind: "slot", slot }`: the drop gives the snapped
    start minute of the shown day; the service clamps it into the day and derives the duration (a card from the
@@ -34,7 +34,5 @@ noted.
 
 ## Behaviour changes
 
-- A source updated after midnight but before the day's start hour reads «today» (it is the plugin's today), where it
-  read «yesterday» by the wall clock.
 - A search of only spaces shows «No tasks found» instead of an empty window.
 - A reveal whose unfolding finds the task changed reports it and stops, instead of moving the screen to a stale place.

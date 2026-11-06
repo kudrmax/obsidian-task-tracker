@@ -810,7 +810,7 @@ export interface SourceStatus {
 	readonly events: number;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
-	/** How the day of `updatedAt` stands to today, by the hour the day starts at; null with no `updatedAt`. The words are the frontend's. */
+	/** How the calendar date of `updatedAt` stands to the clock's (calendar days, not the plugin's day); null with no `updatedAt`. The words are the frontend's. */
 	readonly updatedDay: DayRelation | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;

@@ -107,7 +107,7 @@ describe("CalendarServiceImpl", () => {
 		expect(day.statuses[0]).toMatchObject({ problem: null, events: 3 });
 	});
 
-	it("says how the day of a source's last update stands to today, by the hour the day starts at", async () => {
+	it("says how the calendar date of a source's last update stands to the clock's, whatever hour the day starts at", async () => {
 		const day = async (written: Date, now: Date, dayStartHour: number) => {
 			const google = new FakeFile("google");
 			google.exportedAt = written;
@@ -115,7 +115,8 @@ describe("CalendarServiceImpl", () => {
 		};
 		expect(await day(new Date(2026, 9, 30, 8), new Date(2026, 9, 30, 9), 0)).toBe("today");
 		expect(await day(new Date(2026, 9, 29, 23), new Date(2026, 9, 30, 1), 0)).toBe("yesterday");
-		expect(await day(new Date(2026, 9, 29, 23), new Date(2026, 9, 30, 1), 4)).toBe("today");
+		expect(await day(new Date(2026, 9, 29, 23), new Date(2026, 9, 30, 1), 4)).toBe("yesterday");
+		expect(await day(new Date(2026, 9, 30, 2, 21), new Date(2026, 9, 30, 16), 5)).toBe("today");
 		expect(await day(new Date(2026, 9, 20, 8), new Date(2026, 9, 30, 9), 0)).toBe("other");
 	});
 

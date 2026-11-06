@@ -1,4 +1,5 @@
 import { dayRelation, type DayRelation } from "../domain/Days";
+import { localDateOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
 import { type CalendarKey, keyText } from "./calendarChoice";
@@ -19,7 +20,6 @@ import type {
 	WorkCalendarSetup,
 } from "./contracts";
 import { type EventFeed, type EventFile, SourceProblemError } from "./EventSource";
-import { boundaryOf } from "./documentText";
 import type { Clock, SettingsStore, Timers } from "./ports";
 import { ShownCalendars } from "./shownCalendars";
 
@@ -204,10 +204,9 @@ export class CalendarServiceImpl implements CalendarService {
 		};
 	}
 
-	/** How the day `at` falls on stands to today, both by the hour the day starts at. */
+	/** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
 	private relationOf(at: Date): DayRelation {
-		const boundary = boundaryOf(this.settings.get());
-		return dayRelation(boundary.dayOf(at), boundary.dayOf(this.clock.now()));
+		return dayRelation(localDateOf(at), localDateOf(this.clock.now()));
 	}
 
 	private isOld(updatedAt: Date | null): boolean {
