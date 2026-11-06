@@ -415,6 +415,16 @@ describe("the settings tab: the calendars shown", () => {
 		expect(rows("Календарь")).toHaveLength(1);
 	});
 
+	it("lays the calendars out as rows of the page, so the next heading keeps its space", async () => {
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		await open();
+		page("Calendars");
+		await settled();
+		expect(rows("Календарь")[0].parentElement).toBe(rows("Google Calendar")[0].parentElement);
+		expect(rows("Calendars shown")[0].nextElementSibling).toBe(rows("max@company.ru")[0]);
+		expect(rows("Календарь")[0].nextElementSibling).toBe(rows("Google Calendar")[0]);
+	});
+
 	it("shows the calendars whether or not Google is logged in", async () => {
 		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
 		await open();

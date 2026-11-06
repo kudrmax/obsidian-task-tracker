@@ -314,11 +314,14 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		);
 	}
 
-	/** Every calendar the sources' files list, under its account: a calendar new to them is shown until switched off here. */
-	private async shownGroup(el: HTMLElement): Promise<void> {
+	/**
+	 * Every calendar the sources' files list, under its account: a calendar new to them is shown until switched off here.
+	 * The rows take the place held for them on the page, unwrapped, so the page's next heading keeps its space.
+	 */
+	private async shownGroup(place: HTMLElement): Promise<void> {
 		const calendars = await this.deps.calendars.known();
-		if (calendars.length === 0) return;
-		new Setting(el).setName("Calendars shown").setDesc("Which calendars the timeline and the iPhone's reminders show. A new calendar is shown.").setHeading();
+		const el = place.ownerDocument.createElement("div");
+		if (calendars.length > 0) new Setting(el).setName("Calendars shown").setDesc("Which calendars the timeline and the iPhone's reminders show. A new calendar is shown.").setHeading();
 		let account: string | null = null;
 		for (const calendar of calendars) {
 			if (calendar.account !== account) {
@@ -329,6 +332,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				t.setValue(calendar.shown).onChange((shown) => this.deps.calendars.setShown(calendar.account, calendar.title, shown)),
 			);
 		}
+		place.replaceWith(...el.children);
 	}
 
 	private workGroup(el: HTMLElement): void {
