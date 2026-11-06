@@ -33,7 +33,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    device, folded it shows how many tasks it holds — and an arrow button beside the title opens the project note), then
    «No project», always last. Inside a group, the project's tasks without a section, then its sections in the file's
    order. Off, the list is as today, project tasks with the mark. Projects never go inside sections. Board:
-   `docs/design/canvas/Proj1.dc.html`. Which lists have it: open. Any overview of projects later (projects without a next
+   `docs/design/canvas/Proj1.dc.html`. Backlog and Soon have it (on by default in Backlog, off in Soon,
+   switched per list and kept on the device); Inbox, Now and the day columns never group by project. Any overview of projects later (projects without a next
    step) is a view of these groups, never a screen of its own.
    - **The file does not change.** A section is one `### Name` for every project: with grouping on, «Дальний бэклог»
      shows inside each project that has tasks in it, and inside «No project»; off, it is one section with all of them.
@@ -68,7 +69,9 @@ fixed that but made lines travel between files. One file wins.
 
 ## Open (technical, for the backend)
 
-- Which lists can be grouped by project, and whether grouping is on by default (being decided with Max).
+- Where the switch of grouping is: board.
+- The project note's live block: what it holds, how it looks, the order rule (proposed: a move or a new task goes next
+  to the visible neighbour, as in the grouped view).
 
 ## Ideas for later
 
