@@ -1,12 +1,12 @@
 import type { EntryPart } from "./EntryPart";
-import { type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
 import { Panel, Picks } from "../kit/Panel";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
-import { placeLabel } from "../placeLabel";
+import { dayMonth } from "../dates";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
@@ -47,6 +47,8 @@ export interface QuickBarDeps {
 	/** The labels that tag tasks, which the same panel offers under the levels. */
 	labels(): readonly LabelLevel[];
 	today(): LocalDate;
+	/** The name a list goes by, as the user named its section. */
+	listName(list: GroupedList): string;
 	/** The placement of a task for a day picked: Now for today, else that day. */
 	placementOfDay(day: LocalDate): Placement;
 	onIndent(delta: 1 | -1): void;
@@ -78,14 +80,7 @@ type BarPosition = Partial<Record<"left" | "top" | "width" | "bottom", string>>;
 
 const POSITION = ["left", "top", "width", "bottom"] as const;
 
-type FixedPlace = "inbox" | "backlog" | "soon" | "now";
-
-const FIXED_PLACES: readonly { readonly kind: FixedPlace; readonly label: string }[] = [
-	{ kind: "inbox", label: "Inbox" },
-	{ kind: "backlog", label: "Backlog" },
-	{ kind: "soon", label: "Soon" },
-	{ kind: "now", label: "Now" },
-];
+const FIXED_PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
 
 const GLIDING = "is-gliding";
 
@@ -172,6 +167,7 @@ export class QuickBar implements EntryPart {
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
 		this.place.el.hidden = state.place === null || section;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
+		if (!this.place.el.hidden) this.fadeLongPlace();
 		if (section) this.closePanel();
 		else this.refreshPanel();
 	}
@@ -292,7 +288,13 @@ export class QuickBar implements EntryPart {
 	private showPlace(place: Placement): void {
 		this.shownPlace = place;
 		this.place.setIcon(placeIcon(place));
-		this.place.setText(placeLabel(place));
+		this.place.setText(place.kind === "date" ? dayMonth(place.date) : this.deps.listName(place.kind));
+	}
+
+	/** A section's name may be longer than the button: its end fades, as a card's title does. */
+	private fadeLongPlace(): void {
+		const label = this.place.el.querySelector<HTMLElement>(".tc-btn-label");
+		label?.classList.toggle("is-long", label.scrollWidth > label.clientWidth);
 	}
 
 	private toggle(kind: PanelKind): void {
@@ -407,10 +409,10 @@ export class QuickBar implements EntryPart {
 
 	private renderPlaces(parent: HTMLElement): void {
 		const current = this.state?.place ?? null;
-		const fixed = FIXED_PLACES.map(({ kind, label }): MenuTileSpec => {
+		const fixed = FIXED_PLACES.map((kind): MenuTileSpec => {
 			const placement: Placement = { kind };
 			const on = current?.kind === kind;
-			return { label, icon: kind, on, onPick: this.picked(() => (on ? undefined : this.deps.onPlace(placement))) };
+			return { label: this.deps.listName(kind), icon: kind, on, onPick: this.picked(() => (on ? undefined : this.deps.onPlace(placement))) };
 		});
 		const date: MenuTileSpec = {
 			label: "Date",
