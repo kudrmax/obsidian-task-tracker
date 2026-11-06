@@ -53,6 +53,11 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    right, taken to a project group (the way it is taken to any place), writes the new task in Backlog with that project's
    link.
 10. **Done stays in the file's Done**, with its link: a project's history is its done tasks with the link.
+11. **The project note shows the plugin's screen, filtered to the project** (the live block, in the first version). The
+    same columns, the wheel and every gesture as the main screen, so Max thinks the same way in the project and in the
+    plugin; only that project's tasks, without the project mark (the whole block is the project), with «No tasks» where a
+    column is empty. Everything done in it writes `TODOs Tasks.md` by the visible-neighbour rule of decision 8, and a new
+    task gets the project's link. Board: `docs/design/canvas/Proj4V2.dc.html` (chosen over the lanes-as-a-list variant).
 
 Rejected on the way: tasks written in the project notes, read from many files. It broke manual order (two files have no
 common «above»), sections shared across files and the one-file iPhone app; moving a taken task into the file and back
@@ -70,15 +75,12 @@ fixed that but made lines travel between files. One file wins.
 ## Open (technical, for the backend)
 
 - Where the switch of grouping is: board.
-- The project note's live block: what it holds, how it looks, the order rule (proposed: a move or a new task goes next
-  to the visible neighbour, as in the grouped view).
+- How the block gets into a project note.
 
 ## Ideas for later
 
 Approved by Max as directions, to be designed one by one after the core.
 
-1. **Live block in the project note.** Under the free text: what is in work now (Now, Soon with dates) and what is done.
-   The note becomes the project's control panel.
 2. **Projects without a next step.** Once a week the plugin lists the active projects with nothing in the lane: a soft
    «nothing moves on friends, take a step?», never a red «overdue». Keeps long projects from dying quietly in Backlog.
 3. **Project status in frontmatter**: active, paused, someday. A paused or someday project stays out of the weekly list.
