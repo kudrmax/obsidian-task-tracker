@@ -1,4 +1,4 @@
-import type { GroupName, TaskKey } from "./contracts";
+import type { GroupName, GroupPlace, TaskKey } from "./contracts";
 import { samePlace } from "./taskKeys";
 
 /** A card as the levels around a place see it: how deep, and the section it is drawn in (none in a list that shows none). */
@@ -77,4 +77,35 @@ export function gapOfPlace(cards: readonly ListCard[], place: ListPlace): GapPla
 	let last = cards.length - 1;
 	while (last >= 0 && cards[last].group !== group) last--;
 	return { kind: "gap", index: last >= 0 ? last + 1 : group === null ? 0 : cards.length, level: 0, group };
+}
+
+/** The same place but perhaps for its level: the same gap in the same section. */
+export function sameGap(a: GapPlace, b: GapPlace): boolean {
+	return a.index === b.index && a.group === b.group;
+}
+
+/**
+ * The gap before card `index`, the card's left edge at `level` (fractional). Its section: that of the last header the
+ * finger is past at this gap (`passed`, in their order); else the card's above it; above every card the tasks outside
+ * any section when the list shows headers (`headers`), else the first card's. The level is the nearest the neighbours allow.
+ */
+export function gapAt(cards: readonly LevelCard[], index: number, level: number, passed: readonly GroupName[], headers: boolean): GapPlace {
+	const above: GroupName = index > 0 ? cards[index - 1].group : headers ? null : (cards[0]?.group ?? null);
+	const group = passed.length > 0 ? passed[passed.length - 1] : above;
+	return fitLevel(cards, { kind: "gap", index, level: Math.round(level), group });
+}
+
+/**
+ * What letting go in `place` means (`placeOfGap`), `cards` without the lifted ones; null when it changes nothing: a card
+ * carried alone let go where it was lifted from (`home`), at its level. Several cards carried, or a new task, have no home.
+ */
+export function placeOfDrop(cards: readonly ListCard[], place: GapPlace, home: GapPlace | null): ListPlace | null {
+	if (home && sameGap(place, home) && place.level === home.level) return null;
+	return placeOfGap(cards, place);
+}
+
+/** Where section `lifted` of `groups` goes, let go at slot `slot` (before the group standing there, or past the last): before that group, or last; null at its own place. */
+export function groupPlaceOf(groups: readonly GroupName[], lifted: number, slot: number): GroupPlace | null {
+	if (slot === lifted || slot === lifted + 1) return null;
+	return slot >= groups.length ? "end" : { before: groups[slot] };
 }

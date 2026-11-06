@@ -17,7 +17,7 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			tasks: new DemoTaskService(clock, () => days.boundary()),
 			days,
 			undo: NO_UNDO,
-			calendars: new DemoCalendarService(),
+			calendars: new DemoCalendarService(clock),
 			settings: this.shownSettings(),
 			clock,
 			openInCalendar: () => undefined,

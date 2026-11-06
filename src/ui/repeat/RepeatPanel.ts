@@ -8,8 +8,8 @@ export interface RepeatPanelOptions {
 	/** What the panel offers and shows: `repeatDraft` of the task's rule from its `repeatDay`, or the quick entry's. */
 	readonly draft: RepeatDraft;
 	readonly onChange: (rule: RepeatRule) => void;
-	/** Remove repeat, at the bottom: the opener offers it for a task that has a rule. */
-	readonly onRemove: (() => void) | null;
+	/** Remove repeat, at the bottom, shown while the draft is of a rule there is already (`removable`). */
+	readonly onRemove: () => void;
 }
 
 interface Choice<T> {
@@ -71,8 +71,7 @@ class RepeatEditor {
 		Button.create(row, { kind: "icon", tone: "accent", label: "More", icon: "plus", cls: "tc-repeat-step", onPress: () => this.change({ what: "every", by: 1 }) });
 		const units = this.draft.units.map((value) => ({ value, label: UNIT_LABELS[value] }));
 		this.units = new Segments(panel, "tc-repeat-unit", "Unit", units, (to) => this.change({ what: "unit", to }));
-		const onRemove = opts.onRemove;
-		this.removeRow = onRemove ? menuRow(panel, { label: "Remove repeat", icon: "removeDue", cls: "tc-repeat-remove", onPick: () => onRemove() }) : null;
+		this.removeRow = this.draft.removable ? menuRow(panel, { label: "Remove repeat", icon: "removeDue", cls: "tc-repeat-remove", onPick: () => opts.onRemove() }) : null;
 		panel.classList.toggle("has-remove", this.removeRow !== null);
 		this.show();
 	}

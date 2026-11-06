@@ -299,8 +299,7 @@ export class TaskMenu extends LiftedMenu {
 	/** The start of the description, over the copy; a tap on it reads the whole, a link in it opens as it is. */
 	private peekOf(context: TaskMenuContext): DescriptionPeek | null {
 		const { item, markdown, actions } = context;
-		if (item.description === null || !markdown) return null;
-		return new DescriptionPeek(this.overlay, this.picks, markdown, item.description, {
+		return DescriptionPeek.open(this.overlay, this.picks, markdown ?? null, item.description, {
 			onRead: () => actions.openDescription(false),
 			onLink: () => this.close(),
 		});
@@ -462,12 +461,10 @@ export class TaskMenu extends LiftedMenu {
 				this.repeatDraft = rule;
 				this.place();
 			},
-			onRemove: item.repeat
-				? () => {
-						this.repeatDraft = null;
-						remove();
-					}
-				: null,
+			onRemove: () => {
+				this.repeatDraft = null;
+				remove();
+			},
 		});
 		this.place();
 	}

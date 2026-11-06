@@ -17,6 +17,8 @@ interface DraftState {
 	readonly dayOfMonth: number;
 	/** The day the rule is drawn from: its weekday and month's day are a new rule's, and the rule is checked anchored there. */
 	readonly day: LocalDate;
+	/** The draft is of a rule there is already: Remove repeat is offered. */
+	readonly removable: boolean;
 }
 
 /** A rule as it is being set: what may be chosen, what is chosen, and the rule that stands for it. */
@@ -72,6 +74,7 @@ export function repeatDraft(day: LocalDate, rule: RepeatRule | null): RepeatDraf
 		days: rule && rule.days.length > 0 ? rule.days : [weekdayOf(day)],
 		dayOfMonth: rule?.dayOfMonth ?? partsOf(day).day,
 		day,
+		removable: rule !== null,
 	});
 }
 

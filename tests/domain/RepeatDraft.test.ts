@@ -37,6 +37,16 @@ describe("repeatDraft", () => {
 	});
 });
 
+describe("Remove repeat", () => {
+	it("is offered for a rule there is already, through every change, and not for a new one", () => {
+		expect(repeatDraft(THURSDAY, null).removable).toBe(false);
+		const draft = repeatDraft(THURSDAY, rule({ unit: "week", days: [3] }));
+		expect(draft.removable).toBe(true);
+		expect(editRepeat(draft, { what: "unit", to: "day" })?.removable).toBe(true);
+		expect(editRepeat(repeatDraft(THURSDAY, null), { what: "unit", to: "day" })?.removable).toBe(false);
+	});
+});
+
 describe("editRepeat", () => {
 	const fresh = () => repeatDraft(THURSDAY, null);
 

@@ -1,4 +1,4 @@
-import { addDays, addMonths, gridStart, monthTitle, sameMonth, startOfMonth } from "../dates";
+import { addDays, monthAfter, gridStart, monthTitle, sameMonth, startOfMonth } from "../dates";
 import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
 import type { LocalDate } from "../types";
@@ -45,7 +45,7 @@ export class MonthPicker {
 			icon: months < 0 ? "chevronLeft" : "chevronRight",
 			cls: `tc-picker-arrow ${cls}`,
 			onPress: () => {
-				this.month = addMonths(this.month, months);
+				this.month = monthAfter(this.month, months);
 				this.render();
 			},
 		});

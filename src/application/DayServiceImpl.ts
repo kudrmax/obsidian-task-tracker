@@ -1,4 +1,6 @@
 import type { DayBoundary } from "../domain/DayBoundary";
+import { type DayRelation, dayRelation } from "../domain/Days";
+import { addDays } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import type { DayChange, DayService, TaskService } from "./contracts";
 import { boundaryOf } from "./documentText";
@@ -32,6 +34,14 @@ export class DayServiceImpl implements DayService {
 
 	boundary(): DayBoundary {
 		return boundaryOf(this.settings.get());
+	}
+
+	relation(date: LocalDate): DayRelation {
+		return dayRelation(date, this.today());
+	}
+
+	step(date: LocalDate, days: number): LocalDate {
+		return addDays(date, days);
 	}
 
 	onDayChange(listener: Listener, ready: () => boolean = () => true): () => void {

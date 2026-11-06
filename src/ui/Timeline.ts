@@ -22,6 +22,8 @@ export interface TimelineDeps {
 	/** Where a slotted task's card stands on the shown day, by the clock: the service's rule. */
 	shownSpan(item: TaskItem): TaskSpan;
 	events(): readonly CalendarEvent[];
+	/** The event is over by the clock: drawn grey (`CalendarService.isPast`). Asked at every tick. */
+	isPast(event: CalendarEvent): boolean;
 	now(): Date;
 	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
 	onResize?(): void;
@@ -340,9 +342,8 @@ export class Timeline {
 			const lift = label?.classList.contains("is-minor") ? DESIGN.minorLift : DESIGN.labelLift;
 			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) < lift + DESIGN.nowPillHeight / 2);
 		}
-		const now = this.deps.now();
 		for (const { el, event, start, end } of this.events) {
-			markPast(el, event, now);
+			markPast(el, this.deps.isPast(event));
 			el.style.setProperty(PROPERTY.y, px(this.yOf(start)));
 			el.style.setProperty(PROPERTY.length, px(this.yOf(end) - this.yOf(start)));
 			el.classList.toggle("is-tiny", itemBox(start, end, hourPx).tiny);

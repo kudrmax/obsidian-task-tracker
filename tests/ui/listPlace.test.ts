@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { placeOfGap, type TaskKey } from "../../src/application/contracts";
-import { type PlacedCard, placeAt, sameGap } from "../../src/ui/drag/listPlace";
+import { sameGap } from "../../src/application/contracts";
+import { type PlacedCard, placeAt } from "../../src/ui/drag/listPlace";
 
 const H = 35;
 const STEP = 37;

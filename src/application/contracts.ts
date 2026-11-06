@@ -4,7 +4,7 @@ import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import type { LabelLevel } from "../domain/Label";
 import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priority";
-import type { DayColumn } from "../domain/Days";
+import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
 
@@ -40,6 +40,8 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
+export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** A list in its sections, and whether it shows their headers. */
@@ -60,7 +62,7 @@ export type { Clock } from "./ports";
 /** A priority level, its colours in the order the settings offer them. */
 export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
 export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
-export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
+export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placement, TaskDraft, TaskScreen };
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the
@@ -206,6 +208,19 @@ export interface SearchHit {
 	readonly description: readonly FoundPart[] | null;
 }
 
+/** The tasks the search found in one list, the best first; the groups stand Inbox, Backlog, Soon, Now, Done, none for a list with nothing found. */
+export interface SearchGroup {
+	readonly list: SectionKey;
+	readonly hits: readonly SearchHit[];
+}
+
+/** Whose sections a column shows: Inbox's, Backlog's, Soon's, Now's for today, Soon's for a later day with that day as `date`. */
+export interface ColumnSections {
+	readonly list: GroupedList;
+	/** The later day the column shows; null for one of no day or for today. */
+	readonly date: LocalDate | null;
+}
+
 export interface DayView {
 	readonly date: LocalDate;
 	/** Left column, in file order: see spec §5. */
@@ -342,6 +357,10 @@ export interface ScreenView {
 	readonly done: readonly TaskItem[];
 	readonly sections: Readonly<Record<GroupedList, readonly ListSection[]>>;
 	readonly offer: SectionOffer;
+	/** No tasks file: every list is empty, and the frontend offers to create the file. */
+	readonly missing: boolean;
+	/** The day's events, their sources and the switch's dot are shown: not while the tasks file is missing. */
+	readonly calendars: boolean;
 }
 
 /**
@@ -369,7 +388,7 @@ export interface TaskService {
 	/** `text` with `prefix` first in place of the one it had; null takes it off. */
 	withPriority(text: string, prefix: string | null): string;
 
-	/** Everything the screen shows of the tasks for `date`, the file normalized first. Rejects with TasksFileMissingError. */
+	/** Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen that says so (`missing`). */
 	screen(date: LocalDate): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
@@ -385,9 +404,16 @@ export interface TaskService {
 	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
 	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
 	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
-	 * A query of spaces finds nothing.
+	 * A query of spaces finds nothing. Each list's finds in a group of its own.
 	 */
-	search(query: string): Promise<readonly SearchHit[]>;
+	search(query: string): Promise<readonly SearchGroup[]>;
+	/**
+	 * Where a task shows: Done, Inbox or Backlog in its list; another on the day it stands on, Soon without one. A subtask
+	 * shows under its task, so where that task does. Where that is on its screens is the frontend's.
+	 */
+	screenOf(item: TaskItem): Promise<TaskScreen>;
+	/** The task `key` names among `items` and their subtasks, at every depth; null when none is. */
+	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null;
 
 	/**
 	 * Each grouped list's groups in file order, empty sections included (empty sections spec §5). A column draws the
@@ -440,6 +466,8 @@ export interface TaskService {
 	placementOf(item: TaskItem): Placement;
 	/** What the day column stands for on `date`: today is Now with its sections, a later day Soon with that day, a past day Now with that day and no sections. */
 	dayColumn(date: LocalDate): DayColumn;
+	/** Whose sections `column` shows on `date` (sections spec §5.1): Inbox, Backlog and Soon their own; the day column `dayColumn`'s list, none for a past day. */
+	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
 	/** The name a list goes by wherever the screens name a place: its section's name in the settings. A day is named by its date. */
@@ -622,6 +650,10 @@ export interface DayService {
 	today(): LocalDate;
 	/** Where a day begins: the timeline places slots, events and now by it. */
 	boundary(): DayBoundary;
+	/** How `date` stands to today; the words for it are the frontend's. */
+	relation(date: LocalDate): DayRelation;
+	/** The day `days` after `date`, before it for a negative count: the step of the day arrows and of the screens past today. */
+	step(date: LocalDate, days: number): LocalDate;
 	/**
 	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
 	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
@@ -736,6 +768,8 @@ export interface DayEventsAsk {
 export interface CalendarService {
 	/** The day's events for `reason`: the cached ones and how to fetch them afresh. Nothing is fetched until `fresh` is called. */
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk;
+	/** The event is over by the clock now: it is drawn grey. Asked at every drawing, so it greys as it ends. */
+	isPast(event: CalendarEvent): boolean;
 	/** Fires when a source's data changed by itself (the work file arrived), so a fetch now would bring news. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 	/** Polls every refresh interval of the settings while the screen is on view, from now until `stop`. */

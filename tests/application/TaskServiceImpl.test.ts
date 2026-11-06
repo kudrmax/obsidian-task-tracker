@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DESCRIPTION_TEMPLATE, StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type SearchGroup, StaleTaskError, TasksFileMissingError } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { UndoHistory } from "../../src/application/UndoHistory";
@@ -273,6 +273,15 @@ describe("the task sheet", () => {
 
 describe("the day column and the day of a placement", () => {
 	const { svc } = setup(FULL);
+
+	it("a column's sections: Inbox, Backlog and Soon their own, the day column its day's list, none for a past day", () => {
+		expect(svc.columnSections("inbox", D)).toEqual({ list: "inbox", date: null });
+		expect(svc.columnSections("backlog", "2026-10-28")).toEqual({ list: "backlog", date: null });
+		expect(svc.columnSections("soon", T)).toEqual({ list: "soon", date: null });
+		expect(svc.columnSections("day", T)).toEqual({ list: "now", date: null });
+		expect(svc.columnSections("day", D)).toEqual({ list: "soon", date: D });
+		expect(svc.columnSections("day", "2026-10-28")).toBeNull();
+	});
 
 	it("today is Now with sections, a later day Soon with that day, a past day Now with that day and no sections", () => {
 		expect(svc.dayColumn(T)).toEqual({ list: "now", date: null, sections: true });
@@ -1204,6 +1213,9 @@ describe("empty sections", () => {
 });
 
 describe("search", () => {
+	/** The hits of every group, in the groups' order. */
+	const found = async (svc: { search(query: string): Promise<readonly SearchGroup[]> }, query: string) => (await svc.search(query)).flatMap((group) => group.hits);
+
 	const FILE = [
 		"## Inbox", "", "- [ ] Фото на паспорт", "",
 		"## Backlog", "", "- [ ] Разобрать шкаф", "",
@@ -1212,16 +1224,24 @@ describe("search", () => {
 		"## Done", "", "- [x] Оплатить госпошлину за паспорт", "",
 	].join("\n");
 
+	it("gives the finds in a group per list, Inbox, Backlog, Soon, Now, Done, none for a list with nothing found", async () => {
+		const { svc } = setup(FILE);
+		const groups = await svc.search("паспорт");
+		expect(groups.map((g) => g.list)).toEqual(["inbox", "soon", "now", "done"]);
+		expect(groups.every((g) => g.hits.every((h) => h.item.list === g.list))).toBe(true);
+		expect((await svc.search("шкаф")).map((g) => g.list)).toEqual(["backlog"]);
+	});
+
 	it("finds titles and descriptions section by section, open subtasks too", async () => {
 		const { svc } = setup(FILE);
-		const hits = await svc.search("ПАСПОРТ");
+		const hits = await found(svc, "ПАСПОРТ");
 		expect(hits.map((h) => h.item.list)).toEqual(["inbox", "soon", "soon", "now", "now", "done"]);
 		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Найти", "Записаться", "Забрать", "Читать", "Оплатить"]);
 	});
 
 	it("a found subtask is its own hit; a closed one is not found", async () => {
 		const { svc } = setup(FILE);
-		const hits = await svc.search("паспорт");
+		const hits = await found(svc, "паспорт");
 		const sub = hits.find((h) => h.item.isSubtask);
 		expect(sub?.title).toEqual([{ text: "Найти ", match: false }, { text: "паспорт", match: true }]);
 		expect(hits.some((h) => h.item.text.includes("обложку"))).toBe(false);
@@ -1229,7 +1249,7 @@ describe("search", () => {
 
 	it("a match only in the description leaves the title empty and gives the line around it", async () => {
 		const { svc } = setup(FILE);
-		const hit = (await svc.search("паспорт")).find((h) => h.item.text === "Записаться в МФЦ")!;
+		const hit = (await found(svc, "паспорт")).find((h) => h.item.text === "Записаться в МФЦ")!;
 		expect(hit.title).toEqual([]);
 		expect(hit.description).toEqual([
 			{ text: "взять старый ", match: false },
@@ -1240,21 +1260,21 @@ describe("search", () => {
 
 	it("a match in both gives both", async () => {
 		const { svc } = setup(FILE);
-		const hit = (await svc.search("паспорт")).find((h) => h.item.list === "now")!;
+		const hit = (await found(svc, "паспорт")).find((h) => h.item.list === "now")!;
 		expect(hit.title.some((p) => p.match)).toBe(true);
 		expect(hit.description?.find((p) => p.match)?.text).toBe("паспорт");
 	});
 
 	it("reads a link by what it shows and «ё» as «е»", async () => {
 		const { svc } = setup(FILE);
-		const hits = await svc.search("елочный");
+		const hits = await found(svc, "елочный");
 		expect(hits.map((h) => h.title)).toEqual([[{ text: "Читать ", match: false }, { text: "ёлочный", match: true }, { text: " паспорт", match: false }]]);
-		expect(await svc.search("Заметка")).toEqual([]);
+		expect(await found(svc, "Заметка")).toEqual([]);
 	});
 
 	it("finds the query's words in their order, each a part of a word, and the best match first", async () => {
 		const { svc } = setup(["## Inbox", "", "- [ ] Отвезти шкаф Элеоноре", "- [ ] Ответить Элине", "- [ ] Разобрать почту", ""].join("\n"));
-		const hits = await svc.search("отв эл");
+		const hits = await found(svc, "отв эл");
 		expect(hits.map((h) => h.item.text)).toEqual(["Ответить Элине", "Отвезти шкаф Элеоноре"]);
 		expect(hits[0].title).toEqual([
 			{ text: "Отв", match: true },
@@ -1266,19 +1286,19 @@ describe("search", () => {
 
 	it("a match in the title stands before one only in the description", async () => {
 		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- про паспорт", "- [ ] Сделать паспорт", ""].join("\n"));
-		expect((await svc.search("паспорт")).map((h) => h.item.text)).toEqual(["Сделать паспорт", "Позвонить"]);
+		expect((await found(svc, "паспорт")).map((h) => h.item.text)).toEqual(["Сделать паспорт", "Позвонить"]);
 	});
 
 	it("reads a description by its words, not its Markdown", async () => {
 		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- **важно** сегодня", "\t- [[Заметка|план]]", ""].join("\n"));
-		const [hit] = await svc.search("важно сегодня план");
+		const [hit] = await found(svc, "важно сегодня план");
 		expect(hit.description?.map((p) => p.text).join("")).toBe("важно сегодня план");
-		expect(await svc.search("Заметка")).toEqual([]);
+		expect(await found(svc, "Заметка")).toEqual([]);
 	});
 
 	it("a query of spaces finds nothing", async () => {
 		const { svc } = setup(FILE);
-		expect(await svc.search("   ")).toEqual([]);
+		expect(await found(svc, "   ")).toEqual([]);
 	});
 
 	it("doneView lists Done in file order", async () => {
@@ -1302,6 +1322,8 @@ describe("TaskServiceImpl.screen", () => {
 			done: await svc.doneView(),
 			sections: await svc.listSections(),
 			offer: await svc.sectionOffer(D),
+			missing: false,
+			calendars: true,
 		});
 		expect(screen.done.map((t) => t.text)).toEqual(["Finished"]);
 		expect(screen.day.list.map((t) => t.text)).toEqual(["Later"]);
@@ -1314,9 +1336,15 @@ describe("TaskServiceImpl.screen", () => {
 		expect(read).toHaveBeenCalledTimes(8);
 	});
 
-	it("rejects without a file", async () => {
+	it("without a file is the empty screen that says so, with no calendars beside it", async () => {
 		const { svc } = setup(null);
-		await expect(svc.screen(T)).rejects.toBeInstanceOf(TasksFileMissingError);
+		const screen = await svc.screen(T);
+		expect(screen.missing).toBe(true);
+		expect(screen.calendars).toBe(false);
+		expect(screen.day).toEqual({ date: T, list: [], slotted: [] });
+		expect([...screen.soon, ...screen.inbox, ...screen.backlog, ...screen.done]).toEqual([]);
+		expect(Object.values(screen.sections).flat()).toEqual([]);
+		await expect(svc.dayView(T)).rejects.toBeInstanceOf(TasksFileMissingError);
 	});
 });
 
@@ -1472,5 +1500,45 @@ describe("the full screen's task", () => {
 		expect(renamed).toMatchObject({ text: "Pack the bag", priority: { prefix: "p1" }, parentText: "Trip" });
 		expect(store.text).toContain("\t- [ ] p1 Pack the bag\n");
 		expect(renamed?.key.raw).toBe("\t- [ ] p1 Pack the bag");
+	});
+});
+
+describe("where a task shows, and a task by its key", () => {
+	const FILE = [
+		"## Inbox", "", "- [ ] I", "",
+		"## Backlog", "", "- [ ] B", "",
+		"## Soon", "", "- [ ] S", "- [ ] Later 📅 2026-11-03", "\t- [ ] Sub", "- [ ] Slotted ⏰ 2026-11-05 10:00", "",
+		"## Now", "", "- [ ] N", "",
+		"## Done", "", "- [x] X", "",
+	].join("\n");
+
+	it("Done, Inbox and Backlog in their lists; a task of Now on today, of Soon on its day, Soon without one", async () => {
+		const { svc } = setup(FILE);
+		const all = [...(await svc.inboxView()), ...(await svc.backlogView()), ...(await svc.doneView()), ...(await svc.soonWithoutDateView()), ...(await svc.dayView(T)).list, ...(await svc.dayView(D)).list, ...(await svc.dayView("2026-11-05")).slotted];
+		const at = (text: string) => svc.screenOf(all.find((i) => i.text === text)!);
+		expect(await at("I")).toEqual({ kind: "list", list: "inbox" });
+		expect(await at("B")).toEqual({ kind: "list", list: "backlog" });
+		expect(await at("X")).toEqual({ kind: "list", list: "done" });
+		expect(await at("S")).toEqual({ kind: "list", list: "soon" });
+		expect(await at("N")).toEqual({ kind: "day", date: T });
+		expect(await at("Later")).toEqual({ kind: "day", date: D });
+		expect(await at("Slotted")).toEqual({ kind: "day", date: "2026-11-05" });
+	});
+
+	it("a found subtask shows where its task stands, not by its own dates", async () => {
+		const { svc } = setup(FILE.replace("- [ ] S", "- [ ] S\n\t- [ ] Own 📅 2026-11-09"));
+		const [later] = (await svc.dayView(D)).list;
+		expect(await svc.screenOf(later.subtasks[0])).toEqual({ kind: "day", date: D });
+		const [soon] = await svc.soonWithoutDateView();
+		expect(await svc.screenOf(soon.subtasks[0])).toEqual({ kind: "list", list: "soon" });
+	});
+
+	it("finds a task among items and their subtasks by its key, none for a key not there", async () => {
+		const { svc } = setup(FILE);
+		const items = (await svc.dayView(D)).list;
+		const sub = items[0].subtasks[0];
+		expect(svc.findIn(items, sub.key)?.text).toBe("Sub");
+		expect(svc.findIn(items, items[0].key)?.text).toBe("Later");
+		expect(svc.findIn(items, { ...sub.key, index: 9 })).toBeNull();
 	});
 });

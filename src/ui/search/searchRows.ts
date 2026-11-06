@@ -1,9 +1,6 @@
-import type { FoundPart, SearchHit, SectionKey } from "../../application/contracts";
+import type { FoundPart, SearchGroup, SearchHit, SectionKey } from "../../application/contracts";
 import { el } from "../dom";
 import { renderTaskCard } from "../TaskCard";
-
-/** The groups of the results, in the order the file's sections stand on the screen, Done last. */
-const ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
 
 export interface SearchRow {
 	readonly hit: SearchHit;
@@ -36,14 +33,12 @@ function renderRow(parent: HTMLElement, hit: SearchHit): HTMLElement {
 	return card;
 }
 
-/** The results grouped by section, each group under its section's name; no group for a section with nothing found. */
-export function renderSearchRows(parent: HTMLElement, hits: readonly SearchHit[], sectionName: (section: SectionKey) => string): SearchRow[] {
+/** The search's groups as it gives them, each under its section's name. */
+export function renderSearchRows(parent: HTMLElement, groups: readonly SearchGroup[], sectionName: (section: SectionKey) => string): SearchRow[] {
 	const rows: SearchRow[] = [];
-	for (const section of ORDER) {
-		const found = hits.filter((hit) => hit.item.list === section);
-		if (found.length === 0) continue;
-		el(el(parent, "div", "tc-group-head"), "div", "tc-group-name", sectionName(section));
-		for (const hit of found) rows.push({ hit, el: renderRow(parent, hit) });
+	for (const group of groups) {
+		el(el(parent, "div", "tc-group-head"), "div", "tc-group-name", sectionName(group.list));
+		for (const hit of group.hits) rows.push({ hit, el: renderRow(parent, hit) });
 	}
 	return rows;
 }

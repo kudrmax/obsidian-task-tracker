@@ -81,6 +81,17 @@ const refreshed = (calendars: CalendarServiceImpl, date = DAY) => calendars.even
 const opened = (calendars: CalendarServiceImpl, date = DAY) => calendars.events(date, "open").fresh!();
 
 describe("CalendarServiceImpl", () => {
+	it("an event is past once it has ended by the clock, at its end too", () => {
+		const clock = new FakeClock(new Date(2026, 9, 30, 10, 0));
+		const calendars = service([], [], clock);
+		const at = (end: Date) => calendars.isPast(event("google", "e", new Date(2026, 9, 30, 9), end));
+		expect(at(new Date(2026, 9, 30, 9, 59))).toBe(true);
+		expect(at(new Date(2026, 9, 30, 10, 0))).toBe(true);
+		expect(at(new Date(2026, 9, 30, 10, 1))).toBe(false);
+		clock.current = new Date(2026, 9, 30, 10, 1);
+		expect(at(new Date(2026, 9, 30, 10, 1))).toBe(true);
+	});
+
 	it("a day that starts at 4 takes the timed events from 4 to 4 and the all-day events of its date", async () => {
 		const google = new FakeFile("google", [
 			event("google", "before four", new Date(2026, 9, 30, 2), new Date(2026, 9, 30, 3)),
