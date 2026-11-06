@@ -8,7 +8,11 @@ const committed = readFileSync(BUNDLE, "utf8");
 
 interface Phone {
 	reminders(text: string, settingsJson: string, nowMs: number): { id: string; kind: string; startMs: number; dayEndMs: number }[];
+	complete(text: string, settingsJson: string, id: string, nowMs: number): { changed: boolean; text?: string };
+	silence(text: string, settingsJson: string, id: string, nowMs: number): { changed: boolean; text?: string };
 	snooze(text: string, settingsJson: string, id: string, minutes: number, nowMs: number): { changed: boolean; text?: string };
+	calendarFiles(settingsJson: string): string[];
+	meetings(settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number, nowMs: number): { title: string; startMs: number; endMs: number }[];
 	capture(text: string, settingsJson: string, list: string, title: string, nowMs: number): { changed: boolean; text?: string };
 }
 
@@ -19,18 +23,36 @@ describe(BUNDLE, () => {
 
 	it("needs nothing but the language: no modules, no Obsidian", () => {
 		expect(committed).not.toMatch(/\brequire\(|^import |from "obsidian"/m);
+		expect(committed).not.toMatch(/\b(setTimeout|clearTimeout|setInterval|clearInterval|requestAnimationFrame|fetch)\(|\b(window|document)\./);
 	});
 
-	it("runs on its own and answers in milliseconds", () => {
+	it("every function runs on its own, with nothing of the host: no timers, no window, no fetch", () => {
 		const sandbox: { TaskCalendarPhone?: Phone } = {};
 		runInNewContext(committed, sandbox);
 		const phone = sandbox.TaskCalendarPhone!;
+		expect(Object.keys(phone).sort()).toEqual(["calendarFiles", "capture", "complete", "meetings", "reminders", "silence", "snooze"]);
 		const line = "- [ ] A 🚨 2026-11-04 10:00";
 		const text = `## Now\n\n${line}\n`;
 		const now = new Date(2026, 10, 4, 9).getTime();
 		const [r] = phone.reminders(text, "", now);
 		expect(r).toMatchObject({ id: line, kind: "alarm", startMs: new Date(2026, 10, 4, 10).getTime() });
+		expect(phone.complete(text, "", line, now).text).toContain("- [x] A");
+		expect(phone.silence(text, "", line, now).text).not.toContain("🚨");
 		expect(phone.snooze(text, "", line, 15, now).text).toContain("- [ ] A 🚨 2026-11-04 09:15");
 		expect(phone.capture(text, "", "inbox", "B", now).text).toMatch(/## Inbox\n+- \[ \] B/);
+		expect(phone.calendarFiles("")).toEqual(["calendar/google.json", "calendar/iphone.json", "calendar/work.json"]);
+		const at = (hour: number) => new Date(2026, 10, 4, hour).toISOString();
+		const work = JSON.stringify({ exportedAt: at(8), events: [{ id: "s", title: "Standup", start: at(10), end: at(11), allDay: false, calendar: "Work" }] });
+		expect(phone.meetings("", [null, null, work], now, new Date(2026, 10, 4, 18).getTime(), now)).toEqual([
+			{ title: "Standup", startMs: new Date(2026, 10, 4, 10).getTime(), endMs: new Date(2026, 10, 4, 11).getTime() },
+		]);
+	});
+
+	it("captures a title with a line break as one task line", () => {
+		const sandbox: { TaskCalendarPhone?: Phone } = {};
+		runInNewContext(committed, sandbox);
+		const now = new Date(2026, 10, 4, 9).getTime();
+		const written = sandbox.TaskCalendarPhone!.capture("## Inbox\n\n## Now\n", "", "inbox", "Купить\r\nмолоко\u2028и хлеб", now).text!;
+		expect(written).toMatch(/## Inbox\n+- \[ \] Купить молоко и хлеб\n/);
 	});
 });
