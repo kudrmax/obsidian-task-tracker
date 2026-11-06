@@ -84,4 +84,23 @@ import Testing
         let due: DueLabel = try board.read("rules.dueLabel", ["2026-11-10"], over: files)
         #expect(due == DueLabel(day: "10", month: "NOV"))
     }
+
+    @Test func theSnapshotIsTheScreenAsDrawn() throws {
+        let board = board(FakeVault(Self.file))
+        let snapshot = try board.snapshot(day: nil, now: Fixtures.date(6, 10))
+        #expect(snapshot.day == "2026-11-06")
+        #expect(snapshot.dayTitle == "Today")
+        let day = try #require(snapshot.lists[.day])
+        #expect(day.showsHeaders)
+        #expect(day.groups.map(\.header) == ["No section", "Errands"])
+        #expect(day.groups[0].cards.map(\.level) == [0, 1])
+        #expect(day.groups[0].cards[1].branch == .last)
+        #expect(snapshot.lists[.inbox]?.title == "Inbox")
+        let run = try #require(snapshot.timeline.slots.first)
+        #expect(run.card.item.title == "Morning run")
+        #expect(run.end.map { $0 - run.start } == 60)
+        #expect(snapshot.timeline.now != nil)
+        #expect(snapshot.timeline.hours.count == 25)
+        #expect(snapshot.column(of: run.id) == "timeline")
+    }
 }

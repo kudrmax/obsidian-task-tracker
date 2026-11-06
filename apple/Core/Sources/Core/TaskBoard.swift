@@ -61,6 +61,11 @@ public final class TaskBoard: @unchecked Sendable {
         try read(method, arguments, over: files).decode(T.self)
     }
 
+    /// A pure rule (`rules.*`): made over no file, so a drawing may ask it for every card.
+    public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date())).result.decode(T.self)
+    }
+
     /// A call that may write: the tasks file's new text is written only over the text it was made from; when the file
     /// changed in between, the call is made again over the file as it now is. The answer's result.
     @discardableResult
