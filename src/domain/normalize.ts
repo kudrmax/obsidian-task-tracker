@@ -1,3 +1,4 @@
+import { GROUPED_LISTS } from "./Lists";
 import { DayBoundary } from "./DayBoundary";
 import { isOpen, type LocalDate, type SectionKey, type Task } from "./Task";
 import { hasOpenSubtask, presetPlace } from "./operations";
@@ -90,7 +91,6 @@ function intoGroup(doc: TaskDocument, entry: TaskEntry, name: string, presets: r
 	return doc.moveEntry(doc.tasks(entry.section)[entry.index], "now", { endOf: index });
 }
 
-const GROUPED: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
 
 /** What a section of the list may hold: what the list's column shows (sections spec §3.3). */
 function fitsGroup(section: SectionKey, task: Task, today: LocalDate): boolean {
@@ -101,7 +101,7 @@ function fitsGroup(section: SectionKey, task: Task, today: LocalDate): boolean {
 
 /** Rule 5: a task its section may not hold goes to the end of the tasks outside any section. */
 function misplacedOutOfGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
-	for (const section of GROUPED) {
+	for (const section of GROUPED_LISTS) {
 		for (;;) {
 			const entry = doc.tasks(section).find((e) => e.group !== null && !fitsGroup(section, e.task, today));
 			if (!entry) break;
@@ -113,7 +113,7 @@ function misplacedOutOfGroups(doc: TaskDocument, today: LocalDate): TaskDocument
 
 /** Rule 6: a second section of the same name, or a second No section heading, joins the end of the first. */
 function mergeDuplicates(doc: TaskDocument): TaskDocument {
-	for (const section of GROUPED) {
+	for (const section of GROUPED_LISTS) {
 		for (;;) {
 			const groups = doc.groups(section);
 			const twin = groups.find((g, i) => i > 0 && groups.some((o) => o.index > 0 && o.index < i && o.name === g.name));
@@ -127,7 +127,7 @@ function mergeDuplicates(doc: TaskDocument): TaskDocument {
 
 /** Rule 8: a No section heading with nothing but blank lines under it goes. An empty section stays (empty sections spec §3). */
 function dropEmptyUngroupedHeading(doc: TaskDocument): TaskDocument {
-	for (const section of GROUPED) {
+	for (const section of GROUPED_LISTS) {
 		for (;;) {
 			const empty = doc.groups(section).find((g) => g.index > 0 && g.name === null && g.blank);
 			if (!empty) break;
@@ -139,7 +139,7 @@ function dropEmptyUngroupedHeading(doc: TaskDocument): TaskDocument {
 
 /** Rule 7: with a No section heading, the tasks above the first heading join it; first of all, it needs no heading. */
 function placeUngrouped(doc: TaskDocument): TaskDocument {
-	for (const section of GROUPED) {
+	for (const section of GROUPED_LISTS) {
 		const u = ungroupedIndex(doc.groups(section));
 		if (u === 0) continue;
 		if (doc.groups(section)[0].entries.length > 0) doc = doc.mergeGroup(section, 0, u, "start");

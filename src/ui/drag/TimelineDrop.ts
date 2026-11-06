@@ -1,18 +1,22 @@
 import { AutoScroll } from "./AutoScroll";
 import type { Timeline } from "../Timeline";
 import type { Slot } from "../types";
-import { acceptsDrop, clampSlot } from "../../application/contracts";
+import { acceptsDrop, type DaySpan, type DropOrigin, type TaskItem } from "../../application/contracts";
 import { type DragPayload, type DropResult, type DropTarget, originsOf } from "./DropTarget";
 import { snapMinutes } from "./snap";
 
 export interface TimelineDropOptions {
 	step(): number;
+	/** Where a card from `from` let go at `start` stands (`TaskService.dropSpan`). */
+	span(item: TaskItem | null, from: DropOrigin, start: number): DaySpan;
+	/** The slot a new task takes at `start` (`TaskService.newSlot`). */
+	newSlot(start: number): Slot;
 }
 
 /** The timeline as a place to drop: a line at the start the task will take, snapped to the grid, that scrolls the day near the edges. */
 export class TimelineDrop implements DropTarget {
+	/** The snapped start under the finger, before the service places the card within the day. */
 	private start: number | null = null;
-	private duration: number | null = null;
 	private last: { x: number; y: number; drag: DragPayload } | null = null;
 	private readonly scroll: AutoScroll;
 
@@ -37,27 +41,23 @@ export class TimelineDrop implements DropTarget {
 		this.last = { x, y, drag };
 		const wanted = this.timeline.minutesAt(y - drag.grabPx);
 		const box = this.timeline.viewBox();
-		this.show(wanted, drag.durationMin);
+		this.show(wanted, drag.item, drag.from);
 		this.scroll.follow(y, box);
 	}
 
 	/** The target for a new task under a long tap: its start where the finger is. */
 	previewNew(y: number): void {
-		this.show(this.timeline.minutesAt(y), null);
+		this.show(this.timeline.minutesAt(y), null, "new");
 	}
 
-	/** The slot the target shows now: a task keeps its duration, a new one has none. */
+	/** The slot a new task takes where the target shows now. */
 	get slot(): Slot {
-		const start = this.start ?? 0;
-		return this.timeline.slotAt(start, this.duration === null ? null : start + this.duration);
+		return this.opts.newSlot(this.start ?? 0);
 	}
 
-	private show(wanted: number, duration: number | null): void {
-		const snapped = snapMinutes(wanted, this.opts.step());
-		const span = clampSlot(snapped, duration === null ? null : snapped + duration);
-		this.duration = duration;
-		this.start = span.start;
-		this.timeline.showDrop(span);
+	private show(wanted: number, item: TaskItem | null, from: DropOrigin): void {
+		this.start = snapMinutes(wanted, this.opts.step());
+		this.timeline.showDrop(this.opts.span(item, from, this.start));
 	}
 
 	landing(): DOMRect | null {
@@ -76,6 +76,6 @@ export class TimelineDrop implements DropTarget {
 	}
 
 	drop(): DropResult {
-		return { kind: "slot", slot: this.slot };
+		return { kind: "time", start: this.start ?? 0 };
 	}
 }

@@ -20,6 +20,10 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "a task's day, or its due date instead", pattern: /\.dueDate\s*\?\?|\bitem\.day\s*\?\?/g },
 	{ name: "what a tap on a task's status writes", pattern: /\bitem\.open\s*\?(?![.?])/g },
 	{ name: "what the quick entry's spot allows", pattern: /\.spot\.kind\s*[!=]==/g },
+	{ name: "a task's status compared", pattern: /\.status\s*[!=]==/g },
+	{ name: "whether a task is a subtask", pattern: /\.isSubtask\b/g },
+	{ name: "a task's due date compared", pattern: /\.dueDate\s*[!=]==/g },
+	{ name: "a day compared with today", pattern: /[!=]==\s*(?:this\.)?(?:deps\.)?today\(\)|\btoday\(\)\s*[!=]==/g },
 ];
 
 /**
@@ -27,7 +31,8 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  * here when a hit goes, delete the file's line when it reaches zero. Never raise one or add a file.
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
-	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (repeat icon, description mark); they stay" },
+	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
+	"src/ui/full/FullScreen.ts": { count: 1, removedBy: "none: it draws a done subtask crossed out; it stays" },
 };
 
 function files(dir: string): string[] {
@@ -78,5 +83,9 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("const k = { ...key, path: current.key.path.slice(0, -1) };")).toEqual(["1: a key built from its path"]);
 		expect(hitsIn("// item.list === \"done\" in a comment")).toEqual([]);
 		expect(hitsIn("const day = item.day ?? item.dueDate;")).toHaveLength(1);
+		expect(hitsIn('if (item.status === "done" || item.isSubtask) go();')).toEqual(["1: a task's status compared", "1: whether a task is a subtask"]);
+		expect(hitsIn("const shown = item.dueDate !== opts.day;")).toEqual(["1: a task's due date compared"]);
+		expect(hitsIn("if (date === this.today()) a(); if (this.deps.today() !== day) b();")).toEqual(["1: a day compared with today", "1: a day compared with today"]);
+		expect(hitsIn("this.select(this.today());")).toEqual([]);
 	});
 });

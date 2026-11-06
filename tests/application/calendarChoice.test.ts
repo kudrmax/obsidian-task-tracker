@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarFile, FileCalendar } from "../../src/application/calendarFile";
-import { CalendarChoice, type CalendarKey } from "../../src/application/calendarChoice";
+import { CalendarChoice, type CalendarKey, textOrder } from "../../src/application/calendarChoice";
 import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
 
 const NOW = new Date(2026, 10, 5, 12);
@@ -205,5 +205,12 @@ describe("CalendarChoice", () => {
 			DAY.end,
 		);
 		expect(day).toEqual({ events: [], stale: false });
+	});
+});
+
+describe("the order of names", () => {
+	it("is the same on every engine: by letters in lower case, «ё» as «е», then as written", () => {
+		const names = ["work", "Личное", "Family", "family", "Birthdays", "ёлка", "елка", "Zoo"];
+		expect([...names].sort(textOrder)).toEqual(["Birthdays", "Family", "family", "work", "Zoo", "елка", "ёлка", "Личное"]);
 	});
 });

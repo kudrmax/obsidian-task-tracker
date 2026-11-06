@@ -1,9 +1,9 @@
+import { GROUPED_LISTS } from "./Lists";
 import type { DayBoundary } from "./DayBoundary";
 import { dayOf, newTask } from "./operations";
-import type { GroupName, LocalDate, SectionKey, Task } from "./Task";
+import type { GroupName, LocalDate, Task } from "./Task";
 import { flatten, type TaskDocument, type TaskEntry } from "./TaskDocument";
 
-const RECURRING: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
 
 function closedWithRepeat(entry: TaskEntry): boolean {
 	return (entry.task.status === "done" || entry.task.status === "cancelled") && entry.task.repeat !== null;
@@ -16,7 +16,7 @@ function closedWithRepeat(entry: TaskEntry): boolean {
 export function recurClosed(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	if (!doc.hasSection("soon")) return doc;
 	for (;;) {
-		const entry = RECURRING.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
+		const entry = GROUPED_LISTS.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
 		if (!entry) return doc;
 		const { task } = entry;
 		const copy = newTask(task.text, {

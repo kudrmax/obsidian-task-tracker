@@ -37,7 +37,7 @@ const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 /** No sections to offer: nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
-const NO_EVENTS: DayEvents = { events: [], statuses: [], stale: false };
+const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], stale: false };
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -103,6 +103,16 @@ export class DayData {
 		return this.state.calendars ? this.dayEvents.events : [];
 	}
 
+	/** The day's events of the whole day: the rows over the timeline. */
+	get allDay(): readonly CalendarEvent[] {
+		return this.state.calendars ? this.dayEvents.allDay : [];
+	}
+
+	/** The day's events on a time: the timeline. */
+	get timed(): readonly CalendarEvent[] {
+		return this.state.calendars ? this.dayEvents.timed : [];
+	}
+
 	get statuses(): readonly SourceStatus[] {
 		return this.state.calendars ? this.dayEvents.statuses : [];
 	}
@@ -138,7 +148,7 @@ export class DayData {
 
 	/** Another day is selected: its tasks, the events last fetched for it until the fresh ones come. */
 	selectDay(): Promise<void> {
-		this.showCached({ events: [], statuses: this.dayEvents.statuses, stale: this.dayEvents.stale });
+		this.showCached({ ...NO_EVENTS, statuses: this.dayEvents.statuses, stale: this.dayEvents.stale });
 		return this.fetchBoth();
 	}
 

@@ -1,3 +1,5 @@
+import { dayRelation, type DayRelation } from "../domain/Days";
+import { localDateOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
 import { type CalendarKey, keyText } from "./calendarChoice";
@@ -176,7 +178,13 @@ export class CalendarServiceImpl implements CalendarService {
 		const chosen = this.shown().days().day(date);
 		const events = chosen.events;
 		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
-		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name))), stale: chosen.stale };
+		return {
+			events,
+			allDay: events.filter((e) => e.allDay),
+			timed: events.filter((e) => !e.allDay),
+			statuses: this.files.map((f) => this.status(f.name, shown(f.name))),
+			stale: chosen.stale,
+		};
 	}
 
 	private status(source: CalendarSource, shown: number): SourceStatus {
@@ -190,9 +198,15 @@ export class CalendarServiceImpl implements CalendarService {
 			problem,
 			events: shown,
 			updatedAt,
+			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
 			detail: fed ? null : (file?.device ?? null),
 			stale: problem !== null || this.isOld(updatedAt),
 		};
+	}
+
+	/** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */
+	private relationOf(at: Date): DayRelation {
+		return dayRelation(localDateOf(at), localDateOf(this.clock.now()));
 	}
 
 	private isOld(updatedAt: Date | null): boolean {

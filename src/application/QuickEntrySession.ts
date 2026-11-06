@@ -61,7 +61,7 @@ export interface EntryState {
 }
 
 /** What the session reads from the service: the marks, the places and the writes. */
-export type QuickEntryTasks = Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks">;
+export type QuickEntryTasks = Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks" | "newSlot">;
 
 /** What the session reads from the screen, and tells it. */
 export interface QuickEntryView {
@@ -269,7 +269,7 @@ export class QuickEntrySession {
 	openAtDrop(column: DropColumn | null, result: DropTo | null): boolean {
 		const place = result && column ? placeOfDrop(result) : null;
 		if (column && place) this.open({ kind: "list", column, place: gapOfPlace(this.view.cards(column), place) });
-		else if (result?.kind === "slot") this.openSlot(result.slot);
+		else if (result?.kind === "time") this.openSlot(this.tasks.newSlot(this.view.day(), result.start));
 		else return false;
 		return true;
 	}

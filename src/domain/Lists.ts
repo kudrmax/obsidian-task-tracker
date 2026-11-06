@@ -3,6 +3,9 @@ import type { GroupName } from "./Task";
 /** The lists that hold sections. */
 export type GroupedList = "inbox" | "backlog" | "soon" | "now";
 
+/** The lists that hold sections, in the order the file has them and the rules walk them. */
+export const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
+
 /** The lists a task is put at the end of: a drop on such a column from another one, or at the end of its own. */
 export type EndList = "inbox" | "backlog" | "soon";
 

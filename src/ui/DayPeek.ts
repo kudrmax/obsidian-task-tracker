@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, DayBoundary, DayView, ListSection, TaskService } from "../application/contracts";
+import type { CalendarService, DayBoundary, DayEvents, DayRelation, DayView, ListSection, TaskService } from "../application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { PROPERTY } from "./design";
 import { el } from "./dom";
@@ -11,7 +11,8 @@ export interface DayPeekDeps {
 	readonly tasks: TaskService;
 	readonly calendars: CalendarService;
 	theme(): Theme;
-	today(): LocalDate;
+	/** How a day stands to today: the now line stands on today. */
+	relation(date: LocalDate): DayRelation;
 	boundary(): DayBoundary;
 	hourPx(): number;
 	now(): Date;
@@ -37,7 +38,7 @@ export class DayPeek {
 	readonly left: HTMLElement;
 	readonly right: HTMLElement;
 	private day: DayView | null = null;
-	private events: readonly CalendarEvent[] = [];
+	private events: DayEvents | null = null;
 	private readonly list: TaskList;
 	private readonly allDayEl: HTMLElement;
 	private readonly timeline: Timeline;
@@ -64,19 +65,19 @@ export class DayPeek {
 		this.timeline = new Timeline(el(this.right, "div"), {
 			theme: () => deps.theme(),
 			date: () => date,
-			today: () => deps.today(),
+			isToday: () => deps.relation(date) === "today",
 			boundary: () => deps.boundary(),
 			hourPx: () => deps.hourPx(),
 			tasks: () => this.day?.slotted ?? [],
 			shownSpan: (item) => deps.tasks.shownSpan(item, date),
-			events: () => this.events,
+			events: () => this.events?.timed ?? [],
 			now: () => deps.now(),
 			isPast: (event) => deps.calendars.isPast(event),
 		});
 		const ask = deps.calendars.events(date, "peek");
-		if (ask.cached) this.events = ask.cached.events;
+		if (ask.cached) this.events = ask.cached;
 		void ask.fresh?.().then((events) => {
-			this.events = events.events;
+			this.events = events;
 			this.render();
 		});
 		void deps.tasks.dayView(date).then((day) => {
@@ -108,7 +109,7 @@ export class DayPeek {
 	private render(): void {
 		if (this.removed) return;
 		this.list.render();
-		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme(), (event) => this.deps.calendars.isPast(event));
+		renderAllDayRows(this.allDayEl, this.right, this.events?.allDay ?? [], this.deps.theme(), (event) => this.deps.calendars.isPast(event));
 		this.right.style.setProperty(PROPERTY.allDayExtraRows, this.deps.allDayExtraRows());
 		this.timeline.render();
 	}

@@ -11,6 +11,8 @@ import type { SectionChoice, SectionOffer } from "./sections";
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses. */
 export { nextProgress } from "../domain/Task";
+/** Whether two slots are the same time: the same day, start and end. */
+export { sameSlot } from "../domain/Task";
 /** The kinds a task's reminder is chosen from, in the order the menu offers them. */
 export { REMINDER_KINDS } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -25,8 +27,6 @@ export { repeatParts, type RepeatParts } from "../domain/Repeat";
 export { editRepeat, repeatDraft, type RepeatChange, type RepeatDraft, type RepeatKind } from "../domain/RepeatDraft";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
-/** A slot on the timeline moved, as long as it is, to lie within its day. */
-export { clampSlot } from "../domain/DayBoundary";
 /** Minutes in a day: the timeline's length. */
 export { MINUTES_PER_DAY } from "../domain/LocalDate";
 /** Minutes from the start of the shown day to a card's start and end; a null end for a task without a duration. */
@@ -47,7 +47,9 @@ export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, t
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** A list in its sections, and whether it shows their headers. */
-export { listView, type ListGroup, type ListView } from "./sections";
+export { listView, type ListGroup, type ListRow, type ListView } from "./sections";
+/** What the corner of a card shows on a column's day: the due date unless it is that day, and the repeat icon. */
+export { cardDue, type CardDue } from "./cardDue";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
 export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
 /** What a new description starts as in the editor: one empty point, which alone is no description. */
@@ -288,7 +290,8 @@ export type DropOrigin = DropFrom | "new";
 
 /** Where a task is let go, as the gesture found it. */
 export type DropTo =
-	| { readonly kind: "slot"; readonly slot: Slot }
+	/** On the timeline at `start`, minutes from the start of the shown day, snapped to its grid: `TaskService.dropSpan` is where it lands. */
+	| { readonly kind: "time"; readonly start: number }
 	| { readonly kind: "clearSlot" }
 	/** A gap of a list that shows no sections: right before `before`, or at the end (null). */
 	| { readonly kind: "list"; readonly column: DropColumn; readonly before: TaskKey | null }
@@ -479,6 +482,8 @@ export interface TaskService {
 	 * shows under its task, so where that task does. Where that is on its screens is the frontend's.
 	 */
 	screenOf(item: TaskItem): Promise<TaskScreen>;
+	/** A found task shown: a subtask's tasks show their subtasks (`unfoldAbove`), so its card stands in the list; then `screenOf` it. */
+	reveal(item: TaskItem): Promise<TaskScreen>;
 	/** The task `key` names among `items` and their subtasks, at every depth; null when none is. */
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null;
 
@@ -538,8 +543,8 @@ export interface TaskService {
 	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
-	/** The name a list goes by wherever the screens name a place: its section's name in the settings. A day is named by its date. */
-	listName(list: GroupedList): string;
+	/** The name a list goes by wherever the screens name a place, Done too: its section's name in the settings. A day is named by its date. */
+	listName(list: SectionKey): string;
 	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
 	dayOfPlacement(placement: Placement): LocalDate | null;
 
@@ -634,6 +639,14 @@ export interface TaskService {
 	 * task whose start has passed rides the now line, its duration kept. The file keeps its time.
 	 */
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan;
+	/**
+	 * Where a card let go on the timeline at `start` (minutes from the day's start, snapped) stands, as a drop there writes
+	 * it: one from the timeline keeps its duration, one from a list or the plus (`item` null) gets none; within the day,
+	 * a card as long as it is, one without a duration starting a step before the end at the latest.
+	 */
+	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan;
+	/** The slot of a new task let go or long-tapped on the timeline of `day` at `start`: no duration, as `dropSpan` places it. */
+	newSlot(day: LocalDate, start: number): Slot;
 	/**
 	 * The card of slotted `item` while its `edge` dot is held at `minute` of `day`: the end no earlier than the start nor
 	 * past the day; the start no earlier than the day nor past the end, and on a task without a duration no later than its
@@ -797,6 +810,8 @@ export interface SourceStatus {
 	readonly events: number;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
+	/** How the calendar date of `updatedAt` stands to the clock's (calendar days, not the plugin's day); null with no `updatedAt`. The words are the frontend's. */
+	readonly updatedDay: DayRelation | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
 	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
@@ -805,6 +820,10 @@ export interface SourceStatus {
 
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
+	/** Of `events`, those of the whole day: the rows over the timeline. */
+	readonly allDay: readonly CalendarEvent[];
+	/** Of `events`, those on a time: the timeline. */
+	readonly timed: readonly CalendarEvent[];
 	readonly statuses: readonly SourceStatus[];
 	/** A calendar shown on the day comes from a file no longer fresh: the orange dot, Refresh now would help. */
 	readonly stale: boolean;

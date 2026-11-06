@@ -141,6 +141,7 @@ class FakeTasks {
 				},
 				placementOf: () => ({ kind: "now" }),
 				placementOfDay: (date) => (date === DAY ? { kind: "now" } : { kind: "date", date }),
+				newSlot: (date, start) => ({ date, start, end: null }),
 				dayOfPlacement: (placement) => (placement.kind === "now" ? DAY : placement.kind === "date" ? placement.date : null),
 			},
 			{
@@ -1101,7 +1102,7 @@ describe("QuickEntrySession", () => {
 			expect(entry.state?.spot).toEqual(inSoon(1));
 			expect(entry.openAtDrop("day", { kind: "nest", parent: tasks.cards[0].key, before: null })).toBe(true);
 			expect(entry.state?.spot).toEqual(at(1, 1));
-			expect(entry.openAtDrop(null, { kind: "slot", slot: SLOT })).toBe(true);
+			expect(entry.openAtDrop(null, { kind: "time", start: SLOT.start })).toBe(true);
 			expect(entry.state?.spot).toEqual({ kind: "slot", slot: SLOT });
 			entry.escape();
 			expect(entry.openAtDrop(null, null)).toBe(false);

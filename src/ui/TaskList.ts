@@ -1,8 +1,7 @@
-import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
-import { isEmptyGroup } from "./listGroups";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
@@ -103,7 +102,7 @@ export class TaskList {
 			entered = true;
 			this.enterRows(entry, rows, kept);
 		};
-		const add = ({ item, level }: Row, group: GroupName): void => {
+		const add = ({ item, level }: ListRow, group: GroupName): void => {
 			enter(group);
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
@@ -126,9 +125,9 @@ export class TaskList {
 		if (aboveHeaders) enter(null, true);
 		for (const group of this.rendered) {
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			if (isEmptyGroup(group) && (entry?.place.group !== group.name || entry.section)) this.nodes.push(this.plate(group));
+			if (group.empty && (entry?.place.group !== group.name || entry.section)) this.nodes.push(this.plate(group));
 			groupStart = this.entries.length;
-			for (const row of rowsOf(group.items)) add(row, group.name);
+			for (const row of group.rows) add(row, group.name);
 			subtrees(groupStart);
 			enter(group.name, true);
 		}
@@ -199,7 +198,7 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		return this.viewOf(this.deps.items()).groups.flatMap((group) => rowsOf(group.items).map(({ item, level }) => ({ key: item.key, level, group: group.name })));
+		return this.viewOf(this.deps.items()).groups.flatMap((group) => group.rows.map(({ item, level }) => ({ key: item.key, level, group: group.name })));
 	}
 
 	private viewOf(items: readonly TaskItem[]): ListView {
@@ -249,17 +248,6 @@ export class TaskList {
  * The branch lines of the row at `i` among rows of these `levels`: whether it is the last of its task's subtasks, and for each
  * task above its own whether that one has a later sibling, so its line goes on past the row.
  */
-/** A task of the list at its depth. */
-interface Row {
-	readonly item: TaskItem;
-	readonly level: number;
-}
-
-/** A section's tasks in the order the list draws them: each task, then its subtasks a level deeper, unless they are folded away. */
-function rowsOf(items: readonly TaskItem[], level = 0): Row[] {
-	return items.flatMap((item) => [{ item, level }, ...(item.collapsed ? [] : rowsOf(item.subtasks, level + 1))]);
-}
-
 function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {
 	const goesOn = (level: number): boolean => levels.slice(i + 1).find((l) => l <= level) === level;
 	const through = Array.from({ length: levels[i] - 1 }, (_, k) => goesOn(k + 1));

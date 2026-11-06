@@ -359,7 +359,7 @@ ${key.title}`.toLowerCase();
         }
       }
       return [...found.values()].sort(
-        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title)
+        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || textOrder(a.key.title, b.key.title)
       );
     }
     day(start, end) {
@@ -436,7 +436,16 @@ ${key.title}`.toLowerCase();
     if (a === b) return 0;
     if (a === "") return 1;
     if (b === "") return -1;
-    return a.localeCompare(b);
+    return textOrder(a, b);
+  }
+  function textOrder(a, b) {
+    const x = letters(a);
+    const y = letters(b);
+    if (x !== y) return x < y ? -1 : 1;
+    return a === b ? 0 : a < b ? -1 : 1;
+  }
+  function letters(name) {
+    return name.toLowerCase().replace(/ё/g, "е");
   }
   function calendarOf(e) {
     return { title: e.calendar, account: e.account, calendarId: e.calendarId };
@@ -1493,6 +1502,9 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/domain/Lists.ts
+  var GROUPED_LISTS = ["inbox", "backlog", "now", "soon"];
+
   // src/domain/Marks.ts
   function marksOf(priority, labels) {
     return { priority, labels: priority === null ? labels : [] };
@@ -1828,14 +1840,13 @@ ${key.title}`.toLowerCase();
   var moveToEnd = leavingItsTask(toEnd);
 
   // src/domain/recurrence.ts
-  var RECURRING = ["inbox", "backlog", "now", "soon"];
   function closedWithRepeat(entry) {
     return (entry.task.status === "done" || entry.task.status === "cancelled") && entry.task.repeat !== null;
   }
   function recurClosed(doc, today, boundary) {
     if (!doc.hasSection("soon")) return doc;
     for (; ; ) {
-      const entry = RECURRING.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
+      const entry = GROUPED_LISTS.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
       if (!entry) return doc;
       const { task } = entry;
       const copy = newTask(task.text, {
@@ -1922,14 +1933,13 @@ ${key.title}`.toLowerCase();
     }
     return doc.moveEntry(doc.tasks(entry.section)[entry.index], "now", { endOf: index });
   }
-  var GROUPED = ["inbox", "backlog", "now", "soon"];
   function fitsGroup(section, task, today) {
     if (section === "soon") return task.slot === null;
     if (section === "now") return task.slot === null && (task.dueDate === null || task.dueDate <= today);
     return true;
   }
   function misplacedOutOfGroups(doc, today) {
-    for (const section of GROUPED) {
+    for (const section of GROUPED_LISTS) {
       for (; ; ) {
         const entry = doc.tasks(section).find((e) => e.group !== null && !fitsGroup(section, e.task, today));
         if (!entry) break;
@@ -1939,7 +1949,7 @@ ${key.title}`.toLowerCase();
     return doc;
   }
   function mergeDuplicates(doc) {
-    for (const section of GROUPED) {
+    for (const section of GROUPED_LISTS) {
       for (; ; ) {
         const groups = doc.groups(section);
         const twin = groups.find((g, i) => i > 0 && groups.some((o) => o.index > 0 && o.index < i && o.name === g.name));
@@ -1951,7 +1961,7 @@ ${key.title}`.toLowerCase();
     return doc;
   }
   function dropEmptyUngroupedHeading(doc) {
-    for (const section of GROUPED) {
+    for (const section of GROUPED_LISTS) {
       for (; ; ) {
         const empty = doc.groups(section).find((g) => g.index > 0 && g.name === null && g.blank);
         if (!empty) break;
@@ -1961,7 +1971,7 @@ ${key.title}`.toLowerCase();
     return doc;
   }
   function placeUngrouped(doc) {
-    for (const section of GROUPED) {
+    for (const section of GROUPED_LISTS) {
       const u = ungroupedIndex(doc.groups(section));
       if (u === 0) continue;
       if (doc.groups(section)[0].entries.length > 0) doc = doc.mergeGroup(section, 0, u, "start");

@@ -1,11 +1,14 @@
-import type { LocalDate, Slot } from "../domain/Task";
+import type { LocalDate } from "../domain/Task";
 import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskService, TaskStep } from "./contracts";
 
-/** What a drop means for one task: a change `applyAll` knows, or a slot set or cleared, which only a task dropped alone takes. */
+/** What a drop means for one task: a change `applyAll` knows, or a time set or a slot cleared, which only a task dropped alone takes. */
 type DropMove =
 	| Extract<TaskChange, { readonly kind: "moveToGroup" | "nest" | "moveBefore" | "moveToList" | "moveToSoon" | "moveToEnd" }>
-	| { readonly kind: "setSlot"; readonly slot: Slot }
+	| { readonly kind: "toTime"; readonly from: DropFrom; readonly start: number; readonly day: LocalDate }
 	| { readonly kind: "clearSlot"; readonly place?: { readonly before: TaskKey | null; readonly date: LocalDate } };
+
+/** A service that also sets the time a drop on the timeline gives: the duration the task keeps is its own to read. */
+export type DropService = TaskService & { toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> };
 
 /**
  * Whether `target` takes the tasks carried from `origins` (the one under the finger first): the day takes any; Soon all
@@ -34,8 +37,8 @@ export function placesInGap(column: DropColumn, from: DropOrigin, grouped: boole
 /** The table of spec §5.1: what a task dragged from `from` and let go on `to` means, the day column showing `day`. */
 function dropMove(from: DropFrom, to: DropTo, day: LocalDate): DropMove {
 	switch (to.kind) {
-		case "slot":
-			return { kind: "setSlot", slot: to.slot };
+		case "time":
+			return { kind: "toTime", from, start: to.start, day };
 		case "clearSlot":
 			return { kind: "clearSlot" };
 		case "group":
@@ -51,10 +54,10 @@ function dropMove(from: DropFrom, to: DropTo, day: LocalDate): DropMove {
 }
 
 /** One task's move as the single call of its name. */
-function moveOne(service: TaskService, key: TaskKey, move: DropMove): Promise<void> {
+function moveOne(service: DropService, key: TaskKey, move: DropMove): Promise<void> {
 	switch (move.kind) {
-		case "setSlot":
-			return service.setSlot(key, move.slot);
+		case "toTime":
+			return service.toTime(key, move.from, move.start, move.day);
 		case "clearSlot":
 			return service.clearSlot(key, move.place);
 		case "moveToGroup":
@@ -73,11 +76,11 @@ function moveOne(service: TaskService, key: TaskKey, move: DropMove): Promise<vo
 }
 
 /** `TaskService.drop` on any service: one task as its single call, several as one `applyAll`, a slot set or cleared for none of them. */
-export function runDrop(service: TaskService, tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+export function runDrop(service: DropService, tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
 	if (tasks.length === 1) return moveOne(service, tasks[0].key, dropMove(tasks[0].from, to, day));
 	const steps = tasks.flatMap(({ key, from }): TaskStep[] => {
 		const move = dropMove(from, to, day);
-		return move.kind === "setSlot" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
+		return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
 	});
 	return service.applyAll(steps);
 }

@@ -4,6 +4,7 @@ import type { Clock } from "../../src/application/ports";
 import { TaskServiceImpl } from "../../src/application/TaskServiceImpl";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
+import { DEFAULT_SETTINGS } from "../../src/settings";
 
 /** Today, a later day, a past day. */
 const T = "2026-10-30";
@@ -53,11 +54,14 @@ const FILE = [
 	"",
 ].join("\n");
 
-function setup() {
+function setup(settings = new FakeSettingsStore()) {
 	const store = new InMemoryTaskFileStore(FILE);
-	const svc = new TaskServiceImpl(store, new FakeSettingsStore(), clock);
+	const svc = new TaskServiceImpl(store, settings, clock);
 	return { store, svc };
 }
+
+/** Minutes from the start of the day, which the settings start at 5, to `hour` o'clock: where a drop on the timeline lands. */
+const hourAt = (hour: number) => (hour - DEFAULT_SETTINGS.dayStartHour) * 60;
 
 type Svc = ReturnType<typeof setup>["svc"];
 
@@ -98,17 +102,15 @@ async function dropped(c: DropCase): Promise<string> {
 	return store.text!;
 }
 
-const slot = (date: string, start: number, end: number | null = null) => ({ date, start: start * 60, end: end === null ? null : end * 60 });
-
 const SINGLE: readonly DropCase[] = [
-	{ name: "today's list → the timeline", day: T, tasks: [["N1", "day"]], to: () => ({ kind: "slot", slot: slot(T, 12) }) },
-	{ name: "a later day's list → its timeline: Soon with that day", day: D, tasks: [["SD", "day"]], to: () => ({ kind: "slot", slot: slot(D, 12) }) },
-	{ name: "today's list → a later day's timeline: Now goes to Soon", day: D, tasks: [["N3", "day"]], to: () => ({ kind: "slot", slot: slot(D, 12) }) },
-	{ name: "Soon → the timeline", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
-	{ name: "Inbox → the timeline", day: T, tasks: [["I1", "inbox"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
-	{ name: "Backlog → the timeline", day: T, tasks: [["B2", "backlog"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
-	{ name: "a subtask → the timeline: it becomes a task", day: T, tasks: [["N1a", "day"]], to: () => ({ kind: "slot", slot: slot(T, 13) }) },
-	{ name: "the timeline → another time, with its duration", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "slot", slot: slot(T, 15, 16) }) },
+	{ name: "today's list → the timeline", day: T, tasks: [["N1", "day"]], to: () => ({ kind: "time", start: hourAt(12) }) },
+	{ name: "a later day's list → its timeline: Soon with that day", day: D, tasks: [["SD", "day"]], to: () => ({ kind: "time", start: hourAt(12) }) },
+	{ name: "today's list → a later day's timeline: Now goes to Soon", day: D, tasks: [["N3", "day"]], to: () => ({ kind: "time", start: hourAt(12) }) },
+	{ name: "Soon → the timeline", day: T, tasks: [["S1", "soon"]], to: () => ({ kind: "time", start: hourAt(13) }) },
+	{ name: "Inbox → the timeline", day: T, tasks: [["I1", "inbox"]], to: () => ({ kind: "time", start: hourAt(13) }) },
+	{ name: "Backlog → the timeline", day: T, tasks: [["B2", "backlog"]], to: () => ({ kind: "time", start: hourAt(13) }) },
+	{ name: "a subtask → the timeline: it becomes a task", day: T, tasks: [["N1a", "day"]], to: () => ({ kind: "time", start: hourAt(13) }) },
+	{ name: "the timeline → another time, with its duration", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "time", start: hourAt(15) }) },
 	{ name: "the timeline → today's list before a task", day: T, tasks: [["N2", "timeline"]], to: (k) => ({ kind: "list", column: "day", before: k("N1") }) },
 	{ name: "the timeline → the end of a list", day: T, tasks: [["N2", "timeline"]], to: () => ({ kind: "list", column: "day", before: null }) },
 	{ name: "the later day's timeline → its list", day: D, tasks: [["ST", "timeline"]], to: () => ({ kind: "list", column: "day", before: null }) },
@@ -165,7 +167,7 @@ const SEVERAL: readonly DropCase[] = [
 	{ name: "the day and Soon → before a task of Soon", day: T, tasks: [["N3", "day"], ["S2", "soon"]], to: (k) => ({ kind: "list", column: "soon", before: k("S1") }) },
 	{ name: "Soon and Inbox → the end of Inbox", day: T, tasks: [["S1", "soon"], ["I3", "inbox"]], to: () => ({ kind: "list", column: "inbox", before: null }) },
 	{ name: "a task with its own subtask → a section: the subtask goes along", day: T, tasks: [["N1", "day"], ["N1a", "day"]], to: () => ({ kind: "group", list: "now", date: null, group: "Work", before: null }) },
-	{ name: "several → the timeline: nothing", day: T, tasks: [["N1", "day"], ["S1", "soon"]], to: () => ({ kind: "slot", slot: slot(T, 12) }) },
+	{ name: "several → the timeline: nothing", day: T, tasks: [["N1", "day"], ["S1", "soon"]], to: () => ({ kind: "time", start: hourAt(12) }) },
 ];
 
 /** The file after each drop, as the view and the bulk controller wrote it before the table moved here: `__snapshots__/drops.test.ts.snap` is that record. */
@@ -176,6 +178,35 @@ describe("what a drop writes (spec §5.1)", () => {
 
 	describe("several tasks", () => {
 		for (const c of SEVERAL) it(c.name, async () => expect(await dropped(c)).toMatchSnapshot());
+	});
+});
+
+describe("a drop on the timeline", () => {
+	const midnight = () => setup(new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0 }));
+	const at = async (text: string, from: DropFrom, start: number, day = T) => {
+		const { store, svc } = midnight();
+		const item = (await itemsOf(svc)).get(text)!;
+		await svc.drop([{ key: item.key, from }], { kind: "time", start }, day);
+		return store.text!.split("\n").find((line) => line.includes(` ${text} `) || line.endsWith(` ${text}`));
+	};
+
+	it("a card from the timeline keeps its duration; the same task from a list gets none", async () => {
+		expect(await at("N2", "timeline", 15 * 60)).toBe("- [ ] N2 ⏰ 2026-10-30 15:00-16:00");
+		expect(await at("N2", "day", 15 * 60)).toBe("- [ ] N2 ⏰ 2026-10-30 15:00");
+	});
+
+	it("stands within the day: a card as long as it is, one without a duration five minutes before the end at the latest", async () => {
+		expect(await at("N2", "timeline", 23 * 60 + 30)).toBe("- [ ] N2 ⏰ 2026-10-30 23:00-24:00");
+		expect(await at("N1", "day", 24 * 60 + 10)).toMatch(/N1 📌 2026-10-30 23:55$/);
+		expect(await at("N1", "day", -20)).toMatch(/N1 📌 2026-10-30 00:00$/);
+	});
+
+	it("dropSpan answers where the line under the finger stands, as the drop writes it", async () => {
+		const { svc } = midnight();
+		const n2 = (await itemsOf(svc)).get("N2")!;
+		expect(svc.dropSpan(n2, "timeline", 23 * 60 + 30)).toEqual({ start: 23 * 60, end: 24 * 60 });
+		expect(svc.dropSpan(n2, "day", 600)).toEqual({ start: 600, end: null });
+		expect(svc.dropSpan(null, "new", 1500)).toEqual({ start: 1435, end: null });
 	});
 });
 

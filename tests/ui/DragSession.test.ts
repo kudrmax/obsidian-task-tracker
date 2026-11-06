@@ -5,7 +5,7 @@ import { DragSession, type DragPayload, type DropResult, type DropTarget, type F
 import { onDay } from "../fakes/itemOnDay";
 
 const item: TaskItem = onDay({ key: { section: "now", index: 1, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-11-01");
-const payload: DragPayload = { item, from: "day", durationMin: null, grabPx: 20 };
+const payload: DragPayload = { item, from: "day", grabPx: 20 };
 const rect = (x: number, y: number) => ({ x, y, width: 100, height: 40, top: y, left: x, right: x + 100, bottom: y + 40, toJSON: () => "" }) as DOMRect;
 
 class FakeTarget implements DropTarget {
@@ -91,7 +91,7 @@ describe("DragSession", () => {
 	});
 
 	it("drops on the target, flies the float there and reports the result", async () => {
-		const slot: DropResult = { kind: "slot", slot: { date: "2026-10-30", start: 990, end: 1050 } };
+		const slot: DropResult = { kind: "time", start: 990 };
 		const a = new FakeTarget("a", 0, 100, slot);
 		const float = new FakeFloat();
 		const ended: unknown[] = [];
@@ -156,10 +156,10 @@ describe("DragSession", () => {
 	});
 
 	describe("carrying a new task", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 20 };
+		const fresh: NewTaskPayload = { from: "new", item: null, grabPx: 20 };
 
 		it("hands the new task to the target under the pointer and reports where it landed", async () => {
-			const slot: DropResult = { kind: "slot", slot: { date: "2026-10-30", start: 990, end: null } };
+			const slot: DropResult = { kind: "time", start: 990 };
 			const a = new FakeTarget("a", 0, 100, slot);
 			const float = new FakeFloat();
 			const ended: unknown[] = [];

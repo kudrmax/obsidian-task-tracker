@@ -1,3 +1,4 @@
+import { GROUPED_LISTS } from "../domain/Lists";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
 import { typedMarks } from "../domain/Marks";
@@ -20,6 +21,8 @@ import {
 	type DayView,
 	type DraftMarks,
 	type DroppedTask,
+	type DropFrom,
+	type DropOrigin,
 	type FullTree,
 	type DropTo,
 	type EndList,
@@ -55,7 +58,7 @@ import { fullTree } from "./fullTree";
 import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import type { UndoHistory } from "./UndoHistory";
-import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
+import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -66,8 +69,6 @@ interface Normalized {
 	readonly doc: TaskDocument;
 	readonly changed: boolean;
 }
-
-const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
 
 /** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
 function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {
@@ -239,6 +240,11 @@ export class TaskServiceImpl implements TaskService {
 		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
 	}
 
+	async reveal(item: TaskItem): Promise<TaskScreen> {
+		if (item.isSubtask) await this.unfoldAbove(item.key);
+		return this.screenOf(item);
+	}
+
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 		for (const item of items) {
 			if (samePlace(item.key, key)) return item;
@@ -303,7 +309,7 @@ export class TaskServiceImpl implements TaskService {
 		return placementOfDay(date, this.today());
 	}
 
-	listName(list: GroupedList): string {
+	listName(list: SectionKey): string {
 		return this.settings.get().sections[list];
 	}
 
@@ -485,6 +491,22 @@ export class TaskServiceImpl implements TaskService {
 
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
 		return this.timeline().shown(slotted(item), day);
+	}
+
+	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan {
+		return droppedSpan(start, from === "timeline" ? (item?.durationMin ?? null) : null);
+	}
+
+	newSlot(day: LocalDate, start: number): Slot {
+		return this.rules.moment().boundary.slotAt(day, droppedSpan(start, null).start, null);
+	}
+
+	/** A drop on the timeline of `day` at `start`: the task's own duration from the file when it came from the timeline. */
+	async toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> {
+		const { doc, boundary } = await this.readNormalized();
+		const { slot } = this.rules.entryOf(doc, key).task;
+		const span = droppedSpan(start, from === "timeline" && slot && slot.end !== null ? slot.end - slot.start : null);
+		await this.setSlot(key, boundary.slotAt(day, span.start, span.end));
 	}
 
 	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {

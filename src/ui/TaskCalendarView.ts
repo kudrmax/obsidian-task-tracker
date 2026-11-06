@@ -248,7 +248,7 @@ export class TaskCalendarView extends ItemView {
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.deps.tasks.listName("inbox"),
 			soonName: () => this.deps.tasks.listName("soon"),
-			doneName: () => this.settings.sections.done,
+			doneName: () => this.deps.tasks.listName("done"),
 		});
 		this.leftEl = el(root, "div", "tc-left");
 		this.list = new TaskList(el(this.leftEl, "div"), {
@@ -336,12 +336,12 @@ export class TaskCalendarView extends ItemView {
 		this.timeline = new Timeline(el(this.rightEl, "div"), {
 			theme: () => this.theme(),
 			date: () => this.selectedDate,
-			today: () => this.today(),
+			isToday: () => this.deps.days.relation(this.selectedDate) === "today",
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			tasks: () => this.data.day?.slotted ?? [],
 			shownSpan: (item) => this.deps.tasks.shownSpan(item, this.selectedDate),
-			events: () => this.data.events,
+			events: () => this.data.timed,
 			isPast: (event) => this.deps.calendars.isPast(event),
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
@@ -353,7 +353,11 @@ export class TaskCalendarView extends ItemView {
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(root, "div", "tc-fade");
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
+		this.timelineDrop = new TimelineDrop(this.timeline, {
+			step: () => stepFor(this.hourPx),
+			span: (item, from, start) => this.deps.tasks.dropSpan(item, from, start),
+			newSlot: (start) => this.deps.tasks.newSlot(this.selectedDate, start),
+		});
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		new PinchZoom(timeline.el, {
@@ -598,7 +602,7 @@ export class TaskCalendarView extends ItemView {
 			tasks: this.deps.tasks,
 			calendars: this.deps.calendars,
 			theme: () => this.theme(),
-			today: () => this.today(),
+			relation: (date) => this.deps.days.relation(date),
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
@@ -719,7 +723,7 @@ export class TaskCalendarView extends ItemView {
 				root: this.contentEl,
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
-				sectionName: (section) => this.settings.sections[section],
+				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
 					this.search = null;
 					void this.reveal(hit.item);
@@ -735,8 +739,12 @@ export class TaskCalendarView extends ItemView {
 	 * that day beside its calendar. A found subtask's tasks show their subtasks, so its card is there.
 	 */
 	private async reveal(item: TaskItem): Promise<void> {
-		if (item.isSubtask) await this.act(() => this.deps.tasks.unfoldAbove(item.key));
-		const screen = await this.deps.tasks.screenOf(item);
+		const revealed: { screen?: TaskScreen } = {};
+		await this.act(async () => {
+			revealed.screen = await this.deps.tasks.reveal(item);
+		});
+		const { screen } = revealed;
+		if (!screen) return;
 		this.found.mark(item);
 		const place: Place = screen.kind === "day" ? "calendar" : PLACE_OF_LIST[screen.list];
 		this.atDone = place === "done";
@@ -950,7 +958,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private showSources(anchor: HTMLElement): void {
-		SourcesPopover.open({ anchor, statuses: this.data.statuses, now: this.deps.clock.now(), onRefresh: () => this.refreshNow() });
+		SourcesPopover.open({ anchor, statuses: this.data.statuses, onRefresh: () => this.refreshNow() });
 	}
 
 	private refreshNow(): Promise<void> {
@@ -1095,7 +1103,7 @@ export class TaskCalendarView extends ItemView {
 			this.doneList.render();
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
-		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), (event) => this.deps.calendars.isPast(event));
+		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
@@ -1118,7 +1126,7 @@ export class TaskCalendarView extends ItemView {
 	/** Today opens on the now line, another day at the hour the settings name. */
 	private scrollToOpen(timeline: Timeline, date: LocalDate): void {
 		const boundary = this.boundary();
-		if (date === this.today()) timeline.scrollTo(boundary.offsetOf(date, this.deps.clock.now()), LAYOUT.nowFraction);
+		if (this.deps.days.relation(date) === "today") timeline.scrollTo(boundary.offsetOf(date, this.deps.clock.now()), LAYOUT.nowFraction);
 		else timeline.scrollTo(boundary.offsetOfHour(this.settings.scrollToHour), 0);
 	}
 

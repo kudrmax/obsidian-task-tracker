@@ -1,5 +1,5 @@
 import type { SourceProblem, SourceStatus } from "../../application/contracts";
-import { addDays, dayMonth, formatTime, localDateOf, minutesOf } from "../dates";
+import { dayMonth, formatTime, localDateOf, minutesOf } from "../dates";
 
 export interface SourceText {
 	readonly name: "Google Calendar" | "iPhone calendars" | "Work calendar";
@@ -26,14 +26,12 @@ function problemText(problem: SourceProblem): string {
 }
 
 /** When a source was last brought up to date, the way the board words it. */
-export function sourceText(status: SourceStatus, now: Date): SourceText {
+export function sourceText(status: SourceStatus): SourceText {
 	const names = NAMES[status.source];
 	const at = status.updatedAt;
-	const today = localDateOf(now);
-	const day = at ? localDateOf(at) : null;
-	const relative = day === today ? "today" : day === addDays(today, -1) ? "yesterday" : day ? dayMonth(day) : "";
+	const relative = !at ? "" : status.updatedDay === "today" ? "today" : status.updatedDay === "yesterday" ? "yesterday" : dayMonth(localDateOf(at));
 	const clock = at ? formatTime(minutesOf(at)) : "";
-	const time = !at ? "" : day === today ? clock : day === addDays(today, -1) ? `Yesterday ${clock}` : `${dayMonth(day!)} ${clock}`;
+	const time = !at ? "" : status.updatedDay === "today" ? clock : status.updatedDay === "yesterday" ? `Yesterday ${clock}` : `${dayMonth(localDateOf(at))} ${clock}`;
 	const sub = status.problem ? problemText(status.problem) : status.kind === "exported" ? `Exported from ${status.detail ?? "file"}` : at ? `Updated ${relative}` : "Not updated yet";
 	return { name: names.name, short: names.short, sub, time, stale: status.stale };
 }

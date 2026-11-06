@@ -1,9 +1,9 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../src/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { fullTree } from "../../src/application/fullTree";
-import { TimelineSpans } from "../../src/application/TimelineSpans";
+import { droppedSpan, TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../src/domain/Days";
 import { typedMarks } from "../../src/domain/Marks";
@@ -251,6 +251,10 @@ export class DemoTaskService implements TaskService {
 		return taskScreen(item.list, item.day);
 	}
 
+	async reveal(item: TaskItem): Promise<TaskScreen> {
+		return this.screenOf(item);
+	}
+
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 		for (const item of items) {
 			if (item.key.section === key.section && item.key.index === key.index && item.key.path.join() === key.path.join()) return item;
@@ -328,7 +332,7 @@ export class DemoTaskService implements TaskService {
 		return placementOfDay(date, this.today());
 	}
 
-	listName(list: GroupedList): string {
+	listName(list: SectionKey): string {
 		return DEFAULT_SETTINGS.sections[list];
 	}
 
@@ -523,6 +527,20 @@ export class DemoTaskService implements TaskService {
 		if (!next) return false;
 		await this.setSlot(key, next);
 		return true;
+	}
+
+	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan {
+		return droppedSpan(start, from === "timeline" ? (item?.durationMin ?? null) : null);
+	}
+
+	newSlot(day: LocalDate, start: number): Slot {
+		return this.boundary().slotAt(day, droppedSpan(start, null).start, null);
+	}
+
+	async toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> {
+		const { slot } = this.taskOf(key);
+		const span = droppedSpan(start, from === "timeline" && slot && slot.end !== null ? slot.end - slot.start : null);
+		await this.setSlot(key, this.boundary().slotAt(day, span.start, span.end));
 	}
 
 	private timeline(): TimelineSpans {

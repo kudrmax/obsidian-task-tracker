@@ -9,12 +9,12 @@ const item = (k: TaskKey): TaskItem =>
 	onDay({ key: k, text: k.raw, status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: k.section, isSubtask: false }, T);
 
 describe("what a drag tells the targets and the service", () => {
-	const drag: TaskDragPayload = { item: item(key("now", 0)), from: "day", durationMin: null, grabPx: 0, carried: [{ item: item(key("soon", 1)), from: "soon" }, { item: item(key("inbox", 0)), from: "inbox" }] };
+	const drag: TaskDragPayload = { item: item(key("now", 0)), from: "day", grabPx: 0, carried: [{ item: item(key("soon", 1)), from: "soon" }, { item: item(key("inbox", 0)), from: "inbox" }] };
 
 	it("asks a target about every task carried, the one under the finger first", () => {
 		expect(originsOf(drag)).toEqual(["day", "soon", "inbox"]);
 		expect(originsOf({ ...drag, carried: undefined })).toEqual(["day"]);
-		expect(originsOf({ from: "new", item: null, durationMin: null, grabPx: 0 })).toEqual(["new"]);
+		expect(originsOf({ from: "new", item: null, grabPx: 0 })).toEqual(["new"]);
 	});
 
 	it("lets go every task carried, each with the column it came from", () => {
