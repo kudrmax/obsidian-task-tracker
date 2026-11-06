@@ -66,23 +66,33 @@ struct CaptureView: View {
     @ToolbarContentBuilder
     private var recorderItems: some ToolbarContent {
         if typing {
-            ToolbarItemGroup(placement: .keyboard) {
-                switch recorder.state {
-                case .idle:
+            switch recorder.state {
+            case .idle:
+                ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     recordButton
                     Spacer()
-                case .recording, .paused:
+                }
+            case .recording, .paused:
+                ToolbarItemGroup(placement: .keyboard) {
                     discardButton
                     Spacer()
-                    elapsed
+                }
+                ToolbarItem(placement: .keyboard) { elapsed }
+                    .sharedBackgroundVisibility(.hidden)
+                ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     pauseButton
                     stopButton
-                case .finished:
+                }
+            case .finished:
+                ToolbarItemGroup(placement: .keyboard) {
                     discardButton
                     Spacer()
-                    voiceNote
+                }
+                ToolbarItem(placement: .keyboard) { voiceNote }
+                    .sharedBackgroundVisibility(.hidden)
+                ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                 }
             }
@@ -96,6 +106,7 @@ struct CaptureView: View {
                 ToolbarItem(placement: .bottomBar) { discardButton }
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 ToolbarItem(placement: .status) { elapsed }
+                    .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 ToolbarItemGroup(placement: .bottomBar) {
                     pauseButton
@@ -105,6 +116,7 @@ struct CaptureView: View {
                 ToolbarItem(placement: .bottomBar) { discardButton }
                 ToolbarSpacer(.flexible, placement: .bottomBar)
                 ToolbarItem(placement: .status) { voiceNote }
+                    .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.flexible, placement: .bottomBar)
             }
         }
@@ -147,8 +159,12 @@ struct CaptureView: View {
 
     private var voiceNote: some View {
         VStack(spacing: 0) {
-            Label("Voice note", systemImage: "waveform")
-                .font(.headline)
+            HStack(spacing: 4) {
+                Image(systemName: "waveform")
+                    .foregroundStyle(.red)
+                Text("Voice note")
+            }
+            .font(.headline)
             Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
