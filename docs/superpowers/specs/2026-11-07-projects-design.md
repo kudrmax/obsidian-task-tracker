@@ -75,8 +75,9 @@ fixed that but made lines travel between files. One file wins.
    project mark; a tap on the mark opens the note.
 4. **Done.** The task leaves the screen and goes to Done with its link.
 
-## Open (technical, for the backend)
+## Open
 
+Nothing: every product question is decided. Technical ones are the agents'.
 
 ## Ideas for later
 
