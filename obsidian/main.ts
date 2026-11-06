@@ -1,6 +1,7 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
+import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
 
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { PluginSettings } from "./infrastructure/PluginSettings";
@@ -74,6 +75,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			);
 		});
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
+		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
+		this.register(() => services.stopSyncForApp());
 		this.addSettingTab(
 			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), view: this.viewSettings, google: services.google, work: services.work, calendars: services.calendars }),
 		);

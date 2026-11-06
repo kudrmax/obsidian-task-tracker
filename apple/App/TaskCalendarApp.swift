@@ -33,7 +33,7 @@ struct TaskCalendarApp: App {
                             await AppServices.shared.refresh()
                             await UIApplication.shared.open(back)
                         }
-                    } else {
+                    } else if !ObsidianSync.shared.handle(url) {
                         CaptureRouter.shared.open(url)
                     }
                 }

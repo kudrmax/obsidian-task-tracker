@@ -12,6 +12,7 @@ enum BoardTab: Hashable {
 struct BoardScreen: View {
     @State private var model = BoardModel()
     @State private var router = CaptureRouter.shared
+    @State private var sync = ObsidianSync.shared
     @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
     @State private var newTitle = ""
@@ -53,6 +54,8 @@ struct BoardScreen: View {
                 Task { await model.create(title, at: spot) }
             }
         }
+        .notSyncedAlert(sync)
+        .onChange(of: sync.returns) { Task { await model.reload() } }
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reload() } }) {
             CaptureView()
         }
@@ -95,7 +98,7 @@ enum BoardSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
-/// One tab's page: the ribbon under the top bar, Undo on the left and «⋯» on the right.
+/// One tab's page: the ribbon under the top bar, Undo on the left, Sync and «⋯» on the right.
 struct BoardPage: View {
     let place: RibbonPlace
     @Bindable var model: BoardModel
@@ -164,6 +167,12 @@ struct BoardPage: View {
         ToolbarItem(placement: .topBarLeading) {
             Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
                 .disabled(model.snapshot?.canUndo != true)
+                .tint(.primary)
+        }
+        // Sync and «⋯» stand in one glass group, as iOS 26 groups the trailing items.
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Sync", systemImage: "arrow.triangle.2.circlepath") { Task { await ObsidianSync.shared.start() } }
+                .disabled(ObsidianSync.shared.vault == nil)
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
