@@ -6,13 +6,16 @@ final class AppServices: Sendable {
     static let shared = AppServices()
 
     let vault: Vault
+    /// The lists a new task goes into, as the plugin names them.
+    let captureLists: [CaptureList]
     private let sync: ReminderSync
     private let tasks: TaskCapture
 
     private init() {
-        vault = Vault(bookmarks: UserDefaultsBookmarks())
         let rules = Self.rules()
-        sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport())
+        vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
+        captureLists = (try? rules.captureLists()) ?? []
+        sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
     }
 

@@ -1,8 +1,12 @@
 import Foundation
 
-/// The lists a task is written into from the phone.
-public enum CaptureList: String, CaseIterable, Sendable {
-    case inbox, now, soon, backlog
+/// A list a task is written into from the phone, by the plugin's name of it (`TaskRules.captureLists`).
+public struct CaptureList: Hashable, Sendable {
+    public let name: String
+
+    public init(_ name: String) {
+        self.name = name
+    }
 }
 
 public enum CaptureOutcome: Equatable, Sendable {
@@ -62,7 +66,7 @@ public final class TaskCapture: Sendable {
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !typed.isEmpty || recording != nil else { return .saved }
         do {
-            var parts = typed.isEmpty ? [] : [Self.oneLine(typed)]
+            var parts = typed.isEmpty ? [] : [typed]
             if let recording {
                 let folder = AttachmentFolder.path(appJSON: vault.read(path: AttachmentFolder.appSettingsPath), notePath: try vault.tasksFilePath())
                 parts.append("[[\(try vault.save(recording, in: folder, named: Self.recordingName(at)))]]")
@@ -82,6 +86,8 @@ public final class TaskCapture: Sendable {
             return .failed("No access to the vault folder: choose it in the app")
         } catch VaultError.tasksFileMissing(let path) {
             return .failed("No tasks file “\(path)” in the vault folder")
+        } catch VaultError.noTasksFile {
+            return .failed(VaultError.noTasksFileMessage)
         } catch {
             return .failed("\(Self.failure): \(error.localizedDescription)")
         }
@@ -98,11 +104,6 @@ public final class TaskCapture: Sendable {
     static func tag(_ typed: String) -> String? {
         let name = typed.trimmingCharacters(in: .whitespaces).drop { $0 == "#" }
         return name.isEmpty ? nil : "#\(name)"
-    }
-
-    /// A task is one line: the lines typed are joined by spaces.
-    static func oneLine(_ text: String) -> String {
-        text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     private static func format(_ pattern: String, _ date: Date) -> String {

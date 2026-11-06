@@ -8,6 +8,12 @@ final class PhoneCalendarExport: CalendarExporting {
     private static let daysBack = 30
     private static let daysAhead = 90
 
+    private let rules: TaskRules
+
+    init(rules: TaskRules) {
+        self.rules = rules
+    }
+
     static var allowed: Bool { EKEventStore.authorizationStatus(for: .event) == .fullAccess }
 
     static func requestAccess() async {
@@ -32,7 +38,7 @@ final class PhoneCalendarExport: CalendarExporting {
                     calendarId: event.calendar.calendarIdentifier)
             }
         let device = await UIDevice.current.name
-        let text = CalendarExport.text(calendars: calendars, events: events, from: from, to: to, exportedAt: now, device: device, validUntil: AppSignature.expiration)
+        let text = try rules.iphoneCalendarText(PhoneExport(calendars: calendars, events: events, from: from, to: to, exportedAt: now, device: device, validUntil: AppSignature.expiration))
         Self.keepCopy(text)
         return text
     }

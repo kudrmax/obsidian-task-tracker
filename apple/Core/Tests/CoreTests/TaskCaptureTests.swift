@@ -29,26 +29,26 @@ import Testing
 
     @Test func typedTextGoesLastInInbox() throws {
         let vault = FakeVault(Self.file)
-        #expect(try capture(vault).capture(list: .inbox, text: " Call the bank\n", recording: nil) == .saved)
+        #expect(try capture(vault).capture(list: CaptureList("inbox"), text: " Call the bank\n", recording: nil) == .saved)
         #expect(vault.text.contains("- [ ] Old\n- [ ] Call the bank\n"))
     }
 
     @Test func nowTakesTodaysDate() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .now, text: "Buy milk", recording: nil)
+        _ = try capture(vault).capture(list: CaptureList("now"), text: "Buy milk", recording: nil)
         #expect(vault.text.contains("## Now\n\n- [ ] Buy milk 📅 2026-11-06\n"))
     }
 
     @Test func linesTypedBecomeOneTitle() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .inbox, text: "Call\n\n the bank", recording: nil)
+        _ = try capture(vault).capture(list: CaptureList("inbox"), text: "Call\n\n the bank", recording: nil)
         #expect(vault.text.contains("- [ ] Call the bank\n"))
     }
 
     @Test func backlogAndSoonTakeNoDate() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .backlog, text: "Learn Go", recording: nil)
-        _ = try capture(vault).capture(list: .soon, text: "Book a table", recording: nil)
+        _ = try capture(vault).capture(list: CaptureList("backlog"), text: "Learn Go", recording: nil)
+        _ = try capture(vault).capture(list: CaptureList("soon"), text: "Book a table", recording: nil)
         #expect(vault.text.contains("## Soon\n\n- [ ] Book a table\n"))
         #expect(vault.text.contains("## Backlog\n\n- [ ] Learn Go\n"))
     }
@@ -57,45 +57,45 @@ import Testing
         let vault = FakeVault(Self.file)
         vault.files[".obsidian/app.json"] = #"{"attachmentFolderPath":"Audio"}"#
         let sound = Data([1, 2, 3])
-        #expect(try capture(vault).capture(list: .inbox, text: "", recording: sound, tag: "#transcribe") == .saved)
+        #expect(try capture(vault).capture(list: CaptureList("inbox"), text: "", recording: sound, tag: "#transcribe") == .saved)
         #expect(vault.saved["Audio/Recording 20261106143200.m4a"] == sound)
         #expect(vault.text.contains("- [ ] Old\n- [ ] [[Recording 20261106143200.m4a]] #transcribe\n"))
     }
 
     @Test func textAndRecordingTogether() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .now, text: "Idea", recording: Data([1]), tag: "transcribe")
+        _ = try capture(vault).capture(list: CaptureList("now"), text: "Idea", recording: Data([1]), tag: "transcribe")
         #expect(vault.text.contains("- [ ] Idea [[Recording 20261106143200.m4a]] #transcribe 📅 2026-11-06\n"))
     }
 
     @Test func noTagWhenNoneIsSet() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .inbox, text: "", recording: Data([1]), tag: " ")
+        _ = try capture(vault).capture(list: CaptureList("inbox"), text: "", recording: Data([1]), tag: " ")
         #expect(vault.text.contains("- [ ] [[Recording 20261106143200.m4a]]\n"))
     }
 
     @Test func theTagIsOnlyForARecording() throws {
         let vault = FakeVault(Self.file)
-        _ = try capture(vault).capture(list: .inbox, text: "Typed", recording: nil, tag: "#transcribe")
+        _ = try capture(vault).capture(list: CaptureList("inbox"), text: "Typed", recording: nil, tag: "#transcribe")
         #expect(vault.text.contains("- [ ] Typed\n"))
     }
 
     @Test func nothingToWrite() throws {
         let vault = FakeVault(Self.file)
-        #expect(try capture(vault).capture(list: .inbox, text: "  ", recording: nil) == .saved)
+        #expect(try capture(vault).capture(list: CaptureList("inbox"), text: "  ", recording: nil) == .saved)
         #expect(vault.text == Self.file)
     }
 
     @Test func aFileChangedInBetweenIsReadAgain() throws {
         let vault = FakeVault(Self.file)
         vault.changeBeforeWrite = "## Inbox\n\n- [ ] Typed in Obsidian\n"
-        _ = try capture(vault).capture(list: .inbox, text: "A", recording: nil)
+        _ = try capture(vault).capture(list: CaptureList("inbox"), text: "A", recording: nil)
         #expect(vault.text.contains("- [ ] Typed in Obsidian\n- [ ] A\n"))
     }
 
     @Test func noAccessIsSaid() throws {
         let vault = FakeVault(Self.file)
         vault.readFails = .noAccess
-        #expect(try capture(vault).capture(list: .inbox, text: "A", recording: nil) == .failed("No access to the vault folder: choose it in the app"))
+        #expect(try capture(vault).capture(list: CaptureList("inbox"), text: "A", recording: nil) == .failed("No access to the vault folder: choose it in the app"))
     }
 }

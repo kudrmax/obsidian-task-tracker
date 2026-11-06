@@ -11,13 +11,14 @@ struct FakeExporter: CalendarExporting {
 @Suite struct CalendarExportTests {
     static let quiet = "- [ ] Call ⏰ 2026-11-04 10:00"
     static let work = ExportedCalendar(title: "Календарь", calendarId: "ek-work", account: "max@company.ru", color: "#0A84FF")
-    let rules = try! PhoneCore(script: Fixtures.phoneScript)
+    static let rules = try! PhoneCore(script: Fixtures.phoneScript)
+    let rules = Self.rules
     let notifications = FakeNotifications()
 
     static func export(_ events: [ExportedEvent]) -> String {
-        CalendarExport.text(
+        try! rules.iphoneCalendarText(PhoneExport(
             calendars: [work], events: events, from: Fixtures.date(3, 0), to: Fixtures.date(30, 0),
-            exportedAt: Fixtures.date(4, 9), device: "iPhone", validUntil: Fixtures.date(11, 9))
+            exportedAt: Fixtures.date(4, 9), device: "iPhone", validUntil: Fixtures.date(11, 9)))
     }
 
     @Test func thePluginReadsWhatTheAppWrites() throws {
@@ -40,7 +41,7 @@ struct FakeExporter: CalendarExporting {
     @Test func theSameCalendarsAreNotWrittenAgainWithinTenMinutes() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         let at = { (minute: Int) in
-            CalendarExport.text(calendars: [Self.work], events: [], from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9, minute), device: "iPhone", validUntil: nil)
+            try! Self.rules.iphoneCalendarText(PhoneExport(calendars: [Self.work], events: [], from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9, minute), device: "iPhone", validUntil: nil))
         }
         vault.files["calendar/iphone.json"] = at(0)
         _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), calendar: FakeExporter(text: at(5)), now: { Fixtures.date(4, 9, 5) }).sync()
@@ -49,11 +50,12 @@ struct FakeExporter: CalendarExporting {
         #expect(vault.files["calendar/iphone.json"] == at(10))
     }
 
-    @Test func theAccountIdGoesWithEachCalendar() {
-        let text = CalendarExport.text(
+    @Test func theAccountIdGoesWithEachCalendar() throws {
+        let text = try rules.iphoneCalendarText(PhoneExport(
             calendars: [ExportedCalendar(title: "Personal", calendarId: "p", account: "Gmail", color: nil, sourceId: "src-1")], events: [],
-            from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9), device: "iPhone", validUntil: nil)
-        #expect(text.contains(#""sourceId" : "src-1""#))
+            from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9), device: "iPhone", validUntil: nil))
+        let file = try #require(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+        #expect((file["calendars"] as? [[String: Any]])?.first?["sourceId"] as? String == "src-1")
     }
 
     @Test func noCalendarAccessLeavesTheFileAloneAndSetsTheRemindersAllTheSame() async {

@@ -48,36 +48,30 @@ public struct NoCalendarExport: CalendarExporting {
     public func export(now: Date) async throws -> String? { nil }
 }
 
-/// `calendar/iphone.json`, in the format every writer of the plugin's calendar files uses.
-public enum CalendarExport {
-    public static let path = "calendar/iphone.json"
+/// The phone's calendars and their meetings from `from` to `to`, as the app hands them to the plugin's door to be written.
+public struct PhoneExport: Sendable {
+    public let calendars: [ExportedCalendar]
+    public let events: [ExportedEvent]
+    public let from: Date
+    public let to: Date
+    public let exportedAt: Date
+    public let device: String
+    /// Until when the app can still write them: its signature's end.
+    public let validUntil: Date?
 
-    public static func text(calendars: [ExportedCalendar], events: [ExportedEvent], from: Date, to: Date, exportedAt: Date, device: String, validUntil: Date?) -> String {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let byId = Dictionary(calendars.map { ($0.calendarId, $0) }, uniquingKeysWith: { first, _ in first })
-        let file: [String: Any] = [
-            "exportedAt": iso.string(from: exportedAt),
-            "device": device,
-            "from": iso.string(from: from),
-            "to": iso.string(from: to),
-            "validUntil": validUntil.map(iso.string(from:)) ?? NSNull(),
-            "calendars": calendars.map {
-                ["calendar": $0.title, "calendarId": $0.calendarId, "account": $0.account, "color": $0.color ?? NSNull(), "sourceId": $0.sourceId ?? NSNull()] as [String: Any]
-            },
-            "events": events.map { event -> [String: Any] in
-                let calendar = byId[event.calendarId]
-                return [
-                    "id": event.id, "title": event.title, "start": iso.string(from: event.start), "end": iso.string(from: event.end),
-                    "allDay": event.allDay, "calendar": calendar?.title ?? "", "calendarId": event.calendarId,
-                    "account": calendar?.account ?? NSNull(), "color": calendar?.color ?? NSNull(),
-                ]
-            },
-        ]
-        let data = try! JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys])
-        return String(decoding: data, as: UTF8.self) + "\n"
+    public init(calendars: [ExportedCalendar], events: [ExportedEvent], from: Date, to: Date, exportedAt: Date, device: String, validUntil: Date?) {
+        self.calendars = calendars
+        self.events = events
+        self.from = from
+        self.to = to
+        self.exportedAt = exportedAt
+        self.device = device
+        self.validUntil = validUntil
     }
+}
 
+/// When the phone's calendars are written again.
+public enum CalendarExport {
     /// Sync carries every write: the same calendars are written again only to say they are still fresh, at most this often.
     static let freshStep: TimeInterval = 10 * 60
 

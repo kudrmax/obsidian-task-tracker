@@ -21,6 +21,10 @@ public final class UserDefaultsBookmarks: BookmarkStore, @unchecked Sendable {
 public enum VaultError: Error, Equatable {
     case noAccess
     case tasksFileMissing(String)
+    /// The plugin's settings name no tasks file.
+    case noTasksFile
+
+    static let noTasksFileMessage = "No tasks file set in Task Calendar's settings"
 }
 
 /// Where the tasks file and the plugin's settings come from.
@@ -42,15 +46,19 @@ public protocol TasksVault: Sendable {
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
 public final class Vault: TasksVault, @unchecked Sendable {
     static let settingsPath = ".obsidian/plugins/task-calendar/data.json"
-    static let defaultTasksFile = "TODOs Tasks.md"
 
     private let bookmarks: BookmarkStore
+    private let rule: TasksFileRule
     /// A file changed this recently may still be being written: wait this long and read it again.
     private let settle: Duration
+    private let wait: @Sendable (Duration) -> Void
 
-    public init(bookmarks: BookmarkStore, settle: Duration = .seconds(1)) {
+    /// `wait`: how a read waits out a file still being written.
+    public init(bookmarks: BookmarkStore, rule: TasksFileRule, settle: Duration = .seconds(1), wait: (@Sendable (Duration) -> Void)? = nil) {
         self.bookmarks = bookmarks
+        self.rule = rule
         self.settle = settle
+        self.wait = wait ?? { Thread.sleep(forTimeInterval: $0.seconds) }
     }
 
     /// Remembers `folder` (a URL from the folder picker) for every later run, in the background too.
@@ -62,8 +70,8 @@ public final class Vault: TasksVault, @unchecked Sendable {
 
     public func read() throws -> (tasks: String, settingsJSON: String) {
         try withFolder { folder in
-            let settingsJSON = (try? Self.coordinatedRead(folder.appendingPathComponent(Self.settingsPath))) ?? ""
-            let path = Self.tasksFile(in: settingsJSON)
+            let settingsJSON = Self.settings(in: folder)
+            let path = try tasksFile(settingsJSON)
             let file = folder.appendingPathComponent(path)
             guard FileManager.default.fileExists(atPath: file.path) else { throw VaultError.tasksFileMissing(path) }
             return (try settledRead(file), settingsJSON)
@@ -72,7 +80,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
 
     public func write(tasks: String, expecting old: String) throws -> Bool {
         try withFolder { folder in
-            let file = folder.appendingPathComponent(Self.tasksFile(in: (try? Self.coordinatedRead(folder.appendingPathComponent(Self.settingsPath))) ?? ""))
+            let file = folder.appendingPathComponent(try tasksFile(Self.settings(in: folder)))
             var written = false
             var failure: Error?
             var coordination: NSError?
@@ -91,7 +99,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
     }
 
     public func tasksFilePath() throws -> String {
-        try withFolder { folder in Self.tasksFile(in: (try? Self.coordinatedRead(folder.appendingPathComponent(Self.settingsPath))) ?? "") }
+        try withFolder { folder in try tasksFile(Self.settings(in: folder)) }
     }
 
     public func save(_ data: Data, in path: String, named name: String) throws -> String {
@@ -145,7 +153,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
         var text = try Self.coordinatedRead(file)
         for _ in 0..<5 {
             guard let modified = Self.modified(file), Date().timeIntervalSince(modified) < settle.seconds else { break }
-            Thread.sleep(forTimeInterval: settle.seconds)
+            wait(settle)
             text = try Self.coordinatedRead(file)
         }
         return text
@@ -167,12 +175,14 @@ public final class Vault: TasksVault, @unchecked Sendable {
         try? FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date
     }
 
-    private static func tasksFile(in settingsJSON: String) -> String {
-        guard let data = settingsJSON.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let path = object["tasksFile"] as? String, !path.isEmpty
-        else { return defaultTasksFile }
+    private func tasksFile(_ settingsJSON: String) throws -> String {
+        guard let path = try rule.tasksFile(settingsJSON: settingsJSON) else { throw VaultError.noTasksFile }
         return path
+    }
+
+    /// The plugin's `data.json`, empty for none: the plugin's defaults.
+    private static func settings(in folder: URL) -> String {
+        (try? coordinatedRead(folder.appendingPathComponent(settingsPath))) ?? ""
     }
 
     private static func coordinatedRead(_ file: URL) throws -> String {

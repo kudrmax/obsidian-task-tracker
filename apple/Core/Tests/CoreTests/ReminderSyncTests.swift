@@ -254,7 +254,7 @@ actor FakeCards: CardScheduling {
     }
 
     @Test func noAccessIsSaid() async {
-        let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks()), rules: rules, notifications: notifications, alarms: alarms, cards: cards, now: { Fixtures.date(4, 9) })
+        let s = ReminderSync(vault: Vault(bookmarks: MemoryBookmarks(), rule: rules), rules: rules, notifications: notifications, alarms: alarms, cards: cards, now: { Fixtures.date(4, 9) })
         #expect(await s.sync() == .failed("No access to the vault folder: choose it in the app"))
     }
 
