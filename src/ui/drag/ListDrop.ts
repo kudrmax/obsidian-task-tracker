@@ -117,14 +117,11 @@ export class ListDrop implements DropTarget {
 		this.scroll.follow(y, frame.box);
 	}
 
+	/** The plus shrinks into the plate it lights or into the line's dot. */
 	landing(): DOMRect | null {
 		if (!this.layout || !this.place) return null;
-		const frame = readFrame(this.list.el);
 		if (this.plate) return this.plate.getBoundingClientRect();
-		if (this.last?.drag.from === "new") return this.lineRect(this.place, frame);
-		const gap = this.gapRect(this.place, frame);
-		const leaving = this.waitingAbove(this.place.index) * (this.layout.size.height + this.layout.size.gap);
-		return new DOMRect(gap.left, gap.top - leaving, gap.width, gap.height);
+		return this.lineRect(this.place, readFrame(this.list.el));
 	}
 
 	/** The finger has left the list: the line goes, a card lifted from it still waits dashed where it stood. */
@@ -232,17 +229,6 @@ export class ListDrop implements DropTarget {
 			heads.push({ group: groups[groupIndex++]?.name ?? null, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
 		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
-	}
-
-	/** The dashed places above the gap before card `index`: they go once the drop is written, and the cards below close up. */
-	private waitingAbove(index: number): number {
-		const next = this.layout?.cards[index]?.entry.card;
-		let count = 0;
-		for (const { card } of this.list.cards) {
-			if (card === next) break;
-			if (card.classList.contains(WAITING)) count++;
-		}
-		return count;
 	}
 
 	/** A measured card in client pixels. */

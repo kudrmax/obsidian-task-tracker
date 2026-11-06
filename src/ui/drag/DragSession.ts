@@ -10,8 +10,8 @@ export interface DragSessionOptions {
 	readonly origin: DOMRect;
 	/** The card is about to fly back: its place in the list opens again. */
 	onReturn?(): void;
-	/** The drop, or null for a cancelled drag. */
-	onEnd(result: DropResult | null): Promise<void>;
+	/** The drop, or null for a cancelled drag. A task's drop gives its card once written and drawn: the float lands on it. */
+	onEnd(result: DropResult | null): Promise<HTMLElement | null | void>;
 }
 
 /** One drag from lift to drop: routes the pointer to the target under it and settles the card at the end. */
@@ -39,8 +39,10 @@ export class DragSession {
 		const target = this.current;
 		const result = target?.drop(x, y, this.opts.payload) ?? null;
 		if (!target || !result) return this.settleBack();
-		const landing = target.landing() ?? this.opts.origin;
-		await Promise.all([this.opts.float.land(landing), this.opts.onEnd(result)]);
+		const line = target.landing();
+		const card = await this.opts.onEnd(result);
+		const landing = card ? card.getBoundingClientRect() : this.opts.payload.from === "new" ? line : null;
+		await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
 		this.clearAll();
 		this.opts.float.remove();
 	}

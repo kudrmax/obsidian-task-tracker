@@ -302,12 +302,27 @@ export class TaskWrites {
 		return nothing(this.rules.applyAll(steps));
 	}
 
-	/** What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. */
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): { readonly reads: boolean; plan(s: Snapshot | null): Write<void> } {
+	/**
+	 * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
+	 * the tasks' keys as the file now has them, in their order; one not found again is left out.
+	 */
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): { readonly reads: boolean; plan(s: Snapshot | null): Write<readonly TaskKey[]> } {
 		const moves = dropMoves(tasks, to, day);
 		return {
 			reads: moves.kind === "one" && moves.move.kind === "toTime",
-			plan: (s) => (moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
+			plan: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
+		};
+	}
+
+	/** The dropped tasks where `write` left them. */
+	private landed(tasks: readonly DroppedTask[], write: Write<void>): Write<readonly TaskKey[]> {
+		return {
+			operation: write.operation,
+			answer: (change) => {
+				if (!change) return tasks.map((task) => task.key);
+				const moved = tasks.map((task) => this.rules.entryOf(change.before, task.key));
+				return change.after.movedSince(change.before, moved).flatMap((entry) => (entry ? [{ section: entry.section, index: entry.index, path: entry.path, raw: entry.raw }] : []));
+			},
 		};
 	}
 

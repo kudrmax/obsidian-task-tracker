@@ -407,7 +407,7 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.applyAll(steps));
 	}
 
-	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
 		const drop = this.writes.drop(tasks, to, day);
 		return this.run(drop.plan(drop.reads ? await this.snapshot() : null));
 	}

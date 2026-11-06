@@ -42,7 +42,8 @@ export interface DragControllerDeps {
 	readonly arbiter: GestureArbiter;
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
-	onResult(drag: TaskDragPayload, result: DropResult): Promise<void>;
+	/** Writes the drop and draws it: gives the dropped task's card as drawn now, null when none shows. */
+	onResult(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null>;
 	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
 	stretch(item: TaskItem, edge: ResizeEdge, minute: number): StretchSpan;
 	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */
@@ -288,10 +289,11 @@ export class DragController {
 					onEnd: async (result) => {
 						detach();
 						this.deps.arbiter.release(DRAG);
-						if (!result) return;
+						if (!result) return null;
 						this.deps.haptics.tap();
-						await this.deps.onResult(payload, result);
+						const card = await this.deps.onResult(payload, result);
 						reopen();
+						return card;
 					},
 				}),
 			() => this.deps.onDragging(false),

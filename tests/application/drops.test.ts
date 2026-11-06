@@ -181,6 +181,33 @@ describe("what a drop writes (spec §5.1)", () => {
 	});
 });
 
+/** The keys a drop gives against the tasks a fresh read finds by their text. */
+async function landed(c: DropCase): Promise<{ given: readonly TaskKey[]; read: readonly TaskKey[] }> {
+	const { svc } = setup();
+	const before = await itemsOf(svc);
+	const key = (text: string): TaskKey => before.get(text)!.key;
+	const given = await svc.drop(c.tasks.map(([text, from]) => ({ key: key(text), from })), c.to(key), c.day);
+	const after = await itemsOf(svc);
+	return { given, read: c.tasks.map(([text]) => after.get(text)!.key) };
+}
+
+describe("where a drop leaves the tasks: the keys it gives are theirs as the file now has them", () => {
+	for (const c of [...SINGLE, ...SEVERAL])
+		it(c.name, async () => {
+			const { given, read } = await landed(c);
+			expect(given).toEqual(read);
+		});
+
+	it("a task carried up past a section's header into the end of the section above: the line the move kept unchanged", async () => {
+		const { svc } = setup();
+		const np2 = (await itemsOf(svc)).get("NP2")!;
+		const n3 = (await itemsOf(svc)).get("N3")!;
+		const given = await svc.drop([{ key: n3.key, from: "day" }], { kind: "group", list: "now", date: null, group: null, before: null }, T);
+		expect(given).toEqual([(await itemsOf(svc)).get("N3")!.key]);
+		expect(given[0].index).toBe(np2.key.index + 1);
+	});
+});
+
 describe("a drop on the timeline", () => {
 	const midnight = () => setup(new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 0 }));
 	const at = async (text: string, from: DropFrom, start: number, day = T) => {

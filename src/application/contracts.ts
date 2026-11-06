@@ -712,9 +712,10 @@ export interface TaskService {
 	 * A drop of one task or several on `to`, the day column showing `day`: what spec §5.1 makes of it. One task as the single
 	 * call it means (`setSlot`, `clearSlot`, `moveToGroup`, `nest`, `moveBefore`, `moveToList`, `moveToSoon`, `moveToEnd`);
 	 * several as `applyAll` of what each means by where it came from, never on the timeline. A list without sections puts a
-	 * task from another column at its end (see `placesInGap`).
+	 * task from another column at its end (see `placesInGap`). Gives the tasks' keys as the file now has them, in their
+	 * order, so the screen settles the card on the task where it stands; one not found again is left out.
 	 */
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void>;
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;

@@ -79,6 +79,8 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
+- `tasks.drop(tasks, to, day)` answers the dropped tasks' keys as the file now has them: the screen settles the card on
+  its task where it stands.
 - Subscriptions are the host's: it watches the files and calls again after a change.
 
 ### `days.*`: `DayService`

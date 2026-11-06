@@ -854,7 +854,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
 /* A section lifted: its tasks fold away with its header. A task lifted waits as a dashed place where it stood, its subtasks folded away under it; no other card moves, the drop line shows the place. */
 .tc-card.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
-.tc-card.is-lifted { visibility: hidden; }
+.tc-card.is-lifted, .tc-card.is-arriving { visibility: hidden; }
 .tc-list > .tc-card, .tc-list > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* A subtask's branch from its task: on down past it to the next subtask, bending in at the last; the lines of the tasks further up that go on past it. */
 .tc-branch, .tc-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
@@ -966,7 +966,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* The now line: the time in a pill, the line to the right edge. */
 /* A task on the timeline is the card of the list: 40 px at a time, its duration's length when it has one; selected, it is ringed and gets the two dots that stretch it. */
 .tc-block { position: absolute; top: var(--tc-y); height: var(--tc-len); left: var(--tc-x); right: var(--tc-item-inset); z-index: var(--tc-layer-block); touch-action: pan-y; cursor: pointer; }
-.tc-block.is-lifted { visibility: hidden; }
+.tc-block.is-lifted, .tc-block.is-arriving { visibility: hidden; }
 .tc-block-card { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; border-radius: var(--tc-radius-card); background: var(--tc-card-bg); padding: var(--tc-block-pad-top) var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: flex-start; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-block-card .tc-card-title { font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 .tc-block.is-selected .tc-block-card { box-shadow: var(--tc-ring-selected); }
@@ -996,14 +996,14 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-float { width: var(--tc-float-w); height: var(--tc-float-h); box-sizing: border-box; background: var(--tc-float-bg); border-radius: var(--tc-radius-float); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); box-shadow: var(--tc-shadow-lift); transform-origin: 0 0; font-size: var(--tc-font-body); }
 .tc-float-plus svg { stroke-width: var(--tc-stroke-plus); }
 .tc-float-plus.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out); }
-.tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out); }
+.tc-float.is-flying { transition: transform var(--tc-duration-fly) var(--tc-ease-out), width var(--tc-duration-fly) var(--tc-ease-out), height var(--tc-duration-fly) var(--tc-ease-out), background-color var(--tc-duration-fly) var(--tc-ease-out), box-shadow var(--tc-duration-fly) var(--tc-ease-out), opacity var(--tc-duration-fly) var(--tc-ease-out); }
 /* Landing, the card takes the look of a card at rest. */
 .tc-float.is-landed { background: var(--tc-card-bg); box-shadow: none; }
 .tc-float .tc-due-mon, .tc-float .tc-due-repeat { color: var(--tc-float-month); }
 .tc-float-under { height: var(--tc-float-h); border-radius: var(--tc-radius-float); box-shadow: var(--tc-shadow-lift); transition: opacity var(--tc-duration-fly) var(--tc-ease-out); }
 .tc-float-under.is-1 { margin: var(--tc-stack-step-y) 0 0 var(--tc-stack-step-x); background: var(--tc-stack-1); }
 .tc-float-under.is-2 { margin: calc(2 * var(--tc-stack-step-y)) 0 0 calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
-.tc-float-under.is-gone { opacity: 0; }
+.tc-float-under.is-gone, .tc-float.is-gone { opacity: 0; }
 /* The whole title of a pressed card: the card stretches to the right on its one line; the copy over the menu then wraps a title still too long, its first line where it stood. */
 .is-stretched .tc-card-title, .is-whole .tc-card-title { -webkit-mask-image: none; mask-image: none; }
 .tc-lifted.is-whole { max-width: calc(100% - 2 * var(--tc-whole-margin)); align-items: flex-start; }

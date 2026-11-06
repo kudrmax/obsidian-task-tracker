@@ -46,12 +46,15 @@ class FakeFloat implements Float {
 	async flyTo(to: DOMRect): Promise<void> {
 		this.log.push(`fly ${to.x},${to.y}`);
 	}
+	async vanish(): Promise<void> {
+		this.log.push("vanish");
+	}
 	remove(): void {
 		this.log.push("remove");
 	}
 }
 
-function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload) {
+function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carried: DragPayload = payload, drawn: HTMLElement | null = null) {
 	return new DragSession({
 		payload: carried,
 		targets,
@@ -59,8 +62,16 @@ function session(targets: DropTarget[], float: FakeFloat, ended: unknown[], carr
 		origin: rect(5, 500),
 		onEnd: async (result) => {
 			ended.push(result);
+			return drawn;
 		},
 	});
+}
+
+/** A card drawn after the drop, standing at `top`. */
+function drawnCard(top: number): HTMLElement {
+	const card = document.createElement("div");
+	card.getBoundingClientRect = () => rect(30, top);
+	return card;
 }
 
 describe("DragSession", () => {
@@ -90,17 +101,45 @@ describe("DragSession", () => {
 		expect(journal).toEqual(["hit", "preview", "float", "hit", "preview", "float"]);
 	});
 
-	it("drops on the target, flies the float there and reports the result", async () => {
+	it("drops on the target, reports the result and lands on the task's card as drawn after it, never on the target's guess", async () => {
 		const slot: DropResult = { kind: "time", start: 990 };
 		const a = new FakeTarget("a", 0, 100, slot);
 		const float = new FakeFloat();
 		const ended: unknown[] = [];
-		const s = session([a], float, ended);
+		const s = session([a], float, ended, payload, drawnCard(240));
 		s.move(50, 10);
 		await s.release(50, 10);
 		expect(a.log).toEqual(["preview 50,10", "drop", "clear"]);
-		expect(float.log).toEqual(["move 50,10", "land 0,0", "remove"]);
+		expect(float.log).toEqual(["move 50,10", "land 30,240", "remove"]);
 		expect(ended).toEqual([slot]);
+	});
+
+	it("lands only once the drop is written and drawn", async () => {
+		const order: string[] = [];
+		const float = new FakeFloat();
+		float.land = async () => void order.push("land");
+		const s = new DragSession({
+			payload,
+			targets: [new FakeTarget("a", 0, 100, { kind: "clearSlot" })],
+			float,
+			origin: rect(5, 500),
+			onEnd: async () => {
+				await Promise.resolve();
+				order.push("written");
+				return drawnCard(0);
+			},
+		});
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(order).toEqual(["written", "land"]);
+	});
+
+	it("a task whose card does not show after the drop fades where it was let go", async () => {
+		const float = new FakeFloat();
+		const s = session([new FakeTarget("a", 0, 100, { kind: "clearSlot" })], float, []);
+		s.move(50, 10);
+		await s.release(50, 10);
+		expect(float.log).toEqual(["move 50,10", "vanish", "remove"]);
 	});
 
 	it("flies back and reports nothing when released outside every target", async () => {

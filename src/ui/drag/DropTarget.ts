@@ -63,7 +63,7 @@ export type DropResult = DropTo;
 export interface DropTarget {
 	hitTest(x: number, y: number, drag: DragPayload): boolean;
 	preview(x: number, y: number, drag: DragPayload): void;
-	/** Where the card will come to rest, in client pixels, while a preview shows. */
+	/** Where a new task carried on the plus comes to rest, in client pixels, while a preview shows. A task's card lands on its card as drawn after the drop. */
 	landing(): DOMRect | null;
 	/** The finger has gone elsewhere, the drag goes on. */
 	leave(): void;
@@ -77,6 +77,8 @@ export interface Float {
 	moveTo(x: number, y: number): void;
 	/** Settles where the drop puts it. */
 	land(rect: DOMRect): Promise<void>;
+	/** Fades where it is: the drop is written but its card does not show. */
+	vanish(): Promise<void>;
 	/** Flies back to where it came from. */
 	flyTo(rect: DOMRect): Promise<void>;
 	remove(): void;
