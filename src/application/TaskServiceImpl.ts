@@ -40,7 +40,7 @@ import type { SectionOffer } from "./sections";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
-import { type Snapshot, TaskReads } from "./TaskReads";
+import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
 import type { UndoHistory } from "./UndoHistory";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
@@ -105,14 +105,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	async screen(date: LocalDate): Promise<ScreenView> {
-		try {
-			await this.normalize();
-			return this.reads.screen(await this.snapshot(), date);
-		} catch (error) {
-			if (error instanceof TasksFileMissingError) return this.reads.missingScreen(date);
-			throw error;
-		}
+	screen(date: LocalDate): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date));
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -143,9 +137,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.doneView(await this.snapshot());
 	}
 
-	async search(query: string): Promise<readonly SearchGroup[]> {
-		if (!this.reads.searches(query)) return [];
-		return this.reads.search(await this.snapshot(), query);
+	search(query: string): Promise<readonly SearchGroup[]> {
+		return this.ask(this.reads.searchRead(query));
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {
@@ -234,13 +227,11 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void> {
-		if (keys.length === 0) return;
-		return this.run(this.writes.togglePriority(await this.snapshot(), keys, prefix));
+		return this.run(await this.ask(this.writes.togglePriority(keys, prefix)));
 	}
 
 	async toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]> {
-		if (keys.length === 0) return [];
-		return this.run(this.writes.toggleLabel(await this.snapshot(), keys, name));
+		return this.run(await this.ask(this.writes.toggleLabel(keys, name)));
 	}
 
 	async removeDue(keys: readonly TaskKey[]): Promise<void> {
@@ -319,11 +310,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.find(await this.snapshot(), key, text);
 	}
 
-	async lineOf(key: TaskKey): Promise<number> {
-		await this.normalize();
-		const text = await this.store.read();
-		if (text === null) throw new TasksFileMissingError(this.settings.get().tasksFile);
-		return this.reads.lineOf(text, key);
+	lineOf(key: TaskKey): Promise<number> {
+		return this.ask(this.reads.lineOfRead(key));
 	}
 
 	moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
@@ -399,9 +387,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
-		const rename = this.writes.renameGroup(list, group, name);
-		if (!rename.operation) return false;
-		return this.run(rename.plan(await this.snapshot()));
+		return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
 	}
 
 	removeGroup(list: GroupedList, group: string): Promise<void> {
@@ -417,8 +403,7 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<readonly TaskKey[]> {
-		const drop = this.writes.drop(tasks, to, day);
-		return this.run(drop.plan(drop.reads ? await this.snapshot() : null));
+		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
 	}
 
 	async normalize(): Promise<void> {
@@ -458,6 +443,16 @@ export class TaskServiceImpl implements TaskService {
 		});
 	}
 
+	/** A read as it asks: the file tidied first, read, or missing. */
+	private async ask<R>(read: Read<R>): Promise<R> {
+		if (read.tidies) await this.normalize();
+		if (!read.reads) return read.answer(null);
+		const s = await this.snapshotOrNull();
+		if (s) return read.answer(s);
+		if (read.missing) return read.missing();
+		throw new TasksFileMissingError(this.settings.get().tasksFile);
+	}
+
 	/** A write as one action: its operation written once, then its answer over the document before and after. */
 	private async run<R>(write: Write<R>): Promise<R> {
 		return write.answer(await this.mutate(write.operation));
@@ -491,10 +486,16 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private async snapshot(): Promise<Snapshot> {
+		const s = await this.snapshotOrNull();
+		if (!s) throw new TasksFileMissingError(this.settings.get().tasksFile);
+		return s;
+	}
+
+	private async snapshotOrNull(): Promise<Snapshot | null> {
 		const at = this.rules.moment();
 		const text = await this.store.read();
-		if (text === null) throw new TasksFileMissingError(at.settings.tasksFile);
-		return { doc: this.normalizedOf(text, at).doc, today: at.today, boundary: at.boundary };
+		if (text === null) return null;
+		return { text, doc: this.normalizedOf(text, at).doc, today: at.today, boundary: at.boundary };
 	}
 
 	/** The text parsed and normalized, kept until the text, the day or the settings it is read by change. */

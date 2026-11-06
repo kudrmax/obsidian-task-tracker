@@ -42,11 +42,24 @@ import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
 
-/** The file as one read sees it: normalized for `today`, the day beginning at `boundary`. */
+/** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
+	readonly text: string;
 	readonly doc: TaskDocument;
 	readonly today: LocalDate;
 	readonly boundary: DayBoundary;
+}
+
+/**
+ * An answer that may need the file: whether it reads it (`reads`), tidies it for today first (`tidies`, a write that is no
+ * step), and what it answers without one (`missing`; none: the call fails with TasksFileMissingError). The service and the
+ * door ask it alike: tidy when it says, read when it says, then `answer` over what they read (null when it reads nothing).
+ */
+export interface Read<R> {
+	readonly reads: boolean;
+	readonly tidies?: boolean;
+	readonly missing?: () => R;
+	answer(s: Snapshot | null): R;
 }
 
 /** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
@@ -116,6 +129,11 @@ export class TaskReads {
 		return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
 	}
 
+	/** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
+	screenRead(date: LocalDate): Read<ScreenView> {
+		return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s!, date) };
+	}
+
 	screen(s: Snapshot, date: LocalDate): ScreenView {
 		return {
 			day: this.dayView(s, date),
@@ -179,6 +197,11 @@ export class TaskReads {
 		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)])) as Record<GroupedList, readonly ListSection[]>;
 	}
 
+	/** A query that finds nothing reads no file. */
+	searchRead(query: string): Read<readonly SearchGroup[]> {
+		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
+	}
+
 	search(s: Snapshot | null, query: string): readonly SearchGroup[] {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy || !s) return [];
@@ -208,11 +231,6 @@ export class TaskReads {
 			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
 		return groups;
-	}
-
-	/** A query that finds nothing reads no file: the service asks before it reads. */
-	searches(query: string): boolean {
-		return FuzzyQuery.of(query) !== null;
 	}
 
 	screenOf({ doc, today }: Snapshot, item: TaskItem): TaskScreen {
@@ -252,6 +270,11 @@ export class TaskReads {
 		if (!entry) return null;
 		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
 		return toItem(entry, today, this.itemLevels(), parent, this.rules.moment().boundary);
+	}
+
+	/** The task's line in the file once tidied for today, from 0. */
+	lineOfRead(key: TaskKey): Read<number> {
+		return { reads: true, tidies: true, answer: (s) => this.lineOf(s!.text, key) };
 	}
 
 	/** The task's line in the file as it stands, unnormalized, from 0. */
