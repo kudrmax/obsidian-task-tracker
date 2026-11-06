@@ -81,9 +81,9 @@ fixed that but made lines travel between files. One file wins.
 
 Approved by Max as directions, to be designed one by one after the core.
 
-2. **Projects without a next step.** Once a week the plugin lists the active projects with nothing in the lane: a soft
+1. **Projects without a next step.** Once a week the plugin lists the active projects with nothing in the lane: a soft
    «nothing moves on friends, take a step?», never a red «overdue». Keeps long projects from dying quietly in Backlog.
-3. **Project status in frontmatter**: active, paused, someday. A paused or someday project stays out of the weekly list.
-4. **Agent.** «Look at the friends project and suggest a step for this week»: Claude reads the note and the diary and puts
+2. **Project status in frontmatter**: active, paused, someday. A paused or someday project stays out of the weekly list.
+3. **Agent.** «Look at the friends project and suggest a step for this week»: Claude reads the note and the diary and puts
    one task in Soon, linked to the project. Belongs in `docs/plugin/agents.md` once projects exist.
-5. **Sections fold too**, like project groups in Backlog: the same chevron and tap on the title.
+4. **Sections fold too**, like project groups in Backlog: the same chevron and tap on the title.
