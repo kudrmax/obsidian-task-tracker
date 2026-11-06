@@ -30,7 +30,7 @@ struct TaskFullScreen: View {
                 if let tree, !tree.rows.isEmpty {
                     VStack(alignment: .leading, spacing: CardMetrics.gap) {
                         ForEach(Array(tree.rows.enumerated()), id: \.element.item.id) { index, row in
-                            subtask(row, branch: Self.branch(index, tree.rows))
+                            subtask(row, branch: model.branch(levels: tree.rows.map(\.level), index: index))
                         }
                     }
                 }
@@ -86,15 +86,6 @@ struct TaskFullScreen: View {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
         return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes, later: later) { model.ink($0, dark: dark) }
-    }
-
-    private static func branch(_ index: Int, _ rows: [FullRow]) -> Branch {
-        let level = rows[index].level
-        for row in rows[(index + 1)...] {
-            if row.level == level { return .mid }
-            if row.level < level { return .last }
-        }
-        return .last
     }
 
     private func open() async {

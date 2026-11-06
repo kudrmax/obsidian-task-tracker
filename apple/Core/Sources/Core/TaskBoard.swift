@@ -22,6 +22,8 @@ public enum BoardError: Error, Equatable {
 /// answer changed, keeping the undo steps between calls as the door hands them.
 public final class TaskBoard: @unchecked Sendable {
     private let core: PhoneCore
+    /// The pure rules' own JavaScript context: a gap or a snap asked while a finger moves never waits for a read.
+    private let pure: PhoneCore
     private let vault: TasksVault
     private let lock = NSLock()
     /// One write at a time: each is made over the file and the undo steps the one before it left.
@@ -29,8 +31,10 @@ public final class TaskBoard: @unchecked Sendable {
     private var history: DoorHistory?
     private var calendarSources: [CalendarFile]?
 
-    public init(core: PhoneCore, vault: TasksVault) {
+    /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
+    public init(core: PhoneCore, vault: TasksVault, pure: PhoneCore? = nil) {
         self.core = core
+        self.pure = pure ?? core
         self.vault = vault
     }
 
@@ -68,8 +72,13 @@ public final class TaskBoard: @unchecked Sendable {
         BoardFiles(tasks: nil, settingsJSON: vault.settingsJSON(), calendars: [:], now: now)
     }
 
-    /// A pure rule (`rules.*`): made over no file, so a drawing may ask it for every card.
+    /// A pure rule (`rules.*`) on its own context: made over no file, never waiting for a read on another thread.
     public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
+        try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: pure).result.decode(T.self)
+    }
+
+    /// A pure rule asked by a read on its own thread, on the reading core.
+    func readRule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
         try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date())).result.decode(T.self)
     }
 
@@ -119,10 +128,10 @@ public final class TaskBoard: @unchecked Sendable {
         let history: DoorHistory?
     }
 
-    private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles) throws -> Answer {
+    private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
         let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept())
         do {
-            let reply = try core.call(method, arguments.map(\.any), context: context)
+            let reply = try (lane ?? core).call(method, arguments.map(\.any), context: context)
             return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history)
         } catch PhoneCoreError.refused(let code, let message) {
             throw BoardError.refused(code: code, message: message)
