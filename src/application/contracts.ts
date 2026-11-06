@@ -143,8 +143,34 @@ export interface TaskItem {
 	readonly collapsed: boolean;
 	/** The text of the task a subtask belongs to; null for a task. */
 	readonly parentText: string | null;
+	/** The key of the task a subtask belongs to, its line as read; null for a task. */
+	readonly parentKey: TaskKey | null;
 	/** Its nested lines without a checkbox as Markdown, its first level unindented; null without any. */
 	readonly description: string | null;
+}
+
+/** Where a new subtask stands among the rows of the full screen: the row it takes, and its depth. */
+export interface FullPlace {
+	readonly index: number;
+	readonly level: number;
+}
+
+/** A subtask of the full screen's tree: at its depth (0 right under the task), and where a new last subtask of its own goes. */
+export interface FullRow {
+	readonly item: TaskItem;
+	readonly level: number;
+	readonly newSubtask: FullPlace;
+}
+
+/** A task as the full screen shows it: every subtask at every depth, done and given-up ones too, none folded away. */
+export interface FullTree {
+	readonly task: TaskItem;
+	/** The subtasks for the list: each holds all its own in `subtasks` and is not collapsed, so the list draws them all. */
+	readonly subtasks: readonly TaskItem[];
+	/** The same subtasks in the order the list draws them. */
+	readonly rows: readonly FullRow[];
+	/** Where a new last subtask of the task itself goes: after every row, at the first depth. */
+	readonly newSubtask: FullPlace;
 }
 
 /** A piece of a found task's text; `match` marks a piece the search found. */
@@ -347,6 +373,8 @@ export interface TaskService {
 	dayOfPlacement(placement: Placement): LocalDate | null;
 
 	setStatus(key: TaskKey, status: TaskStatus): Promise<void>;
+	/** The circle of a task: an open one, by its status in the file, is ticked done; a done or given-up one is open again. */
+	toggleDone(key: TaskKey): Promise<void>;
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
@@ -367,7 +395,14 @@ export interface TaskService {
 	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void>;
 	/** Stops a repeating task: the rule goes and the task is done, with no next copy. */
 	stop(key: TaskKey): Promise<void>;
-	rename(key: TaskKey, text: string): Promise<void>;
+	/**
+	 * The title as typed: on one line and trimmed, a level's prefix first the priority of a task without one (a task's own
+	 * priority and labels stay, as for `edit`). A blank text, or the same title and marks, writes nothing. The task as it now
+	 * stands, its key fresh; null when nothing was written.
+	 */
+	rename(key: TaskKey, text: string): Promise<TaskItem | null>;
+	/** The task as the full screen shows it: its tree, and where a new subtask stands in it. */
+	fullTree(item: TaskItem): FullTree;
 	/**
 	 * The description from Markdown, one block right under the task and before its subtasks; the same text writes
 	 * nothing, an empty one or `DESCRIPTION_TEMPLATE` alone takes it away. Blank lines go: they would end the task in the file.

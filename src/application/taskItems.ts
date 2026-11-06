@@ -8,13 +8,17 @@ import { repeatable } from "../domain/queries";
 import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
-import type { SubtaskProgress, TaskItem } from "./contracts";
+import type { SubtaskProgress, TaskItem, TaskKey } from "./contracts";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
 function progressOf(entry: TaskEntry): SubtaskProgress | null {
 	if (entry.subtasks.length === 0) return null;
 	const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
 	return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
+}
+
+function keyOf(entry: TaskEntry): TaskKey {
+	return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
 }
 
 /** How the items read the settings: the level of a prefix, the labels of names in the settings' order. */
@@ -33,14 +37,14 @@ export function itemLevels(levels: readonly PriorityLevel[], labels: readonly La
 	};
 }
 
-/** The task as the UI sees it on `today`. */
-export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parentText: string | null = null): TaskItem {
+/** The task as the UI sees it on `today`; `parent`, the task a subtask sits under. */
+export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parent: TaskEntry | null = null): TaskItem {
 	const marks = marksOfTask(entry.task);
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
-	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry.task.text));
+	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry));
 	return {
-		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
+		key: keyOf(entry),
 		text: entry.task.text,
 		title: plainText(entry.task.text),
 		status: entry.task.status,
@@ -63,6 +67,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		progress: progressOf(entry),
 		collapsed: entry.task.collapsed && hasOpenSubtask(entry),
 		description: descriptionMarkdown(entry),
-		parentText,
+		parentText: parent?.task.text ?? null,
+		parentKey: parent ? keyOf(parent) : null,
 	};
 }

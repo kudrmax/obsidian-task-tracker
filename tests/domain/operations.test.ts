@@ -32,6 +32,7 @@ import {
 	setStatus,
 	snoozedSlot,
 	stop,
+	toggleDone,
 } from "../../src/domain/operations";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { normalize } from "../../src/domain/normalize";
@@ -477,6 +478,11 @@ describe("labels", () => {
 		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: "p1", labels: [] }, T).serialize()).toBe("## Now\n- [ ] p1 X\n");
 	});
 
+	it("a priority typed in a rename takes the labels off: a task has one or the other", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(rename(d, d.tasks("now")[0], "p1 Y").serialize()).toBe("## Now\n- [ ] p1 Y\n");
+	});
+
 	it("keeps the labels when a task is renamed", () => {
 		const d = doc("## Now\n- [ ] X #label/Важное\n");
 		expect(rename(d, d.tasks("now")[0], "Y").serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
@@ -503,6 +509,19 @@ describe("priority", () => {
 	it("rename keeps the priority", () => {
 		const d = doc("## Now\n- [ ] p2 A\n");
 		expect(rename(d, d.tasks("now")[0], "B").serialize()).toBe("## Now\n- [ ] p2 B\n");
+	});
+
+	it("rename reads the text as typed: a typed prefix is the priority of a task without one, the task's own one stays", () => {
+		const d = doc("## Now\n- [ ] A\n- [ ] p1 B\n");
+		expect(rename(d, d.tasks("now")[0], "  p2 A2 ").serialize()).toBe("## Now\n- [ ] p2 A2\n- [ ] p1 B\n");
+		expect(rename(d, d.tasks("now")[1], "p2 B").serialize()).toBe("## Now\n- [ ] A\n- [ ] p1 p2 B\n");
+	});
+
+	it("rename to the same title and marks gives the same document: nothing to write", () => {
+		const d = doc("## Now\n- [ ] p1 A\n- [ ] B\n");
+		expect(rename(d, d.tasks("now")[0], " A ")).toBe(d);
+		expect(rename(d, d.tasks("now")[1], "B")).toBe(d);
+		expect(rename(d, d.tasks("now")[1], "B\n")).toBe(d);
 	});
 });
 
@@ -926,5 +945,17 @@ describe("createSection", () => {
 
 	it("Inbox: a section from the field in its column", () => {
 		expect(section("## Inbox\n\n- [ ] i1\n- [ ] i2\n", null, "i2", "Z", { kind: "inbox" })).toBe("## Inbox\n\n- [ ] i1\n### Z\n- [ ] i2\n");
+	});
+});
+
+describe("toggleDone", () => {
+	const doc = (text: string) => TaskDocument.parse(text, SECTIONS, M);
+
+	it("ticks an open task or subtask done and opens a done or given-up one again", () => {
+		const d = doc("## Now\n- [ ] A\n\t- [/] A1\n\t- [x] A2\n\t- [-] A3\n");
+		const [a1, a2, a3] = d.tasks("now")[0].subtasks;
+		expect(toggleDone(d, a1).serialize()).toBe("## Now\n- [ ] A\n\t- [x] A1\n\t- [x] A2\n\t- [-] A3\n");
+		expect(toggleDone(d, a2).serialize()).toBe("## Now\n- [ ] A\n\t- [/] A1\n\t- [ ] A2\n\t- [-] A3\n");
+		expect(toggleDone(d, a3).serialize()).toBe("## Now\n- [ ] A\n\t- [/] A1\n\t- [x] A2\n\t- [ ] A3\n");
 	});
 });

@@ -1,4 +1,4 @@
-import { DESCRIPTION_TEMPLATE, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../application/contracts";
+import { DESCRIPTION_TEMPLATE, type FullPlace, type FullTree, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../application/contracts";
 import { BottomCapsule } from "../BottomCapsule";
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
@@ -19,8 +19,8 @@ export interface FullScreenDeps {
 	readonly surface: MarkdownSurface;
 	readonly titleField: TitleFieldFactory;
 	day(): LocalDate;
-	/** Writes one change and resolves once the screen shows it. */
-	act(change: () => Promise<void>): Promise<void>;
+	/** Writes one change and resolves once the screen shows it; a change that answers false wrote nothing, so nothing is redrawn. */
+	act(change: () => Promise<void | boolean>): Promise<void>;
 	onUndo(): void;
 	/** The task's own menu over `source`: a subtask's card, or the capsule for the screen's task. */
 	menu(item: TaskItem, source: HTMLElement): void;
@@ -29,12 +29,6 @@ export interface FullScreenDeps {
 
 /** A subtask's card being typed in the list: a new one last under `parent`, or one being renamed in its card's place. */
 type CardTyping = { readonly kind: "subtask"; readonly parent: TaskKey } | { readonly kind: "rename"; readonly item: TaskItem };
-
-/** A row of the subtasks as the list draws them: each subtask, then its own a level deeper. */
-interface Row {
-	readonly item: TaskItem;
-	readonly level: number;
-}
 
 /** Waits this long after the last key before the description is written, so a word is one write, not a letter each. */
 const DESCRIPTION_PAUSE_MS = 600;
@@ -48,6 +42,8 @@ export class FullScreen {
 	readonly el: HTMLElement;
 	/** The tasks opened one inside another, the one on screen last. */
 	private stack: TaskItem[] = [];
+	/** The tree of the task on screen, as the service lays it out. */
+	private tree: FullTree | null = null;
 	private readonly parentButton: HTMLButtonElement;
 	private readonly parentText: HTMLElement;
 	private readonly titleEl: HTMLElement;
@@ -62,6 +58,8 @@ export class FullScreen {
 	private written = "";
 	private saveTimer: number | null = null;
 	private typing: CardTyping | null = null;
+	/** The title being written; settles once the task on screen is the one the file now has. */
+	private titleWrite: Promise<unknown> | null = null;
 	private field: QuickFieldHandle | null = null;
 	private titleField: TitleField | null = null;
 	/** Each refresh is numbered: only the last one asked for draws. */
@@ -89,7 +87,7 @@ export class FullScreen {
 		this.parentButton.addEventListener("click", () => void this.up());
 		this.titleEl = el(column, "div", "tc-full-title");
 		this.list = new TaskList(el(column, "div", "tc-full-list"), {
-			items: () => this.shown(this.current?.allSubtasks ?? []),
+			items: () => this.tree?.subtasks ?? [],
 			day: () => this.deps.day(),
 			entry: () => this.entry(),
 			renaming: () => (this.typing?.kind === "rename" ? this.typing.item.key : null),
@@ -129,6 +127,8 @@ export class FullScreen {
 	/** The file changed: the task on screen is read anew where it now stands; one that is gone gives way to the one under it. */
 	async refresh(): Promise<void> {
 		const ask = ++this.reading;
+		await this.titleWrite?.catch(() => undefined);
+		if (ask !== this.reading || this.closed) return;
 		while (this.current) {
 			const current = this.current;
 			let found: TaskItem | null = null;
@@ -175,27 +175,14 @@ export class FullScreen {
 	}
 
 	private draw(item: TaskItem): void {
+		this.tree = this.deps.tasks.fullTree(item);
 		this.parentButton.hidden = item.parentText === null;
 		clear(this.parentText);
 		if (item.parentText !== null) fillTitle(this.parentText, item.parentText);
-		if (!this.titleField) {
-			clear(this.titleEl);
-			fillTitle(this.titleEl, item.text);
-		}
+		this.drawTitle();
 		this.list.render();
 		this.field?.refocus();
 		this.showDescription(item);
-	}
-
-	/** The subtasks at every depth, done ones too, each with its level. */
-	private rows(): readonly Row[] {
-		const walk = (items: readonly TaskItem[], level: number): Row[] => items.flatMap((item) => [{ item, level }, ...walk(item.allSubtasks, level + 1)]);
-		return this.current ? walk(this.current.allSubtasks, 0) : [];
-	}
-
-	/** The list draws each subtask with all its own under it: done ones stay, crossed out. */
-	private shown(items: readonly TaskItem[]): TaskItem[] {
-		return items.map((item) => ({ ...item, collapsed: false, subtasks: this.shown(item.allSubtasks) }));
 	}
 
 	/** A subtask's card, or its copy over a menu: the circle, filled and the title crossed once it is done. */
@@ -211,7 +198,7 @@ export class FullScreen {
 		const mark = card.querySelector<HTMLElement>(":scope > .tc-pick");
 		mark?.addEventListener("click", (e) => {
 			e.stopPropagation();
-			void this.deps.act(() => this.deps.tasks.setStatus(item.key, item.open ? "done" : "todo"));
+			void this.deps.act(() => this.deps.tasks.toggleDone(item.key));
 		});
 		card.addEventListener("click", () => this.deps.menu(item, card));
 	}
@@ -219,15 +206,14 @@ export class FullScreen {
 	/** Back to the task the one on screen belongs to: the one it was opened from, or its task read where it stands. */
 	private async up(): Promise<void> {
 		const current = this.current;
-		if (!current || current.parentText === null) return;
+		if (!current?.parentKey || current.parentText === null) return;
 		this.leaveTask();
 		if (this.stack.length > 1) {
 			this.stack.pop();
 			await this.refresh();
 			return;
 		}
-		const key = { ...current.key, path: current.key.path.slice(0, -1), raw: "" };
-		const parent = await this.deps.tasks.find(key, current.parentText);
+		const parent = await this.deps.tasks.find(current.parentKey, current.parentText);
 		if (!parent || this.closed) return;
 		this.stack = [parent];
 		this.draw(parent);
@@ -285,27 +271,13 @@ export class FullScreen {
 		this.showDone();
 	}
 
-	/** Where the field stands among the cards: after the new subtask's task and all its own, or in the renamed card's place. */
+	/** Where the field stands among the cards: where the tree puts the new subtask, or in the renamed card's place. */
 	private entry() {
 		const typing = this.typing;
-		if (!typing) return null;
-		const rows = this.rows();
-		let index = rows.length;
-		let level = 0;
-		if (typing.kind === "rename") {
-			index = rows.findIndex((row) => samePlace(row.item.key, typing.item.key));
-			level = rows[index]?.level ?? 0;
-		} else {
-			const at = rows.findIndex((row) => samePlace(row.item.key, typing.parent));
-			if (at >= 0) {
-				level = rows[at].level + 1;
-				index = at + 1;
-				while (index < rows.length && rows[index].level >= level) index++;
-			}
-		}
-		if (index < 0) return null;
+		const at = typing && this.fieldPlace(typing);
+		if (!typing || !at) return null;
 		return {
-			place: { kind: "gap" as const, index, level, group: null },
+			place: { kind: "gap" as const, index: at.index, level: at.level, group: null },
 			pending: [],
 			field: (row: HTMLElement) => {
 				if (!this.field) this.field = this.openField(row, typing);
@@ -315,18 +287,35 @@ export class FullScreen {
 		};
 	}
 
+	private fieldPlace(typing: CardTyping): FullPlace | null {
+		const tree = this.tree;
+		if (!tree) return null;
+		if (typing.kind === "rename") {
+			const index = tree.rows.findIndex((row) => samePlace(row.item.key, typing.item.key));
+			return index < 0 ? null : { index, level: tree.rows[index].level };
+		}
+		if (samePlace(tree.task.key, typing.parent)) return tree.newSubtask;
+		return tree.rows.find((row) => samePlace(row.item.key, typing.parent))?.newSubtask ?? tree.newSubtask;
+	}
+
 	private openField(row: HTMLElement, typing: CardTyping): QuickFieldHandle {
 		const renamed = typing.kind === "rename" ? typing.item : null;
-		return QuickField.open(row, {
+		const tint = () => {
+			const marks = this.deps.tasks.draftMarks(field.text, renamed?.priority?.prefix ?? null, renamed?.labels.map((l) => l.name) ?? []);
+			field.setTint(marks.priority?.color ?? marks.labels[0]?.color ?? null);
+		};
+		const field = QuickField.open(row, {
 			value: renamed?.text ?? "",
 			parseTitle: (text) => this.deps.tasks.parseTitle(text),
 			priority: renamed?.priority ?? null,
 			titleField: this.deps.titleField,
 			onInput: () => undefined,
-			onPriority: () => undefined,
+			onPriority: () => tint(),
 			onKey: (key) => void this.cardKey(key),
 			onBlur: () => void this.cardKey("enter", true),
 		});
+		tint();
+		return field;
 	}
 
 	/** Enter writes the card: a new subtask leaves the field for the next one, a rename ends. Escape ends it unwritten. */
@@ -336,20 +325,17 @@ export class FullScreen {
 		if (!typing || !field) return;
 		if (key === "escape") return this.endCard();
 		if (key !== "enter") return;
-		const text = field.text.trim();
+		const text = field.text;
 		const tasks = this.deps.tasks;
 		if (typing.kind === "rename") {
 			this.endCard();
-			if (text !== "" && text !== typing.item.text) await this.deps.act(() => tasks.rename(typing.item.key, text));
+			await this.deps.act(async () => (await tasks.rename(typing.item.key, text)) !== null);
 			return;
 		}
 		if (tasks.isBlank(text)) return this.endCard();
 		if (leaving) this.endCard();
 		else field.setValue("");
-		const parsed = tasks.parseTitle(text);
-		await this.deps.act(async () => {
-			await tasks.createInPlace(parsed.text, parsed.priority?.prefix ?? null, { kind: "subtask", parent: typing.parent, before: null });
-		});
+		await this.deps.act(async () => (await tasks.createInPlace(text, null, { kind: "subtask", parent: typing.parent, before: null })) !== null);
 	}
 
 	private endCard(): void {
@@ -385,15 +371,27 @@ export class FullScreen {
 		this.showDone();
 	}
 
+	/**
+	 * The typed title is written; the field stays over the title until the task, as the file now has it, takes its place.
+	 * A change of the file meanwhile waits for it: the task is read by the key the rename answers with, the old one finds none.
+	 */
 	private async saveTitle(): Promise<void> {
 		const field = this.titleField;
 		const current = this.current;
 		if (!field || !current) return;
-		const text = field.text.trim();
-		this.endTitle(false);
-		if (text === "" || text === current.text) return;
-		this.stack[this.stack.length - 1] = { ...current, text };
-		await this.deps.act(() => this.deps.tasks.rename(current.key, text));
+		this.titleField = null;
+		const write = this.deps.tasks.rename(current.key, field.text).then((renamed) => {
+			if (renamed && this.current === current) this.stack[this.stack.length - 1] = renamed;
+			return renamed !== null;
+		});
+		this.titleWrite = write;
+		try {
+			await this.deps.act(() => write);
+		} finally {
+			this.titleWrite = null;
+			field.destroy();
+			this.drawTitle();
+		}
 	}
 
 	/** The title field goes; `quiet` leaves the title as it is, else it is drawn from the task again. */
@@ -402,7 +400,11 @@ export class FullScreen {
 		if (!field) return;
 		this.titleField = null;
 		field.destroy();
-		if (quiet || this.closed) return;
+		if (!quiet) this.drawTitle();
+	}
+
+	private drawTitle(): void {
+		if (this.closed || this.titleField) return;
 		clear(this.titleEl);
 		if (this.current) fillTitle(this.titleEl, this.current.text);
 	}

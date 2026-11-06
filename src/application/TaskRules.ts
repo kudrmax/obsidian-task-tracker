@@ -266,9 +266,20 @@ export class TaskRules {
 		return (doc) => ops.stop(doc, this.entryOf(doc, key));
 	}
 
+	/** The title as typed (`ops.rename`); null for a blank one, a priority alone too. */
 	rename(key: TaskKey, text: string): Operation | null {
-		if (blank(text)) return null;
+		if (this.isBlank(text)) return null;
 		return (doc) => ops.rename(doc, this.entryOf(doc, key), text);
+	}
+
+	/** Whether `rename` writes anything on `doc`: not for a blank text, nor for the task's own title and marks. */
+	renameChanges(doc: TaskDocument, key: TaskKey, text: string): boolean {
+		return !this.isBlank(text) && ops.rename(doc, this.entryOf(doc, key), text) !== doc;
+	}
+
+	/** The circle of a task: done when it is open in the file, else open again. */
+	toggleDone(key: TaskKey): Operation {
+		return (doc) => ops.toggleDone(doc, this.entryOf(doc, key));
 	}
 
 	setDescription(key: TaskKey, markdown: string): Operation {
