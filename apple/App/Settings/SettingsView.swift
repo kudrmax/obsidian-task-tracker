@@ -42,8 +42,24 @@ struct SettingsView: View {
                 } footer: {
                     Text("Without the sound an alarm still covers the screen. Snooze moves the task this much later.")
                 }
+
+                Section {
+                    LabeledContent("Recording Tag") {
+                        TextField("None", text: $model.recordingTag)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                } footer: {
+                    Text("Goes after a recording's link in its task, for the plugin that transcribes it. Empty for none.")
+                }
             }
             .navigationTitle("Task Calendar")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Task", systemImage: "plus") { CaptureRouter.shared.open(list: .inbox, voice: false) }
+                }
+            }
             .refreshable { await model.refresh() }
             .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { picked in
                 Task { await model.choose(picked) }
