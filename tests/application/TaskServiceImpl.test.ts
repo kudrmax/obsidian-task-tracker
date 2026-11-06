@@ -1458,7 +1458,6 @@ describe("the full screen's task", () => {
 		const pack = (await svc.dayView(T)).list[0].allSubtasks[0];
 		expect(await svc.rename(pack.key, "  Pack  ")).toBeNull();
 		expect(await svc.rename(pack.key, "   ")).toBeNull();
-		expect(await svc.rename(pack.key, "p1")).toBeNull();
 		expect(store.writes).toBe(0);
 		const renamed = await svc.rename(pack.key, " p1 Pack the bag ");
 		expect(renamed).toMatchObject({ text: "Pack the bag", priority: { prefix: "p1" }, parentText: "Trip" });

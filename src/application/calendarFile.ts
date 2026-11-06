@@ -1,10 +1,21 @@
 import type { CalendarEvent, CalendarSource } from "./contracts";
+import type { TaskCalendarSettings } from "../settings";
 
 /** Where the Google events live in the vault: the plugin writes them there from the Calendar API. */
 export const GOOGLE_CALENDAR_FILE = "calendar/google.json";
 
 /** Where the iPhone app writes the phone's calendars. */
 export const IPHONE_CALENDAR_FILE = "calendar/iphone.json";
+
+/** The calendars' files, in the order the calendar reads them: Google's, the iPhone app's, the work calendar's. */
+export const CALENDAR_SOURCES: readonly CalendarSource[] = ["google", "iphone", "work"];
+
+/** Where a calendar's file is in the vault: the work calendar's at the settings' path. */
+export function calendarPath(source: CalendarSource, settings: TaskCalendarSettings): string {
+	if (source === "google") return GOOGLE_CALENDAR_FILE;
+	if (source === "iphone") return IPHONE_CALENDAR_FILE;
+	return settings.workCalendarFile;
+}
 
 /** The colour of an event whose calendar gave none. */
 const DEFAULT_COLOR: Readonly<Record<CalendarSource, string>> = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };

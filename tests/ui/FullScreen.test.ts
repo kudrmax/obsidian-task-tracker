@@ -2,12 +2,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TaskItem, UndoService } from "../../src/application/contracts";
 import type { TaskStatus } from "../../src/ui/types";
+import { fullTree } from "../../src/application/fullTree";
 import { FullScreen } from "../../src/ui/full/FullScreen";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-06";
+
+const keyOf = (text: string, path: number[]) => ({ section: "now" as const, index: 0, path, raw: `- [ ] ${text}` });
 
 function task(text: string, path: number[], opts: { status?: TaskStatus; subs?: TaskItem[]; description?: string | null; parentText?: string | null } = {}): TaskItem {
 	const status = opts.status ?? "todo";
@@ -29,6 +32,7 @@ function task(text: string, path: number[], opts: { status?: TaskStatus; subs?: 
 		allSubtasks: subs,
 		progress: subs.length > 0 ? { done: subs.filter((s) => s.status === "done").length, total: subs.length } : null,
 		parentText: opts.parentText ?? null,
+		parentKey: opts.parentText ? keyOf(opts.parentText, path.slice(0, -1)) : null,
 		description: opts.description ?? null,
 		list: "now",
 		isSubtask: path.length > 0,
@@ -54,9 +58,10 @@ function setup(item = morning()) {
 	const tasks = {
 		...priorityTitles([]),
 		find: vi.fn(async (): Promise<TaskItem | null> => null),
-		setStatus: vi.fn(async () => undefined),
+		toggleDone: vi.fn(async () => undefined),
+		fullTree,
 		setDescription: vi.fn(async () => undefined),
-		rename: vi.fn(async () => undefined),
+		rename: vi.fn(async (): Promise<TaskItem | null> => null),
 		createInPlace: vi.fn(async () => null),
 	};
 	const deps = {
@@ -66,7 +71,9 @@ function setup(item = morning()) {
 		surface,
 		titleField: fakeTitleField,
 		day: () => T,
-		act: vi.fn(async (change: () => Promise<void>) => change()),
+		act: vi.fn(async (change: () => Promise<void | boolean>) => {
+			await change();
+		}),
 		onUndo: vi.fn(),
 		menu: vi.fn(),
 		onClose: vi.fn(),
@@ -103,9 +110,9 @@ describe("FullScreen", () => {
 	it("a circle ticks an open subtask done and opens a done one again; the card itself opens its menu", () => {
 		const { cards, tasks, deps } = setup();
 		cards()[1].querySelector<HTMLElement>(".tc-pick")!.click();
-		expect(tasks.setStatus).toHaveBeenLastCalledWith(cards()[1] && expect.objectContaining({ path: [0, 0] }), "done");
+		expect(tasks.toggleDone).toHaveBeenLastCalledWith(expect.objectContaining({ path: [0, 0] }));
 		cards()[3].querySelector<HTMLElement>(".tc-pick")!.click();
-		expect(tasks.setStatus).toHaveBeenLastCalledWith(expect.objectContaining({ path: [1] }), "todo");
+		expect(tasks.toggleDone).toHaveBeenLastCalledWith(expect.objectContaining({ path: [1] }));
 		expect(deps.menu).not.toHaveBeenCalled();
 		cards()[0].click();
 		expect(deps.menu).toHaveBeenCalledWith(expect.objectContaining({ text: "Собрать рюкзак" }), cards()[0]);
@@ -157,7 +164,7 @@ describe("FullScreen", () => {
 		tasks.find.mockResolvedValueOnce(morning());
 		screen.el.querySelector<HTMLElement>(".tc-full-parent")!.click();
 		await vi.runAllTimersAsync();
-		expect(tasks.find).toHaveBeenCalledWith(expect.objectContaining({ path: [], raw: "" }), "Собраться утром");
+		expect(tasks.find).toHaveBeenCalledWith({ section: "now", index: 0, path: [], raw: "- [ ] Собраться утром" }, "Собраться утром");
 		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться утром");
 	});
 
@@ -166,11 +173,30 @@ describe("FullScreen", () => {
 		screen.el.querySelector<HTMLElement>("button.tc-plus")!.click();
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")!;
 		expect(field).not.toBeNull();
-		field.value = "Выпить витамины";
+		field.value = " Выпить витамины ";
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.createInPlace).toHaveBeenCalledWith("Выпить витамины", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null });
+		expect(tasks.createInPlace).toHaveBeenCalledWith(" Выпить витамины ", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null });
 		expect(field.value).toBe("");
+	});
+
+	it("a new subtask of a subtask stands where the tree puts it: after that subtask and all its own, a level deeper", () => {
+		const { screen } = setup();
+		screen.addSubtask(backpack());
+		const rows = [...screen.el.querySelectorAll<HTMLElement>(".tc-full-list > .tc-card, .tc-full-list > .tc-quick-row")];
+		expect(rows.map((row) => row.querySelector(".tc-card-title")?.textContent ?? "field")).toEqual(["Собрать рюкзак", "Ноутбук", "Пропуск", "field", "Умыться"]);
+		expect(rows[3].style.getPropertyValue("--tc-level")).toBe("1");
+	});
+
+	it("a subtask's rename sends the text as typed, and the service's answer decides whether anything was written", async () => {
+		const { screen, tasks, deps } = setup();
+		screen.rename(backpack());
+		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")!;
+		expect(field.value).toBe("Собрать рюкзак");
+		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+		await vi.runAllTimersAsync();
+		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [0] }), "Собрать рюкзак");
+		expect(deps.act).toHaveBeenCalledOnce();
 	});
 
 	it("Rename of the task on screen turns its title into the field", async () => {
@@ -181,6 +207,19 @@ describe("FullScreen", () => {
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
 		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), "Собраться");
+	});
+
+	it("the renamed title is the task as the service answers with it", async () => {
+		const { screen, tasks } = setup();
+		tasks.rename.mockResolvedValueOnce({ ...morning(), text: "Собраться к 9" });
+		screen.rename(morning());
+		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
+		field.value = "  Собраться к 9 ";
+		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+		await vi.runAllTimersAsync();
+		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), "  Собраться к 9 ");
+		expect(screen.el.querySelector(".tc-full-title textarea")).toBeNull();
+		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться к 9");
 	});
 
 	it("closes on Close and on Escape", () => {

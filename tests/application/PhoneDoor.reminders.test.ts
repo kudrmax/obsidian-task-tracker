@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { PhoneReminderService } from "../../src/application/PhoneReminderService";
+import { phoneDoor as door } from "../../src/application/PhoneDoor";
 
-const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m);
+const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).getTime();
 const file = (...now: string[]) => ["## Now", "", ...now, "", "## Soon", "", "## Done", ""].join("\n");
-const phone = new PhoneReminderService("");
+const phone = {
+	reminders: (text: string, now: number) => door.reminders(text, "", now),
+	complete: (text: string, id: string, now: number) => door.complete(text, "", id, now),
+	silence: (text: string, id: string, now: number) => door.silence(text, "", id, now),
+	snooze: (text: string, id: string, minutes: number, now: number) => door.snooze(text, "", id, minutes, now),
+};
 
-describe("PhoneReminderService.reminders", () => {
+describe("the phone door's.reminders", () => {
 	it("lists open slotted tasks with their kind", () => {
 		const text = file(
 			"- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00",
@@ -20,7 +25,7 @@ describe("PhoneReminderService.reminders", () => {
 			["Wake", "12:00", "alarm", "2026-11-04"],
 			["Pinned", "13:30", "live", "2026-11-04"],
 		]);
-		expect(list[0].start).toEqual(at(4, 10));
+		expect(list[0].startMs).toBe(at(4, 10));
 		expect(list[0].id).toBe("- [ ] p1 Call [[Mom]] ⏰ 2026-11-04 10:00-11:00");
 	});
 
@@ -31,22 +36,21 @@ describe("PhoneReminderService.reminders", () => {
 	});
 
 	it("dayEnd follows dayStartHour", () => {
-		const r = new PhoneReminderService(JSON.stringify({ dayStartHour: 4 })).reminders(file("- [ ] A ⏰ 2026-11-04 23:00"), at(4, 9))[0];
-		expect(r.dayEnd).toEqual(at(5, 4));
+		const r = door.reminders(file("- [ ] A ⏰ 2026-11-04 23:00"), JSON.stringify({ dayStartHour: 4 }), at(4, 9))[0];
+		expect(r.dayEndMs).toBe(at(5, 4));
 	});
 
 	it("reads custom markers and sections from settings json", () => {
-		const custom = new PhoneReminderService(JSON.stringify({ sections: { now: "Today" }, alarmSlotMarker: "ring:" }));
-		const list = custom.reminders("## Today\n\n- [ ] A ring: 2026-11-04 10:00\n", at(4, 9));
+		const list = door.reminders("## Today\n\n- [ ] A ring: 2026-11-04 10:00\n", JSON.stringify({ sections: { now: "Today" }, alarmSlotMarker: "ring:" }), at(4, 9));
 		expect(list.map((r) => [r.title, r.kind])).toEqual([["A", "alarm"]]);
 	});
 
 	it("empty settings json means defaults", () => {
-		expect(new PhoneReminderService("").reminders(file("- [ ] A 🚨 2026-11-04 10:00"), at(4, 9))[0].kind).toBe("alarm");
+		expect(door.reminders(file("- [ ] A 🚨 2026-11-04 10:00"), "", at(4, 9))[0].kind).toBe("alarm");
 	});
 });
 
-describe("PhoneReminderService actions", () => {
+describe("the phone door's actions", () => {
 	const line = "- [ ] A 🚨 2026-11-04 10:00-11:00";
 
 	it("complete marks the task done", () => {
@@ -82,7 +86,7 @@ describe("PhoneReminderService actions", () => {
 	});
 });
 
-describe("PhoneReminderService.silence", () => {
+describe("the phone door's.silence", () => {
 	it("turns the task's reminder off and keeps its time", () => {
 		const id = "- [ ] Wake 🚨 2026-11-04 12:00";
 		const done = phone.silence(file(id), id, at(4, 12, 1));
@@ -97,7 +101,7 @@ describe("PhoneReminderService.silence", () => {
 	});
 });
 
-describe("PhoneReminderService and a repeating task", () => {
+describe("the phone door's and a repeating task", () => {
 	const line = "- [ ] Gym 🚨 2026-11-04 07:00 🔁 every day";
 
 	it("reminds of it by its name, without the rule", () => {

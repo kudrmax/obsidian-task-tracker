@@ -45,28 +45,10 @@ export function readDocument(text: string, settings: TaskCalendarSettings, today
 	return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
 }
 
-type Operation = (doc: TaskDocument, today: LocalDate, boundary: DayBoundary) => TaskDocument;
-
 /**
- * The text after `op` on the file as it is, before today's normalizing: for a task that normalizing would change, such as
- * yesterday's slot, which the next day erases. The result is normalized as usual.
+ * What of the settings the file is read by: its names, its preset sections and its marks. The service keeps what it read
+ * while this stays; the screen reads the file anew when it changes. The hour the day starts at is the day, not the reading.
  */
-export function applyOperationAsRead(text: string, settings: TaskCalendarSettings, now: Date, op: Operation): string {
-	const boundary = boundaryOf(settings);
-	const today = boundary.dayOf(now);
-	const doc = parseText(text, settings).ensureSections(sectionNames(settings));
-	return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
-}
-
-/** The text after `op`, as the service would write it at `now`. */
-export function applyOperation(
-	text: string,
-	settings: TaskCalendarSettings,
-	now: Date,
-	op: Operation,
-): string {
-	const boundary = boundaryOf(settings);
-	const today = boundary.dayOf(now);
-	const doc = readDocument(text, settings, today, boundary);
-	return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
+export function readingKey(settings: TaskCalendarSettings): string {
+	return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
 }
