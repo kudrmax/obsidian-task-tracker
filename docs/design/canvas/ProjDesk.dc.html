@@ -77,6 +77,27 @@ body{margin:0}
 <button aria-label="New task" style="position: absolute; left: 1140px; top: 716px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: {{c.accent}}; color: #FFFFFF; box-shadow: {{c.plusShadow}}; display: flex; align-items: center; justify-content: center; z-index: 4;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
 <div style="position: absolute; right: 0; bottom: 0; height: 24px; box-sizing: border-box; padding: 0 12px; border-top-left-radius: 6px; background: {{c.chrome}}; box-shadow: inset 1px 1px 0 {{c.chromeLine}}; display: flex; align-items: center; gap: 16px; font-size: 12px; color: {{c.muted}}; z-index: 13;"><span>0 backlinks</span><span>14 words</span><span>112 characters</span></div>
 
+<sc-if value="{{showCap}}" hint-placeholder-val="{{false}}"><div style="position: absolute; left: 64px; top: 716px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.plusShadow}}; display: flex; z-index: {{capZ}};">
+<span style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg></span>
+<span style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M5 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M19 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z"></path></svg></span>
+</div></sc-if>
+<sc-if value="{{sw.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 9;"></div>
+<sc-if value="{{sw.head}}" hint-placeholder-val="{{false}}"><div style="position: absolute; left: 64px; top: 422px; font-size: 28px; line-height: 34px; font-weight: 700; z-index: 10;">Backlog</div></sc-if>
+<div style="position: absolute; left: {{sw.left}}px; top: {{sw.top}}px; width: {{sw.w}}px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-for list="{{sw.groups}}" as="g" hint-placeholder-count="2">
+<div style="border-top: {{g.band}};">
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+<div style="height: 44px; box-sizing: border-box; padding: 0 16px; border-bottom: {{r.sep}}; display: flex; align-items: center; gap: 10px; font-size: 16px; outline: {{r.mark}}; outline-offset: -3px;">
+<span style="flex: 1; min-width: 0; white-space: nowrap;">{{r.label}}</span>
+<sc-if value="{{r.check}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></sc-if>
+<sc-if value="{{r.hasIcon}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
 <sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
 <div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
 <span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
@@ -84,15 +105,15 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card","switchHead","switchMore","flat"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'backlog';
     const look = this.props.look ?? 'project';
     const light = this.props.theme === 'light';
     const c = light
-      ? { bg: '#FFFFFF', chrome: '#F6F6F6', chromeLine: '#E3E3E3', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', pull: '#6C6C70', accent: '#8A5CF5', line: '#E5E5EA', hourLine: '#EFEFF4', now: '#FF3B30', plusShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', mark: '#FF9500', ev: { bg: 'rgba(0,122,255,0.13)', ink: '#0058B8', bar: '#007AFF' }, ev2: { bg: 'rgba(52,199,89,0.16)', ink: '#1F7735', bar: '#34C759' } }
-      : { bg: '#1E1E1E', chrome: '#262626', chromeLine: '#363636', card: '#373737', text: '#FFFFFF', muted: '#8E8E93', pull: '#AEAEB2', accent: '#9580FF', line: '#2C2C2E', hourLine: '#2A2A2A', now: '#D92C24', plusShadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', mark: '#FFD60A', ev: { bg: 'rgba(10,132,255,0.24)', ink: '#85C1FF', bar: '#0A84FF' }, ev2: { bg: 'rgba(48,209,88,0.22)', ink: '#97E8AC', bar: '#30D158' } };
+      ? { bg: '#FFFFFF', chrome: '#F6F6F6', chromeLine: '#E3E3E3', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', pull: '#6C6C70', accent: '#8A5CF5', line: '#E5E5EA', hourLine: '#EFEFF4', now: '#FF3B30', plusShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', mark: '#FF9500', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', backdrop: 'rgba(0,0,0,0.22)', ev: { bg: 'rgba(0,122,255,0.13)', ink: '#0058B8', bar: '#007AFF' }, ev2: { bg: 'rgba(52,199,89,0.16)', ink: '#1F7735', bar: '#34C759' } }
+      : { bg: '#1E1E1E', chrome: '#262626', chromeLine: '#363636', card: '#373737', text: '#FFFFFF', muted: '#8E8E93', pull: '#AEAEB2', accent: '#9580FF', line: '#2C2C2E', hourLine: '#2A2A2A', now: '#D92C24', plusShadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', mark: '#FFD60A', panel: 'rgba(44,44,46,0.96)', shadow: '0 16px 40px rgba(0,0,0,0.6)', sep: '#48484A', gap: '#1C1C1E', backdrop: 'rgba(0,0,0,0.55)', ev: { bg: 'rgba(10,132,255,0.24)', ink: '#85C1FF', bar: '#0A84FF' }, ev2: { bg: 'rgba(48,209,88,0.22)', ink: '#97E8AC', bar: '#30D158' } };
     const icons = {
       open: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
       project: 'M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2.2h7.2a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z'
@@ -104,7 +125,17 @@ class Component extends DCLogic {
     const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
     const pos = (left, top) => 'left: ' + left + 'px; top: ' + top + 'px;';
 
-    if (view === 'backlog') {
+    const mk = this.props.marks === false || this.props.marks === 'false' ? 'none' : '2px dashed ' + c.mark;
+    const rowsOf = (list) => list.map((r, i, a) => ({ check: false, hasIcon: false, d: '', mark: 'none', ...r, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const sw = { on: false, head: false, left: 54, top: 0, w: 250, groups: [] };
+    if (view === 'switchHead') Object.assign(sw, { on: true, head: true, left: 54, top: 468, w: 250, groups: [{ band: '0', rows: rowsOf([{ label: 'Group by project', check: true, mark: mk }]) }] });
+    if (view === 'switchMore') Object.assign(sw, { on: true, left: 64, top: 716 - 12 - (44 * 4 + 8), w: 268, groups: [
+      { band: '0', rows: rowsOf([{ label: 'Search', hasIcon: true, d: 'M11 4a7 7 0 1 1 0 14a7 7 0 1 1 0-14z M16.5 16.5L21 21' }, { label: 'Select tasks', hasIcon: true, d: 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M8 12.5l2.8 2.8L16 9.8' }]) },
+      { band: '8px solid ' + c.gap, rows: rowsOf([{ label: 'Group Backlog by project', check: true, mark: mk }, { label: 'Group Soon by project', mark: mk }]) }
+    ] });
+    const capZ = 10;
+    const showCap = view === 'switchMore';
+    if (view !== 'card') {
       const inbox = ['Узнать про курсы итальянского', 'Написать Ане из языкового клуба', 'Ответить Лёше про поход', 'Посмотреть «Дюну 2»', 'Сменить тариф мобильной связи', 'Почитать про налоговое резидентство', 'Идея подарка на Новый год'];
       const soon = ['Продлить страховку', 'Купить подарок Ане', 'Разобрать фото с поездки', 'Записаться к стоматологу', 'Починить велосипед', 'Прочитать Deep Work', 'Заменить фильтр для воды', 'Настроить бэкап ноутбука'];
       const groups = [
@@ -114,16 +145,20 @@ class Component extends DCLogic {
       ];
       const back = [];
       let y = 0;
-      groups.forEach((g, gi) => {
+      if (view === 'flat') {
+        [['Найти клуб скалолазания', 1], ['Выучить испанский', 0], ['Позвать коллег на ужин', 1], ['Записаться к психологу', 1], ['Разобрать старые фото', 0], ['Вести дневник благодарности', 1]].forEach((f) => { back.push(card(f[0], y, { hasIcon: !!f[1] })); y += STEP; });
+        marks.push(ring(54, 472, 520, 6 * STEP - 2, 17.5, '← Одним списком', pos(586, 474)));
+      }
+      if (view !== 'flat') groups.forEach((g, gi) => {
         if (gi > 0) y += GAP;
         const folded = gi !== 0;
         back.push({ isCard: false, isHead: true, top: y, name: g.name, ink: g.none ? c.muted : c.pull, plus: false, open: !g.none, fold: true, turn: folded ? 0 : 90, hasCount: folded, count: String(g.tasks.length) });
-        if (gi === 0) marks.push(ring(54, 472 + y, 520, HEAD, 6, '← Группа проекта', pos(586, 472 + y + 3)));
+        if (gi === 0 && view === 'backlog') marks.push(ring(54, 472 + y, 520, HEAD, 6, '← Группа проекта', pos(586, 472 + y + 3)));
         y += HEAD;
         if (!folded) g.tasks.forEach((t) => { back.push(card(t, y)); y += STEP; });
       });
       return {
-        c, icons, marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks,
+        c, icons, sw, capZ, showCap, marks: this.props.marks === false || this.props.marks === 'false' || sw.on ? [] : marks,
         titles: [{ name: 'Inbox', left: 64, arrows: false }, { name: 'Soon', left: 636, arrows: false }],
         divider: 599, split: true, calendar: false, hours: [], events: [], nowTop: 0,
         cols: [
@@ -155,7 +190,7 @@ class Component extends DCLogic {
     for (let h = 0; h < 12; h++) hours.push({ label: String(FIRST + h).padStart(2, '0') + ':00', top: 104 + h * HOUR - 7, line: 104 + h * HOUR });
     const at = (hh) => 104 + (hh - FIRST) * HOUR + 1;
     return {
-      c, icons, marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks,
+      c, icons, sw, capZ, showCap, marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks,
       titles: [{ name: 'Now', left: 64, arrows: false }, { name: 'Today', left: 470, arrows: true }],
       divider: 431, split: false, calendar: true,
       hours,

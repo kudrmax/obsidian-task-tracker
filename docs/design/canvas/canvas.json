@@ -2377,6 +2377,22 @@
    "h": 844,
    "page": "components",
    "title": "Компонент заметки проекта с живым блоком (его показывают доски «Проекты»)"
+  },
+  "Proj5V1.dc.html": {
+   "x": 0,
+   "y": 9760,
+   "w": 5228,
+   "h": 1340,
+   "page": "projects",
+   "title": "Группировка по проектам. Вариант 1 — тап по заголовку колонки"
+  },
+  "Proj5V2.dc.html": {
+   "x": 0,
+   "y": 11220,
+   "w": 5228,
+   "h": 1340,
+   "page": "projects",
+   "title": "Группировка по проектам. Вариант 2 — в меню «⋯»"
   }
  },
  "createdOnFiles": {
@@ -3100,7 +3116,9 @@
   "ProjDesk.dc.html",
   "Proj4V1.dc.html",
   "Proj4V2.dc.html",
-  "ProjNote.dc.html"
+  "ProjNote.dc.html",
+  "Proj5V1.dc.html",
+  "Proj5V2.dc.html"
  ],
  "pages": [
   {

@@ -119,6 +119,28 @@ body{margin:0}
 </div>
 </sc-if>
 
+<sc-if value="{{sw.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 9;"></div>
+<sc-if value="{{sw.head}}" hint-placeholder-val="{{false}}"><div style="position: absolute; left: 10px; top: 453px; height: 36px; display: flex; align-items: center; font-size: 20px; font-weight: 700; z-index: 10;">Backlog</div></sc-if>
+<sc-if value="{{sw.more}}" hint-placeholder-val="{{false}}"><div style="position: absolute; left: 16px; top: 722px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.control}}; display: flex; z-index: 10;">
+<span style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.undo}}"></path></svg></span>
+<span style="width: 40px; height: 44px; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="{{icons.more}}"></path></svg></span>
+</div></sc-if>
+<div style="position: absolute; left: {{sw.left}}px; top: {{sw.top}}px; width: {{sw.w}}px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.shadow}}; z-index: 11;">
+<sc-for list="{{sw.groups}}" as="g" hint-placeholder-count="2">
+<div style="border-top: {{g.band}};">
+<sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+<div style="height: 44px; box-sizing: border-box; padding: 0 16px; border-bottom: {{r.sep}}; display: flex; align-items: center; gap: 10px; font-size: 16px; outline: {{r.mark}}; outline-offset: -3px;">
+<span style="flex: 1; min-width: 0; white-space: nowrap;">{{r.label}}</span>
+<sc-if value="{{r.check}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{c.accent}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></sc-if>
+<sc-if value="{{r.hasIcon}}" hint-placeholder-val="{{false}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
 <sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
 <div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
 <span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
@@ -126,7 +148,7 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card","menu","picker","picked"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card","menu","picker","picked","switchHead","switchMore","flat"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'backlog';
@@ -184,7 +206,16 @@ class Component extends DCLogic {
     });
     const inboxRows = (list) => list.forEach((t, i) => rows.push(card(t, 166 + i * STEP)));
 
-    if (view === 'backlog') {
+    const grouped = view === 'backlog' || view === 'switchHead' || view === 'switchMore';
+    if (view === 'flat') {
+      split = true;
+      fade = true;
+      inboxRows(inbox);
+      const flat = [['Найти клуб скалолазания', 1], ['Выучить испанский', 0], ['Позвать коллег на ужин', 1], ['Записаться к психологу', 1], ['Разобрать старые фото', 0], ['Вести дневник благодарности', 1]];
+      flat.forEach((f, i) => rows.push(card(f[0], 501 + i * STEP, { hasIcon: !!f[1] })));
+      marks.push(ring(10, 501, 175, 5 * STEP - 2, 17.5, '← Одним списком', pos(200, 503)));
+    }
+    if (grouped) {
       split = true;
       fade = true;
       inboxRows(inbox);
@@ -194,7 +225,7 @@ class Component extends DCLogic {
         if (gi > 0) y += GAP;
         const folded = gi !== firstOpen;
         rows.push(head(g, y, folded));
-        if (gi === 0) marks.push(ring(10, y, 175, HEAD, 6, '← Группа проекта', pos(200, y + 3)));
+        if (gi === 0 && view === 'backlog') marks.push(ring(10, y, 175, HEAD, 6, '← Группа проекта', pos(200, y + 3)));
         y += HEAD;
         if (!folded) g.tasks.forEach((t) => { rows.push(card(t, y)); y += STEP; });
       });
@@ -239,6 +270,16 @@ class Component extends DCLogic {
     }
 
     const dim = view === 'menu' || view === 'picker';
+    const SEARCH = 'M11 4a7 7 0 1 1 0 14a7 7 0 1 1 0-14z M16.5 16.5L21 21';
+    const PICK = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M8 12.5l2.8 2.8L16 9.8';
+    const mk = this.props.marks === false || this.props.marks === 'false' ? 'none' : '2px dashed ' + c.mark;
+    const rowsOf = (list) => list.map((r, i, a) => ({ check: false, hasIcon: false, d: '', mark: 'none', ...r, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+    const sw = { on: false, head: false, more: false, left: 10, top: 0, w: 250, groups: [] };
+    if (view === 'switchHead') Object.assign(sw, { on: true, head: true, left: 10, top: 501, w: 250, groups: [{ band: '0', rows: rowsOf([{ label: 'Group by project', check: true, mark: mk }]) }] });
+    if (view === 'switchMore') Object.assign(sw, { on: true, more: true, left: 16, top: 722 - 12 - (44 * 4 + 8), w: 268, groups: [
+      { band: '0', rows: rowsOf([{ label: 'Search', hasIcon: true, d: SEARCH }, { label: 'Select tasks', hasIcon: true, d: PICK }]) },
+      { band: '8px solid ' + c.gap, rows: rowsOf([{ label: 'Group Backlog by project', check: true, mark: mk }, { label: 'Group Soon by project', mark: mk }]) }
+    ] });
     const tapped = { top: 166 + STEP, title: inbox[1] };
     const panelTop = tapped.top + CARD + 12;
     const markLine = (on) => (on && this.props.marks !== false && this.props.marks !== 'false' ? '2px dashed ' + c.mark : 'none');
@@ -259,6 +300,7 @@ class Component extends DCLogic {
       theme: light ? 'light' : 'dark',
       dim,
       tapped, panelTop,
+      sw,
       onMenu: view === 'menu',
       onPicker: view === 'picker',
       statusTiles: [
@@ -273,7 +315,7 @@ class Component extends DCLogic {
       ],
       levels: [{ name: 'p1', c: light ? '#FF3B30' : '#FF453A' }, { name: 'p2', c: light ? '#FF9500' : '#FF9F0A' }, { name: 'p3', c: light ? '#FFCC00' : '#FFD60A' }],
       editRows, projectRows,
-      marks: this.props.marks === false || this.props.marks === 'false' || dim ? [] : marks
+      marks: this.props.marks === false || this.props.marks === 'false' || dim || sw.on ? [] : marks
     };
   }
 }
