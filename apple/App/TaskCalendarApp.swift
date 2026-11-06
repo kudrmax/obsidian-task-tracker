@@ -28,7 +28,10 @@ struct TaskCalendarApp: App {
                 }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { Refresh.schedule() }
+            if phase == .background {
+                Refresh.schedule()
+                CaptureRouter.shared.open()
+            }
         }
         .backgroundTask(.appRefresh(Refresh.identifier)) {
             Refresh.schedule()
