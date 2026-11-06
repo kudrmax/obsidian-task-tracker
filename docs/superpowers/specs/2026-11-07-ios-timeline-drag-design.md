@@ -102,7 +102,7 @@ immediate: every touch answers in the same frame, every change is one system ani
 ### The task's menu on a long press (Max's findings 6 and 7, screen recording)
 
 Max asked plainly: **the task's menu opens on a long press**, and a long press then a move drags the task. It works so in
-other apps (his friend's app, Files, Mail): it is the system's own behaviour when a view has both a
+other apps (his friend's app, Files, Mail, Apple Podcasts' library with its manual order: long press opens the menu, drag reorders): it is the system's own behaviour when a view has both a
 `UIContextMenuInteraction` and a `UIDragInteraction` — the long press lifts the card and shows the menu; moving the
 finger while it is lifted turns the lift into the drag. The app now opens the menu on a tap, through a hidden
 `UIButton` laid over the card and pressed from code: the menu grows from that hidden button instead of the card, and
