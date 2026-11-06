@@ -193,6 +193,11 @@ public struct CardDue: Decodable, Hashable, Sendable {
 public struct DueLabel: Decodable, Hashable, Sendable {
     public let day: String
     public let month: String
+
+    public init(day: String, month: String) {
+        self.day = day
+        self.month = month
+    }
 }
 
 /// A level's or a label's colour as a card paints it.

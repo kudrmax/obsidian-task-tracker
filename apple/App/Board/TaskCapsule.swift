@@ -9,6 +9,8 @@ struct TaskCapsule: View {
     var picked = false
     var ringed = false
     var height: CGFloat = CardMetrics.height
+    /// Lying over a long task's body or an event on the timeline: ringed in the ground's colour, as the plugin draws it.
+    var over = false
 
     @Environment(\.colorScheme) private var scheme
 
@@ -66,6 +68,9 @@ struct TaskCapsule: View {
             }
         }
         .background(fill, in: .rect(cornerRadius: CardMetrics.radius))
+        .background {
+            if over { RoundedRectangle(cornerRadius: CardMetrics.radius + 1.5).fill(Color(.systemBackground)).padding(-1.5) }
+        }
         .overlay {
             if ringed {
                 RoundedRectangle(cornerRadius: CardMetrics.radius + 2).stroke(Palette.accent(scheme), lineWidth: 2).padding(-2)

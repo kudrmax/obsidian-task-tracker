@@ -14,7 +14,9 @@ struct BoardScreen: View {
     @State private var router = CaptureRouter.shared
     @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
+    @State private var newTitle = ""
     @Environment(\.scenePhase) private var scene
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         TabView(selection: tab) {
@@ -30,6 +32,23 @@ struct BoardScreen: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
+        .overlay(alignment: .bottomTrailing) {
+            if !model.selecting, model.fullScreen.isEmpty {
+                PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme))
+                    .frame(width: PlusButton.side, height: PlusButton.side)
+                    .padding([.trailing, .bottom], PlusButton.inset)
+                    .ignoresSafeArea()
+            }
+        }
+        .alert("New Task", isPresented: Binding(get: { model.newTaskAt != nil }, set: { if !$0 { model.newTaskAt = nil } }), presenting: model.newTaskAt) { spot in
+            TextField("Task", text: $newTitle)
+            Button("Cancel", role: .cancel) { newTitle = "" }
+            Button("Add") {
+                let title = newTitle
+                newTitle = ""
+                Task { await model.create(title, at: spot) }
+            }
+        }
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reload() } }) {
             CaptureView()
         }
@@ -95,7 +114,6 @@ struct BoardPage: View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
             Ribbon(snapshot: snapshot, model: model, question: $question)
                 .overlay(alignment: .top) { problem }
-                .overlay { LiftedCard(drag: model.drag) }
         } else if let problem = model.problem {
             ContentUnavailableView {
                 Label("Can’t Read Your Tasks", systemImage: "exclamationmark.triangle")
@@ -173,17 +191,25 @@ struct BoardPage: View {
     }
 }
 
-/// The ribbon: four half-screen columns, Inbox over Backlog, Soon, the day list and the calendar, standing at one of
-/// three places. A swipe moves it, and the tab bar follows.
+/// The ribbon: four columns, Inbox over Backlog, Soon, the day list and the calendar, standing at one of three places;
+/// a swipe moves it, and the tab bar follows. Inbox–Soon and Soon–day share the screen evenly; at Today the divider
+/// between the day list and the calendar is dragged to make the list wider or narrower, as in the plugin, and the
+/// widths flow from even to that split as the ribbon moves there.
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
     @State private var leading: Int?
+    /// How far the ribbon has come from Soon to Today, 0 to 1.
+    @State private var toToday: CGFloat = 0
+    @AppStorage("listShare") private var listShare: Double = 0.5
+    @State private var dragStart: CGFloat?
 
     var body: some View {
         GeometryReader { box in
-            let half = box.size.width / 2
+            let width = box.size.width
+            let half = width / 2
+            let day = half + (listWidth(width) - half) * toToday
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
                     column(0, half) {
@@ -193,20 +219,62 @@ struct Ribbon: View {
                         }
                     }
                     column(1, half) { list(.soon) }
-                    column(2, half) { list(.day, dayArrows: true) }
-                    column(3, half) { TimelineColumn(timeline: snapshot.timeline, model: model, question: $question) }
+                    column(2, day) { list(.day, dayArrows: true) }
+                    column(3, width - day) {
+                        TimelineColumn(timeline: snapshot.timeline, model: model, question: $question)
+                            .overlay(alignment: .leading) { divider(width) }
+                    }
                 }
                 .scrollTargetLayout()
             }
             .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
             .scrollPosition(id: $leading, anchor: .leading)
             .scrollIndicators(.hidden)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                min(1, max(0, geometry.contentOffset.x / half - 1))
+            } action: { _, progress in
+                toToday = progress
+            }
             .onAppear { leading = model.place.rawValue }
             .onChange(of: model.place) { withAnimation(.snappy) { leading = model.place.rawValue } }
             .onChange(of: leading) {
                 if let leading, let place = RibbonPlace(rawValue: min(leading, 2)), place != model.place { model.place = place }
             }
         }
+    }
+
+    /// The day list's width at Today: its share of the screen, within the plugin's bounds for a phone.
+    private func listWidth(_ width: CGFloat) -> CGFloat {
+        min(Self.maxList, width - Self.minList, max(Self.minList, listShare * width))
+    }
+
+    /// The plugin's bounds on a list's width on a phone (`LIST_WIDTH_MIN`, `LIST_WIDTH_MAX`).
+    static let minList: CGFloat = 110
+    static let maxList: CGFloat = 280
+
+    /// The handle on the line between the day list and the calendar; it shows and moves only at Today.
+    private func divider(_ width: CGFloat) -> some View {
+        Capsule()
+            .fill(Color(.tertiaryLabel))
+            .frame(width: 5, height: 36)
+            .frame(width: 28)
+            .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+            .offset(x: -14)
+            .opacity(toToday)
+            .allowsHitTesting(toToday > 0.99)
+            .gesture(
+                DragGesture(minimumDistance: 2, coordinateSpace: .global)
+                    .onChanged { drag in
+                        let start = dragStart ?? listWidth(width)
+                        if dragStart == nil { dragStart = start }
+                        listShare = Double(min(Self.maxList, width - Self.minList, max(Self.minList, start + drag.translation.width)) / width)
+                    }
+                    .onEnded { _ in dragStart = nil }
+            )
+            .sensoryFeedback(.selection, trigger: dragStart == nil)
+            .accessibilityLabel("Divider")
+            .accessibilityHint("Drag to make the list wider or narrower")
     }
 
     private func column(_ index: Int, _ width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
@@ -257,7 +325,7 @@ struct BulkActions: View {
             }
             .disabled(menu?.moves.isEmpty ?? true)
             Menu("More", systemImage: "ellipsis.circle") {
-                if let menu { TaskMenuContent(items: items, menu: menu, model: model, question: $question) }
+                if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes) }
             }
             Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
                 .foregroundStyle(.red)

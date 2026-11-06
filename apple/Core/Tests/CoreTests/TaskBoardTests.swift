@@ -87,7 +87,7 @@ import Testing
 
     @Test func theSnapshotIsTheScreenAsDrawn() throws {
         let board = board(FakeVault(Self.file))
-        let snapshot = try board.snapshot(day: nil, now: Fixtures.date(6, 10))
+        let snapshot = try board.snapshot(day: nil, measures: TimelineMeasures(hour: 50, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
         #expect(snapshot.day == "2026-11-06")
         #expect(snapshot.dayTitle == "Today")
         let day = try #require(snapshot.lists[.day])
@@ -99,6 +99,9 @@ import Testing
         let run = try #require(snapshot.timeline.slots.first)
         #expect(run.card.item.title == "Morning run")
         #expect(run.end.map { $0 - run.start } == 60)
+        // Its start has passed: it rides the now line (10:00, five hours into a day that starts at 5), its hour kept.
+        #expect(run.box.top == 251)
+        #expect(run.box.height == 48)
         #expect(snapshot.timeline.now != nil)
         #expect(snapshot.timeline.hours.count == 25)
         #expect(snapshot.column(of: run.id) == "timeline")

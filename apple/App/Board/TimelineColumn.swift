@@ -9,13 +9,15 @@ struct TimelineColumn: View {
     @Binding var question: MenuQuestion?
     @State private var position = ScrollPosition(y: 0)
     @State private var opened: String?
+    /// The minute a carried card would start at, shown as a line while it is held over the calendar.
+    @State private var landing: Int?
 
     @Environment(\.colorScheme) private var scheme
 
     private let hour = CardMetrics.hour
     private let labelWidth: CGFloat = 26
-    private let itemsLeft: CGFloat = 32
-    private let overlayInset: CGFloat = 18
+    /// Where the items area starts, right of the hours: blocks stand in it by the core's insets.
+    private let itemsLeft: CGFloat = 31
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -29,22 +31,22 @@ struct TimelineColumn: View {
                         grid
                         ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
                             EventBlock(event: event, height: height(event.start, event.end), showsTime: height(event.start, event.end) >= 36)
-                                .padding(.leading, itemsLeft + CGFloat(event.level) * overlayInset)
+                                .padding(.leading, itemsLeft + CGFloat(event.left))
                                 .padding(.trailing, 8)
                                 .offset(y: y(event.start) + 1)
                         }
                         ForEach(timeline.slots) { slot in
                             slotCard(slot)
-                                .padding(.leading, itemsLeft)
+                                .padding(.leading, itemsLeft + CGFloat(slot.box.left))
                                 .padding(.trailing, 8)
-                                .offset(y: y(slot.start) + 1)
+                                .offset(y: y(0) + CGFloat(slot.box.top))
                         }
                         if let now = timeline.now { nowLine(now) }
+                        if let minute = landing { landingLine(minute) }
                     }
                     .frame(width: box.size.width, height: y(24 * 60), alignment: .topLeading)
-                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { top in
-                        model.drag.placeTimeline(box.frame(in: .global), zero: top + y(0))
-                    }
+                    .contentShape(.rect)
+                    .onDrop(of: [.plainText], delegate: TimeLanding(model: model, minute: $landing, minuteAt: minute(at:)))
                 }
                 .scrollPosition($position)
                 .scrollIndicators(.hidden)
@@ -74,21 +76,34 @@ struct TimelineColumn: View {
 
     @ViewBuilder
     private func slotCard(_ slot: BoardSlot) -> some View {
-        let tall = slot.end.map { max(CardMetrics.height, height(slot.start, $0)) } ?? CardMetrics.height
-        if let menu = model.snapshot?.menus[slot.id], !model.selecting {
-            Menu {
-                TaskMenuContent(items: [slot.card.item], menu: menu, model: model, question: $question)
-            } label: {
-                TaskCapsule(card: slot.card, ringed: model.found == slot.id, height: tall)
-            }
-            .buttonStyle(.plain)
-            .tint(.primary)
-            .carries(slot.card, with: model.drag, model: model)
-            .opacity(model.drag.lifted?.id == slot.id ? 0 : 1)
+        let tall = CGFloat(slot.box.height)
+        if model.selecting {
+            TaskCapsule(card: slot.card, height: tall, over: slot.box.overlay).opacity(0.5)
         } else {
-            TaskCapsule(card: slot.card, height: tall)
+            CardButton(card: slot.card, menu: { model.cardMenu(slot.card.item) { question = $0 } }, ringed: model.found == slot.id, height: tall, over: slot.box.overlay) { model.found = nil }
+                .frame(height: tall)
         }
     }
+
+    /// Where a carried card would land: the line at its start and the time in the accent, as Calendar draws a moved event.
+    private func landingLine(_ minute: Int) -> some View {
+        HStack(spacing: 2) {
+            Text(BoardTime.label(minute, hours: timeline.hours))
+                .font(.system(size: 10, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 4)
+                .frame(height: 17)
+                .background(.tint, in: .capsule)
+            Rectangle().fill(.tint).frame(height: 2)
+        }
+        .offset(y: y(minute) - 8.5)
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+
+    /// The minute of the day at `y` in the calendar's own height.
+    private func minute(at y: CGFloat) -> Double { Double(max(0, y - self.y(0)) / hour * 60) }
 
     private func nowLine(_ minute: Int) -> some View {
         ZStack(alignment: .leading) {
@@ -146,4 +161,43 @@ struct EventBlock: View {
 
     private var start: Date { Date(timeIntervalSince1970: event.event.startMs / 1000) }
     private var end: Date { Date(timeIntervalSince1970: max(event.event.endMs, event.event.startMs) / 1000) }
+}
+
+/// The calendar taking a carried card or the plus: the line follows the finger on the grid's steps, and letting go drops
+/// it at that time.
+private struct TimeLanding: DropDelegate {
+    let model: BoardModel
+    @Binding var minute: Int?
+    let minuteAt: (CGFloat) -> Double
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let snapped = model.snap(minuteAt(info.location.y), hourHeight: CardMetrics.hour)
+        if snapped != minute {
+            if minute != nil { UISelectionFeedbackGenerator().selectionChanged() }
+            withAnimation(.snappy(duration: 0.15)) { minute = snapped }
+        }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(.snappy(duration: 0.15)) { minute = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let at = minuteAt(info.location.y)
+        minute = nil
+        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let id = object as? String else { return }
+            Task { @MainActor in await model.drop(id, atMinute: at, hourHeight: CardMetrics.hour) }
+        }
+        return true
+    }
+}
+
+/// A minute of the shown day as the timeline writes it: its hour as the core names it, and the minutes.
+enum BoardTime {
+    static func label(_ minute: Int, hours: [BoardHour]) -> String {
+        "\(hours[safe: minute / 60]?.label ?? "--"):\(String(format: "%02d", minute % 60))"
+    }
 }

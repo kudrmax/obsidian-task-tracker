@@ -67,6 +67,8 @@ public struct BoardEvent: Sendable, Hashable, Identifiable {
     public let end: Int
     public let level: Int
     public let layer: Int
+    /// Its left edge in the timeline's items area, by how deep it lies over others.
+    public let left: Double
     public let paint: Themed<EventPaint>
     public var id: String { event.id }
 }
@@ -75,7 +77,41 @@ public struct BoardSlot: Sendable, Hashable, Identifiable {
     public let card: BoardCard
     public let start: Int
     public let end: Int?
+    /// Where its card stands in the stack the core lays out: tasks never share the width.
+    public let box: StackBox
     public var id: String { card.id }
+}
+
+/// `StackBox`: a task card's place in the timeline's items area.
+public struct StackBox: Decodable, Sendable, Hashable {
+    public let top: Double
+    public let height: Double
+    public let left: Double
+    public let overlay: Bool
+    public let stacked: Bool
+    public let hiddenDuration: Bool
+}
+
+/// The frontend's measures of the timeline, which the core lays its blocks out in.
+public struct TimelineMeasures: Sendable {
+    public let hour: Double
+    public let cardHeight: Double
+    public let cardGap: Double
+    public let itemInset: Double
+    public let itemGap: Double
+    public let overlayInset: Double
+
+    public init(hour: Double, cardHeight: Double, cardGap: Double, itemInset: Double, itemGap: Double, overlayInset: Double) {
+        self.hour = hour
+        self.cardHeight = cardHeight
+        self.cardGap = cardGap
+        self.itemInset = itemInset
+        self.itemGap = itemGap
+        self.overlayInset = overlayInset
+    }
+
+    var card: JSONValue { ["height": .number(cardHeight), "gap": .number(cardGap)] }
+    var insets: JSONValue { ["itemInset": .number(itemInset), "itemGap": .number(itemGap), "overlayInset": .number(overlayInset)] }
 }
 
 public struct BoardHour: Sendable, Hashable {
@@ -126,7 +162,7 @@ public struct BoardSnapshot: Sendable {
 
 extension TaskBoard {
     /// The screen for `day` (`nil`: today) over the vault's files as they are now.
-    public func snapshot(day wanted: String?, now: Date = Date()) throws -> BoardSnapshot {
+    public func snapshot(day wanted: String?, measures: TimelineMeasures, now: Date = Date()) throws -> BoardSnapshot {
         let files = try files(now: now)
         let today: String = try read("days.today", over: files)
         let day = wanted ?? today
@@ -160,7 +196,7 @@ extension TaskBoard {
             .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
         ]
         let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : .none
-        let timeline = try timeline(day: day, today: today, screen: screen, events: events, files: files, painter: &painter)
+        let timeline = try timeline(day: day, today: today, screen: screen, events: events, files: files, measures: measures, painter: &painter)
         let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
         // A menu reads no file: asked over the settings alone, it costs nothing per card.
         let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
@@ -206,23 +242,31 @@ extension TaskBoard {
         return .last
     }
 
-    private func timeline(day: String, today: String, screen: ScreenView, events: DayEvents, files: BoardFiles, painter: inout Painter) throws -> BoardTimeline {
-        let boundary: [String: Int] = try read("days.boundary", over: files)
-        let startHour = boundary["startHour"] ?? 0
-        let hours = (0...24).map { BoardHour(minute: $0 * 60, label: String(format: "%02d", (startHour + $0) % 24)) }
+    private func timeline(day: String, today: String, screen: ScreenView, events: DayEvents, files: BoardFiles, measures: TimelineMeasures, painter: inout Painter) throws -> BoardTimeline {
+        let hours = try (0...24).map { index in
+            let hour: Int = try read("boundary.hourAt", [.number(Double(index))], over: files)
+            return BoardHour(minute: index * 60, label: String(format: "%02d", hour))
+        }
         let timed = try events.timed.map { event -> (WireEvent, DaySpan) in
             (event, try read("boundary.clipToDay", [.string(day), .number(event.startMs), .number(event.endMs)], over: files))
         }
         let spans = timed.map { ["start": JSONValue.number(Double($0.1.start)), "end": .number(Double($0.1.end ?? $0.1.start))] as JSONValue }
         let levels: [EventLevel] = try rule("rules.eventLevels", [.array(spans)])
         let placed = try zip(timed, levels).map { pair, level in
-            BoardEvent(event: pair.0, start: pair.1.start, end: pair.1.end ?? pair.1.start, level: level.level, layer: level.layer, paint: try painter.event(pair.0))
+            let left: Double = try rule("rules.overlayLeft", [.number(Double(level.level)), measures.insets])
+            return BoardEvent(event: pair.0, start: pair.1.start, end: pair.1.end ?? pair.1.start, level: level.level, layer: level.layer, left: left, paint: try painter.event(pair.0))
         }
-        let allDay = try events.allDay.map { BoardEvent(event: $0, start: 0, end: 0, level: 0, layer: 0, paint: try painter.event($0)) }
-        let slots = try screen.day.slotted.map { item -> BoardSlot in
-            let span: DaySpan = try read("tasks.shownSpan", [item.json, .string(day)], over: files)
-            let card = BoardCard(item: item, level: 0, branch: nil, due: nil, repeats: false, shades: try item.colors.first.map { try painter.shades($0) })
-            return BoardSlot(card: card, start: span.start, end: span.end)
+        let allDay = try events.allDay.map { BoardEvent(event: $0, start: 0, end: 0, level: 0, layer: 0, left: 0, paint: try painter.event($0)) }
+        let shown = try screen.day.slotted.map { item -> (TaskItem, DaySpan) in (item, try read("tasks.shownSpan", [item.json, .string(day)], over: files)) }
+        let taskSpans = JSONValue.array(shown.map { ["start": .number(Double($0.1.start)), "end": $0.1.end.map { .number(Double($0)) } ?? .null] })
+        let eventSpans = JSONValue.array(placed.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
+        let boxes: [StackBox] = try rule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
+            let span: JSONValue = ["start": .number(Double(pair.1.start)), "end": pair.1.end.map { .number(Double($0)) } ?? .null]
+            let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
+            let corner: [String]? = try rule("rules.stackCorner", [flags, .number(Double(pair.0.slot?.start ?? pair.1.start)), span])
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: corner.map { DueLabel(day: $0[0], month: $0[1]) }, repeats: pair.0.repeats, shades: try pair.0.colors.first.map { try painter.shades($0) })
+            return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
         let opening: DayOpening = try read("days.openAt", [.string(day)], over: files)

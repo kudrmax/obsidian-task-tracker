@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import UIKit
 
 /// The three places of the ribbon the tab bar switches: two half-screen columns each.
 enum RibbonPlace: Int, Hashable, CaseIterable {
@@ -27,8 +28,6 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
 @Observable
 final class BoardModel {
     private let board = AppServices.shared.board
-    /// A card carried by the finger.
-    let drag = CardDrag()
 
     var place = RibbonPlace.today
     private(set) var snapshot: BoardSnapshot?
@@ -58,7 +57,7 @@ final class BoardModel {
         let day = shownDay
         let board = board
         do {
-            snapshot = try await Task.detached { try board.snapshot(day: day) }.value
+            snapshot = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
             problem = nil
         } catch {
             problem = Self.words(error)
@@ -254,35 +253,75 @@ final class BoardModel {
 
     // MARK: Drag and drop
 
-    /// A card let go in a list, before card `index` of its cards (past the last: the list's end) at `level`.
-    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int) async {
-        guard let snapshot, let item = snapshot.item(id), let list = snapshot.lists[column], let from = snapshot.column(of: id) else { return }
+    /// Where the plus was let go: the new task's place, waiting for its title.
+    struct NewTaskSpot: Identifiable {
+        let id = UUID()
+        let place: JSONValue
+    }
+
+    var newTaskAt: NewTaskSpot?
+
+    /// A card or the plus let go in a list: before card `index` of its cards (past the last: the end of section `group`,
+    /// or of the list) at `level`.
+    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int, endOf group: Int? = nil) async {
+        guard let snapshot, let list = snapshot.lists[column] else { return }
         let others = list.cards.filter { $0.id != id && !isUnder($0.item, id) }
         let cards = JSONValue.array(others.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
-        let target = list.cards[safe: index]
-        let at = others.firstIndex { $0.id == target?.id } ?? others.count
-        // The headers the gap is past: down to the section of the card it stands before, or all of them at the end.
+        let target = group == nil ? list.cards[safe: index] : nil
+        let at: Int
+        if let group, let last = list.groups[safe: group]?.cards.last(where: { card in others.contains { $0.id == card.id } }) {
+            at = (others.firstIndex { $0.id == last.id } ?? others.count - 1) + 1
+        } else if let group, let first = list.groups[(group + 1)...].lazy.compactMap({ $0.cards.first { card in others.contains { $0.id == card.id } } }).first {
+            at = others.firstIndex { $0.id == first.id } ?? others.count
+        } else {
+            at = others.firstIndex { $0.id == target?.id } ?? others.count
+        }
+        // The headers the gap is past: down to the section it stands in, or all of them at the end.
         let groups = list.groups.map(\.name)
-        let through = target.flatMap { card in list.groups.firstIndex { $0.cards.contains { $0.id == card.id } } } ?? groups.count - 1
+        let through = group ?? target.flatMap { card in list.groups.firstIndex { $0.cards.contains { $0.id == card.id } } } ?? groups.count - 1
         let passed = list.showsHeaders && through >= 0 ? Array(groups.prefix(through + 1)) : []
         do {
             let gap: JSONValue = try await rule("rules.gapAt", [cards, .number(Double(at)), .number(Double(level)), .array(passed.map(\.json)), .bool(list.showsHeaders)])
+            guard case .object = gap else { return }
             let place: JSONValue = try await rule("rules.placeOfDrop", [cards, gap, .null])
-            await drop(item, from: from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
+            if id == Carried.plus {
+                guard !place.isNull else { return }
+                let look: JSONValue = ["cards": [:], "day": .string(snapshot.day), "shown": [], "sections": [:], "sectioned": [:]]
+                let entry: [String: JSONValue] = try await read("entry.placeOf", [.null, look, .string(column.rawValue), place])
+                if let spot = entry["value"], !spot.isNull { newTaskAt = NewTaskSpot(place: spot) }
+            } else if let item = snapshot.item(id), let from = snapshot.column(of: id) {
+                await drop(item, from: from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
+            }
         } catch {
             problem = Self.words(error)
         }
     }
 
-    /// A card let go on the calendar at `minute` from the start of the day, the timeline drawn `hourHeight` an hour.
+    /// A card or the plus let go on the calendar at `minute` from the start of the day, the timeline drawn `hourHeight` an hour.
     func drop(_ id: String, atMinute minute: Double, hourHeight: CGFloat) async {
-        guard let snapshot, let item = snapshot.item(id), let from = snapshot.column(of: id) else { return }
-        let snapped: Int = (try? await read("tasks.snap", [.number(minute), .number(hourHeight), .number(9)])) ?? Int(minute)
-        await drop(item, from: from, to: ["kind": "time", "start": .number(Double(snapped))])
+        guard let snapshot else { return }
+        let snapped = snap(minute, hourHeight: hourHeight)
+        if id == Carried.plus {
+            guard let slot: JSONValue = try? await read("tasks.newSlot", [.string(snapshot.day), .number(Double(snapped))]) else { return }
+            newTaskAt = NewTaskSpot(place: ["kind": "slot", "slot": slot])
+        } else if let item = snapshot.item(id), let from = snapshot.column(of: id) {
+            await drop(item, from: from, to: ["kind": "time", "start": .number(Double(snapped))])
+        }
+    }
+
+    /// The minute a carry over the calendar stands at, on the grid's step for the timeline drawn `hourHeight` an hour.
+    func snap(_ minute: Double, hourHeight: CGFloat) -> Int {
+        (try? board.rule("tasks.snap", [.number(minute), .number(hourHeight), .number(9)])) ?? Int(minute)
+    }
+
+    /// The task the plus was let go for, once its title is typed.
+    func create(_ text: String, at spot: NewTaskSpot) async {
+        await write("tasks.createInPlace", [.string(text), .null, spot.place])
     }
 
     private func drop(_ item: TaskItem, from: String, to: JSONValue) async {
         guard let day = snapshot?.day else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
         await write("tasks.drop", [[["key": item.key.json, "from": .string(from)]], to, .string(day)])
     }
 
@@ -293,6 +332,29 @@ final class BoardModel {
 
     private func isUnderTree(_ tree: TaskItem, _ item: TaskItem) -> Bool {
         tree.allSubtasks.contains { $0.id == item.id || isUnderTree($0, item) }
+    }
+
+    func openInObsidian(_ item: TaskItem) async {
+        guard let line: Int = try? await read("tasks.lineOf", [item.key.json]),
+              let file = try? AppServices.shared.vault.tasksFilePath(),
+              let vault = UserDefaults.standard.string(forKey: "vaultFolderName")
+        else { return }
+        var link = URLComponents(string: "obsidian://advanced-uri")!
+        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: file), URLQueryItem(name: "line", value: String(line + 1))]
+        if let url = link.url { await UIApplication.shared.open(url) }
+    }
+
+    /// A level's or a label's colour as a menu's flag draws it, in either theme.
+    func ink(_ color: String, dark: Bool) -> UIColor? {
+        guard let hex: String = try? board.rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")]) else { return nil }
+        return UIColor(Color(hex: hex))
+    }
+
+    /// The card's menu as UIKit draws it, read from the screen as it stands.
+    func cardMenu(_ item: TaskItem, ask: @escaping (MenuQuestion) -> Void) -> UIMenu? {
+        guard let menu = snapshot?.menus[item.id] else { return nil }
+        let dark = UITraitCollection.current.userInterfaceStyle == .dark
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: self, ask: ask).nodes) { [weak self] in self?.ink($0, dark: dark) }
     }
 
     // MARK: Words

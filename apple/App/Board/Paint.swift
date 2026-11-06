@@ -1,3 +1,4 @@
+import Core
 import SwiftUI
 
 /// The board's own colours, from the design's palette (`docs/design`, «Палитра»): what is not a system colour.
@@ -30,6 +31,8 @@ enum CardMetrics {
     static let branchWidth: CGFloat = 1.5
     static let columnInset: CGFloat = 10
     static let hour: CGFloat = 50
+    /// The timeline's measures the core lays out the stack of task cards in, as the plugin's design has them.
+    static let timeline = TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18)
 }
 
 extension Color {

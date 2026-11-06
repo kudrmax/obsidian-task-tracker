@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import UIKit
 
 /// What a task's menu, or the bulk menu, asks before it writes: the core marks which statuses and Delete ask first.
 enum MenuQuestion: Identifiable {
@@ -14,126 +15,156 @@ enum MenuQuestion: Identifiable {
     }
 }
 
-/// The task's menu as the iOS 26 context menu draws it: the statuses in a row on top, then the pages, the edits, the
-/// ways out, and Delete last. Every row is the core's `TaskMenuModel`: the menu offers what it offers.
-struct TaskMenuContent: View {
+/// One row of a menu, drawn the same by UIKit (a card's menu) and SwiftUI (a bar's menu).
+indirect enum MenuNode {
+    case action(title: String, symbol: String?, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, run: @MainActor () -> Void)
+    case submenu(title: String, symbol: String, subtitle: String?, children: [MenuNode])
+    /// A group between separators; `row` draws it as the row of icons over their titles on top of a menu.
+    case group(row: Bool, children: [MenuNode])
+}
+
+/// The task's menu as iOS 26 draws a context menu: the statuses in a row on top, then the pages, the edits and the ways
+/// out, Delete last. Every row is the core's `TaskMenuModel`: the menu offers what it offers.
+@MainActor
+struct TaskMenu {
     let items: [TaskItem]
     let menu: TaskMenuModel
-    @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
-    /// One task's menu: its own rows (Rename, Open Full Screen, …); the bulk menu has none of them.
-    var single: Bool { items.count == 1 }
+    let model: BoardModel
+    let ask: (MenuQuestion) -> Void
 
-    @Environment(\.openURL) private var openURL
+    private var single: Bool { items.count == 1 }
 
-    var body: some View {
-        ControlGroup {
-            ForEach(menu.statuses, id: \.id) { status in
-                Button(StatusWords.title(status.id), systemImage: StatusWords.symbol(status.id)) {
-                    if status.confirm { question = .status(items, status.id) } else { Task { await model.pickStatus(items, status.id) } }
-                }
+    var nodes: [MenuNode] {
+        var nodes: [MenuNode] = [.group(row: true, children: menu.statuses.map { status in
+            .action(title: StatusWords.title(status.id), symbol: StatusWords.symbol(status.id)) { [items, model, ask] in
+                if status.confirm { ask(.status(items, status.id)) } else { Task { await model.pickStatus(items, status.id) } }
             }
-        }
-        .controlGroupStyle(.menu)
-
-        Section {
-            if !menu.levels.disabled, !menu.levels.tiles.isEmpty {
-                Menu {
-                    ForEach(menu.levels.tiles, id: \.mark) { tile in
-                        Toggle(isOn: Binding(get: { tile.on }, set: { _ in Task { await model.togglePriority(items, tile.mark.title) } })) {
-                            Label(tile.mark.title, systemImage: "flag.fill")
-                        }
-                    }
-                } label: {
-                    Label("Priority", systemImage: "flag")
-                    if let on = menu.levels.tiles.first(where: \.on) { Text(on.mark.title) }
-                }
-            }
-            if !menu.labels.disabled, !menu.labels.tiles.isEmpty {
-                Menu {
-                    ForEach(menu.labels.tiles, id: \.mark) { tile in
-                        Toggle(tile.mark.title, isOn: Binding(get: { tile.on }, set: { _ in Task { await model.toggleLabel(items, tile.mark.title) } }))
-                    }
-                    .menuActionDismissBehavior(.disabled)
-                } label: {
-                    Label("Labels", systemImage: "tag")
-                    let on = menu.labels.tiles.filter(\.on).map(\.mark.title)
-                    if !on.isEmpty { Text(on.joined(separator: ", ")) }
-                }
-            }
-            if !menu.moves.isEmpty || menu.removeDue {
-                Menu {
-                    ForEach(menu.moves, id: \.id) { move in
-                        Button(MoveWords.title(move.id), systemImage: MoveWords.symbol(move.id)) {
-                            if let date = move.date { Task { await model.postpone(items, to: date) } } else { model.dateFor = items }
-                        }
-                    }
-                    if menu.removeDue {
-                        Button("Remove Due Date", systemImage: "calendar.badge.minus") { Task { await model.removeDue(items) } }
-                    }
-                } label: {
-                    Label("Move To", systemImage: "calendar")
-                }
-            }
-            if let sections = menu.sections, menu.edits.contains("section") {
-                Menu {
-                    ForEach(sections.options, id: \.name) { option in
-                        Toggle(option.name ?? sections.choice.ungrouped, isOn: Binding(get: { option.checked }, set: { _ in Task { await model.toSection(items, option.name) } }))
-                    }
-                    if sections.create {
-                        Divider()
-                        Button("New Section…", systemImage: "plus") { model.newSection = items.first }
-                    }
-                } label: {
-                    Label("Section", systemImage: "rectangle.stack")
-                    if let current = sections.options.first(where: \.checked) { Text(current.name ?? sections.choice.ungrouped) }
-                }
-            }
-            if single, let item = items.first, !menu.reminders.isEmpty {
-                Menu {
-                    ForEach(menu.reminders, id: \.kind) { reminder in
-                        Toggle(ReminderWords.title(reminder.kind), isOn: Binding(get: { reminder.checked }, set: { _ in Task { await model.setReminder(item, reminder.kind) } }))
-                    }
-                } label: {
-                    Label("Reminder", systemImage: "bell")
-                    if let on = menu.reminders.first(where: \.checked) { Text(ReminderWords.title(on.kind)) }
-                }
-            }
-        }
-
-        if single, let item = items.first {
-            Section {
-                if menu.edits.contains("rename") {
-                    Button("Rename", systemImage: "pencil") { model.renaming = item }
-                }
-                if menu.edits.contains("repeat") {
-                    Button("Repeat…", systemImage: "repeat") { model.repeatFor = item }
-                }
-                if menu.edits.contains("subtask") {
-                    Button("Add Subtask", systemImage: "arrow.turn.down.right") { model.subtaskOf = item }
-                }
-                Button("Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { model.fullScreen.append(item) }
-                Button("Open in Obsidian", systemImage: "arrow.up.forward.app") { Task { await openInObsidian(item) } }
-            }
-        }
-
+        })]
+        nodes.append(.group(row: false, children: pages))
+        if single, let item = items.first { nodes.append(.group(row: false, children: edits(item))) }
         if let remove = menu.remove {
-            Section {
-                Button(single ? "Delete" : "Delete \(items.count) Tasks", systemImage: "trash", role: .destructive) {
-                    if remove.confirm && single { question = .remove(items) } else { Task { await model.remove(items) } }
-                }
-            }
+            nodes.append(.group(row: false, children: [
+                .action(title: single ? "Delete" : "Delete \(items.count) Tasks", symbol: "trash", destructive: true) { [items, model, ask] in
+                    if remove.confirm && single { ask(.remove(items)) } else { Task { await model.remove(items) } }
+                },
+            ]))
         }
+        return nodes
     }
 
-    private func openInObsidian(_ item: TaskItem) async {
-        guard let line: Int = try? await model.read("tasks.lineOf", [item.key.json]),
-              let file = try? AppServices.shared.vault.tasksFilePath(),
-              let vault = UserDefaults.standard.string(forKey: "vaultFolderName")
-        else { return }
-        var link = URLComponents(string: "obsidian://advanced-uri")!
-        link.queryItems = [URLQueryItem(name: "vault", value: vault), URLQueryItem(name: "filepath", value: file), URLQueryItem(name: "line", value: String(line + 1))]
-        if let url = link.url { openURL(url) }
+    private var pages: [MenuNode] {
+        var pages: [MenuNode] = []
+        let items = items, model = model
+        if !menu.levels.disabled, !menu.levels.tiles.isEmpty {
+            pages.append(.submenu(title: "Priority", symbol: "flag", subtitle: menu.levels.tiles.first(where: \.on)?.mark.title, children: menu.levels.tiles.map { tile in
+                .action(title: tile.mark.title, symbol: "flag.fill", tint: tile.mark.color, checked: tile.on) { Task { await model.togglePriority(items, tile.mark.title) } }
+            }))
+        }
+        if !menu.labels.disabled, !menu.labels.tiles.isEmpty {
+            let on = menu.labels.tiles.filter(\.on).map(\.mark.title)
+            pages.append(.submenu(title: "Labels", symbol: "tag", subtitle: on.isEmpty ? nil : on.joined(separator: ", "), children: menu.labels.tiles.map { tile in
+                .action(title: tile.mark.title, symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, keepsOpen: true) { Task { await model.toggleLabel(items, tile.mark.title) } }
+            }))
+        }
+        if !menu.moves.isEmpty || menu.removeDue {
+            var moves: [MenuNode] = menu.moves.map { move in
+                .action(title: MoveWords.title(move.id), symbol: MoveWords.symbol(move.id)) {
+                    if let date = move.date { Task { await model.postpone(items, to: date) } } else { model.dateFor = items }
+                }
+            }
+            if menu.removeDue {
+                moves.append(.action(title: "Remove Due Date", symbol: "calendar.badge.minus") { Task { await model.removeDue(items) } })
+            }
+            pages.append(.submenu(title: "Move To", symbol: "calendar", subtitle: nil, children: moves))
+        }
+        if let sections = menu.sections, menu.edits.contains("section") {
+            var rows: [MenuNode] = sections.options.map { option in
+                .action(title: option.name ?? sections.choice.ungrouped, symbol: nil, checked: option.checked) { Task { await model.toSection(items, option.name) } }
+            }
+            if sections.create {
+                rows = [.group(row: false, children: rows), .group(row: false, children: [.action(title: "New Section…", symbol: "plus") { model.newSection = items.first }])]
+            }
+            let current = sections.options.first(where: \.checked).map { $0.name ?? sections.choice.ungrouped }
+            pages.append(.submenu(title: "Section", symbol: "rectangle.stack", subtitle: current, children: rows))
+        }
+        if single, let item = items.first, !menu.reminders.isEmpty {
+            pages.append(.submenu(title: "Reminder", symbol: "bell", subtitle: menu.reminders.first(where: \.checked).map { ReminderWords.title($0.kind) }, children: menu.reminders.map { reminder in
+                .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
+            }))
+        }
+        return pages
+    }
+
+    private func edits(_ item: TaskItem) -> [MenuNode] {
+        let model = model
+        var edits: [MenuNode] = []
+        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil") { model.renaming = item }) }
+        if menu.edits.contains("repeat") { edits.append(.action(title: "Repeat…", symbol: "repeat") { model.repeatFor = item }) }
+        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right") { model.subtaskOf = item }) }
+        edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right") { model.fullScreen.append(item) })
+        edits.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
+        return edits
+    }
+}
+
+// MARK: UIKit: a card's menu
+
+extension MenuNode {
+    @MainActor
+    static func uiMenu(_ nodes: [MenuNode], palette: (String) -> UIColor?) -> UIMenu {
+        UIMenu(children: nodes.map { $0.element(palette) })
+    }
+
+    @MainActor
+    private func element(_ palette: (String) -> UIColor?) -> UIMenuElement {
+        switch self {
+        case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let run):
+            var image = symbol.flatMap { UIImage(systemName: $0) }
+            if let tint, let color = palette(tint) { image = image?.withTintColor(color, renderingMode: .alwaysOriginal) }
+            var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
+            if keepsOpen { attributes.insert(.keepsMenuPresented) }
+            return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in run() }
+        case .submenu(let title, let symbol, let subtitle, let children):
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(palette) })
+            menu.subtitle = subtitle
+            return menu
+        case .group(let row, let children):
+            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(palette) })
+            if row { menu.preferredElementSize = .medium }
+            return menu
+        }
+    }
+}
+
+// MARK: SwiftUI: a bar's menu
+
+/// The same rows inside a SwiftUI `Menu`: the bulk menu's «⋯» and the full screen's.
+struct MenuNodes: View {
+    let nodes: [MenuNode]
+
+    var body: some View {
+        ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
+            switch node {
+            case .action(let title, let symbol, _, let destructive, let checked, let keepsOpen, let run):
+                let button = Button(role: destructive ? .destructive : nil) { run() } label: {
+                    if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
+                }
+                if keepsOpen { button.menuActionDismissBehavior(.disabled) } else { button }
+            case .submenu(let title, let symbol, let subtitle, let children):
+                Menu {
+                    MenuNodes(nodes: children)
+                } label: {
+                    Label(title, systemImage: symbol)
+                    if let subtitle { Text(subtitle) }
+                }
+            case .group(let row, let children):
+                if row {
+                    ControlGroup { MenuNodes(nodes: children) }.controlGroupStyle(.menu)
+                } else {
+                    Section { MenuNodes(nodes: children) }
+                }
+            }
+        }
     }
 }
 

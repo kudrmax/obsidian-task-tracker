@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import UIKit
 
 /// One task on the whole screen: where it lies, its title, every subtask as the same capsules, and its description,
 /// typed straight in and saved by itself. A navigation page: back by the glass arrow or a swipe from the edge.
@@ -44,12 +45,14 @@ struct TaskFullScreen: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Add Subtask", systemImage: "plus") { model.subtaskOf = task }
+                    .tint(.primary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if let menu = menuModel {
                     Menu("More", systemImage: "ellipsis") {
-                        TaskMenuContent(items: [task], menu: menu, model: model, question: $question)
+                        MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model) { question = $0 }.nodes)
                     }
+                    .tint(.primary)
                 }
             }
         }
@@ -61,20 +64,21 @@ struct TaskFullScreen: View {
 
     @State private var menuModel: TaskMenuModel?
 
+    @State private var subtaskMenus: [String: TaskMenuModel] = [:]
+
+    /// A subtask as the same capsule as on the main screen, at its depth; a tap opens its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
-        let card = BoardCard(item: row.item, level: row.level + 1, branch: branch, due: nil, repeats: row.item.repeats, shades: nil)
-        return Menu {
-            if let menu = model.snapshot?.menus[row.item.id] {
-                TaskMenuContent(items: [row.item], menu: menu, model: model, question: $question)
-            } else {
-                Button("Open Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { model.fullScreen.append(row.item) }
-            }
-        } label: {
-            TaskCapsule(card: card)
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch).padding(.leading, CGFloat(row.level + 1) * CardMetrics.indent) } }
-        .padding(.leading, CGFloat(row.level + 1) * CardMetrics.indent)
+        let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
+        return CardButton(card: card, menu: { menu(for: row.item) })
+            .frame(height: CardMetrics.height)
+            .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
+            .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
+    }
+
+    private func menu(for item: TaskItem) -> UIMenu? {
+        guard let menu = subtaskMenus[item.id] else { return nil }
+        let dark = UITraitCollection.current.userInterfaceStyle == .dark
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes) { model.ink($0, dark: dark) }
     }
 
     private static func branch(_ index: Int, _ rows: [FullRow]) -> Branch {
@@ -99,6 +103,9 @@ struct TaskFullScreen: View {
         tree = try? await model.rule("tasks.fullTree", [task.json])
         listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
         menuModel = try? await model.read("tasks.menu", [task.json, "full", model.menuScreen])
+        var menus: [String: TaskMenuModel] = [:]
+        for row in tree?.rows ?? [] { menus[row.item.id] = try? await model.read("tasks.menu", [row.item.json, "full", model.menuScreen]) }
+        subtaskMenus = menus
         let read: [String: JSONValue]? = try? await model.rule("description.read", [draft, task.description.json, ["focused": .bool(typing), "pending": .bool(saving != nil)]])
         if let read {
             draft = read["state"] ?? draft
