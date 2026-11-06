@@ -11,8 +11,9 @@ struct CaptureView: View {
     @State private var sending = false
     /// The list the last task went into, told of until the next one is typed.
     @State private var added: CaptureListOption?
-    private let router = CaptureRouter.shared
     @FocusState private var typing: Bool
+    /// The on-screen keyboard is up: the recording's controls ride on it, the bar above the tab bar is under it.
+    @State private var keyboardShown = false
 
     var body: some View {
         NavigationStack {
@@ -42,13 +43,24 @@ struct CaptureView: View {
                         Label(problem, systemImage: "mic.slash.fill")
                             .foregroundStyle(.red)
                     }
+                    // The empty page under the task is its field too: a tap there starts typing.
+                    Color.clear
+                        .frame(maxHeight: .infinity)
+                        .contentShape(.rect)
+                        .onTapGesture { typing = true }
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .containerRelativeFrame(.vertical, alignment: .top)
             }
             .scrollDismissesKeyboard(.interactively)
-            .contentShape(.rect)
-            .onTapGesture { typing = true }
+            .safeAreaInset(edge: .bottom) {
+                if keyboardShown {
+                    KeyboardRecorderBar(recorder: recorder)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                }
+            }
             .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -61,55 +73,23 @@ struct CaptureView: View {
                     Button("Add", systemImage: "checkmark") { Task { await send() } }
                         .disabled(!canSend || sending)
                 }
-                recorderItems
             }
-            // Focused a moment after the screen appears: focused at once, iOS leaves the keyboard's bar out.
-            .task {
-                try? await Task.sleep(for: .milliseconds(300))
-                typing = true
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+                keyboardShown = Self.keyboardHeight(note) > Self.onScreenKeyboard
             }
-            .onChange(of: router.asked) { typing = true }
             .onChange(of: text) { if !text.isEmpty { added = nil } }
             .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
         }
     }
 
-    /// The recording's controls above the keyboard while typing, as Notes has them; without the keyboard they are in the
-    /// bar above the tab bar (`RecorderAccessory`). Declared always: iOS shows them only with the keyboard.
-    @ToolbarContentBuilder
-    private var recorderItems: some ToolbarContent {
-        let controls = RecorderControls(recorder: recorder)
-        switch recorder.state {
-        case .idle:
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
-                    .tint(.red)
-                Spacer()
-            }
-        case .recording, .paused:
-            ToolbarItemGroup(placement: .keyboard) {
-                controls.discard
-                Spacer()
-            }
-            ToolbarItem(placement: .keyboard) { controls.elapsed }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                controls.pauseOrResume
-                controls.stop
-            }
-        case .finished:
-            ToolbarItemGroup(placement: .keyboard) {
-                controls.discard
-                Spacer()
-            }
-            ToolbarItem(placement: .keyboard) { controls.voiceNote }
-                .sharedBackgroundVisibility(.hidden)
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-            }
-        }
+    /// Taller than the bar iOS shows for a hardware keyboard.
+    private static let onScreenKeyboard: CGFloat = 100
+
+    private static func keyboardHeight(_ note: Notification) -> CGFloat {
+        guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let screen = (note.object as? UIScreen) ?? UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.screen }).first
+        else { return 0 }
+        return max(0, screen.bounds.maxY - frame.minY)
     }
 
     private var canSend: Bool {

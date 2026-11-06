@@ -14,7 +14,7 @@ struct RootView: View {
                 SettingsView()
             }
         }
-        .tabViewBottomAccessory(isEnabled: router.tab == .newTask) {
+        .tabViewBottomAccessory {
             RecorderAccessory(recorder: recorder)
         }
     }

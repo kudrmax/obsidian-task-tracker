@@ -14,12 +14,9 @@ final class CaptureRouter {
     static let url = URL(string: "taskcalendar://new-task")!
 
     var tab = AppTab.newTask
-    /// Changes each time a new task is asked for: the screen puts the cursor in the task's field.
-    private(set) var asked = 0
 
     func open() {
         tab = .newTask
-        asked += 1
     }
 
     func open(_ url: URL) {

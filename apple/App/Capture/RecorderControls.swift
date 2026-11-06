@@ -7,6 +7,7 @@ struct RecorderControls {
 
     var discard: some View {
         Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
+            .foregroundStyle(.red)
     }
 
     @ViewBuilder
@@ -50,7 +51,8 @@ struct RecorderControls {
     }
 }
 
-/// The recording's controls in the system bar above the tab bar, where Music keeps its player.
+/// The recording's controls in the system bar above the tab bar, on both tabs as Music keeps its player: the tab bar
+/// keeps one width. Recording from Settings goes to New Task, where the recording is added.
 struct RecorderAccessory: View {
     let recorder: VoiceRecorder
 
@@ -59,7 +61,10 @@ struct RecorderAccessory: View {
         HStack(spacing: 20) {
             switch recorder.state {
             case .idle:
-                Button { Task { await recorder.start() } } label: {
+                Button {
+                    CaptureRouter.shared.open()
+                    Task { await recorder.start() }
+                } label: {
                     Label("Record", systemImage: "mic.fill")
                         .labelStyle(.titleAndIcon)
                         .frame(maxWidth: .infinity)
@@ -83,5 +88,45 @@ struct RecorderAccessory: View {
         .font(.headline)
         .tint(.primary)
         .padding(.horizontal)
+    }
+}
+
+/// The recording's controls riding on the keyboard while typing: system glass buttons, as iOS's own bars over the
+/// keyboard, with the room above it that Reminders leaves.
+struct KeyboardRecorderBar: View {
+    let recorder: VoiceRecorder
+
+    var body: some View {
+        let controls = RecorderControls(recorder: recorder)
+        GlassEffectContainer {
+            HStack {
+                switch recorder.state {
+                case .idle:
+                    Spacer()
+                    Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
+                        .foregroundStyle(.red)
+                    Spacer()
+                case .recording, .paused:
+                    controls.discard
+                    Spacer()
+                    controls.elapsed
+                    Spacer()
+                    HStack(spacing: 0) {
+                        controls.pauseOrResume
+                        controls.stop
+                    }
+                case .finished:
+                    controls.discard
+                    Spacer()
+                    controls.voiceNote
+                    Spacer()
+                }
+            }
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(.large)
+        .tint(.primary)
     }
 }
