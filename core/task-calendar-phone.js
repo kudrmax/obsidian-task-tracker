@@ -2572,6 +2572,19 @@ ${key.title}`.toLowerCase();
     if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
     return levels.map((hourPx) => ({ hourPx }));
   }
+  function wholeDayOr(wholeDayPx, levels) {
+    return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
+  }
+  function zoomAfterPinch(hourPx, wholeDayPx, levels) {
+    return hourPx <= levelsFor(wholeDayOr(wholeDayPx, levels), levels)[0].hourPx ? "wholeDay" : hourPx;
+  }
+  function zoomShown(saved, wholeDayPx, levels) {
+    const ends = levelsFor(wholeDayOr(wholeDayPx, levels), levels);
+    const [min, max] = [ends[0].hourPx, ends[ends.length - 1].hourPx];
+    if (saved === "wholeDay") return min;
+    const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
+    return Math.min(max, Math.max(min, hourPx));
+  }
 
   // core/application/taskKeys.ts
   function samePlace2(a, b) {
@@ -5506,7 +5519,9 @@ ${key.title}`.toLowerCase();
     formatZoomLevels,
     levelsFor,
     gridAt,
-    gridMarks
+    gridMarks,
+    zoomAfterPinch: (hourPx, wholeDayPx, levels) => zoomAfterPinch(hourPx, wholeDayPx ?? null, levels),
+    zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels)
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
   var TIMELINE = {

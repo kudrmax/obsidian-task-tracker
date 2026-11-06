@@ -20,7 +20,7 @@ import { dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, levelsFor, parseZoomLevels, zoomLevelsOf } from "./timelineZoom";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
 	type CalendarSource,
@@ -657,6 +657,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	levelsFor,
 	gridAt,
 	gridMarks,
+	zoomAfterPinch: (hourPx, wholeDayPx, levels) => zoomAfterPinch(hourPx, wholeDayPx ?? null, levels),
+	zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels),
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

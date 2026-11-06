@@ -189,8 +189,11 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
 - backend: `rules.formatZoomLevels` is offered too (the plugin's settings field uses it; the app may show the levels the
   same way).
 - frontend-obsidian: the plugin draws the grid's minor lines and labels from `gridMarks` and takes `Grid` from contracts;
-  past events keep their CSS tokens, a comment by them names `PAST_SHARES`. Still in the plugin, for the backend to take:
-  a released pinch counts as the whole day when its height is at or under `levelsFor(...)[0]`
-  (`TaskCalendarView.settleZoom`), and before the timeline is measured the whole day's height falls back to the smallest
-  configured level (`TaskCalendarView.zoomLevels`). Swift would repeat the first; a core `zoomAfterPinch(hourPx, levels)`
-  answering `"wholeDay" | hourPx` would end it.
+  past events keep their CSS tokens, a comment by them names `PAST_SHARES`. The plugin's pinch
+  bounds, the zoom a released pinch saves and the zoom it opens at come from `levelsFor`, `zoomAfterPinch` and
+  `zoomShown` (`wholeDayPx` null until the timeline is measured); `viewSettings.ts` re-exports the core's `Zoom`.
+- backend: `rules.zoomAfterPinch(hourPx, wholeDayPx, levels)` → `"wholeDay" | hourPx` and `rules.zoomShown(saved,
+  wholeDayPx, levels)` → the hour height to open at (`"wholeDay"` → the whole day; a number clamped to `levelsFor`'s ends;
+  an unreadable saved zoom → `DEFAULT_ZOOM_HOUR`, clamped). `wholeDayPx` is `null` before the timeline has a height, and
+  then the smallest level stands for the whole day. The `Zoom` type (`number | "wholeDay"`) is exported from contracts;
+  `obsidian/ui/viewSettings.ts` still declares its own and may switch to it.
