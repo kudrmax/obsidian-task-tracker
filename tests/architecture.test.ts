@@ -178,6 +178,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	QuickEntrySession: "./QuickEntrySession",
 	listView: "./sections",
 	sectionChoice: "./sections",
+	cardDue: "./cardDue",
 	DESCRIPTION_TEMPLATE: "../domain/description",
 	textParts: "../domain/TaskText",
 	LINE_BREAK: "../domain/TaskTitle",

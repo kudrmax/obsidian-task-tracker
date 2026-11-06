@@ -27,7 +27,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  * here when a hit goes, delete the file's line when it reaches zero. Never raise one or add a file.
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
-	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (repeat icon, description mark); they stay" },
+	"src/ui/TaskCard.ts": { count: 3, removedBy: "none: these draw the card's marks (repeat icon, description mark); they stay" },
 };
 
 function files(dir: string): string[] {

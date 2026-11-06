@@ -2,17 +2,31 @@ import type { GroupedList } from "../domain/Lists";
 import type { GroupName } from "../domain/Task";
 import type { ListSection, TaskItem } from "./contracts";
 
+/** A task of a list at its depth: 0 for a task, one more for each task above a subtask. */
+export interface ListRow {
+	readonly item: TaskItem;
+	readonly level: number;
+}
+
 /** The tasks of one section of a list, in file order. */
 export interface ListGroup {
 	readonly name: GroupName;
 	readonly items: readonly TaskItem[];
+	/** The rows its column draws: each task, then its open subtasks a level deeper, unless they are folded away. */
+	readonly rows: readonly ListRow[];
+	/** A section with no task: its header stands over the No tasks plate. No section is never empty. */
+	readonly empty: boolean;
 	/** What its header's menu offers: a section is renamed or removed; No section has no menu. */
 	readonly can: { readonly rename: boolean; readonly remove: boolean };
 }
 
+function rowsOf(items: readonly TaskItem[], level = 0): ListRow[] {
+	return items.flatMap((item) => [{ item, level }, ...(item.collapsed ? [] : rowsOf(item.subtasks, level + 1))]);
+}
+
 function groupOf(name: GroupName, items: readonly TaskItem[]): ListGroup {
 	const section = name !== null;
-	return { name, items, can: { rename: section, remove: section } };
+	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, can: { rename: section, remove: section } };
 }
 
 /**

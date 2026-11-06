@@ -1,4 +1,4 @@
-import type { PriorityLevel, TaskItem } from "../application/contracts";
+import { cardDue, type PriorityLevel, type TaskItem } from "../application/contracts";
 import { LABEL_SLOTS } from "./priorityColors";
 import type { LocalDate } from "./types";
 import { dayOfMonth, monthAbbreviation } from "./dates";
@@ -38,14 +38,15 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
 	renderMeta(card, item);
-	const shownDue = item.dueDate && item.dueDate !== opts.day ? item.dueDate : null;
-	if (!shownDue && !item.repeat) return;
+	const corner = cardDue(item, opts.day);
+	if (!corner) return;
+	const { date, repeats } = corner;
 	const due = el(card, "span", "tc-due");
-	due.classList.toggle("is-repeat-only", !shownDue);
-	const top = item.repeat ? el(due, "span", "tc-due-top") : due;
-	if (shownDue) el(top, "span", "tc-due-day", dayOfMonth(shownDue));
-	if (item.repeat) top.appendChild(icon("repeat")).classList.add("tc-due-repeat");
-	if (shownDue) el(due, "span", "tc-due-mon", monthAbbreviation(shownDue));
+	due.classList.toggle("is-repeat-only", date === null);
+	const top = repeats ? el(due, "span", "tc-due-top") : due;
+	if (date) el(top, "span", "tc-due-day", dayOfMonth(date));
+	if (repeats) top.appendChild(icon("repeat")).classList.add("tc-due-repeat");
+	if (date) el(due, "span", "tc-due-mon", monthAbbreviation(date));
 }
 
 /**

@@ -45,7 +45,9 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** A list in its sections, and whether it shows their headers. */
-export { listView, type ListGroup, type ListView } from "./sections";
+export { listView, type ListGroup, type ListRow, type ListView } from "./sections";
+/** What the corner of a card shows on a column's day: the due date unless it is that day, and the repeat icon. */
+export { cardDue, type CardDue } from "./cardDue";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
 export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections";
 /** What a new description starts as in the editor: one empty point, which alone is no description. */
