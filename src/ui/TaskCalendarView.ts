@@ -733,8 +733,12 @@ export class TaskCalendarView extends ItemView {
 	 * that day beside its calendar. A found subtask's tasks show their subtasks, so its card is there.
 	 */
 	private async reveal(item: TaskItem): Promise<void> {
-		if (item.isSubtask) await this.act(() => this.deps.tasks.unfoldAbove(item.key));
-		const screen = await this.deps.tasks.screenOf(item);
+		const revealed: { screen?: TaskScreen } = {};
+		await this.act(async () => {
+			revealed.screen = await this.deps.tasks.reveal(item);
+		});
+		const { screen } = revealed;
+		if (!screen) return;
 		this.found.mark(item);
 		const place: Place = screen.kind === "day" ? "calendar" : PLACE_OF_LIST[screen.list];
 		this.atDone = place === "done";

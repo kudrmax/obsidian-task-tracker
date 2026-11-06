@@ -1533,6 +1533,22 @@ describe("where a task shows, and a task by its key", () => {
 		expect(await svc.screenOf(soon.subtasks[0])).toEqual({ kind: "list", list: "soon" });
 	});
 
+	it("reveal: a found subtask's tasks show their subtasks, and the screen is its task's", async () => {
+		const { store, svc } = setup(FILE.replace("- [ ] Later 📅 2026-11-03\n\t- [ ] Sub", "- [ ] Later 📅 2026-11-03 📁\n\t- [ ] Sub"));
+		const [later] = (await svc.dayView(D)).list;
+		expect(later.collapsed).toBe(true);
+		expect(await svc.reveal(later.subtasks[0])).toEqual({ kind: "day", date: D });
+		expect(store.text).toContain("- [ ] Later 📅 2026-11-03\n\t- [ ] Sub");
+	});
+
+	it("reveal: a task writes nothing and answers where it shows", async () => {
+		const { store, svc } = setup(FILE);
+		const before = store.text;
+		const [inbox] = await svc.inboxView();
+		expect(await svc.reveal(inbox)).toEqual({ kind: "list", list: "inbox" });
+		expect(store.text).toBe(before);
+	});
+
 	it("finds a task among items and their subtasks by its key, none for a key not there", async () => {
 		const { svc } = setup(FILE);
 		const items = (await svc.dayView(D)).list;

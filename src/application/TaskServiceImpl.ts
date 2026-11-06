@@ -239,6 +239,11 @@ export class TaskServiceImpl implements TaskService {
 		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
 	}
 
+	async reveal(item: TaskItem): Promise<TaskScreen> {
+		if (item.isSubtask) await this.unfoldAbove(item.key);
+		return this.screenOf(item);
+	}
+
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 		for (const item of items) {
 			if (samePlace(item.key, key)) return item;

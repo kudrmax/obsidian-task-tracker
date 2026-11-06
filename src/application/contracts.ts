@@ -414,6 +414,8 @@ export interface TaskService {
 	 * shows under its task, so where that task does. Where that is on its screens is the frontend's.
 	 */
 	screenOf(item: TaskItem): Promise<TaskScreen>;
+	/** A found task shown: a subtask's tasks show their subtasks (`unfoldAbove`), so its card stands in the list; then `screenOf` it. */
+	reveal(item: TaskItem): Promise<TaskScreen>;
 	/** The task `key` names among `items` and their subtasks, at every depth; null when none is. */
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null;
 

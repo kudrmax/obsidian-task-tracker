@@ -255,6 +255,10 @@ export class DemoTaskService implements TaskService {
 		return taskScreen(item.list, item.day);
 	}
 
+	async reveal(item: TaskItem): Promise<TaskScreen> {
+		return this.screenOf(item);
+	}
+
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
 		for (const item of items) {
 			if (item.key.section === key.section && item.key.index === key.index && item.key.path.join() === key.path.join()) return item;
