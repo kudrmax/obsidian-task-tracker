@@ -13,11 +13,19 @@ struct TaskCalendarApp: App {
         UserDefaults.standard.removeObject(forKey: "alarmReminders")
         Task { await UserNotifications.registerCategories() }
         UNUserNotificationCenter.current().delegate = Self.notifications
+        #if DEBUG
+        // A scratch vault for the simulator: `--vault <folder>`, a folder the app can reach without the picker.
+        if let at = CommandLine.arguments.firstIndex(of: "--vault"), CommandLine.arguments.indices.contains(at + 1) {
+            let folder = URL(fileURLWithPath: CommandLine.arguments[at + 1])
+            try? AppServices.shared.vault.choose(folder: folder)
+            UserDefaults.standard.set(folder.lastPathComponent, forKey: "vaultFolderName")
+        }
+        #endif
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            BoardScreen()
                 .onOpenURL { url in
                     if let back = RefreshLink.back(from: url) {
                         Task {
@@ -32,7 +40,6 @@ struct TaskCalendarApp: App {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
                 Refresh.schedule()
-                CaptureRouter.shared.open()
             }
         }
         .backgroundTask(.appRefresh(Refresh.identifier)) {

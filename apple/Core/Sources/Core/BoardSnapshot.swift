@@ -4,6 +4,11 @@ import Foundation
 public struct Themed<Value: Sendable & Hashable>: Sendable, Hashable {
     public let dark: Value
     public let light: Value
+
+    public init(dark: Value, light: Value) {
+        self.dark = dark
+        self.light = light
+    }
 }
 
 /// How a card's line runs to it from the task above: through it to a later sibling, or ending at it.
@@ -21,6 +26,15 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let repeats: Bool
     public let shades: Themed<Shades>?
     public var id: String { item.id }
+
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?) {
+        self.item = item
+        self.level = level
+        self.branch = branch
+        self.due = due
+        self.repeats = repeats
+        self.shades = shades
+    }
 }
 
 public struct BoardGroup: Sendable, Hashable, Identifiable {
@@ -92,6 +106,8 @@ public struct BoardSnapshot: Sendable {
     public let statuses: [SourceStatus]
     public let calendarsStale: Bool
     public let canUndo: Bool
+    /// Each card's menu by its id, as opened from where the card stands.
+    public let menus: [String: TaskMenuModel]
     /// The tasks file's text it was read from: the screen reads again only when it changes.
     public let tasksText: String?
 
@@ -144,16 +160,26 @@ extension TaskBoard {
             .backlog: try list(.backlog, screen.backlog, title: name("backlog")),
         ]
         let events: DayEvents = screen.calendars ? try read("calendars.events", [.string(day)], over: files) : .none
+        let timeline = try timeline(day: day, today: today, screen: screen, events: events, files: files, painter: &painter)
+        let menuScreen: JSONValue = ["today": .string(today), "day": .string(day), "offer": screen.offer]
+        // A menu reads no file: asked over the settings alone, it costs nothing per card.
+        let settingsOnly = BoardFiles(tasks: nil, settingsJSON: files.settingsJSON, calendars: [:], now: files.now)
+        var menus: [String: TaskMenuModel] = [:]
+        for (column, list) in lists {
+            for card in list.cards { menus[card.id] = try read("tasks.menu", [card.item.json, .string(column.rawValue), menuScreen], over: settingsOnly) }
+        }
+        for slot in timeline.slots { menus[slot.id] = try read("tasks.menu", [slot.card.item.json, "timeline", menuScreen], over: settingsOnly) }
         return BoardSnapshot(
             today: today,
             day: day,
             dayTitle: dayTitle,
             screen: screen,
             lists: lists,
-            timeline: try timeline(day: day, today: today, screen: screen, events: events, files: files, painter: &painter),
+            timeline: timeline,
             statuses: events.statuses,
             calendarsStale: events.stale,
             canUndo: canUndo,
+            menus: menus,
             tasksText: files.tasks)
     }
 
