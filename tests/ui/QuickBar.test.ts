@@ -11,7 +11,15 @@ const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p3", color: "blue" },
 ];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
+const LABELS = [
+	{ name: "Важное", color: "red" },
+	{ name: "Очень_срочное", color: "orange" },
+] as const;
+
+/** The labels the next bar set up offers: none unless a test gives some. */
+let shownLabels: readonly (typeof LABELS)[number][] = [];
+
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, labels: [], place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
@@ -26,9 +34,12 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 	const places: Placement[] = [];
 	const repeats: (RepeatRule | null)[] = [];
 	const sections: true[] = [];
+	const labelled: (readonly string[])[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
 		levels: () => LEVELS,
+		labels: () => shownLabels,
+		onLabels: (names: readonly string[]) => labelled.push(names),
 		today: () => TODAY,
 		placementOfDay: placementOf,
 		onIndent: (delta) => indents.push(delta),
@@ -38,13 +49,14 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 		onSection: () => sections.push(true),
 	});
 	bar.show({ ...STATE, ...state });
-	return { parent, bar, indents, priorities, places, repeats, sections };
+	return { parent, bar, indents, priorities, places, repeats, sections, labelled };
 }
 
 const q = <T extends Element = HTMLButtonElement>(root: ParentNode, selector: string) => root.querySelector<T>(selector)!;
 const tiles = (root: ParentNode) => [...root.querySelectorAll<HTMLButtonElement>(".tc-menu-tile")];
 
 afterEach(() => {
+	shownLabels = [];
 	document.body.innerHTML = "";
 });
 
@@ -53,7 +65,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -157,7 +169,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -636,12 +648,37 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 			bar.show({ ...STATE, section: false });
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);
 			for (const node of own) expect(bar.owns(node)).toBe(true);
 			expect(bar.owns(other)).toBe(false);
 		}
+	});
+});
+
+describe("the flag's labels", () => {
+	it("offers the labels under the levels, one tap putting a label on and the panel staying for the next", () => {
+		shownLabels = LABELS;
+		const { parent, labelled } = setup({ labels: [LABELS[1]] });
+		q(parent, ".tc-bar-flag").click();
+		const labels = [...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")];
+		expect(labels.map((t) => [t.textContent, t.classList.contains("is-on")])).toEqual([["Важное", false], ["Очень срочное", true]]);
+		labels[0].click();
+		expect(labelled).toEqual([["Очень_срочное", "Важное"]]);
+		expect(document.querySelector(".tc-menu-tiles.is-labels")).not.toBeNull();
+	});
+
+	it("turns the labels off while there is a priority, the levels while there are labels, and colours the flag by the first label", () => {
+		shownLabels = LABELS;
+		const prioritized = setup({ priority: LEVELS[0] });
+		q(prioritized.parent, ".tc-bar-flag").click();
+		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
+		document.body.innerHTML = "";
+		const labelled = setup({ labels: [LABELS[1]] });
+		expect(q(labelled.parent, ".tc-bar-flag").dataset.priority).toBe("orange");
+		q(labelled.parent, ".tc-bar-flag").click();
+		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
 	});
 });

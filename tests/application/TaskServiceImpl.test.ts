@@ -152,9 +152,9 @@ describe("writing", () => {
 	it("createAtTime puts the task at the time, without a duration", async () => {
 		const { store, svc } = setup(FULL);
 		await svc.createAtTime(T, 600, "Call");
-		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] B\n- [ ] Call ⏰ 2026-10-30 10:00\n");
+		expect(store.text).toContain("## Now\n\n- [ ] A\n- [ ] B\n- [ ] Call 📌 2026-10-30 10:00\n");
 		await svc.createAtTime(D, 1420, "Late");
-		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] Late ⏰ 2026-11-03 23:40\n");
+		expect(store.text).toContain("## Soon\n\n- [ ] C\n- [ ] Late 📌 2026-11-03 23:40\n");
 	});
 
 	it("normalizes after every write", async () => {
@@ -168,7 +168,7 @@ describe("writing", () => {
 		const { store, svc } = setup(FULL);
 		let view = await svc.dayView(T);
 		await svc.setSlot(view.list[0].key, { date: T, start: 600, end: 660 });
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A 📌 2026-10-30 10:00-11:00\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n");
 		view = await svc.dayView(T);
 		await svc.clearSlot(view.slotted[0].key);
 		expect(store.text).toBe(FULL);
@@ -228,7 +228,7 @@ describe("the task sheet", () => {
 		await svc.create({ text: "D", placement: { kind: "date", date: D }, priority: null }, { date: D, start: 600, end: 660 });
 		await svc.create({ text: "P", placement: { kind: "date", date: "2026-10-01" }, priority: null });
 		expect(store.writes).toBe(4);
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n- [ ] N 📅 2026-10-30\n- [ ] P 📅 2026-10-30\n\n## Soon\n\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 ⏰ 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n- [ ] N 📅 2026-10-30\n- [ ] P 📅 2026-10-30\n\n## Soon\n\n- [ ] C\n- [ ] S\n- [ ] D 📅 2026-11-03 📌 2026-11-03 10:00-11:00\n\n## Backlog\n\n## Done\n");
 	});
 
 	it("create with blank text writes nothing", async () => {
@@ -362,7 +362,7 @@ describe("a day that starts at 4", () => {
 		const day = await svc.dayView(T);
 		expect(day.slotted.map((i) => i.text)).toEqual(["B"]);
 		await svc.setSlot(day.list[0].key, { date: "2026-10-31", start: 180, end: 300 });
-		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A ⏰ 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n\n## Backlog\n");
+		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A 📌 2026-10-31 03:00-04:00\n- [ ] B ⏰ 2026-10-31 01:00-02:00\n\n## Soon\n\n## Done\n\n## Backlog\n");
 	});
 });
 
@@ -442,6 +442,21 @@ describe("priority", () => {
 		await svc.setReminder((await svc.dayView(T)).slotted[0].key, "alarm");
 		expect(store.text).toContain("- [ ] A 🚨 2026-10-30 10:00");
 		expect((await svc.dayView(T)).slotted[0].reminder).toBe("alarm");
+	});
+
+	it("setCollapsed writes the marker on the task's line and the item says so; false takes it off", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n");
+		await svc.setCollapsed((await svc.dayView(T)).list[0].key, true);
+		expect(store.text).toContain("- [ ] A 📁\n\t- [ ] B\n");
+		expect((await svc.dayView(T)).list[0]).toMatchObject({ collapsed: true, subtasks: [{ text: "B" }] });
+		await svc.setCollapsed((await svc.dayView(T)).list[0].key, false);
+		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n");
+	});
+
+	it("unfoldAbove shows the subtasks of every task a subtask sits under", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A 📁\n\t- [ ] B 📁\n\t\t- [ ] C\n\n## Soon\n\n## Done\n");
+		await svc.unfoldAbove((await svc.dayView(T)).list[0].subtasks[0].subtasks[0].key);
+		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n\t\t- [ ] C\n");
 	});
 
 	it("setPriority writes the prefix, null takes it off", async () => {
@@ -785,6 +800,42 @@ describe("lineOf", () => {
 		const { svc } = setup(FULL);
 		const a = (await svc.dayView(T)).list[0];
 		await expect(svc.lineOf({ ...a.key, raw: "- [ ] Other" })).rejects.toBeInstanceOf(StaleTaskError);
+	});
+});
+
+describe("find", () => {
+	const TREE = "## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\t- [x] B1\n\t- [ ] B2\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	it("gives the task at its place with every subtask, a subtask with the text of its task", async () => {
+		const { svc } = setup(TREE);
+		const b = (await svc.dayView(T)).list.find((i) => i.text === "B")!;
+		const found = await svc.find(b.key, b.text);
+		expect(found?.allSubtasks.map((s) => [s.text, s.status])).toEqual([["B1", "done"], ["B2", "todo"]]);
+		expect((await svc.find(b.allSubtasks[1].key, "B2"))?.parentText).toBe("B");
+	});
+
+	it("follows the task to where it moved, its line the same", async () => {
+		const { svc } = setup(TREE);
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.remove(a.key);
+		expect((await svc.find(b.key, b.text))?.key.index).toBe(0);
+	});
+
+	it("keeps the task at its place whose text is the one asked for, its other fields changed", async () => {
+		const { svc } = setup(TREE);
+		const b = (await svc.dayView(T)).list[1];
+		await svc.setPriority(b.key, "p1");
+		expect((await svc.find(b.key, "B"))?.priority?.prefix).toBe("p1");
+		await svc.rename((await svc.find(b.key, "B"))!.key, "Bee");
+		expect((await svc.find(b.key, "Bee"))?.text).toBe("Bee");
+	});
+
+	it("gives null once the task is gone from its place and its line from the file", async () => {
+		const { svc } = setup(TREE);
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.setStatus(a.key, "done");
+		expect(await svc.find(a.key, a.text)).toBeNull();
+		expect((await svc.find(b.key, b.text))?.text).toBe("B");
 	});
 });
 
@@ -1138,11 +1189,11 @@ describe("search", () => {
 		"## Done", "", "- [x] Оплатить госпошлину за паспорт", "",
 	].join("\n");
 
-	it("finds titles and descriptions section by section, a task before its open subtasks", async () => {
+	it("finds titles and descriptions section by section, open subtasks too", async () => {
 		const { svc } = setup(FILE);
 		const hits = await svc.search("ПАСПОРТ");
 		expect(hits.map((h) => h.item.list)).toEqual(["inbox", "soon", "soon", "now", "now", "done"]);
-		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Записаться", "Найти", "Забрать", "Читать", "Оплатить"]);
+		expect(hits.map((h) => h.item.text.split(" ")[0])).toEqual(["Фото", "Найти", "Записаться", "Забрать", "Читать", "Оплатить"]);
 	});
 
 	it("a found subtask is its own hit; a closed one is not found", async () => {
@@ -1157,20 +1208,48 @@ describe("search", () => {
 		const { svc } = setup(FILE);
 		const hit = (await svc.search("паспорт")).find((h) => h.item.text === "Записаться в МФЦ")!;
 		expect(hit.title).toEqual([]);
-		expect(hit.description).toEqual({ before: "взять старый ", match: "паспорт", after: " и фото" });
+		expect(hit.description).toEqual([
+			{ text: "взять старый ", match: false },
+			{ text: "паспорт", match: true },
+			{ text: " и фото", match: false },
+		]);
 	});
 
 	it("a match in both gives both", async () => {
 		const { svc } = setup(FILE);
 		const hit = (await svc.search("паспорт")).find((h) => h.item.list === "now")!;
 		expect(hit.title.some((p) => p.match)).toBe(true);
-		expect(hit.description?.match).toBe("паспорт");
+		expect(hit.description?.find((p) => p.match)?.text).toBe("паспорт");
 	});
 
 	it("reads a link by what it shows and «ё» as «е»", async () => {
 		const { svc } = setup(FILE);
 		const hits = await svc.search("елочный");
 		expect(hits.map((h) => h.title)).toEqual([[{ text: "Читать ", match: false }, { text: "ёлочный", match: true }, { text: " паспорт", match: false }]]);
+		expect(await svc.search("Заметка")).toEqual([]);
+	});
+
+	it("finds the query's words in their order, each a part of a word, and the best match first", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Отвезти шкаф Элеоноре", "- [ ] Ответить Элине", "- [ ] Разобрать почту", ""].join("\n"));
+		const hits = await svc.search("отв эл");
+		expect(hits.map((h) => h.item.text)).toEqual(["Ответить Элине", "Отвезти шкаф Элеоноре"]);
+		expect(hits[0].title).toEqual([
+			{ text: "Отв", match: true },
+			{ text: "етить ", match: false },
+			{ text: "Эл", match: true },
+			{ text: "ине", match: false },
+		]);
+	});
+
+	it("a match in the title stands before one only in the description", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- про паспорт", "- [ ] Сделать паспорт", ""].join("\n"));
+		expect((await svc.search("паспорт")).map((h) => h.item.text)).toEqual(["Сделать паспорт", "Позвонить"]);
+	});
+
+	it("reads a description by its words, not its Markdown", async () => {
+		const { svc } = setup(["## Inbox", "", "- [ ] Позвонить", "\t- **важно** сегодня", "\t- [[Заметка|план]]", ""].join("\n"));
+		const [hit] = await svc.search("важно сегодня план");
+		expect(hit.description?.map((p) => p.text).join("")).toBe("важно сегодня план");
 		expect(await svc.search("Заметка")).toEqual([]);
 	});
 
@@ -1215,5 +1294,27 @@ describe("TaskServiceImpl.screen", () => {
 	it("rejects without a file", async () => {
 		const { svc } = setup(null);
 		await expect(svc.screen(T)).rejects.toBeInstanceOf(TasksFileMissingError);
+	});
+});
+
+describe("labels", () => {
+	const labelled = () => new FakeSettingsStore({ ...DEFAULT_SETTINGS, labels: [{ name: "Важное", color: "red" }, { name: "Срочное", color: "orange" }] });
+
+	it("writes several tasks' labels at once and gives each task back as it then stands, its key fresh", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] p1 B\n- [ ] C #label/Важное\n", labelled());
+		const now = (await svc.dayView(T)).list;
+		const items = await svc.setLabelsAll([
+			{ key: now[0].key, labels: ["Срочное"] },
+			{ key: now[1].key, labels: ["Срочное"] },
+			{ key: now[2].key, labels: ["Важное", "Срочное"] },
+		]);
+		expect(await store.read()).toContain("- [ ] A #label/Срочное\n- [ ] p1 B\n- [ ] C #label/Важное #label/Срочное");
+		expect(items.map((item) => [item?.text, item?.labels.map((l) => l.name), item?.key.raw])).toEqual([
+			["A", ["Срочное"], "- [ ] A #label/Срочное"],
+			["B", [], "- [ ] p1 B"],
+			["C", ["Важное", "Срочное"], "- [ ] C #label/Важное #label/Срочное"],
+		]);
+		const again = await svc.setLabels(items[0]!.key, []);
+		expect(again?.labels).toEqual([]);
 	});
 });

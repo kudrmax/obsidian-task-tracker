@@ -80,16 +80,25 @@ async function settled(): Promise<void> {
 	for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function open(file: unknown = START): Promise<void> {
+async function open(file: unknown = START, google: GoogleAccount = loggedOut): Promise<void> {
+	document.body.replaceChildren();
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google: loggedOut, work, calendars });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars });
 	tab.display();
 }
 
+/** The tab's rows, then those of the page open over it. */
 function rows(name: string): HTMLElement[] {
-	return [...tab.containerEl.querySelectorAll<HTMLElement>(".setting-item")].filter((row) => row.querySelector(".setting-item-name")?.textContent === name);
+	return [tab.containerEl, ...document.querySelectorAll<HTMLElement>(".modal")]
+		.flatMap((root) => [...root.querySelectorAll<HTMLElement>(".setting-item")]).filter((row) => row.querySelector(".setting-item-name")?.textContent === name);
+}
+
+/** Opens the page a row of More leads to. */
+function page(name: string): HTMLElement {
+	rows(name)[0].click();
+	return document.querySelector<HTMLElement>(".modal")!;
 }
 
 function input(name: string, nth = 0): HTMLInputElement {
@@ -147,15 +156,18 @@ beforeEach(async () => {
 
 describe("the settings tab: the tasks file", () => {
 	it("writes the path as typed, empty too", async () => {
+		page("Tasks file");
 		await writes(() => type(input("File path"), " Other.md "), { tasksFile: " Other.md " });
 		await writes(() => type(input("File path"), ""), { tasksFile: "" });
 	});
 
 	it("writes a section's name as typed, empty too, keeping the other names", async () => {
-		await writes(() => type(input("Now section"), " Today "), { sections: { ...START.sections, now: " Today " } });
-		await writes(() => type(input("Done section"), ""), { sections: { ...START.sections, now: " Today ", done: "" } });
-		for (const [label, key] of [["Inbox section", "inbox"], ["Soon section", "soon"], ["Backlog section", "backlog"]] as const) {
+		page("Tasks file");
+		await writes(() => type(input("Now"), " Today "), { sections: { ...START.sections, now: " Today " } });
+		await writes(() => type(input("Done"), ""), { sections: { ...START.sections, now: " Today ", done: "" } });
+		for (const [label, key] of [["Inbox", "inbox"], ["Soon", "soon"], ["Backlog", "backlog"]] as const) {
 			await open();
+			page("Tasks file");
 			await writes(() => type(input(label), "X"), { sections: { ...START.sections, [key]: "X" } });
 		}
 	});
@@ -165,11 +177,13 @@ describe("the settings tab: the tasks file", () => {
 			["Due date marker", "dueDateMarker"],
 			["Slot marker", "slotMarker"],
 			["Alarm marker", "alarmSlotMarker"],
+			["Live Activity marker", "liveSlotMarker"],
 			["No-reminder marker", "silentSlotMarker"],
 			["Repeat marker", "repeatMarker"],
 		] as const;
 		for (const [label, key] of markers) {
 			await open();
+			page("Tasks file");
 			expect(input(label).value).toBe(START[key]);
 			await writes(() => type(input(label), " ✱"), { [key]: " ✱" });
 		}
@@ -263,8 +277,18 @@ describe("the settings tab: the sections", () => {
 		expect(presetRows()).toHaveLength(3);
 	});
 
+	it("moves a level by its grip", async () => {
+		const grip = levelRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
+		await writes(() => {
+			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
+			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
+			document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientY: 10 }));
+		}, { priorities: [START.priorities[1], START.priorities[0]] });
+		expect(levelRows().map((row) => row.querySelector<HTMLInputElement>(".tc-level-prefix")!.value)).toEqual(["p2", "p1"]);
+	});
+
 	it("moves a preset by its grip", async () => {
-		const grip = presetRows()[0].querySelector<HTMLElement>(".tc-preset-grip")!;
+		const grip = presetRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
 		await writes(() => {
 			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
 			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
@@ -285,41 +309,54 @@ describe("the settings tab: the cards and the timeline", () => {
 	});
 
 	it("writes a count of zero or more, and nothing for anything else", async () => {
-		for (const label of ["Long press delay", "Scroll to hour", "Stale after"] as const) {
+		const pages = { "Long press delay": "Day and timeline", "Scroll to hour": "Day and timeline", "Stale after": "Calendars" } as const;
+		const opened = async (label: keyof typeof pages) => {
+			await open();
+			page(pages[label]);
+		};
+		for (const label of Object.keys(pages) as (keyof typeof pages)[]) {
 			for (const bad of ["", "  ", "-1", "abc", "Infinity", "1,5"]) {
-				await open();
+				await opened(label);
 				await rejects(() => type(input(label), bad));
 			}
 		}
-		await open();
+		await opened("Long press delay");
 		await writes(() => type(input("Long press delay"), " 300 "), { longPressMs: 300 });
-		await open();
+		await opened("Scroll to hour");
 		await writes(() => type(input("Scroll to hour"), "0"), { scrollToHour: 0 });
-		await open();
+		await opened("Stale after");
 		await writes(() => type(input("Stale after"), "2.5"), { staleAfterMinutes: 2.5 });
-		await open();
+		await opened("Stale after");
 		await writes(() => type(input("Stale after"), "1e3"), { staleAfterMinutes: 1000 });
 	});
 
 	it("writes the hour the day starts at as the dropdown chose it", async () => {
+		page("Day and timeline");
 		expect(input("Day starts at").value).toBe("5");
 		await writes(() => type(input("Day starts at"), "0", "change"), { dayStartHour: 0 });
 		await writes(() => type(input("Day starts at"), "23", "change"), { dayStartHour: 23 });
 	});
 
 	it("writes zoom levels that read, the old text with steps too, and nothing for the rest", async () => {
+		page("Day and timeline");
 		expect(input("Zoom levels").value).toBe("28, 56, 112, 224");
 		for (const bad of ["", "28, x", "0", "28:", "28,,56"]) {
 			await open();
+			page("Day and timeline");
 			await rejects(() => type(input("Zoom levels"), bad));
 		}
 		await open();
+		page("Day and timeline");
 		await writes(() => type(input("Zoom levels"), " 40 , 80"), { zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] });
 		await writes(() => type(input("Zoom levels"), "28:60, 56:30"), { zoomLevels: [{ hourPx: 28 }, { hourPx: 56 }] });
 	});
 });
 
 describe("the settings tab: the calendar sources", () => {
+	beforeEach(() => {
+		page("Calendars");
+	});
+
 	it("writes Google's client id and keeps the secret and the token", async () => {
 		expect(input("Client id").value).toBe("id");
 		await writes(() => type(input("Client id"), " other "), { google: { ...START.google, clientId: " other " } });
@@ -338,18 +375,26 @@ describe("the settings tab: the calendar sources", () => {
 	});
 
 	it("writes the work calendar's path as typed", async () => {
-		await writes(() => type(input("File path", 1), "cal.json"), { workCalendarFile: "cal.json" });
+		await writes(() => type(input("File path"), "cal.json"), { workCalendarFile: "cal.json" });
+	});
+
+	it("no longer asks for titles to take from the work file", () => {
+		expect(rows("Calendar titles")).toEqual([]);
 	});
 });
 
 describe("the settings tab: the calendars shown", () => {
-	it("lists every known calendar under its account with a toggle that hides it", async () => {
+	it("lists every known calendar under its account on the Calendars page, with a toggle that hides it", async () => {
 		calendars.list = [
 			{ account: "max@gmail.com", title: "Personal", color: null, shown: true },
 			{ account: "max@company.ru", title: "Календарь", color: null, shown: false },
 		];
 		await open();
 		await settled();
+		expect(rows("Personal")).toHaveLength(0);
+		page("Calendars");
+		await settled();
+		expect(rows("Calendars shown")).toHaveLength(1);
 		expect(rows("max@gmail.com")).toHaveLength(1);
 		expect(rows("max@company.ru")).toHaveLength(1);
 		const personal = rows("Personal")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
@@ -364,12 +409,65 @@ describe("the settings tab: the calendars shown", () => {
 	it("names a calendar under the iPhone heading without repeating iPhone", async () => {
 		calendars.list = [{ account: "", title: "iPhone · Календарь", color: null, shown: true }];
 		await open();
+		page("Calendars");
 		await settled();
 		expect(rows("iPhone")).toHaveLength(1);
 		expect(rows("Календарь")).toHaveLength(1);
 	});
 
-	it("no longer asks for titles to take from the work file", async () => {
-		expect(rows("Calendars").filter((row) => row.querySelector("input[type=text]"))).toEqual([]);
+	it("shows the calendars whether or not Google is logged in", async () => {
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		await open();
+		page("Calendars");
+		await settled();
+		expect(rows("Календарь")).toHaveLength(1);
+	});
+});
+
+describe("the settings tab: the order", () => {
+	function headings(root: HTMLElement): (string | null)[] {
+		return [...root.querySelectorAll(".setting-item-heading > .setting-item-info > .setting-item-name")].map((name) => name.textContent);
+	}
+
+	it("puts what is changed often first and the set-up-once part on pages under More", () => {
+		expect(headings(tab.containerEl)).toEqual(["Priorities", "Labels", "Sections", "Cards", "More"]);
+		for (const name of ["Calendars", "Day and timeline", "Tasks file"]) expect(rows(name)).toHaveLength(1);
+		for (const name of ["Account", "Client id", "Day starts at", "Scroll to hour", "Due date marker", "Long press delay", "Zoom levels", "Stale after"]) expect(rows(name)).toHaveLength(0);
+	});
+
+	it("opens a page over the tab with its title, and draws the tab anew once it closes", async () => {
+		const opened = page("Tasks file");
+		expect(opened.querySelector(".modal-title")!.textContent).toBe("Tasks file");
+		await writes(() => type(input("File path"), "Other.md"), { tasksFile: "Other.md" });
+		expect(rows("Tasks file")[0].querySelector(".setting-item-description")!.textContent).toBe(START.tasksFile);
+		opened.querySelector<HTMLElement>(".modal-content")!.parentElement!.remove();
+		expect(rows("Client id")).toHaveLength(0);
+	});
+
+	it("draws the Calendars page anew on logging out", async () => {
+		let loggedIn = true;
+		const google: GoogleAccount = {
+			...loggedOut,
+			isLoggedIn: () => loggedIn,
+			logout: async () => {
+				loggedIn = false;
+			},
+		};
+		await open(START, google);
+		page("Calendars");
+		await settled();
+		expect(rows("Account")[0].querySelector(".setting-item-description")!.textContent).toContain("Logged in");
+		rows("Account")[0].querySelector<HTMLElement>("button")!.click();
+		await settled();
+		expect(rows("Account")[0].querySelector(".setting-item-description")!.textContent).toContain("Not logged in");
+	});
+
+	it("tells where to set the OAuth client up while there is none", async () => {
+		const description = () => rows("Account")[0].querySelector(".setting-item-description")!.textContent;
+		page("Calendars");
+		expect(description()).toContain("Opens the browser");
+		await open({ ...START, google: { ...START.google, clientId: "" } });
+		page("Calendars");
+		expect(description()).toContain("client id and secret below");
 	});
 });

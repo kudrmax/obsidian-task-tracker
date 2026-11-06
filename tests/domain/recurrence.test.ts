@@ -87,8 +87,18 @@ describe("recurClosed: Done and Won't do leave the next copy", () => {
 		expect(once.tasks("soon")).toHaveLength(2);
 	});
 
-	it("ignores a subtask's repeat", () => {
-		const text = file({ now: `- [ ] Неделя\n\t- [x] Зал ${ZAL}` });
+	it("a subtask's copy goes to Soon as a task of its own; the done subtask stays under its task", () => {
+		const doc = normalize(parse(file({ now: `- [ ] Неделя\n\t- [x] Зал ${ZAL}\n\t\t- [x] Разминка` })), T);
+		expect(doc.serialize()).toBe(file({ now: "- [ ] Неделя\n\t- [x] Зал\n\t\t- [x] Разминка", soon: `- [ ] Зал 📅 2026-11-06 ${ZAL}\n\t- [ ] Разминка` }));
+	});
+
+	it("a subtask's copy keeps its task's section", () => {
+		const doc = normalize(parse(file({ now: `### Morning\n- [ ] Неделя\n\t- [-] Зал ${ZAL}` })), T);
+		expect(doc.serialize()).toBe(file({ now: "### Morning\n- [ ] Неделя\n\t- [-] Зал", soon: `### Morning\n- [ ] Зал 📅 2026-11-06 ${ZAL}` }));
+	});
+
+	it("leaves an open subtask with a repeat", () => {
+		const text = file({ now: `- [ ] Неделя\n\t- [ ] Зал 📅 2026-11-06 ${ZAL}` });
 		expect(normalize(parse(text), T).serialize()).toBe(text);
 	});
 
@@ -125,5 +135,13 @@ describe("freshChildren", () => {
 		const markers = { ...M, alarmSlot: "🚨", silentSlot: "🔕" };
 		const doc = normalize(TaskDocument.parse(file({ now: `- [x] Зал 🚨 2026-11-05 07:00 ${ZAL}` }), SECTIONS, markers), T);
 		expect(doc.serialize()).toBe(file({ soon: `- [ ] Зал 📅 2026-11-06 ${ZAL}`, done: "- [x] Зал 🚨 2026-11-05 07:00" }));
+	});
+});
+
+describe("the next copy keeps the task's labels", () => {
+	it("as it keeps its priority", () => {
+		const labelled = { ...M, labelTag: "label", labels: ["Важное"] };
+		const doc = TaskDocument.parse("## Now\n- [x] Зал #label/Важное 📅 2026-10-30 🔁 every day\n\n## Soon\n\n## Done\n", SECTIONS, labelled);
+		expect(recurClosed(doc, "2026-10-30", DayBoundary.MIDNIGHT).serialize()).toContain("## Soon\n- [ ] Зал #label/Важное 📅 2026-10-31 🔁 every day\n");
 	});
 });

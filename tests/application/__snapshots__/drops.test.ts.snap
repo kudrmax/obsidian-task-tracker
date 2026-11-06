@@ -123,7 +123,7 @@ exports[`what a drop writes (spec §5.1) > one task > Backlog → the timeline 1
 
 ## Now
 
-- [ ] B2 ⏰ 2026-10-30 13:00
+- [ ] B2 📌 2026-10-30 13:00
 - [ ] N1
 	- [ ] N1a
 	- [ ] N1b
@@ -424,7 +424,7 @@ exports[`what a drop writes (spec §5.1) > one task > Inbox → the timeline 1`]
 
 ## Now
 
-- [ ] I1 ⏰ 2026-10-30 13:00
+- [ ] I1 📌 2026-10-30 13:00
 - [ ] N1
 	- [ ] N1a
 	- [ ] N1b
@@ -767,7 +767,7 @@ exports[`what a drop writes (spec §5.1) > one task > Soon → the timeline 1`] 
 
 ## Now
 
-- [ ] S1 ⏰ 2026-10-30 13:00
+- [ ] S1 📌 2026-10-30 13:00
 - [ ] N1
 	- [ ] N1a
 	- [ ] N1b
@@ -1008,7 +1008,7 @@ exports[`what a drop writes (spec §5.1) > one task > a later day's list → its
 
 - [ ] S1
 - [ ] S2
-- [ ] SD 📅 2026-11-03 ⏰ 2026-11-03 12:00
+- [ ] SD 📅 2026-11-03 📌 2026-11-03 12:00
 - [ ] ST ⏰ 2026-11-03 09:00-09:30
 ### Later
 - [ ] S3
@@ -1228,7 +1228,7 @@ exports[`what a drop writes (spec §5.1) > one task > a subtask → the timeline
 - [ ] N2 ⏰ 2026-10-30 10:00-11:00
 - [ ] NP 📅 2026-10-30
 - [ ] NP2 📅 2026-10-30
-- [ ] N1a ⏰ 2026-10-30 13:00
+- [ ] N1a 📌 2026-10-30 13:00
 ### Work
 - [ ] N3
 
@@ -1690,7 +1690,7 @@ exports[`what a drop writes (spec §5.1) > one task > today's list → a later d
 - [ ] S2
 - [ ] SD 📅 2026-11-03
 - [ ] ST ⏰ 2026-11-03 09:00-09:30
-- [ ] N3 ⏰ 2026-11-03 12:00
+- [ ] N3 📌 2026-11-03 12:00
 ### Later
 - [ ] S3
 
@@ -1827,7 +1827,7 @@ exports[`what a drop writes (spec §5.1) > one task > today's list → the timel
 
 ## Now
 
-- [ ] N1 ⏰ 2026-10-30 12:00
+- [ ] N1 📌 2026-10-30 12:00
 	- [ ] N1a
 	- [ ] N1b
 - [ ] N2 ⏰ 2026-10-30 10:00-11:00

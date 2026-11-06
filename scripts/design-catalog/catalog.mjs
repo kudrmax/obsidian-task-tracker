@@ -69,8 +69,8 @@ const states = {
 	confirm: { setup: `top(); await tap(card(1)); await tap(byText("Delete")); await sleep(400);` },
 	group: { setup: `top(); const h=[...V().contentEl.querySelectorAll(".tc-left .tc-group-head")].filter(vis)[0]; await tap(h); await sleep(400);` },
 	sources: { setup: `V().showSources(V().contentEl.querySelector(".tc-seg")); await sleep(700);` },
-	sheet: {
-		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
+	full: {
+		setup: `top(); await tap(card(1)); await tap(byText("Open full screen")); await sleep(900);`,
 		teardown: `document.querySelector(".tc-sheet-bar > .tc-btn")?.click(); await sleep(700);`,
 	},
 	quick: { setup: `await quick();`, teardown: `await unquick();` },
@@ -110,9 +110,9 @@ const states = {
 	},
 	"focus-row": { on: "mac", setup: `top(); await tap(card(1)); await sleep(500);`, force: [".tc-panel .tc-menu-row", ["focus", "focus-visible"]] },
 	"focus-seg": { on: "mac", setup: `await sleep(300);`, force: [".tc-seg", ["focus", "focus-visible"]] },
-	"hover-sheet": {
+	"hover-full": {
 		on: "mac",
-		setup: `V().descriptionSheet({ text: "Задача с описанием", description: "Первая строка описания.\\n\\n- пункт один\\n- пункт два", key: { section: "x", index: 0 } }, false); await sleep(900);`,
+		setup: `top(); await tap(card(1)); await tap(byText("Open full screen")); await sleep(900);`,
 		teardown: `document.querySelector(".tc-sheet-bar > .tc-btn")?.click(); await sleep(700);`,
 		force: [".tc-sheet-bar > .tc-btn", ["hover"]],
 	},

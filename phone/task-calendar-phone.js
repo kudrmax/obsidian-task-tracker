@@ -1,282 +1,6 @@
 // Task Calendar: built from src/phone by `node phone/build.mjs`. Do not edit.
 "use strict";
 (() => {
-  // src/domain/Priority.ts
-  function usablePrefix(prefix) {
-    return /^\S+$/.test(prefix);
-  }
-  function usableLevels(levels) {
-    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
-  }
-  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
-  function priorityOfText(text, prefixes) {
-    const m = FIRST_WORD_RE.exec(text);
-    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
-    return { priority: m[1], text: m[2] };
-  }
-
-  // src/settings.ts
-  var DEFAULT_SETTINGS = {
-    tasksFile: "TODOs Tasks.md",
-    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
-    dueDateMarker: "📅",
-    slotMarker: "⏰",
-    alarmSlotMarker: "🚨",
-    silentSlotMarker: "🔕",
-    repeatMarker: "🔁",
-    workCalendarFile: "calendar/work.json",
-    workCalendarTitles: [],
-    hiddenCalendars: [],
-    calendarsMigrated: false,
-    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
-    longPressMs: 250,
-    zoom: 56,
-    zoomLevels: [
-      { hourPx: 28 },
-      { hourPx: 56 },
-      { hourPx: 112 },
-      { hourPx: 224 }
-    ],
-    scrollToHour: 9,
-    dayStartHour: 5,
-    listShare: 0.5,
-    rightMode: "calendar",
-    staleAfterMinutes: 180,
-    priorities: [
-      { prefix: "p1", color: "red" },
-      { prefix: "p2", color: "orange" }
-    ],
-    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-    cardHeight: 35,
-    cardGap: 2
-  };
-  function settingsFrom(saved) {
-    const s = saved ?? {};
-    return {
-      ...DEFAULT_SETTINGS,
-      ...s,
-      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
-      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
-      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
-    };
-  }
-
-  // src/application/calendarChoice.ts
-  var keyText = (key) => `${key.account}
-${key.title}`.toLowerCase();
-  var GOOGLE_ORDER = ["google", "iphone", "work"];
-  var OTHER_ORDER = ["iphone", "work"];
-  var CalendarChoice = class {
-    constructor(files, hidden, staleAfterMs, now) {
-      this.files = files;
-      this.staleAfterMs = staleAfterMs;
-      this.now = now;
-      this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
-      const phone = files.get("iphone")?.calendars ?? [];
-      const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google").calendars, phone);
-      this.phoneGoogleIds = new Set(
-        phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
-      );
-      this.hidden = new Set(hidden.map(keyText));
-    }
-    known() {
-      const found = /* @__PURE__ */ new Map();
-      for (const source of GOOGLE_ORDER) {
-        for (const calendar of this.files.get(source)?.calendars ?? []) {
-          const key = this.keyOf(source, calendar);
-          const text = keyText(key);
-          if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
-        }
-      }
-      return [...found.values()].sort(
-        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title)
-      );
-    }
-    day(start, end) {
-      const events = [];
-      let stale = false;
-      for (const calendar of this.known()) {
-        if (this.hidden.has(keyText(calendar.key))) continue;
-        const source = this.sourceFor(calendar, start);
-        if (source === null) continue;
-        const file = this.files.get(source);
-        if (!this.fresh(file)) stale = true;
-        const text = keyText(calendar.key);
-        events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
-      }
-      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
-    }
-    sourceFor(calendar, day) {
-      const text = keyText(calendar.key);
-      const candidates = (calendar.google ? GOOGLE_ORDER : OTHER_ORDER).filter((source) => {
-        const file = this.files.get(source);
-        return file !== void 0 && covers(file, day) && file.calendars.some((c) => keyText(this.keyOf(source, c)) === text);
-      });
-      const fresh = candidates.find((source) => this.fresh(this.files.get(source)));
-      if (fresh) return fresh;
-      return candidates.reduce(
-        (best, source) => best === null || this.files.get(source).exportedAt > this.files.get(best).exportedAt ? source : best,
-        null
-      );
-    }
-    fresh(file) {
-      return this.now.getTime() - file.exportedAt.getTime() <= this.staleAfterMs;
-    }
-    isGoogle(key) {
-      return this.googleEmail !== null && key.account === this.googleEmail;
-    }
-    /** The calendar a file's row or event belongs to, the same across the files. */
-    keyOf(source, ref) {
-      if (source === "work") return this.scriptableKey(ref);
-      if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail, title: ref.title };
-      return { account: ref.account ?? "", title: ref.title };
-    }
-    /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
-    scriptableKey(ref) {
-      const phone = this.files.get("iphone")?.calendars.find((c) => ref.calendarId !== null && c.calendarId === ref.calendarId);
-      if (phone) return this.keyOf("iphone", phone);
-      const titled = /* @__PURE__ */ new Map();
-      for (const source of ["google", "iphone"]) {
-        for (const c of this.files.get(source)?.calendars ?? []) {
-          if (c.title !== ref.title) continue;
-          const key = this.keyOf(source, c);
-          titled.set(keyText(key), key);
-        }
-      }
-      if (titled.size === 1) return [...titled.values()][0];
-      return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
-    }
-  };
-  function phoneAccountOf(calendar) {
-    return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
-  }
-  function phoneGoogleAccount(google, phone) {
-    const titles = new Set(google.map((c) => c.title.toLowerCase()));
-    const shared = /* @__PURE__ */ new Map();
-    for (const calendar of phone) {
-      if (!titles.has(calendar.title.toLowerCase())) continue;
-      const account = phoneAccountOf(calendar);
-      shared.set(account, (shared.get(account) ?? 0) + 1);
-    }
-    const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
-    if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
-    return ranked[0][0];
-  }
-  function byAccount(a, b) {
-    if (a === b) return 0;
-    if (a === "") return 1;
-    if (b === "") return -1;
-    return a.localeCompare(b);
-  }
-  function calendarOf(e) {
-    return { title: e.calendar, account: e.account, calendarId: e.calendarId };
-  }
-  function covers(file, day) {
-    if (file.from !== null && file.to !== null) return file.from <= day && day < file.to;
-    if (file.events.length === 0) return false;
-    const first = Math.min(...file.events.map((e) => e.start.getTime()));
-    const last = Math.max(...file.events.map((e) => e.end.getTime()));
-    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
-    return first < dayEnd && day.getTime() <= last;
-  }
-
-  // src/application/calendarFile.ts
-  var GOOGLE_CALENDAR_FILE = "calendar/google.json";
-  var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
-  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
-  var dateOrNull = (text) => text ? new Date(text) : null;
-  function readCalendarFile(text, source) {
-    const content = JSON.parse(text);
-    const events = (content.events ?? []).map((e) => ({
-      id: e.id,
-      title: e.title,
-      start: new Date(e.start),
-      end: new Date(e.end),
-      allDay: e.allDay,
-      calendar: e.calendar,
-      color: e.color ?? DEFAULT_COLOR[source],
-      source,
-      account: e.account ?? null,
-      calendarId: e.calendarId ?? null
-    }));
-    const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
-    return {
-      events,
-      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
-      exportedAt: new Date(content.exportedAt),
-      device: content.device ?? null,
-      from: dateOrNull(content.from),
-      to: dateOrNull(content.to),
-      validUntil: dateOrNull(content.validUntil)
-    };
-  }
-  function eventCalendars(events) {
-    const seen = /* @__PURE__ */ new Map();
-    for (const e of events) {
-      const key = `${e.account ?? ""}
-${e.calendarId ?? ""}
-${e.calendar}`;
-      if (!seen.has(key)) seen.set(key, { calendar: e.calendar, calendarId: e.calendarId ?? null, account: e.account ?? null, color: e.color ?? null });
-    }
-    return [...seen.values()];
-  }
-
-  // src/application/calendarMigration.ts
-  function migratedHidden(settings, known, googleIds2) {
-    const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
-    const googleChoice = settings.google.calendarIds.length > 0 && googleIds2.size > 0;
-    const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
-    return known.filter((c) => c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
-  }
-  function hiddenNow(settings, known, google) {
-    return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));
-  }
-  function googleIds(google) {
-    return new Map((google?.calendars ?? []).flatMap((c) => c.calendarId === null ? [] : [[c.calendarId, c.title]]));
-  }
-
-  // src/application/PhoneMeetingService.ts
-  var MINUTE_MS = 6e4;
-  var PhoneMeetingService = class {
-    constructor(settingsJson) {
-      this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
-    }
-    /** The files' paths in the vault, in the order `between` takes their texts. */
-    files() {
-      return this.sources().map((s) => s.path);
-    }
-    /** The timed meetings that overlap `from`–`to`, chosen day by day; a file missing (`null`) or unreadable adds none. */
-    between(texts, from, to, now) {
-      const files = /* @__PURE__ */ new Map();
-      this.sources().forEach((source, i) => {
-        const text = texts[i];
-        if (text === null || text === void 0) return;
-        try {
-          files.set(source.name, readCalendarFile(text, source.name));
-        } catch {
-        }
-      });
-      const known = new CalendarChoice(files, [], this.settings.staleAfterMinutes * MINUTE_MS, now).known();
-      const choice = new CalendarChoice(files, hiddenNow(this.settings, known, files.get("google")), this.settings.staleAfterMinutes * MINUTE_MS, now);
-      const found = /* @__PURE__ */ new Map();
-      for (let day = new Date(from.getFullYear(), from.getMonth(), from.getDate()); day < to; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
-        const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
-        const start = day < from ? from : day;
-        for (const e of choice.day(start, next < to ? next : to).events) {
-          if (!e.allDay && !found.has(e.id)) found.set(e.id, { title: e.title, start: e.start, end: e.end });
-        }
-      }
-      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
-    }
-    sources() {
-      return [
-        { name: "google", path: GOOGLE_CALENDAR_FILE },
-        { name: "iphone", path: IPHONE_CALENDAR_FILE },
-        { name: "work", path: this.settings.workCalendarFile }
-      ];
-    }
-  };
-
   // src/domain/LocalDate.ts
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var TIME_RE = /^(\d{2}):(\d{2})$/;
@@ -415,6 +139,7 @@ ${e.calendar}`;
   function isOpen(status) {
     return status === "todo" || status === "inProgress";
   }
+  var DEFAULT_REMINDER = "live";
   var STATUS_CHARS = {
     todo: " ",
     inProgress: "/",
@@ -594,6 +319,47 @@ ${e.calendar}`;
     }
   };
 
+  // src/domain/Label.ts
+  function usableLabelName(name) {
+    return /^[^\s#]+$/.test(name);
+  }
+  function usableLabels(labels) {
+    return labels.filter((label, i) => usableLabelName(label.name) && labels.findIndex((l) => l.name === label.name) === i);
+  }
+  function usableLabelTag(tag) {
+    return /^[^\s#/]+$/.test(tag);
+  }
+  function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function labelsOfText(text, tag, names) {
+    if (!usableLabelTag(tag) || names.length === 0) return { labels: [], text };
+    const labels = [];
+    const rest = text.replace(new RegExp(`(^|\\s)#${escapeRegExp(tag)}/(\\S+)(?=\\s|$)`, "g"), (whole, space, name) => {
+      if (!names.includes(name)) return whole;
+      if (!labels.includes(name)) labels.push(name);
+      return space;
+    });
+    return labels.length === 0 ? { labels, text } : { labels, text: rest.replace(/\s{2,}/g, " ").trim() };
+  }
+  function labelTags(tag, labels) {
+    return labels.map((name) => ` #${tag}/${name}`).join("");
+  }
+
+  // src/domain/Priority.ts
+  function usablePrefix(prefix) {
+    return /^\S+$/.test(prefix);
+  }
+  function usableLevels(levels) {
+    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+  }
+  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+  function priorityOfText(text, prefixes) {
+    const m = FIRST_WORD_RE.exec(text);
+    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+    return { priority: m[1], text: m[2] };
+  }
+
   // src/domain/TaskLine.ts
   var LINE_RE = /^([ \t]*)([-*+])[ \t]+\[(.)\][ \t]+(.*)$/;
   var DATE = "(\\d{4}-\\d{2}-\\d{2})";
@@ -604,34 +370,36 @@ ${e.calendar}`;
     }
     return "todo";
   }
-  function escapeRegExp(s) {
+  function escapeRegExp2(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   function slotMarkers(markers) {
     const kinds = /* @__PURE__ */ new Map();
-    for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.silentSlot, "none"]]) {
+    for (const [marker, kind] of [[markers.slot, "notification"], [markers.alarmSlot, "alarm"], [markers.liveSlot, "live"], [markers.silentSlot, "none"]]) {
       if (marker && !kinds.has(marker)) kinds.set(marker, kind);
     }
     return kinds;
   }
   function markerOf(kind, markers) {
-    const own = kind === "alarm" ? markers.alarmSlot : kind === "none" ? markers.silentSlot : markers.slot;
+    const own = { notification: markers.slot, alarm: markers.alarmSlot, live: markers.liveSlot, none: markers.silentSlot }[kind];
     return own || markers.slot;
   }
   var FieldSlicer = class {
     constructor(markers) {
       this.kinds = slotMarkers(markers);
-      const alternatives = [...this.kinds.keys()].map(escapeRegExp).join("|");
+      const alternatives = [...this.kinds.keys()].map(escapeRegExp2).join("|");
       this.slotRe = new RegExp(`(?:^|\\s+)(${alternatives})\\s+${DATE}\\s+${TIME}(?:-${TIME})?$`);
-      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp(markers.dueDate)}\\s+${DATE}$`);
-      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp(markers.repeat)}\\s+(.+?)$`) : null;
+      this.dueRe = new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.dueDate)}\\s+${DATE}$`);
+      this.repeatRe = markers.repeat ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.repeat)}\\s+(.+?)$`) : null;
+      this.collapsedRe = markers.collapsed ? new RegExp(`(?:^|\\s+)${escapeRegExp2(markers.collapsed)}$`) : null;
     }
     slice(body) {
       let text = body;
       let dueDate = null;
       let slot = null;
-      let reminder = "notification";
+      let reminder = DEFAULT_REMINDER;
       let repeat = null;
+      let collapsed = false;
       for (; ; ) {
         const slotMatch = slot === null ? this.slotRe.exec(text) : null;
         if (slotMatch) {
@@ -649,6 +417,12 @@ ${e.calendar}`;
           text = text.slice(0, dueMatch.index);
           continue;
         }
+        const collapsedMatch = collapsed ? null : this.collapsedRe?.exec(text) ?? null;
+        if (collapsedMatch) {
+          collapsed = true;
+          text = text.slice(0, collapsedMatch.index);
+          continue;
+        }
         const repeatMatch = repeat === null ? this.repeatRe?.exec(text) ?? null : null;
         if (repeatMatch) {
           const parsed = Repeat.parse(repeatMatch[1]);
@@ -659,7 +433,7 @@ ${e.calendar}`;
         }
         break;
       }
-      return { text: text.trim(), dueDate, slot, reminder, repeat };
+      return { text: text.trim(), dueDate, slot, reminder, repeat, collapsed };
     }
     slotOf(m) {
       const date = m[2];
@@ -673,7 +447,7 @@ ${e.calendar}`;
   };
   var slicers = /* @__PURE__ */ new Map();
   function fieldSlicerFor(markers) {
-    const key = [markers.slot, markers.alarmSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? ""].join("\0");
+    const key = [markers.slot, markers.alarmSlot ?? "", markers.liveSlot ?? "", markers.silentSlot ?? "", markers.dueDate, markers.repeat ?? "", markers.collapsed ?? ""].join("\0");
     let slicer = slicers.get(key);
     if (!slicer) {
       slicer = new FieldSlicer(markers);
@@ -685,16 +459,19 @@ ${e.calendar}`;
     const m = LINE_RE.exec(line);
     if (!m) return null;
     const statusChar = m[3];
-    const fields = fieldSlicerFor(markers).slice(m[4]);
+    const tagged = labelsOfText(m[4], markers.labelTag ?? "", markers.labels ?? []);
+    const fields = fieldSlicerFor(markers).slice(tagged.text);
     return {
       indent: m[1],
       bullet: m[2],
-      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), children: [] }
+      task: { status: statusOf(statusChar), statusChar, ...fields, ...priorityOfText(fields.text, markers.priorities ?? []), labels: tagged.labels, children: [] }
     };
   }
   function formatTaskLine(parsed, markers) {
     const { indent, bullet, task } = parsed;
     let line = `${indent}${bullet} [${task.statusChar}] ${task.priority ? `${task.priority} ` : ""}${task.text}`;
+    if (task.labels.length > 0 && markers.labelTag) line += labelTags(markers.labelTag, task.labels);
+    if (task.collapsed && markers.collapsed) line += ` ${markers.collapsed}`;
     if (task.dueDate) line += ` ${markers.dueDate} ${task.dueDate}`;
     if (task.slot) {
       const { date, start, end } = task.slot;
@@ -719,7 +496,7 @@ ${e.calendar}`;
     return INDENT_RE2.exec(line)[0].length;
   }
   function sameTask(a, b) {
-    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && sameLines(a.children, b.children);
+    return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && sameLines(a.children, b.children);
   }
   function insertedLines(before, after) {
     let start = 0;
@@ -958,17 +735,20 @@ ${e.calendar}`;
       const subtasks = entry.subtasks.flatMap((sub) => [sub.raw, ...sub.task.children]);
       return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
     }
-    /** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+    /**
+     * The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat;
+     * description lines as they are. Indented as a task of its own's, even for a subtask.
+     */
     freshChildren(entry) {
       const first = this.spanOf(entry).line + 1;
       const children = [...entry.task.children];
       const open = (sub) => {
-        const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+        const task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null };
         children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
         sub.subtasks.forEach(open);
       };
       entry.subtasks.forEach(open);
-      return children;
+      return children.map((line) => line.startsWith(entry.indent) ? line.slice(entry.indent.length) : line);
     }
     /** A new subtask of `parent`, right before its subtask `before` or last. */
     insertUnder(parent, task, before = null) {
@@ -1239,15 +1019,18 @@ ${e.calendar}`;
 
   // src/domain/operations.ts
   var HOUR_MINUTES3 = 60;
-  var MINUTE_MS2 = 6e4;
+  var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
   }
   function isUndated(section) {
     return section === "inbox" || section === "backlog";
+  }
+  function listSection(date, today) {
+    return date === today ? "now" : "soon";
   }
   function patch(doc, entry, changes) {
     return doc.replace(entry, { ...entry.task, ...changes });
@@ -1268,14 +1051,40 @@ ${e.calendar}`;
     const dated = patch(doc, entry, { dueDate: today });
     return dated.moveEntry(sameEntryIn(dated, entry), section, index);
   }
+  function createInSlot(doc, slot, text, marks, today, boundary) {
+    const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
+    return doc.insert(listSection(boundary.dayOfSlot(clamped), today), "end", newTask(text, { slot: clamped, ...marks }));
+  }
   function setStatus(doc, entry, status) {
     return patch(doc, entry, { status, statusChar: STATUS_CHARS[status] });
+  }
+  function anchoredRepeat(rule, date) {
+    return Repeat.of(rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule);
+  }
+  function repeated(task, rule, today, boundary) {
+    if (rule === null) return { ...task, repeat: null };
+    const day = dayOf(task, boundary);
+    if (day !== null) return { ...task, repeat: anchoredRepeat(rule, day) };
+    const first = rule.kind === "schedule" ? Repeat.of({ ...rule, every: 1, from: null }).first(today) : null;
+    if (first === null) return { ...task, repeat: Repeat.of(rule) };
+    return { ...task, repeat: anchoredRepeat(rule, first), dueDate: first };
+  }
+  function withRepeat(task, rule, today, boundary) {
+    return rule ? repeated(task, rule, today, boundary) : task;
   }
   function setDueDate(doc, entry, date) {
     return patch(doc, entry, { dueDate: date });
   }
   function setReminder(doc, entry, reminder) {
     return patch(doc, entry, { reminder });
+  }
+  function hasOpenSubtask(entry) {
+    return entry.subtasks.some((sub) => isOpen(sub.task.status));
+  }
+  function intoUnfolded(doc, parent, operation) {
+    if (!parent.task.collapsed) return operation(doc, (entry) => entry);
+    const opened = patch(doc, parent, { collapsed: false });
+    return operation(opened, (entry) => sameEntryIn(opened, entry));
   }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
     const clamped = boundary.clamp(slot, MIN_SLOT_MINUTES);
@@ -1284,12 +1093,15 @@ ${e.calendar}`;
     return slotted.moveEntry(sameEntryIn(slotted, entry), "soon", "end");
   }
   function snoozedSlot(slot, now, minutes) {
-    const at = new Date(now.getTime() + minutes * MINUTE_MS2);
+    const at = new Date(now.getTime() + minutes * MINUTE_MS);
     const start = at.getHours() * HOUR_MINUTES3 + at.getMinutes();
     return { date: localDateOf(at), start, end: slot.end === null ? null : start + (slot.end - slot.start) };
   }
   function toList(doc, entry, date, today) {
     return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
+  }
+  function marksOf(priority, labels) {
+    return { priority: labels.length > 0 ? null : priority, labels };
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1304,6 +1116,10 @@ ${e.calendar}`;
     const section = date <= today ? "now" : "soon";
     return entry.section === section ? postponed : postponed.moveEntry(sameEntryIn(postponed, entry), section, "end");
   }
+  function groupIndex(doc, list, name) {
+    const groups = doc.groups(list);
+    return name === null ? ungroupedIndex(groups) : groups.findIndex((g) => g.index > 0 && g.name === name);
+  }
   function usablePresets(presets) {
     const trimmed = presets.map((p) => p.trim());
     return trimmed.filter((p, i) => p !== "" && trimmed.indexOf(p) === i);
@@ -1315,6 +1131,33 @@ ${e.calendar}`;
     if (earlier.length > 0) return earlier[earlier.length - 1].index + 1;
     const later = groups.find((g) => rank(g) > own);
     return later ? later.index : groups.length;
+  }
+  function enteringList(list, today, date) {
+    if (list === "now") return { dueDate: today, slot: null };
+    return { dueDate: list === "soon" && date !== null && date > today ? date : null, slot: null };
+  }
+  function positionIn(doc, list, group, before) {
+    if (before !== null && before.section === list) return before.index;
+    return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
+  }
+  function createInPlace(doc, text, priority, place, today, boundary, repeat, labels = []) {
+    const marks = marksOf(priority, labels);
+    switch (place.kind) {
+      case "subtask":
+        return intoUnfolded(
+          doc,
+          place.parent,
+          (d, same) => d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before))
+        );
+      case "slot":
+        return createInSlot(doc, place.slot, text, marks, today, boundary);
+      case "list": {
+        const { list, group, before } = place;
+        const dueDate = list === "now" ? place.date ?? today : enteringList(list, today, place.date).dueDate;
+        const task = newTask(text, { dueDate, ...marks });
+        return doc.insert(list, positionIn(doc, list, group, before), withRepeat(task, repeat, today, boundary));
+      }
+    }
   }
   var setSlot = leavingItsTask(placeOnTimeline);
   var moveToList = leavingItsTask(toList);
@@ -1330,14 +1173,16 @@ ${e.calendar}`;
   function recurClosed(doc, today, boundary) {
     if (!doc.hasSection("soon")) return doc;
     for (; ; ) {
-      const entry = RECURRING.flatMap((s) => doc.tasks(s)).find(closedWithRepeat);
+      const entry = RECURRING.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
       if (!entry) return doc;
       const { task } = entry;
       const copy = newTask(task.text, {
         priority: task.priority,
+        labels: task.labels,
         children: doc.freshChildren(entry),
         dueDate: task.repeat.next(dayOf(task, boundary), today),
-        repeat: task.repeat
+        repeat: task.repeat,
+        collapsed: task.collapsed
       });
       doc = intoSoon(doc.replace(entry, { ...task, repeat: null }), entry.group, copy);
     }
@@ -1465,11 +1310,67 @@ ${e.calendar}`;
   function normalizeGroups(doc, today) {
     return placeUngrouped(dropEmptyUngroupedHeading(mergeDuplicates(misplacedOutOfGroups(doc, today))));
   }
+  function unfoldEmpty(doc) {
+    const empty = flatten(doc.allTasks()).filter((e) => e.task.collapsed && !hasOpenSubtask(e));
+    if (empty.length === 0) return doc;
+    return doc.replaceAll(empty.map((e) => [e, { ...e.task, collapsed: false }]));
+  }
   function normalize(doc, today, boundary = DayBoundary.MIDNIGHT, presets = []) {
     const listed2 = dueToNow(datedOutOfUndated(closedToDone(recurClosed(pastDatesToToday(erasePastSlots(doc, today, boundary), today), today, boundary))), today, boundary, presets);
-    const result = normalizeGroups(listed2, today).spacedHeadings();
+    const result = unfoldEmpty(normalizeGroups(listed2, today)).spacedHeadings();
     if (result === doc) return doc;
     return result.serialize() === doc.serialize() ? doc : result;
+  }
+
+  // src/settings.ts
+  var DEFAULT_SETTINGS = {
+    tasksFile: "TODOs Tasks.md",
+    sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
+    dueDateMarker: "📅",
+    slotMarker: "⏰",
+    alarmSlotMarker: "🚨",
+    liveSlotMarker: "📌",
+    silentSlotMarker: "🔕",
+    repeatMarker: "🔁",
+    collapsedMarker: "📁",
+    workCalendarFile: "calendar/work.json",
+    workCalendarTitles: [],
+    hiddenCalendars: [],
+    calendarsMigrated: false,
+    google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
+    longPressMs: 250,
+    zoom: 56,
+    zoomLevels: [
+      { hourPx: 28 },
+      { hourPx: 56 },
+      { hourPx: 112 },
+      { hourPx: 224 }
+    ],
+    scrollToHour: 9,
+    dayStartHour: 5,
+    listShare: 0.5,
+    rightMode: "calendar",
+    staleAfterMinutes: 180,
+    priorities: [
+      { prefix: "p1", color: "red" },
+      { prefix: "p2", color: "orange" }
+    ],
+    labelTag: "label",
+    labels: [],
+    labelPaint: "stripes",
+    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
+    cardHeight: 35,
+    cardGap: 2
+  };
+  function settingsFrom(saved) {
+    const s = saved ?? {};
+    return {
+      ...DEFAULT_SETTINGS,
+      ...s,
+      sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
+      google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
+      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
+    };
   }
 
   // src/application/documentText.ts
@@ -1478,9 +1379,13 @@ ${e.calendar}`;
       dueDate: settings.dueDateMarker,
       slot: settings.slotMarker,
       alarmSlot: settings.alarmSlotMarker,
+      liveSlot: settings.liveSlotMarker,
       silentSlot: settings.silentSlotMarker,
       repeat: settings.repeatMarker,
-      priorities: usableLevels(settings.priorities).map((l) => l.prefix)
+      collapsed: settings.collapsedMarker,
+      priorities: usableLevels(settings.priorities).map((l) => l.prefix),
+      labelTag: settings.labelTag,
+      labels: usableLabels(settings.labels).map((l) => l.name)
     };
   }
   function boundaryOf(settings) {
@@ -1513,6 +1418,240 @@ ${e.calendar}`;
     const doc = readDocument(text, settings, today, boundary);
     return normalize(op(doc, today, boundary), today, boundary, usablePresets(settings.groups.presets)).serialize();
   }
+
+  // src/application/PhoneCaptureService.ts
+  var PhoneCaptureService = class {
+    constructor(settingsJson) {
+      this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
+    }
+    /** A blank `title` changes nothing. */
+    capture(text, list, title, now) {
+      if (title.trim() === "") return { changed: false, reason: "stale" };
+      const written = applyOperation(
+        text,
+        this.settings,
+        now,
+        (doc, today, boundary) => createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
+      );
+      return { changed: true, text: written };
+    }
+  };
+
+  // src/application/calendarChoice.ts
+  var keyText = (key) => `${key.account}
+${key.title}`.toLowerCase();
+  var GOOGLE_ORDER = ["google", "iphone", "work"];
+  var OTHER_ORDER = ["iphone", "work"];
+  var CalendarChoice = class {
+    constructor(files, hidden, staleAfterMs, now) {
+      this.files = files;
+      this.staleAfterMs = staleAfterMs;
+      this.now = now;
+      this.googleEmail = files.get("google")?.calendars.find((c) => c.account !== null)?.account ?? null;
+      const phone = files.get("iphone")?.calendars ?? [];
+      const google = this.googleEmail === null ? null : phoneGoogleAccount(files.get("google").calendars, phone);
+      this.phoneGoogleIds = new Set(
+        phone.filter((c) => google !== null && phoneAccountOf(c) === google).flatMap((c) => c.calendarId === null ? [] : [c.calendarId])
+      );
+      this.hidden = new Set(hidden.map(keyText));
+    }
+    known() {
+      const found = /* @__PURE__ */ new Map();
+      for (const source of GOOGLE_ORDER) {
+        for (const calendar of this.files.get(source)?.calendars ?? []) {
+          const key = this.keyOf(source, calendar);
+          const text = keyText(key);
+          if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
+        }
+      }
+      return [...found.values()].sort(
+        (a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title)
+      );
+    }
+    day(start, end) {
+      const events = [];
+      let stale = false;
+      for (const calendar of this.known()) {
+        if (this.hidden.has(keyText(calendar.key))) continue;
+        const source = this.sourceFor(calendar, start);
+        if (source === null) continue;
+        const file = this.files.get(source);
+        if (!this.fresh(file)) stale = true;
+        const text = keyText(calendar.key);
+        events.push(...file.events.filter((e) => keyText(this.keyOf(source, calendarOf(e))) === text && e.start < end && e.end > start));
+      }
+      return { events: events.sort((a, b) => a.start.getTime() - b.start.getTime()), stale };
+    }
+    sourceFor(calendar, day) {
+      const text = keyText(calendar.key);
+      const candidates = (calendar.google ? GOOGLE_ORDER : OTHER_ORDER).filter((source) => {
+        const file = this.files.get(source);
+        return file !== void 0 && covers(file, day) && file.calendars.some((c) => keyText(this.keyOf(source, c)) === text);
+      });
+      const fresh = candidates.find((source) => this.fresh(this.files.get(source)));
+      if (fresh) return fresh;
+      return candidates.reduce(
+        (best, source) => best === null || this.files.get(source).exportedAt > this.files.get(best).exportedAt ? source : best,
+        null
+      );
+    }
+    fresh(file) {
+      return this.now.getTime() - file.exportedAt.getTime() <= this.staleAfterMs;
+    }
+    isGoogle(key) {
+      return this.googleEmail !== null && key.account === this.googleEmail;
+    }
+    /** The calendar a file's row or event belongs to, the same across the files. */
+    keyOf(source, ref) {
+      if (source === "work") return this.scriptableKey(ref);
+      if (source === "iphone" && ref.calendarId !== null && this.phoneGoogleIds.has(ref.calendarId)) return { account: this.googleEmail, title: ref.title };
+      return { account: ref.account ?? "", title: ref.title };
+    }
+    /** Scriptable knows no account: the phone's calendar with the same id, else the only calendar so titled, else its own. */
+    scriptableKey(ref) {
+      const phone = this.files.get("iphone")?.calendars.find((c) => ref.calendarId !== null && c.calendarId === ref.calendarId);
+      if (phone) return this.keyOf("iphone", phone);
+      const titled = /* @__PURE__ */ new Map();
+      for (const source of ["google", "iphone"]) {
+        for (const c of this.files.get(source)?.calendars ?? []) {
+          if (c.title !== ref.title) continue;
+          const key = this.keyOf(source, c);
+          titled.set(keyText(key), key);
+        }
+      }
+      if (titled.size === 1) return [...titled.values()][0];
+      return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
+    }
+  };
+  function phoneAccountOf(calendar) {
+    return calendar.sourceId ? `id:${calendar.sourceId}` : `name:${calendar.account ?? ""}`;
+  }
+  function phoneGoogleAccount(google, phone) {
+    const titles = new Set(google.map((c) => c.title.toLowerCase()));
+    const shared = /* @__PURE__ */ new Map();
+    for (const calendar of phone) {
+      if (!titles.has(calendar.title.toLowerCase())) continue;
+      const account = phoneAccountOf(calendar);
+      shared.set(account, (shared.get(account) ?? 0) + 1);
+    }
+    const ranked = [...shared.entries()].sort((a, b) => b[1] - a[1]);
+    if (ranked.length === 0 || ranked[1]?.[1] === ranked[0][1]) return null;
+    return ranked[0][0];
+  }
+  function byAccount(a, b) {
+    if (a === b) return 0;
+    if (a === "") return 1;
+    if (b === "") return -1;
+    return a.localeCompare(b);
+  }
+  function calendarOf(e) {
+    return { title: e.calendar, account: e.account, calendarId: e.calendarId };
+  }
+  function covers(file, day) {
+    if (file.from !== null && file.to !== null) return file.from <= day && day < file.to;
+    if (file.events.length === 0) return false;
+    const first = Math.min(...file.events.map((e) => e.start.getTime()));
+    const last = Math.max(...file.events.map((e) => e.end.getTime()));
+    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime();
+    return first < dayEnd && day.getTime() <= last;
+  }
+
+  // src/application/calendarFile.ts
+  var GOOGLE_CALENDAR_FILE = "calendar/google.json";
+  var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
+  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
+  var dateOrNull = (text) => text ? new Date(text) : null;
+  function readCalendarFile(text, source) {
+    const content = JSON.parse(text);
+    const events = (content.events ?? []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      start: new Date(e.start),
+      end: new Date(e.end),
+      allDay: e.allDay,
+      calendar: e.calendar,
+      color: e.color ?? DEFAULT_COLOR[source],
+      source,
+      account: e.account ?? null,
+      calendarId: e.calendarId ?? null
+    }));
+    const listed2 = content.calendars ?? eventCalendars(content.events ?? []);
+    return {
+      events,
+      calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
+      exportedAt: new Date(content.exportedAt),
+      device: content.device ?? null,
+      from: dateOrNull(content.from),
+      to: dateOrNull(content.to),
+      validUntil: dateOrNull(content.validUntil)
+    };
+  }
+  function eventCalendars(events) {
+    const seen = /* @__PURE__ */ new Map();
+    for (const e of events) {
+      const key = `${e.account ?? ""}
+${e.calendarId ?? ""}
+${e.calendar}`;
+      if (!seen.has(key)) seen.set(key, { calendar: e.calendar, calendarId: e.calendarId ?? null, account: e.account ?? null, color: e.color ?? null });
+    }
+    return [...seen.values()];
+  }
+
+  // src/application/calendarMigration.ts
+  function migratedHidden(settings, known, googleIds2) {
+    const checked = new Set(settings.google.calendarIds.map((id) => googleIds2.get(id)).filter((t) => t !== void 0));
+    const googleChoice = settings.google.calendarIds.length > 0 && googleIds2.size > 0;
+    const named = settings.workCalendarTitles.map((t) => t.trim().toLowerCase()).filter((t) => t !== "");
+    return known.filter((c) => c.google ? googleChoice && !checked.has(c.key.title) : named.length > 0 && !named.includes(c.key.title.toLowerCase())).map((c) => c.key);
+  }
+  function hiddenNow(settings, known, google) {
+    return settings.calendarsMigrated ? [...settings.hiddenCalendars] : migratedHidden(settings, known, googleIds(google));
+  }
+  function googleIds(google) {
+    return new Map((google?.calendars ?? []).flatMap((c) => c.calendarId === null ? [] : [[c.calendarId, c.title]]));
+  }
+
+  // src/application/PhoneMeetingService.ts
+  var MINUTE_MS2 = 6e4;
+  var PhoneMeetingService = class {
+    constructor(settingsJson) {
+      this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
+    }
+    /** The files' paths in the vault, in the order `between` takes their texts. */
+    files() {
+      return this.sources().map((s) => s.path);
+    }
+    /** The timed meetings that overlap `from`–`to`, chosen day by day; a file missing (`null`) or unreadable adds none. */
+    between(texts, from, to, now) {
+      const files = /* @__PURE__ */ new Map();
+      this.sources().forEach((source, i) => {
+        const text = texts[i];
+        if (text === null || text === void 0) return;
+        try {
+          files.set(source.name, readCalendarFile(text, source.name));
+        } catch {
+        }
+      });
+      const known = new CalendarChoice(files, [], this.settings.staleAfterMinutes * MINUTE_MS2, now).known();
+      const choice = new CalendarChoice(files, hiddenNow(this.settings, known, files.get("google")), this.settings.staleAfterMinutes * MINUTE_MS2, now);
+      const found = /* @__PURE__ */ new Map();
+      for (let day = new Date(from.getFullYear(), from.getMonth(), from.getDate()); day < to; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
+        const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+        const start = day < from ? from : day;
+        for (const e of choice.day(start, next < to ? next : to).events) {
+          if (!e.allDay && !found.has(e.id)) found.set(e.id, { title: e.title, start: e.start, end: e.end });
+        }
+      }
+      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    sources() {
+      return [
+        { name: "google", path: GOOGLE_CALENDAR_FILE },
+        { name: "iphone", path: IPHONE_CALENDAR_FILE },
+        { name: "work", path: this.settings.workCalendarFile }
+      ];
+    }
+  };
 
   // src/domain/TaskText.ts
   var TOKEN_RE = new RegExp(
@@ -1630,7 +1769,7 @@ ${e.calendar}`;
         id: entry.raw,
         title: plainText(entry.task.text),
         body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
-        kind: entry.task.reminder === "alarm" ? "alarm" : "notification",
+        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
         date: slot.date,
         start: clockOf(slot.date, slot.start),
         dayEnd: clockOf(nextDay, this.boundary.startHour * HOUR_MINUTES4)
@@ -1652,6 +1791,7 @@ ${e.calendar}`;
     silence: (text, settingsJson, id, nowMs) => new PhoneReminderService(settingsJson).silence(text, id, new Date(nowMs)),
     snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs)),
     calendarFiles: (settingsJson) => new PhoneMeetingService(settingsJson).files(),
-    meetings: (settingsJson, texts, fromMs, toMs, nowMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs), new Date(nowMs)).map(wireMeeting)
+    meetings: (settingsJson, texts, fromMs, toMs, nowMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs), new Date(nowMs)).map(wireMeeting),
+    capture: (text, settingsJson, list, title, nowMs) => new PhoneCaptureService(settingsJson).capture(text, list, title, new Date(nowMs))
   };
 })();

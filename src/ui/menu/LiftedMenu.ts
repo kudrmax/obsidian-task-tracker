@@ -33,6 +33,11 @@ export abstract class LiftedMenu {
 		this.liftedCopy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted"), true);
 	}
 
+	/** The menu has closed: what was waited for in it lands nowhere. */
+	protected get isClosed(): boolean {
+		return this.gone;
+	}
+
 	protected get lifted(): HTMLElement {
 		return this.liftedCopy.el;
 	}

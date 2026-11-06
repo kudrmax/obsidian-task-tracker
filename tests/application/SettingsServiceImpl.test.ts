@@ -11,6 +11,27 @@ function service(start: Partial<TaskCalendarSettings> = {}) {
 	return { svc: new SettingsServiceImpl(store), now: () => store.get(), writes: () => writes };
 }
 
+describe("editing the labels", () => {
+	it("writes a name typed with spaces as one word of a tag, adds one in a colour no label has", async () => {
+		const { svc, now } = service({ labels: [{ name: "Важное", color: "red" }] });
+		await svc.renameLabel(0, " Важное и срочное ");
+		await svc.addLabel();
+		expect(now().labels).toEqual([{ name: "Важное_и_срочное", color: "red" }, { name: "Label_2", color: "orange" }]);
+		await svc.moveLabel(1, 0);
+		await svc.recolourLabel(0, "#123456");
+		await svc.removeLabel(1);
+		expect(now().labels).toEqual([{ name: "Label_2", color: "#123456" }]);
+	});
+
+	it("writes a tag folder of one word only, and the paint", async () => {
+		const { svc, now } = service();
+		await svc.setLabelTag(" tags ");
+		await svc.setLabelTag("two words");
+		await svc.setLabelPaint("blend");
+		expect([now().labelTag, now().labelPaint]).toEqual(["tags", "blend"]);
+	});
+});
+
 describe("editing the priority levels", () => {
 	const DEFAULT: readonly PriorityLevel[] = [
 		{ prefix: "p1", color: "red" },
@@ -43,6 +64,21 @@ describe("editing the priority levels", () => {
 		const { svc, now } = service({ priorities: all });
 		await svc.addLevel();
 		expect(now().priorities[6]).toEqual({ prefix: "p7", color: "red" });
+	});
+});
+
+describe("moving a priority level", () => {
+	it("puts the level at its new place, the others keeping their order", async () => {
+		const levels = [
+			{ prefix: "p1", color: "red" },
+			{ prefix: "p2", color: "orange" },
+			{ prefix: "p3", color: "blue" },
+		] as const;
+		const { svc, now } = service({ priorities: [...levels] });
+		await svc.moveLevel(2, 0);
+		expect(now().priorities).toEqual([levels[2], levels[0], levels[1]]);
+		await svc.moveLevel(0, 2);
+		expect(now().priorities).toEqual([...levels]);
 	});
 });
 
@@ -81,7 +117,7 @@ describe("SettingsServiceImpl", () => {
 		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
 		const form = service({ google, workCalendarTitles: ["A", "B"] }).svc.form();
 		expect(form).toMatchObject({ zoomLevels: "28, 56, 112, 224", workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
-		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", silentSlotMarker: "🔕", repeatMarker: "🔁" });
+		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕", repeatMarker: "🔁", collapsedMarker: "📁" });
 		expect(JSON.stringify(form)).not.toMatch(/secret|token/);
 	});
 

@@ -2,6 +2,7 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
+import type { LabelLevel, LabelPaint } from "../domain/Label";
 import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
@@ -9,8 +10,10 @@ import type { SectionOffer } from "./sections";
 import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
-/** What In progress or Stop progress sets on tasks of these statuses, and the reminder's kind a tap goes to. */
-export { nextProgress, nextReminder } from "../domain/Task";
+/** What In progress or Stop progress sets on tasks of these statuses. */
+export { nextProgress } from "../domain/Task";
+/** The kinds a task's reminder is chosen from, in the order the menu offers them. */
+export { REMINDER_KINDS } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";
@@ -43,6 +46,7 @@ export type { Clock } from "./ports";
 /** A card's height and the gap between cards before the settings are read. */
 export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
 /** A priority level, its colours in the order the settings offer them. */
+export { LABEL_PAINTS, type LabelLevel, type LabelPaint, labelTitle, sameLabels } from "../domain/Label";
 export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
@@ -100,10 +104,12 @@ export interface TaskItem {
 	readonly repeat: RepeatRule | null;
 	/** Not done and not given up: todo or in progress. */
 	readonly open: boolean;
-	/** The task may be given a rule: an open task of its own; a subtask goes with its parent, and a closed task repeats no more. */
+	/** The task may be given a rule: an open task or subtask; a closed task repeats no more. */
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
+	/** The labels the task is tagged with, in the settings' order; none while it has a priority. */
+	readonly labels: readonly LabelLevel[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
 	/** The list the task is in, its task's for a subtask. */
@@ -117,32 +123,32 @@ export interface TaskItem {
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
+	/** Every subtask right under this one, done and given up ones too, in file order, each with all its own. */
+	readonly allSubtasks: readonly TaskItem[];
 	/** Null without subtasks. */
 	readonly progress: SubtaskProgress | null;
+	/** Its open subtasks are folded away: a list draws its card without them. Only a task with an open subtask is. */
+	readonly collapsed: boolean;
 	/** The text of the task a subtask belongs to; null for a task. */
 	readonly parentText: string | null;
 	/** Its nested lines without a checkbox as Markdown, its first level unindented; null without any. */
 	readonly description: string | null;
 }
 
-/** A piece of a found task's title; `match` marks the words searched for. */
-export interface TitlePart {
+/** A piece of a found task's text; `match` marks a piece the search found. */
+export interface FoundPart {
 	readonly text: string;
 	readonly match: boolean;
 }
 
-/** A line of a found task's description: the words searched for and some around them. */
-export interface SnippetParts {
-	readonly before: string;
-	readonly match: string;
-	readonly after: string;
-}
-
-/** A task the search found: its title cut around the match (empty when the title has none), the description's line (null when it has none). */
+/**
+ * A task the search found: its title in pieces (empty when the title has none), and a line of the description's words
+ * from a little before the first found piece (null when it has none).
+ */
 export interface SearchHit {
 	readonly item: TaskItem;
-	readonly title: readonly TitlePart[];
-	readonly description: SnippetParts | null;
+	readonly title: readonly FoundPart[];
+	readonly description: readonly FoundPart[] | null;
 }
 
 export interface DayView {
@@ -171,6 +177,7 @@ export class TasksFileMissingError extends Error {
 export type TaskChange =
 	| { readonly kind: "status"; readonly status: TaskStatus }
 	| { readonly kind: "priority"; readonly priority: string | null }
+	| { readonly kind: "labels"; readonly labels: readonly string[] }
 	| { readonly kind: "dueDate"; readonly date: LocalDate | null }
 	| { readonly kind: "postpone"; readonly date: LocalDate }
 	| { readonly kind: "remove" }
@@ -232,6 +239,8 @@ export interface ScreenView {
 export interface TaskService {
 	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
 	priorityLevels(): readonly PriorityLevel[];
+	/** The labels that tag tasks, in the settings' order: usable names, the first of two alike. */
+	labelLevels(): readonly LabelLevel[];
 	/** The level a typed title starts with and the title without it, as the file will read it. */
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null };
 	/** Nothing to write: no text, or a level's prefix alone. */
@@ -251,8 +260,11 @@ export interface TaskService {
 	/** Every Done task, in file order. */
 	doneView(): Promise<readonly TaskItem[]>;
 	/**
-	 * The tasks the screen draws whose title or description holds the query, case and «ё» aside: Inbox, Backlog, Soon,
-	 * Now, Done, each in file order, a task before its open subtasks. A query of spaces finds nothing.
+	 * The tasks the screen draws whose title or description holds the query as Obsidian's quick switcher finds it: the
+	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
+	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
+	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
+	 * A query of spaces finds nothing.
 	 */
 	search(query: string): Promise<readonly SearchHit[]>;
 
@@ -275,11 +287,11 @@ export interface TaskService {
 	 * Quick entry. `list`: in section `group` of the list right before `before` (null: at the end of the section), with the
 	 * due-date rules of `moveToGroup`: Now gets today, Inbox none, Soon `date` (the column's day) or none. `subtask`: among
 	 * `parent`'s subtasks before `before` or last; it has no due date of its own. `slot`: as `createAtTime`. `priority` is a
-	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write, on a task of its own only: a subtask or a slot takes none.
+	 * level's prefix or null; whitespace-only text creates nothing. `repeat` is set as `setRepeat` sets it, in the same write, on a task or a subtask: a slot takes none.
 	 * One write per call. Gives the new task's key as the file stands after the write, wherever its rules put it (a schedule
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
@@ -311,8 +323,16 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
+	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null>;
+	/** `setLabels` for several tasks in one write; each task as it then stands, in the order given, null for one gone. */
+	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
+	/** Folds the task's subtasks away on the screen, or shows them again: the marker on its line. A task without an open subtask has nothing to fold. */
+	setCollapsed(key: TaskKey, collapsed: boolean): Promise<void>;
+	/** The tasks a subtask sits under show their subtasks again, so its card stands in the list. */
+	unfoldAbove(key: TaskKey): Promise<void>;
 	/**
 	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
 	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.
@@ -329,6 +349,11 @@ export interface TaskService {
 	remove(key: TaskKey): Promise<void>;
 	/** The task's line in the file, from 0, once the file is normalized: where Open in Obsidian puts the cursor. */
 	lineOf(key: TaskKey): Promise<number>;
+	/**
+	 * The task `key` names as the file now has it: its line at its place; moved, the one line like it anywhere; else the
+	 * task at its place whose text is `text`, its other fields changed there. Null when none of these is found.
+	 */
+	find(key: TaskKey, text: string): Promise<TaskItem | null>;
 
 	/**
 	 * Puts `key` right before the task `before` in the file, in `before`'s section. `before` null: end of the list's section
@@ -585,6 +610,7 @@ export interface ScreenSettings extends ViewSettings {
 	/** The heading over tasks outside any section. */
 	readonly ungrouped: string;
 	readonly priorities: readonly PriorityLevel[];
+	readonly labels: readonly LabelLevel[];
 }
 
 /** What the screen sets by hand, on this device only: the divider's place, the columns shown, the zoom. */
@@ -600,7 +626,7 @@ export interface ViewSettingsStore {
 }
 
 /** The marks of a task line the settings tab sets. */
-export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "silentSlotMarker" | "repeatMarker";
+export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "liveSlotMarker" | "silentSlotMarker" | "repeatMarker" | "collapsedMarker";
 /** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
 export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
 /** The cards' size, set by a slider. */
@@ -612,6 +638,9 @@ export interface SettingsForm {
 	readonly sections: SectionNames;
 	readonly markers: Readonly<Record<Marker, string>>;
 	readonly priorities: readonly PriorityLevel[];
+	readonly labelTag: string;
+	readonly labels: readonly LabelLevel[];
+	readonly labelPaint: LabelPaint;
 	readonly presets: readonly string[];
 	readonly ungrouped: string;
 	readonly cardHeight: number;
@@ -657,6 +686,18 @@ export interface SettingsService {
 	removeLevel(index: number): Promise<void>;
 	/** The next `p<n>` no level has, in the first colour no level has. */
 	addLevel(): Promise<void>;
+	/** The level at `from` goes to `to`, the others keeping their order. */
+	moveLevel(from: number, to: number): Promise<void>;
+	/** The tag folder trimmed; written when it is one word. */
+	setLabelTag(tag: string): Promise<void>;
+	/** The name as shown, its spaces written as underscores. */
+	renameLabel(index: number, title: string): Promise<void>;
+	recolourLabel(index: number, color: PriorityColor): Promise<void>;
+	removeLabel(index: number): Promise<void>;
+	/** A new label `Label_<n>` no label has, in the first colour no label has. */
+	addLabel(): Promise<void>;
+	moveLabel(from: number, to: number): Promise<void>;
+	setLabelPaint(paint: LabelPaint): Promise<void>;
 	/** The name trimmed. */
 	renamePreset(index: number, name: string): Promise<void>;
 	removePreset(index: number): Promise<void>;

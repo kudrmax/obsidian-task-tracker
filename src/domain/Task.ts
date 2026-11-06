@@ -32,16 +32,14 @@ export interface Slot {
 	readonly end: number | null;
 }
 
-/** What the time of a task does on the phone: a quiet notification, an alarm, or nothing. Read from the marker before the slot. */
-export type ReminderKind = "notification" | "alarm" | "none";
+/** What the time of a task does on the phone: a quiet notification, an alarm, a Live Activity on the lock screen, or nothing. Read from the marker before the slot. */
+export type ReminderKind = "notification" | "alarm" | "live" | "none";
 
-/** The order a reminder's kind goes round in. */
-export const REMINDER_KINDS: readonly ReminderKind[] = ["notification", "alarm", "none"];
+/** The kinds a task's reminder is chosen from, in the order they are offered. */
+export const REMINDER_KINDS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
 
-/** The kind after `kind`, round. */
-export function nextReminder(kind: ReminderKind): ReminderKind {
-	return REMINDER_KINDS[(REMINDER_KINDS.indexOf(kind) + 1) % REMINDER_KINDS.length];
-}
+/** The kind of a task put on a time for the first time. */
+export const DEFAULT_REMINDER: ReminderKind = "live";
 
 /** Only a task on a time reminds: one without a slot keeps its kind for when it gets one. */
 export function canRemind(slot: Slot | null): boolean {
@@ -62,6 +60,10 @@ export interface Task {
 	readonly repeat: Repeat | null;
 	/** The prefix of a priority level, the first word of the line's text; null without one. */
 	readonly priority: string | null;
+	/** The names of the labels the line is tagged with, in its order; a task has these or a priority, not both. */
+	readonly labels: readonly string[];
+	/** Its subtasks are folded away on the screen: the marker on its line. Only a task with an open subtask keeps it. */
+	readonly collapsed: boolean;
 	/** Nested lines (deeper indent than the task), raw, in file order. They travel with the task. */
 	readonly children: readonly string[];
 }

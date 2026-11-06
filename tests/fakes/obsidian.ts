@@ -59,6 +59,35 @@ export class Plugin {
 	constructor(readonly app: unknown) {}
 }
 
+export class Modal {
+	readonly modalEl = document.createElement("div");
+	readonly titleEl = createEl(this.modalEl, "div", { cls: "modal-title" });
+	readonly contentEl = createEl(this.modalEl, "div", { cls: "modal-content" });
+
+	constructor(readonly app: unknown) {
+		this.modalEl.className = "modal";
+	}
+
+	setTitle(title: string): this {
+		this.titleEl.textContent = title;
+		return this;
+	}
+
+	open(): void {
+		document.body.appendChild(this.modalEl);
+		this.onOpen();
+	}
+
+	close(): void {
+		this.modalEl.remove();
+		this.onClose();
+	}
+
+	onOpen(): void {}
+
+	onClose(): void {}
+}
+
 export class PluginSettingTab {
 	readonly containerEl = document.createElement("div");
 
@@ -254,6 +283,11 @@ export class Setting {
 
 	addToggle(build: (toggle: ToggleComponent) => unknown): this {
 		build(new ToggleComponent(this.controlEl));
+		return this;
+	}
+
+	addExtraButton(build: (button: ExtraButtonComponent) => unknown): this {
+		build(new ExtraButtonComponent(this.controlEl));
 		return this;
 	}
 }

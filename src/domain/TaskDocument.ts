@@ -1,5 +1,5 @@
 import { descriptionIndent, descriptionMarkdown, markdownLines } from "./description";
-import { STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
+import { DEFAULT_REMINDER, STATUS_CHARS, type GroupName, type SectionKey, type Task } from "./Task";
 import { formatTaskLine, parseTaskLine, type Markers } from "./TaskLine";
 
 export interface SectionNamesOf {
@@ -96,11 +96,14 @@ function sameTask(a: Task, b: Task): boolean {
 		a.text === b.text &&
 		a.dueDate === b.dueDate &&
 		a.priority === b.priority &&
+		a.labels.length === b.labels.length &&
+		a.labels.every((label, i) => label === b.labels[i]) &&
 		(a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) &&
 		a.slot?.date === b.slot?.date &&
 		a.slot?.start === b.slot?.start &&
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
+		a.collapsed === b.collapsed &&
 		sameLines(a.children, b.children)
 	);
 }
@@ -142,7 +145,7 @@ function insertedLines(before: readonly string[], after: readonly string[]): Set
 }
 
 /** Every task and subtask, each before its own subtasks. */
-function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
+export function flatten(entries: readonly TaskEntry[]): TaskEntry[] {
 	return entries.flatMap((entry) => [entry, ...flatten(entry.subtasks)]);
 }
 
@@ -388,17 +391,20 @@ export class TaskDocument {
 		return this.replace(entry, { ...entry.task, children: [...lines.map((line) => indent + line), ...subtasks] });
 	}
 
-	/** The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat; description lines as they are. */
+	/**
+	 * The entry's child lines with every subtask `[ ]` and without its due date, slot (with its reminder kind) and repeat;
+	 * description lines as they are. Indented as a task of its own's, even for a subtask.
+	 */
 	freshChildren(entry: TaskEntry): readonly string[] {
 		const first = this.spanOf(entry).line + 1;
 		const children = [...entry.task.children];
 		const open = (sub: TaskEntry): void => {
-			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: "notification", repeat: null };
+			const task: Task = { ...sub.task, status: "todo", statusChar: STATUS_CHARS.todo, dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null };
 			children[this.spanOf(sub).line - first] = formatTaskLine({ indent: sub.indent, bullet: sub.bullet, task }, this.markers);
 			sub.subtasks.forEach(open);
 		};
 		entry.subtasks.forEach(open);
-		return children;
+		return children.map((line) => (line.startsWith(entry.indent) ? line.slice(entry.indent.length) : line));
 	}
 
 	/** A new subtask of `parent`, right before its subtask `before` or last. */

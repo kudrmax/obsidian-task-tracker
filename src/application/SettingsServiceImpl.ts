@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { labelNameOf, usableLabelTag } from "../domain/Label";
+import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CardField, CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 import { formatZoomLevels, parseZoomLevels } from "./zoomLevelsText";
@@ -22,10 +23,15 @@ export class SettingsServiceImpl implements SettingsService {
 				dueDateMarker: s.dueDateMarker,
 				slotMarker: s.slotMarker,
 				alarmSlotMarker: s.alarmSlotMarker,
+				liveSlotMarker: s.liveSlotMarker,
 				silentSlotMarker: s.silentSlotMarker,
 				repeatMarker: s.repeatMarker,
+				collapsedMarker: s.collapsedMarker,
 			},
 			priorities: s.priorities,
+			labelTag: s.labelTag,
+			labels: s.labels,
+			labelPaint: s.labelPaint,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
 			cardHeight: s.cardHeight,
@@ -93,6 +99,43 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.saveLevels([...levels, { prefix: `p${n}`, color }]);
 	}
 
+	moveLevel(from: number, to: number): Promise<void> {
+		return this.saveLevels(moved(this.settings.priorities, from, to));
+	}
+
+	async setLabelTag(tag: string): Promise<void> {
+		const labelTag = tag.trim();
+		if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+	}
+
+	renameLabel(index: number, title: string): Promise<void> {
+		return this.patchLabel(index, { name: labelNameOf(title) });
+	}
+
+	recolourLabel(index: number, color: PriorityColor): Promise<void> {
+		return this.patchLabel(index, { color });
+	}
+
+	removeLabel(index: number): Promise<void> {
+		return this.saveLabels(this.settings.labels.filter((_, i) => i !== index));
+	}
+
+	addLabel(): Promise<void> {
+		const labels = this.settings.labels;
+		let n = labels.length + 1;
+		while (labels.some((l) => l.name === `Label_${n}`)) n++;
+		const color = PRIORITY_COLORS.find((c) => !labels.some((l) => l.color === c)) ?? PRIORITY_COLORS[0];
+		return this.saveLabels([...labels, { name: `Label_${n}`, color }]);
+	}
+
+	moveLabel(from: number, to: number): Promise<void> {
+		return this.saveLabels(moved(this.settings.labels, from, to));
+	}
+
+	setLabelPaint(labelPaint: LabelPaint): Promise<void> {
+		return this.store.update({ labelPaint });
+	}
+
 	renamePreset(index: number, name: string): Promise<void> {
 		return this.savePresets(this.presets.map((preset, i) => (i === index ? name.trim() : preset)));
 	}
@@ -106,10 +149,7 @@ export class SettingsServiceImpl implements SettingsService {
 	}
 
 	movePreset(from: number, to: number): Promise<void> {
-		const presets = [...this.presets];
-		const [moved] = presets.splice(from, 1);
-		presets.splice(to, 0, moved);
-		return this.savePresets(presets);
+		return this.savePresets(moved(this.presets, from, to));
 	}
 
 	setUngrouped(name: string): Promise<void> {
@@ -149,6 +189,14 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.store.update({ priorities });
 	}
 
+	private patchLabel(index: number, patch: Partial<LabelLevel>): Promise<void> {
+		return this.saveLabels(this.settings.labels.map((label, i) => (i === index ? { ...label, ...patch } : label)));
+	}
+
+	private saveLabels(labels: readonly LabelLevel[]): Promise<void> {
+		return this.store.update({ labels });
+	}
+
 	private savePresets(presets: readonly string[]): Promise<void> {
 		return this.store.update(this.groups({ presets }));
 	}
@@ -160,4 +208,12 @@ export class SettingsServiceImpl implements SettingsService {
 	private google(patch: Partial<GoogleSettings>): Partial<TaskCalendarSettings> {
 		return { google: { ...this.settings.google, ...patch } };
 	}
+}
+
+/** The list with the item at `from` taken out and put back at `to`. */
+function moved<T>(list: readonly T[], from: number, to: number): T[] {
+	const items = [...list];
+	const [item] = items.splice(from, 1);
+	items.splice(to, 0, item);
+	return items;
 }

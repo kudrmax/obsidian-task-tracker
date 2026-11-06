@@ -1,7 +1,7 @@
 import type { DayBoundary } from "./DayBoundary";
 import { dayOf, newTask } from "./operations";
 import type { GroupName, LocalDate, SectionKey, Task } from "./Task";
-import type { TaskDocument, TaskEntry } from "./TaskDocument";
+import { flatten, type TaskDocument, type TaskEntry } from "./TaskDocument";
 
 const RECURRING: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
 
@@ -9,18 +9,23 @@ function closedWithRepeat(entry: TaskEntry): boolean {
 	return (entry.task.status === "done" || entry.task.status === "cancelled") && entry.task.repeat !== null;
 }
 
-/** Spec §3.3: a closed top-level task with a repeat in Inbox/Backlog/Now/Soon loses its field; its copy goes to the end of Soon, in the section of the same name. */
+/**
+ * Spec §3.3: a closed task or subtask with a repeat in Inbox/Backlog/Now/Soon loses its field; its copy goes to the end
+ * of Soon as a task of its own, in the section of the same name. A subtask's copy has no parent.
+ */
 export function recurClosed(doc: TaskDocument, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	if (!doc.hasSection("soon")) return doc;
 	for (;;) {
-		const entry = RECURRING.flatMap((s) => doc.tasks(s)).find(closedWithRepeat);
+		const entry = RECURRING.flatMap((s) => flatten(doc.tasks(s))).find(closedWithRepeat);
 		if (!entry) return doc;
 		const { task } = entry;
 		const copy = newTask(task.text, {
 			priority: task.priority,
+			labels: task.labels,
 			children: doc.freshChildren(entry),
 			dueDate: task.repeat!.next(dayOf(task, boundary), today),
 			repeat: task.repeat,
+			collapsed: task.collapsed,
 		});
 		doc = intoSoon(doc.replace(entry, { ...task, repeat: null }), entry.group, copy);
 	}

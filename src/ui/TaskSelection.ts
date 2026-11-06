@@ -1,4 +1,4 @@
-import { keyId, type TaskItem } from "../application/contracts";
+import { keyId, type TaskItem, type TaskKey } from "../application/contracts";
 import { el } from "./dom";
 import type { ListColumn } from "./drag/DropTarget";
 import { icon } from "./kit/icons";
@@ -104,6 +104,17 @@ export class TaskSelection {
 	private current(card: PickedCard): PickedCard {
 		const latest = this.latest.get(keyId(card.item.key));
 		return latest && latest.card.isConnected ? latest : card;
+	}
+
+	/** Tasks written anew stay picked: each old key gives way to the task's new one, the card drawn for it wearing the selection. */
+	renew(changes: readonly { readonly from: TaskKey; readonly to: TaskKey }[]): void {
+		for (const { from, to } of changes) {
+			const was = this.picked.get(keyId(from));
+			if (!was) continue;
+			this.picked.delete(keyId(from));
+			this.picked.set(keyId(to), this.latest.get(keyId(to)) ?? was);
+		}
+		this.show();
 	}
 
 	clear(): void {

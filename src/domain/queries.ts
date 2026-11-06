@@ -41,9 +41,9 @@ export function backlogList(doc: TaskDocument): readonly TaskEntry[] {
 	return doc.tasks("backlog");
 }
 
-/** An open task of its own may repeat; a subtask goes with its parent, and a closed task repeats no more. */
+/** An open task or subtask may repeat; a closed one repeats no more. */
 export function repeatable(entry: TaskEntry): boolean {
-	return entry.path.length === 0 && isOpen(entry.task.status);
+	return isOpen(entry.task.status);
 }
 
 /** A column that shows a list's sections: Inbox, Backlog, Soon without a date, or the day column on `date`. */

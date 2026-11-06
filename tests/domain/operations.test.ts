@@ -24,6 +24,7 @@ import {
 	remove,
 	rename,
 	setDueDate,
+	setLabels,
 	setPriority,
 	setReminder,
 	setSlot,
@@ -47,7 +48,7 @@ function parse(text: string): TaskDocument {
 
 describe("newTask", () => {
 	it("builds a todo task and applies the patch", () => {
-		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "notification", repeat: null, priority: null, children: [] });
+		expect(newTask("A")).toEqual({ status: "todo", statusChar: " ", text: "A", dueDate: null, slot: null, reminder: "live", repeat: null, priority: null, labels: [], collapsed: false, children: [] });
 		expect(newTask("A", { dueDate: D }).dueDate).toBe(D);
 	});
 });
@@ -156,13 +157,13 @@ describe("createInPlace", () => {
 		}
 	});
 
-	it("takes a rule for a task of its own only: a subtask goes with its parent, a task on the calendar has its slot", () => {
+	it("takes a rule for a task and a subtask; a task on the calendar has its slot", () => {
 		const rule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null } as const;
 		const parseR = (text: string) => TaskDocument.parse(text, G, { ...M, repeat: "🔁" });
 		const d = parseR("## Now\n- [ ] P\n\n## Soon\n");
 		const sub = createInPlace(d, "X", null, { kind: "subtask", parent: d.tasks("now")[0], before: null }, T, DayBoundary.MIDNIGHT, rule);
 		const slot = createInPlace(parseR("## Now\n"), "X", null, { kind: "slot", slot: { date: T, start: 600, end: null } }, T, DayBoundary.MIDNIGHT, rule);
-		expect([sub.serialize(), slot.serialize()]).toEqual(["## Now\n- [ ] P\n\t- [ ] X\n\n## Soon\n", "## Now\n- [ ] X ⏰ 2026-10-30 10:00\n"]);
+		expect([sub.serialize(), slot.serialize()]).toEqual(["## Now\n- [ ] P\n\t- [ ] X 🔁 every week when done\n\n## Soon\n", "## Now\n- [ ] X ⏰ 2026-10-30 10:00\n"]);
 	});
 
 	it("writes the priority before the text", () => {
@@ -432,6 +433,38 @@ describe("Backlog", () => {
 	it("a drop into a gap of Backlog puts the task there without a due date", () => {
 		const d = parse("## Backlog\n- [ ] L\n- [ ] M\n\n## Now\n- [ ] A 📅 2026-10-30\n");
 		expect(moveToGroup(d, d.tasks("now")[0], "backlog", null, d.tasks("backlog")[1], T).serialize()).toBe("## Backlog\n- [ ] L\n- [ ] A\n- [ ] M\n\n## Now\n");
+	});
+});
+
+describe("labels", () => {
+	const L = { ...M, priorities: ["p1"], labelTag: "label", labels: ["Важное", "Срочное"] };
+	const doc = (text: string) => TaskDocument.parse(text, SECTIONS, L);
+
+	it("setLabels writes the labels as tags, and none takes them off", () => {
+		const d = doc("## Now\n- [ ] X 📅 2026-10-30\n");
+		const tagged = setLabels(d, d.tasks("now")[0], ["Срочное", "Важное"]);
+		expect(tagged.serialize()).toBe("## Now\n- [ ] X #label/Срочное #label/Важное 📅 2026-10-30\n");
+		expect(setLabels(tagged, tagged.tasks("now")[0], []).serialize()).toBe("## Now\n- [ ] X 📅 2026-10-30\n");
+	});
+
+	it("gives a task a priority or labels, never both", () => {
+		const prioritized = doc("## Now\n- [ ] p1 X\n");
+		expect(setLabels(prioritized, prioritized.tasks("now")[0], ["Важное"]).serialize()).toBe("## Now\n- [ ] p1 X\n");
+		const labelled = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(setPriority(labelled, labelled.tasks("now")[0], "p1").serialize()).toBe("## Now\n- [ ] X #label/Важное\n");
+		expect(placeTask(labelled, labelled.tasks("now")[0], { text: "Y", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
+	});
+
+	it("writes a new task's labels, and an edit's labels in place of the task's own, a priority none beside them", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(createInPlace(d, "Y", "p1", { kind: "list", list: "now", group: null, before: null, date: null }, T, DayBoundary.MIDNIGHT, undefined, ["Срочное"]).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] Y #label/Срочное 📅 2026-10-30\n");
+		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: null, labels: ["Срочное", "Важное"] }, T).serialize()).toBe("## Now\n- [ ] X #label/Срочное #label/Важное\n");
+		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: "p1", labels: [] }, T).serialize()).toBe("## Now\n- [ ] p1 X\n");
+	});
+
+	it("keeps the labels when a task is renamed", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(rename(d, d.tasks("now")[0], "Y").serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
 	});
 });
 

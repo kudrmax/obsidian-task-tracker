@@ -27,7 +27,8 @@ import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
 import { QuickEntryController } from "./quick/QuickEntryController";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
-import { DescriptionSheet } from "./sheet/DescriptionSheet";
+import { FullScreen } from "./full/FullScreen";
+import { MoreMenu } from "./menu/MoreMenu";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, stepFor } from "./zoomLevels";
@@ -38,7 +39,6 @@ import { centeredListWidth, listShareOf, listWidthMax, shownListWidth } from "./
 import { clear, el, px } from "./dom";
 import { Button } from "./kit/Button";
 import { FreeRoomDoubleClick } from "./FreeRoomDoubleClick";
-import { EntryTrace } from "./entryTrace";
 import { Keyboard } from "./Keyboard";
 import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
@@ -48,7 +48,8 @@ import { type Place, type Shift, stepScreen } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
-import { type DayLane, DayTrack, EdgeTrack, restore, StripTrack, stripParts } from "./ScreenTracks";
+import { type DayLane, DayTrack, EdgeTrack, edgeParts, restore, StripTrack } from "./ScreenTracks";
+import { onCounter } from "./TaskCard";
 import { TaskList } from "./TaskList";
 import { Timeline } from "./Timeline";
 import type { LocalDate } from "./types";
@@ -80,8 +81,6 @@ export interface ViewDeps {
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
-	/** Temporary: the note the quick entry trace is written to, for a phone with no console. */
-	readonly entryLog: { append(text: string): void };
 }
 
 /**
@@ -106,6 +105,8 @@ export class TaskCalendarView extends ItemView {
 	/** The window stands at Done, left of Inbox: only the search brings it there, and any other move leaves it. */
 	private atDone = false;
 	private search: SearchWindow | null = null;
+	/** The task on the whole screen, while one is. */
+	private full: FullScreen | null = null;
 	private readonly found = new FoundCard();
 	private inboxList: TaskList | null = null;
 	private inboxDrop: ListDrop | null = null;
@@ -172,6 +173,14 @@ export class TaskCalendarView extends ItemView {
 			today: () => this.today(),
 			day: () => this.selectedDate,
 			levels: () => this.deps.tasks.priorityLevels(),
+			labels: () => this.deps.tasks.labelLevels(),
+			setLabels: async (steps) => {
+				const written: { items: readonly (TaskItem | null)[] } = { items: steps.map(() => null) };
+				await this.act(async () => {
+					written.items = await this.deps.tasks.setLabelsAll(steps);
+				});
+				return written.items;
+			},
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
 			sections: (cards) => this.bulkSections(cards),
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
@@ -188,6 +197,7 @@ export class TaskCalendarView extends ItemView {
 				const picked = this.bulk.selection.cardOf(card);
 				return picked !== undefined && this.bulk.pick(picked, e, how);
 			},
+			fold: (item, pressed) => this.fold(item, pressed),
 			carried: (item) => this.bulk.carried(item),
 			haptics: this.haptics,
 			arbiter: this.arbiter,
@@ -394,9 +404,11 @@ export class TaskCalendarView extends ItemView {
 			onError: (error) => this.reportFailure(error),
 		});
 		const keyboard = new Keyboard(root, (glide) => this.quick?.keyboardSlides(glide));
-		if (Platform.isMobile) this.traceEntry(root);
 		this.unsubscribe.push(() => keyboard.destroy());
-		const capsule = new BottomCapsule(root, this.deps.undo, { onUndo: () => void this.undoStep("undo"), onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() });
+		const capsule = new BottomCapsule(root, this.deps.undo, {
+			onUndo: () => void this.undoStep("undo"),
+			onMore: (anchor) => MoreMenu.open({ anchor, onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() }),
+		});
 		this.unsubscribe.push(() => capsule.destroy());
 		this.bulk.mount();
 		this.scope = new Scope(this.app.scope);
@@ -412,7 +424,10 @@ export class TaskCalendarView extends ItemView {
 			target: new ScreenPager({ track: (shift) => this.trackTo(shift), duration: () => tokenMs(root, DURATION.slide), width: () => root.clientWidth }),
 		});
 		this.unsubscribe.push(
-			this.deps.tasks.onChange(() => void this.data.tasks()),
+			this.deps.tasks.onChange(() => {
+				void this.data.tasks();
+				void this.full?.refresh();
+			}),
 			this.deps.calendars.onChange(() => void this.data.calendars()),
 			this.deps.settings.onChange(() => this.onSettings()),
 			this.deps.days.onDayChange((change) => this.onDayChange(change), () => this.canTick()),
@@ -480,17 +495,11 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	override async onClose(): Promise<void> {
+		this.full?.close();
 		this.quick?.close();
 		this.poll?.stop();
 		this.timeline?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
-	}
-
-	/** Temporary: how quick entry opens and closes on the phone, frame by frame, in «Task Calendar entry log.md». */
-	private traceEntry(root: HTMLElement): void {
-		const trace = new EntryTrace(root.ownerDocument, { write: (text) => this.deps.entryLog.append(text) });
-		trace.log(`open ${Platform.isIosApp ? "ios" : "mobile"} width=${root.clientWidth}`);
-		this.unsubscribe.push(() => trace.destroy());
 	}
 
 	override onResize(): void {
@@ -563,10 +572,9 @@ export class TaskCalendarView extends ItemView {
 	private trackTo(shift: Shift): ScreenTrack {
 		this.landed();
 		const root = this.contentEl;
-		const parts = stripParts(root);
 		const from = { mode: this.place(), date: this.selectedDate };
 		const to = stepScreen(from, shift, this.today());
-		if (!to) return new EdgeTrack(parts, root.clientWidth);
+		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
 			root.classList.remove("is-switching");
@@ -682,11 +690,21 @@ export class TaskCalendarView extends ItemView {
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
 	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
 		this.found.attach(card, item);
-		card.addEventListener("click", () => this.showMenu(item, card));
+		card.addEventListener("click", (e) => {
+			if (!this.fold(item, e.target)) this.showMenu(item, card);
+		});
 		card.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
 			this.showMenu(item, card);
 		});
+	}
+
+	/** A tap on a card's subtask counter folds its open subtasks away, or shows them again; true when it did, in place of the menu. */
+	private fold(item: TaskItem, target: EventTarget | null): boolean {
+		if (item.subtasks.length === 0 || !onCounter(target)) return false;
+		this.haptics.tap();
+		void this.act(() => this.deps.tasks.setCollapsed(item.key, !item.collapsed));
+		return true;
 	}
 
 	private openSearch(): void {
@@ -709,9 +727,10 @@ export class TaskCalendarView extends ItemView {
 	/**
 	 * The screen goes where the found task stands, as the switch and the arrows would take it, and its card wears the ring:
 	 * Done to its own place left of Inbox, Inbox and Backlog to Inbox and Soon, Soon to Soon and Now, a task of a day to
-	 * that day beside its calendar.
+	 * that day beside its calendar. A found subtask's tasks show their subtasks, so its card is there.
 	 */
 	private async reveal(item: TaskItem): Promise<void> {
+		if (item.isSubtask) await this.act(() => this.deps.tasks.unfoldAbove(item.key));
 		this.found.mark(item);
 		if (item.list === "done") {
 			this.atDone = true;
@@ -942,49 +961,76 @@ export class TaskCalendarView extends ItemView {
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
 	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
 
-	/** A task's description on its own screen: to read, or straight in the editor. */
-	private descriptionSheet(item: TaskItem, editing: boolean): void {
-		DescriptionSheet.open(this.contentEl, {
-			title: item.text,
-			markdown: item.description,
+	/** The task over the whole view; one already open there takes it in over its own. `editing` puts the caret in its description. */
+	private openFull(item: TaskItem, editing: boolean): void {
+		if (this.full) {
+			this.full.show(item, editing);
+			return;
+		}
+		this.full = FullScreen.open(
+			{
+				root: this.contentEl,
+				tasks: this.deps.tasks,
+				undo: this.deps.undo,
+				surface: this.markdown,
+				titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
+				day: () => this.today(),
+				act: (change) => this.act(change),
+				onUndo: () => void this.undoStep("undo"),
+				menu: (task, source) => {
+					if (this.full) this.showMenu(task, source, source.classList.contains("tc-card") ? (copy) => FullScreen.mark(copy, task) : undefined, this.full);
+				},
+				onClose: () => (this.full = null),
+			},
+			item,
 			editing,
-			surface: this.markdown,
-			onSave: (markdown) => this.act(() => this.deps.tasks.setDescription(item.key, markdown)),
-		});
+		);
 	}
 
-	/** The task menu; a list card's offers the sections of its list too. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): TaskMenu {
+	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
 		const tasks = this.deps.tasks;
 		const column = this.sectionColumn(source);
 		const sections = column ? sectionChoice([item], this.data.offer) : null;
+		/** The task as the menu last saw it: a label set from the menu gives it a fresh key, which the next action needs. */
+		let current = item;
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
 			sections: sections ?? undefined,
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
-			markdown: this.markdown,
+			markdown: full?.holds(item) ? undefined : this.markdown,
 			today: this.today(),
 			day: this.selectedDate,
 			levels: tasks.priorityLevels(),
+			labels: tasks.labelLevels(),
 			actions: {
-				setStatus: (status) => this.act(() => tasks.setStatus(item.key, status)),
-				postpone: (date) => this.act(() => tasks.postpone(item.key, date)),
-				removeDue: () => this.act(() => tasks.setDueDate(item.key, null)),
-				toSection: (name) => this.act(() => tasks.toSection([item.key], name)),
+				setStatus: (status) => this.act(() => tasks.setStatus(current.key, status)),
+				postpone: (date) => this.act(() => tasks.postpone(current.key, date)),
+				removeDue: () => this.act(() => tasks.setDueDate(current.key, null)),
+				toSection: (name) => this.act(() => tasks.toSection([current.key], name)),
 				newSection: () => {
-					if (column && sections) this.askGroupName(item, column);
+					if (column && sections) this.askGroupName(current, column);
 				},
-				setPriority: (prefix) => this.act(() => tasks.setPriority(item.key, prefix)),
-				setReminder: (kind) => this.act(() => tasks.setReminder(item.key, kind)),
-				setRepeat: (rule) => this.act(() => tasks.setRepeat(item.key, rule)),
-				stop: () => this.act(() => tasks.stop(item.key)),
-				rename: (menu) => this.quick?.rename(item, menu),
-				openDescription: (editing) => this.descriptionSheet(item, editing),
-				addSubtask: (menu) => this.quick?.addSubtask(item, menu),
-				remove: () => this.act(() => tasks.remove(item.key)),
-				openInObsidian: () => void this.openInObsidian(item),
+				setPriority: (prefix) => this.act(() => tasks.setPriority(current.key, prefix)),
+				setLabels: async (names) => {
+					const written: { item: TaskItem | null } = { item: null };
+					await this.act(async () => {
+						written.item = await tasks.setLabels(current.key, names);
+					});
+					if (written.item) current = written.item;
+					return written.item;
+				},
+				setReminder: (kind) => this.act(() => tasks.setReminder(current.key, kind)),
+				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
+				stop: () => this.act(() => tasks.stop(current.key)),
+				rename: (menu) => (full ? full.rename(current) : this.quick?.rename(current, menu)),
+				openDescription: (editing) => this.openFull(current, editing),
+				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
+				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
+				remove: () => this.act(() => tasks.remove(current.key)),
+				openInObsidian: () => void this.openInObsidian(current),
 				openLink: (link) => this.openLink(link),
 			},
 		});

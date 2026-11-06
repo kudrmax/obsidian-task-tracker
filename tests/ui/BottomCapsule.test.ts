@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UndoService } from "../../src/application/contracts";
 import { BottomCapsule } from "../../src/ui/BottomCapsule";
+import { MoreMenu } from "../../src/ui/menu/MoreMenu";
 
 function service(steps: number) {
 	const listeners = new Set<() => void>();
@@ -20,14 +21,12 @@ function service(steps: number) {
 	return undo satisfies UndoService;
 }
 
-const actions = () => ({ onUndo: vi.fn(), onSearch: vi.fn(), onSelect: vi.fn() });
+const actions = () => ({ onUndo: vi.fn(), onMore: vi.fn() });
 
 describe("BottomCapsule", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
 	});
-
-	const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-panel.is-more .tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
 
 	it("holds Undo and «⋯» in one capsule", () => {
 		new BottomCapsule(document.body, service(0), actions());
@@ -56,10 +55,28 @@ describe("BottomCapsule", () => {
 		expect(on.onUndo).toHaveBeenCalledOnce();
 	});
 
-	it("«⋯» opens Search and Select tasks; Search opens the search", () => {
+	it("«⋯» opens its menu over the capsule", () => {
 		const on = actions();
 		new BottomCapsule(document.body, service(0), on);
 		document.querySelector<HTMLButtonElement>(".tc-more-open")!.click();
+		expect(on.onMore).toHaveBeenCalledWith(document.querySelector(".tc-capsule"));
+	});
+});
+
+describe("MoreMenu", () => {
+	afterEach(() => {
+		document.body.innerHTML = "";
+	});
+
+	const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-panel.is-more .tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
+	const open = () => {
+		const on = { onSearch: vi.fn(), onSelect: vi.fn() };
+		MoreMenu.open({ anchor: document.body.appendChild(document.createElement("div")), ...on });
+		return on;
+	};
+
+	it("offers Search and Select tasks; Search opens the search", () => {
+		const on = open();
 		expect([...document.querySelectorAll(".tc-panel.is-more .tc-menu-row")].map((r) => r.textContent?.trim())).toEqual(["Search", "Select tasks"]);
 		row("Search").click();
 		expect(on.onSearch).toHaveBeenCalledOnce();
@@ -67,9 +84,7 @@ describe("BottomCapsule", () => {
 	});
 
 	it("Select tasks starts picking", () => {
-		const on = actions();
-		new BottomCapsule(document.body, service(0), on);
-		document.querySelector<HTMLButtonElement>(".tc-more-open")!.click();
+		const on = open();
 		row("Select tasks").click();
 		expect(on.onSelect).toHaveBeenCalledOnce();
 	});

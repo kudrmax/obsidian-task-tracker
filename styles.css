@@ -18,6 +18,10 @@ body {
 	--tc-card-lift: 11%;
 	--tc-card-lift-light: 5%;
 	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift));
+	/* The card peeking out under a task whose subtasks are folded away: the ground lifted less than a card. */
+	--tc-fold-lift: 6%;
+	--tc-fold-lift-light: 3%;
+	--tc-fold-layer: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-fold-lift));
 	/* The day's arrows and the sources' icons. */
 	--tc-ink-soft: #E5E5EA;
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
@@ -243,6 +247,10 @@ body {
 	/* A lifted section, and a dragged task with subtasks: two layers under it, each a step further down and narrower by a step on each side. */
 	--tc-stack-step-x: 7px;
 	--tc-stack-step-y: 6px;
+	/* A task whose subtasks are folded away: one layer peeking a step out under its card, a step narrower on each side, drawn as its shadow so it stays under the card. */
+	--tc-shadow-fold: 0 calc(var(--tc-stack-step-y) + var(--tc-stack-step-x)) 0 calc(-1 * var(--tc-stack-step-x)) var(--tc-fold-layer);
+	/* The subtask counter of a list card answers a tap from the card's whole height and a few px either side. */
+	--tc-fold-hit-x: var(--tc-space-6);
 	--tc-fade-block: 16px;
 	--tc-fade-card-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-card)), transparent);
 	--tc-fade-block-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent);
@@ -271,6 +279,14 @@ body {
 	--tc-float-count-ring: 2px;
 	/* The carried stack over the cancel ring, seen through. */
 	--tc-float-cancel-opacity: 0.35;
+	/* A card of several labels, painted as stripes: each colour's band across, then the next, at this slant. */
+	--tc-label-stripe: 6px;
+	--tc-label-stripe-2: calc(2 * var(--tc-label-stripe));
+	--tc-label-stripe-3: calc(3 * var(--tc-label-stripe));
+	--tc-label-stripe-4: calc(4 * var(--tc-label-stripe));
+	--tc-label-stripe-angle: 120deg;
+	/* A menu tile that can't be pressed: a label's while the task has a priority, a level's while it has labels. */
+	--tc-tile-off-opacity: 0.35;
 	/* A subtask's card stands this much further in per level. */
 	--tc-subtask-indent: 20px;
 	/* A branch runs up through the gap and a little under the card above, to the curve of its bottom. */
@@ -313,7 +329,10 @@ body {
 	--tc-menu-badge-icon: var(--tc-icon-xs);
 	--tc-stroke-badge: var(--tc-stroke-3-6);
 	/* The settings' priority rows: the prefix field and the colour swatches, the chosen one ringed off the page's ground. */
-	--tc-level-prefix-w: 56px;
+	--tc-level-prefix-w: 48px;
+	--tc-label-name-w: 88px;
+	/* The row's card shows its title and its time: a row with less room for it lays out as on the phone. */
+	--tc-level-preview-min: 140px;
 	--tc-swatch: 26px;
 	--tc-swatch-ring: 2px;
 	--tc-swatch-halo: var(--setting-items-background);
@@ -387,14 +406,23 @@ body {
 	--tc-source-row: 56px;
 	--tc-source-icon: var(--tc-icon-l);
 
-	/* Sizes: a description's own screen over the view */
+	/* Sizes: a task over the whole view */
 	--tc-sheet-bar: 44px;
 	--tc-sheet-side: var(--tc-space-20);
-	/* A description's own screen: the title over the text; the text is Obsidian's, in its font, size, spacing and ink. */
+	/* A task over the whole view: its task's name, the title, the subtasks, the description; the text is Obsidian's, in its font, size, spacing and ink. */
 	--tc-font-desc-title: var(--tc-text-22);
 	--tc-leading-desc-title: 28px;
 	--tc-desc-title-gap: var(--tc-space-12);
 	--tc-desc-top: var(--tc-space-8);
+	/* On the desktop the column stands in the middle, as a note's text does. */
+	--tc-full-w: 640px;
+	--tc-full-parent-h: var(--tc-space-20);
+	--tc-full-parent-icon: var(--tc-icon-s);
+	--tc-font-full-parent: var(--tc-text-15);
+	--tc-full-parent-gap: var(--tc-space-6);
+	--tc-full-desc-gap: var(--tc-space-20);
+	/* The last of the screen scrolls clear of the bottom row. */
+	--tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20));
 	--tc-font-desc: var(--font-text);
 	--tc-desc-size: var(--font-text-size);
 	--tc-desc-leading: var(--line-height-normal);
@@ -569,6 +597,7 @@ body {
 body.theme-light {
 	--tc-text: #000000;
 	--tc-card-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-card-lift-light));
+	--tc-fold-layer: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-fold-lift-light));
 	--tc-ink-soft: #3A3A3C;
 	--tc-ink-strong: #1C1C1E;
 	--tc-on-strong: #FFFFFF;
@@ -841,6 +870,14 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-desc-mark { display: block; width: var(--tc-desc-mark); height: var(--tc-desc-mark); stroke-width: var(--tc-stroke-desc-mark); }
 .tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+/* A list card's counter folds the subtasks away and shows them again: it takes the tap from the card's whole height and lights up under the pointer. */
+.tc-list > .tc-card .tc-count { position: relative; }
+.tc-list > .tc-card .tc-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+@media (hover: hover) {
+	body:not(.is-mobile) .tc-list > .tc-card .tc-count:hover { color: var(--tc-text); }
+}
+/* A task whose subtasks are folded away: a card peeks out under it, and the next card stands below that. */
+.tc-list > .tc-card.is-collapsed { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* Where a dragged task will land: the calendar's drop line between two cards, at the level it picks, inside the list so it scrolls with the cards. */
 .tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); width: 0; height: var(--tc-drop-dot); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop.is-shown { opacity: 1; }
@@ -1005,6 +1042,13 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 
 /* A task with a priority: its card, wherever it stands, takes the level's tint; a dot shows the level's colour. The shades come per colour from src/ui/priorityColors.ts; a field's row takes its field's, for the dot of the task it renames. */
 .tc-card[data-priority], .tc-block-card[data-priority], .tc-float[data-priority], .tc-lifted[data-priority] { background: var(--tc-priority-fill); }
+/* A task with several labels: narrow diagonal stripes of their colours in turn, or, with the settings' blend, one colour flowing into the next. Each label's fill comes from src/ui/priorityColors.ts; the first also tints the card as a priority would, for the dot and the time. */
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="2"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2)); }
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="3"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3)); }
+:is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="4"] { background: repeating-linear-gradient(var(--tc-label-stripe-angle), var(--tc-label-fill-0) 0 var(--tc-label-stripe), var(--tc-label-fill-1) var(--tc-label-stripe) var(--tc-label-stripe-2), var(--tc-label-fill-2) var(--tc-label-stripe-2) var(--tc-label-stripe-3), var(--tc-label-fill-3) var(--tc-label-stripe-3) var(--tc-label-stripe-4)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="2"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="3"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2)); }
+:where(body.tc-labels-blend) :is(.tc-card, .tc-block-card, .tc-float, .tc-lifted)[data-labels="4"] { background: linear-gradient(to right, var(--tc-label-fill-0), var(--tc-label-fill-1), var(--tc-label-fill-2), var(--tc-label-fill-3)); }
 .tc-card.is-selected, .tc-lifted.is-selected { background: var(--tc-select-bg); }
 /* Select tasks: every list card leads with a circle, which the accent fills with a check once the task is picked; the in-progress dot gives it its place. */
 .tc-pick { display: none; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: var(--tc-pick-gap); border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; }
@@ -1060,6 +1104,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-panel .tc-menu-tile.is-on { background: var(--tc-priority-fill); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-priority-ink); }
 .tc-menu-tile > svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-menu-tile[data-priority] > svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
+.tc-panel button.tc-menu-tile:disabled { opacity: var(--tc-tile-off-opacity); }
 /* The quick moves: their icons in the accent, as the drop zones' were. */
 .tc-menu-tiles.is-move .tc-menu-tile > svg { color: var(--tc-accent-ui); }
 .tc-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }
@@ -1167,11 +1212,37 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background-color: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
 
 
-/* A description's own screen over the whole view: the bar with Close and Edit, or Cancel and Save, the title, the text. */
-.tc-desc-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: 0; padding-top: var(--tc-desc-top); overflow-y: auto; display: flex; flex-direction: column; gap: var(--tc-desc-title-gap); }
-.tc-desc-title { flex-shrink: 0; font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+/* A task over the whole view: the bar with Close (and Done while typing), its task's name, the title, the subtasks, the description in Obsidian's editor. */
+/* On the desktop the bar stands over the column, Close over the title's edge. */
+.tc-full > .tc-sheet-bar { max-width: var(--tc-full-w); margin: 0 auto; }
+.tc-full-body { position: absolute; left: 0; right: 0; top: var(--tc-sheet-bar); bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.tc-full-body::-webkit-scrollbar { display: none; }
+.tc-full-column { max-width: var(--tc-full-w); margin: 0 auto; padding: var(--tc-desc-top) var(--tc-sheet-side) var(--tc-full-foot); display: flex; flex-direction: column; }
+.tc-full button.tc-full-parent { align-self: flex-start; height: var(--tc-full-parent-h); margin-bottom: var(--tc-space-8); padding: 0; border: 0; background: none; box-shadow: none; display: flex; align-items: center; gap: var(--tc-full-parent-gap); font-size: var(--tc-font-full-parent); color: var(--tc-muted); cursor: pointer; }
+.tc-full button.tc-full-parent[hidden] { display: none; }
+.tc-full-parent svg { width: var(--tc-full-parent-icon); height: var(--tc-full-parent-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-ring); }
+.tc-full-title { font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+/* Rename of the task on screen: the title itself is the field, as big and bold, with no card under it. */
+.task-calendar .tc-full-title .tc-quick-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; font-size: var(--tc-font-desc-title); font-weight: var(--tc-weight-bold); line-height: var(--tc-leading-desc-title); }
+.tc-full-title .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-line { font-weight: var(--tc-weight-bold); }
+.tc-full .tc-list { flex: none; margin-top: var(--tc-desc-title-gap); overflow: visible; }
+.tc-full .tc-list::after { content: none; }
+.tc-full .tc-list:empty { display: none; }
 .tc-desc-text { font-family: var(--tc-font-desc); font-size: var(--tc-desc-size); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
-.tc-desc-sheet .tc-desc-text { flex: 1; min-height: 0; }
+.tc-full-desc { margin-top: var(--tc-full-desc-gap); }
+/* Each subtask's circle, as Select tasks draws it, ticks it: a done one is the accent with a check, its title crossed out and dim. */
+.tc-full .tc-card { padding-left: var(--tc-pick-pad-start); }
+.tc-full .tc-card > .tc-pick { display: flex; cursor: pointer; }
+.tc-full .tc-card > .tc-progress-dot { display: none; }
+:is(.tc-full .tc-card, .tc-lifted).is-done > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+:is(.tc-full .tc-card, .tc-lifted).is-done > .tc-pick svg { visibility: visible; }
+:is(.tc-full .tc-card, .tc-lifted).is-closed > .tc-card-title { color: var(--tc-muted); text-decoration: line-through; }
+/* The bottom row stands as on the main screen: Undo and «⋯» on the left, the plus on the right. */
+.tc-full > button.tc-plus, .tc-full > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); }
+.tc-full > button.tc-plus { right: var(--tc-space-16); }
+.tc-full > .tc-capsule { left: var(--tc-space-16); }
+/* While something is typed in, the keyboard has the foot of the screen: the bottom row stands aside. */
+.tc-full.is-typing > :is(button.tc-plus, .tc-capsule) { display: none; }
 /* Obsidian's editor keeps a note's margins and, on the phone, room for the view's header: here it is a field under the title. */
 .task-calendar .tc-desc-text.is-editing { --file-margins: 0; --view-top-spacing-markdown: 0; --view-bottom-spacing-markdown: 0; }
 .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-editor, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-scroller, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-sizer, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-contentContainer { padding: 0; margin: 0; max-width: none; min-height: 0; }
@@ -1180,14 +1251,17 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* The buttons' text, inside their own padding, starts and ends on the title's edges (--tc-sheet-side). */
 .tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
 .tc-sheet-bar > button.tc-btn { height: var(--tc-sheet-bar); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.tc-sheet-bar > button.tc-btn.is-hidden { visibility: hidden; }
 
 /* A level keeps its parts in one row, where Obsidian stacks a setting's parts on the phone. */
-.setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-12); }
+/* The gap is the circles' own: with the grip the row still leaves the card room for its title. */
+.setting-item.tc-level-row, .is-phone .modal .setting-item.tc-level-row { flex-direction: row; align-items: center; gap: var(--tc-space-8); }
 .tc-level-row input[type="text"].tc-level-prefix { width: var(--tc-level-prefix-w); flex-shrink: 0; margin: 0; }
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
-.tc-preset-grip { touch-action: none; cursor: grab; }
-.tc-preset-row.is-dragging { opacity: var(--tc-pressed); }
-.tc-swatches { display: flex; align-items: center; gap: var(--tc-space-8); flex-shrink: 0; }
+.tc-level-row input[type="text"].tc-label-name { flex: 1 1 var(--tc-label-name-w); width: auto; min-width: var(--tc-label-name-w); margin: 0; }
+.tc-row-grip { touch-action: none; cursor: grab; }
+.tc-level-row.is-dragging { opacity: var(--tc-pressed); }
+.tc-swatches { display: flex; align-items: center; gap: var(--tc-space-6); flex-shrink: 0; }
 .tc-swatch-well { position: relative; width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-swatch-well); display: flex; align-items: center; justify-content: center; }
 .tc-swatch-well.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }
 .tc-swatch-well-inner { width: var(--tc-swatch-well-inner); height: var(--tc-swatch-well-inner); border-radius: var(--tc-radius-circle); background: var(--tc-swatch-halo); pointer-events: none; }
@@ -1196,14 +1270,14 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-level-hex { position: relative; width: var(--tc-level-hex-w); flex-shrink: 0; display: flex; align-items: center; }
 .tc-level-hex-mark { position: absolute; left: var(--tc-space-10); font-family: var(--tc-font-code); color: var(--tc-muted); pointer-events: none; }
 .tc-level-row input[type="text"].tc-level-hex-input { width: 100%; padding-left: var(--tc-level-hex-pad); font-family: var(--tc-font-code); }
-.tc-level-preview { position: relative; flex: 1; min-width: 0; height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-priority-fill); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); color: var(--tc-text); }
+.tc-level-preview { position: relative; flex: 1; min-width: var(--tc-level-preview-min); height: var(--tc-card-h); box-sizing: border-box; border-radius: var(--tc-radius-card); background: var(--tc-priority-fill); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); color: var(--tc-text); }
 .tc-level-preview-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-level-preview-time { flex-shrink: 0; font-size: var(--tc-font-block); font-weight: var(--tc-weight-semibold); color: var(--tc-priority-meta); font-variant-numeric: tabular-nums; }
-/* The phone's row is too narrow for all of it: the prefix, the card and the bin; under them the circles across the row; then the code. */
-.is-phone .modal .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }
-.is-phone .tc-level-row :is(.tc-level-preview, .extra-setting-button) { order: 1; }
-.is-phone .tc-level-row .tc-swatches { order: 2; flex-basis: 100%; justify-content: space-between; }
-.is-phone .tc-level-row .tc-level-hex { order: 2; }
+/* A row too narrow for all of it, the phone's and a narrow settings window's: the name, the card and the bin; under them the circles across the row; then the code. */
+:is(.is-phone .modal, .tc-level-rows.is-wrapped) .setting-item.tc-level-row { flex-wrap: wrap; column-gap: var(--tc-space-8); row-gap: var(--tc-space-12); }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row :is(.tc-level-preview, .extra-setting-button:not(.tc-row-grip)) { order: 1; }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row .tc-swatches { order: 2; flex-basis: 100%; justify-content: space-between; }
+:is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row .tc-level-hex { order: 2; }
 
 /* No tasks file yet. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); color: var(--tc-muted); text-align: center; }
@@ -1234,3 +1308,8 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-hit-desc { white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-hit-card.is-picked, .tc-card.is-found, .tc-block.is-found .tc-block-card { box-shadow: var(--tc-ring-selected); }
 
+
+/* A row of More opens its page: the whole row answers, like Obsidian's own rows that lead on. */
+.setting-item.tc-settings-link { cursor: pointer; }
+/* On its page the rows stand flat, not in Obsidian's cards: a heading starts on their edge. */
+.tc-settings-page .setting-item-heading { padding-inline: 0; }

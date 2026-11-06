@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RepeatRule, TaskItem } from "../../src/application/contracts";
 import { tileRows } from "../../src/ui/menu/MenuPanel";
-import { editRows, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
+import { editRows, labelTiles, nextLabels, nextPriority, priorityTiles, type SectionChoice, statusTiles, TaskMenu } from "../../src/ui/menu/TaskMenu";
 import { onDay } from "../fakes/itemOnDay";
 
 const item = (extra: Partial<TaskItem> = {}): TaskItem => onDay({ key: { section: "now", index: 0, path: [], raw: "- [ ] A" }, text: "A", status: "todo", dueDate: null, slot: null, reminder: "notification", repeat: null, open: true, repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: extra.key?.section ?? "now", isSubtask: (extra.key?.path.length ?? 0) > 0, ...extra }, "2026-11-01");
@@ -77,6 +77,7 @@ describe("the edit group", () => {
 		const rows = editRows(item({ description: "- note", slot, reminder: "alarm" }));
 		expect(rows.map((r) => [r.id, r.value])).toEqual([["rename", ""], ["reminder", "Alarm"], ["repeat", ""], ["subtask", ""]]);
 		expect(editRows(item({ description: "- note", slot, reminder: "none" }))[1].value).toBe("Off");
+		expect(editRows(item({ description: "- note", slot, reminder: "live" }))[1].value).toBe("Live Activity");
 		expect(editRows(item({ description: "- note", slot }))[1].value).toBe("Notification");
 	});
 
@@ -93,6 +94,57 @@ describe("the edit group", () => {
 
 	it("shows no name beside Section for a task outside any", () => {
 		expect(editRows(item({ description: "- note" }), { ...sections, current: null }).find((r) => r.id === "section")!.value).toBe("");
+	});
+});
+
+describe("the label group", () => {
+	const LABELS = [{ name: "Важное", color: "red" }, { name: "Очень_срочное", color: "orange" }] as const;
+
+	it("has a tile per label in the settings' order, named with spaces, the task's own on", () => {
+		expect(labelTiles(item({ labels: [LABELS[1]] }), LABELS)).toEqual([
+			{ name: "Важное", color: "red", title: "Важное", on: false },
+			{ name: "Очень_срочное", color: "orange", title: "Очень срочное", on: true },
+		]);
+	});
+
+	it("puts a label on beside the others, and takes one the task has off", () => {
+		expect(nextLabels(item({ labels: [LABELS[1]] }), "Важное")).toEqual(["Очень_срочное", "Важное"]);
+		expect(nextLabels(item({ labels: [LABELS[0], LABELS[1]] }), "Важное")).toEqual(["Очень_срочное"]);
+	});
+
+	it("stays open after a tap on a label, drawn for the task as the file then has it, so the next tap reads that", async () => {
+		const source = document.body.appendChild(document.createElement("div"));
+		const written: (readonly string[])[] = [];
+		const setLabels = vi.fn(async (names: readonly string[]) => {
+			written.push(names);
+			return item({ labels: LABELS.filter((l) => names.includes(l.name)), key: { section: "now", index: 0, path: [], raw: `- [ ] A ${names.join(" ")}` } });
+		});
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels, setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const menu = TaskMenu.open({ item: item(), source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, labels: LABELS, actions });
+		await new Promise((r) => setTimeout(r, 0));
+		const tile = (i: number) => document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")[i];
+		tile(0).click();
+		await vi.waitFor(() => expect(tile(0)?.classList.contains("is-on")).toBe(true));
+		tile(1).click();
+		await vi.waitFor(() => expect(written).toEqual([["Важное"], ["Важное", "Очень_срочное"]]));
+		await vi.waitFor(() => expect(document.querySelector(".tc-lifted")?.getAttribute("data-labels")).toBe("2"));
+		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
+		menu.close();
+		document.body.innerHTML = "";
+	});
+
+	it("can't be pressed while the task has a priority, nor the levels while it has labels", () => {
+		const source = document.body.appendChild(document.createElement("div"));
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const disabled = (kind: string) => [...document.querySelectorAll<HTMLButtonElement>(`.tc-menu-tiles.${kind} .tc-menu-tile`)].map((t) => t.disabled);
+		const labelled = TaskMenu.open({ item: item({ labels: [LABELS[0]] }), source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, labels: LABELS, actions });
+		expect([disabled("is-priority"), disabled("is-labels")]).toEqual([[true, true], [false, false]]);
+		labelled.close();
+		document.body.innerHTML = "";
+		const prioritized = TaskMenu.open({ item: item({ priority: LEVELS[0] }), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, labels: LABELS, actions });
+		expect(disabled("is-labels")).toEqual([true, true]);
+		prioritized.close();
+		document.body.innerHTML = "";
 	});
 });
 
@@ -124,8 +176,8 @@ describe("the menu", () => {
 	});
 
 	const surface = { rendered: [] as string[], render: vi.fn(async (el: HTMLElement, markdown: string) => { el.innerHTML = '<p>note <a href="x">link</a></p>'; surface.rendered.push(markdown); }), edit: vi.fn() };
-	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01") => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01", focused = false) => {
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), openFull: focused ? undefined : vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		TaskMenu.open({ item: task, source, today, day: today, levels: LEVELS, actions, markdown: surface, sections });
 		return actions;
@@ -189,11 +241,11 @@ describe("the menu", () => {
 			expect(again.toSection).toHaveBeenCalledWith(null);
 		});
 
-		it("leaves the task where it is on its own section", () => {
+		it("hands its own section to the service too, which leaves the task where it is", () => {
 			const actions = open(item({ group: "Morning" }), sections);
 			row("Section").click();
 			row("Morning").click();
-			expect(actions.toSection).not.toHaveBeenCalled();
+			expect(actions.toSection).toHaveBeenCalledWith("Morning");
 			expect(closing()).toBe(true);
 		});
 
@@ -392,17 +444,31 @@ describe("the menu", () => {
 		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
 		expect(labels(".tc-menu-tiles.is-move .tc-menu-tile-label")).toEqual(["Tomorrow", "Pick a date"]);
-		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Add subtask", "Open in Obsidian", "Delete"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Add subtask", "Open full screen", "Open in Obsidian", "Delete"]);
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
-	it("opens the task in Obsidian from a row of its own and closes", () => {
+	it("opens the task on the whole screen and in Obsidian from a group of their own, and closes", () => {
 		const actions = open(item());
-		const row = [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((r) => r.textContent === "Open in Obsidian")!;
-		expect(row.classList.contains("is-apart")).toBe(true);
-		row.click();
+		const rows = [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-row")];
+		const full = rows.find((r) => r.textContent === "Open full screen")!;
+		const obsidian = rows.find((r) => r.textContent === "Open in Obsidian")!;
+		expect(full.parentElement).toBe(obsidian.parentElement);
+		expect(full.nextElementSibling).toBe(obsidian);
+		expect(full.classList.contains("is-tall") && obsidian.classList.contains("is-tall")).toBe(true);
+		obsidian.click();
 		expect(actions.openInObsidian).toHaveBeenCalled();
 		expect(document.querySelector(".tc-backdrop")?.classList.contains("is-closing")).toBe(true);
+	});
+
+	it("Open full screen opens the task there; the task already there has no such row", () => {
+		const actions = open(item());
+		row("Open full screen").click();
+		expect(actions.openFull).toHaveBeenCalled();
+		document.body.innerHTML = "";
+		open(item(), undefined, "2026-11-01", true);
+		expect(labels(".tc-menu-row .tc-menu-label")).not.toContain("Open full screen");
+		expect(labels(".tc-menu-row .tc-menu-label")).toContain("Open in Obsidian");
 	});
 
 	it("marks the task's level with a badge, and a tap on it takes the priority off", () => {
@@ -420,10 +486,36 @@ describe("the menu", () => {
 		expect(actions.setPriority).toHaveBeenCalledWith("p2");
 	});
 
-	it("sets the next reminder's kind on a tap on Reminder", () => {
-		const actions = open(item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder: "alarm" }));
-		row("Reminder").click();
-		expect(actions.setReminder).toHaveBeenCalledWith("none");
+	describe("Reminder", () => {
+		const onTime = (reminder: TaskItem["reminder"]) => item({ slot: { date: "2026-11-01", start: 600, end: null }, reminder });
+
+		it("lists the kinds in place of the menu, the task's own checked, Off last and quiet", () => {
+			open(onTime("alarm"));
+			row("Reminder").click();
+			expect(panel().querySelector(".tc-menu-back")?.textContent).toBe("Reminder");
+			expect(labels(".tc-menu-group .tc-menu-label")).toEqual(["Live Activity", "Notification", "Alarm", "Off"]);
+			expect(row("Alarm").querySelector("svg")).not.toBeNull();
+			expect(row("Live Activity").querySelector("svg")).toBeNull();
+			expect(row("Off").classList.contains("is-quiet")).toBe(true);
+			expect(closing()).toBe(false);
+		});
+
+		it("sets the kind picked and closes", () => {
+			const actions = open(onTime("alarm"));
+			row("Reminder").click();
+			row("Off").click();
+			expect(actions.setReminder).toHaveBeenCalledWith("none");
+			expect(closing()).toBe(true);
+		});
+
+		it("goes back to the menu without a change", () => {
+			const actions = open(onTime("live"));
+			row("Reminder").click();
+			panel().querySelector<HTMLButtonElement>(".tc-menu-back")!.click();
+			expect(row("Rename")).toBeDefined();
+			expect(actions.setReminder).not.toHaveBeenCalled();
+			expect(closing()).toBe(false);
+		});
 	});
 
 	it("starts and stops the progress from its tile", () => {
@@ -576,7 +668,7 @@ describe("the menu", () => {
 	});
 
 	it("leaves out the priority group when no level is set up", () => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: [], actions });
 		expect(panel().querySelector(".tc-menu-tiles.is-priority")).toBeNull();
 	});
@@ -591,7 +683,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 
 	const surface = { render: vi.fn(async (el: HTMLElement) => void (el.textContent = "note")), edit: vi.fn() };
 	const openOnBlock = (task: TaskItem) => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";
 		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions, markdown: surface });
@@ -652,7 +744,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 		source.className = "tc-block";
 		source.innerHTML = '<div class="tc-block-card"><div class="tc-card-title">A</div><span class="tc-block-meta"></span></div>';
 		const task = item();
-		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() } });
+		const menu = TaskMenu.open({ item: task, source, today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions: { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() } });
 		menu.openStack(() => {});
 		const count = () => [...document.querySelectorAll(".tc-lifted .tc-count")].map((c) => c.textContent);
 		menu.showStack({ ...task, subtasks: [sub(0, "A1")], progress: { done: 0, total: 1 } }, []);
@@ -672,7 +764,7 @@ describe("the calendar menu's stack for a new subtask", () => {
 	});
 
 	it("a list card's menu is no stack: Add subtask closes it", () => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const menu = TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, actions });
 		expect(menu.stacks).toBe(false);
 		[...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Add subtask"))!.click();
@@ -688,7 +780,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 
 	const subtask = item({ key: { section: "now", index: 0, path: [1], raw: "- [ ] A2" }, text: "A2", status: "inProgress", parentText: "A", repeatable: false });
 	const openOnStackCard = (description: string | null = null) => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const stack = document.body.appendChild(document.createElement("div"));
 		stack.className = "tc-menu-subtasks";
 		const source = stack.appendChild(document.createElement("div"));
@@ -746,7 +838,7 @@ describe("the parts over the blur, raised over the keyboard", () => {
 	});
 
 	it("stand higher by the amount asked, never lower than the card, and the field's row with them", () => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		source.className = "tc-block";
 		source.getBoundingClientRect = () => new DOMRect(200, 500, 150, 35);

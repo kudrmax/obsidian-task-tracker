@@ -1,10 +1,12 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarService, type CountField, type GoogleAccount, hexColor, isPresetColor, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, type CalendarService, type CountField, type GoogleAccount, hexColor, isPresetColor, LABEL_PAINTS, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../application/contracts";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
 import { Button } from "./kit/Button";
 import { el } from "./dom";
+import { RowReorder } from "./RowReorder";
+import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
@@ -20,16 +22,33 @@ const MARKERS: readonly (readonly [Marker, string, string])[] = [
 	["dueDateMarker", "Due date marker", "Precedes the due date on a task line."],
 	["slotMarker", "Slot marker", "Precedes the time slot on a task line."],
 	["alarmSlotMarker", "Alarm marker", "Precedes the time slot of a task that rings as an alarm on the phone."],
+	["liveSlotMarker", "Live Activity marker", "Precedes the time slot of a task the phone shows as a Live Activity on the lock screen."],
 	["silentSlotMarker", "No-reminder marker", "Precedes the time slot of a task the phone does not remind of."],
 	["repeatMarker", "Repeat marker", "Precedes the repeat rule on a task line."],
+	["collapsedMarker", "Collapsed marker", "Marks a task whose subtasks are hidden."],
 ];
 
+const PAINT_NAMES: Readonly<Record<LabelPaint, string>> = { stripes: "Stripes", blend: "Blend" };
+
+/** What a group of colour rows edits: the priorities or the labels, each by its index in the settings. */
+interface ColourRows {
+	readonly rows: readonly { readonly name: string; readonly color: PriorityColor }[];
+	readonly nameClass: string;
+	rename(index: number, name: string): Promise<void>;
+	recolour(index: number, color: PriorityColor): Promise<void>;
+	remove(index: number): Promise<void>;
+	move(from: number, to: number): Promise<void>;
+	/** The colour being picked, on the screen and in the menus, before it is saved. */
+	preview(index: number, color: PriorityColor): void;
+	readonly deleteTooltip: string;
+}
+
 const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
-	inbox: "Inbox section",
-	now: "Now section",
-	soon: "Soon section",
-	backlog: "Backlog section",
-	done: "Done section",
+	inbox: "Inbox",
+	now: "Now",
+	soon: "Soon",
+	backlog: "Backlog",
+	done: "Done",
 };
 
 export class TaskCalendarSettingsTab extends PluginSettingTab {
@@ -44,14 +63,11 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	override display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		this.tasksFileGroup(containerEl);
 		this.prioritiesGroup(containerEl);
+		this.labelsGroup(containerEl);
 		this.sectionsGroup(containerEl);
 		this.cardsGroup(containerEl);
-		this.timelineGroup(containerEl);
-		this.googleGroup(containerEl);
-		this.workGroup(containerEl);
-		void this.shownGroup(containerEl.createDiv());
+		this.moreGroup(containerEl);
 	}
 
 	private get settings(): SettingsForm {
@@ -62,31 +78,98 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return this.deps.settings;
 	}
 
-	private tasksFileGroup(el: HTMLElement): void {
-		new Setting(el).setName("Tasks file").setHeading();
+	/** The set-up-once part, each on a page of its own behind a row. */
+	private moreGroup(el: HTMLElement): void {
+		new Setting(el).setName("More").setHeading();
+		this.pageRow(el, "Calendars", "Which calendars show, the Google account, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
+		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels.", (page) => this.dayPage(page));
+		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
+	}
+
+	private pageRow(el: HTMLElement, name: string, desc: string, build: (page: HTMLElement, redraw: () => void) => void): void {
+		const row = new Setting(el)
+			.setName(name)
+			.setDesc(desc)
+			.addExtraButton((b) => b.setIcon("chevron-right"));
+		row.settingEl.addClass("tc-settings-link", "mod-navigable");
+		row.settingEl.addEventListener("click", () => new SettingsPage(this.app, name, build, () => this.display()).open());
+	}
+
+	private tasksFilePage(el: HTMLElement): void {
 		this.text(el, "File path", "Markdown file with the task sections.", this.settings.tasksFile, (path) => this.service.setTasksFile(path));
+		new Setting(el).setName("Section headings").setDesc("Heading text after ##.").setHeading();
 		for (const key of Object.keys(SECTION_LABELS) as (keyof SectionNames)[]) {
-			this.text(el, SECTION_LABELS[key], "Heading text after ##.", this.settings.sections[key], (name) => this.service.setSection(key, name));
+			this.text(el, SECTION_LABELS[key], "", this.settings.sections[key], (name) => this.service.setSection(key, name));
 		}
+		new Setting(el).setName("Line markers").setDesc("Lines written with an old marker are no longer read: change them in the file by hand.").setHeading();
 		for (const [marker, name, desc] of MARKERS) {
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
+		this.text(el, "Label tag", "The tag's part before the slash: a task tagged #label/<name> has the label of that name. One word.", this.settings.labelTag, (tag) => this.service.setLabelTag(tag));
+	}
+
+	/** The priorities' rows; see `colourRows`. */
+	private prioritiesGroup(group: HTMLElement): void {
+		new Setting(group).setName("Priorities").setHeading();
+		const levels = this.settings.priorities;
+		this.colourRows(group, {
+			rows: levels.map((level) => ({ name: level.prefix, color: level.color })),
+			nameClass: "tc-level-prefix",
+			rename: (index, name) => this.service.renameLevel(index, name),
+			recolour: (index, color) => this.service.recolourLevel(index, color),
+			remove: (index) => this.service.removeLevel(index),
+			move: (from, to) => this.service.moveLevel(from, to),
+			preview: (index, color) => showPriorityColors(levels.map((level, i) => (i === index ? { ...level, color } : level)), this.settings.labels),
+			deleteTooltip: "Delete level",
+		});
+		new Setting(group)
+			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Drag a level by its grip: levels show in this order in the task menu and in the bar shown while a task is typed.")
+			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
+	}
+
+	/** The labels' rows, as the priorities', the name shown with spaces; how a card of several is painted. */
+	private labelsGroup(group: HTMLElement): void {
+		new Setting(group).setName("Labels").setHeading();
+		const labels = this.settings.labels;
+		this.colourRows(group, {
+			rows: labels.map((label) => ({ name: labelTitle(label.name), color: label.color })),
+			nameClass: "tc-label-name",
+			rename: (index, name) => this.service.renameLabel(index, name),
+			recolour: (index, color) => this.service.recolourLabel(index, color),
+			remove: (index) => this.service.removeLabel(index),
+			move: (from, to) => this.service.moveLabel(from, to),
+			preview: (index, color) => showPriorityColors(this.settings.priorities, labels.map((label, i) => (i === index ? { ...label, color } : label))),
+			deleteTooltip: "Delete label",
+		});
+		new Setting(group)
+			.setDesc(`A task tagged #${this.settings.labelTag}/<name> gets the label: the tag's underscores show as spaces. A task may have several labels, or a priority, not both. Labels show in this order in the task menu and on a card.`)
+			.addButton((b) => b.setButtonText("Add label").onClick(() => void this.redrawn(this.service.addLabel())));
+		new Setting(group)
+			.setName("Several labels")
+			.setDesc("How a card of several labels is painted.")
+			.addDropdown((d) => {
+				for (const paint of LABEL_PAINTS) d.addOption(paint, PAINT_NAMES[paint]);
+				d.setValue(this.settings.labelPaint).onChange((value) => this.service.setLabelPaint(value as LabelPaint));
+			});
 	}
 
 	/**
-	 * A row per level: its prefix, the six colours and the circle that picks any other, the chosen one ringed, the colour's
-	 * code, a card in that colour, a bin; then Add priority. The circles are drawn in the shade a card takes, so the colour
-	 * here is the colour on the screen.
+	 * A row per level or label: its name, the six colours and the circle that picks any other, the chosen one ringed, the
+	 * colour's code, a card in that colour, a bin. The circles are drawn in the shade a card takes, so the colour here is the
+	 * colour on the screen.
 	 */
-	private prioritiesGroup(group: HTMLElement): void {
-		new Setting(group).setName("Priorities").setHeading();
-		this.settings.priorities.forEach((level, index) => {
-			const row = group.createDiv("setting-item tc-level-row");
-			const prefix = new TextComponent(row).setValue(level.prefix).onChange((value) => void this.service.renameLevel(index, value));
-			prefix.inputEl.addClass("tc-level-prefix");
+	private colourRows(group: HTMLElement, spec: ColourRows): void {
+		const rows = group.createDiv("tc-level-rows");
+		wrapWhenNarrow(rows);
+		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(spec.move(from, to)));
+		spec.rows.forEach((level, index) => {
+			const row = rows.createDiv("setting-item tc-level-row");
+			reorder.grip(row, index);
+			const name = new TextComponent(row).setValue(level.name).onChange((value) => void spec.rename(index, value));
+			name.inputEl.addClass(spec.nameClass);
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of PRIORITY_COLORS) {
-				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void this.redrawn(this.service.recolourLevel(index, color)) });
+				const swatch = Button.create(swatches, { kind: "swatch", label: color, onPress: () => void this.redrawn(spec.recolour(index, color)) });
 				swatch.el.dataset.priority = color;
 				swatch.setOn(color === level.color);
 			}
@@ -107,32 +190,33 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			el(preview, "span", "tc-progress-dot");
 			el(preview, "span", "tc-level-preview-title", "Call mom");
 			el(preview, "span", "tc-level-preview-time", "10:00");
-			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete level").onClick(() => void this.redrawn(this.service.removeLevel(index)));
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip(spec.deleteTooltip).onClick(() => void this.redrawn(spec.remove(index)));
+			const show = (color: PriorityColor, withCode?: TextComponent) => {
+				spec.preview(index, color);
+				preview.dataset.priority = color;
+				withCode?.setValue(inkOf(color, this.theme).slice(1));
+			};
 			picker.addEventListener("input", () => {
 				const color = this.colorOf(picker.value);
-				if (!color) return;
-				this.previewLevel(index, color, preview, code);
+				if (color) show(color, code);
 			});
 			picker.addEventListener("change", () => {
 				const color = this.colorOf(picker.value);
-				if (color) void this.redrawn(this.service.recolourLevel(index, color));
+				if (color) void this.redrawn(spec.recolour(index, color));
 			});
 			code.onChange((value) => {
 				const color = this.colorOf(value);
-				if (color) this.previewLevel(index, color, preview);
+				if (color) show(color);
 			});
 			code.inputEl.addEventListener("blur", () => {
 				const color = this.colorOf(code.getValue());
-				if (color && color !== level.color) void this.redrawn(this.service.recolourLevel(index, color));
-				else this.previewLevel(index, level.color, preview, code);
+				if (color && color !== level.color) void this.redrawn(spec.recolour(index, color));
+				else show(level.color, code);
 			});
 			code.inputEl.addEventListener("keydown", (e) => {
 				if (e.key === "Enter") code.inputEl.blur();
 			});
 		});
-		new Setting(group)
-			.setDesc("A task whose text starts with the prefix gets its colour. Pick one of the six, open the last circle to choose any colour, or type its code. Levels show in this order in the task menu and in the bar shown while a task is typed.")
-			.addButton((b) => b.setButtonText("Add priority").onClick(() => void this.redrawn(this.service.addLevel())));
 	}
 
 	private get theme(): Theme {
@@ -146,22 +230,14 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		return PRIORITY_COLORS.find((preset) => inkOf(preset, this.theme) === hex) ?? hex;
 	}
 
-	/** The colour being picked, on the row's card and everywhere else, before it is saved; with `code`, its code there too. */
-	private previewLevel(index: number, color: PriorityColor, preview: HTMLElement, code?: TextComponent): void {
-		showPriorityColors(this.settings.priorities.map((level, i) => (i === index ? { ...level, color } : level)));
-		preview.dataset.priority = color;
-		code?.setValue(inkOf(color, this.theme).slice(1));
-	}
-
 	/** The `###` sections inside a list: the presets the zones offer while a task is dragged, and the name of the tasks outside any. */
 	private sectionsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Sections").setHeading();
 		const rows = el.createDiv("tc-preset-rows");
+		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(this.service.movePreset(from, to)));
 		this.settings.presets.forEach((name, index) => {
 			const row = rows.createDiv("setting-item tc-level-row tc-preset-row");
-			const grip = new ExtraButtonComponent(row).setIcon("menu").setTooltip("Drag to reorder");
-			grip.extraSettingsEl.addClass("tc-preset-grip");
-			grip.extraSettingsEl.addEventListener("pointerdown", (e) => this.dragPreset(rows, row, index, e));
+			reorder.grip(row, index);
 			const field = new TextComponent(row).setValue(name).onChange((value) => void this.service.renamePreset(index, value));
 			field.inputEl.addClass("tc-preset-name");
 			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete preset").onClick(() => void this.redrawn(this.service.removePreset(index)));
@@ -170,34 +246,6 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc("While a task is dragged, presets the list doesn’t have yet show under it as places to drop, in this order.")
 			.addButton((b) => b.setButtonText("Add preset").onClick(() => void this.redrawn(this.service.addPreset())));
 		this.text(el, "No section", "The heading over tasks outside any section, shown once a list has sections.", this.settings.ungrouped, (name) => this.service.setUngrouped(name));
-	}
-
-	/** A preset's row follows the grip up and down among the others; let go, the presets take that order. */
-	private dragPreset(rows: HTMLElement, row: HTMLElement, from: number, e: PointerEvent): void {
-		if (!e.isPrimary || e.button !== 0) return;
-		e.preventDefault();
-		row.addClass("is-dragging");
-		let to = from;
-		const move = (ev: PointerEvent) => {
-			if (ev.pointerId !== e.pointerId) return;
-			const others = Array.from(rows.children).filter((child): child is HTMLElement => child !== row);
-			to = others.filter((other) => {
-				const r = other.getBoundingClientRect();
-				return ev.clientY > r.top + r.height / 2;
-			}).length;
-			rows.insertBefore(row, others[to] ?? null);
-		};
-		const up = (ev: PointerEvent) => {
-			if (ev.pointerId !== e.pointerId) return;
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", up);
-			row.removeClass("is-dragging");
-			if (to !== from) void this.redrawn(this.service.movePreset(from, to));
-		};
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", up);
 	}
 
 	/** A change that adds, drops or reorders rows: once written, the rows are drawn anew. */
@@ -213,9 +261,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.settings.cardGap, (px) => this.service.setCardSize("cardGap", px));
 	}
 
-	private timelineGroup(el: HTMLElement): void {
-		new Setting(el).setName("Timeline").setHeading();
-		this.count(el, "longPressMs", "Long press delay", "Milliseconds before a touch becomes a drag.");
+	private dayPage(el: HTMLElement): void {
 		new Setting(el)
 			.setName("Day starts at")
 			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
@@ -224,16 +270,18 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.service.setDayStartHour(Number(value)));
 			});
 		this.count(el, "scrollToHour", "Scroll to hour", "Hour another day opens at.");
+		this.count(el, "longPressMs", "Long press delay", "Milliseconds before a touch becomes a drag.");
 		new Setting(el)
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
 			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
 	}
 
-	private googleGroup(el: HTMLElement): void {
-		new Setting(el).setName("Calendar sources").setHeading();
-		this.count(el, "staleAfterMinutes", "Stale after", "Minutes without an update before a source gets the orange dot.");
+	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */
+	private calendarsPage(el: HTMLElement, redraw: () => void): void {
+		void this.shownGroup(el.createDiv());
 		new Setting(el).setName("Google Calendar").setHeading();
+		this.loginRow(el, redraw);
 		this.text(el, "Client id", "OAuth client of type Web application with the redirect URI from the README.", this.settings.googleClientId, (id) => this.service.setGoogleClientId(id));
 		new Setting(el)
 			.setName("Client secret")
@@ -241,20 +289,24 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				t.inputEl.type = "password";
 				this.service.bindClientSecret({ setValue: (value) => t.setValue(value), onChange: (listener) => t.onChange(listener) });
 			});
-		this.loginRow(el);
 		this.count(el, "refreshSeconds", "Refresh interval", "Seconds between calendar fetches while the view is open; 0 turns the timer off. Coming back to Obsidian fetches at once.");
+		this.workGroup(el);
+		new Setting(el).setName("All sources").setHeading();
+		this.count(el, "staleAfterMinutes", "Stale after", "Minutes before a calendar file gives way to the next source; with none fresh, the orange dot.");
 	}
 
-	private loginRow(el: HTMLElement): void {
+	private loginRow(el: HTMLElement, redraw: () => void): void {
 		const loggedIn = this.deps.google.isLoggedIn();
-		const row = new Setting(el).setName(loggedIn ? "Logged in" : "Not logged in");
-		row.setDesc(loggedIn ? "The token syncs to your other devices." : "Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
+		const row = new Setting(el).setName("Account");
+		if (loggedIn) row.setDesc("Logged in. The token syncs to your other devices.");
+		else if (!this.settings.googleClientId) row.setDesc("Not logged in. Fill in the client id and secret below first.");
+		else row.setDesc("Not logged in. Opens the browser; Google sends you back to Obsidian. The token syncs to your other devices.");
 		row.addButton((b) =>
 			b.setButtonText(loggedIn ? "Log out" : "Log in").onClick(async () => {
 				try {
 					if (loggedIn) await this.deps.google.logout();
 					else await this.deps.google.login();
-					this.display();
+					redraw();
 				} catch (e) {
 					new Notice(`Google: ${e instanceof Error ? e.message : String(e)}`);
 				}
@@ -280,7 +332,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	}
 
 	private workGroup(el: HTMLElement): void {
-		new Setting(el).setName("Work calendar").setHeading();
+		new Setting(el).setName("Work calendar").setDesc("The iPhone's calendars, exported by Scriptable.").setHeading();
 		this.text(el, "File path", "JSON written by the Scriptable export.", this.settings.workCalendarFile, (path) => this.service.setWorkCalendarFile(path));
 		new Setting(el)
 			.setName("Scriptable script")
@@ -320,4 +372,24 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setDesc(desc)
 			.addText((t) => t.setValue(String(this.settings[field])).onChange((text) => this.service.setCount(field, text)));
 	}
+}
+
+/**
+ * The rows lay out as on the phone while one line can't hold them: tried in one line at every change of the width, and
+ * wrapped again before a frame is drawn when a row runs over. The settings may open in a window of their own: the rows
+ * are watched by that window.
+ */
+function wrapWhenNarrow(rows: HTMLElement): void {
+	const fit = () => {
+		rows.classList.remove("is-wrapped");
+		const over = [...rows.children].some((row) => row.scrollWidth > row.clientWidth);
+		rows.classList.toggle("is-wrapped", over);
+	};
+	let width = -1;
+	const Observer = rows.ownerDocument.defaultView?.ResizeObserver ?? ResizeObserver;
+	new Observer(() => {
+		if (rows.clientWidth === width) return;
+		width = rows.clientWidth;
+		fit();
+	}).observe(rows);
 }

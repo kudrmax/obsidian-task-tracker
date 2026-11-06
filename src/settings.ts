@@ -1,7 +1,9 @@
 import type { GroupSettings } from "./domain/Groups";
+import type { LabelLevel, LabelPaint } from "./domain/Label";
 import type { PriorityLevel } from "./domain/Priority";
 
 export type { GroupSettings } from "./domain/Groups";
+export { LABEL_PAINTS, type LabelLevel, type LabelPaint, sameLabels, usableLabels } from "./domain/Label";
 export { PRIORITY_COLORS, type PriorityColor, type PriorityLevel, sameLevels, usableLevels, usablePrefix } from "./domain/Priority";
 
 /** Which pair of neighbouring columns the window shows: Inbox and Soon, Soon and Now, or Now and the calendar. */
@@ -41,11 +43,19 @@ export interface FileFormatSettings {
 	readonly slotMarker: string;
 	/** Precedes the slot of a task that rings as an alarm on the phone. */
 	readonly alarmSlotMarker: string;
+	/** Precedes the slot of a task that the phone shows as a Live Activity on the lock screen. */
+	readonly liveSlotMarker: string;
 	/** Precedes the slot of a task that the phone does not remind of. */
 	readonly silentSlotMarker: string;
 	readonly repeatMarker: string;
+	/** Stands among the fields of a task whose subtasks are folded away. */
+	readonly collapsedMarker: string;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
+	/** The tag folder of the labels: a task tagged `#<labelTag>/<name>` has the label of that name. */
+	readonly labelTag: string;
+	/** Labels in the order the menu offers them and a card of several paints their colours. */
+	readonly labels: readonly LabelLevel[];
 	readonly groups: GroupSettings;
 	/** The hour one day ends and the next begins, 0..23: today, the due dates and the timeline count from it. */
 	readonly dayStartHour: number;
@@ -67,6 +77,8 @@ export interface ViewSettings {
 	readonly longPressMs: number;
 	/** The hour a day other than today scrolls to when opened. */
 	readonly scrollToHour: number;
+	/** How a card of several labels is painted. */
+	readonly labelPaint: LabelPaint;
 }
 
 /** Where the events come from: the work file, Google, and when a source counts as stale. */
@@ -98,8 +110,10 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	dueDateMarker: "📅",
 	slotMarker: "⏰",
 	alarmSlotMarker: "🚨",
+	liveSlotMarker: "📌",
 	silentSlotMarker: "🔕",
 	repeatMarker: "🔁",
+	collapsedMarker: "📁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	hiddenCalendars: [],
@@ -122,6 +136,9 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 		{ prefix: "p1", color: "red" },
 		{ prefix: "p2", color: "orange" },
 	],
+	labelTag: "label",
+	labels: [],
+	labelPaint: "stripes",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 	cardHeight: 35,
 	cardGap: 2,

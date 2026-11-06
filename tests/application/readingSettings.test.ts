@@ -27,6 +27,7 @@ describe("readsAnew", () => {
 	it("for another slot marker", () => {
 		expect(after({ slotMarker: "🕐" })).toBe(true);
 		expect(after({ alarmSlotMarker: "🔔" })).toBe(true);
+		expect(after({ liveSlotMarker: "🪧" })).toBe(true);
 		expect(after({ silentSlotMarker: "🤫" })).toBe(true);
 	});
 

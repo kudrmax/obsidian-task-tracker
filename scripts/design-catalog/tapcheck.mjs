@@ -23,7 +23,7 @@ const states = {
 	picker: `await tap(card(1)); await tap(byText("Pick a date"));`,
 	confirm: `await tap(card(1)); await tap(byText("Delete"));`,
 	sources: `V().showSources(V().contentEl.querySelector(".tc-seg")); await sleep(500);`,
-	sheet: `V().descriptionSheet({ text: "x", description: "y", key: { section: "x", index: 0 } }, false); await sleep(700);`,
+	full: `await tap(card(1)); await tap(byText("Open full screen")); await sleep(700);`,
 	quick: `V().quick.openAtEnd("left"); await sleep(700);`,
 };
 await ev(`require("@electron/remote").getCurrentWindow().setSize(390,844); app.emulateMobile(true); await new Promise(r=>setTimeout(r,2500)); return 1`);

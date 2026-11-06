@@ -86,6 +86,8 @@ export interface MenuTileSpec {
 	readonly color?: PriorityColor;
 	/** The tile that stands for what is set now; a level's tile also carries the cross that takes it off. */
 	readonly on?: boolean;
+	/** Shown but not pressed: a label's tile while the task has a priority, a level's while it has labels. */
+	readonly disabled?: boolean;
 	readonly onPick: () => void;
 }
 
@@ -94,6 +96,7 @@ function menuTile(parent: HTMLElement, spec: MenuTileSpec): HTMLButtonElement {
 	const tile = el(parent, "button", "tc-btn tc-menu-tile");
 	if (spec.color) tile.dataset.priority = spec.color;
 	tile.classList.toggle("is-on", spec.on === true);
+	tile.disabled = spec.disabled === true;
 	tile.appendChild(icon(spec.icon));
 	el(tile, "span", "tc-menu-tile-label", spec.label);
 	if (spec.on && spec.color) el(tile, "span", "tc-menu-badge").appendChild(icon("cross"));

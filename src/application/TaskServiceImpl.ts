@@ -4,12 +4,12 @@ import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { backlogList, type Column, columnGroups, columnList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import { hitIn, snippetIn, type TextHit } from "../domain/search";
+import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
-import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
-import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
+import { flatten, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
+import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
 import {
 	StaleTaskError,
 	TasksFileMissingError,
@@ -34,15 +34,14 @@ import {
 	type TaskKey,
 	type TaskService,
 	type TaskStep,
-	type TitlePart,
 } from "./contracts";
 import { EntryTags } from "../domain/EntryTags";
 import { runDrop } from "./drops";
-import { offeredNames, type SectionOffer } from "./sections";
+import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
-import { toItem } from "./taskItems";
+import { itemLevels, toItem } from "./taskItems";
 import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
 
@@ -61,6 +60,14 @@ type Operation = (doc: TaskDocument, today: LocalDate, settings: TaskCalendarSet
 const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
 
 /** The column a section is written in from the field: a list's, or a later day's for Soon with a date. */
+/** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
+function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {
+	return doc
+		.groups(list)
+		.filter((g) => g.heading || g.entries.length > 0)
+		.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+}
+
 function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 	if (place.kind === "day") return { kind: "day", date: place.date };
 	if (place.list === "now") return { kind: "day", date: place.date ?? today };
@@ -75,13 +82,16 @@ const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore"
 /** The sections a search walks, in the order its results stand. */
 const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
 
-function titleParts(hit: TextHit): readonly TitlePart[] {
-	const parts: TitlePart[] = [
-		{ text: hit.before, match: false },
-		{ text: hit.match, match: true },
-		{ text: hit.after, match: false },
-	];
-	return parts.filter((part) => part.text !== "");
+interface RankedHit {
+	readonly hit: SearchHit;
+	readonly title: TextMatch | null;
+	readonly description: TextMatch | null;
+}
+
+/** A match in the title before one only in the description, then the higher score; a sort keeps ties in file order. */
+function byQuality(a: RankedHit, b: RankedHit): number {
+	if ((a.title === null) !== (b.title === null)) return a.title ? -1 : 1;
+	return (b.title ?? b.description)!.score - (a.title ?? a.description)!.score;
 }
 
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
@@ -115,6 +125,10 @@ export class TaskServiceImpl implements TaskService {
 
 	priorityLevels(): readonly PriorityLevel[] {
 		return this.levels(this.settings.get());
+	}
+
+	labelLevels(): readonly LabelLevel[] {
+		return usableLabels(this.settings.get().labels);
 	}
 
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
@@ -162,18 +176,14 @@ export class TaskServiceImpl implements TaskService {
 		const { doc, today, boundary } = await this.readNormalized();
 		const { presets, ungrouped } = this.settings.get().groups;
 		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-		const names = (list: GroupedList) => offeredNames(shown.filter((entry) => entry.section === list).map((entry) => entry.group), presets, ungrouped);
+		const names = (list: GroupedList) =>
+			offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sectionsOf(doc, list)), presets, ungrouped);
 		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
 	}
 
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
 		const { doc } = await this.readNormalized();
-		const sectionsOf = (list: GroupedList): readonly ListSection[] =>
-			doc
-				.groups(list)
-				.filter((g) => g.heading || g.entries.length > 0)
-				.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
-		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(list)])) as Record<GroupedList, readonly ListSection[]>;
+		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)])) as Record<GroupedList, readonly ListSection[]>;
 	}
 
 	async doneView(): Promise<readonly TaskItem[]> {
@@ -182,18 +192,33 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async search(query: string): Promise<readonly SearchHit[]> {
-		if (query.trim() === "") return [];
+		const fuzzy = FuzzyQuery.of(query);
+		if (!fuzzy) return [];
 		const { doc, today } = await this.readNormalized();
 		const item = this.itemOf(today);
-		const hits: SearchHit[] = [];
+		const ranked: RankedHit[] = [];
 		const visit = (entry: TaskEntry): void => {
-			const title = hitIn(plainText(entry.task.text), query);
+			const titleText = plainText(entry.task.text);
+			const title = fuzzy.match(titleText);
 			const markdown = descriptionMarkdown(entry);
-			const description = markdown === null ? null : snippetIn(markdown, query);
-			if (title || description) hits.push({ item: item(entry), title: title ? titleParts(title) : [], description });
+			const descriptionText = markdown === null ? "" : plainDescription(markdown);
+			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
+			if (title || description) {
+				const hit: SearchHit = {
+					item: item(entry),
+					title: title ? matchParts(titleText, title.found) : [],
+					description: description ? snippetParts(descriptionText, description.found) : null,
+				};
+				ranked.push({ hit, title, description });
+			}
 			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
 		};
-		for (const section of SEARCH_ORDER) for (const entry of doc.tasks(section)) visit(entry);
+		const hits: SearchHit[] = [];
+		for (const section of SEARCH_ORDER) {
+			ranked.length = 0;
+			for (const entry of doc.tasks(section)) visit(entry);
+			hits.push(...ranked.sort(byQuality).map((r) => r.hit));
+		}
 		return hits;
 	}
 
@@ -212,9 +237,9 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary));
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<TaskKey | null> {
+	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
 		if (this.isBlank(text)) return null;
-		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat));
+		const change = await this.mutate((doc, today, _settings, boundary) => ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels));
 		const created = change?.after.insertedSince(change.before);
 		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
 	}
@@ -265,8 +290,49 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.setPriority(doc, this.entryOf(doc, key), priority));
 	}
 
+	async setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null> {
+		const [item] = await this.setLabelsAll([{ key, labels }]);
+		return item ?? null;
+	}
+
+	async setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]> {
+		if (steps.length === 0) return [];
+		let places: readonly (TaskKey | null)[] = [];
+		const change = await this.mutate((doc) => {
+			const { doc: tagged, tags } = EntryTags.tag(doc, steps.map((step) => this.entryOf(doc, step.key)));
+			let current = tagged;
+			steps.forEach((step, n) => {
+				const entry = tags.find(current, n);
+				if (entry) current = ops.setLabels(current, entry, step.labels);
+			});
+			places = steps.map((_, n) => {
+				const entry = tags.find(current, n);
+				return entry ? { section: entry.section, index: entry.index, path: entry.path, raw: "" } : null;
+			});
+			return tags.untag(current);
+		});
+		if (!change) return steps.map(() => null);
+		const settings = this.settings.get();
+		const today = this.boundary(settings).dayOf(this.clock.now());
+		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
+		return places.map((place) => {
+			const entry = place && change.after.find(place.section, place.index, place.path);
+			if (!place || !entry) return null;
+			const parent = place.path.length > 0 ? change.after.find(place.section, place.index, place.path.slice(0, -1)) : undefined;
+			return toItem(entry, today, levels, parent?.task.text ?? null);
+		});
+	}
+
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
 		await this.mutate((doc) => ops.setReminder(doc, this.entryOf(doc, key), reminder));
+	}
+
+	async setCollapsed(key: TaskKey, collapsed: boolean): Promise<void> {
+		await this.mutate((doc) => ops.setCollapsed(doc, this.entryOf(doc, key), collapsed));
+	}
+
+	async unfoldAbove(key: TaskKey): Promise<void> {
+		await this.mutate((doc) => ops.unfoldAbove(doc, this.entryOf(doc, key)));
 	}
 
 	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
@@ -288,6 +354,17 @@ export class TaskServiceImpl implements TaskService {
 
 	async remove(key: TaskKey): Promise<void> {
 		await this.mutate((doc) => ops.remove(doc, this.entryOf(doc, key)));
+	}
+
+	async find(key: TaskKey, text: string): Promise<TaskItem | null> {
+		const { doc, today } = await this.readNormalized();
+		const atPlace = doc.find(key.section, key.index, key.path);
+		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
+		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
+		if (!entry) return null;
+		const parent = entry.path.length > 0 ? doc.find(entry.section, entry.index, entry.path.slice(0, -1)) : undefined;
+		const settings = this.settings.get();
+		return toItem(entry, today, itemLevels(this.levels(settings), usableLabels(settings.labels)), parent?.task.text ?? null);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
@@ -356,8 +433,8 @@ export class TaskServiceImpl implements TaskService {
 			const change = this.sectionChange(this.entryOf(doc, key), name);
 			return change ? [{ key, change }] : [];
 		});
-		if (keys.length !== 1) return this.applyAll(steps);
 		if (steps.length === 0) return;
+		if (keys.length !== 1) return this.applyAll(steps);
 		const { key, change } = steps[0];
 		if (change.kind === "moveToGroup") return this.moveToGroup(key, change.list, change.group, change.before, change.date);
 		if (change.kind === "createGroup") return this.createGroup(key, change.list, change.name, change.date);
@@ -437,6 +514,8 @@ export class TaskServiceImpl implements TaskService {
 				return ops.setStatus(doc, entry, change.status);
 			case "priority":
 				return ops.setPriority(doc, entry, change.priority);
+			case "labels":
+				return ops.setLabels(doc, entry, change.labels);
 			case "dueDate":
 				return ops.setDueDate(doc, entry, change.date);
 			case "postpone":
@@ -553,9 +632,10 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, dayStartHour } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, collapsedMarker, dayStartHour, labelTag } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, silentSlotMarker, repeatMarker, prefixes, dayStartHour]);
+		const labels = usableLabels(settings.labels).map((l) => l.name);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, collapsedMarker, prefixes, labelTag, labels, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
@@ -567,14 +647,15 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
-		const levels = this.levels(this.settings.get());
-		return (entry) => toItem(entry, today, (prefix) => levels.find((l) => l.prefix === prefix) ?? null);
+		const settings = this.settings.get();
+		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
+		return (entry) => toItem(entry, today, levels);
 	}
 
 	/** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */
 	private sectionChange(entry: TaskEntry, name: GroupName): Extract<TaskChange, { readonly kind: "moveToGroup" | "createGroup" }> | null {
 		const list = entry.section;
-		if (list === "done") return null;
+		if (list === "done" || entry.group === name) return null;
 		const date = (list === "soon" ? entry.task.dueDate : null) ?? undefined;
 		return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
 	}

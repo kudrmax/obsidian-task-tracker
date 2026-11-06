@@ -20,6 +20,8 @@ export interface EntryState {
 	readonly text: string;
 	/** A level's prefix, or none. */
 	readonly priority: string | null;
+	/** The labels' names; none while there is a priority. */
+	readonly labels: readonly string[];
 	/** The rule the task repeats by, or none. */
 	readonly repeat: RepeatRule | null;
 	/** Texts entered here and not yet written, in order: drawn right before the field. */
@@ -61,6 +63,7 @@ export interface QuickEntryDeps {
 
 interface Line extends PendingText {
 	readonly priority: string | null;
+	readonly labels: readonly string[];
 	readonly repeat: RepeatRule | null;
 }
 
@@ -128,6 +131,7 @@ interface Field {
 	readonly run: Run;
 	readonly text: string;
 	readonly priority: string | null;
+	readonly labels: readonly string[];
 	readonly repeat: RepeatRule | null;
 	readonly rename: Rename | null;
 	/** The field writes a section's name (empty sections spec §4). */
@@ -157,6 +161,7 @@ export class QuickEntry {
 			spot: field.run.spot,
 			text: field.text,
 			priority: field.priority,
+			labels: field.labels,
 			repeat: field.repeat,
 			pending: field.run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename?.item ?? null,
@@ -207,7 +212,7 @@ export class QuickEntry {
 	open(spot: EntrySpot, renaming?: TaskItem): void {
 		if (this.field) this.save(this.field);
 		const rename = renaming ? { item: renaming, home: new Run(spot) } : null;
-		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, repeat: renaming?.repeat ?? null, rename, section: false });
+		this.reset({ run: new Run(spot), text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false });
 	}
 
 	type(text: string): void {
@@ -216,6 +221,10 @@ export class QuickEntry {
 
 	setPriority(prefix: string | null): void {
 		if (this.field) this.reset({ ...this.field, priority: prefix }, true);
+	}
+
+	setLabels(labels: readonly string[]): void {
+		if (this.field) this.reset({ ...this.field, labels }, true);
 	}
 
 	setRepeat(rule: RepeatRule | null): void {
@@ -268,7 +277,7 @@ export class QuickEntry {
 		if (this.blank(field.text)) this.reset(null);
 		else {
 			this.saveRename(field, rename);
-			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, repeat: null, rename: null, section: false } : null);
+			this.reset(spot.kind === "list" ? { run: new Run(this.under(spot, rename.item)), text: "", priority: null, labels: [], repeat: null, rename: null, section: false } : null);
 		}
 	}
 
@@ -287,7 +296,7 @@ export class QuickEntry {
 	/** The task goes to the queue; the next field opens at once, without a priority or a repeat. A slot takes one task only. */
 	private enterTask(field: Field): void {
 		this.create(field);
-		this.reset(field.run.spot.kind === "slot" ? null : { ...field, text: "", priority: null, repeat: null });
+		this.reset(field.run.spot.kind === "slot" ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
 	}
 
 	/**
@@ -312,10 +321,10 @@ export class QuickEntry {
 
 	/**
 	 * Edits once the writes before it show, by the key the lists give the task then: the one read at the open may have gone
-	 * stale. The task's own rule, the same in the bar, is left as the file has it.
+	 * stale. The task's own rule and labels, the same in the bar, are left as the file has them.
 	 */
 	private saveRename(field: Field, { item, home }: Rename): void {
-		const draft: TaskDraft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority, ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }) };
+		const draft: TaskDraft = { text: field.text, placement: this.deps.placement(field.run.spot), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }) };
 		this.queued(home, async () => {
 			await this.deps.fresh();
 			await this.deps.edit(this.keyAt(home, item), draft);
@@ -346,7 +355,7 @@ export class QuickEntry {
 	/** The field's text, written at its run once the lists show the writes before it: at the level it was entered at, as far as the cards then allow. */
 	private create(field: Field): void {
 		const { run } = field;
-		const line = { text: field.text, priority: field.priority, repeat: field.repeat, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
+		const line = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: run.spot.kind === "list" ? run.spot.place.level : 0 };
 		run.pending.push(line);
 		this.queued(run, async () => {
 			let shown = false;
@@ -381,15 +390,15 @@ export class QuickEntry {
 		const { spot } = run;
 		switch (spot.kind) {
 			case "slot":
-				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot });
+				await this.deps.createInPlace(line.text, line.priority, { kind: "slot", slot: spot.slot }, undefined, line.labels);
 				return this.deps.fresh(shown());
 			case "stack":
-				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null });
+				await this.deps.createInPlace(line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels);
 				return this.deps.fresh(shown());
 			case "list": {
 				const cards = this.deps.cards(spot.column);
 				const place = fitLevel(cards, { ...spot.place, level: line.level });
-				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, placeOfGap(cards, place)), line.repeat);
+				const key = await this.deps.createInPlace(line.text, line.priority, this.deps.placeOf(spot.column, placeOfGap(cards, place)), line.repeat, line.labels);
 				return this.deps.fresh(shown({ column: spot.column, key }));
 			}
 		}
@@ -417,10 +426,11 @@ export class QuickEntry {
 		});
 	}
 
-	/** Right under a renamed task at its level, or its first subtask when it has some: nothing may stand between a task and them. */
+	/** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
 	private under(spot: Extract<EntrySpot, { kind: "list" }>, item: TaskItem): EntrySpot {
 		const { place } = spot;
-		return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (item.subtasks.length > 0 ? 1 : 0) } };
+		const shown = item.subtasks.length > 0 && !item.collapsed;
+		return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown ? 1 : 0) } };
 	}
 
 	/** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
@@ -442,4 +452,8 @@ export class QuickEntry {
 function runsOf(field: Field | null): Run[] {
 	if (!field) return [];
 	return field.rename ? [field.run, field.rename.home] : [field.run];
+}
+
+function sameNames(a: readonly string[], b: readonly string[]): boolean {
+	return a.length === b.length && a.every((name, i) => name === b[i]);
 }

@@ -27,9 +27,11 @@ Never in `~/Obsidian`: it is production and syncs to the phone. A separate Obsid
 
 ## Releasing
 
-Per `~/.claude/CLAUDE.md`, «Свои плагины Obsidian». Version in `manifest.json`, `package.json`, `versions.json`. No CI: `npm run build`, then `gh release create <version> main.js manifest.json styles.css`. BRAT: `kudrmax/obsidian-task-tracker`, plugin id `task-calendar`.
+Per `~/.claude/CLAUDE.md`, «Свои плагины Obsidian». Version in `manifest.json`, `package.json`, `versions.json`. BRAT: `kudrmax/obsidian-task-tracker`, plugin id `task-calendar`.
 
-The release is the task; installing it through BRAT is a try, not a must. If the `obsidian` CLI can't reach Max's Obsidian (no socket, «Command line interface is not enabled», another session's test Obsidian holds it), say so in one line and the task is done: Max runs the update himself. Don't wait for the CLI, don't offer to restart his Obsidian, don't close or restart any test Obsidian to free it.
+**A release is made only by `npm run release -- "<notes>"`, in the main clone on master.** Never `gh release create` or `gh release upload` by hand, never a `main.js` built anywhere else. A release's `main.js` is not in git: `gh` uploads whatever file lies in the folder, so a failed build silently ships an old one (0.4.133 and 0.4.137 went out with a `main.js` from before the 📌 marker, and it spoiled task lines in Max's file). The script stops on anything wrong: not master, uncommitted changes, master behind origin, versions that disagree, a failing test or build, a `main.js` whose first line isn't `// task-calendar <version>` or that is older than the last commit, and assets on GitHub that differ from the local build. Never filter the output of a build or a test (`| grep error` hid «tsc: command not found»), and check a build by a mark of the new code, never by comparing two copies of the same file. A stopped release is fixed at its cause, never walked around.
+
+Installing the release through BRAT is a must, not a try. With the `obsidian` CLI: `betaPlugins.updatePlugin`. When the CLI can't reach Max's Obsidian (no socket, «Command line interface is not enabled», another session's test Obsidian holds it), Advanced URI runs BRAT inside his running Obsidian, in the background: `open -g "obsidian://adv-uri?vault=Obsidian&commandid=obsidian42-brat%3AcheckForUpdatesAndUpdate"`. BRAT loads the updated plugin again itself. Only one Obsidian may be running for that, so quit your own test instance first. Then check `~/Obsidian/.obsidian/plugins/task-calendar/manifest.json` shows the version and that its `main.js` starts with `// task-calendar <version>`. Never restart Max's Obsidian and never close another session's test Obsidian.
 
 ## Files
 

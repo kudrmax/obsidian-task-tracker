@@ -1,3 +1,4 @@
+import { type CaptureList, PhoneCaptureService } from "../application/PhoneCaptureService";
 import { type PhoneMeeting, PhoneMeetingService } from "../application/PhoneMeetingService";
 import { type PhoneAction, type PhoneReminder, PhoneReminderService } from "../application/PhoneReminderService";
 
@@ -31,4 +32,6 @@ function wireMeeting(m: PhoneMeeting): WireMeeting {
 	calendarFiles: (settingsJson: string): string[] => new PhoneMeetingService(settingsJson).files(),
 	meetings: (settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number, nowMs: number): WireMeeting[] =>
 		new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs), new Date(nowMs)).map(wireMeeting),
+	capture: (text: string, settingsJson: string, list: CaptureList, title: string, nowMs: number): PhoneAction =>
+		new PhoneCaptureService(settingsJson).capture(text, list, title, new Date(nowMs)),
 };

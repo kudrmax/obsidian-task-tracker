@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import type { PriorityLevel, TaskService } from "../../application/contracts";
+import type { PriorityColor, PriorityLevel, TaskService } from "../../application/contracts";
 import { markPriority } from "../TaskCard";
 import type { TitleFieldFactory } from "./TitleField";
 
@@ -30,8 +30,8 @@ export interface QuickFieldHandle extends EntryPart {
 	refocus(): void;
 	/** The field writes a section's name: it looks like the section name field, and its hint says so. */
 	setSection(on: boolean): void;
-	/** A level chosen elsewhere; the field takes its colour. */
-	setPriority(level: PriorityLevel | null): void;
+	/** The colour of a level or the first label chosen elsewhere; the field takes it, none takes it away. */
+	setTint(color: PriorityColor | null): void;
 	/** A text set by the owner: a prefix in it counts as already reported. */
 	setValue(text: string): void;
 	/** Part of the typing: the field, or what its editor shows for it elsewhere on the page. */
@@ -88,8 +88,9 @@ export const QuickField = {
 				title.el.classList.toggle("is-section", on);
 				markPriority(title.el, on ? null : levelOf(title.text));
 			},
-			setPriority(level) {
-				markPriority(title.el, level);
+			setTint(color) {
+				if (color) title.el.dataset.priority = color;
+				else delete title.el.dataset.priority;
 			},
 			setValue(text) {
 				title.setText(text);

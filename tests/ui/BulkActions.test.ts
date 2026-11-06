@@ -73,6 +73,20 @@ describe("the selection", () => {
 		expect(selection.size).toBe(1);
 	});
 
+	it("keeps a task picked once it is written anew, on the card drawn for its new line", () => {
+		const selection = new TaskSelection();
+		const [a] = cards([item()]);
+		selection.toggle(a);
+		const written = { ...a.item, key: { ...a.item.key, raw: `${a.item.key.raw} #label/X` } };
+		selection.forgetDrawn();
+		const [redrawn] = cards([written]);
+		selection.attach(redrawn);
+		expect(selection.has(written)).toBe(false);
+		selection.renew([{ from: a.item.key, to: written.key }]);
+		expect(selection.cards.map((c) => c.card)).toEqual([redrawn.card]);
+		expect(redrawn.card.classList.contains("is-selected")).toBe(true);
+	});
+
 	it("picks the run from the last picked card with Shift-click", () => {
 		const selection = new TaskSelection();
 		const column = cards([item(), item(), item(), item()]);
@@ -86,6 +100,8 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 	const bulk = new BulkController({
 		root: document.body,
 		apply: async () => {},
+		labels: () => [],
+		setLabels: async (steps) => steps.map(() => null),
 		today: () => T,
 		day: () => T,
 		levels: () => LEVELS,

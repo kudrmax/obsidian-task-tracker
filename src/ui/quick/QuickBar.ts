@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -18,10 +18,12 @@ export interface QuickBarState {
 	/** The field shifts at all: a field on the calendar does not, and has no shift buttons. */
 	readonly indents: boolean;
 	readonly priority: PriorityLevel | null;
+	/** The labels chosen, in the settings' order; none while there is a priority. */
+	readonly labels: readonly LabelLevel[];
 	/** Where the field stands; null for a field with no place of its own (a subtask, a slot): no place button. */
 	readonly place: Placement | null;
 	readonly repeat: RepeatRule | null;
-	/** The field may repeat: a subtask's field and one on the calendar may not, and have no repeat button. */
+	/** The field may repeat: one on the calendar may not, and has no repeat button. */
 	readonly repeatable: boolean;
 	/** The field writes a section's name, not a task; null where it cannot (no column with sections, a rename): no section button. */
 	readonly section: boolean | null;
@@ -42,6 +44,8 @@ export interface QuickBarDeps {
 	desktop(): boolean;
 	/** The levels that mark tasks, as the panel offers them. */
 	levels(): readonly PriorityLevel[];
+	/** The labels that tag tasks, which the same panel offers under the levels. */
+	labels(): readonly LabelLevel[];
 	today(): LocalDate;
 	/** The placement of a task for a day picked: Now for today, else that day. */
 	placementOfDay(day: LocalDate): Placement;
@@ -50,6 +54,8 @@ export interface QuickBarDeps {
 	onSection(): void;
 	/** A level's prefix, or null to take the level off. */
 	onPriority(prefix: string | null): void;
+	/** The labels' names the field now has. */
+	onLabels(names: readonly string[]): void;
 	onPlace(placement: Placement): void;
 	/** A rule set in the repeat panel, or null to take it off. */
 	onRepeat(rule: RepeatRule | null): void;
@@ -156,9 +162,10 @@ export class QuickBar implements EntryPart {
 		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents || section;
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
-		this.flag.hidden = this.levels().length === 0 || section;
-		this.flag.classList.toggle("is-set", state.priority !== null);
-		if (state.priority) this.flag.dataset.priority = state.priority.color;
+		this.flag.hidden = !this.marks() || section;
+		const color = state.priority?.color ?? state.labels[0]?.color ?? null;
+		this.flag.classList.toggle("is-set", color !== null);
+		if (color) this.flag.dataset.priority = color;
 		else delete this.flag.dataset.priority;
 		this.repeat.hidden = !state.repeatable || section;
 		this.repeat.classList.toggle("is-set", state.repeat !== null);
@@ -315,7 +322,7 @@ export class QuickBar implements EntryPart {
 	/** The shown state changed under an open panel: it follows, or closes when its button is gone. */
 	private refreshPanel(): void {
 		if (!this.panel) return;
-		const gone = this.panel.kind === "priority" ? this.levels().length === 0 : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
+		const gone = this.panel.kind === "priority" ? !this.marks() : this.panel.kind === "repeat" ? !this.state?.repeatable : this.state?.place == null;
 		if (gone) this.closePanel();
 		else if (!this.panel.picking && this.panel.drawn !== this.drawnKey(this.panel.kind)) this.renderPanel();
 	}
@@ -327,7 +334,7 @@ export class QuickBar implements EntryPart {
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
 		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, this.repeatDay()]);
-		return JSON.stringify([kind, this.levels(), state?.priority?.prefix ?? null, state?.place ?? null, this.deps.today()]);
+		return JSON.stringify([kind, this.levels(), this.deps.labels(), state?.priority?.prefix ?? null, state?.labels.map((l) => l.name) ?? [], state?.place ?? null, this.deps.today()]);
 	}
 
 	/** The day a new rule starts from: the field's own, else today. */
@@ -360,13 +367,28 @@ export class QuickBar implements EntryPart {
 		return this.panel?.window.pick(action) ?? action;
 	}
 
+	/**
+	 * The flag's panel: the levels, a pick that closes it; under them the labels, each tap putting one on or taking it off
+	 * while the panel stays for the next. A priority and labels don't go together: while one is set the other's tiles are off.
+	 */
 	private renderLevels(parent: HTMLElement): void {
 		const current = this.state?.priority ?? null;
-		const specs = this.levels().map((level): MenuTileSpec => {
+		const chosen = this.state?.labels.map((l) => l.name) ?? [];
+		const levels = this.levels().map((level): MenuTileSpec => {
 			const on = level.prefix === current?.prefix;
-			return { label: level.prefix, icon: "priority", color: level.color, on, onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
+			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: chosen.length > 0, onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
 		});
-		markLongLabels(tileGroup(parent, "is-priority", tileRows(specs)));
+		if (levels.length > 0) markLongLabels(tileGroup(parent, "is-priority", tileRows(levels)));
+		const labels = this.deps.labels().map((label): MenuTileSpec => {
+			const on = chosen.includes(label.name);
+			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: current !== null, onPick: () => this.deps.onLabels(on ? chosen.filter((n) => n !== label.name) : [...chosen, label.name]) };
+		});
+		if (labels.length > 0) markLongLabels(tileGroup(parent, "is-labels", tileRows(labels)));
+	}
+
+	/** The flag stands for the levels and the labels: it shows while there is one of either. */
+	private marks(): boolean {
+		return this.levels().length > 0 || this.deps.labels().length > 0;
 	}
 
 	/** Every change is reported at once and the panel stays, standing again as it grows or shrinks; Remove repeat is a pick. */

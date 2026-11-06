@@ -119,6 +119,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
+			labelLevels: () => [],
 			createInPlace: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;
@@ -842,17 +843,19 @@ describe("QuickEntryController", () => {
 			await vi.waitFor(() => expect(created).toEqual([{ text: "Gym", priority: null, place: { kind: "day", date: TODAY, group: null, before: null } }]));
 		});
 
-		it("is not on a subtask's field; the write is a subtask's, whose rule the file drops", async () => {
+		it("is on a subtask's field too: the rule goes with the subtask's write", async () => {
 			const parent = item("A", key("now", 0));
 			const { controller, root, type, press, created } = setUp({ items: { left: [parent] } });
 			controller.openAtEnd("left");
 			chooseThursday(root);
 			press("Tab");
-			expect(repeatButton(root).hidden).toBe(true);
+			expect(repeatButton(root).hidden).toBe(false);
+			expect(repeatButton(root).classList.contains("is-set")).toBe(true);
 			type("Sub");
 			press("Enter");
 			await vi.waitFor(() => expect(created).toHaveLength(1));
 			expect(created[0].place.kind).toBe("subtask");
+			expect(created[0].repeat).toEqual(WEEKLY_THU);
 		});
 
 		it("is not on a field on the calendar", () => {
@@ -1068,7 +1071,7 @@ describe("QuickEntryController", () => {
 				stackEl.className = "tc-menu-subtasks";
 				const source = stackEl.appendChild(document.createElement("div"));
 				source.className = "tc-card";
-				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setRepeat: async () => {}, stop: async () => {}, setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: sub, source, today: TODAY, day: TODAY, levels: [], actions: { setRepeat: async () => {}, stop: async () => {}, setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, setLabels: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const menuField = () => document.querySelector<HTMLTextAreaElement>(".tc-menu-field textarea.tc-quick-field");
 
@@ -1122,7 +1125,7 @@ describe("QuickEntryController", () => {
 				const source = document.body.appendChild(document.createElement("div"));
 				source.className = "tc-block";
 				source.getBoundingClientRect = () => at;
-				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setRepeat: async () => {}, stop: async () => {}, setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
+				return TaskMenu.open({ item: task, source, today: TODAY, day: TODAY, levels: [], actions: { setRepeat: async () => {}, stop: async () => {}, setStatus: async () => {}, postpone: async () => {}, removeDue: async () => {}, toSection: async () => {}, newSection: () => {}, setPriority: async () => {}, setLabels: async () => null, setReminder: async () => {}, rename: () => {}, openDescription: () => {}, addSubtask: () => {}, remove: async () => {}, openInObsidian: () => {}, openLink: () => {} } });
 			};
 			const stack = () => [...document.querySelectorAll<HTMLElement>(".tc-menu-subtasks > *")].map((row) => (row.classList.contains("tc-quick-row") ? "field" : row.textContent));
 
