@@ -1,3 +1,4 @@
+import { GROUPED_LISTS } from "../domain/Lists";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
 import { markChoices, typedMarks } from "../domain/Marks";
@@ -63,8 +64,6 @@ interface Normalized {
 	readonly doc: TaskDocument;
 	readonly changed: boolean;
 }
-
-const GROUPED_LISTS: readonly GroupedList[] = ["inbox", "backlog", "now", "soon"];
 
 /** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
 function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {

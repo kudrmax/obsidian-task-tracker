@@ -160,7 +160,6 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	editRepeat: "../domain/RepeatDraft",
 	repeatDraft: "../domain/RepeatDraft",
 	DayBoundary: "../domain/DayBoundary",
-	clampSlot: "../domain/DayBoundary",
 	MINUTES_PER_DAY: "../domain/LocalDate",
 	samePlacement: "../domain/operations",
 	keyId: "./taskKeys",

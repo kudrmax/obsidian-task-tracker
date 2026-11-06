@@ -80,7 +80,7 @@ export class CalendarChoice {
 			}
 		}
 		return [...found.values()].sort(
-			(a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || a.key.title.localeCompare(b.key.title),
+			(a, b) => Number(b.google) - Number(a.google) || byAccount(a.key.account, b.key.account) || textOrder(a.key.title, b.key.title),
 		);
 	}
 
@@ -172,7 +172,22 @@ function byAccount(a: string, b: string): number {
 	if (a === b) return 0;
 	if (a === "") return 1;
 	if (b === "") return -1;
-	return a.localeCompare(b);
+	return textOrder(a, b);
+}
+
+/**
+ * Names in an order every engine agrees on (Electron's and JavaScriptCore's `localeCompare` may not): by their letters
+ * in lower case, «ё» as «е», then as written.
+ */
+export function textOrder(a: string, b: string): number {
+	const x = letters(a);
+	const y = letters(b);
+	if (x !== y) return x < y ? -1 : 1;
+	return a === b ? 0 : a < b ? -1 : 1;
+}
+
+function letters(name: string): string {
+	return name.toLowerCase().replace(/ё/g, "е");
 }
 
 /** The calendar an event sits in, as a file's calendar rows name it. */

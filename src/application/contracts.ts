@@ -27,8 +27,6 @@ export { repeatParts, type RepeatParts } from "../domain/Repeat";
 export { editRepeat, repeatDraft, type RepeatChange, type RepeatDraft, type RepeatKind } from "../domain/RepeatDraft";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
-/** A slot on the timeline moved, as long as it is, to lie within its day. */
-export { clampSlot } from "../domain/DayBoundary";
 /** Minutes in a day: the timeline's length. */
 export { MINUTES_PER_DAY } from "../domain/LocalDate";
 /** Minutes from the start of the shown day to a card's start and end; a null end for a task without a duration. */
