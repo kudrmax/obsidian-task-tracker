@@ -31,6 +31,10 @@ function roundTrip(isPhone: boolean) {
 }
 
 describe("SyncRoundTrip", () => {
+	it("encodes a plus in a reason so the app doesn't read it as a space", () => {
+		expect(backLink({ kind: "failed", reason: "a+b c" })).toBe("taskcalendar://synced?error=a%2Bb%20c");
+	});
+
 	it("shows the notice while it waits and hands the phone back to the app once Sync finished", async () => {
 		const r = roundTrip(true);
 		r.trip.run();
@@ -71,8 +75,10 @@ describe("SyncRoundTrip", () => {
 
 	it("puts every reason into the link so the app reads it back as is", () => {
 		for (const reason of Object.values(SYNC_REASONS)) {
-			const url = new URL(backLink({ kind: "failed", reason }) ?? "");
-			expect(url.searchParams.get("error")).toBe(reason);
+			const link = backLink({ kind: "failed", reason }) ?? "";
+			expect(reason).not.toBe("");
+			expect(link).not.toContain("+");
+			expect(new URL(link).searchParams.get("error")).toBe(reason);
 		}
 	});
 });

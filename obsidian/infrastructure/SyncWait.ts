@@ -42,7 +42,8 @@ export type SyncOutcome = { readonly kind: "synced" } | { readonly kind: "failed
 
 const SYNCED: SyncOutcome = { kind: "synced" };
 const LEFT: SyncOutcome = { kind: "left" };
-const failed = (reason: string): SyncOutcome => ({ kind: "failed", reason });
+/** Only the spec's reasons go back to the app: an empty one would leave its alert with a title alone. */
+const failed = (why: keyof typeof SYNC_REASONS): SyncOutcome => ({ kind: "failed", reason: SYNC_REASONS[why] });
 
 /**
  * Finished: a run that started after the request has ended with the server ready and the status `synced`, and no new
@@ -80,11 +81,11 @@ class Waiting {
 
 	start(): void {
 		const first = this.sync.snapshot();
-		if (first.status === "off") return this.finish(failed(SYNC_REASONS.off));
-		if (first.status === "paused") return this.finish(failed(SYNC_REASONS.paused));
+		if (first.status === "off") return this.finish(failed("off"));
+		if (first.status === "paused") return this.finish(failed("paused"));
 		this.running = first.running;
 		this.stale = first.running;
-		this.timeout = this.timers.set(() => this.finish(failed(SYNC_REASONS.timeout)), SYNC_TIMEOUT_MS);
+		this.timeout = this.timers.set(() => this.finish(failed("timeout")), SYNC_TIMEOUT_MS);
 		this.stopLeave = this.leave.onLeave(() => this.finish(LEFT));
 		this.unsubscribe = this.sync.onChange(() => this.step());
 		if (!this.stale) this.sync.request();
@@ -94,14 +95,14 @@ class Waiting {
 	private step(): void {
 		if (this.done) return;
 		const now = this.sync.snapshot();
-		if (now.status === "off") return this.finish(failed(SYNC_REASONS.off));
+		if (now.status === "off") return this.finish(failed("off"));
 		if (now.running) {
 			this.running = true;
 			this.stopQuiet();
 			return;
 		}
 		if (!this.running) {
-			if (now.status === "paused") this.finish(failed(SYNC_REASONS.paused));
+			if (now.status === "paused") this.finish(failed("paused"));
 			return;
 		}
 		this.running = false;
@@ -114,8 +115,8 @@ class Waiting {
 	}
 
 	private ended(now: SyncSnapshot): void {
-		if (now.status === "paused") return this.finish(failed(SYNC_REASONS.paused));
-		if (now.status === "error") return this.finish(failed(SYNC_REASONS.error));
+		if (now.status === "paused") return this.finish(failed("paused"));
+		if (now.status === "error") return this.finish(failed("error"));
 		if (now.status === "synced" && now.ready && this.quiet === null) this.quiet = this.timers.set(() => this.finish(SYNCED), SYNC_QUIET_MS);
 	}
 
