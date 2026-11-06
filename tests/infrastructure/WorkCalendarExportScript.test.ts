@@ -151,7 +151,7 @@ describe("WorkCalendarExportScript", () => {
 		s.keepInstalled();
 		await s.install();
 		const looks = adapter.looks;
-		await settings.update({ rightMode: "soon" });
+		await settings.update({ longPressMs: 400 });
 		await settings.update({ scrollToHour: 3 });
 		await new Promise((resolve) => setTimeout(resolve));
 		expect(adapter.looks).toBe(looks);

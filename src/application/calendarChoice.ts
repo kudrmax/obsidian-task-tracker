@@ -13,9 +13,19 @@ export const keyText = (key: CalendarKey): string => `${key.account}\n${key.titl
 /** A calendar some file lists, once however many list it. `google`: it belongs to the Google account the plugin reads. */
 export interface KnownCalendar {
 	readonly key: CalendarKey;
+	/** The account it is listed under: its own, or the phone's for a calendar no writer gives an account. */
+	readonly accountName: string;
+	/** Its title as its file writes it: Scriptable's calendar of a title two others share keeps its own title here, its key set apart. */
+	readonly name: string;
 	readonly color: string | null;
 	readonly google: boolean;
 }
+
+/** The account a calendar is listed under when no writer gives it one: the phone's own. */
+export const PHONE_ACCOUNT = "iPhone";
+
+/** The key of Scriptable's calendar whose title two calendars of the other files share: set apart from both. */
+const apart = (title: string): string => `${PHONE_ACCOUNT} · ${title}`;
 
 /** A day's events of the calendars shown, and whether any of them came from a file no longer fresh. */
 export interface ChosenDay {
@@ -64,7 +74,9 @@ export class CalendarChoice {
 			for (const calendar of this.files.get(source)?.calendars ?? []) {
 				const key = this.keyOf(source, calendar);
 				const text = keyText(key);
-				if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
+				if (found.has(text)) continue;
+				const name = source === "work" && key.title === apart(calendar.title) ? calendar.title : key.title;
+				found.set(text, { key, accountName: key.account === "" ? PHONE_ACCOUNT : key.account, name, color: calendar.color, google: source === "google" || this.isGoogle(key) });
 			}
 		}
 		return [...found.values()].sort(
@@ -129,7 +141,7 @@ export class CalendarChoice {
 			}
 		}
 		if (titled.size === 1) return [...titled.values()][0];
-		return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
+		return { account: "", title: titled.size === 0 ? ref.title : apart(ref.title) };
 	}
 }
 

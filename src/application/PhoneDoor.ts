@@ -1,4 +1,5 @@
 import type { GroupedList } from "../domain/Lists";
+import { MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import { settingsFrom, type TaskCalendarSettings } from "../settings";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import type { CalendarSource } from "./contracts";
@@ -31,6 +32,11 @@ export type PhoneAction = { readonly changed: true; readonly text: string } | { 
 
 /** The lists the phone writes a new task into. */
 export type CaptureList = GroupedList;
+
+/** The reminder's time as the app shows it: `10:00`, or `10:00–11:00`. */
+function timeText(start: number, end: number | null): string {
+	return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
+}
 
 const STALE: PhoneAction = { changed: false, reason: "stale" };
 
@@ -67,9 +73,12 @@ class Call {
  */
 export const phoneDoor = {
 	reminders(text: string, settingsJson: string, nowMs: number): WireReminder[] {
-		return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, start, dayEnd, ...rest }) => ({
+		return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
 			id: key.raw,
-			...rest,
+			title,
+			body: timeText(startMinute, endMinute),
+			kind,
+			date,
 			startMs: start.getTime(),
 			dayEndMs: dayEnd.getTime(),
 		}));

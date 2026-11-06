@@ -5,10 +5,10 @@ import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const GMAIL = "max@gmail.com";
 const known: KnownCalendar[] = [
-	{ key: { account: GMAIL, title: GMAIL }, color: null, google: true },
-	{ key: { account: GMAIL, title: "Personal" }, color: null, google: true },
-	{ key: { account: "max@company.ru", title: "Календарь" }, color: null, google: false },
-	{ key: { account: "iCloud", title: "Home" }, color: null, google: false },
+	{ key: { account: GMAIL, title: GMAIL }, accountName: GMAIL, name: GMAIL, color: null, google: true },
+	{ key: { account: GMAIL, title: "Personal" }, accountName: GMAIL, name: "Personal", color: null, google: true },
+	{ key: { account: "max@company.ru", title: "Календарь" }, accountName: "max@company.ru", name: "Календарь", color: null, google: false },
+	{ key: { account: "iCloud", title: "Home" }, accountName: "iCloud", name: "Home", color: null, google: false },
 ];
 const googleIds = new Map([
 	["max@gmail.com", GMAIL],

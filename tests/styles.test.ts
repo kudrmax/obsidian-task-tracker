@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { VIEW_DEFAULTS } from "../src/ui/viewSettings";
 import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../src/ui/design";
 import { STATUS_BAR_SHOWN } from "../src/ui/StatusBarRoom";
 
@@ -342,8 +342,8 @@ describe("styles.css keeps to its design system", () => {
 	});
 
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
-		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_SETTINGS.cardHeight}px`);
-		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_SETTINGS.cardGap}px`);
+		expect(sheet.tokens.get("--tc-card-h")).toBe(`${VIEW_DEFAULTS.cardHeight}px`);
+		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${VIEW_DEFAULTS.cardGap}px`);
 	});
 
 	it("runs a list to the bottom under its foot and the fade, its end room a row rather than padding, the lists fading as the day does", () => {

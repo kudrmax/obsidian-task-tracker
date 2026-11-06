@@ -1,4 +1,4 @@
-import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
+import { addDays } from "../domain/LocalDate";
 import { openSlotted } from "../domain/queries";
 import type { LocalDate, Slot } from "../domain/Task";
 import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
@@ -13,7 +13,9 @@ const HOUR_MINUTES = 60;
 export interface TaskReminder {
 	readonly key: TaskKey;
 	readonly title: string;
-	readonly body: string;
+	/** Its slot's start and end, minutes from the slot's midnight; null for a slot without an end. */
+	readonly startMinute: number;
+	readonly endMinute: number | null;
 	readonly kind: "notification" | "alarm" | "live";
 	/** The slot's date, `YYYY-MM-DD`. */
 	readonly date: LocalDate;
@@ -67,12 +69,12 @@ export class TaskReminders {
 	}
 
 	private reminder(entry: TaskEntry, slot: Slot, at: Moment): TaskReminder {
-		const start = minutesToHHMM(slot.start);
 		const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
 		return {
 			key: keyOf(entry),
 			title: plainText(entry.task.text),
-			body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
+			startMinute: slot.start,
+			endMinute: slot.end,
 			kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
 			date: slot.date,
 			start: clockOf(slot.date, slot.start),

@@ -1,4 +1,4 @@
-import { DEFAULT_CARD_SIZE } from "../application/contracts";
+import { DEFAULT_CARD_SIZE } from "./viewSettings";
 import { PROPERTY } from "./design";
 import { px } from "./dom";
 

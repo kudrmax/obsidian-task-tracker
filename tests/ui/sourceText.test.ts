@@ -3,7 +3,7 @@ import type { SourceStatus } from "../../src/application/contracts";
 import { sourceText } from "../../src/ui/sources/sourceText";
 
 const now = new Date(2026, 9, 30, 14, 20);
-const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", ok: true, message: "7 events", updatedAt: null, detail: null, stale: false, ...extra });
+const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", problem: null, events: 7, updatedAt: null, detail: null, stale: false, ...extra });
 
 describe("sourceText", () => {
 	it("says Google was updated today at its time", () => {
@@ -24,9 +24,16 @@ describe("sourceText", () => {
 	it("dates an older update, and shows an error's text with no time", () => {
 		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2) }), now).time).toBe("3 Oct 08:02");
 		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2) }), now).sub).toBe("Updated 3 Oct");
-		const failed = sourceText(status({ ok: false, message: "not logged in", stale: true }), now);
+		const failed = sourceText(status({ problem: { kind: "loggedOut" }, stale: true }), now);
 		expect(failed.sub).toBe("not logged in");
 		expect(failed.time).toBe("");
 		expect(failed.stale).toBe(true);
+	});
+
+	it("words each problem as the sources window always did", () => {
+		const sub = (problem: SourceStatus["problem"]) => sourceText(status({ problem }), now).sub;
+		expect(sub({ kind: "fileMissing" })).toBe("file missing");
+		expect(sub({ kind: "noAnswer", seconds: 15 })).toBe("no answer in 15 s");
+		expect(sub({ kind: "failed", detail: "Google API 500: oops" })).toBe("Google API 500: oops");
 	});
 });

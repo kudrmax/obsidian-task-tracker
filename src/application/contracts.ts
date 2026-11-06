@@ -2,12 +2,11 @@ import type { GroupName, LocalDate, ReminderKind, SectionKey, Slot, TaskStatus }
 import type { RepeatRule } from "../domain/Repeat";
 import type { EndList, GroupedList, GroupPlace } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
-import type { LabelLevel, LabelPaint } from "../domain/Label";
-import type { PriorityColor, PriorityLevel } from "../domain/Priority";
+import type { LabelLevel } from "../domain/Label";
+import type { PresetColor, PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionOffer } from "./sections";
-import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses. */
@@ -53,17 +52,14 @@ export { DESCRIPTION_TEMPLATE } from "../domain/description";
 export { textParts, type TextPart } from "../domain/TaskText";
 /** A task is one line of the file: a line break in its title reads as one space, the same as the domain writes it. */
 export { LINE_BREAK, oneLine } from "../domain/TaskTitle";
-/** The hour's heights the settings tab writes and reads as text. */
-import type { SectionNames, ViewSettings } from "../settings";
-export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
-export { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, LIST_WIDTH_MAX, LIST_WIDTH_MIN, sameLevels } from "../settings";
+import type { ScreenBehaviour, SectionNames } from "../settings";
+export type { ScreenBehaviour, SectionNames } from "../settings";
+export { sameLevels } from "../settings";
 export type { Clock } from "./ports";
 
-/** A card's height and the gap between cards before the settings are read. */
-export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
 /** A priority level, its colours in the order the settings offer them. */
-export { LABEL_PAINTS, type LabelLevel, type LabelPaint, labelTitle, sameLabels } from "../domain/Label";
-export { hexColor, isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
+export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
+export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
 export type { DayColumn, EndList, GroupedList, GroupPlace, Placement, TaskDraft };
 
 /**
@@ -208,16 +204,20 @@ export interface DayView {
 	readonly slotted: readonly TaskItem[];
 }
 
+/** The task a call names is no longer at its place in the file, as read: the frontend says so and reads the tasks anew. */
 export class StaleTaskError extends Error {
+	readonly code = "staleTask";
 	constructor() {
-		super("The task changed in the file; the view was refreshed");
+		super("stale task");
 		this.name = "StaleTaskError";
 	}
 }
 
+/** No tasks file at `path`: the frontend says so, or offers to create it. */
 export class TasksFileMissingError extends Error {
+	readonly code = "tasksFileMissing";
 	constructor(readonly path: string) {
-		super(`Tasks file not found: ${path}`);
+		super(`tasks file missing: ${path}`);
 		this.name = "TasksFileMissingError";
 	}
 }
@@ -243,8 +243,14 @@ export interface TaskStep {
 	readonly change: TaskChange;
 }
 
+/**
+ * Which pair of neighbouring lists the screen shows: Inbox and Soon, Soon and the day's list, or the day's list and the
+ * calendar. Where a frontend keeps it is its own; what quick entry looks at first follows from it.
+ */
+export type RightMode = "calendar" | "soon" | "inbox";
+
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
-export type DropColumn = "left" | "soon" | "inbox" | "backlog";
+export type DropColumn = "day" | "soon" | "inbox" | "backlog";
 /** Where a task that exists is dragged from. */
 export type DropFrom = DropColumn | "timeline";
 /** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */
@@ -487,13 +493,13 @@ export interface TaskService {
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void>;
 	/**
 	 * A menu's section picked, or a new one named: each task into section `name` of its list, null outside any, as
-	 * `createGroup` takes a name; a task of Soon keeps its due date. One task as `moveToGroup` or `createGroup`, several as
+	 * `createGroup` takes a name; the name as typed, trimmed, a blank one writing nothing; a task of Soon keeps its due date. One task as `moveToGroup` or `createGroup`, several as
 	 * one `applyAll`. The section a task stands in already is no exception: it goes to its end.
 	 */
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
-	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */
+	/** The name as typed, trimmed: a blank one or the section's own writes nothing; a name the list has merges the two; the No section name hands the tasks to it. */
 	renameGroup(list: GroupedList, group: string, name: string): Promise<void>;
 	/** The heading goes; its tasks, in order, join the end of No section. */
 	removeGroup(list: GroupedList, group: string): Promise<void>;
@@ -586,17 +592,28 @@ export interface CalendarEvent {
 /** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */
 export type SourceKind = "synced" | "exported";
 
+/**
+ * Why a source has nothing fresh: Google not logged in, its file not in the vault, a feed silent for `seconds`, or any
+ * other failure with the source's own text. The frontend words it.
+ */
+export type SourceProblem =
+	| { readonly kind: "loggedOut" }
+	| { readonly kind: "fileMissing" }
+	| { readonly kind: "noAnswer"; readonly seconds: number }
+	| { readonly kind: "failed"; readonly detail: string };
+
 export interface SourceStatus {
 	readonly source: CalendarSource;
 	readonly kind: SourceKind;
-	readonly ok: boolean;
-	/** "12 events", "not logged in", "file missing", an error text. */
-	readonly message: string;
+	/** Null while the source is fine. */
+	readonly problem: SourceProblem | null;
+	/** How many of the day's events shown come from it. */
+	readonly events: number;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
-	/** `updatedAt` older than `settings.staleAfterMinutes`, or not ok: the orange dot. */
+	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
 	readonly stale: boolean;
 }
 
@@ -609,8 +626,13 @@ export interface DayEvents {
 
 /** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */
 export interface ShownCalendar {
+	/** With `title`, the calendar's key: what `setShown` takes back. */
 	readonly account: string;
 	readonly title: string;
+	/** The heading the calendar is listed under: its account, or iPhone for the phone's own calendars no account names. */
+	readonly accountName: string;
+	/** The calendar's name as listed under that heading. */
+	readonly name: string;
 	readonly color: string | null;
 	readonly shown: boolean;
 }
@@ -695,8 +717,11 @@ export interface WorkCalendarSetup {
 	export(): void;
 }
 
-/** What the screen reads of the settings: its own, and the path, the names and the levels it draws. */
-export interface ScreenSettings extends ViewSettings {
+/**
+ * What a screen reads of the shared settings: the path, the names and the levels it draws, when a touch becomes a drag
+ * and the hour a day opens at. How a frontend lays out its own screen is its own settings, not these.
+ */
+export interface ScreenSettings extends ScreenBehaviour {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;
 	/** The heading over tasks outside any section. */
@@ -705,14 +730,10 @@ export interface ScreenSettings extends ViewSettings {
 	readonly labels: readonly LabelLevel[];
 }
 
-/** What the screen sets by hand, on this device only: the divider's place, the columns shown, the zoom. */
-export type ScreenState = Pick<ViewSettings, "listShare" | "rightMode" | "zoom">;
-
-/** The settings as the screen sees them, and what it sets by hand. */
-export interface ViewSettingsStore {
+/** The shared settings as a screen sees them. */
+export interface ScreenSettingsStore {
 	/** The same object while the settings stay the same. */
 	get(): ScreenSettings;
-	set(patch: Partial<ScreenState>): Promise<void>;
 	/** Fires after the settings changed, here or through Sync. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
 }
@@ -721,9 +742,6 @@ export interface ViewSettingsStore {
 export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "liveSlotMarker" | "silentSlotMarker" | "repeatMarker" | "collapsedMarker";
 /** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
 export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
-/** The cards' size, set by a slider. */
-export type CardField = "cardHeight" | "cardGap";
-
 /** The settings tab's fields as it shows them: no secret of Google's among them. */
 export interface SettingsForm {
 	readonly tasksFile: string;
@@ -732,16 +750,11 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
-	readonly labelPaint: LabelPaint;
 	readonly presets: readonly string[];
 	readonly ungrouped: string;
-	readonly cardHeight: number;
-	readonly cardGap: number;
 	readonly longPressMs: number;
 	readonly dayStartHour: number;
 	readonly scrollToHour: number;
-	/** The hour's heights as the field shows them: `28, 56, 112, 224`. */
-	readonly zoomLevels: string;
 	readonly staleAfterMinutes: number;
 	readonly googleClientId: string;
 	readonly refreshSeconds: number;
@@ -768,10 +781,7 @@ export interface SettingsService {
 	setMarker(marker: Marker, text: string): Promise<void>;
 	/** Written when the text reads as a number of zero or more. */
 	setCount(field: CountField, text: string): Promise<void>;
-	setCardSize(field: CardField, px: number): Promise<void>;
 	setDayStartHour(hour: number): Promise<void>;
-	/** Written when the text reads as the hour's heights. */
-	setZoomLevels(text: string): Promise<void>;
 	/** The prefix trimmed. */
 	renameLevel(index: number, prefix: string): Promise<void>;
 	recolourLevel(index: number, color: PriorityColor): Promise<void>;
@@ -789,7 +799,11 @@ export interface SettingsService {
 	/** A new label `Label_<n>` no label has, in the first colour no label has. */
 	addLabel(): Promise<void>;
 	moveLabel(from: number, to: number): Promise<void>;
-	setLabelPaint(paint: LabelPaint): Promise<void>;
+	/**
+	 * A code typed for a level's or a label's colour, read with the shade each preset takes on the frontend's screen now: a
+	 * preset's own shade is that preset, so it keeps its other shade; any other code is itself. Null for text that is no colour.
+	 */
+	colourOf(text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null;
 	/** The name trimmed. */
 	renamePreset(index: number, name: string): Promise<void>;
 	removePreset(index: number): Promise<void>;

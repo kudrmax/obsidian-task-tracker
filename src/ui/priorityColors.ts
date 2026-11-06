@@ -1,4 +1,5 @@
-import { isPresetColor, type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../application/contracts";
+import { isPresetColor, type LabelLevel, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../application/contracts";
+import type { LabelPaint } from "./viewSettings";
 import type { Theme } from "./eventColors";
 
 /** What a level's colour paints: the flag and the dot (ink), a card's ground (fill), a card's date, time and progress dot (meta). */

@@ -16,7 +16,7 @@ export function acceptsDrop(target: DropColumn | "timeline", origins: readonly D
 	switch (target) {
 		case "timeline":
 			return origins.length <= 1;
-		case "left":
+		case "day":
 			return true;
 		case "soon":
 			return origins.every((from) => from !== "timeline");
@@ -44,9 +44,9 @@ function dropMove(from: DropFrom, to: DropTo, day: LocalDate): DropMove {
 			return { kind: "nest", parent: to.parent, before: to.before };
 		case "list":
 			if (from === "timeline") return { kind: "clearSlot", place: { before: to.before, date: day } };
-			if (to.column === "left") return from === "left" ? { kind: "moveBefore", before: to.before, date: day } : { kind: "moveToList", date: day };
+			if (to.column === "day") return from === "day" ? { kind: "moveBefore", before: to.before, date: day } : { kind: "moveToList", date: day };
 			if (to.before) return { kind: "moveBefore", before: to.before, date: day };
-			return from === "left" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
+			return from === "day" ? { kind: "moveToSoon", date: day } : { kind: "moveToEnd", section: to.column };
 	}
 }
 

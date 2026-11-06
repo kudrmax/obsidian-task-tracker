@@ -18,7 +18,7 @@ const LEVELS = [
 	{ prefix: "p2", color: "orange" },
 ] as const;
 
-function cards(items: readonly TaskItem[], column: PickedCard["column"] = "left"): PickedCard[] {
+function cards(items: readonly TaskItem[], column: PickedCard["column"] = "day"): PickedCard[] {
 	const list = document.body.appendChild(document.createElement("div"));
 	return items.map((it) => ({ item: it, card: list.appendChild(Object.assign(document.createElement("div"), { className: "tc-card" })), column, subtree: [] }));
 }
@@ -147,7 +147,7 @@ describe("bulk actions", () => {
 		const [a, b] = cards([item(), item()]);
 		bulk.selection.toggle(a);
 		bulk.selection.toggle(b);
-		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0 };
+		const drag: TaskDragPayload = { item: a.item, from: "day", durationMin: null, grabPx: 0 };
 		bulk.dropping(drag);
 		expect(bulk.selection.size).toBe(2);
 		bulk.dropping({ ...drag, carried: [{ item: b.item, from: "soon" }] });
@@ -176,9 +176,9 @@ describe("bulk actions", () => {
 	it("offers the cancel ring only while several cards are carried", () => {
 		const bulk = controller();
 		const [a] = cards([item()]);
-		const drag: TaskDragPayload = { item: a.item, from: "left", durationMin: null, grabPx: 0 };
+		const drag: TaskDragPayload = { item: a.item, from: "day", durationMin: null, grabPx: 0 };
 		expect(bulk.targets(drag)).toEqual([]);
-		expect(bulk.targets({ ...drag, carried: [{ item: item(), from: "left" }] })).toHaveLength(1);
+		expect(bulk.targets({ ...drag, carried: [{ item: item(), from: "day" }] })).toHaveLength(1);
 		bulk.settled();
 	});
 });

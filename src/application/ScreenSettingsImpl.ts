@@ -1,16 +1,10 @@
 import type { TaskCalendarSettings } from "../settings";
-import type { ScreenSettings, ScreenState, ViewSettingsStore } from "./contracts";
+import type { ScreenSettings, ScreenSettingsStore } from "./contracts";
 import type { SettingsStore } from "./ports";
 
-/** The part of the settings the screen reads. */
+/** The part of the shared settings a screen reads. */
 export function screenSettingsOf(settings: TaskCalendarSettings): ScreenSettings {
 	return {
-		listShare: settings.listShare,
-		rightMode: settings.rightMode,
-		zoom: settings.zoom,
-		zoomLevels: settings.zoomLevels,
-		cardHeight: settings.cardHeight,
-		cardGap: settings.cardGap,
 		longPressMs: settings.longPressMs,
 		scrollToHour: settings.scrollToHour,
 		tasksFile: settings.tasksFile,
@@ -18,12 +12,11 @@ export function screenSettingsOf(settings: TaskCalendarSettings): ScreenSettings
 		ungrouped: settings.groups.ungrouped,
 		priorities: settings.priorities,
 		labels: settings.labels,
-		labelPaint: settings.labelPaint,
 	};
 }
 
-/** The screen's view of the settings store: read once per change of the settings, written only where the screen sets by hand. */
-export class ViewSettingsImpl implements ViewSettingsStore {
+/** A screen's view of the settings store: read once per change of the settings. */
+export class ScreenSettingsImpl implements ScreenSettingsStore {
 	private source: TaskCalendarSettings | null = null;
 	private shown: ScreenSettings | null = null;
 
@@ -36,10 +29,6 @@ export class ViewSettingsImpl implements ViewSettingsStore {
 			this.shown = screenSettingsOf(settings);
 		}
 		return this.shown;
-	}
-
-	set(patch: Partial<ScreenState>): Promise<void> {
-		return this.store.update(patch);
 	}
 
 	onChange(listener: () => void): () => void {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, partition, settingsFrom, sharedOf } from "../src/settings";
+import { DEFAULT_SETTINGS, settingsFrom } from "../src/settings";
+import { storedSettingsFrom } from "../src/settingsFile";
+import { viewSettingsFrom } from "../src/ui/viewSettings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -19,9 +21,14 @@ describe("settingsFrom", () => {
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
 	});
 
-	it("draws cards 35 px high, 2 px apart, unless set", () => {
-		expect(settingsFrom(null)).toMatchObject({ cardHeight: 35, cardGap: 2 });
-		expect(settingsFrom({ cardHeight: 30, cardGap: 0 })).toMatchObject({ cardHeight: 30, cardGap: 0 });
+	it("draws cards 35 px high, 2 px apart, unless set: the view's own settings", () => {
+		expect(viewSettingsFrom(null)).toMatchObject({ cardHeight: 35, cardGap: 2 });
+		expect(viewSettingsFrom({ cardHeight: 30, cardGap: 0 })).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		expect(storedSettingsFrom({ cardHeight: 30 })).toMatchObject({ cardHeight: 30, cardGap: 2, dayStartHour: 5 });
+	});
+
+	it("hold nothing of how a frontend lays out its screen", () => {
+		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels", "cardHeight", "cardGap", "labelPaint"]) expect(key in DEFAULT_SETTINGS).toBe(false);
 	});
 
 	it("keeps the other nested keys when one is saved", () => {
@@ -39,23 +46,6 @@ describe("groups", () => {
 		const s = settingsFrom({ groups: { ungrouped: "Без секции" } });
 		expect(s.groups.ungrouped).toBe("Без секции");
 		expect(s.groups.presets).toHaveLength(3);
-		const groups = { presets: ["Утро"], ungrouped: "No section" };
-		expect(partition({ groups }).shared).toEqual({ groups });
-	});
-});
-
-describe("the device's part of the settings", () => {
-	it("keeps the divider's place, the column shown and the zoom apart from what the file holds", () => {
-		expect(partition({ listShare: 0.4, rightMode: "soon", zoom: 112, longPressMs: 300 })).toEqual({ device: { listShare: 0.4, rightMode: "soon", zoom: 112 }, shared: { longPressMs: 300 } });
-		expect(partition({ zoom: "wholeDay" }).device).toEqual({ zoom: "wholeDay" });
-	});
-
-	it("leaves them out of what is written to the file", () => {
-		const shared = sharedOf(DEFAULT_SETTINGS) as Record<string, unknown>;
-		expect("listShare" in shared).toBe(false);
-		expect("rightMode" in shared).toBe(false);
-		expect("zoom" in shared).toBe(false);
-		expect(shared.google).toEqual(DEFAULT_SETTINGS.google);
 	});
 });
 

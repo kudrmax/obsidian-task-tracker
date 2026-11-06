@@ -40,12 +40,12 @@ export class DemoCalendarService implements CalendarService {
 		const events: CalendarEvent[] = date === DEMO_DATE
 			? DEMO.map((e, i) => ({ id: `demo-${i}`, title: e.title, start: at(date, e.start), end: at(date, e.end), allDay: e.allDay === true, calendar: e.calendar, color: e.color, source: e.source, account: null, calendarId: null }))
 			: [];
-		const count = (source: CalendarSource) => `${events.filter((e) => e.source === source).length} events`;
+		const count = (source: CalendarSource) => events.filter((e) => e.source === source).length;
 		const result: DayEvents = {
 			events,
 			statuses: [
-				{ source: "google", kind: "synced", ok: true, message: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
-				{ source: "work", kind: "exported", ok: true, message: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
+				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
+				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
 			],
 			stale: true,
 		};

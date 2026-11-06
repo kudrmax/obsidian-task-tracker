@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CalendarFile } from "../../src/application/calendarFile";
 import { CalendarServiceImpl } from "../../src/application/CalendarServiceImpl";
 import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
-import type { EventFeed, EventFile } from "../../src/application/EventSource";
+import { type EventFeed, type EventFile, SourceProblemError } from "../../src/application/EventSource";
 import type { Clock } from "../../src/application/ports";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
@@ -91,7 +91,7 @@ describe("CalendarServiceImpl", () => {
 		]);
 		const day = await refreshed(service([google], [], new FakeClock(), 4));
 		expect(day.events.map((e) => e.id)).toEqual(["all day", "evening", "after midnight"]);
-		expect(day.statuses[0].message).toBe("3 events");
+		expect(day.statuses[0]).toMatchObject({ problem: null, events: 3 });
 	});
 
 	it("merges the files' events by start and says where each file came from", async () => {
@@ -102,8 +102,8 @@ describe("CalendarServiceImpl", () => {
 		const day = await refreshed(service([google, work], [new FakeFeed("google")]));
 		expect(day.events.map((e) => e.id)).toEqual(["w1", "g1"]);
 		expect(day.statuses).toEqual([
-			{ source: "google", kind: "synced", ok: true, message: "1 event", updatedAt: WRITTEN, detail: null, stale: false },
-			{ source: "work", kind: "exported", ok: true, message: "1 event", updatedAt: WRITTEN, detail: "iPhone", stale: false },
+			{ source: "google", kind: "synced", problem: null, events: 1, updatedAt: WRITTEN, detail: null, stale: false },
+			{ source: "work", kind: "exported", problem: null, events: 1, updatedAt: WRITTEN, detail: "iPhone", stale: false },
 		]);
 	});
 
@@ -130,7 +130,7 @@ describe("CalendarServiceImpl", () => {
 		feed.failWith = new Error("Google API 500");
 		const day = await refreshed(service([file], [feed]));
 		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", ok: false, message: "Google API 500", updatedAt: WRITTEN, detail: null, stale: true });
+		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", problem: { kind: "failed", detail: "Google API 500" }, events: 1, updatedAt: WRITTEN, detail: null, stale: true });
 	});
 
 	it("a feed that answers again clears its error", async () => {
@@ -140,7 +140,7 @@ describe("CalendarServiceImpl", () => {
 		feed.failWith = new Error("offline");
 		await refreshed(calendars);
 		feed.failWith = null;
-		expect((await refreshed(calendars)).statuses[0].ok).toBe(true);
+		expect((await refreshed(calendars)).statuses[0].problem).toBeNull();
 	});
 
 	it("a feed silent for 15 s is reported and the file is still shown, timed by the service's timers", async () => {
@@ -154,7 +154,14 @@ describe("CalendarServiceImpl", () => {
 		timers.fire();
 		const day = await pending;
 		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-		expect(day.statuses[0].message).toBe("no answer in 15 s");
+		expect(day.statuses[0].problem).toEqual({ kind: "noAnswer", seconds: 15 });
+	});
+
+	it("a feed that is not logged in says so, as a problem the screen words", async () => {
+		const file = new FakeFile("google");
+		const feed = new FakeFeed("google", file);
+		feed.failWith = new SourceProblemError({ kind: "loggedOut" }, "not logged in");
+		expect((await refreshed(service([file], [feed]))).statuses[0].problem).toEqual({ kind: "loggedOut" });
 	});
 
 	it("a feed that answers clears its timer", async () => {
@@ -167,24 +174,24 @@ describe("CalendarServiceImpl", () => {
 		const work = new FakeFile("work", [event("work", "w1", new Date(2026, 9, 30, 9), new Date(2026, 9, 30, 10))]);
 		const calendars = service([work]);
 		await refreshed(calendars);
-		work.failWith = new Error("file missing");
+		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
 		const day = await refreshed(calendars);
 		expect(day.events.map((e) => e.id)).toEqual(["w1"]);
-		expect(day.statuses[0]).toMatchObject({ ok: false, message: "file missing", stale: true });
+		expect(day.statuses[0]).toMatchObject({ problem: { kind: "fileMissing" }, stale: true });
 	});
 
 	it("a file never read reports no events and no time", async () => {
 		const work = new FakeFile("work");
-		work.failWith = new Error("file missing");
+		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
 		const day = await refreshed(service([work]));
-		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", ok: false, message: "file missing", updatedAt: null, detail: null, stale: true });
+		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, detail: null, stale: true });
 	});
 
 	it("a file written longer ago than staleAfterMinutes is stale", async () => {
 		const work = new FakeFile("work");
 		work.exportedAt = new Date(NOW.getTime() - (DEFAULT_SETTINGS.staleAfterMinutes + 1) * 60_000);
 		const day = await refreshed(service([work]));
-		expect(day.statuses[0]).toMatchObject({ ok: true, stale: true });
+		expect(day.statuses[0]).toMatchObject({ problem: null, stale: true });
 	});
 
 	it("nothing is cached before the first read, then any day comes from the files as last read", async () => {
@@ -332,7 +339,7 @@ describe("CalendarServiceImpl, the calendars across the files", () => {
 	it("known lists every calendar with whether it is shown, and setShown hides it", async () => {
 		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, calendarsMigrated: true });
 		const calendars = service([new FakeFile("iphone", [work("iphone", "w", 10)])], [], new FakeClock(), 0, settings);
-		expect(await calendars.known()).toEqual([{ account: "max@company.ru", title: "Work", color: null, shown: true }]);
+		expect(await calendars.known()).toEqual([{ account: "max@company.ru", title: "Work", accountName: "max@company.ru", name: "Work", color: null, shown: true }]);
 		await calendars.setShown("max@company.ru", "Work", false);
 		expect(settings.get().hiddenCalendars).toEqual([{ account: "max@company.ru", title: "Work" }]);
 		expect((await calendars.known())[0].shown).toBe(false);

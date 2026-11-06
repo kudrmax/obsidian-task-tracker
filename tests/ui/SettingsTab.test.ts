@@ -4,8 +4,18 @@ import type { App, Plugin } from "obsidian";
 import type { CalendarService, GoogleAccount, ShownCalendar, WorkCalendarSetup } from "../../src/application/contracts";
 import { SettingsServiceImpl } from "../../src/application/SettingsServiceImpl";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
-import { DEFAULT_SETTINGS, sharedOf, type SharedSettings } from "../../src/settings";
+import { DEFAULT_SETTINGS } from "../../src/settings";
+import { SETTINGS_FILE, type StoredSettings } from "../../src/settingsFile";
 import { TaskCalendarSettingsTab } from "../../src/ui/SettingsTab";
+import { ViewSettingsStore } from "../../src/ui/viewSettings";
+
+type FileSettings = Omit<StoredSettings, "listShare" | "rightMode" | "zoom">;
+
+/** What data.json holds of the settings: all but the device's part. */
+function fileOf(settings: StoredSettings): FileSettings {
+	const { listShare: _s, rightMode: _m, zoom: _z, ...file } = settings;
+	return file;
+}
 
 const FILE = ".obsidian/plugins/task-calendar/data.json";
 
@@ -39,13 +49,13 @@ class Disk implements SettingsPersistence {
 }
 
 /** The file the tab starts from: the defaults, logged in to Google. */
-const START: SharedSettings = {
-	...sharedOf(DEFAULT_SETTINGS),
+const START: FileSettings = {
+	...fileOf(SETTINGS_FILE.from(null)),
 	google: { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" },
 };
 
 /** The file's text after a change: the start with `patch` over it, in the order the plugin writes the keys. */
-function fileWith(patch: Partial<SharedSettings>): string {
+function fileWith(patch: Partial<FileSettings>): string {
 	return JSON.stringify({ ...START, ...patch }, null, 2);
 }
 
@@ -73,7 +83,7 @@ class KnownCalendars implements Pick<CalendarService, "known" | "setShown"> {
 let calendars: KnownCalendars;
 
 let disk: Disk;
-let settings: PluginSettings;
+let settings: PluginSettings<StoredSettings>;
 let tab: TaskCalendarSettingsTab;
 
 async function settled(): Promise<void> {
@@ -83,9 +93,9 @@ async function settled(): Promise<void> {
 async function open(file: unknown = START, google: GoogleAccount = loggedOut): Promise<void> {
 	document.body.replaceChildren();
 	disk = new Disk(file);
-	settings = new PluginSettings(disk, FILE);
+	settings = new PluginSettings(disk, FILE, SETTINGS_FILE);
 	await settings.load();
-	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars });
+	tab = new TaskCalendarSettingsTab({} as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), view: new ViewSettingsStore(settings), google, work, calendars });
 	tab.display();
 }
 
@@ -128,9 +138,9 @@ function deviceState(): unknown {
 }
 
 /** Typed into the field, the value counts at once and lands in data.json; nothing goes to the device. */
-async function writes(change: () => void, patch: Partial<SharedSettings>): Promise<void> {
+async function writes(change: () => void, patch: Partial<FileSettings>): Promise<void> {
 	change();
-	const counted = sharedOf(settings.get());
+	const counted = fileOf(settings.get());
 	await settled();
 	expect(disk.text).toBe(fileWith(patch));
 	expect(JSON.stringify(counted, null, 2)).toBe(fileWith(patch));
@@ -144,7 +154,7 @@ async function rejects(change: () => void): Promise<void> {
 	await settled();
 	expect(disk.saves).toBe(0);
 	expect(disk.text).toBe(before);
-	expect(JSON.stringify(sharedOf(settings.get()), null, 2)).toBe(before);
+	expect(JSON.stringify(fileOf(settings.get()), null, 2)).toBe(before);
 	expect(deviceState()).toBeNull();
 }
 
@@ -386,8 +396,8 @@ describe("the settings tab: the calendar sources", () => {
 describe("the settings tab: the calendars shown", () => {
 	it("lists every known calendar under its account on the Calendars page, with a toggle that hides it", async () => {
 		calendars.list = [
-			{ account: "max@gmail.com", title: "Personal", color: null, shown: true },
-			{ account: "max@company.ru", title: "Календарь", color: null, shown: false },
+			{ account: "max@gmail.com", title: "Personal", accountName: "max@gmail.com", name: "Personal", color: null, shown: true },
+			{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: false },
 		];
 		await open();
 		await settled();
@@ -406,8 +416,8 @@ describe("the settings tab: the calendars shown", () => {
 		expect(calendars.asked).toEqual([["max@gmail.com", "Personal", false]]);
 	});
 
-	it("names a calendar under the iPhone heading without repeating iPhone", async () => {
-		calendars.list = [{ account: "", title: "iPhone · Календарь", color: null, shown: true }];
+	it("lists each calendar by its name under its account's name, as the service names them", async () => {
+		calendars.list = [{ account: "", title: "iPhone · Календарь", accountName: "iPhone", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();
@@ -416,7 +426,7 @@ describe("the settings tab: the calendars shown", () => {
 	});
 
 	it("lays the calendars out as rows of the page, so the next heading keeps its space", async () => {
-		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();
@@ -426,7 +436,7 @@ describe("the settings tab: the calendars shown", () => {
 	});
 
 	it("shows the calendars whether or not Google is logged in", async () => {
-		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();

@@ -159,9 +159,10 @@ export class TaskRules {
 	}
 
 	/** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */
-	sectionChange(entry: TaskEntry, name: GroupName): Extract<TaskChange, { readonly kind: "moveToGroup" | "createGroup" }> | null {
+	sectionChange(entry: TaskEntry, typed: GroupName): Extract<TaskChange, { readonly kind: "moveToGroup" | "createGroup" }> | null {
 		const list = entry.section;
-		if (list === "done" || entry.group === name) return null;
+		const name = typed === null ? null : typed.trim();
+		if (list === "done" || name === "" || entry.group === name) return null;
 		const date = (list === "soon" ? entry.task.dueDate : null) ?? undefined;
 		return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
 	}
@@ -347,7 +348,9 @@ export class TaskRules {
 		};
 	}
 
-	renameGroup(list: GroupedList, group: string, name: string): Operation {
+	/** Null for a blank name or the section's own: nothing to write. */
+	renameGroup(list: GroupedList, group: string, name: string): Operation | null {
+		if (blank(name) || name.trim() === group) return null;
 		return (doc, _today, settings) => {
 			this.groupOf(doc, list, group);
 			return ops.renameGroup(doc, list, group, name, settings.groups.ungrouped);

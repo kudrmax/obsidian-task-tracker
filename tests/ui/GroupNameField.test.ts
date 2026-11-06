@@ -14,18 +14,18 @@ function open(value = "") {
 const key = (input: HTMLInputElement, k: string) => input.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
 
 describe("GroupNameField", () => {
-	it("Enter gives the trimmed name", () => {
+	it("Enter gives the name as typed: the service reads it", () => {
 		const { input, got } = open();
 		input.value = "  Вечером дома ";
 		key(input, "Enter");
-		expect(got).toEqual(["Вечером дома"]);
+		expect(got).toEqual(["  Вечером дома "]);
 	});
 
-	it("empty, Escape and blur give null, once", () => {
+	it("Escape and blur give null, once", () => {
 		const empty = open();
 		key(empty.input, "Enter");
 		empty.input.dispatchEvent(new FocusEvent("blur"));
-		expect(empty.got).toEqual([null]);
+		expect(empty.got).toEqual([""]);
 		const escape = open("Экскурсия");
 		key(escape.input, "Escape");
 		expect(escape.got).toEqual([null]);

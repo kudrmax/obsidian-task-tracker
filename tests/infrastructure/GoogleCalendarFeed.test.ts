@@ -130,7 +130,7 @@ describe("GoogleCalendarFeed", () => {
 		const { google, adapter, settings } = feed();
 		await google.refresh(true);
 		await settings.update({ google: { ...settings.get().google, refreshToken: "" } });
-		await expect(google.refresh(true)).rejects.toThrow("not logged in");
+		await expect(google.refresh(true)).rejects.toMatchObject({ problem: { kind: "loggedOut" }, message: "not logged in" });
 		expect(written(adapter).events).toEqual([]);
 	});
 
