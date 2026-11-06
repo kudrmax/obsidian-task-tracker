@@ -31,8 +31,7 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 ## Open (being planned now)
 
 - How a project note is recognised (folder, frontmatter, tag).
-- What a project task looks like in the note before it is taken, when it is taken, when it is done.
-- How a task of a project gets into the lane (Inbox, Soon, Now, a day, the calendar) and how it leaves it; where Done goes.
+- How the lane is written on a project task's line (technical, decided by the backend).
 - Where the plugin shows projects: a screen of projects inside the plugin or only the notes.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
