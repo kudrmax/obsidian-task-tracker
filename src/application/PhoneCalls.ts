@@ -1,4 +1,5 @@
-import { DayBoundary } from "../domain/DayBoundary";
+import type { DayBoundary } from "../domain/DayBoundary";
+import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
 import { addDays, MINUTES_PER_DAY } from "../domain/LocalDate";
 import { DESCRIPTION_TEMPLATE } from "../domain/description";
@@ -435,7 +436,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, LISTS: GROUPED_LISTS };
 
 /** A quick entry's look from the wire. */
 function lookOf(c: Call, look: WireLook): EntryLook {

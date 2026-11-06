@@ -4719,7 +4719,7 @@ ${key.title}`.toLowerCase();
     acceptsDrop,
     placesInGap
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, LISTS: GROUPED_LISTS };
   function lookOf(c, look) {
     return {
       cards: (column) => look.cards[column] ?? [],
