@@ -209,10 +209,11 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   an unreadable saved zoom → `DEFAULT_ZOOM_HOUR`, clamped). `wholeDayPx` is `null` before the timeline has a height, and
   then the smallest level stands for the whole day. The `Zoom` type (`number | "wholeDay"`) is exported from contracts;
   `obsidian/ui/viewSettings.ts` still declares its own and may switch to it.
-- frontend-swift: the tab bar is a standalone `UITabBar` (iOS 26 glass) bound to the one ribbon, the plus a real
-  `UIControl` beside it (the accent's interactive glass, `UIGlassEffect` tinted). A standalone tab bar draws its glass at
-  most 273 pt wide for three items, inset 21 pt in its bounds: its glass is lined up with the screen's 16 pt margin, so
-  the gap to the plus is wider than the board's 10 pt. TabView could not host one shared content.
+- frontend-swift (finding 9, replaces the standalone `UITabBar`): the bottom bar is a real `UITabBarController` (three
+  `UITab`s and a `UISearchTab`) laid over the one ribbon, its tabs empty pass-through placeholders, so iOS lays out the
+  bar and its round search slot itself (same height, centre line and gap as the first build's TabView). The plus is our
+  draggable control placed on the search slot's own frame as the bar laid it out (the bar's square subview), the same
+  size; the search tab is never selected (`shouldSelectTab` refuses it). A tap on a tab moves the ribbon.
 - frontend-swift: the day list and the calendar slide as one unit when the day changes (`.push` from the arrow's side,
   `.smooth`); SwiftUI's clip does not hold the UIKit-backed columns apart during a transition, so they move together as
   the day they are. The day before and after are read ahead (`days.step` + a snapshot each) and shown in the same frame;
@@ -274,4 +275,3 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   from where the card is drawn. The drop places hold the model weakly; the file watch follows the settings' tasks file.
 - frontend-swift (round 2): the ribbon pages by view alignment with no limit per swipe: it settles on the place the
   swipe's speed reaches, so one fast swipe goes from Today to Inbox.
-

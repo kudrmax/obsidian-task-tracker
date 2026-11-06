@@ -100,6 +100,11 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        solid.layer.cornerRadius = bounds.height / 2
+    }
+
     override var intrinsicContentSize: CGSize { CGSize(width: PlusButton.side, height: PlusButton.side) }
 
     /// The plus, the cancel target, or the cancel target held: each change one system spring.

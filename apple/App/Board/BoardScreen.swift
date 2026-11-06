@@ -10,6 +10,8 @@ struct BoardScreen: View {
     @State private var router = CaptureRouter.shared
     @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
+    /// Where the system lays out the tab bar's search slot, on the screen.
+    @State private var plusSlot: CGRect?
     @Environment(\.scenePhase) private var scene
     @Environment(\.colorScheme) private var scheme
 
@@ -22,7 +24,7 @@ struct BoardScreen: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
         }
-        .overlay(alignment: .bottom) {
+        .overlay {
             if !model.selecting, model.fullScreen.isEmpty {
                 bottomBar.transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -57,20 +59,18 @@ struct BoardScreen: View {
         }
     }
 
-    /// The tab bar beside the plus, measured from the screen's edges as the design stands them.
+    /// The system tab bar with its search slot, laid out by iOS; the plus stands on that slot, the same size, so it can be
+    /// carried while the bar keeps the system's layout.
     private var bottomBar: some View {
-        HStack(spacing: 10) {
-            // The bar draws its glass inside its own margins: the glass, not the bar, lines up with the screen's edge.
-            PlaceBar(place: model.place) { model.go(to: $0) }
-                .frame(width: PlaceBar.glass + 2 * PlaceBar.margin, height: PlusButton.side)
-                .padding(.horizontal, -PlaceBar.margin)
-            Spacer(minLength: 0)
-            PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
-                .frame(width: PlusButton.side, height: PlusButton.side)
+        ZStack(alignment: .topLeading) {
+            PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
+            if let slot = plusSlot {
+                PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                    .frame(width: slot.width, height: slot.height)
+                    .offset(x: slot.minX, y: slot.minY)
+            }
         }
-        .padding(.horizontal, PlusButton.inset)
-        .padding(.bottom, PlusButton.bottom)
-        .ignoresSafeArea(edges: .bottom)
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -153,44 +153,6 @@ struct BoardScreen: View {
 enum BoardSheet: String, Identifiable {
     case search, settings, calendars
     var id: String { rawValue }
-}
-
-/// The system tab bar, standing alone beside the plus: its items are the ribbon's places, the selected one where the
-/// ribbon stands, and a tap moves the ribbon there.
-struct PlaceBar: UIViewRepresentable {
-    /// How far inside its bounds a standalone tab bar draws its glass, and the widest glass it draws for three items.
-    static let margin: CGFloat = 21
-    static let glass: CGFloat = 273
-
-    let place: RibbonPlace
-    let choose: (RibbonPlace) -> Void
-
-    func makeUIView(context: Context) -> UITabBar {
-        let bar = UITabBar()
-        bar.items = RibbonPlace.allCases.map { place in
-            UITabBarItem(title: place.name, image: UIImage(systemName: place.symbol), tag: place.rawValue)
-        }
-        bar.delegate = context.coordinator
-        bar.selectedItem = bar.items?[place.rawValue]
-        return bar
-    }
-
-    func updateUIView(_ bar: UITabBar, context: Context) {
-        context.coordinator.choose = choose
-        if bar.selectedItem?.tag != place.rawValue { bar.selectedItem = bar.items?[place.rawValue] }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator(choose: choose) }
-
-    final class Coordinator: NSObject, UITabBarDelegate {
-        var choose: (RibbonPlace) -> Void
-
-        init(choose: @escaping (RibbonPlace) -> Void) { self.choose = choose }
-
-        func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
-            if let place = RibbonPlace(rawValue: item.tag) { choose(place) }
-        }
-    }
 }
 
 /// The ribbon: four columns side by side, Inbox over Backlog, Soon, the day list and the calendar, each a fixed width the
