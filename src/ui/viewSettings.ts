@@ -1,6 +1,10 @@
-import type { RightMode, ScreenSettings, ScreenSettingsStore } from "../application/contracts";
+import type { ScreenSettings, ScreenSettingsStore } from "../application/contracts";
 
-export type { RightMode } from "../application/contracts";
+/**
+ * Which pair of neighbouring lists the window shows: Inbox and Soon, Soon and the day's list, or the day's list and the
+ * calendar. The window's own layout: the services hear only which lists show (`SHOWN_LISTS`).
+ */
+export type RightMode = "calendar" | "soon" | "inbox";
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the

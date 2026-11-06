@@ -1,5 +1,6 @@
 import { type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../viewSettings";
+import { SHOWN_LISTS } from "../screens";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -152,7 +153,7 @@ export class QuickEntryController {
 				sectioned: (column) => deps.sectioned(column),
 				day: () => deps.day(),
 				today: () => deps.today(),
-				mode: () => deps.mode(),
+				shown: () => SHOWN_LISTS[deps.mode()],
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			},

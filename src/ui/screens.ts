@@ -1,9 +1,12 @@
-import type { DayService } from "../application/contracts";
+import type { DayService, DropColumn } from "../application/contracts";
 import type { RightMode } from "./viewSettings";
 import type { LocalDate } from "./types";
 
 /** The window's places left to right; a place's index is that of the first of the two columns it shows. */
 export const PLACES: readonly RightMode[] = ["inbox", "soon", "calendar"];
+
+/** The lists each place shows, in its order: Inbox over Backlog beside Soon, Soon beside the day's list, the day's list beside the calendar. */
+export const SHOWN_LISTS: Readonly<Record<RightMode, readonly DropColumn[]>> = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
 
 /** Where the window stands: one of the places, or Done left of Inbox, which only the search opens. */
 export type Place = RightMode | "done";

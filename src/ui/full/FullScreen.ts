@@ -1,5 +1,6 @@
 import { DESCRIPTION_TEMPLATE, type EntryState, type FullPlace, type FullTree, QuickEntrySession, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../application/contracts";
 import { BottomCapsule } from "../BottomCapsule";
+import { SHOWN_LISTS } from "../screens";
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
@@ -91,7 +92,7 @@ export class FullScreen {
 				sectioned: () => false,
 				day: () => deps.day(),
 				today: () => deps.day(),
-				mode: () => "calendar",
+				shown: () => SHOWN_LISTS.calendar,
 				fresh: (beforeShow) => this.reread(beforeShow && (() => beforeShow(() => []))),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 				renamed: (was, now) => this.renamed(was, now),
