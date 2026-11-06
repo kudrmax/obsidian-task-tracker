@@ -58,6 +58,8 @@ export class FullScreen {
 	private written = "";
 	private saveTimer: number | null = null;
 	private typing: CardTyping | null = null;
+	/** The title being written; settles once the task on screen is the one the file now has. */
+	private titleWrite: Promise<unknown> | null = null;
 	private field: QuickFieldHandle | null = null;
 	private titleField: TitleField | null = null;
 	/** Each refresh is numbered: only the last one asked for draws. */
@@ -125,6 +127,8 @@ export class FullScreen {
 	/** The file changed: the task on screen is read anew where it now stands; one that is gone gives way to the one under it. */
 	async refresh(): Promise<void> {
 		const ask = ++this.reading;
+		await this.titleWrite?.catch(() => undefined);
+		if (ask !== this.reading || this.closed) return;
 		while (this.current) {
 			const current = this.current;
 			let found: TaskItem | null = null;
@@ -367,18 +371,25 @@ export class FullScreen {
 		this.showDone();
 	}
 
-	/** The typed title is written; the field stays over the title until the task, as the file now has it, takes its place. */
+	/**
+	 * The typed title is written; the field stays over the title until the task, as the file now has it, takes its place.
+	 * A change of the file meanwhile waits for it: the task is read by the key the rename answers with, the old one finds none.
+	 */
 	private async saveTitle(): Promise<void> {
 		const field = this.titleField;
 		const current = this.current;
 		if (!field || !current) return;
 		this.titleField = null;
-		let renamed: TaskItem | null = null;
-		try {
-			await this.deps.act(async () => (renamed = await this.deps.tasks.rename(current.key, field.text)) !== null);
-		} finally {
-			field.destroy();
+		const write = this.deps.tasks.rename(current.key, field.text).then((renamed) => {
 			if (renamed && this.current === current) this.stack[this.stack.length - 1] = renamed;
+			return renamed !== null;
+		});
+		this.titleWrite = write;
+		try {
+			await this.deps.act(() => write);
+		} finally {
+			this.titleWrite = null;
+			field.destroy();
 			this.drawTitle();
 		}
 	}

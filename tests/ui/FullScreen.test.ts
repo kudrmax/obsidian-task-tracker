@@ -222,6 +222,25 @@ describe("FullScreen", () => {
 		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться к 9");
 	});
 
+	it("a change of the file while its title is written waits for it, then reads the task by the key the rename answered with", async () => {
+		const { screen, tasks, deps } = setup();
+		const renamed = { ...morning(), text: "Собраться к 9", key: { section: "now" as const, index: 0, path: [], raw: "- [ ] Собраться к 9" } };
+		tasks.rename.mockResolvedValueOnce(renamed);
+		tasks.find.mockResolvedValue(renamed);
+		deps.act.mockImplementationOnce(async (change: () => Promise<void | boolean>) => {
+			const refreshed = screen.refresh();
+			await change();
+			await refreshed;
+		});
+		screen.rename(morning());
+		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
+		field.value = "Собраться к 9";
+		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+		await vi.runAllTimersAsync();
+		expect(tasks.find).toHaveBeenCalledWith(renamed.key, "Собраться к 9");
+		expect(deps.onClose).not.toHaveBeenCalled();
+	});
+
 	it("closes on Close and on Escape", () => {
 		const first = setup();
 		first.screen.el.querySelector<HTMLElement>(".tc-sheet-bar button")!.click();
