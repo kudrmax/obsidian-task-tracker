@@ -1,4 +1,5 @@
 import type { CardSize } from "./cardSize";
+import { eventLevels } from "../../core/application/contracts";
 import { DESIGN, LAYOUT } from "./design";
 
 export interface Span {
@@ -66,21 +67,9 @@ const MINUTES_PER_HOUR = 60;
 /** Under half a pixel off its time a card still stands on it. */
 const STACK_SLACK = 0.5;
 
-/**
- * Events never share the width, like tasks: by start, the longer first on a tie, an event that starts while another goes on lies over
- * it, one inset further in; the later lies higher. Answers in the order given.
- */
+/** Each event's box: its left edge by how deep it lies over others (`eventLevels`). Answers in the order given. */
 export function layoutEvents(spans: readonly Span[]): EventBox[] {
-	const order = spans.map((span, index) => ({ span, index })).sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
-	const boxes: EventBox[] = new Array(spans.length);
-	const placed: (Span & { level: number })[] = [];
-	for (const { span, index } of order) {
-		const under = placed.filter((p) => p.start <= span.start && span.start < p.end).pop();
-		const level = under ? under.level + 1 : 0;
-		boxes[index] = { left: overlayLeft(level), level, layer: placed.length };
-		placed.push({ ...span, level });
-	}
-	return boxes;
+	return eventLevels(spans).map(({ level, layer }) => ({ left: overlayLeft(level), level, layer }));
 }
 
 /** The left edge of a block lying `level` deep: on the ground at the inset, over others one overlay inset per level. */

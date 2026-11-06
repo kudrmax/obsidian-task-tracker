@@ -17,6 +17,7 @@ import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } f
 import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
 import { dayTitle, dueLabel } from "./dayLabels";
+import { eventLevels } from "./eventLevels";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, shadesOf } from "./paints";
 import {
 	type CalendarEvent,
@@ -641,6 +642,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
 	dayTitle,
 	dueLabel,
+	eventLevels,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

@@ -2372,6 +2372,20 @@ ${key.title}`.toLowerCase();
     return { day: String(day), month: MONTHS[month - 1].toUpperCase() };
   }
 
+  // core/application/eventLevels.ts
+  function eventLevels(spans) {
+    const order = spans.map((span, index) => ({ span, index })).sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
+    const levels = new Array(spans.length);
+    const placed = [];
+    for (const { span, index } of order) {
+      const under = placed.filter((p) => p.start <= span.start && span.start < p.end).pop();
+      const level = under ? under.level + 1 : 0;
+      levels[index] = { level, layer: placed.length };
+      placed.push({ ...span, level });
+    }
+    return levels;
+  }
+
   // core/application/paints.ts
   var PRESET_INK = {
     red: { dark: "#FF453A", light: "#FF3B30" },
@@ -5370,7 +5384,8 @@ ${key.title}`.toLowerCase();
     bgAlphaFor,
     eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
     dayTitle,
-    dueLabel
+    dueLabel,
+    eventLevels
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
   function lookOf(c, look) {

@@ -485,6 +485,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.eventColors", "#0A84FF", 0.22, "light"),
 		plain("rules.dayTitle", T, "other", T),
 		plain("rules.dueLabel", T),
+		plain("rules.eventLevels", [{ start: 60, end: 120 }, { start: 90, end: 100 }]),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],

@@ -76,6 +76,8 @@ export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placemen
 export { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, type EventColors, eventHex, inkOf, type PriorityShades, shadesOf, type Theme } from "./paints";
 /** A day as the screens name it (`Today`, `Tue, 3 Nov`), and a due date as a card's corner writes it. */
 export { dayTitle, type DueLabel, dueLabel } from "./dayLabels";
+/** How deep each event of a day lies over the others on the timeline. */
+export { type EventLevel, eventLevels, type EventSpan } from "./eventLevels";
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the
