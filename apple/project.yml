@@ -38,10 +38,15 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: Alarms for tasks set to a time
+        NSCalendarsFullAccessUsageDescription: Writes this iPhone's calendars to your vault for Task Calendar
         NSMicrophoneUsageDescription: Records a task you say instead of typing
         NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kudrmax.taskcalendar.refresh
+            CFBundleURLSchemes: [taskcalendar]
+        LSApplicationQueriesSchemes: [obsidian]
   TaskCalendarCards:
     type: app-extension
     platform: iOS

@@ -30,6 +30,8 @@ public protocol TasksVault: Sendable {
     func write(tasks: String, expecting old: String) throws -> Bool
     /// Another file of the vault, by path from its folder; `nil` when it is missing or unreadable.
     func read(path: String) -> String?
+    /// Writes another file of the vault whole, its folder made if missing.
+    func write(path: String, text: String) throws
     /// The tasks file, by path from the vault folder.
     func tasksFilePath() throws -> String
     /// A new file in `folder` (by path from the vault folder, made if missing), never over another: a taken name gets
@@ -109,6 +111,19 @@ public final class Vault: TasksVault, @unchecked Sendable {
 
     public func read(path: String) -> String? {
         try? withFolder { folder in try Self.coordinatedRead(folder.appendingPathComponent(path)) }
+    }
+
+    public func write(path: String, text: String) throws {
+        try withFolder { folder in
+            let file = folder.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var failure: Error?
+            var coordination: NSError?
+            NSFileCoordinator().coordinate(writingItemAt: file, options: .forReplacing, error: &coordination) { url in
+                do { try text.write(to: url, atomically: true, encoding: .utf8) } catch { failure = error }
+            }
+            if let error = coordination ?? failure { throw error }
+        }
     }
 
     private func withFolder<T>(_ body: (URL) throws -> T) throws -> T {

@@ -78,17 +78,19 @@ public actor ReminderSync {
     private let notifications: NotificationScheduling
     private let alarms: AlarmScheduling
     private let cards: CardScheduling
+    private let calendar: CalendarExporting
     private let now: @Sendable () -> Date
     /// The operation running now: the next one waits for it, so a sync that read the file before a Done was written
     /// never brings the done task's reminders back.
     private var turn: Task<SyncStatus, Never>?
 
-    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, cards: CardScheduling, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(vault: TasksVault, rules: TaskRules, notifications: NotificationScheduling, alarms: AlarmScheduling, cards: CardScheduling, calendar: CalendarExporting = NoCalendarExport(), now: @escaping @Sendable () -> Date = Date.init) {
         self.vault = vault
         self.rules = rules
         self.notifications = notifications
         self.alarms = alarms
         self.cards = cards
+        self.calendar = calendar
         self.now = now
     }
 
@@ -151,6 +153,7 @@ public actor ReminderSync {
         let at = now()
         let status: SyncStatus
         do {
+            await exportCalendars(at: at)
             let file = try vault.read()
             let reminders = try rules.reminders(text: file.tasks, settingsJSON: file.settingsJSON, now: at)
             let meetings = self.meetings(until: reminders.map(\.dayEnd).max(), settingsJSON: file.settingsJSON, at: at)
@@ -226,12 +229,19 @@ public actor ReminderSync {
         return (failure, refusedCard)
     }
 
+    /// The phone's calendars into the vault for the plugin, before the meetings are read back. Without access the file is
+    /// left as it is; a write that fails leaves the reminders to be set all the same.
+    private func exportCalendars(at: Date) async {
+        guard let text = try? await calendar.export(now: at), CalendarExport.adds(text, over: vault.read(path: CalendarExport.path), at: at) else { return }
+        try? vault.write(path: CalendarExport.path, text: text)
+    }
+
     /// The meetings from now to the last reminder's day end, as the plugin's calendar shows them. Meetings that cannot be
     /// read only take the snooze until a meeting away: the reminders are set all the same.
     private func meetings(until end: Date?, settingsJSON: String, at: Date) -> [CalendarEvent] {
         guard let end, let paths = try? rules.calendarFiles(settingsJSON: settingsJSON) else { return [] }
         let texts = paths.map { vault.read(path: $0) }
-        return (try? rules.meetings(settingsJSON: settingsJSON, texts: texts, from: at, to: end)) ?? []
+        return (try? rules.meetings(settingsJSON: settingsJSON, texts: texts, from: at, to: end, now: at)) ?? []
     }
 
     /// Shown notifications to take away: those of reminders that are gone, and all but the latest of each reminder.
