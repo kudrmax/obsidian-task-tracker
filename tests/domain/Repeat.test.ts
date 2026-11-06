@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Repeat, type RepeatRule, sameRule } from "../../src/domain/Repeat";
+import { Repeat, type RepeatRule, repeatParts, sameRule } from "../../src/domain/Repeat";
 
 const cases = [
 	"every week on Mon, Wed, Fri",
@@ -79,5 +79,37 @@ describe("sameRule", () => {
 		expect(sameRule(weekly([0]), { ...weekly([0]), kind: "afterDone" })).toBe(false);
 		expect(sameRule({ ...weekly([]), unit: "month", dayOfMonth: 5 }, { ...weekly([]), unit: "month", dayOfMonth: 6 })).toBe(false);
 		expect(sameRule(weekly([0]), null)).toBe(false);
+	});
+});
+
+const ruleOf = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });
+
+describe("repeatParts", () => {
+	it("the step, the days it falls on, and whether it counts from done", () => {
+		expect(repeatParts(ruleOf({}))).toEqual({ every: "every day", on: null, days: null, afterDone: false });
+		expect(repeatParts(ruleOf({ every: 3, unit: "week", days: [0, 2], from: "2026-11-02" }))).toEqual({ every: "every 3 weeks", on: "on Mon, Wed", days: [0, 2], afterDone: false });
+		expect(repeatParts(ruleOf({ unit: "month", dayOfMonth: 22 }))).toEqual({ every: "every month", on: "on the 22nd", days: null, afterDone: false });
+		expect(repeatParts(ruleOf({ kind: "afterDone", every: 2, unit: "month" }))).toEqual({ every: "every 2 months", on: null, days: null, afterDone: true });
+	});
+
+	it("ordinals: 1st 2nd 3rd 4th 11th 12th 13th 21st 22nd 23rd 31st", () => {
+		const on = (n: number) => repeatParts(ruleOf({ unit: "month", dayOfMonth: n })).on;
+		expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(on)).toEqual(["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st"].map((o) => `on the ${o}`));
+	});
+});
+
+describe("Repeat.anchored and problemWith", () => {
+	it("a schedule of every few units counts from the date; any other rule stays", () => {
+		expect(Repeat.anchored(ruleOf({ every: 2 }), "2026-11-05").from).toBe("2026-11-05");
+		expect(Repeat.anchored(ruleOf({}), "2026-11-05").from).toBeNull();
+		expect(Repeat.anchored(ruleOf({ kind: "afterDone", every: 2 }), "2026-11-05").from).toBeNull();
+		expect(Repeat.parse("every 2 days from 2026-11-01")!.anchoredAt("2026-11-05").rule.from).toBe("2026-11-05");
+	});
+
+	it("says what keeps a rule from being written", () => {
+		expect(Repeat.problemWith(ruleOf({}))).toBeNull();
+		expect(Repeat.problemWith(ruleOf({ every: 0 }))).not.toBeNull();
+		expect(Repeat.problemWith(ruleOf({ unit: "week", days: [] }))).not.toBeNull();
+		expect(Repeat.problemWith(ruleOf({ unit: "week", days: [1], dayOfMonth: 5 }))).not.toBeNull();
 	});
 });
