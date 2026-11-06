@@ -32,11 +32,29 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 10. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project note; the
     Backlog tasks of `TODOs Tasks.md` are one more group, «No project». A tap on a group's title opens the project note.
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
+11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
+    `TODOs Tasks.md` into that project's note (after its last task, or at the end of the note), keeping where it is in the
+    lane; «No project» moves it back into the file. The plus on a project group's title in Backlog writes a new task
+    straight into that note.
+12. **Every task line in a project note is a project task**, wherever it stands in the note.
+
+## How it is used
+
+1. **Start a project.** A new note «Окружение в новой стране» with `#project`. Write freely: why, thoughts, observations,
+   and the steps that come to mind as tasks (`- [ ] Сходить на языковой обмен`).
+2. **See it in the plugin.** Backlog shows a group «Окружение в новой стране» with those steps, beside the other projects
+   and «No project».
+3. **Take a step.** Drag «Сходить на языковой обмен» from its group to Soon, Now, a day or the calendar, as any Backlog
+   task. On its card the project mark says where it comes from; a tap on the mark opens the note.
+4. **A thought on the run.** Into Inbox as always; at the next review, the task menu → «Project» → «Окружение…»: the task
+   moves into the note.
+5. **Done.** The task leaves the screen; in the note it stays as `- [x]`, the project's history.
 
 ## Open (being planned now)
 
 - How the lane is written on a project task's line (technical, decided by the backend).
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
+- How Backlog grouped by project looks, and the project mark on a card: boards, phone and desktop, dark and light.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
 
