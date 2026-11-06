@@ -86,7 +86,7 @@ struct RecorderBar: View {
                 }
             }
         }
-        .labelStyle(.iconOnly)
+        .labelStyle(.squareIcon)
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .controlSize(.large)
