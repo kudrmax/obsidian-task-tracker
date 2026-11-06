@@ -256,6 +256,9 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	stackTasks: "./timelineStack",
 	overlayLeft: "./timelineStack",
 	eventLeft: "./timelineStack",
+	stackCorner: "./timelineStack",
+	timeParts: "./timelineStack",
+	durationParts: "./timelineStack",
 };
 
 /**

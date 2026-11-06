@@ -85,3 +85,30 @@ export function stackTasks(tasks: readonly TaskSpan[], events: readonly Levelled
 	}
 	return boxes;
 }
+
+/** A duration as the card writes it: a number over its unit. */
+export function durationParts(minutes: number): [string, string] {
+	if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];
+	const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+	const rest = minutes % MINUTES_PER_HOUR;
+	return [rest ? `${hours}:${pad(rest)}` : String(hours), "H"];
+}
+
+/** A start as a stacked card writes it: the hours over the minutes. */
+export function timeParts(minutes: number): [string, string] {
+	return [String(Math.floor(minutes / MINUTES_PER_HOUR)), pad(minutes % MINUTES_PER_HOUR)];
+}
+
+function pad(n: number): string {
+	return String(n).padStart(2, "0");
+}
+
+/**
+ * What a card of the stack shows on the right: a stacked one the time it is put on in the file (`slotStart`, minutes of
+ * the clock), one shorter than its duration the duration; null for neither.
+ */
+export function stackCorner(box: Pick<StackBox, "stacked" | "hiddenDuration">, slotStart: number, span: TaskSpan): [string, string] | null {
+	if (box.stacked) return timeParts(slotStart);
+	if (box.hiddenDuration && span.end !== null) return durationParts(span.end - span.start);
+	return null;
+}

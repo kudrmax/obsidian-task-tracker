@@ -489,6 +489,9 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.stackTasks", [{ start: 60, end: null }, { start: 60, end: 120 }], [{ start: 0, end: 30, level: 0 }], 50, { height: 35, gap: 2 }, { itemInset: 1, itemGap: 2, overlayInset: 18 }),
 		plain("rules.overlayLeft", 2, { itemInset: 1, itemGap: 2, overlayInset: 18 }),
 		plain("rules.eventLeft", { level: 1, layer: 0 }, { itemInset: 1, itemGap: 2, overlayInset: 18 }),
+		plain("rules.stackCorner", { stacked: true, hiddenDuration: false }, 600, { start: 600, end: null }),
+		plain("rules.timeParts", 605),
+		plain("rules.durationParts", 90),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],

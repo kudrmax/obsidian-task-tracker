@@ -2422,6 +2422,23 @@ ${key.title}`.toLowerCase();
     }
     return boxes;
   }
+  function durationParts(minutes) {
+    if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];
+    const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+    const rest = minutes % MINUTES_PER_HOUR;
+    return [rest ? `${hours}:${pad(rest)}` : String(hours), "H"];
+  }
+  function timeParts(minutes) {
+    return [String(Math.floor(minutes / MINUTES_PER_HOUR)), pad(minutes % MINUTES_PER_HOUR)];
+  }
+  function pad(n) {
+    return String(n).padStart(2, "0");
+  }
+  function stackCorner(box, slotStart, span) {
+    if (box.stacked) return timeParts(slotStart);
+    if (box.hiddenDuration && span.end !== null) return durationParts(span.end - span.start);
+    return null;
+  }
 
   // core/application/paints.ts
   var PRESET_INK = {
@@ -5425,7 +5442,10 @@ ${key.title}`.toLowerCase();
     eventLevels,
     stackTasks,
     overlayLeft,
-    eventLeft
+    eventLeft,
+    stackCorner,
+    timeParts,
+    durationParts
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
   function lookOf(c, look) {

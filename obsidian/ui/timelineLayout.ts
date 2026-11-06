@@ -1,4 +1,5 @@
 import type { CardSize } from "./cardSize";
+export { durationParts, stackCorner, timeParts } from "../../core/application/contracts";
 import { eventLevels, overlayLeft as coreOverlayLeft, type StackBox, stackTasks as coreStackTasks, type TaskSpan } from "../../core/application/contracts";
 import { DESIGN, LAYOUT } from "./design";
 
@@ -85,23 +86,6 @@ export function stackTasks(tasks: readonly TaskSpan[], events: readonly PlacedSp
 }
 
 const INSETS = { itemInset: DESIGN.itemInset, itemGap: DESIGN.itemGap, overlayInset: LAYOUT.overlayInset };
-
-/** A duration as the card writes it: a number over its unit. */
-export function durationParts(minutes: number): [string, string] {
-	if (minutes < MINUTES_PER_HOUR) return [String(minutes), "MIN"];
-	const hours = Math.floor(minutes / MINUTES_PER_HOUR);
-	const rest = minutes % MINUTES_PER_HOUR;
-	return [rest ? `${hours}:${pad(rest)}` : String(hours), "H"];
-}
-
-/** A start as a stacked card writes it: the hours over the minutes. */
-export function timeParts(minutes: number): [string, string] {
-	return [String(Math.floor(minutes / MINUTES_PER_HOUR)), pad(minutes % MINUTES_PER_HOUR)];
-}
-
-function pad(n: number): string {
-	return String(n).padStart(2, "0");
-}
 
 /** Puts a minute `fraction` down the visible height; one too near the day's first or last hour gets empty room beyond it to stand there all the same. */
 export function scrollPlace(box: ScrollBox, fraction: number): ScrollPlace {
