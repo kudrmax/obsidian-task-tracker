@@ -1,11 +1,11 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import type { LocalDate } from "../domain/Task";
+import { CalendarDays } from "./calendarDays";
 import { CalendarPolling } from "./CalendarPolling";
 import { CalendarChoice, type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
 import { hiddenNow } from "./calendarMigration";
 import type {
-	CalendarEvent,
 	CalendarPoll,
 	CalendarService,
 	CalendarSource,
@@ -28,53 +28,6 @@ const SECOND_MS = 1000;
 const MINUTE_MS = 60_000;
 /** A feed silent this long counts as failed: its file keeps what it had, and the next refresh asks afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
-
-function localTime(date: LocalDate, plusDays: number, hour: number): Date {
-	const [y, m, d] = date.split("-").map(Number);
-	return new Date(y, m - 1, d + plusDays, hour);
-}
-
-/** The times a day shows: its timed events from the hour it starts to the next day's, its all-day events by date. */
-class DayWindow {
-	private readonly timedStart: Date;
-	private readonly timedEnd: Date;
-	private readonly dateStart: Date;
-	private readonly dateEnd: Date;
-
-	constructor(date: LocalDate, boundary: DayBoundary) {
-		this.timedStart = localTime(date, 0, boundary.startHour);
-		this.timedEnd = localTime(date, 1, boundary.startHour);
-		this.dateStart = localTime(date, 0, 0);
-		this.dateEnd = localTime(date, 1, 0);
-	}
-
-	/** What to choose the events from: both spans. */
-	get fetchStart(): Date {
-		return this.dateStart;
-	}
-
-	get fetchEnd(): Date {
-		return this.timedEnd;
-	}
-
-	shows(e: CalendarEvent): boolean {
-		return e.allDay ? this.touches(e, this.dateStart, this.dateEnd) : this.touches(e, this.timedStart, this.timedEnd);
-	}
-
-	private touches(e: CalendarEvent, start: Date, end: Date): boolean {
-		const overlaps = e.start < end && e.end > start;
-		const startsInside = e.start >= start && e.start < end;
-		return overlaps || (e.allDay && startsInside);
-	}
-}
-
-function answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const silence = new Promise<never>((_, reject) => {
-		timer = setTimeout(() => reject(new Error(`no answer in ${ms / 1000} s`)), ms);
-	});
-	return Promise.race([answer, silence]).finally(() => clearTimeout(timer));
-}
 
 function countMessage(n: number): string {
 	return n === 1 ? "1 event" : `${n} events`;
@@ -170,7 +123,7 @@ export class CalendarServiceImpl implements CalendarService {
 	private refreshFeeds(force: boolean): Promise<void> {
 		return Promise.all(
 			this.feeds.map((feed) =>
-				answerWithin(feed.refresh(force), ANSWER_TIMEOUT_MS).then(
+				this.answerWithin(feed.refresh(force), ANSWER_TIMEOUT_MS).then(
 					() => this.feedProblems.delete(feed.name),
 					(e) => this.feedProblems.set(feed.name, messageOf(e)),
 				),
@@ -208,10 +161,19 @@ export class CalendarServiceImpl implements CalendarService {
 		return hiddenNow(this.settings.get(), this.choice().known(), this.lastRead.get("google"));
 	}
 
+	private answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
+		let timer: number | undefined;
+		const silence = new Promise<never>((_, reject) => {
+			timer = this.timers.set(() => reject(new Error(`no answer in ${ms / 1000} s`)), ms);
+		});
+		return Promise.race([answer, silence]).finally(() => {
+			if (timer !== undefined) this.timers.clear(timer);
+		});
+	}
+
 	private dayOf(date: LocalDate): DayEvents {
-		const window = new DayWindow(date, new DayBoundary(this.settings.get().dayStartHour));
-		const chosen = this.choice(this.hidden()).day(window.fetchStart, window.fetchEnd);
-		const events = chosen.events.filter((e) => window.shows(e));
+		const chosen = new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.get().dayStartHour)).day(date);
+		const events = chosen.events;
 		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
 		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name))), stale: chosen.stale };
 	}
