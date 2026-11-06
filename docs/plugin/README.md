@@ -102,7 +102,7 @@
 **Что настроено руками**
 
 - [Рабочий календарь на iPhone](work-calendar.md) — Scriptable, команда `Export Work Calendar`, автоматизации, проверка.
-- [Напоминания на iPhone](notifications.md) — приложение Task Calendar для iPhone: установка, автоматизация, проверка.
+- [Напоминания на iPhone](notifications.md) — приложение Tasks для iPhone: установка, автоматизация, проверка.
 - [Быстрый ввод с iPhone](capture.md) — задача текстом или голосом в Inbox, Now, Soon или Backlog: кнопка на экране блокировки, Siri, кнопка действия, проверка.
 - [Google Calendar](../../README.md#google-calendar) — проект в Google Cloud, вход, как не дать входу протухнуть.
 
