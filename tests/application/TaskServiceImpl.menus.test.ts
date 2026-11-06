@@ -103,12 +103,91 @@ describe("Remove due date", () => {
 });
 
 describe("the menu's model", () => {
+	const screenOf = async (svc: TaskServiceImpl, day = T) => ({ today: T, day, offer: await svc.sectionOffer(day) });
+
 	it("reads the levels and labels of the settings", async () => {
 		const { svc } = setup("## Now\n\n- [ ] p1 A\n");
-		const menu = svc.menu((await svc.dayView(T)).list, T);
+		const menu = svc.menu((await svc.dayView(T)).list[0], "day", await screenOf(svc));
 		expect(menu.levels.tiles.map((t) => [t.level.prefix, t.on])).toEqual(DEFAULT_SETTINGS.priorities.map((l) => [l.prefix, l.prefix === "p1"]));
 		expect(menu.labels).toEqual({ tiles: [{ label: { name: "Важное", color: "red" }, on: false }, { label: { name: "Срочное", color: "orange" }, on: false }], disabled: true });
 		expect(menu.moves.map((m) => m.id)).toEqual(["tomorrow", "pick"]);
+	});
+
+	it("offers a list card the sections of its list where its column shows them, a timeline card none", async () => {
+		const { svc } = setup("## Now\n\n### Work\n- [ ] A\n\n## Soon\n\n- [ ] S 📅 2026-10-31\n");
+		const [a] = (await svc.dayView(T)).list;
+		const screen = await screenOf(svc);
+		expect(svc.menu(a, "day", screen).sections?.choice.current).toBe("Work");
+		expect(svc.menu(a, "timeline", screen).sections).toBeNull();
+		expect(svc.menu(a, "full", screen).sections).toBeNull();
+		expect(svc.menu(a, "day", screen).edits).toContain("section");
+	});
+
+	it("offers no sections in the column of a past day, which shows none", async () => {
+		const { svc } = setup("## Now\n\n### Work\n- [ ] A\n");
+		const [a] = (await svc.dayView(T)).list;
+		expect(svc.menu(a, "day", await screenOf(svc, "2026-10-29")).sections).toBeNull();
+	});
+
+	it("offers the picked tasks sections only when every card stands where its list's show", async () => {
+		const { svc } = setup("## Now\n\n### Work\n- [ ] A\n- [ ] B\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		const screen = await screenOf(svc);
+		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).sections?.options[0]).toEqual({ name: "Work", checked: true });
+		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).edits).toEqual(["section"]);
+		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "timeline" }], screen).sections).toBeNull();
+	});
+});
+
+describe("a menu's status tiles", () => {
+	it("write one task's status, Won't do giving it up and Stop stopping it", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B 🔁 every day\n");
+		const [a] = (await svc.dayView(T)).list;
+		await svc.pickStatus([a.key], "wontDo");
+		expect(store.text).toContain("- [-] A");
+		const [b] = (await svc.dayView(T)).list;
+		await svc.pickStatus([b.key], "stop");
+		expect(store.text).not.toContain("🔁");
+		expect(store.text).toContain("- [x] B");
+	});
+
+	it("write every picked task's in one write", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [/] B\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		const writes = store.writes;
+		await svc.pickStatus([a.key, b.key], "stopProgress");
+		expect(store.writes).toBe(writes + 1);
+		expect(store.text).toContain("- [ ] A\n- [ ] B");
+	});
+});
+
+describe("a bulk menu's moves and Delete", () => {
+	it("put off only the tasks that may be, in one write", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		const writes = store.writes;
+		await svc.postponeAll([a.key, b.key], "2026-11-02");
+		expect(store.writes).toBe(writes + 1);
+		expect((await svc.soonWithoutDateView()).length).toBe(0);
+		expect((await svc.dayView("2026-11-02")).list.map((i) => i.text)).toEqual(["A", "B"]);
+	});
+
+	it("leave a done task where it is", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n\n## Done\n\n- [x] D\n");
+		const [a] = (await svc.dayView(T)).list;
+		const [d] = await svc.doneView();
+		await svc.postponeAll([a.key, d.key], "2026-11-02");
+		expect(store.text).toContain("- [x] D\n");
+		expect(store.text).not.toContain("- [x] D 📅");
+	});
+
+	it("delete every picked task in one write", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n- [ ] C\n");
+		const [a, , c] = (await svc.dayView(T)).list;
+		const writes = store.writes;
+		await svc.removeAll([a.key, c.key]);
+		expect(store.writes).toBe(writes + 1);
+		expect((await svc.dayView(T)).list.map((i) => i.text)).toEqual(["B"]);
 	});
 });
 

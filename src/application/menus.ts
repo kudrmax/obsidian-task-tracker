@@ -1,8 +1,8 @@
 import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
-import { type LocalDate, nextProgress } from "../domain/Task";
-import type { MenuSections, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
+import { type LocalDate, nextProgress, type TaskStatus } from "../domain/Task";
+import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
 
@@ -69,21 +69,76 @@ function sharedDueDate(items: readonly TaskItem[]): LocalDate | null {
 	return items.every((item) => item.dueDate === first) ? first : null;
 }
 
-function menuSections(items: readonly TaskItem[], offer: SectionOffer | null): MenuSections | null {
-	const choice = offer ? sectionChoice(items, offer) : null;
-	return choice && { choice, shared: items.every((item) => item.group === items[0].group) };
+/** Which menu: one task's, opened from `from`, or the bulk menu of the picked tasks. */
+export type MenuOf = { readonly kind: "task"; readonly from: MenuFrom } | { readonly kind: "bulk" };
+
+const A_LIST_CARD: MenuOf = { kind: "task", from: "day" };
+
+const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbox", "backlog"]);
+
+/**
+ * The sections a menu offers, opened from cards at `froms`: the screen's offer when every card stands in a list column
+ * that shows its list's sections (`columnSections`); none from the timeline, Done, a stack or the whole screen.
+ */
+export function menuOffer(froms: readonly MenuFrom[], screen: MenuScreen, columnSections: (column: DropColumn, date: LocalDate) => ColumnSections | null): SectionOffer | null {
+	const shown = froms.every((from) => COLUMNS.has(from) && columnSections(from as DropColumn, screen.day) !== null);
+	return shown ? screen.offer : null;
 }
 
-/** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null): TaskMenuModel {
+/** What a status tile writes; null for Stop, which stops the task as `stop` does. */
+export function tileStatus(id: MenuStatusId): TaskStatus | null {
+	const statuses: Readonly<Record<MenuStatusId, TaskStatus | null>> = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
+	return statuses[id];
+}
+
+/** Done, the progress tile named for what it sets, Won't do, and Stop for one task that may be stopped; one task's menu asks before Won't do and Stop. */
+function menuStatuses(items: readonly TaskItem[], of: MenuOf): readonly MenuStatus[] {
+	const one = of.kind === "task";
+	const progress: MenuStatusId = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
+	return [
+		{ id: "done", confirm: false },
+		{ id: progress, confirm: false },
+		{ id: "wontDo", confirm: one },
+		...(one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true } as const] : []),
+	];
+}
+
+function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSections | null): readonly MenuEditId[] {
+	const section: MenuEditId[] = sections ? ["section"] : [];
+	if (of.kind === "bulk") return section;
+	const item = items[0];
+	const edits: [MenuEditId, boolean][] = [
+		["rename", true],
+		["reminder", item.can.remind],
+		["description", item.can.addDescription],
+		["repeat", item.repeatable],
+		["section", sections !== null],
+		["subtask", of.from !== "stack"],
+	];
+	return edits.flatMap(([id, offered]) => (offered ? [id] : []));
+}
+
+function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of: MenuOf): MenuSections | null {
+	const choice = offer ? sectionChoice(items, offer) : null;
+	if (!choice) return null;
+	const shared = items.every((item) => item.group === choice.current);
+	const names = [...choice.names, null];
+	return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
+}
+
+/** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD): TaskMenuModel {
+	const sections = menuSections(items, offer, of);
 	return {
-		progress: nextProgress(items.map((item) => item.status)),
+		statuses: menuStatuses(items, of),
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
 		labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
 		moves: sharedMoves(items, today),
 		removeDue: items.some((item) => item.can.removeDue),
 		dueDate: sharedDueDate(items),
-		sections: menuSections(items, offer),
+		sections,
+		edits: menuEdits(items, of, sections),
+		remove: { confirm: of.kind === "task" },
 	};
 }
 

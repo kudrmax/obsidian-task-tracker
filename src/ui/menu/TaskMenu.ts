@@ -1,28 +1,27 @@
-import { type GroupName, type LabelLevel, labelTitle, type PriorityLevel, REMINDER_KINDS, type ReminderKind, repeatDraft, repeatParts, type RepeatRule, sameRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuStatus, type MenuStatusId, type PriorityLevel, REMINDER_KINDS, type ReminderKind, repeatDraft, repeatParts, type RepeatRule, sameRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
 import { linkAt, type TaskLink } from "../TaskTitle";
 import { showWhole } from "../wholeCard";
-import type { LocalDate, TaskStatus } from "../types";
+import type { LocalDate } from "../types";
 import type { CloseHow } from "./Overlay";
 import { LiftedMenu } from "./LiftedMenu";
 import { moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
-import { type SectionChoice, sectionChooser } from "./SectionChooser";
+import { sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import { repeatValue } from "../repeat/repeatLabel";
 
-export type StatusTileId = "done" | "progress" | "wontdo" | "stop";
-export type EditRowId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
-type Asking = "delete" | "wontdo" | "stop";
+export type EditRowId = MenuEditId;
+/** What the menu asks about: a status tile that asks first, or Delete. */
+export type Asking = MenuStatusId | "delete";
 
-export interface StatusTile {
-	readonly id: StatusTileId;
+export interface StatusTile extends MenuStatus {
 	readonly label: string;
 	readonly icon: IconName;
 }
@@ -36,39 +35,43 @@ export interface EditRow {
 	readonly icon: IconName;
 }
 
-/** The progress tile's name for the status it sets: back to todo stops the progress. */
-export function progressLabel(next: TaskStatus): string {
-	return next === "todo" ? "Stop progress" : "In progress";
+const STATUS_LOOKS: Readonly<Record<MenuStatusId, { readonly label: string; readonly icon: IconName }>> = {
+	done: { label: "Done", icon: "done" },
+	inProgress: { label: "In progress", icon: "progress" },
+	stopProgress: { label: "Stop progress", icon: "progress" },
+	wontDo: { label: "Won’t do", icon: "wontdo" },
+	stop: { label: "Stop", icon: "stop" },
+};
+
+/** The status group's tiles as the menu's model has them, named and drawn. */
+export function statusTiles(model: TaskMenuModel): readonly StatusTile[] {
+	return model.statuses.map((status) => ({ ...status, ...STATUS_LOOKS[status.id] }));
 }
 
-/** The status group: Done first, the most used; the progress tile named for what it sets; Stop last for a task that may be stopped. */
-export function statusTiles(item: TaskItem, progress: TaskStatus): readonly StatusTile[] {
-	return [
-		{ id: "done", label: "Done", icon: "done" },
-		{ id: "progress", label: progressLabel(progress), icon: "progress" },
-		{ id: "wontdo", label: "Won’t do", icon: "wontdo" },
-		...(item.can.stop ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
-	];
+/** How a question looks: its verb, its button's icon, and whether it is the danger of Delete. */
+export function askLooks(what: Asking): { readonly verb: string; readonly icon: IconName; readonly danger: boolean } {
+	if (what === "delete") return { verb: "Delete", icon: "delete", danger: true };
+	const { label, icon } = STATUS_LOOKS[what];
+	return { verb: label, icon, danger: false };
 }
 
 function repeatRow(rule: RepeatRule | null): EditRow {
 	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: rule && repeatParts(rule).days, icon: "repeat" };
 }
 
-export type { SectionChoice } from "./SectionChooser";
-
 const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", live: "Live Activity", none: "Off" };
 
-/** The edit group: Rename, the reminder of a task on a time with its kind beside it, Add description for a task without one, Repeat with its rule, the section with its name beside it, a subtask. */
-export function editRows(item: TaskItem, sections: SectionChoice | null = null): readonly EditRow[] {
-	return [
-		{ id: "rename", label: "Rename", value: "", icon: "rename" },
-		...(item.can.remind ? [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const] : []),
-		...(item.can.addDescription ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
-		...(item.repeatable ? [repeatRow(item.repeat)] : []),
-		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
-		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
-	];
+/** The edit group's rows as the menu's model has them: the reminder's kind, the rule and the section's name beside theirs. */
+export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow[] {
+	const rows: Readonly<Record<EditRowId, () => EditRow>> = {
+		rename: () => ({ id: "rename", label: "Rename", value: "", icon: "rename" }),
+		reminder: () => ({ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" }),
+		description: () => ({ id: "description", label: "Add description", value: "", icon: "description" }),
+		repeat: () => repeatRow(item.repeat),
+		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
+		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
+	};
+	return model.edits.map((id) => rows[id]());
 }
 
 export interface LevelTile extends PriorityLevel {
@@ -91,7 +94,8 @@ export function labelTiles(model: TaskMenuModel): readonly LabelTile[] {
 }
 
 export interface MenuActions {
-	setStatus(status: TaskStatus): Promise<void>;
+	/** A status tile (`TaskService.pickStatus`). */
+	pickStatus(id: MenuStatusId): Promise<void>;
 	/** Puts the task off to `date`: due that day, no slot, at the end of Now for today, of Soon for a later day. */
 	postpone(date: LocalDate): Promise<void>;
 	removeDue(): Promise<void>;
@@ -106,8 +110,6 @@ export interface MenuActions {
 	setReminder(kind: ReminderKind): Promise<void>;
 	/** The task repeats by `rule` from now on; null: it repeats no more. */
 	setRepeat(rule: RepeatRule | null): Promise<void>;
-	/** The task that repeats is closed with no next time. */
-	stop(): Promise<void>;
 	/** The menu of a card in a calendar menu's stack stays open for it, its card may become the field (`openRename`); any other has closed. */
 	rename(menu: TaskMenu): void;
 	/** The task on the whole screen: to read its description, or with the caret straight in it. */
@@ -318,12 +320,6 @@ export class TaskMenu extends LiftedMenu {
 		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
 		const { item, actions } = this.context;
 		const model = this.context.menu(item);
-		const statuses: Record<StatusTileId, () => void> = {
-			done: this.pick(() => actions.setStatus("done")),
-			progress: this.pick(() => actions.setStatus(model.progress)),
-			wontdo: () => this.askFor("wontdo"),
-			stop: () => this.askFor("stop"),
-		};
 		const edits: Record<EditRowId, () => void> = {
 			rename: this.inStack ? () => actions.rename(this) : this.pick(() => actions.rename(this)),
 			reminder: () => this.showReminders(),
@@ -332,9 +328,10 @@ export class TaskMenu extends LiftedMenu {
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
-		const tiles = statusTiles(item, model.progress);
-		if (this.asking === "wontdo" || this.asking === "stop") this.askGroup(this.asking);
-		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
+		const tiles = statusTiles(model);
+		const asked = this.asking;
+		if (asked !== null && asked !== "delete") this.askGroup(asked);
+		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
 		const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
 		const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
@@ -345,7 +342,7 @@ export class TaskMenu extends LiftedMenu {
 			onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
 		}));
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
-		const rows = editRows(item, model.sections?.choice ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
+		const rows = editRows(item, model);
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
 		const openFull = actions.openFull;
 		menuGroup(this.panel, [
@@ -353,7 +350,7 @@ export class TaskMenu extends LiftedMenu {
 			{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
 		]);
 		if (this.asking === "delete") this.askGroup("delete");
-		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: () => this.askFor("delete") });
+		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: model.remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}
@@ -378,7 +375,7 @@ export class TaskMenu extends LiftedMenu {
 		}
 	}
 
-	/** Delete, Won’t do and Stop ask first, in place of what was pressed; the rest of the menu stays as it is. */
+	/** What the model says asks first (Delete, Won’t do, Stop) asks in place of what was pressed; the rest of the menu stays as it is. */
 	private askFor(what: Asking | null, show = true): void {
 		this.asking = what;
 		this.confirmAsked = null;
@@ -395,20 +392,15 @@ export class TaskMenu extends LiftedMenu {
 
 	private askGroup(what: Asking): void {
 		const { item, actions } = this.context;
-		const questions: Record<Asking, { readonly verb: string; readonly icon: IconName; readonly act: () => Promise<void> }> = {
-			delete: { verb: "Delete", icon: "delete", act: () => actions.remove() },
-			wontdo: { verb: "Won’t do", icon: "wontdo", act: () => actions.setStatus("cancelled") },
-			stop: { verb: "Stop", icon: "stop", act: () => actions.stop() },
-		};
-		const { verb, icon, act } = questions[what];
-		const confirm = this.pick(act);
+		const { verb, icon, danger } = askLooks(what);
+		const confirm = this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what)));
 		this.confirmAsked = confirm;
 		askGroup(this.panel, {
 			verb,
 			title: item.title,
 			confirm: verb,
 			icon,
-			danger: what === "delete",
+			danger,
 			onCancel: () => this.askFor(null),
 			onConfirm: confirm,
 		});
@@ -416,15 +408,14 @@ export class TaskMenu extends LiftedMenu {
 
 	/** The sections of the task's list, its own checked, then the tasks outside any; New section asks for a name. */
 	private showSections(): void {
-		const sections = this.context.menu(this.context.item).sections?.choice;
+		const sections = this.context.menu(this.context.item).sections;
 		if (!sections) return;
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
 		const { actions } = this.context;
 		sectionChooser(this.panel, {
-			choice: sections,
-			checked: (name) => name === sections.current,
+			sections,
 			onBack: () => this.showMenu(),
 			onPick: (name) => this.pick(() => actions.toSection(name))(),
 			onNew: this.pick(() => actions.newSection()),

@@ -429,6 +429,8 @@ export class TaskRules {
 				return ops.postpone(doc, entry, change.date, today);
 			case "remove":
 				return ops.remove(doc, entry);
+			case "stop":
+				return ops.stop(doc, entry);
 			case "moveBefore":
 				return ops.moveBefore(doc, entry, first, change.date, today);
 			case "moveToList":

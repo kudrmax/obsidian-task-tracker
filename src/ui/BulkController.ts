@@ -1,4 +1,4 @@
-import { type GroupName, keyId, type TaskChange, type TaskItem, type TaskKey, type TaskMenuModel, type TaskStep } from "../application/contracts";
+import { type GroupName, keyId, type MenuStatusId, type PickedTask, type TaskItem, type TaskKey, type TaskMenuModel } from "../application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
@@ -10,13 +10,17 @@ import type { LocalDate } from "./types";
 export interface BulkDeps {
 	/** The view's content: the cancel ring goes in it, where the plus stands, and so do the buttons of Select tasks. */
 	readonly root: HTMLElement;
-	/** Writes the steps and resolves once the screen shows them. */
-	apply(steps: readonly TaskStep[]): Promise<void>;
+	/** A status tile (`TaskService.pickStatus`); resolves once the screen shows it. */
+	pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void>;
+	/** A move (`TaskService.postponeAll`); resolves once the screen shows it. */
+	postpone(keys: readonly TaskKey[], date: LocalDate): Promise<void>;
+	/** Delete N tasks (`TaskService.removeAll`); resolves once the screen shows it. */
+	remove(keys: readonly TaskKey[]): Promise<void>;
 	today(): LocalDate;
 	/** The day the day column shows. */
 	day(): LocalDate;
-	/** The menu of `items`, the tasks of the picked `cards` as they now stand: sections only when every card stands where its list's sections show. */
-	menu(items: readonly TaskItem[], cards: readonly PickedCard[]): TaskMenuModel;
+	/** The bulk menu of the picked tasks as they now stand, each with the column its card stands in (`TaskService.bulkMenu`). */
+	menu(picked: readonly PickedTask[]): TaskMenuModel;
 	/** A level tapped (`TaskService.togglePriority`); resolves once the screen shows it. */
 	togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void>;
 	/** A label tapped (`TaskService.toggleLabel`): the screen shows it, and it resolves with the tasks as they then stand, null for one gone. */
@@ -167,9 +171,11 @@ export class BulkController {
 		/** The tasks as the menu last saw them: labels set from it give them fresh keys, which the next action needs. */
 		let items = cards.map((card) => card.item);
 		const keys = () => items.map((item) => item.key);
-		const each = (change: TaskChange) => {
+		/** A pick on the picked tasks lets them go and ends Select tasks; a label tap alone keeps them, as it keeps the menu. */
+		const done = (write: (keys: readonly TaskKey[]) => Promise<void>) => {
+			const picked = keys();
 			this.stop();
-			return this.deps.apply(items.map((item) => ({ key: item.key, change })));
+			return write(picked);
 		};
 		this.menu = BulkMenu.open({
 			items,
@@ -178,18 +184,12 @@ export class BulkController {
 			at,
 			today: this.deps.today(),
 			day: this.deps.day(),
-			menu: (now) => this.deps.menu(now, cards),
+			menu: (now) => this.deps.menu(now.map((item, i) => ({ item, from: cards[i].column }))),
 			actions: {
-				setStatus: (status) => each({ kind: "status", status }),
-				togglePriority: (prefix) => {
-					this.stop();
-					return this.deps.togglePriority(keys(), prefix);
-				},
-				postpone: (date) => each({ kind: "postpone", date }),
-				removeDue: () => {
-					this.stop();
-					return this.deps.removeDue(keys());
-				},
+				pickStatus: (id) => done((picked) => this.deps.pickStatus(picked, id)),
+				togglePriority: (prefix) => done((picked) => this.deps.togglePriority(picked, prefix)),
+				postpone: (date) => done((picked) => this.deps.postpone(picked, date)),
+				removeDue: () => done((picked) => this.deps.removeDue(picked)),
 				toggleLabel: async (name) => {
 					const written = await this.deps.toggleLabel(keys(), name);
 					this.selection.renew(items.flatMap((item, i) => (written[i] ? [{ from: item.key, to: written[i]!.key }] : [])));
@@ -197,11 +197,8 @@ export class BulkController {
 					items = written as TaskItem[];
 					return items;
 				},
-				toSection: (name) => {
-					this.stop();
-					return this.deps.toSection(keys(), name);
-				},
-				remove: () => each({ kind: "remove" }),
+				toSection: (name) => done((picked) => this.deps.toSection(picked, name)),
+				remove: () => done((picked) => this.deps.remove(picked)),
 			},
 			onClose: () => (this.menu = null),
 		});
