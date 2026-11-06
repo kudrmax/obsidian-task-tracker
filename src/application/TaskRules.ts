@@ -138,6 +138,16 @@ export class TaskRules {
 		return parseText(text, at.settings).ensureSections(sectionNames(at.settings));
 	}
 
+	/** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
+	parse(text: string): TaskDocument {
+		return parseText(text, this.settings.get());
+	}
+
+	/** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
+	changeOf(doc: TaskDocument, operation: Operation, at: Moment = this.moment()): TextChange {
+		return this.written(doc, operation, at);
+	}
+
 	emptyFile(): string {
 		return TaskDocument.empty(sectionNames(this.settings.get()));
 	}

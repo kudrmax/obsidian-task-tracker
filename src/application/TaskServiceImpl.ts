@@ -1,16 +1,7 @@
-import { GROUPED_LISTS } from "../domain/Lists";
-import type { DayBoundary } from "../domain/DayBoundary";
-import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
-import { typedMarks } from "../domain/Marks";
-import { draftMarksOf } from "./marks";
-import { priorityOfTitle, withPriority } from "../domain/Priority";
-import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
-import { plainText } from "../domain/TaskText";
-import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
-import { descriptionMarkdown } from "../domain/description";
-import { flatten, type TaskDocument, type TaskEntry } from "../domain/TaskDocument";
-import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
+import type { TaskScreen } from "../domain/Days";
+import type { LocalDate, ReminderKind, SectionKey, Slot, TaskStatus } from "../domain/Task";
+import type { TaskDocument } from "../domain/TaskDocument";
+import type { LabelLevel, PriorityLevel } from "../settings";
 import {
 	TasksFileMissingError,
 	type ColumnSections,
@@ -21,7 +12,6 @@ import {
 	type DayView,
 	type DraftMarks,
 	type DroppedTask,
-	type DropFrom,
 	type DropOrigin,
 	type FullTree,
 	type DropTo,
@@ -35,7 +25,6 @@ import {
 	type RepeatRule,
 	type ScreenView,
 	type SectionPlace,
-	type SearchHit,
 	type TaskDraft,
 	type TaskItem,
 	type TaskKey,
@@ -47,18 +36,14 @@ import {
 	type TaskService,
 	type TaskStep,
 } from "./contracts";
-import { carriedWith, menuOffer, taskMenu, tileStatus, toggledLabels, toggledPriority } from "./menus";
-import { runDrop } from "./drops";
-import { samePlace } from "./taskKeys";
-import { offeredNames, type SectionOffer, shownSections } from "./sections";
-import { parseText } from "./documentText";
+import type { SectionOffer } from "./sections";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
-import { fullTree } from "./fullTree";
-import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
+import { type Snapshot, TaskReads } from "./TaskReads";
+import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
 import type { UndoHistory } from "./UndoHistory";
-import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
+import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -70,530 +55,361 @@ interface Normalized {
 	readonly changed: boolean;
 }
 
-/** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
-function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {
-	return doc
-		.groups(list)
-		.filter((g) => g.heading || g.entries.length > 0)
-		.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
-}
-
-/** The sections a search walks, in the order its results stand. */
-const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
-
-interface RankedHit {
-	readonly hit: SearchHit;
-	readonly title: TextMatch | null;
-	readonly description: TextMatch | null;
-}
-
-/** A match in the title before one only in the description, then the higher score; a sort keeps ties in file order. */
-function byQuality(a: RankedHit, b: RankedHit): number {
-	if ((a.title === null) !== (b.title === null)) return a.title ? -1 : 1;
-	return (b.title ?? b.description)!.score - (a.title ?? a.description)!.score;
-}
-
+/**
+ * The task service over a file store: it reads the file into a snapshot and asks TaskReads, runs TaskWrites' operations
+ * as one write each, keeps the last reading, tells its listeners of changes and records each action's step for undo.
+ * Every rule is in TaskReads, TaskWrites and TaskRules; the phone's door asks the same ones over the text it is handed.
+ */
 export class TaskServiceImpl implements TaskService {
 	private readonly listeners = new Set<() => void>();
 	private unsubscribeStore: (() => void) | null = null;
 	private unsubscribeSettings: (() => void) | null = null;
 	private normalized: Normalized | null = null;
 	private readonly rules: TaskRules;
+	private readonly reads: TaskReads;
+	private readonly writes: TaskWrites;
 
 	constructor(
 		private readonly store: TaskFileStore,
 		private readonly settings: SettingsStore,
-		private readonly clock: Clock,
+		clock: Clock,
 		private readonly history: UndoHistory | null = null,
 	) {
 		this.rules = new TaskRules(settings, clock);
+		this.reads = new TaskReads(this.rules, settings, clock);
+		this.writes = new TaskWrites(this.rules, this.reads);
 	}
 
 	priorityLevels(): readonly PriorityLevel[] {
-		return this.rules.priorityLevels();
+		return this.reads.priorityLevels();
 	}
 
 	labelLevels(): readonly LabelLevel[] {
-		return usableLabels(this.settings.get().labels);
+		return this.reads.labelLevels();
 	}
 
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
-		const levels = this.priorityLevels();
-		const parsed = priorityOfTitle(text, levels.map((l) => l.prefix));
-		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
+		return this.reads.parseTitle(text);
 	}
 
 	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
-		const levels = this.priorityLevels();
-		return draftMarksOf(typedMarks(text, priority, labels, levels.map((l) => l.prefix)), levels, this.labelLevels());
+		return this.reads.draftMarks(text, priority, labels);
 	}
 
 	isBlank(text: string): boolean {
-		return this.rules.isBlank(text);
+		return this.reads.isBlank(text);
 	}
 
 	withPriority(text: string, prefix: string | null): string {
-		return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
+		return this.reads.withPriority(text, prefix);
 	}
 
 	async screen(date: LocalDate): Promise<ScreenView> {
 		try {
 			await this.normalize();
-			const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer(date)]);
-			return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true };
+			return this.reads.screen(await this.snapshot(), date);
 		} catch (error) {
-			if (error instanceof TasksFileMissingError) return this.missingScreen(date);
+			if (error instanceof TasksFileMissingError) return this.reads.missingScreen(date);
 			throw error;
 		}
 	}
 
-	/** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
-	private missingScreen(date: LocalDate): ScreenView {
-		const none = { inbox: [], backlog: [], soon: [], now: [] };
-		return {
-			day: { date, list: [], slotted: [] },
-			soon: [],
-			inbox: [],
-			backlog: [],
-			done: [],
-			sections: none,
-			offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
-			missing: true,
-			calendars: false,
-		};
-	}
-
 	async dayView(date: LocalDate): Promise<DayView> {
-		const { doc, today, boundary } = await this.readNormalized();
-		const item = this.itemOf(today);
-		return { date, list: dayList(doc, date, today, boundary).map(item), slotted: slottedOn(doc, date, boundary).map(item) };
+		return this.reads.dayView(await this.snapshot(), date);
 	}
 
 	async soonWithoutDateView(): Promise<readonly TaskItem[]> {
-		const { doc, today } = await this.readNormalized();
-		return soonWithoutDate(doc).map(this.itemOf(today));
+		return this.reads.soonWithoutDateView(await this.snapshot());
 	}
 
 	async inboxView(): Promise<readonly TaskItem[]> {
-		const { doc, today } = await this.readNormalized();
-		return inboxList(doc).map(this.itemOf(today));
+		return this.reads.inboxView(await this.snapshot());
 	}
 
 	async backlogView(): Promise<readonly TaskItem[]> {
-		const { doc, today } = await this.readNormalized();
-		return backlogList(doc).map(this.itemOf(today));
+		return this.reads.backlogView(await this.snapshot());
 	}
 
 	async sectionOffer(date: LocalDate): Promise<SectionOffer> {
-		const { doc, today, boundary } = await this.readNormalized();
-		const { presets, ungrouped } = this.settings.get().groups;
-		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-		const names = (list: GroupedList) =>
-			offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sectionsOf(doc, list)), presets, ungrouped);
-		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
+		return this.reads.sectionOffer(await this.snapshot(), date);
 	}
 
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
-		const { doc } = await this.readNormalized();
-		return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)])) as Record<GroupedList, readonly ListSection[]>;
+		return this.reads.listSections(await this.snapshot());
 	}
 
 	async doneView(): Promise<readonly TaskItem[]> {
-		const { doc, today } = await this.readNormalized();
-		return doc.tasks("done").map(this.itemOf(today));
+		return this.reads.doneView(await this.snapshot());
 	}
 
 	async search(query: string): Promise<readonly SearchGroup[]> {
-		const fuzzy = FuzzyQuery.of(query);
-		if (!fuzzy) return [];
-		const { doc, today } = await this.readNormalized();
-		const item = this.itemOf(today);
-		const ranked: RankedHit[] = [];
-		const visit = (entry: TaskEntry): void => {
-			const titleText = plainText(entry.task.text);
-			const title = fuzzy.match(titleText);
-			const markdown = descriptionMarkdown(entry);
-			const descriptionText = markdown === null ? "" : plainDescription(markdown);
-			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
-			if (title || description) {
-				const hit: SearchHit = {
-					item: item(entry),
-					title: title ? matchParts(titleText, title.found) : [],
-					description: description ? snippetParts(descriptionText, description.found) : null,
-				};
-				ranked.push({ hit, title, description });
-			}
-			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
-		};
-		const groups: SearchGroup[] = [];
-		for (const list of SEARCH_ORDER) {
-			ranked.length = 0;
-			for (const entry of doc.tasks(list)) visit(entry);
-			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
-		}
-		return groups;
+		if (!this.reads.searches(query)) return [];
+		return this.reads.search(await this.snapshot(), query);
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {
-		const { doc, today } = await this.readNormalized();
-		const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : undefined;
-		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
+		return this.reads.screenOf(await this.snapshot(), item);
 	}
 
 	async reveal(item: TaskItem): Promise<TaskScreen> {
-		if (item.isSubtask) await this.unfoldAbove(item.key);
+		await this.run(this.writes.revealUnfold(item));
 		return this.screenOf(item);
 	}
 
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
-		for (const item of items) {
-			if (samePlace(item.key, key)) return item;
-			const inner = this.findIn(item.subtasks, key);
-			if (inner) return inner;
-		}
-		return null;
+		return this.reads.findIn(items, key);
 	}
 
-	async createInList(date: LocalDate, text: string): Promise<void> {
-		await this.mutate(this.rules.createInList(date, text));
+	createInList(date: LocalDate, text: string): Promise<void> {
+		return this.run(this.writes.createInList(date, text));
 	}
 
-	async createInSoon(text: string): Promise<void> {
-		await this.mutate(this.rules.createInSoon(text));
+	createInSoon(text: string): Promise<void> {
+		return this.run(this.writes.createInSoon(text));
 	}
 
-	async createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
-		await this.mutate(this.rules.createAtTime(date, start, text));
+	createAtTime(date: LocalDate, start: number, text: string): Promise<void> {
+		return this.run(this.writes.createAtTime(date, start, text));
 	}
 
-	async createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
-		const change = await this.mutate(this.rules.createInPlace(text, priority, place, repeat, labels));
-		const created = change?.after.insertedSince(change.before);
-		return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
+		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels));
 	}
 
-	async create(draft: TaskDraft, slot?: Slot): Promise<void> {
-		await this.mutate(this.rules.create(draft, slot));
+	create(draft: TaskDraft, slot?: Slot): Promise<void> {
+		return this.run(this.writes.create(draft, slot));
 	}
 
-	async createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
-		await this.mutate(this.rules.createSubtask(parent, draft));
+	createSubtask(parent: TaskKey, draft: TaskDraft): Promise<void> {
+		return this.run(this.writes.createSubtask(parent, draft));
 	}
 
-	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
-		const edit = this.rules.edit(key, draft);
-		const change = edit && (await this.mutate(edit.operation));
-		const place = edit?.place() ?? null;
-		if (!change || !place || change.before.serialize() === change.after.serialize()) return null;
-		return this.itemAt(change.after, place, this.today(), this.itemLevels());
+	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
+		return this.run(this.writes.edit(key, draft));
 	}
 
 	placementOf(item: TaskItem): Placement {
-		if (item.dueDate === this.today()) return { kind: "now" };
-		if (item.dueDate !== null) return { kind: "date", date: item.dueDate };
-		if (item.key.section === "inbox" || item.key.section === "backlog") return { kind: item.key.section };
-		return item.key.section === "soon" ? { kind: "soon" } : { kind: "now" };
+		return this.reads.placementOf(item);
 	}
 
 	dayColumn(date: LocalDate): DayColumn {
-		return dayColumn(date, this.today());
+		return this.reads.dayColumn(date);
 	}
 
 	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null {
-		if (column !== "day") return { list: column, date: null };
-		const { list, date: day, sections } = this.dayColumn(date);
-		return sections ? { list, date: day } : null;
+		return this.reads.columnSections(column, date);
 	}
 
 	placementOfDay(date: LocalDate): Placement {
-		return placementOfDay(date, this.today());
+		return this.reads.placementOfDay(date);
 	}
 
 	listName(list: SectionKey): string {
-		return this.settings.get().sections[list];
+		return this.reads.listName(list);
 	}
 
 	dayOfPlacement(placement: Placement): LocalDate | null {
-		return dayOfPlacement(placement, this.today());
+		return this.reads.dayOfPlacement(placement);
 	}
 
-	async setStatus(key: TaskKey, status: TaskStatus): Promise<void> {
-		await this.mutate(this.rules.setStatus(key, status));
+	setStatus(key: TaskKey, status: TaskStatus): Promise<void> {
+		return this.run(this.writes.setStatus(key, status));
 	}
 
-	async setDueDate(key: TaskKey, date: LocalDate | null): Promise<void> {
-		await this.mutate(this.rules.setDueDate(key, date));
+	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void> {
+		return this.run(this.writes.setDueDate(key, date));
 	}
 
-	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
-		await this.mutate(this.rules.setPriority(key, priority));
+	setPriority(key: TaskKey, priority: string | null): Promise<void> {
+		return this.run(this.writes.setPriority(key, priority));
 	}
 
-	async setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null> {
-		const [item] = await this.setLabelsAll([{ key, labels }]);
-		return item ?? null;
+	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null> {
+		return this.run(this.writes.setLabels(key, labels));
 	}
 
-	async setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]> {
-		if (steps.length === 0) return [];
-		const labelled = this.rules.setLabelsAll(steps);
-		const change = await this.mutate(labelled.operation);
-		if (!change) return steps.map(() => null);
-		const today = this.rules.today();
-		const levels = this.itemLevels();
-		return labelled.places().map((place) => (place ? this.itemAt(change.after, place, today, levels) : null));
+	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]> {
+		return this.run(this.writes.setLabelsAll(steps));
 	}
 
 	async togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void> {
 		if (keys.length === 0) return;
-		const priority = toggledPriority(await this.itemsAt(keys), prefix);
-		if (keys.length === 1) return this.setPriority(keys[0], priority);
-		await this.applyAll(keys.map((key) => ({ key, change: { kind: "priority", priority } })));
+		return this.run(this.writes.togglePriority(await this.snapshot(), keys, prefix));
 	}
 
 	async toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]> {
 		if (keys.length === 0) return [];
-		const labels = toggledLabels(await this.itemsAt(keys), name);
-		return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+		return this.run(this.writes.toggleLabel(await this.snapshot(), keys, name));
 	}
 
 	async removeDue(keys: readonly TaskKey[]): Promise<void> {
-		const items = await this.itemsAt(keys);
-		const steps = items.flatMap((item): TaskStep[] => (item.can.removeDue ? [{ key: item.key, change: { kind: "dueDate", date: null } }] : []));
-		if (steps.length === 0) return;
-		if (keys.length === 1) return this.setDueDate(steps[0].key, null);
-		await this.applyAll(steps);
+		return this.run(this.writes.removeDue(await this.snapshot(), keys));
 	}
 
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
-		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+		return this.reads.menu(item, from, screen);
 	}
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
-		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+		return this.reads.bulkMenu(picked, screen);
 	}
 
-	async pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void> {
-		const status = tileStatus(id);
-		if (keys.length === 1) return status === null ? this.stop(keys[0]) : this.setStatus(keys[0], status);
-		await this.applyAll(keys.map((key) => ({ key, change: status === null ? { kind: "stop" } : { kind: "status", status } })));
+	pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void> {
+		return this.run(this.writes.pickStatus(keys, id));
 	}
 
 	async postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void> {
-		const items = await this.itemsAt(keys);
-		const steps = items.flatMap((item): TaskStep[] => (item.can.postpone ? [{ key: item.key, change: { kind: "postpone", date } }] : []));
-		if (steps.length === 0) return;
-		if (keys.length === 1) return this.postpone(steps[0].key, date);
-		await this.applyAll(steps);
+		return this.run(this.writes.postponeAll(await this.snapshot(), keys, date));
 	}
 
-	async removeAll(keys: readonly TaskKey[]): Promise<void> {
-		if (keys.length === 1) return this.remove(keys[0]);
-		await this.applyAll(keys.map((key) => ({ key, change: { kind: "remove" } })));
+	removeAll(keys: readonly TaskKey[]): Promise<void> {
+		return this.run(this.writes.removeAll(keys));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
-		return carriedWith(lifted, picked);
+		return this.reads.carried(lifted, picked);
 	}
 
-	/** The tasks the keys name as the file now has them, in their order; rejects with StaleTaskError when one is gone. */
-	private async itemsAt(keys: readonly TaskKey[]): Promise<readonly TaskItem[]> {
-		const { doc, today } = await this.readNormalized();
-		const levels = this.itemLevels();
-		return keys.map((key) => {
-			const entry = this.rules.entryOf(doc, key);
-			const parent = key.path.length > 0 ? (doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null) : null;
-			return toItem(entry, today, levels, parent);
-		});
+	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
+		return this.run(this.writes.setReminder(key, reminder));
 	}
 
-	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
-		await this.mutate(this.rules.setReminder(key, reminder));
+	setCollapsed(key: TaskKey, collapsed: boolean): Promise<void> {
+		return this.run(this.writes.setCollapsed(key, collapsed));
 	}
 
-	async setCollapsed(key: TaskKey, collapsed: boolean): Promise<void> {
-		await this.mutate(this.rules.setCollapsed(key, collapsed));
+	unfoldAbove(key: TaskKey): Promise<void> {
+		return this.run(this.writes.unfoldAbove(key));
 	}
 
-	async unfoldAbove(key: TaskKey): Promise<void> {
-		await this.mutate(this.rules.unfoldAbove(key));
+	setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
+		return this.run(this.writes.setRepeat(key, rule));
 	}
 
-	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
-		await this.mutate(this.rules.setRepeat(key, rule));
+	stop(key: TaskKey): Promise<void> {
+		return this.run(this.writes.stop(key));
 	}
 
-	async stop(key: TaskKey): Promise<void> {
-		await this.mutate(this.rules.stop(key));
-	}
-
-	async toggleDone(key: TaskKey): Promise<void> {
-		await this.mutate(this.rules.toggleDone(key));
+	toggleDone(key: TaskKey): Promise<void> {
+		return this.run(this.writes.toggleDone(key));
 	}
 
 	async rename(key: TaskKey, text: string): Promise<TaskItem | null> {
-		const { doc, today } = await this.readNormalized();
-		if (!this.rules.renameChanges(doc, key, text)) return null;
-		const change = await this.mutate(this.rules.rename(key, text));
-		return change && this.itemAt(change.after, key, today, this.itemLevels());
+		return this.run(this.writes.rename(await this.snapshot(), key, text));
 	}
 
 	fullTree(item: TaskItem): FullTree {
-		return fullTree(item);
+		return this.reads.fullTree(item);
 	}
 
-	async setDescription(key: TaskKey, markdown: string): Promise<void> {
-		await this.mutate(this.rules.setDescription(key, markdown));
+	setDescription(key: TaskKey, markdown: string): Promise<void> {
+		return this.run(this.writes.setDescription(key, markdown));
 	}
 
-	async remove(key: TaskKey): Promise<void> {
-		await this.mutate(this.rules.remove(key));
+	remove(key: TaskKey): Promise<void> {
+		return this.run(this.writes.remove(key));
 	}
 
 	async find(key: TaskKey, text: string): Promise<TaskItem | null> {
-		const { doc, today } = await this.readNormalized();
-		const atPlace = doc.find(key.section, key.index, key.path);
-		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
-		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
-		return entry ? this.itemAt(doc, entry, today, this.itemLevels()) : null;
-	}
-
-	/** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
-	private itemAt(doc: TaskDocument, place: Pick<TaskKey, "section" | "index" | "path">, today: LocalDate, levels: ItemLevels): TaskItem | null {
-		const entry = doc.find(place.section, place.index, place.path);
-		if (!entry) return null;
-		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
-		return toItem(entry, today, levels, parent, this.rules.moment().boundary);
+		return this.reads.find(await this.snapshot(), key, text);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
 		await this.normalize();
-		const settings = this.settings.get();
 		const text = await this.store.read();
-		if (text === null) throw new TasksFileMissingError(settings.tasksFile);
-		const doc = parseText(text, settings);
-		return doc.lineOf(this.rules.entryOf(doc, key));
+		if (text === null) throw new TasksFileMissingError(this.settings.get().tasksFile);
+		return this.reads.lineOf(text, key);
 	}
 
-	async moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
-		await this.mutate(this.rules.moveBefore(key, before, date));
+	moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
+		return this.run(this.writes.moveBefore(key, before, date));
 	}
 
-	async nest(key: TaskKey, parent: TaskKey, before: TaskKey | null): Promise<void> {
-		await this.mutate(this.rules.nest(key, parent, before));
+	nest(key: TaskKey, parent: TaskKey, before: TaskKey | null): Promise<void> {
+		return this.run(this.writes.nest(key, parent, before));
 	}
 
-	async setSlot(key: TaskKey, slot: Slot): Promise<void> {
-		await this.mutate(this.rules.setSlot(key, slot));
+	setSlot(key: TaskKey, slot: Slot): Promise<void> {
+		return this.run(this.writes.setSlot(key, slot));
 	}
 
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
-		return this.timeline().shown(slotted(item), day);
+		return this.reads.shownSpan(item, day);
 	}
 
 	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan {
-		return droppedSpan(start, from === "timeline" ? (item?.durationMin ?? null) : null);
+		return this.reads.dropSpan(item, from, start);
 	}
 
 	newSlot(day: LocalDate, start: number): Slot {
-		return this.rules.moment().boundary.slotAt(day, droppedSpan(start, null).start, null);
-	}
-
-	/** A drop on the timeline of `day` at `start`: the task's own duration from the file when it came from the timeline. */
-	async toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> {
-		const { doc, boundary } = await this.readNormalized();
-		const { slot } = this.rules.entryOf(doc, key).task;
-		const span = droppedSpan(start, from === "timeline" && slot && slot.end !== null ? slot.end - slot.start : null);
-		await this.setSlot(key, boundary.slotAt(day, span.start, span.end));
+		return this.reads.newSlot(day, start);
 	}
 
 	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {
-		return this.timeline().stretched(slotted(item), day, edge, minute);
+		return this.reads.stretch(item, day, edge, minute);
 	}
 
 	async resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean> {
-		const { doc, boundary } = await this.readNormalized();
-		const { slot, status } = this.rules.entryOf(doc, key).task;
-		const next = slot && new TimelineSpans(boundary, this.clock.now()).resized({ slot, open: isOpen(status) }, day, edge, minute, minDurationMin);
-		if (!next) return false;
-		await this.setSlot(key, next);
-		return true;
+		return this.run(this.writes.resize(await this.snapshot(), key, day, edge, minute, minDurationMin));
 	}
 
-	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
-		await this.mutate(this.rules.clearSlot(key, place));
+	clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
+		return this.run(this.writes.clearSlot(key, place));
 	}
 
-	async moveToList(key: TaskKey, date: LocalDate): Promise<void> {
-		await this.mutate(this.rules.moveToList(key, date));
+	moveToList(key: TaskKey, date: LocalDate): Promise<void> {
+		return this.run(this.writes.moveToList(key, date));
 	}
 
-	async moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
-		await this.mutate(this.rules.moveToSoon(key, date));
+	moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
+		return this.run(this.writes.moveToSoon(key, date));
 	}
 
-	async postpone(key: TaskKey, date: LocalDate): Promise<void> {
-		await this.mutate(this.rules.postpone(key, date));
+	postpone(key: TaskKey, date: LocalDate): Promise<void> {
+		return this.run(this.writes.postpone(key, date));
 	}
 
-	async moveToEnd(key: TaskKey, section: EndList): Promise<void> {
-		await this.mutate(this.rules.moveToEnd(key, section));
+	moveToEnd(key: TaskKey, section: EndList): Promise<void> {
+		return this.run(this.writes.moveToEnd(key, section));
 	}
 
-	async moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Promise<void> {
-		await this.mutate(this.rules.moveToGroup(key, list, group, before, date));
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Promise<void> {
+		return this.run(this.writes.moveToGroup(key, list, group, before, date));
 	}
 
-	async createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void> {
-		await this.mutate(this.rules.createGroup(key, list, name, date));
+	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Promise<void> {
+		return this.run(this.writes.createGroup(key, list, name, date));
 	}
 
 	async toSection(keys: readonly TaskKey[], name: GroupName): Promise<void> {
-		const { doc } = await this.readNormalized();
-		const steps = keys.flatMap((key): TaskStep[] => {
-			const change = this.rules.sectionChange(this.rules.entryOf(doc, key), name);
-			return change ? [{ key, change }] : [];
-		});
-		if (steps.length === 0) return;
-		if (keys.length !== 1) return this.applyAll(steps);
-		const { key, change } = steps[0];
-		if (change.kind === "moveToGroup") return this.moveToGroup(key, change.list, change.group, change.before, change.date);
-		if (change.kind === "createGroup") return this.createGroup(key, change.list, change.name, change.date);
+		return this.run(this.writes.toSection(await this.snapshot(), keys, name));
 	}
 
-	async moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void> {
-		await this.mutate(this.rules.moveGroup(list, group, place));
+	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void> {
+		return this.run(this.writes.moveGroup(list, group, place));
 	}
 
 	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
-		const operation = this.rules.renameGroup(list, group, name);
-		if (!operation) return false;
-		const { doc, today, boundary } = await this.readNormalized();
-		if (operation(doc, today, this.settings.get(), boundary) === doc) return false;
-		await this.mutate(operation);
-		return true;
+		const rename = this.writes.renameGroup(list, group, name);
+		if (!rename.operation) return false;
+		return this.run(rename.plan(await this.snapshot()));
 	}
 
-	async removeGroup(list: GroupedList, group: string): Promise<void> {
-		await this.mutate(this.rules.removeGroup(list, group));
+	removeGroup(list: GroupedList, group: string): Promise<void> {
+		return this.run(this.writes.removeGroup(list, group));
 	}
 
-	async createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
-		const made = this.rules.createSection(name, place);
-		if (!made) return null;
-		const change = await this.mutate(made.operation);
-		if (!change || change.after.serialize() === change.before.serialize()) return null;
-		return { list: made.list, group: made.group };
+	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
+		return this.run(this.writes.createSection(name, place));
 	}
 
-	async applyAll(steps: readonly TaskStep[]): Promise<void> {
-		await this.mutate(this.rules.applyAll(steps));
+	applyAll(steps: readonly TaskStep[]): Promise<void> {
+		return this.run(this.writes.applyAll(steps));
 	}
 
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
-		return runDrop(this, tasks, to, day);
+	async drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
+		const drop = this.writes.drop(tasks, to, day);
+		return this.run(drop.plan(drop.reads ? await this.snapshot() : null));
 	}
 
 	async normalize(): Promise<void> {
@@ -633,11 +449,16 @@ export class TaskServiceImpl implements TaskService {
 		});
 	}
 
+	/** A write as one action: its operation written once, then its answer over the document before and after. */
+	private async run<R>(write: Write<R>): Promise<R> {
+		return write.answer(await this.mutate(write.operation));
+	}
+
 	/**
 	 * One action's change of the file; it is a step to take back unless `record` is false (the file tidied, not changed by an
 	 * action). Gives the document as normalized before and after the write; null when it changed nothing.
 	 */
-	private async mutate(operation: Operation | null, record = true): Promise<{ readonly before: TaskDocument; readonly after: TaskDocument } | null> {
+	private async mutate(operation: Operation | null, record = true): Promise<DocChange | null> {
 		if (!operation) return null;
 		const at = this.rules.moment();
 		let failure: unknown = null;
@@ -660,7 +481,7 @@ export class TaskServiceImpl implements TaskService {
 		return { before: written.before, after: written.after };
 	}
 
-	private async readNormalized(): Promise<{ doc: TaskDocument; today: LocalDate; boundary: DayBoundary }> {
+	private async snapshot(): Promise<Snapshot> {
 		const at = this.rules.moment();
 		const text = await this.store.read();
 		if (text === null) throw new TasksFileMissingError(at.settings.tasksFile);
@@ -676,37 +497,7 @@ export class TaskServiceImpl implements TaskService {
 		return this.normalized;
 	}
 
-	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {
-		return usableLevels(settings.priorities);
-	}
-
-	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
-		const levels = this.itemLevels();
-		const { boundary } = this.rules.moment();
-		return (entry) => toItem(entry, today, levels, null, boundary);
-	}
-
-	private itemLevels(): ItemLevels {
-		const settings = this.settings.get();
-		return itemLevels(this.levels(settings), usableLabels(settings.labels));
-	}
-
-	private today(): LocalDate {
-		return this.rules.today();
-	}
-
-	/** The timeline's rules by the clock and the day's boundary now. */
-	private timeline(): TimelineSpans {
-		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
-	}
-
 	private emit(): void {
 		for (const listener of this.listeners) listener();
 	}
-}
-
-/** A task on the timeline as its rules read it; one without a slot has no place there. */
-function slotted(item: TaskItem): SlottedTask {
-	if (!item.slot) throw new Error("Task Calendar: the task has no slot on the timeline");
-	return { slot: item.slot, open: item.open };
 }
