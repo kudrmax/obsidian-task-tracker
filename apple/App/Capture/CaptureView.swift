@@ -31,13 +31,13 @@ struct CaptureView: View {
                     Label(failure, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                 }
+                if let problem = recorder.problem {
+                    Label(problem, systemImage: "mic.slash.fill")
+                        .foregroundStyle(.red)
+                }
                 Spacer(minLength: 0)
             }
             .padding()
-            .safeAreaInset(edge: .bottom) {
-                RecorderBar(recorder: recorder)
-                    .padding()
-            }
             .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -51,8 +51,63 @@ struct CaptureView: View {
                     Button("Add", systemImage: "checkmark") { Task { await send() } }
                         .disabled(!canSend || sending)
                 }
+                recorderItems
             }
             .onAppear { typing = true }
+        }
+    }
+
+    /// The recording's controls in the system bottom bar, drawn and animated by iOS as every toolbar is.
+    @ToolbarContentBuilder
+    private var recorderItems: some ToolbarContent {
+        switch recorder.state {
+        case .idle:
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .bottomBar) {
+                Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
+                    .buttonStyle(.glassProminent)
+                    .tint(.red)
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+        case .recording, .paused:
+            ToolbarItem(placement: .bottomBar) {
+                Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .status) {
+                VStack(spacing: 0) {
+                    Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
+                        .font(.headline.monospacedDigit())
+                        .contentTransition(.numericText())
+                    Text(recorder.state == .recording ? "Recording" : "Paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItemGroup(placement: .bottomBar) {
+                if recorder.state == .recording {
+                    Button("Pause", systemImage: "pause.fill") { recorder.pause() }
+                } else {
+                    Button("Resume", systemImage: "mic.fill") { recorder.resume() }
+                }
+                Button("Stop", systemImage: "stop.fill") { recorder.finish() }
+            }
+        case .finished:
+            ToolbarItem(placement: .bottomBar) {
+                Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+            ToolbarItem(placement: .status) {
+                VStack(spacing: 0) {
+                    Label("Voice note", systemImage: "waveform")
+                        .font(.headline)
+                    Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
         }
     }
 
@@ -74,98 +129,6 @@ struct CaptureView: View {
             close()
         case .failed(let reason):
             failure = reason
-        }
-    }
-}
-
-/// The microphone and, once it is going, the recording's time with pause, resume and stop: system glass buttons, as
-/// the controls floating over an iOS screen are.
-private struct RecorderBar: View {
-    let recorder: VoiceRecorder
-
-    var body: some View {
-        VStack(spacing: 12) {
-            if let problem = recorder.problem {
-                Label(problem, systemImage: "mic.slash.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-            GlassEffectContainer(spacing: 16) {
-                switch recorder.state {
-                case .idle:
-                    GlassCircle(title: "Record", symbol: "mic.fill", main: true) { Task { await recorder.start() } }
-                case .recording, .paused:
-                    running
-                case .finished:
-                    finished
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var running: some View {
-        HStack(spacing: 16) {
-            GlassCircle(title: "Discard", symbol: "trash") { recorder.discard() }
-
-            VStack(spacing: 2) {
-                Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                    .font(.title.monospacedDigit().weight(.semibold))
-                    .contentTransition(.numericText())
-                Text(recorder.state == .recording ? "Recording" : "Paused")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-
-            GlassCircle(title: recorder.state == .recording ? "Pause" : "Resume", symbol: recorder.state == .recording ? "pause.fill" : "mic.fill", main: true) {
-                if recorder.state == .recording { recorder.pause() } else { recorder.resume() }
-            }
-
-            GlassCircle(title: "Stop", symbol: "stop.fill") { recorder.finish() }
-        }
-    }
-
-    private var finished: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "waveform")
-                .font(.title3)
-                .foregroundStyle(.red)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Voice note")
-                    .font(.headline)
-                Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            GlassCircle(title: "Discard", symbol: "trash") { recorder.discard() }
-        }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 28))
-    }
-}
-
-/// A round button on system glass: the main one red and larger, the rest plain.
-private struct GlassCircle: View {
-    let title: String
-    let symbol: String
-    var main = false
-    let action: () -> Void
-
-    var body: some View {
-        let button = Button(action: action) {
-            Image(systemName: symbol)
-                .font(main ? .title : .title3)
-                .frame(width: main ? 56 : 40, height: main ? 56 : 40)
-                .contentTransition(.symbolEffect(.replace))
-        }
-        .buttonBorderShape(.circle)
-        .accessibilityLabel(title)
-        if main {
-            button.buttonStyle(.glassProminent).tint(.red)
-        } else {
-            button.buttonStyle(.glass)
         }
     }
 }
