@@ -1,7 +1,6 @@
-import { MINUTES_PER_DAY } from "../../core/application/contracts";
+import { dueLabel, MINUTES_PER_DAY } from "../../core/application/contracts";
 import type { LocalDate } from "./types";
 
-const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 const MINUTES_PER_HOUR = 60;
 
 const two = (n: number) => String(n).padStart(2, "0");
@@ -23,11 +22,11 @@ export function addDays(date: LocalDate, days: number): LocalDate {
 }
 
 export function dayOfMonth(date: LocalDate): string {
-	return String(parseLocalDate(date).getDate());
+	return dueLabel(date).day;
 }
 
 export function monthAbbreviation(date: LocalDate): string {
-	return MONTHS[parseLocalDate(date).getMonth()];
+	return dueLabel(date).month;
 }
 
 export function minutesOf(d: Date): number {
@@ -51,8 +50,8 @@ const DAYS_PER_WEEK = 7;
 
 /** `3 Nov`. */
 export function dayMonth(date: LocalDate): string {
-	const d = parseLocalDate(date);
-	return `${d.getDate()} ${MONTHS[d.getMonth()][0]}${MONTHS[d.getMonth()].slice(1).toLowerCase()}`;
+	const { day, month } = dueLabel(date);
+	return `${day} ${month[0]}${month.slice(1).toLowerCase()}`;
 }
 
 /** `November 2026`. */

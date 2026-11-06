@@ -243,6 +243,15 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	PRIORITY_COLORS: "../domain/Priority",
 	acceptsDrop: "./drops",
 	placesInGap: "./drops",
+	bgAlphaFor: "./paints",
+	contrast: "./paints",
+	EVENT_BG_ALPHA: "./paints",
+	eventColors: "./paints",
+	eventHex: "./paints",
+	inkOf: "./paints",
+	shadesOf: "./paints",
+	dayTitle: "./dayLabels",
+	dueLabel: "./dayLabels",
 };
 
 /**
@@ -256,6 +265,7 @@ const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
 	MINUTES_PER_DAY: "rules.constants",
 	DESCRIPTION_TEMPLATE: "rules.constants",
 	PRIORITY_COLORS: "rules.constants",
+	EVENT_BG_ALPHA: "rules.constants",
 	LINE_BREAK: "rules.oneLine",
 	DayBoundary: "boundary.dayOf",
 	QuickEntrySession: "entry.enter",

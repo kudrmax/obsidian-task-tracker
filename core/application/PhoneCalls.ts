@@ -16,6 +16,8 @@ import { CalendarDay, type CalendarReading } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
+import { dayTitle, dueLabel } from "./dayLabels";
+import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, shadesOf } from "./paints";
 import {
 	type CalendarEvent,
 	type CalendarSource,
@@ -631,10 +633,18 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	usableColor,
 	acceptsDrop,
 	placesInGap,
+	shadesOf,
+	inkOf,
+	contrast,
+	eventHex,
+	bgAlphaFor,
+	eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
+	dayTitle,
+	dueLabel,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, LISTS: GROUPED_LISTS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
 
 /** A quick entry's look from the wire. */
 function lookOf(c: Call, look: WireLook): EntryLook {
