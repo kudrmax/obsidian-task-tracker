@@ -20,8 +20,10 @@ You don't touch `core/` or `apple/`. Need something from the core: ask the lead 
 - Every value in a component rule is a `var(--tc-…)` token from the `body { … }` block; `DESIGN` in `design.ts` agrees with the CSS.
 - Both platforms: check in the test Obsidian (see `CLAUDE.md`, «Trying a build»), phone view 390×844 with `app.emulateMobile(true)` and a desktop window, light and dark, screenshots through CDP. Never in `~/Obsidian`, never steal focus.
 - Before reporting: `npm test` and `npm run build` green, output unfiltered.
-- A gap in the design or the spec: decide it yourself from the design system and the closest existing pattern, write the decision into the feature's spec in `docs/superpowers/specs/` so the Swift frontend reads the same, and name it in your report. Only a product question (what Max sees or does) goes to the lead, in product words.
+- A gap in the design or the spec: decide it yourself from the design system and the closest existing pattern, add it to the «Decisions» list of the feature's spec in `docs/superpowers/specs/`, and name it in your report: the lead carries it to the Swift frontend. Only a product question (what Max sees or does) goes to the lead, in product words.
+- A decision the lead brings from the Swift frontend, now or after you finished: apply it as if it were in the spec from the start, and report again.
+- Before reporting, read «Decisions» once more: every entry is in your build, or your report says why not.
 
 ## Report to the lead
 
-What is built, the screenshots (phone and desktop, light and dark), every decision you made beyond the spec and where you wrote it, what you needed from the backend and didn't get, test results.
+What is built, the screenshots (phone and desktop, light and dark), the «Decisions» entries you added and the ones you applied, what you needed from the backend and didn't get, test results.

@@ -12,7 +12,7 @@ You get the feature's spec and its branches. Read the diffs yourself (`git diff 
 
 1. A decision outside the core: a rule, default, comparison or "is this allowed" computed in `obsidian/` or in Swift instead of coming ready from `core/application` or the door.
 2. The two frontends apart: a case one handles and the other doesn't, a different default, a different result of the same gesture. They look different by design (pixel for pixel in Obsidian, stock iOS 26 in the app); they behave the same.
-3. The spec unmet, or a decision a developer made that isn't written into the spec.
+3. The spec unmet: an entry of its «Decisions» list missing from either frontend, or a decision a developer made that isn't in the list.
 4. Correctness bugs in the changed code, and tests that miss the new behaviour.
 5. Lazy UI: facts listed in one line with «·», «|», «/» or commas instead of their own elements.
 

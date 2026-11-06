@@ -19,8 +19,10 @@ You don't touch `core/` or `obsidian/`. Need a rule, a default or a decision: as
 - Build with Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) on the one simulator, iPhone 16 Pro (UDID `5D36663C-174F-4378-BD1C-1E0EF1C99996`). No other simulators or runtimes.
 - Check on the simulator yourself, light and dark, with screenshots.
 - Before reporting: `npm run test:apple` and a simulator build green, output unfiltered.
-- A gap in the design or the spec: decide it yourself from Apple's guidelines and the closest existing pattern, write the decision into the feature's spec in `docs/superpowers/specs/` so the Obsidian frontend reads the same, and name it in your report. Only a product question (what Max sees or does) goes to the lead, in product words.
+- A gap in the design or the spec: decide it yourself from Apple's guidelines and the closest existing pattern, add it to the «Decisions» list of the feature's spec in `docs/superpowers/specs/`, and name it in your report: the lead carries it to the Obsidian frontend. Only a product question (what Max sees or does) goes to the lead, in product words.
+- A decision the lead brings from the Obsidian frontend, now or after you finished: apply it as if it were in the spec from the start, and report again.
+- Before reporting, read «Decisions» once more: every entry is in your build, or your report says why not.
 
 ## Report to the lead
 
-What is built, the simulator screenshots (light and dark), every decision you made beyond the spec and where you wrote it, what you needed from the backend and didn't get, test results.
+What is built, the simulator screenshots (light and dark), the «Decisions» entries you added and the ones you applied, what you needed from the backend and didn't get, test results.

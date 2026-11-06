@@ -65,7 +65,13 @@ A feature that touches more than one layer is built by the project's agents in `
 - `frontend-swift`: `apple/`.
 - `reviewer`: reads all the diffs against the spec, changes nothing.
 
-The lead writes the feature's spec in `docs/superpowers/specs/` (what Max sees, what the contract gives), then runs `backend` in its own worktree; once its contract is in, `frontend-obsidian` and `frontend-swift` run at the same time, each in its own worktree from the backend's branch; then `reviewer`. The spec is where the frontends meet: a gap either of them closes is decided by that agent and written into the spec, so the other reads the same; they don't pass messages through the lead. Technical and small design decisions stay with the agents; only a product question reaches Max, from the lead, in product words. The lead checks every report against the diff, sends the review's findings back to the side that should fix them, and shows Max the result for approval before the merge.
+The lead writes the feature's spec in `docs/superpowers/specs/` (what Max sees, what the contract gives), then runs `backend` in its own worktree; once its contract is in, `frontend-obsidian` and `frontend-swift` run at the same time, each in its own worktree from the backend's branch; then `reviewer`. A gap either frontend finds (in the design, the spec or the contract) is decided by that agent, written into the spec's «Decisions» list and named in its report. The spec only records it; carrying it to the other frontend is the lead's job, because the other may be mid-work or already finished:
+
+- The other frontend still running: the lead sends it the decision (`SendMessage`) at once.
+- The other frontend finished: the lead continues it (`SendMessage` to the same agent, its context intact) to apply the decision.
+- The decision needs the core: the lead continues `backend` first, then both frontends.
+
+The feature is done only when every entry of «Decisions» is in both frontends' last reports and the reviewer found none missing. Technical and small design decisions stay with the agents; only a product question reaches Max, from the lead, in product words. The lead checks every report against the diff, sends the review's findings back to the side that should fix them, and shows Max the result for approval before the merge.
 
 ## The Apple apps
 
