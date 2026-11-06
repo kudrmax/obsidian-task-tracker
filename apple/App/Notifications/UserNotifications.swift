@@ -60,9 +60,10 @@ final class UserNotifications: NotificationScheduling {
         center.add(UNNotificationRequest(identifier: "\(reminder.id)#failed", content: content, trigger: nil))
     }
 
-    /// Only the reminders': the sync leaves the app's other notices (the signature's) alone.
+    /// Only the reminders', told by their task as `delivered()` tells them: one offering to wait out a meeting has a
+    /// category of its own. The sync leaves the app's other notices (the signature's) alone.
     func pending() async -> Set<String> {
-        Set(await Self.center.pendingNotificationRequests().filter { $0.content.categoryIdentifier == Self.category }.map(\.identifier))
+        Set(await Self.center.pendingNotificationRequests().filter { $0.content.userInfo[Key.reminderID] is String }.map(\.identifier))
     }
 
     func delivered() async -> [DeliveredNotification] {
