@@ -1,10 +1,7 @@
-import { DayBoundary } from "../domain/DayBoundary";
 import type { LocalDate } from "../domain/Task";
-import { CalendarDays } from "./calendarDays";
 import { CalendarPolling } from "./CalendarPolling";
-import { CalendarChoice, type CalendarKey, keyText } from "./calendarChoice";
+import { type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
-import { hiddenNow } from "./calendarMigration";
 import type {
 	CalendarPoll,
 	CalendarService,
@@ -20,6 +17,7 @@ import type {
 } from "./contracts";
 import type { EventFeed, EventFile } from "./EventSource";
 import type { Clock, SettingsStore, Timers } from "./ports";
+import { ShownCalendars } from "./shownCalendars";
 
 /** Google is fetched by the plugin; the work calendar is a file the iPhone exports. */
 const KINDS: Readonly<Record<CalendarSource, SourceKind>> = { google: "synced", iphone: "exported", work: "exported" };
@@ -61,7 +59,7 @@ export class CalendarServiceImpl implements CalendarService {
 	async known(): Promise<readonly ShownCalendar[]> {
 		await this.readFiles();
 		const hidden = new Set(this.hidden().map(keyText));
-		return this.choice().known().map((c) => ({ account: c.key.account, title: c.key.title, color: c.color, shown: !hidden.has(keyText(c.key)) }));
+		return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, color: c.color, shown: !hidden.has(keyText(c.key)) }));
 	}
 
 	async setShown(account: string, title: string, shown: boolean): Promise<void> {
@@ -153,12 +151,12 @@ export class CalendarServiceImpl implements CalendarService {
 		await this.settings.update({ hiddenCalendars: this.hidden(), calendarsMigrated: true });
 	}
 
-	private choice(hidden: readonly CalendarKey[] = []): CalendarChoice {
-		return new CalendarChoice(this.lastRead, hidden, this.settings.get().staleAfterMinutes * MINUTE_MS, this.clock.now());
+	private shown(): ShownCalendars {
+		return new ShownCalendars(this.lastRead, this.settings.get(), this.clock.now());
 	}
 
 	private hidden(): CalendarKey[] {
-		return hiddenNow(this.settings.get(), this.choice().known(), this.lastRead.get("google"));
+		return this.shown().hidden();
 	}
 
 	private answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
@@ -172,7 +170,7 @@ export class CalendarServiceImpl implements CalendarService {
 	}
 
 	private dayOf(date: LocalDate): DayEvents {
-		const chosen = new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.get().dayStartHour)).day(date);
+		const chosen = this.shown().days().day(date);
 		const events = chosen.events;
 		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
 		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name))), stale: chosen.stale };
