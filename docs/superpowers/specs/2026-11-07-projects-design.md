@@ -33,18 +33,19 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     Backlog tasks of `TODOs Tasks.md` are one more group, «No project». A tap on a group's title opens the project note.
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
-    `TODOs Tasks.md` into that project's note (after its last task, or at the end of the note), keeping where it is in the
+    `TODOs Tasks.md` into that project's note (the end of its `## Tasks`), keeping where it is in the
     lane; «No project» moves it back into the file. The plus on a project group's title in Backlog writes a new task
     straight into that note.
-12. **Not every checkbox in a project note is a project task**: a note may hold plain checklists that stay out of the
-    plugin. How they are told apart: open.
+12. **Project tasks live under `## Tasks`.** Only checkboxes in the note's `## Tasks` section (down to the next heading of
+    the same or a higher level) are project tasks; every other checkbox is a plain checklist the plugin never reads. A new
+    or moved-in task is written at the end of that section; a note without one gets it at its end on the first write.
 13. **The lane on a project task's line** uses the existing fields: nothing — Backlog; `📅` — a day, today's date — Now;
     `⏰` (or `🚨`, `📌`, `🔕`) — the calendar. Soon without a date is `🔜` at the end of the line, like the other fields.
 
 ## How it is used
 
 1. **Start a project.** A new note «Окружение в новой стране» with `#project`. Write freely: why, thoughts, observations,
-   and the steps that come to mind as tasks (`- [ ] Сходить на языковой обмен`).
+   and, under `## Tasks`, the steps that come to mind (`- [ ] Сходить на языковой обмен`).
 2. **See it in the plugin.** Backlog shows a group «Окружение в новой стране» with those steps, beside the other projects
    and «No project».
 3. **Take a step.** Drag «Сходить на языковой обмен» from its group to Soon, Now, a day or the calendar, as any Backlog
@@ -55,7 +56,6 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 
 ## Open (being planned now)
 
-- How a project task is told from a plain checkbox in the note.
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
 - How Backlog grouped by project looks, and the project mark on a card: boards, phone and desktop, dark and light.
 - What the project mark on a card looks like, on the phone and the desktop.
