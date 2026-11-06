@@ -13,6 +13,7 @@ export function readsAnew(before: TaskCalendarSettings, after: TaskCalendarSetti
 		before.liveSlotMarker !== after.liveSlotMarker ||
 		before.silentSlotMarker !== after.silentSlotMarker ||
 		before.repeatMarker !== after.repeatMarker ||
+		before.collapsedMarker !== after.collapsedMarker ||
 		before.groups.ungrouped !== after.groups.ungrouped ||
 		!same(before.groups.presets, after.groups.presets) ||
 		!sameLevels(before.priorities, after.priorities) ||

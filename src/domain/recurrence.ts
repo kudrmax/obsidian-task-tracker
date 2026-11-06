@@ -21,9 +21,11 @@ export function recurClosed(doc: TaskDocument, today: LocalDate, boundary: DayBo
 		const { task } = entry;
 		const copy = newTask(task.text, {
 			priority: task.priority,
+			labels: task.labels,
 			children: doc.freshChildren(entry),
 			dueDate: task.repeat!.next(dayOf(task, boundary), today),
 			repeat: task.repeat,
+			collapsed: task.collapsed,
 		});
 		doc = intoSoon(doc.replace(entry, { ...task, repeat: null }), entry.group, copy);
 	}

@@ -494,6 +494,14 @@ describe("QuickEntry", () => {
 		expect(entry.state).toMatchObject({ spot: at(1, 1), renaming: null });
 	});
 
+	it("rename enter on a collapsed parent opens a task after it, its subtasks folded away", () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const entry = tasks.entry();
+		entry.open(at(0), { ...item("A", [item("A0")]), collapsed: true });
+		entry.enter();
+		expect(entry.state).toMatchObject({ spot: at(1), renaming: null });
+	});
+
 	it("rename does not move the field by indent", () => {
 		const tasks = new FakeTasks(["A", "B"]);
 		const entry = tasks.entry();

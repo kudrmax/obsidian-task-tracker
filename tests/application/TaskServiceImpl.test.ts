@@ -444,6 +444,21 @@ describe("priority", () => {
 		expect((await svc.dayView(T)).slotted[0].reminder).toBe("alarm");
 	});
 
+	it("setCollapsed writes the marker on the task's line and the item says so; false takes it off", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n\t- [ ] B\n\n## Soon\n\n## Done\n");
+		await svc.setCollapsed((await svc.dayView(T)).list[0].key, true);
+		expect(store.text).toContain("- [ ] A 📁\n\t- [ ] B\n");
+		expect((await svc.dayView(T)).list[0]).toMatchObject({ collapsed: true, subtasks: [{ text: "B" }] });
+		await svc.setCollapsed((await svc.dayView(T)).list[0].key, false);
+		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n");
+	});
+
+	it("unfoldAbove shows the subtasks of every task a subtask sits under", async () => {
+		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A 📁\n\t- [ ] B 📁\n\t\t- [ ] C\n\n## Soon\n\n## Done\n");
+		await svc.unfoldAbove((await svc.dayView(T)).list[0].subtasks[0].subtasks[0].key);
+		expect(store.text).toContain("- [ ] A\n\t- [ ] B\n\t\t- [ ] C\n");
+	});
+
 	it("setPriority writes the prefix, null takes it off", async () => {
 		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] p1 A\n\n## Soon\n\n## Done\n");
 		await svc.setPriority((await svc.dayView(T)).list[0].key, "p2");

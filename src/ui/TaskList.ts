@@ -56,7 +56,7 @@ export const PLATE = "tc-group-empty";
 
 /**
  * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
- * from the task to each; with sections, a header over each.
+ * from the task to each, unless the task folds them away; with sections, a header over each.
  */
 export class TaskList {
 	private entries: ListEntry[] = [];
@@ -256,9 +256,9 @@ interface Row {
 	readonly level: number;
 }
 
-/** A section's tasks in the order the list draws them: each task, then its subtasks a level deeper. */
+/** A section's tasks in the order the list draws them: each task, then its subtasks a level deeper, unless they are folded away. */
 function rowsOf(items: readonly TaskItem[], level = 0): Row[] {
-	return items.flatMap((item) => [{ item, level }, ...rowsOf(item.subtasks, level + 1)]);
+	return items.flatMap((item) => [{ item, level }, ...(item.collapsed ? [] : rowsOf(item.subtasks, level + 1))]);
 }
 
 function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {

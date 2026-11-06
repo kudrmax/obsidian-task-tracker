@@ -327,6 +327,14 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.setReminder(doc, this.entryOf(doc, key), reminder));
 	}
 
+	async setCollapsed(key: TaskKey, collapsed: boolean): Promise<void> {
+		await this.mutate((doc) => ops.setCollapsed(doc, this.entryOf(doc, key), collapsed));
+	}
+
+	async unfoldAbove(key: TaskKey): Promise<void> {
+		await this.mutate((doc) => ops.unfoldAbove(doc, this.entryOf(doc, key)));
+	}
+
 	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
 		await this.mutate((doc, today, _settings, boundary) => ops.setRepeat(doc, this.entryOf(doc, key), rule, today, boundary));
 	}
@@ -624,10 +632,10 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private readingOf(settings: TaskCalendarSettings): string {
-		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, dayStartHour, labelTag } = settings;
+		const { sections, groups, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, collapsedMarker, dayStartHour, labelTag } = settings;
 		const prefixes = this.levels(settings).map((l) => l.prefix);
 		const labels = usableLabels(settings.labels).map((l) => l.name);
-		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, prefixes, labelTag, labels, dayStartHour]);
+		return JSON.stringify([sections, groups.ungrouped, groups.presets, dueDateMarker, slotMarker, alarmSlotMarker, liveSlotMarker, silentSlotMarker, repeatMarker, collapsedMarker, prefixes, labelTag, labels, dayStartHour]);
 	}
 
 	private levels(settings: TaskCalendarSettings): readonly PriorityLevel[] {

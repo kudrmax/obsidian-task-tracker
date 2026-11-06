@@ -146,6 +146,7 @@ export class DemoTaskService implements TaskService {
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,
+			collapsed: false,
 			parentText: null,
 			description: t.description ?? null,
 			group: null,
@@ -342,6 +343,10 @@ export class DemoTaskService implements TaskService {
 
 	/** The demo keeps no reminder kinds: every task on a time reminds with a notification. */
 	async setReminder(): Promise<void> {}
+
+	async setCollapsed(): Promise<void> {}
+
+	async unfoldAbove(): Promise<void> {}
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
 		this.taskOf(key).priority = priority;

@@ -1,8 +1,8 @@
 import { DayBoundary } from "./DayBoundary";
 import { isOpen, type LocalDate, type SectionKey, type Task } from "./Task";
-import { presetPlace } from "./operations";
+import { hasOpenSubtask, presetPlace } from "./operations";
 import { recurClosed } from "./recurrence";
-import { type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
+import { flatten, type TaskDocument, type TaskEntry, ungroupedIndex } from "./TaskDocument";
 
 /** A rewritten line can show another date or slot that was text before it: the rule runs again until nothing changes. */
 function untilSettled(doc: TaskDocument, pass: (doc: TaskDocument) => TaskDocument): TaskDocument {
@@ -152,10 +152,17 @@ function normalizeGroups(doc: TaskDocument, today: LocalDate): TaskDocument {
 	return placeUngrouped(dropEmptyUngroupedHeading(mergeDuplicates(misplacedOutOfGroups(doc, today))));
 }
 
+/** A task whose subtasks are all done, given up or gone has nothing to fold: it loses the marker, and a subtask reopened later is seen. */
+function unfoldEmpty(doc: TaskDocument): TaskDocument {
+	const empty = flatten(doc.allTasks()).filter((e) => e.task.collapsed && !hasOpenSubtask(e));
+	if (empty.length === 0) return doc;
+	return doc.replaceAll(empty.map((e) => [e, { ...e.task, collapsed: false }] as const));
+}
+
 /** `presets`: the section presets in their order, for a section rule 4 has to make in Now. */
 export function normalize(doc: TaskDocument, today: LocalDate, boundary = DayBoundary.MIDNIGHT, presets: readonly string[] = []): TaskDocument {
 	const listed = dueToNow(datedOutOfUndated(closedToDone(recurClosed(pastDatesToToday(erasePastSlots(doc, today, boundary), today), today, boundary))), today, boundary, presets);
-	const result = normalizeGroups(listed, today).spacedHeadings();
+	const result = unfoldEmpty(normalizeGroups(listed, today)).spacedHeadings();
 	if (result === doc) return doc;
 	return result.serialize() === doc.serialize() ? doc : result;
 }

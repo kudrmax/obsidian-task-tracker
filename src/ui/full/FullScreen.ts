@@ -195,7 +195,7 @@ export class FullScreen {
 
 	/** The list draws each subtask with all its own under it: done ones stay, crossed out. */
 	private shown(items: readonly TaskItem[]): TaskItem[] {
-		return items.map((item) => ({ ...item, subtasks: this.shown(item.allSubtasks) }));
+		return items.map((item) => ({ ...item, collapsed: false, subtasks: this.shown(item.allSubtasks) }));
 	}
 
 	/** A subtask's card, or its copy over a menu: the circle, filled and the title crossed once it is done. */

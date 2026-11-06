@@ -127,6 +127,8 @@ export interface TaskItem {
 	readonly allSubtasks: readonly TaskItem[];
 	/** Null without subtasks. */
 	readonly progress: SubtaskProgress | null;
+	/** Its open subtasks are folded away: a list draws its card without them. Only a task with an open subtask is. */
+	readonly collapsed: boolean;
 	/** The text of the task a subtask belongs to; null for a task. */
 	readonly parentText: string | null;
 	/** Its nested lines without a checkbox as Markdown, its first level unindented; null without any. */
@@ -327,6 +329,10 @@ export interface TaskService {
 	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
+	/** Folds the task's subtasks away on the screen, or shows them again: the marker on its line. A task without an open subtask has nothing to fold. */
+	setCollapsed(key: TaskKey, collapsed: boolean): Promise<void>;
+	/** The tasks a subtask sits under show their subtasks again, so its card stands in the list. */
+	unfoldAbove(key: TaskKey): Promise<void>;
 	/**
 	 * Sets or replaces the task's repeat rule; null takes it off. A schedule on an undated task gives it the first suitable
 	 * day as its due date, and the rule is anchored at the task's day. Closing a task that repeats writes its next copy in the same write.
@@ -603,7 +609,7 @@ export interface ViewSettingsStore {
 }
 
 /** The marks of a task line the settings tab sets. */
-export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "liveSlotMarker" | "silentSlotMarker" | "repeatMarker";
+export type Marker = "dueDateMarker" | "slotMarker" | "alarmSlotMarker" | "liveSlotMarker" | "silentSlotMarker" | "repeatMarker" | "collapsedMarker";
 /** The settings typed as a count: milliseconds, an hour, minutes, seconds. */
 export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | "refreshSeconds";
 /** The cards' size, set by a slider. */

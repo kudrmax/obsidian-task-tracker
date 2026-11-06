@@ -94,6 +94,12 @@ describe("FullScreen", () => {
 		expect(surface.edit.mock.calls[0][1]).toBe("- Выйти в 8:40");
 	});
 
+	it("shows the subtasks of a subtask folded away in the list", () => {
+		const folded = morning();
+		const { titles } = setup({ ...folded, allSubtasks: [{ ...folded.allSubtasks[0], collapsed: true }, folded.allSubtasks[1]] });
+		expect(titles()).toEqual(["Собрать рюкзак", "Ноутбук", "Пропуск", "Умыться"]);
+	});
+
 	it("a circle ticks an open subtask done and opens a done one again; the card itself opens its menu", () => {
 		const { cards, tasks, deps } = setup();
 		cards()[1].querySelector<HTMLElement>(".tc-pick")!.click();

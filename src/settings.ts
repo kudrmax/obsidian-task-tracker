@@ -48,6 +48,8 @@ export interface FileFormatSettings {
 	/** Precedes the slot of a task that the phone does not remind of. */
 	readonly silentSlotMarker: string;
 	readonly repeatMarker: string;
+	/** Stands among the fields of a task whose subtasks are folded away. */
+	readonly collapsedMarker: string;
 	/** Priority levels in the order the menu and the task screen offer them. */
 	readonly priorities: readonly PriorityLevel[];
 	/** The tag folder of the labels: a task tagged `#<labelTag>/<name>` has the label of that name. */
@@ -107,6 +109,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	liveSlotMarker: "📌",
 	silentSlotMarker: "🔕",
 	repeatMarker: "🔁",
+	collapsedMarker: "📁",
 	workCalendarFile: "calendar/work.json",
 	workCalendarTitles: [],
 	google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },

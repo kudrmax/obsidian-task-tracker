@@ -2,6 +2,7 @@ import { canPostpone, canRemoveDue, dayOfTask } from "../domain/Days";
 import { descriptionMarkdown } from "../domain/description";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
+import { hasOpenSubtask } from "../domain/operations";
 import { repeatable } from "../domain/queries";
 import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
@@ -56,6 +57,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,
 		progress: progressOf(entry),
+		collapsed: entry.task.collapsed && hasOpenSubtask(entry),
 		description: descriptionMarkdown(entry),
 		parentText,
 	};
