@@ -53,7 +53,9 @@ describe("toItem", () => {
 			allSubtasks: [],
 			progress: null,
 			collapsed: false,
-			parentText: null, description: null,
+			parentText: null,
+			parentKey: null,
+			description: null,
 		});
 	});
 

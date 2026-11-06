@@ -1,6 +1,7 @@
-import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
+import { fullTree } from "../../src/application/fullTree";
 import { TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
@@ -166,6 +167,7 @@ export class DemoTaskService implements TaskService {
 			progress: null,
 			collapsed: false,
 			parentText: null,
+			parentKey: null,
 			description: t.description ?? null,
 			group: null,
 			list: section,
@@ -393,9 +395,22 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async rename(key: TaskKey, text: string): Promise<void> {
-		this.taskOf(key).text = text;
+	async toggleDone(key: TaskKey): Promise<void> {
+		const t = this.taskOf(key);
+		await this.setStatus(key, t.status === "todo" || t.status === "inProgress" ? "done" : "todo");
+	}
+
+	async rename(key: TaskKey, text: string): Promise<TaskItem | null> {
+		const title = text.trim();
+		const t = this.taskOf(key);
+		if (this.isBlank(title) || title === t.text) return null;
+		t.text = title;
 		this.changed();
+		return this.item(key.section, key.index);
+	}
+
+	fullTree(item: TaskItem): FullTree {
+		return fullTree(item);
 	}
 
 	async remove(key: TaskKey): Promise<void> {

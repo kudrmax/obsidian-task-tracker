@@ -1594,7 +1594,10 @@ ${key.title}`.toLowerCase();
     return patch(doc, entry, { reminder });
   }
   function rename(doc, entry, text) {
-    return patch(doc, entry, { text: taskTitle(text) });
+    return patch(doc, entry, typed(doc, text, entry.task.priority, entry.task.labels));
+  }
+  function toggleDone(doc, entry) {
+    return setStatus(doc, entry, isOpen(entry.task.status) ? "done" : "todo");
   }
   function setDescription(doc, entry, markdown) {
     return doc.setDescription(entry, markdown);
@@ -2242,9 +2245,18 @@ ${key.title}`.toLowerCase();
     stop(key) {
       return (doc) => stop(doc, this.entryOf(doc, key));
     }
+    /** The title as typed (`ops.rename`); null for a blank one, a priority alone too. */
     rename(key, text) {
-      if (blank(text)) return null;
+      if (this.isBlank(text)) return null;
       return (doc) => rename(doc, this.entryOf(doc, key), text);
+    }
+    /** Whether `rename` writes anything on `doc`: not for a blank text, nor for the task's own title and marks. */
+    renameChanges(doc, key, text) {
+      return !this.isBlank(text) && rename(doc, this.entryOf(doc, key), text) !== doc;
+    }
+    /** The circle of a task: done when it is open in the file, else open again. */
+    toggleDone(key) {
+      return (doc) => toggleDone(doc, this.entryOf(doc, key));
     }
     setDescription(key, markdown) {
       return (doc) => setDescription(doc, this.entryOf(doc, key), markdown);

@@ -16,6 +16,7 @@ import {
 	type DayView,
 	type DraftMarks,
 	type DroppedTask,
+	type FullTree,
 	type DropTo,
 	type EndList,
 	type GroupedList,
@@ -39,7 +40,8 @@ import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { parseText } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
-import { itemLevels, toItem } from "./taskItems";
+import { fullTree } from "./fullTree";
+import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import type { UndoHistory } from "./UndoHistory";
 import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
@@ -279,15 +281,9 @@ export class TaskServiceImpl implements TaskService {
 		const labelled = this.rules.setLabelsAll(steps);
 		const change = await this.mutate(labelled.operation);
 		if (!change) return steps.map(() => null);
-		const settings = this.settings.get();
 		const today = this.rules.today();
-		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
-		return labelled.places().map((place) => {
-			const entry = place && change.after.find(place.section, place.index, place.path);
-			if (!place || !entry) return null;
-			const parent = place.path.length > 0 ? change.after.find(place.section, place.index, place.path.slice(0, -1)) : undefined;
-			return toItem(entry, today, levels, parent?.task.text ?? null);
-		});
+		const levels = this.itemLevels();
+		return labelled.places().map((place) => (place ? this.itemAt(change.after, place, today, levels) : null));
 	}
 
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
@@ -310,8 +306,19 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate(this.rules.stop(key));
 	}
 
-	async rename(key: TaskKey, text: string): Promise<void> {
-		await this.mutate(this.rules.rename(key, text));
+	async toggleDone(key: TaskKey): Promise<void> {
+		await this.mutate(this.rules.toggleDone(key));
+	}
+
+	async rename(key: TaskKey, text: string): Promise<TaskItem | null> {
+		const { doc, today } = await this.readNormalized();
+		if (!this.rules.renameChanges(doc, key, text)) return null;
+		const change = await this.mutate(this.rules.rename(key, text));
+		return change && this.itemAt(change.after, key, today, this.itemLevels());
+	}
+
+	fullTree(item: TaskItem): FullTree {
+		return fullTree(item);
 	}
 
 	async setDescription(key: TaskKey, markdown: string): Promise<void> {
@@ -327,10 +334,15 @@ export class TaskServiceImpl implements TaskService {
 		const atPlace = doc.find(key.section, key.index, key.path);
 		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
 		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
+		return entry ? this.itemAt(doc, entry, today, this.itemLevels()) : null;
+	}
+
+	/** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
+	private itemAt(doc: TaskDocument, place: Pick<TaskKey, "section" | "index" | "path">, today: LocalDate, levels: ItemLevels): TaskItem | null {
+		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
-		const parent = entry.path.length > 0 ? doc.find(entry.section, entry.index, entry.path.slice(0, -1)) : undefined;
-		const settings = this.settings.get();
-		return toItem(entry, today, itemLevels(this.levels(settings), usableLabels(settings.labels)), parent?.task.text ?? null);
+		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
+		return toItem(entry, today, levels, parent);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
@@ -525,9 +537,13 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
-		const settings = this.settings.get();
-		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
+		const levels = this.itemLevels();
 		return (entry) => toItem(entry, today, levels);
+	}
+
+	private itemLevels(): ItemLevels {
+		const settings = this.settings.get();
+		return itemLevels(this.levels(settings), usableLabels(settings.labels));
 	}
 
 	private today(): LocalDate {
