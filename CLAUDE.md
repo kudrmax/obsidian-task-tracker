@@ -58,7 +58,7 @@ Delete only with `trash`, never `rm`.
 
 ## The Apple apps
 
-`apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `core/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
+`apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `core/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26; Apple's guides and UI kits to design from are in `docs/design/apple.md`. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
 
 ### Installing on the iPhone
 
