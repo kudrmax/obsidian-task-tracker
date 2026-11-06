@@ -78,6 +78,8 @@ export { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, type EventColors, ev
 export { dayTitle, type DueLabel, dueLabel } from "./dayLabels";
 /** How deep each event of a day lies over the others on the timeline. */
 export { type EventLevel, eventLevels, type EventSpan } from "./eventLevels";
+/** The timeline's zoom: its levels, the grid of lines and labels at an hour's height. */
+export { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, type Grid, type GridMark, gridAt, gridMarks, type GridMeasures, levelsFor, parseZoomLevels, type ZoomLevel } from "./timelineZoom";
 /** The stack of task cards on the timeline: tasks never share the width, each on its time or one gap under the card before. */
 export { durationParts, eventLeft, type LevelledSpan, overlayLeft, stackCorner, timeParts, type StackBox, type StackCard, stackTasks, type TaskSpan, type TimelineInsets } from "./timelineStack";
 

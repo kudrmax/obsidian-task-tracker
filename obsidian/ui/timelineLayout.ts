@@ -1,6 +1,6 @@
 import type { CardSize } from "./cardSize";
 export { durationParts, stackCorner, timeParts } from "../../core/application/contracts";
-import { eventLevels, overlayLeft as coreOverlayLeft, type StackBox, stackTasks as coreStackTasks, type TaskSpan } from "../../core/application/contracts";
+import { eventLevels, gridAt as coreGridAt, overlayLeft as coreOverlayLeft, type StackBox, stackTasks as coreStackTasks, type TaskSpan } from "../../core/application/contracts";
 import { DESIGN, LAYOUT } from "./design";
 
 export interface Span {
@@ -59,11 +59,9 @@ function overlayLeft(level: number): number {
 	return coreOverlayLeft(level, INSETS);
 }
 
-/** The grid at this zoom: labels at the finest division that still has room for them, else the hour; lines as often as they stay apart. */
+/** The grid at this zoom (`gridAt` in the core) in this design's measures. */
 export function gridAt(hourPx: number): Grid {
-	const labels = LAYOUT.gridDivisions.find((minutes) => minutesToPx(minutes, hourPx) >= LAYOUT.gridLabelGap) ?? MINUTES_PER_HOUR;
-	const ticks = minutesToPx(LAYOUT.gridTickMinutes, hourPx) >= LAYOUT.gridTickGap;
-	return { labels, lines: ticks ? LAYOUT.gridTickMinutes : labels };
+	return coreGridAt(hourPx, { divisions: LAYOUT.gridDivisions, labelGap: LAYOUT.gridLabelGap, tickMinutes: LAYOUT.gridTickMinutes, tickGap: LAYOUT.gridTickGap });
 }
 
 export function minutesToPx(minutes: number, hourPx: number): number {
