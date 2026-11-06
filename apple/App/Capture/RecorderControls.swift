@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The recording's buttons and labels, the same above the tab bar and above the keyboard.
+/// The recording's buttons and labels.
 @MainActor
 struct RecorderControls {
     let recorder: VoiceRecorder
@@ -51,49 +51,9 @@ struct RecorderControls {
     }
 }
 
-/// The recording's controls in the system bar above the tab bar, on both tabs as Music keeps its player: the tab bar
-/// keeps one width. Recording from Settings goes to New Task, where the recording is added.
-struct RecorderAccessory: View {
-    let recorder: VoiceRecorder
-
-    var body: some View {
-        let controls = RecorderControls(recorder: recorder)
-        HStack(spacing: 20) {
-            switch recorder.state {
-            case .idle:
-                Button {
-                    CaptureRouter.shared.open()
-                    Task { await recorder.start() }
-                } label: {
-                    Label("Record", systemImage: "mic.fill")
-                        .labelStyle(.titleAndIcon)
-                        .frame(maxWidth: .infinity)
-                }
-                .tint(.red)
-            case .recording, .paused:
-                controls.discard
-                Spacer()
-                controls.elapsed
-                Spacer()
-                controls.pauseOrResume
-                controls.stop
-            case .finished:
-                controls.discard
-                Spacer()
-                controls.voiceNote
-                Spacer()
-            }
-        }
-        .labelStyle(.iconOnly)
-        .font(.headline)
-        .tint(.primary)
-        .padding(.horizontal)
-    }
-}
-
-/// The recording's controls riding on the keyboard while typing: system glass buttons, as iOS's own bars over the
-/// keyboard, with the room above it that Reminders leaves.
-struct KeyboardRecorderBar: View {
+/// The recording's controls at the bottom of New Task, above the tab bar or riding on the keyboard: system glass
+/// buttons with the room above the keyboard that Reminders leaves.
+struct RecorderBar: View {
     let recorder: VoiceRecorder
 
     var body: some View {
@@ -104,7 +64,8 @@ struct KeyboardRecorderBar: View {
                 case .idle:
                     Spacer()
                     Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
-                        .foregroundStyle(.red)
+                        .buttonStyle(.glassProminent)
+                        .tint(.red)
                     Spacer()
                 case .recording, .paused:
                     controls.discard
@@ -120,6 +81,8 @@ struct KeyboardRecorderBar: View {
                     Spacer()
                     controls.voiceNote
                     Spacer()
+                    // As wide as the trash on the left, so the voice note stands in the middle.
+                    controls.discard.hidden()
                 }
             }
         }

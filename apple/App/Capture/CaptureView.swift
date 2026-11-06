@@ -3,17 +3,14 @@ import SwiftUI
 
 /// A new task: typed, recorded, or both, into one of the four lists. Once added, the screen is empty for the next one.
 struct CaptureView: View {
-    let recorder: VoiceRecorder
-
     @State private var list = CaptureListOption.inbox
     @State private var text = ""
+    @State private var recorder = VoiceRecorder()
     @State private var failure: String?
     @State private var sending = false
     /// The list the last task went into, told of until the next one is typed.
     @State private var added: CaptureListOption?
     @FocusState private var typing: Bool
-    /// The on-screen keyboard is up: the recording's controls ride on it, the bar above the tab bar is under it.
-    @State private var keyboardShown = false
 
     var body: some View {
         NavigationStack {
@@ -55,11 +52,9 @@ struct CaptureView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) {
-                if keyboardShown {
-                    KeyboardRecorderBar(recorder: recorder)
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
-                }
+                RecorderBar(recorder: recorder)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
             }
             .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
@@ -74,22 +69,9 @@ struct CaptureView: View {
                         .disabled(!canSend || sending)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-                keyboardShown = Self.keyboardHeight(note) > Self.onScreenKeyboard
-            }
             .onChange(of: text) { if !text.isEmpty { added = nil } }
             .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
         }
-    }
-
-    /// Taller than the bar iOS shows for a hardware keyboard.
-    private static let onScreenKeyboard: CGFloat = 100
-
-    private static func keyboardHeight(_ note: Notification) -> CGFloat {
-        guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-              let screen = (note.object as? UIScreen) ?? UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.screen }).first
-        else { return 0 }
-        return max(0, screen.bounds.maxY - frame.minY)
     }
 
     private var canSend: Bool {
