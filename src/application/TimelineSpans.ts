@@ -1,4 +1,4 @@
-import type { DayBoundary, Span } from "../domain/DayBoundary";
+import { clampSlot, type DayBoundary, type Span } from "../domain/DayBoundary";
 import { MINUTES_PER_DAY } from "../domain/LocalDate";
 import type { LocalDate, Slot } from "../domain/Task";
 
@@ -15,6 +15,11 @@ export interface StretchSpan {
 export interface SlottedTask {
 	readonly slot: Slot;
 	readonly open: boolean;
+}
+
+/** Where a card let go at `start` stands: as long as `durationMin` (none for null), within the day. */
+export function droppedSpan(start: number, durationMin: number | null): Span {
+	return clampSlot(start, durationMin === null ? null : start + durationMin);
 }
 
 /** Where the cards of a day's timeline stand at a moment, and what a dot held or let go there makes of a task's time. */

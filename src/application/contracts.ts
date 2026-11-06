@@ -287,7 +287,8 @@ export type DropOrigin = DropFrom | "new";
 
 /** Where a task is let go, as the gesture found it. */
 export type DropTo =
-	| { readonly kind: "slot"; readonly slot: Slot }
+	/** On the timeline at `start`, minutes from the start of the shown day, snapped to its grid: `TaskService.dropSpan` is where it lands. */
+	| { readonly kind: "time"; readonly start: number }
 	| { readonly kind: "clearSlot" }
 	/** A gap of a list that shows no sections: right before `before`, or at the end (null). */
 	| { readonly kind: "list"; readonly column: DropColumn; readonly before: TaskKey | null }
@@ -564,6 +565,14 @@ export interface TaskService {
 	 * task whose start has passed rides the now line, its duration kept. The file keeps its time.
 	 */
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan;
+	/**
+	 * Where a card let go on the timeline at `start` (minutes from the day's start, snapped) stands, as a drop there writes
+	 * it: one from the timeline keeps its duration, one from a list or the plus (`item` null) gets none; within the day,
+	 * a card as long as it is, one without a duration starting a step before the end at the latest.
+	 */
+	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan;
+	/** The slot of a new task let go or long-tapped on the timeline of `day` at `start`: no duration, as `dropSpan` places it. */
+	newSlot(day: LocalDate, start: number): Slot;
 	/**
 	 * The card of slotted `item` while its `edge` dot is held at `minute` of `day`: the end no earlier than the start nor
 	 * past the day; the start no earlier than the day nor past the end, and on a task without a duration no later than its

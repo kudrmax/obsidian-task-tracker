@@ -19,6 +19,8 @@ import {
 	type DayView,
 	type DraftMarks,
 	type DroppedTask,
+	type DropFrom,
+	type DropOrigin,
 	type FullTree,
 	type DropTo,
 	type EndList,
@@ -50,7 +52,7 @@ import { fullTree } from "./fullTree";
 import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import type { UndoHistory } from "./UndoHistory";
-import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
+import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -461,6 +463,22 @@ export class TaskServiceImpl implements TaskService {
 
 	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
 		return this.timeline().shown(slotted(item), day);
+	}
+
+	dropSpan(item: TaskItem | null, from: DropOrigin, start: number): DaySpan {
+		return droppedSpan(start, from === "timeline" ? (item?.durationMin ?? null) : null);
+	}
+
+	newSlot(day: LocalDate, start: number): Slot {
+		return this.rules.moment().boundary.slotAt(day, droppedSpan(start, null).start, null);
+	}
+
+	/** A drop on the timeline of `day` at `start`: the task's own duration from the file when it came from the timeline. */
+	async toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> {
+		const { doc, boundary } = await this.readNormalized();
+		const { slot } = this.rules.entryOf(doc, key).task;
+		const span = droppedSpan(start, from === "timeline" && slot && slot.end !== null ? slot.end - slot.start : null);
+		await this.setSlot(key, boundary.slotAt(day, span.start, span.end));
 	}
 
 	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {

@@ -20,8 +20,6 @@ export interface ColumnSections {
 export interface TaskDragPayload {
 	readonly item: TaskItem;
 	readonly from: TaskOrigin;
-	/** The duration a task on the timeline keeps when it moves; null for a task without one, and for every task from a list. */
-	readonly durationMin: number | null;
 	/** How far under the card's top the finger holds it: a timeline card keeps its grip, a list card hangs by its middle. */
 	readonly grabPx: number;
 	/** The other picked tasks that go along (bulk actions spec); none for a task carried alone. */
@@ -53,7 +51,6 @@ export function droppedTasks(drag: TaskDragPayload): readonly DroppedTask[] {
 export interface NewTaskPayload {
 	readonly from: "new";
 	readonly item: null;
-	readonly durationMin: null;
 	readonly grabPx: number;
 }
 

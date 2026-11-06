@@ -140,6 +140,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			placementOfDay: (date) => placementOfDay(date, TODAY),
 			listName: (list) => DEFAULT_SETTINGS.sections[list],
 			dayOfPlacement: (placement) => dayOfPlacement(placement, TODAY),
+			newSlot: (date, start) => ({ date, start, end: null }),
 			...priorityTitles([{ prefix: "p1", color: "red" }], labels),
 		},
 		arbiter: new GestureArbiter(),
@@ -1042,7 +1043,7 @@ describe("QuickEntryController", () => {
 		it("opens the field in the slot where the plus was let go on the timeline", () => {
 			const { controller, root, plus, beginNew, field } = setUp();
 			controller.dragFromPlus(new PointerEvent("pointermove"), plus);
-			beginNew.mock.calls[0][3]({ kind: "slot", slot });
+			beginNew.mock.calls[0][3]({ kind: "time", start: slot.start });
 			expect(timelineField(root)!.contains(field())).toBe(true);
 			expect(plus.classList.contains("is-hidden")).toBe(true);
 		});

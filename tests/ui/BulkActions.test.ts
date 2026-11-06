@@ -126,7 +126,7 @@ describe("bulk actions", () => {
 		const [a, b] = cards([item(), item()]);
 		bulk.selection.toggle(a);
 		bulk.selection.toggle(b);
-		const drag: TaskDragPayload = { item: a.item, from: "day", durationMin: null, grabPx: 0 };
+		const drag: TaskDragPayload = { item: a.item, from: "day", grabPx: 0 };
 		bulk.dropping(drag);
 		expect(bulk.selection.size).toBe(2);
 		bulk.dropping({ ...drag, carried: [{ item: b.item, from: "soon" }] });
@@ -178,7 +178,7 @@ describe("bulk actions", () => {
 	it("offers the cancel ring only while several cards are carried", () => {
 		const bulk = controller();
 		const [a] = cards([item()]);
-		const drag: TaskDragPayload = { item: a.item, from: "day", durationMin: null, grabPx: 0 };
+		const drag: TaskDragPayload = { item: a.item, from: "day", grabPx: 0 };
 		expect(bulk.targets(drag)).toEqual([]);
 		expect(bulk.targets({ ...drag, carried: [{ item: item(), from: "day" }] })).toHaveLength(1);
 		bulk.settled();

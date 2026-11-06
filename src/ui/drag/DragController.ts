@@ -132,11 +132,9 @@ export class DragController {
 	}
 
 	private payload(card: HTMLElement, item: TaskItem, from: TaskOrigin, e: PointerEvent): TaskDragPayload {
-		const onTimeline = from === "timeline" && item.slot;
-		const durationMin = onTimeline ? item.durationMin : null;
 		const rect = card.getBoundingClientRect();
-		const grabPx = onTimeline ? e.clientY - rect.top : shownCardSize().height / 2;
-		return { item, from, durationMin, grabPx };
+		const grabPx = from === "timeline" ? e.clientY - rect.top : shownCardSize().height / 2;
+		return { item, from, grabPx };
 	}
 
 	/** A click opens the menu at once; a second one, on the copy now over the card, makes it a double click that renames. */
@@ -311,7 +309,7 @@ export class DragController {
 		const float = new PlusFloat({ dx: e.clientX - origin.left, dy: e.clientY - origin.top });
 		float.moveTo(e.clientX, e.clientY);
 		capturePointer(source, e.pointerId);
-		const payload: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: e.clientY - origin.top };
+		const payload: NewTaskPayload = { from: "new", item: null, grabPx: e.clientY - origin.top };
 		let placed = false;
 		this.follow(
 			source,

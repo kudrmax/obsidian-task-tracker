@@ -65,7 +65,7 @@ function setup(items: TaskItem[], column: ListColumn, grouped: GroupedList | nul
 	return { list, drop };
 }
 
-const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, durationMin: null, grabPx: 17 });
+const drag = (from: ListColumn | "timeline", it: TaskItem): DragPayload => ({ item: it, from, grabPx: 17 });
 
 /** The finger holding a carried card by 17 px so that the card picks the place at `y`: its middle. */
 const picking = (y: number) => y + 17 - shownCardSize().height / 2;
@@ -135,7 +135,7 @@ describe("ListDrop", () => {
 	});
 
 	describe("the left column of a past day, its tasks in sections it does not show", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17 };
+		const fresh: NewTaskPayload = { from: "new", item: null, grabPx: 17 };
 		const two = () => [item("now", 0, "A", "Work"), item("now", 1, "B", "Home")];
 
 		it("a new task let go between cards of two sections goes before the one under it", () => {
@@ -157,7 +157,7 @@ describe("ListDrop", () => {
 	});
 
 	describe("a new task", () => {
-		const fresh: NewTaskPayload = { from: "new", item: null, durationMin: null, grabPx: 17 };
+		const fresh: NewTaskPayload = { from: "new", item: null, grabPx: 17 };
 		const three = () => [item("now", 0, "A", null), item("now", 1, "B", null), item("now", 2, "C", null)];
 		const indented = <T extends { list: TaskList }>(made: T): T => {
 			made.list.el.style.setProperty("--tc-subtask-indent", "20px");
@@ -347,7 +347,7 @@ describe("ListDrop", () => {
 		it("several cards carried: let go at the place of one of them, they still move there", () => {
 			const { list, drop, items } = lifted(1);
 			list.elements[3].classList.add("is-lifted", "is-waiting");
-			const many: DragPayload = { item: items[1], from: "day", durationMin: null, grabPx: 17, carried: [{ item: items[3], from: "day" }] };
+			const many: DragPayload = { item: items[1], from: "day", grabPx: 17, carried: [{ item: items[3], from: "day" }] };
 			drop.preview(27, picking(100 + STEP + 17), many);
 			expect(lineEl()).not.toBeNull();
 			expect(drop.drop(27, picking(100 + STEP + 17), many)).toEqual({ kind: "list", column: "day", before: items[2].key });

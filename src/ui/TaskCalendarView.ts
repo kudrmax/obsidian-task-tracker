@@ -351,7 +351,11 @@ export class TaskCalendarView extends ItemView {
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(root, "div", "tc-fade");
-		this.timelineDrop = new TimelineDrop(this.timeline, { step: () => stepFor(this.hourPx) });
+		this.timelineDrop = new TimelineDrop(this.timeline, {
+			step: () => stepFor(this.hourPx),
+			span: (item, from, start) => this.deps.tasks.dropSpan(item, from, start),
+			newSlot: (start) => this.deps.tasks.newSlot(this.selectedDate, start),
+		});
 		this.drag.attachCanvas(this.timeline.canvas);
 		const timeline = this.timeline;
 		new PinchZoom(timeline.el, {
