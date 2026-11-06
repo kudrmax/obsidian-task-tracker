@@ -9,7 +9,7 @@ const committed = readFileSync(BUNDLE, "utf8");
 interface Phone {
 	reminders(text: string, settingsJson: string, nowMs: number): { id: string; kind: string; startMs: number; dayEndMs: number }[];
 	snooze(text: string, settingsJson: string, id: string, minutes: number, nowMs: number): { changed: boolean; text?: string };
-	capture(text: string, settingsJson: string, list: string, title: string, description: string, nowMs: number): { changed: boolean; text?: string };
+	capture(text: string, settingsJson: string, list: string, title: string, nowMs: number): { changed: boolean; text?: string };
 }
 
 describe(BUNDLE, () => {
@@ -31,6 +31,6 @@ describe(BUNDLE, () => {
 		const [r] = phone.reminders(text, "", now);
 		expect(r).toMatchObject({ id: line, kind: "alarm", startMs: new Date(2026, 10, 4, 10).getTime() });
 		expect(phone.snooze(text, "", line, 15, now).text).toContain("- [ ] A 🚨 2026-11-04 09:15");
-		expect(phone.capture(text, "", "inbox", "B", "", now).text).toMatch(/## Inbox\n+- \[ \] B/);
+		expect(phone.capture(text, "", "inbox", "B", now).text).toMatch(/## Inbox\n+- \[ \] B/);
 	});
 });

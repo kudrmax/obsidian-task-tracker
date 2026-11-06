@@ -1078,9 +1078,6 @@
   function setReminder(doc, entry, reminder) {
     return patch(doc, entry, { reminder });
   }
-  function setDescription(doc, entry, markdown) {
-    return doc.setDescription(entry, markdown);
-  }
   function hasOpenSubtask(entry) {
     return entry.subtasks.some((sub) => isOpen(sub.task.status));
   }
@@ -1425,14 +1422,15 @@
     constructor(settingsJson) {
       this.settings = settingsFrom(settingsJson.trim() === "" ? null : JSON.parse(settingsJson));
     }
-    /** `description`: Markdown under the task, such as the embed of a recording; empty for none. Blank `title` changes nothing. */
-    capture(text, list, title, description, now) {
+    /** A blank `title` changes nothing. */
+    capture(text, list, title, now) {
       if (title.trim() === "") return { changed: false, reason: "stale" };
-      const written = applyOperation(text, this.settings, now, (doc, today, boundary) => {
-        const created = createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary);
-        const entry = created.insertedSince(doc);
-        return entry && description.trim() !== "" ? setDescription(created, entry, description) : created;
-      });
+      const written = applyOperation(
+        text,
+        this.settings,
+        now,
+        (doc, today, boundary) => createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
+      );
       return { changed: true, text: written };
     }
   };
@@ -1624,6 +1622,6 @@
     snooze: (text, settingsJson, id, minutes, nowMs) => new PhoneReminderService(settingsJson).snooze(text, id, minutes, new Date(nowMs)),
     calendarFiles: (settingsJson) => new PhoneMeetingService(settingsJson).files(),
     meetings: (settingsJson, texts, fromMs, toMs) => new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs)).map(wireMeeting),
-    capture: (text, settingsJson, list, title, description, nowMs) => new PhoneCaptureService(settingsJson).capture(text, list, title, description, new Date(nowMs))
+    capture: (text, settingsJson, list, title, nowMs) => new PhoneCaptureService(settingsJson).capture(text, list, title, new Date(nowMs))
   };
 })();

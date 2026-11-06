@@ -32,6 +32,6 @@ function wireMeeting(m: PhoneMeeting): WireMeeting {
 	calendarFiles: (settingsJson: string): string[] => new PhoneMeetingService(settingsJson).files(),
 	meetings: (settingsJson: string, texts: (string | null)[], fromMs: number, toMs: number): WireMeeting[] =>
 		new PhoneMeetingService(settingsJson).between(texts, new Date(fromMs), new Date(toMs)).map(wireMeeting),
-	capture: (text: string, settingsJson: string, list: CaptureList, title: string, description: string, nowMs: number): PhoneAction =>
-		new PhoneCaptureService(settingsJson).capture(text, list, title, description, new Date(nowMs)),
+	capture: (text: string, settingsJson: string, list: CaptureList, title: string, nowMs: number): PhoneAction =>
+		new PhoneCaptureService(settingsJson).capture(text, list, title, new Date(nowMs)),
 };
