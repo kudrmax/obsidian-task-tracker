@@ -140,7 +140,24 @@ export function fieldSlicerFor(markers: Markers): FieldSlicer {
 	return slicer;
 }
 
+/** Lines read under one set of markers: a document rebuilt after each change reads mostly the same lines again. */
+const readLines = new WeakMap<Markers, Map<string, ParsedTaskLine | null>>();
+/** Lines kept per set of markers before the store starts afresh. */
+const KEPT_LINES = 20_000;
+
+/** The task a line holds under `markers`, or null; the answer is shared, never to be changed. */
 export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
+	let kept = readLines.get(markers);
+	if (!kept) readLines.set(markers, (kept = new Map()));
+	const known = kept.get(line);
+	if (known !== undefined) return known;
+	if (kept.size >= KEPT_LINES) kept.clear();
+	const parsed = readTaskLine(line, markers);
+	kept.set(line, parsed);
+	return parsed;
+}
+
+function readTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
 	const m = LINE_RE.exec(line);
 	if (!m) return null;
 	const statusChar = m[3];

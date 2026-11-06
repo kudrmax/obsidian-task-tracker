@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { calendarPath } from "./application/calendarFile";
 import { composeCore, type Core } from "./application/composeCore";
+import { tasksFilePath } from "./application/documentText";
 import type { CalendarSource, GoogleAccount, WorkCalendarSetup } from "./application/contracts";
 import { GoogleAccountService } from "./application/GoogleAccountService";
 import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "./application/ports";
@@ -45,7 +46,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	const core = composeCore({
-		tasksFile: new VaultTaskFileStore(app, () => settings.get().tasksFile),
+		tasksFile: new VaultTaskFileStore(app, () => tasksFilePath(settings.get()) ?? ""),
 		settings,
 		clock,
 		ticker: windowTicker,

@@ -1,7 +1,10 @@
 import type { GroupedList } from "../domain/Lists";
 import { MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
-import { settingsFrom, type TaskCalendarSettings } from "../settings";
-import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
+import type { TaskCalendarSettings } from "../settings";
+import { tasksFilePath } from "./documentText";
+import { CALENDAR_SOURCES, type CalendarFile, calendarPath, IPHONE_CALENDAR_FILE, type PhoneExport, phoneCalendarText, readCalendarFile } from "./calendarFile";
+import { callDoorJson, doorMethods, settingsOf } from "./PhoneCalls";
+import { oneLine } from "../domain/TaskTitle";
 import type { CalendarSource } from "./contracts";
 import type { Clock, SettingsStore } from "./ports";
 import { ShownCalendars } from "./shownCalendars";
@@ -42,11 +45,6 @@ const STALE: PhoneAction = { changed: false, reason: "stale" };
 
 function action(text: string | null): PhoneAction {
 	return text === null ? STALE : { changed: true, text };
-}
-
-/** The plugin's settings from its `data.json`, or the defaults for nothing. */
-function settingsOf(json: string): TaskCalendarSettings {
-	return settingsFrom(json.trim() === "" ? null : JSON.parse(json));
 }
 
 /** The settings as they are for one call: the phone only reads them. */
@@ -132,5 +130,39 @@ export const phoneDoor = {
 			.days()
 			.timedBetween(new Date(fromMs), new Date(toMs))
 			.map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+	},
+
+	/**
+	 * Every call of the services a frontend makes, by name (`tasks.screen`, `entry.enter`, …: see `docs/door.md`): the
+	 * arguments a JSON list, the context the files' texts, the settings and the moment; the answer JSON, the result with the
+	 * texts to write back, or the error by its code.
+	 */
+	call(method: string, argsJson: string, contextJson: string): string {
+		return callDoorJson(method, argsJson, contextJson);
+	},
+
+	/** Every method `call` answers, `space.name`. */
+	methods(): string[] {
+		return doorMethods();
+	},
+
+	/** The tasks file a host reads, by path from the vault folder, as the plugin reads it: none for a blank setting. */
+	tasksFile(settingsJson: string): string | null {
+		return tasksFilePath(settingsOf(settingsJson));
+	},
+
+	/** Where the iOS app writes the phone's calendars, by path from the vault folder. */
+	iphoneCalendarFile(): string {
+		return IPHONE_CALENDAR_FILE;
+	},
+
+	/** `iphoneCalendarFile`'s text for the phone's calendars and events (`PhoneExport`, as JSON), in the format every writer of the calendars uses. */
+	iphoneCalendarText(exportJson: string): string {
+		return phoneCalendarText(JSON.parse(exportJson) as PhoneExport);
+	},
+
+	/** A task is one line: a line break in its title reads as one space, as the plugin writes it. */
+	oneLine(text: string): string {
+		return oneLine(text);
 	},
 };

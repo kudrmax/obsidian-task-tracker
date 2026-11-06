@@ -116,7 +116,10 @@ function eventCalendars(events: readonly FileEvent[]): FileCalendarRow[] {
 }
 
 /** The file's text, in the format every writer uses. */
-export function calendarFileText(file: Omit<CalendarFile, "device"> & { readonly device: string | null }): string {
+/** An event as a writer writes it: a phone's calendar may have no colour of its own. */
+type WrittenEvent = Omit<CalendarEvent, "color" | "source"> & { readonly color: string | null };
+
+export function calendarFileText(file: Omit<CalendarFile, "device" | "events"> & { readonly device: string | null; readonly events: readonly WrittenEvent[] }): string {
 	const iso = (d: Date | null) => (d ? d.toISOString() : null);
 	const content: FileContent = {
 		exportedAt: file.exportedAt.toISOString(),
@@ -140,3 +143,61 @@ export function calendarFileText(file: Omit<CalendarFile, "device"> & { readonly
 	return `${JSON.stringify(content, null, "\t")}\n`;
 }
 
+
+/** A calendar of the phone as the iOS app hands it to `phoneCalendarText`. */
+export interface PhoneCalendar {
+	readonly title: string;
+	readonly calendarId: string;
+	readonly account: string;
+	readonly color?: string | null;
+	/** The account's own id: two accounts may share a title («Gmail»). */
+	readonly sourceId?: string | null;
+}
+
+/** An event of the phone as the iOS app hands it to `phoneCalendarText`: times in epoch ms, its calendar by id. */
+export interface PhoneEvent {
+	readonly id: string;
+	readonly title: string;
+	readonly startMs: number;
+	readonly endMs: number;
+	readonly allDay: boolean;
+	readonly calendarId: string;
+}
+
+export interface PhoneExport {
+	readonly calendars: readonly PhoneCalendar[];
+	readonly events: readonly PhoneEvent[];
+	readonly fromMs: number;
+	readonly toMs: number;
+	readonly exportedAtMs: number;
+	readonly device: string;
+	readonly validUntilMs?: number | null;
+}
+
+/** `calendar/iphone.json`'s text for the phone's calendars and events: each event named by its calendar, the first of two with one id. */
+export function phoneCalendarText(file: PhoneExport): string {
+	const byId = new Map<string, PhoneCalendar>();
+	for (const c of file.calendars) if (!byId.has(c.calendarId)) byId.set(c.calendarId, c);
+	return calendarFileText({
+		exportedAt: new Date(file.exportedAtMs),
+		device: file.device,
+		from: new Date(file.fromMs),
+		to: new Date(file.toMs),
+		validUntil: file.validUntilMs === null || file.validUntilMs === undefined ? null : new Date(file.validUntilMs),
+		calendars: file.calendars.map((c) => ({ title: c.title, calendarId: c.calendarId, account: c.account, color: c.color ?? null, ...(c.sourceId ? { sourceId: c.sourceId } : {}) })),
+		events: file.events.map((e) => {
+			const calendar = byId.get(e.calendarId);
+			return {
+				id: e.id,
+				title: e.title,
+				start: new Date(e.startMs),
+				end: new Date(e.endMs),
+				allDay: e.allDay,
+				calendar: calendar?.title ?? "",
+				calendarId: e.calendarId,
+				account: calendar?.account ?? null,
+				color: calendar?.color ?? null,
+			};
+		}),
+	});
+}

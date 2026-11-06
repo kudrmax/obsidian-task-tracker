@@ -1349,11 +1349,11 @@ describe("TaskServiceImpl.screen", () => {
 		expect(screen.day.list.map((t) => t.text)).toEqual(["Later"]);
 	});
 
-	it("reads the file as often as the normalization and the seven reads did", async () => {
+	it("reads the file once for the normalization and once for every list: the lists agree with each other", async () => {
 		const { store, svc } = setup(FILE);
 		const read = vi.spyOn(store, "read");
 		await svc.screen(T);
-		expect(read).toHaveBeenCalledTimes(8);
+		expect(read).toHaveBeenCalledTimes(2);
 	});
 
 	it("without a file is the empty screen that says so, with no calendars beside it", async () => {

@@ -1,14 +1,11 @@
 import type { LocalDate } from "../domain/Task";
-import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskService, TaskStep } from "./contracts";
+import type { DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskStep } from "./contracts";
 
 /** What a drop means for one task: a change `applyAll` knows, or a time set or a slot cleared, which only a task dropped alone takes. */
-type DropMove =
+export type DropMove =
 	| Extract<TaskChange, { readonly kind: "moveToGroup" | "nest" | "moveBefore" | "moveToList" | "moveToSoon" | "moveToEnd" }>
 	| { readonly kind: "toTime"; readonly from: DropFrom; readonly start: number; readonly day: LocalDate }
 	| { readonly kind: "clearSlot"; readonly place?: { readonly before: TaskKey | null; readonly date: LocalDate } };
-
-/** A service that also sets the time a drop on the timeline gives: the duration the task keeps is its own to read. */
-export type DropService = TaskService & { toTime(key: TaskKey, from: DropFrom, start: number, day: LocalDate): Promise<void> };
 
 /**
  * Whether `target` takes the tasks carried from `origins` (the one under the finger first): the day takes any; Soon all
@@ -53,34 +50,15 @@ function dropMove(from: DropFrom, to: DropTo, day: LocalDate): DropMove {
 	}
 }
 
-/** One task's move as the single call of its name. */
-function moveOne(service: DropService, key: TaskKey, move: DropMove): Promise<void> {
-	switch (move.kind) {
-		case "toTime":
-			return service.toTime(key, move.from, move.start, move.day);
-		case "clearSlot":
-			return service.clearSlot(key, move.place);
-		case "moveToGroup":
-			return service.moveToGroup(key, move.list, move.group, move.before, move.date);
-		case "nest":
-			return service.nest(key, move.parent, move.before);
-		case "moveBefore":
-			return service.moveBefore(key, move.before, move.date);
-		case "moveToList":
-			return service.moveToList(key, move.date);
-		case "moveToSoon":
-			return service.moveToSoon(key, move.date);
-		case "moveToEnd":
-			return service.moveToEnd(key, move.section);
-	}
-}
+/** What a drop of these tasks means: one task's move, its single call; several, the steps of one `applyAll`, a slot set or cleared for none of them. */
+export type DropMoves = { readonly kind: "one"; readonly key: TaskKey; readonly move: DropMove } | { readonly kind: "many"; readonly steps: readonly TaskStep[] };
 
-/** `TaskService.drop` on any service: one task as its single call, several as one `applyAll`, a slot set or cleared for none of them. */
-export function runDrop(service: DropService, tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {
-	if (tasks.length === 1) return moveOne(service, tasks[0].key, dropMove(tasks[0].from, to, day));
+/** `TaskService.drop`'s meaning, the day column showing `day`. */
+export function dropMoves(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): DropMoves {
+	if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day) };
 	const steps = tasks.flatMap(({ key, from }): TaskStep[] => {
 		const move = dropMove(from, to, day);
 		return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
 	});
-	return service.applyAll(steps);
+	return { kind: "many", steps };
 }

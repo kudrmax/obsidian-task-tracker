@@ -275,12 +275,6 @@ export interface TaskStep {
 	readonly change: TaskChange;
 }
 
-/**
- * Which pair of neighbouring lists the screen shows: Inbox and Soon, Soon and the day's list, or the day's list and the
- * calendar. Where a frontend keeps it is its own; what quick entry looks at first follows from it.
- */
-export type RightMode = "calendar" | "soon" | "inbox";
-
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
 export type DropColumn = "day" | "soon" | "inbox" | "backlog";
 /** Where a task that exists is dragged from. */
