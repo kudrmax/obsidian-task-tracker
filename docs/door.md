@@ -257,7 +257,7 @@ What the plugin's UI calls itself, by the names in `contracts.ts`: `nextProgress
 `placesInGap`; the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
 `fill`, its date and dot's `meta`), `inkOf`, `contrast`, `eventHex(event)`, `bgAlphaFor(source)`, `eventColors(hex,
 bgAlpha, theme)` (an event's `bg`, `bar`, `text`); `dayTitle(date, relation, today)` (`Today`, `Tue, 3 Nov`) and
-`dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
+`dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `stackTasks(tasks, events, hourPx, card, insets)` (each task card's top, height and left edge on the timeline: they never share the width), `overlayLeft(level, insets)`, `eventLeft(level, insets)`; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA` and `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 

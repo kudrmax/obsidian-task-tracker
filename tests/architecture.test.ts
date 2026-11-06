@@ -253,6 +253,9 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	dayTitle: "./dayLabels",
 	dueLabel: "./dayLabels",
 	eventLevels: "./eventLevels",
+	stackTasks: "./timelineStack",
+	overlayLeft: "./timelineStack",
+	eventLeft: "./timelineStack",
 };
 
 /**

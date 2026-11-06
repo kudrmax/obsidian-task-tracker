@@ -18,6 +18,7 @@ import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
 import { dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
+import { eventLeft, overlayLeft, stackTasks } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, shadesOf } from "./paints";
 import {
 	type CalendarEvent,
@@ -643,6 +644,9 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	dayTitle,
 	dueLabel,
 	eventLevels,
+	stackTasks,
+	overlayLeft,
+	eventLeft,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

@@ -78,6 +78,8 @@ export { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, type EventColors, ev
 export { dayTitle, type DueLabel, dueLabel } from "./dayLabels";
 /** How deep each event of a day lies over the others on the timeline. */
 export { type EventLevel, eventLevels, type EventSpan } from "./eventLevels";
+/** The stack of task cards on the timeline: tasks never share the width, each on its time or one gap under the card before. */
+export { eventLeft, type LevelledSpan, overlayLeft, type StackBox, type StackCard, stackTasks, type TaskSpan, type TimelineInsets } from "./timelineStack";
 
 /**
  * How the UI names a task between a read and an action: its section, its index among the tasks of that section, the

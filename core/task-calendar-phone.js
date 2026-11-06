@@ -2386,6 +2386,43 @@ ${key.title}`.toLowerCase();
     return levels;
   }
 
+  // core/application/timelineStack.ts
+  var MINUTES_PER_HOUR = 60;
+  var STACK_SLACK = 0.5;
+  function overlayLeft(level, insets) {
+    return level === 0 ? insets.itemInset : level * insets.overlayInset;
+  }
+  function eventLeft(level, insets) {
+    return overlayLeft(level.level, insets);
+  }
+  function stackTasks(tasks, events, hourPx, card, insets) {
+    const head = card.height;
+    const y = (minutes) => minutes / MINUTES_PER_HOUR * hourPx;
+    const eventsUnder = (top, bottom) => events.filter((e) => top < y(e.end) && bottom > y(e.start));
+    const order = tasks.map((task, index) => ({ task, index })).sort((a, b) => a.task.start - b.task.start || a.index - b.index);
+    const boxes = new Array(tasks.length);
+    const bodies = [];
+    let previous = null;
+    let headBottom = -Infinity;
+    for (const { task, index } of order) {
+      const natural = y(task.start) + insets.itemInset;
+      const top = Math.max(natural, headBottom + card.gap);
+      const height = task.end === null ? head : Math.max(head, y(task.end) - insets.itemInset - top);
+      headBottom = top + head;
+      const parent = bodies.filter((b) => top < b.bottom && top + head > b.top).pop();
+      const under = eventsUnder(top, top + height);
+      const overlay = !!parent || under.length > 0;
+      const eventLeft2 = under.length ? overlayLeft(Math.max(...under.map((e) => e.level)) + 1, insets) : insets.itemInset;
+      const left = Math.max(parent ? parent.left + insets.overlayInset : insets.itemInset, eventLeft2);
+      if (height > head) bodies.push({ top: top + head, bottom: top + height, left });
+      const stacked = top - natural > STACK_SLACK;
+      if (stacked && previous) previous.stacked = true;
+      const hiddenDuration = task.end !== null && y(task.end - task.start) - insets.itemGap < head;
+      previous = boxes[index] = { top, height, left, overlay, stacked, hiddenDuration };
+    }
+    return boxes;
+  }
+
   // core/application/paints.ts
   var PRESET_INK = {
     red: { dark: "#FF453A", light: "#FF3B30" },
@@ -4971,10 +5008,10 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/snapGrid.ts
-  var MINUTES_PER_HOUR = 60;
+  var MINUTES_PER_HOUR2 = 60;
   var SNAP_STEPS = [5, 15, 30, 60];
   function snapStep(hourPx, tolerance) {
-    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR2 * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
   }
   function snapMinute(minute, hourPx, tolerance) {
     const step = snapStep(hourPx, tolerance);
@@ -5385,7 +5422,10 @@ ${key.title}`.toLowerCase();
     eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
     dayTitle,
     dueLabel,
-    eventLevels
+    eventLevels,
+    stackTasks,
+    overlayLeft,
+    eventLeft
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
   function lookOf(c, look) {
