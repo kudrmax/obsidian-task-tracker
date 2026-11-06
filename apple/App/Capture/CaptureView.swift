@@ -14,30 +14,34 @@ struct CaptureView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Picker("List", selection: $list) {
-                    ForEach(CaptureListOption.allCases, id: \.self) { option in
-                        Text(option.title).tag(option)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Picker("List", selection: $list) {
+                        ForEach(CaptureListOption.allCases, id: \.self) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    TextField("New task", text: $text, axis: .vertical)
+                        .font(.title3)
+                        .focused($typing)
+                        .submitLabel(.done)
+
+                    if let failure {
+                        Label(failure, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                    }
+                    if let problem = recorder.problem {
+                        Label(problem, systemImage: "mic.slash.fill")
+                            .foregroundStyle(.red)
                     }
                 }
-                .pickerStyle(.segmented)
-
-                TextField("New task", text: $text, axis: .vertical)
-                    .font(.title3)
-                    .focused($typing)
-                    .submitLabel(.done)
-
-                if let failure {
-                    Label(failure, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                }
-                if let problem = recorder.problem {
-                    Label(problem, systemImage: "mic.slash.fill")
-                        .foregroundStyle(.red)
-                }
-                Spacer(minLength: 0)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
+            .scrollDismissesKeyboard(.interactively)
+            .interactiveDismissDisabled(canSend)
             .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -57,58 +61,99 @@ struct CaptureView: View {
         }
     }
 
-    /// The recording's controls in the system bottom bar, drawn and animated by iOS as every toolbar is.
+    /// The recording's controls in the system bottom bar, drawn and animated by iOS as every toolbar is; above the
+    /// keyboard while typing, as Notes has them.
     @ToolbarContentBuilder
     private var recorderItems: some ToolbarContent {
-        switch recorder.state {
-        case .idle:
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItem(placement: .bottomBar) {
-                Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
-                    .buttonStyle(.glassProminent)
-                    .tint(.red)
-            }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-        case .recording, .paused:
-            ToolbarItem(placement: .bottomBar) {
-                Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
-            }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItem(placement: .status) {
-                VStack(spacing: 0) {
-                    Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                        .font(.headline.monospacedDigit())
-                        .contentTransition(.numericText())
-                    Text(recorder.state == .recording ? "Recording" : "Paused")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        if typing {
+            ToolbarItemGroup(placement: .keyboard) {
+                switch recorder.state {
+                case .idle:
+                    Spacer()
+                    recordButton
+                    Spacer()
+                case .recording, .paused:
+                    discardButton
+                    Spacer()
+                    elapsed
+                    Spacer()
+                    pauseButton
+                    stopButton
+                case .finished:
+                    discardButton
+                    Spacer()
+                    voiceNote
+                    Spacer()
                 }
             }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItemGroup(placement: .bottomBar) {
-                if recorder.state == .recording {
-                    Button("Pause", systemImage: "pause.fill") { recorder.pause() }
-                } else {
-                    Button("Resume", systemImage: "mic.fill") { recorder.resume() }
+        } else {
+            switch recorder.state {
+            case .idle:
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItem(placement: .bottomBar) { recordButton }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+            case .recording, .paused:
+                ToolbarItem(placement: .bottomBar) { discardButton }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItem(placement: .status) { elapsed }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItemGroup(placement: .bottomBar) {
+                    pauseButton
+                    stopButton
                 }
-                Button("Stop", systemImage: "stop.fill") { recorder.finish() }
+            case .finished:
+                ToolbarItem(placement: .bottomBar) { discardButton }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItem(placement: .status) { voiceNote }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
             }
-        case .finished:
-            ToolbarItem(placement: .bottomBar) {
-                Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
-            }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
-            ToolbarItem(placement: .status) {
-                VStack(spacing: 0) {
-                    Label("Voice note", systemImage: "waveform")
-                        .font(.headline)
-                    Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
-            ToolbarSpacer(.flexible, placement: .bottomBar)
         }
+    }
+
+    private var recordButton: some View {
+        Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
+            .buttonStyle(.glassProminent)
+            .tint(.red)
+    }
+
+    private var discardButton: some View {
+        Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
+    }
+
+    @ViewBuilder
+    private var pauseButton: some View {
+        if recorder.state == .recording {
+            Button("Pause", systemImage: "pause.fill") { recorder.pause() }
+        } else {
+            Button("Resume", systemImage: "mic.fill") { recorder.resume() }
+        }
+    }
+
+    private var stopButton: some View {
+        Button("Stop", systemImage: "stop.fill") { recorder.finish() }
+    }
+
+    private var elapsed: some View {
+        VStack(spacing: 0) {
+            Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
+                .font(.headline.monospacedDigit())
+                .contentTransition(.numericText())
+            Text(recorder.state == .recording ? "Recording" : "Paused")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .fixedSize()
+    }
+
+    private var voiceNote: some View {
+        VStack(spacing: 0) {
+            Label("Voice note", systemImage: "waveform")
+                .font(.headline)
+            Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .fixedSize()
     }
 
     private var canSend: Bool {

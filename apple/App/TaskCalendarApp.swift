@@ -27,7 +27,7 @@ struct TaskCalendarApp: App {
                         router.open(url)
                     }
                 }
-                .fullScreenCover(item: $router.request) { _ in
+                .sheet(item: $router.request) { _ in
                     CaptureView { router.request = nil }
                 }
         }
