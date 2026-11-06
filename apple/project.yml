@@ -14,7 +14,7 @@ targets:
       - path: App
         excludes:
           - Config/**
-      - path: plugin/phone/task-calendar-phone.js
+      - path: ../phone/task-calendar-phone.js
         buildPhase: resources
     dependencies:
       - package: Core

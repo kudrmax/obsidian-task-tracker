@@ -1,11 +1,12 @@
 import Foundation
 
 enum Fixtures {
-    /// The plugin's phone module from the submodule, as the app bundles it.
+    /// The core's phone module from the repository's root, as the app bundles it.
     static let phoneScript: String = {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("plugin/phone/task-calendar-phone.js")
+            .deletingLastPathComponent()
+            .appendingPathComponent("phone/task-calendar-phone.js")
         return try! String(contentsOf: url, encoding: .utf8)
     }()
 

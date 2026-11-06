@@ -3,3 +3,14 @@ main.js
 .DS_Store
 .worktrees
 docs/design/reference/.chrome-profile
+.superpowers/
+
+# The Apple apps: XcodeGen makes the project and the Info.plists, the signing team is personal
+apple/*.xcodeproj/
+apple/App/Info.plist
+apple/App/Config/Team.xcconfig
+apple/Cards/Info.plist
+apple/build/
+apple/DerivedData/
+apple/Core/.build/
+apple/Core/.swiftpm/

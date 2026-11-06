@@ -1,6 +1,6 @@
 # The door: `globalThis.TaskCalendarPhone`
 
-`phone/task-calendar-phone.js` is the plugin's core built for JavaScriptCore. A host (the iOS app) evaluates it once
+`phone/task-calendar-phone.js` is the plugin's core built for JavaScriptCore. A host (the Apple apps in `apple/`) evaluates it once
 and calls the functions of `globalThis.TaskCalendarPhone` synchronously (`JSValue.invokeMethod`). Every rule of the
 task manager lives behind this door: a host draws, reads and writes its files, and asks the door for everything else.
 The door keeps nothing between calls; what must last (the undo steps, a quick entry being typed) the door hands back

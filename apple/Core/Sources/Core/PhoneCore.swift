@@ -32,8 +32,8 @@ public struct DoorReply: @unchecked Sendable {
     public let settingsJSON: String?
 }
 
-/// Runs the plugin's phone module (`plugin/phone/task-calendar-phone.js`) in JavaScriptCore: every rule of the tasks
-/// file is the plugin's, asked for through its door (`plugin/docs/door.md`).
+/// Runs the core's phone module (`phone/task-calendar-phone.js`) in JavaScriptCore: every rule of the tasks
+/// file is the core's, asked for through its door (`docs/door.md`).
 public final class PhoneCore: TaskRules, @unchecked Sendable {
     private let context: JSContext
     private let phone: JSValue
