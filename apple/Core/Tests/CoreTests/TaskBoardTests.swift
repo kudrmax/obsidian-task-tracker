@@ -94,7 +94,7 @@ import Testing
         #expect(day.showsHeaders)
         #expect(day.groups.map(\.header) == ["No section", "Errands"])
         #expect(day.groups[0].cards.map(\.level) == [0, 1])
-        #expect(day.groups[0].cards[1].branch == .last)
+        #expect(day.groups[0].cards[1].branch == Branch(last: true, through: []))
         #expect(snapshot.lists[.inbox]?.title == "Inbox")
         let run = try #require(snapshot.timeline.slots.first)
         #expect(run.card.item.title == "Morning run")
@@ -114,12 +114,24 @@ import Testing
     let measures = GridMeasures(divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16)
 
     @Test func theGridGetsFinerAsTheHourGrows() throws {
-        #expect(try board.gridMarks(hour: 28, measures: measures).isEmpty)
-        let half = try board.gridMarks(hour: 112, measures: measures)
+        #expect(try board.gridMarks(board.grid(hour: 28, measures: measures)).isEmpty)
+        let half = try board.gridMarks(board.grid(hour: 112, measures: measures))
         #expect(half.contains(GridMark(minute: 30, label: ":30")))
-        let fine = try board.gridMarks(hour: 224, measures: measures)
+        let fine = try board.gridMarks(board.grid(hour: 224, measures: measures))
         #expect(fine.contains(GridMark(minute: 15, label: ":15")))
         #expect(fine.contains { $0.minute == 5 })
+    }
+
+    @Test func aListDropIsTheCoresPlace() throws {
+        let cards = [PlacedCard(level: 0, group: nil, top: 0, height: 35), PlacedCard(level: 0, group: nil, top: 37, height: 35)]
+        let place = try board.placeAt(cards, y: 50, level: 0, shift: 0, room: .null, heads: [], held: .null, hysteresis: 6)
+        #expect(place["index"].number == 1)
+        #expect(try board.levelAt(x: 150, left: 0, width: 200, indent: 20) == 2.5)
+        #expect(try board.carriedMiddle(y: 100, grab: 10, cardHeight: 35) == 107.5)
+        #expect(try board.branchOf(levels: [0, 1, 1], index: 1) == Branch(last: false, through: []))
+        #expect(try board.gapBranch(levels: [0, 1], gap: ["kind": "gap", "index": 2, "level": 1, "group": .null]) == Branch(last: true, through: []))
+        #expect(try board.labelHides(y: 100, now: 103, lift: 7, pill: 16))
+        #expect(try !board.labelHides(y: 100, now: nil, lift: 7, pill: 16))
     }
 
     @Test func aPinchMovesFromTheWholeDayToTheLargestLevel() throws {

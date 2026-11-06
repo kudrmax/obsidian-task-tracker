@@ -12,6 +12,7 @@ struct PlusButton: UIViewRepresentable {
     let cancelling: Bool
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
+    var onEnd: () -> Void = {}
 
     /// The design's size of the round button beside the tab bar, and its gap to the screen's edges.
     static let side: CGFloat = 62
@@ -29,6 +30,7 @@ struct PlusButton: UIViewRepresentable {
         control.accent = UIColor(accent)
         control.onCarry = onCarry
         control.onCancel = onCancel
+        control.onEnd = onEnd
         control.cancelling = cancelling
     }
 }
@@ -37,6 +39,7 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
     var open: () -> Void = {}
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
+    var onEnd: () -> Void = {}
     var accent = UIColor.tintColor {
         didSet { if accent != oldValue { look() } }
     }
@@ -137,6 +140,8 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
         if operation == .cancel { onCancel() }
     }
+
+    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) { onEnd() }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
 

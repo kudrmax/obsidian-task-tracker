@@ -65,7 +65,7 @@ struct BoardScreen: View {
                 .frame(width: PlaceBar.glass + 2 * PlaceBar.margin, height: PlusButton.side)
                 .padding(.horizontal, -PlaceBar.margin)
             Spacer(minLength: 0)
-            PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarry(Carried.plus) }, onCancel: { model.cancelCarry() })
+            PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                 .frame(width: PlusButton.side, height: PlusButton.side)
         }
         .padding(.horizontal, PlusButton.inset)
@@ -239,7 +239,7 @@ struct Ribbon: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne))
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in

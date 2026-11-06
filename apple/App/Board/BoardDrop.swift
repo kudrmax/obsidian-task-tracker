@@ -22,6 +22,8 @@ struct DropPlace {
 @MainActor
 final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private(set) lazy var interaction = UIDropInteraction(delegate: self)
+    /// Told when a carry's drag session ends, whatever came of it: the screen's way to end a carry whose card is gone.
+    var ended: () -> Void = {}
     private var places: [String: DropPlace] = [:]
     private var current: String?
     /// Where the card let go will stand, in the window, kept for the drop's preview.
@@ -77,6 +79,7 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
         current = nil
         landing = nil
+        ended()
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: any UIDropSession) {

@@ -24,9 +24,12 @@ struct CardButton: UIViewRepresentable {
     /// The card stands in a carry: it gives its place up until the carry ends.
     var carried = false
     var onTouch: () -> Void = {}
-    var onCarry: () -> Void = {}
+    /// The card was lifted to carry, the finger this far below its top.
+    var onCarry: (CGFloat) -> Void = { _ in }
     /// The carry ended with no drop: on the cancel target, or over no place.
     var onCancel: () -> Void = {}
+    /// The drag session ended, whatever came of it.
+    var onEnd: () -> Void = {}
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
 
@@ -62,6 +65,7 @@ struct CardButton: UIViewRepresentable {
         control.onTouch = onTouch
         control.onCarry = onCarry
         control.onCancel = onCancel
+        control.onEnd = onEnd
         control.onFold = onFold
         control.draggable = draggable
         control.carried = carried
@@ -73,8 +77,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var id = ""
     var menuMaker: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? = { _ in nil }
     var onTouch: () -> Void = {}
-    var onCarry: () -> Void = {}
+    var onCarry: (CGFloat) -> Void = { _ in }
     var onCancel: () -> Void = {}
+    var onEnd: () -> Void = {}
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
     }
@@ -222,7 +227,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
         home = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
-        onCarry()
+        onCarry(session.location(in: self).y)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
@@ -243,6 +248,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
         if returning { landed() }
+        onEnd()
     }
 
     private func landed() {

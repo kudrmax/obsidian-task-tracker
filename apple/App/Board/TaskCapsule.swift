@@ -170,7 +170,8 @@ struct TaskCapsule: View {
     }
 }
 
-/// The line from a task to its subtasks, as a folder tree draws it: the last one's turns with a rounded corner.
+/// The lines from a task to its subtasks, as a folder tree draws them: the row's own line goes on to a sibling or bends
+/// in with a rounded corner at the last, and the lines of the tasks further up that go on past the row run through it.
 struct BranchLine: View {
     let branch: Branch
     @Environment(\.colorScheme) private var scheme
@@ -178,23 +179,29 @@ struct BranchLine: View {
     var body: some View {
         let color = Palette.branch(scheme)
         let mid = CardMetrics.height / 2
+        let height = CardMetrics.height + 4 + CardMetrics.gap
+        let reach = CGFloat(branch.through.count) * CardMetrics.indent
         Canvas { context, size in
             var path = Path()
-            path.move(to: CGPoint(x: 0, y: 0))
-            switch branch {
-            case .mid:
-                path.addLine(to: CGPoint(x: 0, y: size.height))
-                path.move(to: CGPoint(x: 0, y: mid + 4))
-                path.addLine(to: CGPoint(x: size.width, y: mid + 4))
-            case .last:
-                path.addLine(to: CGPoint(x: 0, y: mid + 4 - 6))
-                path.addQuadCurve(to: CGPoint(x: 6, y: mid + 4), control: CGPoint(x: 0, y: mid + 4))
-                path.addLine(to: CGPoint(x: size.width, y: mid + 4))
+            let own = reach
+            path.move(to: CGPoint(x: own, y: 0))
+            if branch.last {
+                path.addLine(to: CGPoint(x: own, y: mid + 4 - 6))
+                path.addQuadCurve(to: CGPoint(x: own + 6, y: mid + 4), control: CGPoint(x: own, y: mid + 4))
+            } else {
+                path.addLine(to: CGPoint(x: own, y: size.height))
+                path.move(to: CGPoint(x: own, y: mid + 4))
+            }
+            path.addLine(to: CGPoint(x: size.width, y: mid + 4))
+            for (k, on) in branch.through.enumerated() where on {
+                let x = CGFloat(k) * CardMetrics.indent
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
             }
             context.stroke(path, with: .color(color), lineWidth: CardMetrics.branchWidth)
         }
-        .frame(width: 11, height: CardMetrics.height + 4 + CardMetrics.gap)
-        .offset(x: -11, y: -4)
+        .frame(width: 11 + reach, height: height)
+        .offset(x: -11 - reach, y: -4)
         .accessibilityHidden(true)
     }
 }

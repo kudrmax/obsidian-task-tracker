@@ -14,6 +14,8 @@ struct TimelineColumn: View {
     @State private var hour: CGFloat?
     @State private var visible: CGFloat = 0
     @State private var pinch: Pinch?
+    /// The hour heights a pinch moves between at this column's height, asked once per height.
+    @State private var range: [Double] = []
     @State private var scroll = ScrollSpot()
     /// The zoom a pinch last settled on, kept on the device: `wholeDay`, or the hour's height.
     @AppStorage("timelineZoom") private var savedZoom: String = ""
@@ -23,11 +25,11 @@ struct TimelineColumn: View {
     /// The plugin's measures of the timeline (`styles.css`, `.tc-hour-label`, `.tc-items`, `.tc-item`).
     private enum Measure {
         static let labelWidth: CGFloat = 22
-        static let labelLift: CGFloat = 7
+        static let labelLift = TimelineGeometry.labelLift
         static let minorLift: CGFloat = 4
         static let lineLeft: CGFloat = 26
-        static let itemsLeft: CGFloat = 28
-        static let itemsRight: CGFloat = 4
+        static let itemsLeft = TimelineGeometry.itemsLeft
+        static let itemsRight = TimelineGeometry.itemsRight
         static let itemInset: CGFloat = 1
         static let itemGap: CGFloat = 2
         static let nowHeight: CGFloat = 16
@@ -70,6 +72,7 @@ struct TimelineColumn: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Color(.separator)).frame(width: 1).padding(.top, -8)
         }
+        .onAppear { model.registerCalendar() }
         .onDisappear { model.dropping.remove(Self.key) }
     }
 
@@ -97,27 +100,11 @@ struct TimelineColumn: View {
         }
         .frame(width: width, height: height, alignment: .topLeading)
         .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(Self.key, origin: $0) }
-        .onChange(of: hour, initial: true) { register(hour: hour, width: width) }
-        .onChange(of: width) { register(hour: hour, width: width) }
+        .onChange(of: hour, initial: true) { model.calendarHour = hour }
+        .onChange(of: width, initial: true) { model.calendarWidth = width }
     }
 
     private static let key = "timeline"
-
-    /// The calendar as a place to drop on: the line follows the finger on the grid's steps at this zoom, and a card let
-    /// go settles at the time it shows.
-    private func register(hour: CGFloat, width: CGFloat) {
-        let model = model
-        model.dropping.register(Self.key, DropPlace(
-            hover: { model.hover(minute: Double(max(0, $0.y - Measure.labelLift) / hour * 60), hourHeight: hour) },
-            leave: { model.leaveCalendar() },
-            land: {
-                guard let id = model.carried, let minute = model.landing else { return nil }
-                Task { await model.dropOnCalendar(id, hourHeight: hour) }
-                guard id != Carried.plus else { return nil }
-                let top = CGFloat(minute) / 60 * hour + Measure.labelLift
-                return CGRect(x: Measure.itemsLeft, y: top, width: width - Measure.itemsLeft - Measure.itemsRight, height: CardMetrics.height)
-            }))
-    }
 
     // MARK: The grid
 
@@ -128,7 +115,7 @@ struct TimelineColumn: View {
             ForEach(marks, id: \.minute) { mark in
                 let at = y(mark.minute, hour)
                 line(Palette.minorLine(scheme), at: at)
-                if let label = mark.label, !nearNow(at, nowY, lift: Measure.minorLift) {
+                if let label = mark.label, !model.labelHides(at, now: nowY, lift: Measure.minorLift, pill: Measure.nowHeight) {
                     hourLabel(label, size: 7, leading: 8, color: Palette.minorLabel(scheme))
                         .offset(y: at - Measure.minorLift)
                 }
@@ -136,7 +123,7 @@ struct TimelineColumn: View {
             ForEach(timeline.hours, id: \.minute) { mark in
                 let at = y(mark.minute, hour)
                 line(Palette.hourLine(scheme), at: at)
-                if !nearNow(at, nowY, lift: Measure.labelLift) {
+                if !model.labelHides(at, now: nowY, lift: Measure.labelLift, pill: Measure.nowHeight) {
                     hourLabel(mark.label, size: 11, leading: 14, color: Palette.muted)
                         .offset(y: at - Measure.labelLift)
                 }
@@ -157,12 +144,6 @@ struct TimelineColumn: View {
             .monospacedDigit()
             .foregroundStyle(color)
             .frame(width: Measure.labelWidth, height: leading, alignment: .trailing)
-    }
-
-    /// A label next to the now pill hides, as the plugin hides it.
-    private func nearNow(_ y: CGFloat, _ now: CGFloat?, lift: CGFloat) -> Bool {
-        guard let now else { return false }
-        return abs(y - now) < lift + Measure.nowHeight / 2
     }
 
     // MARK: Blocks
@@ -186,8 +167,9 @@ struct TimelineColumn: View {
                 over: slot.box.overlay,
                 carried: model.isCarried(slot.card),
                 onTouch: { model.found = nil },
-                onCarry: { model.startCarry(slot.card.id) },
-                onCancel: { model.cancelCarry() })
+                onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
+                onCancel: { model.cancelCarry() },
+                onEnd: { model.carryEnded() })
                 .frame(height: max(tall, CardMetrics.height))
         }
     }
@@ -239,6 +221,7 @@ struct TimelineColumn: View {
     /// The zoom kept on the device, at this height of the screen: the whole day stays the whole day.
     private func settleZoom() {
         guard pinch == nil else { return }
+        range = wholeDay.map { model.zoomRange(wholeDay: $0, levels: timeline.zoomLevels) } ?? []
         hour = CGFloat(model.zoomShown(saved: saved, wholeDay: wholeDay, levels: timeline.zoomLevels))
     }
 
@@ -249,7 +232,6 @@ struct TimelineColumn: View {
                 // The gesture is the scroll view's: its points are on the screen, the minute under them in the content.
                 let start = pinch ?? Pinch(hour: shown, minute: minute(at: value.startLocation.y + scroll.y, shown), screenY: value.startLocation.y)
                 pinch = start
-                let range = model.zoomRange(wholeDay: wholeDay, levels: timeline.zoomLevels)
                 let next = min(CGFloat(range.last ?? wholeDay), max(CGFloat(range.first ?? wholeDay), start.hour * value.magnification))
                 var instant = Transaction()
                 instant.disablesAnimations = true
@@ -274,6 +256,13 @@ struct TimelineColumn: View {
         let top = y(timeline.opening, hour) - (timeline.now != nil ? visible / 2 : 0)
         position.scrollTo(y: max(0, top))
     }
+}
+
+/// The timeline's measures a drop on it reads by (`styles.css`): the room over the first hour, the items' edges.
+enum TimelineGeometry {
+    static let labelLift: CGFloat = 7
+    static let itemsLeft: CGFloat = 28
+    static let itemsRight: CGFloat = 4
 }
 
 /// Where the timeline stands scrolled: read by a pinch as it starts, never drawn.

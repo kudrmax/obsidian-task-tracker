@@ -260,3 +260,18 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   / `TaskFullScreen.branch` / `ListColumn`'s gap branch can all switch to them.
 - backend (round 2): `rules.labelHidesNearNow(y, nowY, lift, pillHeight)` in `timelineZoom.ts`; `nowY` `null` stands for
   a day that is not today, so the host doesn't decide that part either.
+- frontend-swift (round 2): a carry ends on its drag session's end (the window's drop interaction and the card's own drag
+  both tell it), and a drop's carry ends when its write and read are done, whatever the reads did or threw; a read asked
+  while one runs makes that one read once more and is waited for, a drop's read drawn with no animation.
+- frontend-swift (round 2): the pure rules run on a second JavaScriptCore context of their own (`TaskBoard(pure:)`), so a
+  gap, a snap or a label asked in the same frame never waits for a read on another thread. Per pinch frame: the zoom's
+  range is asked once per column height; the grid once per whole hour height and its lines once per grid (bounded
+  caches); the stack is laid out anew off the main thread, the last one scaled to the pinch's height until it lands;
+  `rules.labelHidesNearNow` is asked only for labels within two pill-lifts of the now line, the rest show.
+- frontend-swift (round 2): a list's drop uses the core's `levelAt`, `carriedMiddle` (the finger's offset in the card taken
+  as the drag begins) and `placeAt` (rest frames, headers, the open room's shift, hysteresis 6); branches are
+  `branchOf` / `gapBranch`, drawn with the `through` lines of tasks further up. A carry knows its card, task and column
+  from where the card is drawn. The drop places hold the model weakly; the file watch follows the settings' tasks file.
+- frontend-swift (round 2): the ribbon pages by view alignment with no limit per swipe: it settles on the place the
+  swipe's speed reaches, so one fast swipe goes from Today to Inbox.
+

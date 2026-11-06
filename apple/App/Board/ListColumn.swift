@@ -10,32 +10,28 @@ struct ListColumn: View {
     var dayArrows = false
     @Binding var question: MenuQuestion?
 
-    @State private var width: CGFloat = 0
-    /// Where each card and header stands with no gap open in the list: a carry reads its place against them, so the gap
-    /// opening under the finger never moves what it is read against.
-    @State private var cardFrames: [String: CGRect] = [:]
-    @State private var headerFrames: [String: CGRect] = [:]
-
     private static let space = "list"
 
     private var gap: ListGap? { model.gap?.column == list.column ? model.gap : nil }
+    private var key: String { "list.\(list.column.rawValue)" }
 
     var body: some View {
+        let column = list.column
         VStack(alignment: .leading, spacing: 8) {
             ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
             ScrollView {
                 VStack(alignment: .leading, spacing: CardMetrics.gap) {
                     ForEach(list.groups) { group in
                         if let header = group.header {
-                            SectionHeader(title: header, group: group, column: list.column, model: model)
-                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { rest(header: group.id, $0) }
+                            SectionHeader(title: header, group: group, column: column, model: model)
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: group.id, $0) }
                         }
                         if group.empty, gap?.group != group.name { EmptyPlate() }
                         ForEach(rows(of: group)) { row in
                             switch row {
                             case .card(let card):
-                                CardRow(card: card, model: model, question: $question)
-                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { rest(card: card.id, $0) }
+                                CardRow(card: card, column: column, model: model, question: $question)
+                                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
                             case .gap(let level, let branch):
                                 GapSpace(level: level, branch: branch)
                             }
@@ -48,20 +44,11 @@ struct ListColumn: View {
                 .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
             }
             .scrollIndicators(.hidden)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.rest(column, width: $0) }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
         }
-        .onChange(of: list, initial: true) { register() }
-        .onChange(of: width) { register() }
+        .onAppear { model.registerList(column) }
         .onDisappear { model.dropping.remove(key) }
-    }
-
-    private var key: String { "list.\(list.column.rawValue)" }
-
-    /// The list as a place to drop on, with the cards it now shows.
-    private func register() {
-        let list = self
-        model.dropping.register(key, DropPlace(hover: { list.hover(at: $0) }, leave: { list.leave() }, land: { list.land() }))
     }
 
     /// A group's rows as drawn: its cards, and the carry's gap among them when it lands in this group.
@@ -70,66 +57,9 @@ struct ListColumn: View {
         guard let gap, gap.group == group.name else { return rows }
         let others = model.others(in: list.column)
         let next = others[safe: gap.at].flatMap { $0.item.group == gap.group ? $0 : nil }
-        let branch: Branch? = gap.level == 0 ? nil : (next?.level == gap.level ? .mid : .last)
         let at = next.flatMap { card in rows.firstIndex { $0.id == card.id } } ?? rows.count
-        rows.insert(.gap(level: gap.level, branch: branch), at: at)
+        rows.insert(.gap(level: gap.level, branch: gap.branch), at: at)
         return rows
-    }
-
-    private func rest(card id: String, _ frame: CGRect) {
-        if gap == nil { cardFrames[id] = frame }
-    }
-
-    private func rest(header id: String, _ frame: CGRect) {
-        if gap == nil { headerFrames[id] = frame }
-    }
-
-    // MARK: A carry over the list
-
-    private func hover(at point: CGPoint) {
-        let others = model.others(in: list.column)
-        let before = others.firstIndex { (cardFrames[$0.id]?.midY ?? .infinity) > point.y } ?? others.count
-        model.hover(list.column, before: before, level: level(point.x), passed: passedHeaders(at: point))
-    }
-
-    private func leave() { model.leave(list.column) }
-
-    /// Let go: the drop is written, and the card settles into the gap shown.
-    private func land() -> CGRect? {
-        guard let id = model.carried else { return nil }
-        let spot = gapRect()
-        Task { await model.drop(id, in: list.column) }
-        return id == Carried.plus ? nil : spot
-    }
-
-    /// Where the gap stands in the list: before the card it parts from, or under the last card of its section.
-    private func gapRect() -> CGRect? {
-        guard let gap else { return nil }
-        let others = model.others(in: list.column)
-        let indent = CGFloat(gap.level) * CardMetrics.indent
-        let x = CardMetrics.columnInset + indent
-        let w = width - CardMetrics.columnInset * 2 - indent
-        if let next = others[safe: gap.at], next.item.group == gap.group, let frame = cardFrames[next.id] {
-            return CGRect(x: x, y: frame.minY, width: w, height: CardMetrics.height)
-        }
-        let above = others.prefix(gap.at).last { $0.item.group == gap.group }
-        guard let frame = above.flatMap({ cardFrames[$0.id] }) ?? list.groups.first(where: { $0.name == gap.group }).flatMap({ headerFrames[$0.id] }) else { return nil }
-        return CGRect(x: x, y: frame.maxY + CardMetrics.gap, width: w, height: CardMetrics.height)
-    }
-
-    /// How deep a card let go at `x` goes: left of the list's middle a task, then one level deeper for each indent past
-    /// it; the core fits it to what the neighbours allow.
-    private func level(_ x: CGFloat) -> Double {
-        let cards = width - CardMetrics.columnInset * 2
-        let middle = cards / 2
-        let along = x - CardMetrics.columnInset
-        return along <= middle ? 0 : Double(1 + (along - middle) / CardMetrics.indent)
-    }
-
-    /// The headers above a point, in their order: the section a drop lands in is the last of them.
-    private func passedHeaders(at point: CGPoint) -> [String?] {
-        guard list.showsHeaders else { return [] }
-        return list.groups.filter { $0.header != nil && (headerFrames[$0.id]?.midY ?? .infinity) < point.y }.map(\.name)
     }
 }
 
@@ -255,6 +185,7 @@ struct EmptyPlate: View {
 /// puts the system's selection circle before it, as Mail and Reminders do. Carried, it gives its place up.
 struct CardRow: View {
     let card: BoardCard
+    let column: BoardColumn
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
 
@@ -291,8 +222,9 @@ struct CardRow: View {
                 ringed: model.found == card.id,
                 carried: carried,
                 onTouch: { model.found = nil },
-                onCarry: { model.startCarry(card.id) },
+                onCarry: { model.startCarry(card, from: column.rawValue, grab: $0) },
                 onCancel: { model.cancelCarry() },
+                onEnd: { model.carryEnded() },
                 onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil)
                 .frame(height: CardMetrics.height)
         }
