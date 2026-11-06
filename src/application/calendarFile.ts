@@ -1,3 +1,4 @@
+import { isoMoment } from "../domain/IsoMoment";
 import type { CalendarEvent, CalendarSource } from "./contracts";
 import type { TaskCalendarSettings } from "../settings";
 
@@ -70,7 +71,7 @@ export interface CalendarFile {
 	readonly validUntil: Date | null;
 }
 
-const dateOrNull = (text: string | null | undefined): Date | null => (text ? new Date(text) : null);
+const dateOrNull = (text: string | null | undefined): Date | null => (text ? isoMoment(text) : null);
 
 /**
  * A writer's events in the vault: the one place they are true. Each writer keeps its own file and lists every calendar
@@ -81,8 +82,8 @@ export function readCalendarFile(text: string, source: CalendarSource): Calendar
 	const events = (content.events ?? []).map((e) => ({
 		id: e.id,
 		title: e.title,
-		start: new Date(e.start),
-		end: new Date(e.end),
+		start: isoMoment(e.start),
+		end: isoMoment(e.end),
 		allDay: e.allDay,
 		calendar: e.calendar,
 		color: e.color ?? null,
@@ -94,7 +95,7 @@ export function readCalendarFile(text: string, source: CalendarSource): Calendar
 	return {
 		events,
 		calendars: listed.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...(c.sourceId ? { sourceId: c.sourceId } : {}) })),
-		exportedAt: new Date(content.exportedAt),
+		exportedAt: isoMoment(content.exportedAt),
 		device: content.device ?? null,
 		from: dateOrNull(content.from),
 		to: dateOrNull(content.to),

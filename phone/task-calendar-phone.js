@@ -1771,6 +1771,30 @@
     return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
   }
 
+  // src/domain/IsoMoment.ts
+  var ISO = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+  var MINUTE_MS2 = 6e4;
+  function isoMoment(text) {
+    const m = ISO.exec(text.trim());
+    if (!m) return new Date(Number.NaN);
+    const [, y, mo, d, h, mi, s, fraction, zone] = m;
+    const ms = fraction === void 0 ? 0 : Math.floor(Number(`0.${fraction}`) * 1e3);
+    const fields = [Number(y), Number(mo) - 1, Number(d), Number(h ?? 0), Number(mi ?? 0), Number(s ?? 0), ms];
+    if (!valid(fields)) return new Date(Number.NaN);
+    if (h === void 0) return new Date(Date.UTC(...fields));
+    if (zone === void 0) return new Date(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]);
+    return new Date(Date.UTC(...fields) - offsetMinutes(zone) * MINUTE_MS2);
+  }
+  function valid([, month, day, hour, minute, second]) {
+    return month <= 11 && day >= 1 && day <= 31 && hour <= 24 && minute <= 59 && second <= 59;
+  }
+  function offsetMinutes(zone) {
+    if (zone === "Z") return 0;
+    const digits = zone.slice(1).replace(":", "");
+    const minutes = Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2));
+    return zone.startsWith("-") ? -minutes : minutes;
+  }
+
   // src/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
   var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
@@ -1780,14 +1804,14 @@
     if (source === "iphone") return IPHONE_CALENDAR_FILE;
     return settings.workCalendarFile;
   }
-  var dateOrNull = (text) => text ? new Date(text) : null;
+  var dateOrNull = (text) => text ? isoMoment(text) : null;
   function readCalendarFile(text, source) {
     const content = JSON.parse(text);
     const events = (content.events ?? []).map((e) => ({
       id: e.id,
       title: e.title,
-      start: new Date(e.start),
-      end: new Date(e.end),
+      start: isoMoment(e.start),
+      end: isoMoment(e.end),
       allDay: e.allDay,
       calendar: e.calendar,
       color: e.color ?? null,
@@ -1799,7 +1823,7 @@
     return {
       events,
       calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
-      exportedAt: new Date(content.exportedAt),
+      exportedAt: isoMoment(content.exportedAt),
       device: content.device ?? null,
       from: dateOrNull(content.from),
       to: dateOrNull(content.to),
@@ -2182,7 +2206,7 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/shownCalendars.ts
-  var MINUTE_MS2 = 6e4;
+  var MINUTE_MS3 = 6e4;
   var ShownCalendars = class {
     constructor(files, settings, now) {
       this.files = files;
@@ -2202,13 +2226,13 @@ ${key.title}`.toLowerCase();
       return new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.dayStartHour));
     }
     choice(hidden) {
-      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS2, this.now);
+      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS3, this.now);
     }
   };
 
   // src/application/calendarDay.ts
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
-  var MINUTE_MS3 = 6e4;
+  var MINUTE_MS4 = 6e4;
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2280,7 +2304,7 @@ ${key.title}`.toLowerCase();
     }
     isOld(updatedAt) {
       if (updatedAt === null) return true;
-      return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS3;
+      return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS4;
     }
   };
 
@@ -2364,6 +2388,18 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/QuickEntry.ts
+  function entryAt(drawing, place, section) {
+    const { cards, sections } = drawing;
+    if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
+    const at = sections.indexOf(place.group);
+    if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
+    const start = cards.findIndex((card2) => sections.indexOf(card2.group) >= at);
+    const from = start < 0 ? cards.length : start;
+    let end = from;
+    while (end < cards.length && cards[end].group === place.group) end++;
+    const card = place.index >= from && place.index <= end ? place.index : end;
+    return { kind: "in", section: at, card, keepsPlate: section };
+  }
   var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
   function emptySession() {
     return { field: null, runs: {}, jobs: [], next: 0 };
@@ -2414,11 +2450,17 @@ ${key.title}`.toLowerCase();
       return this.session.field?.rename?.item.key ?? null;
     }
     /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
-    listEntry(column) {
+    /**
+     * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
+     * (the look's cards and sections when left out); `at` is where among them the field stands.
+     */
+    listEntry(column, drawn) {
       const state = this.state;
       const list = state && listSpot(state.spot);
       if (!state || !list || list.column !== column) return null;
-      return { place: list.place, pending: state.pending, section: state.section === true };
+      const section = state.section === true;
+      const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
+      return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
     }
     /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
     openAtEnd(column) {

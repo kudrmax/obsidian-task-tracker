@@ -7,6 +7,11 @@ import { QuickField, type QuickKey } from "../../src/ui/quick/QuickField";
 import { TaskList } from "../../src/ui/TaskList";
 import { fakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
+import { type EntryDrawing, entryAt } from "../../src/application/QuickEntry";
+import type { GapPlace } from "../../src/application/nesting";
+
+/** The field's spot among what the list draws, as the quick entry answers it. */
+const spotted = (drawing: EntryDrawing, place: GapPlace) => ({ at: entryAt(drawing, place, false), level: place.level });
 
 function open(value = "", tint: PriorityColor | null = null) {
 	const parent = document.createElement("div");
@@ -165,8 +170,8 @@ describe("TaskList with a task being typed", () => {
 		const l = new TaskList(document.createElement("div"), {
 			items: () => items,
 			day: () => null,
-			entry: () => ({
-				place: { kind: "gap", index, level, group: null },
+			entry: (drawing) => ({
+				...spotted(drawing, { kind: "gap", index, level, group: null }),
 				pending,
 				field: (parent) => QuickField.open(parent, { value: "", tint: null, titleField: fakeTitleField, onInput() {}, onKey() {}, onBlur() {} }).el,
 			}),
@@ -234,7 +239,7 @@ describe("TaskList with a task being typed", () => {
 		const l = new TaskList(document.createElement("div"), {
 			items: () => [{ ...keyed("A", []), subtasks: [keyed("A1", [0]), last] }],
 			day: () => null,
-			entry: () => ({ place: { kind: "gap", index: 2, level: 1, group: null }, pending: [], field: (parent) => parent }),
+			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 2, level: 1, group: null }), pending: [], field: (parent) => parent }),
 			renaming: () => last.key,
 		});
 		l.render();
@@ -256,7 +261,7 @@ describe("TaskList with a task being typed", () => {
 			items: () => grouped,
 			day: () => null,
 			grouped: () => true,
-			entry: () => ({ place: { kind: "gap", index: 2, level: 0, group: "Home" }, pending: [], field: (parent) => parent }),
+			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 2, level: 0, group: "Home" }), pending: [], field: (parent) => parent }),
 		});
 		l.render();
 		expect([...l.el.children].map((r) => r.className)).toEqual(["tc-group-head", "tc-card", "tc-quick-row", "tc-group-head", "tc-card"]);
@@ -268,8 +273,8 @@ describe("TaskList with a task being typed", () => {
 		const l = new TaskList(document.createElement("div"), {
 			items: () => items,
 			day: () => null,
-			entry: () => ({
-				place: { kind: "gap", index: items.length, level: 0, group: null },
+			entry: (drawing) => ({
+				...spotted(drawing, { kind: "gap", index: items.length, level: 0, group: null }),
 				pending: [],
 				field: (parent) => {
 					field ??= document.createElement("textarea");
@@ -293,7 +298,7 @@ describe("TaskList with a task being typed", () => {
 			items: () => grouped,
 			day: () => null,
 			grouped: () => true,
-			entry: () => ({ place: { kind: "gap", index: 1, level: 0, group: "Work" }, pending: [], field: (parent) => parent }),
+			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 1, level: 0, group: "Work" }), pending: [], field: (parent) => parent }),
 		});
 		l.render();
 		expect([...l.el.children].map((r) => r.className)).toEqual(["tc-group-head", "tc-card", "tc-group-head", "tc-quick-row", "tc-card"]);

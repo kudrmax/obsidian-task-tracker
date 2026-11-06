@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { TaskList } from "../../src/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
+import { entryAt } from "../../src/application/QuickEntry";
 
 const task = (text: string, index: number): TaskItem => onDay({
 	key: { section: "now", index, path: [], raw: text },
@@ -87,7 +88,7 @@ describe("TaskList", () => {
 			day: () => null,
 			grouped: () => true,
 			sections: () => [{ name: null, empty: false }, { name: "Evening", empty: true }],
-			entry: () => ({ place: { kind: "gap", index: 1, level: 0, group: "Evening" }, pending: [], field: (row) => row }),
+			entry: (drawing) => ({ at: entryAt(drawing, { kind: "gap", index: 1, level: 0, group: "Evening" }, false), level: 0, pending: [], field: (row) => row }),
 		});
 		list.render();
 		expect(list.plateOf("Evening")).toBeNull();
