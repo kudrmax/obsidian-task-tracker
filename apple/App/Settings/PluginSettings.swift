@@ -10,17 +10,30 @@ final class PluginSettings {
     private(set) var form: SettingsForm?
     /// Each preset colour's own shade in either theme, as the core draws presets: a typed code that is one reads as it.
     private(set) var presetInk: [String: Themed<String>] = [:]
+    private var shades: [String: Themed<Shades>] = [:]
 
     func load() async {
         let board = board
         form = try? await Task.detached { try board.read("settings.form", over: try board.files()) }.value
-        if presetInk.isEmpty, let presets: [String: [JSONValue]] = try? await Task.detached(operation: { try board.rule("rules.constants") }).value {
-            for preset in presets["PRIORITY_COLORS"]?.compactMap(\.string) ?? [] {
-                let dark: String = (try? board.rule("rules.inkOf", [.string(preset), "dark"])) ?? "#888888"
-                let light: String = (try? board.rule("rules.inkOf", [.string(preset), "light"])) ?? "#888888"
+        if presetInk.isEmpty, let constants: [String: JSONValue] = try? board.rule("rules.constants") {
+            for preset in constants["PRIORITY_COLORS"]?.array.compactMap(\.string) ?? [] {
+                let dark: String = (try? board.rule("rules.inkOf", [.string(preset), "dark"])) ?? preset
+                let light: String = (try? board.rule("rules.inkOf", [.string(preset), "light"])) ?? preset
                 presetInk[preset] = Themed(dark: dark, light: light)
             }
         }
+        for mark in (form?.priorities ?? []) + (form?.labels ?? []) where shades[mark.color] == nil {
+            if let dark: Shades = try? board.rule("rules.shadesOf", [.string(mark.color), "dark"]),
+               let light: Shades = try? board.rule("rules.shadesOf", [.string(mark.color), "light"]) {
+                shades[mark.color] = Themed(dark: dark, light: light)
+            }
+        }
+    }
+
+    /// A level's or a label's card ground, as the cards on the screen are painted.
+    func fill(_ color: String, _ scheme: ColorScheme) -> Color {
+        guard let shades = shades[color] else { return Palette.card(scheme) }
+        return Color(hex: scheme == .dark ? shades.dark.fill : shades.light.fill)
     }
 
     func write(_ method: String, _ arguments: [JSONValue] = []) async {

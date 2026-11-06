@@ -26,6 +26,7 @@ struct TaskCalendarApp: App {
     var body: some Scene {
         WindowGroup {
             BoardScreen()
+                .boardTint()
                 .onOpenURL { url in
                     if let back = RefreshLink.back(from: url) {
                         Task {

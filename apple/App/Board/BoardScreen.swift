@@ -30,7 +30,6 @@ struct BoardScreen: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
-        .toolbar(model.selecting ? .hidden : .automatic, for: .tabBar)
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reload() } }) {
             CaptureView()
         }
@@ -85,6 +84,8 @@ struct BoardPage: View {
                     if model.selecting { selectionBar } else { mainBar }
                 }
                 .navigationBarTitleDisplayMode(.inline)
+                // Select Tasks' actions take the tab bar's place, as in Mail and Files.
+                .toolbar(model.selecting ? .hidden : .automatic, for: .tabBar)
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
         }
     }
@@ -94,6 +95,7 @@ struct BoardPage: View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
             Ribbon(snapshot: snapshot, model: model, question: $question)
                 .overlay(alignment: .top) { problem }
+                .overlay { LiftedCard(drag: model.drag) }
         } else if let problem = model.problem {
             ContentUnavailableView {
                 Label("Can’t Read Your Tasks", systemImage: "exclamationmark.triangle")
@@ -138,6 +140,7 @@ struct BoardPage: View {
         ToolbarItem(placement: .topBarLeading) {
             Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
                 .disabled(model.snapshot?.canUndo != true)
+                .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu("More", systemImage: "ellipsis") {
@@ -148,6 +151,7 @@ struct BoardPage: View {
                 Button("Settings", systemImage: "gear") { sheet = .settings }
             }
             .badge(model.snapshot?.calendarsStale == true ? 1 : 0)
+            .tint(.primary)
         }
     }
 
@@ -231,7 +235,6 @@ struct BulkActions: View {
         let items = model.pickedItems
         Group {
             Button("Done", systemImage: "checkmark.circle") { Task { await model.pickStatus(items, "done") } }
-            Spacer()
             Menu("Priority", systemImage: "flag") {
                 if let menu, !menu.levels.disabled {
                     ForEach(menu.levels.tiles, id: \.mark) { tile in
@@ -240,7 +243,6 @@ struct BulkActions: View {
                 }
             }
             .disabled(menu?.levels.disabled ?? true)
-            Spacer()
             Menu("Move", systemImage: "calendar") {
                 if let menu {
                     ForEach(menu.moves, id: \.id) { move in
@@ -254,15 +256,14 @@ struct BulkActions: View {
                 }
             }
             .disabled(menu?.moves.isEmpty ?? true)
-            Spacer()
             Menu("More", systemImage: "ellipsis.circle") {
                 if let menu { TaskMenuContent(items: items, menu: menu, model: model, question: $question) }
             }
-            Spacer()
             Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
-                .tint(.red)
+                .foregroundStyle(.red)
                 .disabled(menu?.remove == nil)
         }
+        .tint(.primary)
         .disabled(items.isEmpty)
         .task(id: model.picked) { menu = items.isEmpty ? nil : await model.bulkMenu() }
     }

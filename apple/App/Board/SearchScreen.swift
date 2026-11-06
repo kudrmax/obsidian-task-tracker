@@ -32,10 +32,8 @@ struct SearchScreen: View {
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() } }
-            }
             .searchable(text: $query, isPresented: $focused, prompt: "Tasks")
+            .onChange(of: focused) { if !focused, query.isEmpty { dismiss() } }
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
                 groups = (try? await model.read("tasks.search", [.string(query)])) ?? []

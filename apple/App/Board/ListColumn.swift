@@ -14,12 +14,9 @@ struct ListColumn: View {
             ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: CardMetrics.gap) {
-                    ForEach(Array(list.groups.enumerated()), id: \.element.id) { groupIndex, group in
+                    ForEach(list.groups) { group in
                         if let header = group.header {
                             SectionHeader(title: header, group: group, column: list.column, model: model)
-                                .dropDestination(for: DraggedTask.self) { dropped, _ in
-                                    land(dropped, before: firstIndex(of: group), level: 0, passed: passed(through: groupIndex))
-                                }
                         }
                         if group.empty {
                             Text("No tasks")
@@ -32,40 +29,22 @@ struct ListColumn: View {
                                 }
                         }
                         ForEach(group.cards) { card in
-                            CardRow(card: card, column: list.column.rawValue, model: model, question: $question) { dropped in
-                                land(dropped, before: index(of: card), level: card.level, passed: passed(through: groupIndex))
-                            }
+                            CardRow(card: card, column: list.column, index: index(of: card), model: model, question: $question)
                         }
                     }
-                    Color.clear
-                        .frame(height: 120)
-                        .contentShape(.rect)
-                        .dropDestination(for: DraggedTask.self) { dropped, _ in
-                            land(dropped, before: list.cards.count, level: 0, passed: passed(through: list.groups.count - 1))
-                        }
+                    Color.clear.frame(height: 120)
                 }
                 .padding(.horizontal, CardMetrics.columnInset)
             }
             .scrollIndicators(.hidden)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.drag.place(list.column, $0) }
         }
     }
 
     private func index(of card: BoardCard) -> Int { list.cards.firstIndex { $0.id == card.id } ?? list.cards.count }
 
-    private func firstIndex(of group: BoardGroup) -> Int {
-        group.cards.first.map(index(of:)) ?? list.cards.count
-    }
 
-    private func passed(through groupIndex: Int) -> [String?] {
-        guard list.showsHeaders, groupIndex >= 0 else { return [] }
-        return list.groups.prefix(groupIndex + 1).map(\.name)
-    }
 
-    private func land(_ dropped: [DraggedTask], before index: Int, level: Int, passed: [String?]) -> Bool {
-        guard let id = dropped.first?.id else { return false }
-        Task { await model.drop(id, in: list.column, before: index, level: level, passed: passed) }
-        return true
-    }
 }
 
 /// A column's title, 20 points bold; the day list's has the arrows that turn the day, and a tap on it comes back to today.
@@ -81,15 +60,12 @@ struct ColumnTitle: View {
                     .labelStyle(.iconOnly)
                     .frame(width: 32, height: 32)
             }
-            Button {
-                if dayArrows { Task { await model.showToday() } }
-            } label: {
-                Text(title)
-                    .font(.system(size: 20, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            if dayArrows {
+                Button { Task { await model.showToday() } } label: { titleText }
+                    .accessibilityHint("Back to today")
+            } else {
+                titleText.accessibilityAddTraits(.isHeader)
             }
-            .disabled(!dayArrows)
             if dayArrows {
                 Button("Next Day", systemImage: "chevron.right") { Task { await model.step(1) } }
                     .labelStyle(.iconOnly)
@@ -100,6 +76,13 @@ struct ColumnTitle: View {
         .fontWeight(.semibold)
         .frame(height: 32)
         .padding(.horizontal, dayArrows ? 0 : 16)
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(.system(size: 20, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
     }
 }
 
@@ -136,22 +119,24 @@ struct SectionHeader: View {
     }
 }
 
-/// One card in a list: at its depth, with its branch, its menu on a tap and a drag on a long press.
+/// One card in a list: at its depth, with its branch, its menu on a tap; a long press lifts it to carry, and the rows
+/// part before the card it would land before.
 struct CardRow: View {
     let card: BoardCard
-    let column: String
+    let column: BoardColumn
+    let index: Int
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
-    let land: ([DraggedTask]) -> Bool
-    @State private var targeted = false
 
     var body: some View {
+        let gap = model.drag.gapBefore == card.id
         capsule
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
-            .padding(.top, targeted ? CardMetrics.height + CardMetrics.gap : 0)
-            .animation(.snappy, value: targeted)
-            .dropDestination(for: DraggedTask.self, action: { dropped, _ in land(dropped) }, isTargeted: { targeted = $0 })
+            .dragSlot(card, column: column, index: index, drag: model.drag)
+            .padding(.top, gap ? CardMetrics.height + CardMetrics.gap : 0)
+            .opacity(model.drag.lifted?.id == card.id ? 0 : 1)
+            .animation(.snappy, value: gap)
     }
 
     @ViewBuilder
@@ -169,8 +154,9 @@ struct CardRow: View {
                 TaskCapsule(card: card, ringed: ringed)
             }
             .buttonStyle(.plain)
-            .draggable(DraggedTask(id: card.id)) { TaskCapsule(card: card).frame(width: 180) }
+            .tint(.primary)
             .simultaneousGesture(TapGesture().onEnded { model.found = nil })
+            .carries(card, with: model.drag, model: model)
         } else {
             TaskCapsule(card: card, ringed: ringed)
         }

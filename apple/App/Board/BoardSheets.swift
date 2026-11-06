@@ -68,7 +68,7 @@ struct DateSheet: View {
             .navigationTitle("Pick a Date")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
             }
         }
         .presentationDetents([.medium, .large])
@@ -160,7 +160,7 @@ struct RepeatSheet: View {
             .navigationTitle("Repeat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", systemImage: "checkmark") { Task { await save(); dismiss() } }
                         .buttonStyle(.glassProminent)

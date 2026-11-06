@@ -42,11 +42,8 @@ struct TimelineColumn: View {
                         if let now = timeline.now { nowLine(now) }
                     }
                     .frame(width: box.size.width, height: y(24 * 60), alignment: .topLeading)
-                    .contentShape(.rect)
-                    .dropDestination(for: DraggedTask.self) { dropped, at in
-                        guard let id = dropped.first?.id else { return false }
-                        Task { await model.drop(id, atMinute: Double(at.y / hour * 60), hourHeight: hour) }
-                        return true
+                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { top in
+                        model.drag.placeTimeline(box.frame(in: .global), zero: top + y(0))
                     }
                 }
                 .scrollPosition($position)
@@ -85,7 +82,9 @@ struct TimelineColumn: View {
                 TaskCapsule(card: slot.card, ringed: model.found == slot.id, height: tall)
             }
             .buttonStyle(.plain)
-            .draggable(DraggedTask(id: slot.id)) { TaskCapsule(card: slot.card).frame(width: 160) }
+            .tint(.primary)
+            .carries(slot.card, with: model.drag, model: model)
+            .opacity(model.drag.lifted?.id == slot.id ? 0 : 1)
         } else {
             TaskCapsule(card: slot.card, height: tall)
         }

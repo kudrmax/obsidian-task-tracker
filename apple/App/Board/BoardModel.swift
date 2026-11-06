@@ -22,20 +22,13 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
     }
 }
 
-/// A task being dragged: which card, and where it was lifted from.
-struct DraggedTask: Codable, Transferable {
-    let id: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .data)
-    }
-}
-
 /// The main screen's state: the day shown, what the door read for it, and every action, each a call through the door.
 @MainActor
 @Observable
 final class BoardModel {
     private let board = AppServices.shared.board
+    /// A card carried by the finger.
+    let drag = CardDrag()
 
     var place = RibbonPlace.today
     private(set) var snapshot: BoardSnapshot?
@@ -261,12 +254,17 @@ final class BoardModel {
 
     // MARK: Drag and drop
 
-    /// A card let go in a list, before card `index` of `cards` at `level`, in section `group` (`passed`: the headers above).
-    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int, passed: [String?]) async {
+    /// A card let go in a list, before card `index` of its cards (past the last: the list's end) at `level`.
+    func drop(_ id: String, in column: BoardColumn, before index: Int, level: Int) async {
         guard let snapshot, let item = snapshot.item(id), let list = snapshot.lists[column], let from = snapshot.column(of: id) else { return }
         let others = list.cards.filter { $0.id != id && !isUnder($0.item, id) }
         let cards = JSONValue.array(others.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
-        let at = others.firstIndex { $0.id == list.cards[safe: index]?.id } ?? others.count
+        let target = list.cards[safe: index]
+        let at = others.firstIndex { $0.id == target?.id } ?? others.count
+        // The headers the gap is past: down to the section of the card it stands before, or all of them at the end.
+        let groups = list.groups.map(\.name)
+        let through = target.flatMap { card in list.groups.firstIndex { $0.cards.contains { $0.id == card.id } } } ?? groups.count - 1
+        let passed = list.showsHeaders && through >= 0 ? Array(groups.prefix(through + 1)) : []
         do {
             let gap: JSONValue = try await rule("rules.gapAt", [cards, .number(Double(at)), .number(Double(level)), .array(passed.map(\.json)), .bool(list.showsHeaders)])
             let place: JSONValue = try await rule("rules.placeOfDrop", [cards, gap, .null])

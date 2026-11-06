@@ -46,3 +46,16 @@ extension Color {
         self = Color(.sRGB, red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
     }
 }
+
+extension View {
+    /// The design's accent over the whole app, in either theme: the selected tab, the glass checks, links, the cursor.
+    func boardTint() -> some View { modifier(BoardTint()) }
+}
+
+private struct BoardTint: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content.tint(Palette.accent(scheme))
+    }
+}

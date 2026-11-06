@@ -28,7 +28,7 @@ struct CalendarsView: View {
                         }
                         Spacer()
                         if let device = status.detail {
-                            Label(device, systemImage: "iphone").font(.footnote).foregroundStyle(.secondary)
+                            Text(device).font(.footnote).foregroundStyle(.secondary)
                         }
                         if status.stale {
                             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).accessibilityLabel("Out of date")
@@ -57,6 +57,7 @@ struct CalendarsView: View {
                             }
                         }
                     }
+                    .tint(Color(.systemGreen))
                 }
             } header: {
                 Text("Shown")
@@ -67,7 +68,7 @@ struct CalendarsView: View {
         .navigationTitle("Calendars")
         .toolbar {
             if model != nil {
-                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
             }
         }
         .task { await load() }

@@ -43,7 +43,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.tint(.primary) }
         }
         .task { await plugin.load() }
         .refreshable { await model.refresh(); await plugin.load() }
@@ -91,7 +91,7 @@ struct MarkRow: View {
                 .fixedSize()
                 .padding(.horizontal, 12)
                 .frame(height: 30)
-                .background(plugin.ink(color, scheme).opacity(scheme == .dark ? 0.26 : 0.16), in: .rect(cornerRadius: 10))
+                .background(plugin.fill(color, scheme), in: .rect(cornerRadius: 10))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .onSubmit { rename(name) }
