@@ -21,10 +21,10 @@ struct CaptureView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 Picker("List", selection: $list) {
                     ForEach(CaptureListOption.allCases, id: \.self) { option in
-                        Label(option.title, systemImage: option.symbol).tag(option)
+                        Text(option.title).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -56,7 +56,6 @@ struct CaptureView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add", systemImage: "checkmark") { Task { await send() } }
-                        .buttonStyle(.borderedProminent)
                         .disabled(!canSend || sending)
                 }
             }
@@ -88,7 +87,8 @@ struct CaptureView: View {
     }
 }
 
-/// The microphone and, once it is going, the recording's time with pause, resume and stop.
+/// The microphone and, once it is going, the recording's time with pause, resume and stop: system glass buttons, as
+/// the controls floating over an iOS screen are.
 private struct RecorderBar: View {
     let recorder: VoiceRecorder
 
@@ -99,62 +99,40 @@ private struct RecorderBar: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             }
-            switch recorder.state {
-            case .idle:
-                Button { Task { await recorder.start() } } label: {
-                    Label("Record", systemImage: "mic.fill")
-                        .font(.title2)
-                        .labelStyle(.iconOnly)
-                        .frame(width: 72, height: 72)
+            GlassEffectContainer(spacing: 16) {
+                switch recorder.state {
+                case .idle:
+                    GlassCircle(title: "Record", symbol: "mic.fill", main: true) { Task { await recorder.start() } }
+                case .recording, .paused:
+                    running
+                case .finished:
+                    finished
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
-                .tint(.red)
-                .accessibilityLabel("Record")
-            case .recording, .paused:
-                running
-            case .finished:
-                finished
             }
         }
         .frame(maxWidth: .infinity)
     }
 
     private var running: some View {
-        HStack(spacing: 20) {
-            Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
-                .labelStyle(.iconOnly)
-                .font(.title3)
-                .frame(width: 52, height: 52)
+        HStack(spacing: 16) {
+            GlassCircle(title: "Discard", symbol: "trash") { recorder.discard() }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-                    .monospacedDigit()
+                    .font(.title.monospacedDigit().weight(.semibold))
                     .contentTransition(.numericText())
-                Label(recorder.state == .recording ? "Recording" : "Paused", systemImage: recorder.state == .recording ? "record.circle" : "pause.circle")
+                Text(recorder.state == .recording ? "Recording" : "Paused")
                     .font(.footnote)
-                    .foregroundStyle(recorder.state == .recording ? .red : .secondary)
-                    .symbolEffect(.pulse, isActive: recorder.state == .recording)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
-            Button(recorder.state == .recording ? "Pause" : "Resume", systemImage: recorder.state == .recording ? "pause.fill" : "mic.fill") {
+            GlassCircle(title: recorder.state == .recording ? "Pause" : "Resume", symbol: recorder.state == .recording ? "pause.fill" : "mic.fill", main: true) {
                 if recorder.state == .recording { recorder.pause() } else { recorder.resume() }
             }
-            .labelStyle(.iconOnly)
-            .font(.title2)
-            .frame(width: 64, height: 64)
-            .background(.red.opacity(0.15), in: .circle)
-            .foregroundStyle(.red)
 
-            Button("Stop", systemImage: "stop.fill") { recorder.finish() }
-                .labelStyle(.iconOnly)
-                .font(.title3)
-                .frame(width: 52, height: 52)
-                .background(.quaternary, in: .circle)
+            GlassCircle(title: "Stop", symbol: "stop.fill") { recorder.finish() }
         }
-        .buttonStyle(.plain)
     }
 
     private var finished: some View {
@@ -166,27 +144,37 @@ private struct RecorderBar: View {
                 Text("Voice note")
                     .font(.headline)
                 Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                    .font(.subheadline)
-                    .monospacedDigit()
+                    .font(.subheadline.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
-                .labelStyle(.iconOnly)
-                .font(.title3)
+            GlassCircle(title: "Discard", symbol: "trash") { recorder.discard() }
         }
-        .padding()
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 16))
+        .padding(12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 28))
     }
 }
 
-extension CaptureListOption {
-    var symbol: String {
-        switch self {
-        case .inbox: "tray"
-        case .now: "sun.max"
-        case .soon: "calendar"
-        case .backlog: "archivebox"
+/// A round button on system glass: the main one red and larger, the rest plain.
+private struct GlassCircle: View {
+    let title: String
+    let symbol: String
+    var main = false
+    let action: () -> Void
+
+    var body: some View {
+        let button = Button(action: action) {
+            Image(systemName: symbol)
+                .font(main ? .title : .title3)
+                .frame(width: main ? 56 : 40, height: main ? 56 : 40)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonBorderShape(.circle)
+        .accessibilityLabel(title)
+        if main {
+            button.buttonStyle(.glassProminent).tint(.red)
+        } else {
+            button.buttonStyle(.glass)
         }
     }
 }
