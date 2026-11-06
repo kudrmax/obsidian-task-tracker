@@ -31,19 +31,19 @@ export function bulkLevelTiles(items: readonly TaskItem[], levels: readonly Prio
 	return levels.map((level) => ({ prefix: level.prefix, color: level.color, on: same && level.prefix === shared }));
 }
 
-/** The labels: one is on when every task that may carry labels (any without a priority) has it; off while every task has a priority. */
+/** The labels: one is on when every task that may carry labels has it; off while none may. */
 export function bulkLabelTiles(items: readonly TaskItem[], labels: readonly LabelLevel[]): readonly { readonly name: string; readonly title: string; readonly color: LabelLevel["color"]; readonly on: boolean; readonly disabled: boolean }[] {
-	const open = items.filter((item) => item.priority === null);
+	const open = items.filter((item) => item.can.setLabels);
 	return labels.map((label) => ({ name: label.name, title: labelTitle(label.name), color: label.color, on: open.length > 0 && open.every((item) => item.labels.some((l) => l.name === label.name)), disabled: open.length === 0 }));
 }
 
-/** A tap on a label every such task has takes it off them all; otherwise it goes on each that lacks it. The tasks with a priority keep none. */
+/** A tap on a label every such task has takes it off them all; otherwise it goes on each that lacks it. The tasks that may carry none keep theirs. */
 export function bulkNextLabels(items: readonly TaskItem[], name: string): readonly (readonly string[])[] {
-	const open = items.filter((item) => item.priority === null);
+	const open = items.filter((item) => item.can.setLabels);
 	const all = open.length > 0 && open.every((item) => item.labels.some((l) => l.name === name));
 	return items.map((item) => {
 		const names = item.labels.map((l) => l.name);
-		if (item.priority !== null) return names;
+		if (!item.can.setLabels) return names;
 		if (all) return names.filter((n) => n !== name);
 		return names.includes(name) ? names : [...names, name];
 	});
@@ -168,7 +168,7 @@ export class BulkMenu {
 			{ label: "Won’t do", icon: "wontdo", onPick: this.pick(() => actions.setStatus("cancelled")) },
 		];
 		tileGroup(panel, "is-status", [statuses]);
-		const levelTiles = bulkLevelTiles(items, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: items.every((item) => item.labels.length > 0), onPick: this.pick(() => actions.setPriority(bulkNextPriority(items, tile.prefix))) }));
+		const levelTiles = bulkLevelTiles(items, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: items.every((item) => !item.can.setPriority), onPick: this.pick(() => actions.setPriority(bulkNextPriority(items, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(panel, "is-priority", tileRows(levelTiles));
 		const labelTiles = bulkLabelTiles(items, this.context.labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: tile.disabled, onPick: () => void this.toggleLabel(tile.name) }));
 		if (labelTiles.length > 0) tileGroup(panel, "is-labels", tileRows(labelTiles));

@@ -108,7 +108,7 @@ export interface TaskItem {
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
-	/** The labels the task is tagged with, in the settings' order; none while it has a priority. */
+	/** The labels the task is tagged with, in the settings' order; none while it has a priority, which wins on a line with both. */
 	readonly labels: readonly LabelLevel[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
@@ -118,8 +118,11 @@ export interface TaskItem {
 	readonly isSubtask: boolean;
 	/** The day the task stands on: its slot's, today for Now, else its due date. */
 	readonly day: LocalDate | null;
-	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task on a time). */
-	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean };
+	/**
+	 * What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task
+	 * on a time), a priority set (one without labels), labels set (one without a priority).
+	 */
+	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean; readonly setPriority: boolean; readonly setLabels: boolean };
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -236,6 +239,14 @@ export interface ScreenView {
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
  */
 /** A call that takes the last task out of a section takes the section away; a section left empty any other way stays. */
+/** The marks a task being typed is written with, and what may still be chosen for it: the bar shows exactly these. */
+export interface DraftMarks {
+	readonly priority: PriorityLevel | null;
+	/** In the settings' order; none while there is a priority. */
+	readonly labels: readonly LabelLevel[];
+	readonly can: { readonly setPriority: boolean; readonly setLabels: boolean };
+}
+
 export interface TaskService {
 	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
 	priorityLevels(): readonly PriorityLevel[];
@@ -292,6 +303,11 @@ export interface TaskService {
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
+	/**
+	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
+	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.
+	 */
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now

@@ -452,12 +452,27 @@ describe("labels", () => {
 		expect(setLabels(prioritized, prioritized.tasks("now")[0], ["Важное"]).serialize()).toBe("## Now\n- [ ] p1 X\n");
 		const labelled = doc("## Now\n- [ ] X #label/Важное\n");
 		expect(setPriority(labelled, labelled.tasks("now")[0], "p1").serialize()).toBe("## Now\n- [ ] X #label/Важное\n");
-		expect(placeTask(labelled, labelled.tasks("now")[0], { text: "Y", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] Y #label/Важное\n");
+		expect(placeTask(labelled, labelled.tasks("now")[0], { text: "Y", placement: { kind: "now" }, priority: "p1" }, T).serialize()).toBe("## Now\n- [ ] p1 Y\n");
 	});
 
-	it("writes a new task's labels, and an edit's labels in place of the task's own, a priority none beside them", () => {
+	it("lets the priority win on a line written with both: a new priority or none takes the labels off, labels are not set", () => {
+		const both = doc("## Now\n- [ ] p1 X #label/Важное\n");
+		expect(setPriority(both, both.tasks("now")[0], "p1").serialize()).toBe("## Now\n- [ ] p1 X\n");
+		expect(setPriority(both, both.tasks("now")[0], null).serialize()).toBe("## Now\n- [ ] X\n");
+		expect(setLabels(both, both.tasks("now")[0], ["Срочное"]).serialize()).toBe("## Now\n- [ ] p1 X #label/Важное\n");
+	});
+
+	it("reads a typed prefix as the priority of a new or edited task, which then keeps no labels", () => {
 		const d = doc("## Now\n- [ ] X #label/Важное\n");
-		expect(createInPlace(d, "Y", "p1", { kind: "list", list: "now", group: null, before: null, date: null }, T, DayBoundary.MIDNIGHT, undefined, ["Срочное"]).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] Y #label/Срочное 📅 2026-10-30\n");
+		const list = { kind: "list", list: "now", group: null, before: null, date: null } as const;
+		expect(createInPlace(d, "p1 Y", null, list, T, DayBoundary.MIDNIGHT, undefined, ["Срочное"]).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] p1 Y 📅 2026-10-30\n");
+		expect(placeTask(d, d.tasks("now")[0], { text: "p1 X", placement: { kind: "now" }, priority: null }, T).serialize()).toBe("## Now\n- [ ] p1 X\n");
+		expect(placeTask(d, null, { text: "p1 Z", placement: { kind: "now" }, priority: null, labels: ["Срочное"] }, T).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] p1 Z 📅 2026-10-30\n");
+	});
+
+	it("writes a new task's labels, and an edit's labels in place of the task's own, none beside a priority", () => {
+		const d = doc("## Now\n- [ ] X #label/Важное\n");
+		expect(createInPlace(d, "Y", "p1", { kind: "list", list: "now", group: null, before: null, date: null }, T, DayBoundary.MIDNIGHT, undefined, ["Срочное"]).serialize()).toBe("## Now\n- [ ] X #label/Важное\n- [ ] p1 Y 📅 2026-10-30\n");
 		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: null, labels: ["Срочное", "Важное"] }, T).serialize()).toBe("## Now\n- [ ] X #label/Срочное #label/Важное\n");
 		expect(placeTask(d, d.tasks("now")[0], { text: "X", placement: { kind: "now" }, priority: "p1", labels: [] }, T).serialize()).toBe("## Now\n- [ ] p1 X\n");
 	});

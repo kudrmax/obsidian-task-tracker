@@ -1,4 +1,4 @@
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type PriorityLevel, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService, type LabelLevel } from "../../application/contracts";
+import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService, type DraftMarks } from "../../application/contracts";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
@@ -26,7 +26,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -595,30 +595,23 @@ export class QuickEntryController {
 		}
 	}
 
-	/** The field and the bar show the state: its text, its level, what the field may do. */
+	/** The field and the bar show the state: its text, the marks it is written with, what the field may do. */
 	private sync(state: EntryState): void {
-		const level = state.section ? null : this.levelOf(state);
-		const labels = this.labelsOf(state);
+		const marks = this.marksOf(state);
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setSection(state.section === true);
-		if (!state.section) this.field?.setTint(level?.color ?? labels[0]?.color ?? null);
-		this.bar.show(this.barState(state, level, labels));
+		if (!state.section) this.field?.setTint(marks.priority?.color ?? marks.labels[0]?.color ?? null);
+		this.bar.show(this.barState(state, marks));
 	}
 
-	private barState(state: EntryState, priority: PriorityLevel | null, labels: readonly LabelLevel[]): QuickBarState {
+	private barState(state: EntryState, marks: DraftMarks): QuickBarState {
 		const place = this.shownPlace(state);
-		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", priority, labels: priority ? [] : labels, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
+		return { canIndent: state.canIndent, canOutdent: state.canOutdent, indents: state.spot.kind === "list", marks, place, repeat: state.repeat, repeatable: state.spot.kind !== "slot", section: state.section };
 	}
 
-	/** The labels chosen, in the settings' order. */
-	private labelsOf(state: EntryState): readonly LabelLevel[] {
-		return this.deps.tasks.labelLevels().filter((label) => state.labels.includes(label.name));
-	}
-
-	/** The level chosen in the bar, else the one the text's prefix stands for. */
-	private levelOf(state: EntryState): PriorityLevel | null {
-		const { tasks } = this.deps;
-		return tasks.priorityLevels().find((level) => level.prefix === state.priority) ?? tasks.parseTitle(state.text).priority;
+	/** The priority and labels the field's task is written with, as the service answers for its text and choices. */
+	private marksOf(state: EntryState): DraftMarks {
+		return this.deps.tasks.draftMarks(state.text, state.priority, state.labels);
 	}
 
 	/** A level chosen in the bar takes the place of a prefix typed: the text keeps no prefix, so the file gets one. */
@@ -682,7 +675,7 @@ export class QuickEntryController {
 		const handle: QuickFieldHandle = QuickField.open(row, {
 			value: state?.text ?? "",
 			parseTitle: (text) => this.deps.tasks.parseTitle(text),
-			priority: state ? this.levelOf(state) : null,
+			priority: state ? this.marksOf(state).priority : null,
 			titleField: this.deps.titleField,
 			onInput: (text) => {
 				this.entry.type(text);

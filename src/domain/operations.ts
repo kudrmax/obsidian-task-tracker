@@ -1,5 +1,6 @@
 import { DayBoundary, MIN_SLOT_MINUTES } from "./DayBoundary";
 import { localDateOf } from "./LocalDate";
+import { markChoices, type Marks, marksOf, typedMarks } from "./Marks";
 import type { GroupSettings } from "./Groups";
 import type { EndList, GroupedList, GroupPlace } from "./Lists";
 import type { Placement, TaskDraft } from "./Placement";
@@ -130,15 +131,21 @@ export function setDueDate(doc: TaskDocument, entry: TaskEntry, date: LocalDate 
 	return patch(doc, entry, { dueDate: date });
 }
 
-/** A task has a priority or labels, never both: a priority for a task with labels is not set. */
+/** The marks a task has: its priority, else its labels; a line written with both has the priority only. */
+export function marksOfTask(task: Task): Marks {
+	return marksOf(task.priority, task.labels);
+}
+
+/** A priority for a task with labels is not set; one set, or taken off, leaves no labels beside it. */
 export function setPriority(doc: TaskDocument, entry: TaskEntry, priority: string | null): TaskDocument {
-	if (priority !== null && entry.task.labels.length > 0) return doc;
-	return patch(doc, entry, { priority });
+	const marks = marksOfTask(entry.task);
+	if (priority !== null && !markChoices(marks).priority) return doc;
+	return patch(doc, entry, marksOf(priority, marks.labels));
 }
 
 /** The task's labels become `labels`; a task with a priority gets none. */
 export function setLabels(doc: TaskDocument, entry: TaskEntry, labels: readonly string[]): TaskDocument {
-	if (labels.length > 0 && entry.task.priority !== null) return doc;
+	if (labels.length > 0 && !markChoices(marksOfTask(entry.task)).labels) return doc;
 	return patch(doc, entry, { labels });
 }
 
@@ -213,7 +220,8 @@ function subtaskDueDate(placement: Placement, inherited: Placement, today: Local
 
 export function createSubtask(doc: TaskDocument, parent: TaskEntry, draft: TaskDraft, today: LocalDate): TaskDocument {
 	const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
-	const task = newTask(draft.text, { dueDate, ...marksOf(draft.priority, draft.labels ?? []) });
+	const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
+	const task = newTask(text, { dueDate, ...marks });
 	return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
 }
 
@@ -270,10 +278,13 @@ function placementTarget(placement: Placement, today: LocalDate): { section: Sec
 export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: TaskDraft, today: LocalDate, slot?: Slot, boundary = DayBoundary.MIDNIGHT): TaskDocument {
 	const { section, dueDate } = placementTarget(draft.placement, today);
 	const unsorted = isUndated(section);
-	if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marksOf(draft.priority, draft.labels ?? []) }), draft, today, boundary));
+	if (entry === null) {
+		const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
+		return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : (slot ?? null), ...marks }), draft, today, boundary));
+	}
 	if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
 	const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-	const changed = { ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
+	const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...(same ? {} : { dueDate }), ...(unsorted ? { slot: null } : {}) };
 	const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
 	if (same || entry.section === section) return edited;
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -283,19 +294,18 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);
 	const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-	return doc.replace(entry, withDraftRepeat({ ...entry.task, text: draft.text.trim(), ...draftMarks(entry.task, draft), dueDate }, draft, today, boundary));
+	return doc.replace(entry, withDraftRepeat({ ...entry.task, ...draftMarks(doc, entry.task, draft), dueDate }, draft, today, boundary));
 }
 
-type Marks = Pick<Task, "priority" | "labels">;
-
-/** A priority or labels, never both: the labels win, a task that has them keeps no priority. */
-function marksOf(priority: string | null, labels: readonly string[]): Marks {
-	return { priority: labels.length > 0 ? null : priority, labels };
+/** A title as typed, with the priority and labels chosen for it, as the file is to get it. */
+function typed(doc: TaskDocument, text: string, priority: string | null, labels: readonly string[]): Marks & { readonly text: string } {
+	const marked = typedMarks(text, priority, labels, doc.priorityPrefixes());
+	return { ...marked, text: marked.text.trim() };
 }
 
-/** What an edit marks a task with: the draft's labels, else the task's own, and the draft's priority while there are none. */
-function draftMarks(task: Task, draft: TaskDraft): Marks {
-	return marksOf(draft.priority, draft.labels ?? task.labels);
+/** What an edit writes: the draft's text, its priority or the one typed, and its labels, else the task's own, while there is none. */
+function draftMarks(doc: TaskDocument, task: Task, draft: TaskDraft): Marks & { readonly text: string } {
+	return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
 }
 
 /** The end of Inbox, Backlog or Soon: a drop on that list from another one, or at the end of its own. Into Inbox and Backlog the due date and slot go. */
@@ -373,9 +383,9 @@ export type CreatePlace =
 	| { kind: "subtask"; parent: TaskEntry; before: TaskEntry | null }
 	| { kind: "slot"; slot: Slot };
 
-/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority or `labels`, not both. */
-export function createInPlace(doc: TaskDocument, text: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = []): TaskDocument {
-	const marks = marksOf(priority, labels);
+/** A new task at `place`; `repeat` is set as `setRepeat` sets it, on a task or a subtask; a slot takes none. A priority, chosen or typed, or `labels`: not both. */
+export function createInPlace(doc: TaskDocument, typedText: string, priority: string | null, place: CreatePlace, today: LocalDate, boundary: DayBoundary, repeat?: RepeatRule | null, labels: readonly string[] = []): TaskDocument {
+	const { text, ...marks } = typed(doc, typedText, priority, labels);
 	switch (place.kind) {
 		case "subtask":
 			return intoUnfolded(doc, place.parent, (d, same) =>

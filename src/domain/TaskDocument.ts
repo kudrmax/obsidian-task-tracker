@@ -209,6 +209,11 @@ export class TaskDocument {
 			.serialize();
 	}
 
+	/** The prefixes of the priority levels the file is read with. */
+	priorityPrefixes(): readonly string[] {
+		return this.markers.priorities ?? [];
+	}
+
 	serialize(): string {
 		return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
 	}

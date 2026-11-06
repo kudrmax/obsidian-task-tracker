@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Placement, RepeatRule } from "../../src/application/contracts";
-import type { PriorityLevel } from "../../src/application/contracts";
+import type { DraftMarks, LabelLevel, PriorityLevel } from "../../src/application/contracts";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
 import { placementOfDay } from "../../src/domain/Days";
 
@@ -19,7 +19,12 @@ const LABELS = [
 /** The labels the next bar set up offers: none unless a test gives some. */
 let shownLabels: readonly (typeof LABELS)[number][] = [];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, labels: [], place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
+/** The service's answer for a field with this priority and these labels. */
+function marks(priority: PriorityLevel | null = null, labels: readonly LabelLevel[] = []): DraftMarks {
+	return { priority, labels, can: { setPriority: labels.length === 0, setLabels: priority === null } };
+}
+
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
@@ -105,7 +110,7 @@ describe("QuickBar", () => {
 		const flag = q(parent, ".tc-bar-flag");
 		expect(flag.dataset.priority).toBeUndefined();
 		expect(flag.classList.contains("is-set")).toBe(false);
-		bar.show({ ...STATE, priority: LEVELS[1] });
+		bar.show({ ...STATE, marks: marks(LEVELS[1]) });
 		expect(flag.dataset.priority).toBe("orange");
 		expect(flag.classList.contains("is-set")).toBe(true);
 		bar.show(STATE);
@@ -142,7 +147,7 @@ describe("QuickBar", () => {
 
 describe("the priority panel", () => {
 	it("is a tile group with a tile per level in rows of three, the field's level on", () => {
-		const { parent } = setup({ priority: LEVELS[1] });
+		const { parent } = setup({ marks: marks(LEVELS[1]) });
 		q(parent, ".tc-bar-flag").click();
 		const panel = q<HTMLElement>(parent, ".tc-quick-panel");
 		expect(panel.querySelectorAll(".tc-menu-tile-row")).toHaveLength(1);
@@ -161,7 +166,7 @@ describe("the priority panel", () => {
 	});
 
 	it("takes the level off on a tap on the current one", () => {
-		const { parent, priorities } = setup({ priority: LEVELS[0] });
+		const { parent, priorities } = setup({ marks: marks(LEVELS[0]) });
 		q(parent, ".tc-bar-flag").click();
 		tiles(parent)[0].click();
 		expect(priorities).toEqual([null]);
@@ -409,7 +414,7 @@ describe("the panels' opening and closing", () => {
 	it("keeps an open priority panel current as the field's level changes", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-flag").click();
-		bar.show({ ...STATE, priority: LEVELS[2] });
+		bar.show({ ...STATE, marks: marks(LEVELS[2]) });
 		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([false, false, true]);
 	});
 
@@ -444,7 +449,7 @@ describe("the panels' opening and closing", () => {
 		const level = tiles(parent)[0];
 		bar.show({ ...STATE, place: { kind: "inbox" } });
 		expect(tiles(parent)[0]).toBe(level);
-		bar.show({ ...STATE, place: { kind: "inbox" }, priority: LEVELS[0] });
+		bar.show({ ...STATE, place: { kind: "inbox" }, marks: marks(LEVELS[0]) });
 		expect(tiles(parent)[0]).not.toBe(level);
 		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([true, false, false]);
 	});
@@ -661,7 +666,7 @@ describe("QuickBar on the phone keyboard", () => {
 describe("the flag's labels", () => {
 	it("offers the labels under the levels, one tap putting a label on and the panel staying for the next", () => {
 		shownLabels = LABELS;
-		const { parent, labelled } = setup({ labels: [LABELS[1]] });
+		const { parent, labelled } = setup({ marks: marks(null, [LABELS[1]]) });
 		q(parent, ".tc-bar-flag").click();
 		const labels = [...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")];
 		expect(labels.map((t) => [t.textContent, t.classList.contains("is-on")])).toEqual([["Важное", false], ["Очень срочное", true]]);
@@ -672,13 +677,19 @@ describe("the flag's labels", () => {
 
 	it("turns the labels off while there is a priority, the levels while there are labels, and colours the flag by the first label", () => {
 		shownLabels = LABELS;
-		const prioritized = setup({ priority: LEVELS[0] });
+		const prioritized = setup({ marks: marks(LEVELS[0]) });
 		q(prioritized.parent, ".tc-bar-flag").click();
 		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-labels .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
 		document.body.innerHTML = "";
-		const labelled = setup({ labels: [LABELS[1]] });
+		const labelled = setup({ marks: marks(null, [LABELS[1]]) });
 		expect(q(labelled.parent, ".tc-bar-flag").dataset.priority).toBe("orange");
 		q(labelled.parent, ".tc-bar-flag").click();
 		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
+	});
+	it("turns tiles off as the service answers, whatever the field shows", () => {
+		shownLabels = LABELS;
+		const { parent } = setup({ marks: { priority: null, labels: [], can: { setPriority: false, setLabels: false } } });
+		q(parent, ".tc-bar-flag").click();
+		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
 	});
 });
