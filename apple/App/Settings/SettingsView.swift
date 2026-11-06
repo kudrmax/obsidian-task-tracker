@@ -57,7 +57,7 @@ struct SettingsView: View {
             .navigationTitle("Task Calendar")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("New Task", systemImage: "plus") { CaptureRouter.shared.open(list: .inbox, voice: false) }
+                    Button("New Task", systemImage: "plus") { CaptureRouter.shared.open() }
                 }
             }
             .refreshable { await model.refresh() }

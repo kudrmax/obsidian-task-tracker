@@ -39,6 +39,9 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: Alarms for tasks set to a time
         NSMicrophoneUsageDescription: Records a task you say instead of typing
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kudrmax.taskcalendar
+            CFBundleURLSchemes: [taskcalendar]
         NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]

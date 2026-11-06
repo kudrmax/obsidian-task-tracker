@@ -7,7 +7,7 @@ struct TaskCardWidgets: WidgetBundle {
     var body: some Widget {
         TaskCardWidget()
         NewTaskControl()
-        VoiceTaskControl()
+        NewTaskWidget()
     }
 }
 

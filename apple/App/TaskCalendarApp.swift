@@ -16,9 +16,10 @@ struct TaskCalendarApp: App {
     var body: some Scene {
         WindowGroup {
             SettingsView()
-                .fullScreenCover(item: $router.request) { request in
-                    CaptureView(request: request) { router.request = nil }
+                .fullScreenCover(item: $router.request) { _ in
+                    CaptureView { router.request = nil }
                 }
+                .onOpenURL { router.open($0) }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { Refresh.schedule() }
