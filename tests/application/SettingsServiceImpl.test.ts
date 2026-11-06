@@ -115,7 +115,8 @@ describe("SettingsServiceImpl", () => {
 	it("shows the tab its fields, the texts as the fields hold them, and no secret", () => {
 		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
 		const form = service({ google, workCalendarTitles: ["A", "B"] }).svc.form();
-		expect(form).toMatchObject({ workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
+		expect(form).not.toHaveProperty("workCalendars");
+		expect(form).toMatchObject({ googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
 		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕", repeatMarker: "🔁", collapsedMarker: "📁" });
 		expect(JSON.stringify(form)).not.toMatch(/secret|token/);
 	});
@@ -146,14 +147,6 @@ describe("SettingsServiceImpl", () => {
 		await svc.setMarker("repeatMarker", "↻");
 		await svc.setWorkCalendarFile("w.json");
 		expect(now()).toMatchObject({ tasksFile: "", sections: { ...DEFAULT_SETTINGS.sections, now: " Today " }, repeatMarker: "↻", workCalendarFile: "w.json" });
-	});
-
-	it("splits the work calendars at the commas, the blanks dropped", async () => {
-		const { svc, now } = service();
-		await svc.setWorkCalendars(" Work ,, Team ,");
-		expect(now().workCalendarTitles).toEqual(["Work", "Team"]);
-		await svc.setWorkCalendars("");
-		expect(now().workCalendarTitles).toEqual([]);
 	});
 
 	it("puts the saved secret in its field and saves what is typed, keeping the rest of Google's", async () => {

@@ -9,14 +9,7 @@ const API = "https://www.googleapis.com/calendar/v3";
 /** How long the list of calendars is taken as it is: it changes when a calendar is added in Google, rarely. */
 const LIST_KEPT_MS = 30 * 60_000;
 const PAGE_SIZE = "250";
-const DEFAULT_COLOR = "#4285F4";
 const UNTITLED = "(untitled)";
-
-export interface GoogleCalendarInfo {
-	readonly id: string;
-	readonly title: string;
-	readonly color: string;
-}
 
 interface CalendarListEntry {
 	id: string;
@@ -63,7 +56,7 @@ export class GoogleCalendarApi {
 		const account = list.find((c) => c.primary)?.id ?? list[0]?.id ?? "";
 		try {
 			const perCalendar = await Promise.all(list.map((c) => this.eventsOf(c, account, start, end)));
-			const calendars = list.map((c) => ({ title: c.summary, account, calendarId: c.id, color: c.backgroundColor ?? DEFAULT_COLOR }));
+			const calendars = list.map((c) => ({ title: c.summary, account, calendarId: c.id, color: c.backgroundColor ?? null }));
 			return { account, calendars, events: perCalendar.flat() };
 		} catch (e) {
 			// A calendar removed in Google answers 404: the list is asked again, not kept failing for half an hour.
@@ -72,17 +65,12 @@ export class GoogleCalendarApi {
 		}
 	}
 
-	/** The settings page: always asked afresh, and kept for the fetches after it. */
-	async listCalendars(): Promise<GoogleCalendarInfo[]> {
-		return (await this.calendarList(true)).map((c) => ({ id: c.id, title: c.summary, color: c.backgroundColor ?? DEFAULT_COLOR }));
-	}
-
 	/** Kept per login for LIST_KEPT_MS; fetches at once share one request. */
-	private calendarList(fresh = false): Promise<CalendarListEntry[]> {
+	private calendarList(): Promise<CalendarListEntry[]> {
 		const { clientId, refreshToken } = this.settings.get().google;
 		const key = JSON.stringify([clientId, refreshToken]);
 		const now = this.clock.now().getTime();
-		if (!fresh && this.list && this.list.key === key && now - this.list.at < LIST_KEPT_MS) return this.list.calendars;
+		if (this.list && this.list.key === key && now - this.list.at < LIST_KEPT_MS) return this.list.calendars;
 		const calendars = this.get<{ items?: CalendarListEntry[] }>(`${API}/users/me/calendarList`, {}).then((data) => data.items ?? []);
 		const list = { key, at: now, calendars };
 		this.list = list;
@@ -116,7 +104,7 @@ export class GoogleCalendarApi {
 				end: dateOf(e.end),
 				allDay: !e.start.dateTime,
 				calendar: calendar.summary,
-				color: calendar.backgroundColor ?? DEFAULT_COLOR,
+				color: calendar.backgroundColor ?? null,
 				source: "google",
 				account,
 				calendarId: calendar.id,

@@ -774,8 +774,8 @@ export interface CalendarEvent {
 	readonly end: Date;
 	readonly allDay: boolean;
 	readonly calendar: string;
-	/** `#RRGGBB`. The source supplies one; a source without colors falls back to a per-calendar default. */
-	readonly color: string;
+	/** `#RRGGBB` as the calendar's file gives it; null when it gives none, and the frontend picks the source's own. */
+	readonly color: string | null;
 	readonly source: CalendarSource;
 	/** The calendar's account as its writer knows it (an email for Google and Exchange); null when the writer does not say. */
 	readonly account: string | null;
@@ -891,24 +891,12 @@ export interface CalendarPoll {
 	stop(): void;
 }
 
-/** A calendar of the Google account, as the settings tab lists it. */
-export interface CalendarOption {
-	readonly id: string;
-	readonly title: string;
-	readonly color: string;
-}
-
-/** The Google account as the settings tab sees it: logged in or not, and which of its calendars the timeline shows. */
+/** The Google account as the settings tab sees it: logged in or not. Which calendars show is CalendarService's. */
 export interface GoogleAccount {
 	isLoggedIn(): boolean;
 	/** Opens the browser for Google's consent; the token syncs to the other devices. */
 	login(): Promise<string>;
 	logout(): Promise<void>;
-	/** Asked afresh each time. */
-	listCalendars(): Promise<readonly CalendarOption[]>;
-	/** Shown calendar ids: empty means every calendar selected in Google. */
-	setShown(all: readonly CalendarOption[], id: string, shown: boolean): Promise<void>;
-	isShown(id: string): boolean;
 }
 
 /** What the work calendar needs set up by hand: the Scriptable script, and the export on the phone. */
@@ -961,8 +949,6 @@ export interface SettingsForm {
 	readonly googleClientId: string;
 	readonly refreshSeconds: number;
 	readonly workCalendarFile: string;
-	/** The work file's calendars to take, comma-separated. */
-	readonly workCalendars: string;
 }
 
 /** A field the service fills with a secret and takes typed text from: the UI never asks for the secret. */
@@ -1019,6 +1005,4 @@ export interface SettingsService {
 	/** The saved client secret goes into the field, and what is typed there is saved. */
 	bindClientSecret(field: SecretField): void;
 	setWorkCalendarFile(path: string): Promise<void>;
-	/** The titles between the commas, trimmed, the empty ones dropped. */
-	setWorkCalendars(text: string): Promise<void>;
 }

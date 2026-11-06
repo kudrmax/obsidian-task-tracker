@@ -58,7 +58,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	});
 	return {
 		...core,
-		google: new GoogleAccountService(auth, googleApi, settings),
+		google: new GoogleAccountService(auth),
 		work,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),

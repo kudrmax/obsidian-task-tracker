@@ -169,8 +169,7 @@ export class QuickEntrySession {
 		if (!call) return void (job.kind === "section" && (await this.view.fresh()));
 		switch (call.method) {
 			case "createInPlace": {
-				const [text, priority, place, repeat, labels] = call.args;
-				const created = await this.tasks.createInPlace(text, priority, place, place.kind === "slot" ? undefined : repeat, labels);
+				const created = await this.tasks.createInPlace(...call.args);
 				return this.view.fresh((coming) => this.entry.shown(job.id, created, coming));
 			}
 			case "edit": {
