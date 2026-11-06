@@ -126,11 +126,11 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card","menu","picker","picked"]},"look":{"editor":"enum","default":"plain","options":["plain","open","folded","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card","menu","picker","picked"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'backlog';
-    const look = this.props.look ?? 'plain';
+    const look = this.props.look ?? 'project';
     const light = this.props.theme === 'light';
     const c = light
       ? { bg: '#FFFFFF', clear: 'rgba(255,255,255,0)', card: '#F2F2F2', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', pull: '#6C6C70', line: '#E5E5EA', accent: '#8A5CF5', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', shadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', control: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', sep: '#D1D1D6', gap: '#E5E5EA', tile: 'rgba(0,0,0,0.05)', danger: '#FF3B30', mark: '#FF9500' }
@@ -171,6 +171,16 @@ class Component extends DCLogic {
     const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
     const pos = (left, top) => 'left: ' + left + 'px; top: ' + top + 'px;';
 
+    const head = (g, top, folded) => ({
+      isCard: false, isHead: true, top, name: g.name,
+      ink: g.none ? c.muted : c.pull,
+      plus: false,
+      open: !g.none,
+      fold: true,
+      turn: folded ? 0 : 90,
+      hasCount: folded,
+      count: String(g.count)
+    });
     const inboxRows = (list) => list.forEach((t, i) => rows.push(card(t, 166 + i * STEP)));
 
     if (view === 'backlog') {
@@ -181,17 +191,8 @@ class Component extends DCLogic {
       const firstOpen = 0;
       groups.forEach((g, gi) => {
         if (gi > 0) y += GAP;
-        const folded = look === 'folded' && gi !== firstOpen;
-        rows.push({
-          isCard: false, isHead: true, top: y, name: g.name,
-          ink: g.none ? c.muted : c.pull,
-          plus: !g.none,
-          open: look === 'open' && !g.none,
-          fold: look === 'folded',
-          turn: folded ? 0 : 90,
-          hasCount: look === 'folded' && folded,
-          count: String(g.count)
-        });
+        const folded = gi !== firstOpen;
+        rows.push(head(g, y, folded));
         if (gi === 0) marks.push(ring(10, y, 175, HEAD, 6, '← Группа проекта', pos(200, y + 3)));
         y += HEAD;
         if (!folded) g.tasks.forEach((t) => { rows.push(card(t, y)); y += STEP; });
@@ -225,9 +226,10 @@ class Component extends DCLogic {
       let y = 501;
       groups.forEach((g, gi) => {
         if (gi > 0) y += GAP;
-        rows.push({ isCard: false, isHead: true, top: y, name: g.name, ink: g.none ? c.muted : c.pull, plus: !g.none, open: false, fold: false, turn: 90, hasCount: false, count: '' });
+        const folded = gi !== 0;
+        rows.push(head(g, y, folded));
         y += HEAD;
-        g.tasks.forEach((t) => { rows.push(card(t, y)); y += STEP; });
+        if (!folded) g.tasks.forEach((t) => { rows.push(card(t, y)); y += STEP; });
       });
       if (picked) {
         rows[1] = card(inbox[1], 166 + STEP, { hasIcon: true });

@@ -36,8 +36,9 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
     `TODOs Tasks.md` into that project's note (the end of its `## Tasks`), keeping where it is in the
-    lane; «No project» moves it back into the file. A project group has no plus of its own: new tasks come from the
-    plus at the bottom right, as everywhere.
+    lane; «No project» moves it back into the file. A project group has no plus of its own: the plus at the bottom right,
+    taken to a project group (the way it is taken to any place), writes the new task into that project's note.
+    Everything inside a project group is that project's: tasks, their subtasks and descriptions.
 12. **Project tasks live under `## Tasks`.** Only checkboxes in the note's `## Tasks` section (down to the next heading of
     the same or a higher level) are project tasks; every other checkbox is a plain checklist the plugin never reads. A new
     or moved-in task is written at the end of that section; a note without one gets it at its end on the first write.
@@ -60,7 +61,6 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
 - The project mark on a card and the task menu's «Project»: boards, phone and desktop, dark and light.
-- How the plus at the bottom right writes a new task straight into a project, if at all.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
 

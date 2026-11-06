@@ -2306,33 +2306,9 @@
    "page": "components",
    "title": "Компонент экрана задачи на весь экран, Mac (его показывает «Задача на весь экран»)"
   },
-  "Proj1V1.dc.html": {
-   "x": 0,
-   "y": 0,
-   "w": 3508,
-   "h": 1340,
-   "page": "projects",
-   "title": "Backlog по проектам. Вариант 1 — как заголовок секции"
-  },
-  "Proj1V2.dc.html": {
-   "x": 0,
-   "y": 1460,
-   "w": 3508,
-   "h": 1340,
-   "page": "projects",
-   "title": "Backlog по проектам. Вариант 2 — со стрелкой в заметку"
-  },
-  "Proj1V3.dc.html": {
-   "x": 0,
-   "y": 2920,
-   "w": 3508,
-   "h": 1340,
-   "page": "projects",
-   "title": "Backlog по проектам. Вариант 3 — свёрнутые проекты"
-  },
   "Proj2V1.dc.html": {
    "x": 0,
-   "y": 4380,
+   "y": 1460,
    "w": 3508,
    "h": 1340,
    "page": "projects",
@@ -2340,7 +2316,7 @@
   },
   "Proj2V2.dc.html": {
    "x": 0,
-   "y": 5840,
+   "y": 2920,
    "w": 3508,
    "h": 1340,
    "page": "projects",
@@ -2348,7 +2324,7 @@
   },
   "Proj3Flow.dc.html": {
    "x": 0,
-   "y": 7300,
+   "y": 4380,
    "w": 1378,
    "h": 2340,
    "page": "projects",
@@ -2369,6 +2345,14 @@
    "h": 800,
    "page": "components",
    "title": "Компонент экрана проектов на Mac (его показывают доски «Проекты»)"
+  },
+  "Proj1.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 3508,
+   "h": 1340,
+   "page": "projects",
+   "title": "Backlog по проектам"
   }
  },
  "createdOnFiles": {
@@ -2789,7 +2773,7 @@
    "kind": "title1",
    "maxW": 3508,
    "page": "projects",
-   "text": "Проекты: Backlog по проектам, метка на карточке, строка Project в меню (на обсуждении)",
+   "text": "Проекты: Backlog по проектам (решено 07.11), метка на карточке, строка Project в меню",
    "x": 0,
    "y": -300
   }
@@ -3084,9 +3068,7 @@
   "FocusDesk.dc.html",
   "FocusFlow.dc.html",
   "FocusDeskBoard.dc.html",
-  "Proj1V1.dc.html",
-  "Proj1V2.dc.html",
-  "Proj1V3.dc.html",
+  "Proj1.dc.html",
   "Proj2V1.dc.html",
   "Proj2V2.dc.html",
   "Proj3Flow.dc.html",

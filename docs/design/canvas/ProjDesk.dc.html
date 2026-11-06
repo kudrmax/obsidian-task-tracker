@@ -84,11 +84,11 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card"]},"look":{"editor":"enum","default":"plain","options":["plain","open","folded","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"backlog","options":["backlog","card"]},"look":{"editor":"enum","default":"plain","options":["project","icon","line"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":1200,"height":800}}'>
 class Component extends DCLogic {
   renderVals() {
     const view = this.props.view ?? 'backlog';
-    const look = this.props.look ?? 'plain';
+    const look = this.props.look ?? 'project';
     const light = this.props.theme === 'light';
     const c = light
       ? { bg: '#FFFFFF', chrome: '#F6F6F6', chromeLine: '#E3E3E3', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', pull: '#6C6C70', accent: '#8A5CF5', line: '#E5E5EA', hourLine: '#EFEFF4', now: '#FF3B30', plusShadow: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', mark: '#FF9500', ev: { bg: 'rgba(0,122,255,0.13)', ink: '#0058B8', bar: '#007AFF' }, ev2: { bg: 'rgba(52,199,89,0.16)', ink: '#1F7735', bar: '#34C759' } }
@@ -116,8 +116,8 @@ class Component extends DCLogic {
       let y = 0;
       groups.forEach((g, gi) => {
         if (gi > 0) y += GAP;
-        const folded = look === 'folded' && gi !== 0;
-        back.push({ isCard: false, isHead: true, top: y, name: g.name, ink: g.none ? c.muted : c.pull, plus: !g.none, open: look === 'open' && !g.none, fold: look === 'folded', turn: folded ? 0 : 90, hasCount: folded, count: String(g.tasks.length) });
+        const folded = gi !== 0;
+        back.push({ isCard: false, isHead: true, top: y, name: g.name, ink: g.none ? c.muted : c.pull, plus: false, open: !g.none, fold: true, turn: folded ? 0 : 90, hasCount: folded, count: String(g.tasks.length) });
         if (gi === 0) marks.push(ring(54, 472 + y, 520, HEAD, 6, '← Группа проекта', pos(586, 472 + y + 3)));
         y += HEAD;
         if (!folded) g.tasks.forEach((t) => { back.push(card(t, y)); y += STEP; });
