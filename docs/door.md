@@ -177,6 +177,12 @@ client secret, which the phone does not edit.
 labels, when a touch becomes a drag (`longPressMs`) and the hour another day opens at (`scrollToHour`). Every frontend's
 screen behaves by them alike. `onChange` is the host's: it watches `data.json`.
 
+### `timeline.zoomLevels()`: the zoom's levels
+
+The hour's heights a pinch settles on, `[{ hourPx }]`, as `data.json` keeps them under `zoomLevels`; `DEFAULT_ZOOM_LEVELS`
+when it keeps none or one doesn't read (a height not a positive number). The settings tab of the plugin writes them; the
+host hands them to `rules.levelsFor` with its screen's whole-day height.
+
 ### `history.*`: undo
 
 The steps live with the host. Every write that is a step answers `history`; hand it in again in the next context.
@@ -257,8 +263,16 @@ What the plugin's UI calls itself, by the names in `contracts.ts`: `nextProgress
 `placesInGap`; the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
 `fill`, its date and dot's `meta`), `inkOf`, `contrast`, `eventHex(event)`, `bgAlphaFor(source)`, `eventColors(hex,
 bgAlpha, theme)` (an event's `bg`, `bar`, `text`); `dayTitle(date, relation, today)` (`Today`, `Tue, 3 Nov`) and
-`dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `stackTasks(tasks, events, hourPx, card, insets)` (each task card's top, height and left edge on the timeline: they never share the width), `overlayLeft(level, insets)`, `eventLeft(level, insets)`, `stackCorner(box, slotStart, span)` (what a stack card shows on the right: its start when stacked, its duration when shorter than one; null for neither), `timeParts`, `durationParts`; `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
-`DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA` and `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `stackTasks(tasks, events, hourPx, card, insets)` (each task card's top, height and left edge on the timeline: they never share the width), `overlayLeft(level, insets)`, `eventLeft(level, insets)`, `stackCorner(box, slotStart, span)` (what a stack card shows on the right: its start when stacked, its duration when shorter than one; null for neither), `timeParts`, `durationParts`; a past event's paint: `pastEventPaint(ground, text, theme)` (`{ bg, bar, text }` as
+`#RRGGBB`: the screen's ground mixed towards its text, 1.5% and 12.5% dark, 1.2% and 10% light, as the plugin's
+`--tc-event-past-*` tokens); the timeline's zoom: `parseZoomLevels(text)` (`"28, 56"` → `[{ hourPx: 28 }, { hourPx: 56 }]`,
+`null` for a text that doesn't read), `formatZoomLevels(levels)`, `levelsFor(wholeDayPx, levels)` (the levels a pinch
+moves between at this screen's height, the whole day first), `gridAt(hourPx, measures)` (`measures`:
+`{ divisions, labelGap, tickMinutes, tickGap }`, the frontend's own; answers `{ labels, lines }`, minutes),
+`gridMarks(grid, dayHours)` (every line between the hours: `{ minute, label }`, `minute` from the day's start, `label`
+`":30"` or `null`); `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
+`DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
+`DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host

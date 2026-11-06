@@ -72,3 +72,12 @@ export function gridMarks(grid: Grid, dayHours: number): GridMark[] {
 	}
 	return marks;
 }
+
+/** The levels `data.json` keeps under `zoomLevels`, each only its height; the defaults when it keeps none, or one doesn't read. */
+export function zoomLevelsOf(saved: unknown): ZoomLevel[] {
+	const kept = saved !== null && typeof saved === "object" ? (saved as { zoomLevels?: unknown }).zoomLevels : undefined;
+	if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
+	const levels = kept.map((level) => (level !== null && typeof level === "object" ? (level as { hourPx?: unknown }).hourPx : undefined));
+	if (!levels.every((hourPx): hourPx is number => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
+	return levels.map((hourPx) => ({ hourPx }));
+}

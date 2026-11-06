@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ScreenView, TaskItem } from "../../core/application/contracts";
 import { callDoor, callDoorJson, type DoorAnswer, type DoorContext, DOOR_COVERAGE, doorMethods, HOST_TASK_METHODS, plainJson } from "../../core/application/PhoneCalls";
 import { ScreenSettingsImpl } from "../../core/application/ScreenSettingsImpl";
+import { DEFAULT_ZOOM_LEVELS } from "../../core/application/timelineZoom";
 import { SettingsServiceImpl } from "../../core/application/SettingsServiceImpl";
 import type { Clock } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
@@ -280,7 +281,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -289,6 +290,19 @@ describe("the door's screen settings", () => {
 	it("answer what ScreenSettingsStore gives a screen over the same settings", () => {
 		const door = callDoor("screenSettings.get", [], { tasks: null, settings: DATA, nowMs: NOW.getTime() });
 		expect(door).toEqual({ ok: true, result: wire(new ScreenSettingsImpl(new FakeSettingsStore(settingsFrom(JSON.parse(DATA)))).get()) });
+	});
+});
+
+describe("the door's timeline", () => {
+	const levels = (settings?: string) => callDoor("timeline.zoomLevels", [], { tasks: null, settings, nowMs: NOW.getTime() });
+
+	it("answers the zoom's levels data.json keeps", () => {
+		expect(levels(JSON.stringify({ zoomLevels: [{ hourPx: 40 }, { hourPx: 80 }] }))).toEqual({ ok: true, result: [{ hourPx: 40 }, { hourPx: 80 }] });
+	});
+
+	it("answers the defaults for no data.json, or one without levels that read", () => {
+		const defaults = { ok: true, result: wire(DEFAULT_ZOOM_LEVELS) };
+		for (const settings of [undefined, "", DATA, JSON.stringify({ zoomLevels: [{ hourPx: -1 }] })]) expect(levels(settings)).toEqual(defaults);
 	});
 });
 
@@ -492,6 +506,13 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.stackCorner", { stacked: true, hiddenDuration: false }, 600, { start: 600, end: null }),
 		plain("rules.timeParts", 605),
 		plain("rules.durationParts", 90),
+		plain("rules.pastEventPaint", "#000000", "#DADADA", "dark"),
+		plain("rules.parseZoomLevels", "28, 56"),
+		plain("rules.formatZoomLevels", [{ hourPx: 28 }, { hourPx: 56 }]),
+		plain("rules.levelsFor", 30, [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }]),
+		plain("rules.gridAt", 192, { divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16 }),
+		plain("rules.gridMarks", { labels: 30, lines: 15 }, 2),
+		plain("timeline.zoomLevels"),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],
