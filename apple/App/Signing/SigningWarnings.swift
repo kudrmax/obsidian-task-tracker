@@ -4,11 +4,11 @@ import UserNotifications
 /// Notices set ahead before the signature runs out, so they come even if the app is not opened. Set again whenever
 /// the app opens: a fresh install brings a new signature.
 enum SigningWarnings {
-    private static let prefix = "signing#"
-
     static func schedule(now: Date = Date()) async {
         let center = UNUserNotificationCenter.current()
-        let old = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
+        let old = await center.pendingNotificationRequests().map(\.identifier).filter {
+            if case .signing = NoticeID(identifier: $0) { true } else { false }
+        }
         center.removePendingNotificationRequests(withIdentifiers: old)
         guard let expiration = AppSignature.expiration else { return }
         for (index, warning) in SigningExpiry.warnings(expiration: expiration, now: now).enumerated() {
@@ -18,7 +18,7 @@ enum SigningWarnings {
             content.sound = nil
             content.interruptionLevel = .active
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: warning.fire.timeIntervalSince(now), repeats: false)
-            try? await center.add(UNNotificationRequest(identifier: "\(prefix)\(index)", content: content, trigger: trigger))
+            try? await center.add(UNNotificationRequest(identifier: NoticeID.signing(index).identifier, content: content, trigger: trigger))
         }
     }
 }

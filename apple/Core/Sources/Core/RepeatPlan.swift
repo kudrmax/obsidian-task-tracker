@@ -2,24 +2,26 @@ import Foundation
 
 /// One delivery of a reminder's quiet notification.
 public struct PlannedNotification: Equatable, Hashable, Sendable {
-    /// `"<reminder id>#<minutes after the start>"`, and the meeting it offers to wait out: the same delivery keeps it
-    /// between plans, and a meeting moved or gone sets the delivery again.
-    public let identifier: String
     public let reminderID: String
+    /// After the task's start.
+    let minutes: Int
     public let fire: Date
     public let after: AfterEvent?
 
-    init(identifier: String, reminderID: String, fire: Date, after: AfterEvent? = nil) {
-        self.identifier = identifier
+    init(reminderID: String, minutes: Int, fire: Date, after: AfterEvent? = nil) {
         self.reminderID = reminderID
+        self.minutes = minutes
         self.fire = fire
         self.after = after
     }
 
+    /// The same delivery keeps its name between plans; a meeting moved or gone makes it another one, set again.
+    public var id: NoticeID { .reminder(reminderID: reminderID, minutes: minutes, offer: after.map(NoticeID.Offer.init)) }
+    public var identifier: String { id.identifier }
+
     func offering(_ after: AfterEvent?) -> PlannedNotification {
         guard let after else { return self }
-        let until = Int(after.until.timeIntervalSince1970)
-        return PlannedNotification(identifier: "\(identifier)#after \(until) \(after.title)", reminderID: reminderID, fire: fire, after: after)
+        return PlannedNotification(reminderID: reminderID, minutes: minutes, fire: fire, after: after)
     }
 }
 
@@ -51,7 +53,7 @@ public enum RepeatPlan {
         for reminder in reminders where seen.insert(reminder.id).inserted {
             if reminder.kind == .live, reminder.start <= now {
                 if !told.contains(reminder.id), now < reminder.dayEnd {
-                    firsts.append(PlannedNotification(identifier: "\(reminder.id)#0", reminderID: reminder.id, fire: now))
+                    firsts.append(PlannedNotification(reminderID: reminder.id, minutes: 0, fire: now))
                 }
                 continue
             }
@@ -60,7 +62,7 @@ public enum RepeatPlan {
                 let fire = reminder.start.addingTimeInterval(Double(offset) * 60)
                 guard fire < reminder.dayEnd else { break }
                 guard fire > now else { continue }
-                let planned = PlannedNotification(identifier: "\(reminder.id)#\(offset)", reminderID: reminder.id, fire: fire)
+                let planned = PlannedNotification(reminderID: reminder.id, minutes: offset, fire: fire)
                 if offset == offsets.first { firsts.append(planned) } else { repeats.append(planned) }
             }
         }
@@ -69,6 +71,6 @@ public enum RepeatPlan {
     }
 
     private static func nearest(_ a: PlannedNotification, _ b: PlannedNotification) -> Bool {
-        a.fire == b.fire ? a.identifier < b.identifier : a.fire < b.fire
+        a.fire == b.fire ? (a.reminderID, a.minutes) < (b.reminderID, b.minutes) : a.fire < b.fire
     }
 }
