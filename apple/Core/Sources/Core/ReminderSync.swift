@@ -235,8 +235,9 @@ public actor ReminderSync {
     /// The phone's calendars into the vault for the plugin, before the meetings are read back. Without access the file is
     /// left as it is; a write that fails leaves the reminders to be set all the same.
     private func exportCalendars(at: Date) async {
-        guard let text = try? await calendar.export(now: at), CalendarExport.adds(text, over: vault.read(path: CalendarExport.path), at: at) else { return }
-        try? vault.write(path: CalendarExport.path, text: text)
+        guard let text = try? await calendar.export(now: at), let path = try? rules.iphoneCalendarFile(),
+              CalendarExport.adds(text, over: vault.read(path: path), at: at) else { return }
+        try? vault.write(path: path, text: text)
     }
 
     /// The meetings from now to the last reminder's day end, as the plugin's calendar shows them. Meetings that cannot be
@@ -261,6 +262,7 @@ public actor ReminderSync {
         switch error {
         case VaultError.noAccess: "No access to the vault folder: choose it in the app"
         case VaultError.tasksFileMissing(let path): "No tasks file “\(path)” in the vault folder"
+        case VaultError.noTasksFile: VaultError.noTasksFileMessage
         case PhoneCoreError.scriptFailed(let reason): "Couldn't read the tasks: \(reason)"
         default: "Couldn't read the tasks file: \(error.localizedDescription)"
         }

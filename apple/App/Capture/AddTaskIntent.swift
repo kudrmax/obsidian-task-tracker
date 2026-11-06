@@ -10,7 +10,7 @@ struct AddTaskIntent: AppIntent {
     @Parameter(title: "Task", requestValueDialog: "What's the task?") var text: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        switch AppServices.shared.capture(list: .inbox, text: text, recording: nil) {
+        switch AppServices.shared.capture(list: CaptureListOption.inbox, text: text, recording: nil) {
         case .saved: return .result(dialog: "Added to Inbox.")
         case .failed(let reason): throw AddTaskError(reason: reason)
         }

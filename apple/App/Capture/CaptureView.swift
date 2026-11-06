@@ -3,7 +3,8 @@ import SwiftUI
 
 /// A new task: typed, recorded, or both, into one of the four lists. Once added, the screen is empty for the next one.
 struct CaptureView: View {
-    @State private var list = CaptureListOption.inbox
+    @State private var list = CaptureListOption(list: CaptureListOption.inbox)
+    private let options = CaptureListOption.options(AppServices.shared.captureLists)
     @State private var text = ""
     @State private var recorder = VoiceRecorder()
     @State private var failure: String?
@@ -16,7 +17,7 @@ struct CaptureView: View {
         ScrollView {
             VStack(spacing: Layout.margin) {
                 Picker("List", selection: $list) {
-                    ForEach(CaptureListOption.allCases, id: \.self) { option in
+                    ForEach(options, id: \.self) { option in
                         Text(option.title).tag(option)
                     }
                 }
@@ -88,7 +89,7 @@ struct CaptureView: View {
         defer { sending = false }
         let recording = recorder.take()
         let typed = text
-        let target = list.core
+        let target = list.list
         let tag = AppSettings.recordingTag
         let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag) }.value
         switch outcome {
