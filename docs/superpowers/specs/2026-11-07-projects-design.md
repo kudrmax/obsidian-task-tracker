@@ -16,7 +16,7 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    notes, that is his notes' business; the plugin ignores it.
 3. **Every task stays in `TODOs Tasks.md`.** One file, as now: the lane, order, sections, the morning rules and the
    iPhone app work unchanged. A project's tasks are lines of this file like any other.
-4. **A project is a note tagged `#project`**, anywhere in the vault (Max hardly uses folders); the tag counts in the
+4. **A project is a note with the project tag** (a setting, «Project tag», `#project` by default), anywhere in the vault (Max hardly uses folders); the tag counts in the
    note's properties or in its text. The note holds free text: why, thoughts, observations. The project's name is the
    note's name.
 5. **A task belongs to a project by a link to its note** at the end of the line: `- [ ] Сходить на языковой обмен
@@ -58,6 +58,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     plugin; only that project's tasks, without the project mark (the whole block is the project), with «No tasks» where a
     column is empty. Everything done in it writes `TODOs Tasks.md` by the visible-neighbour rule of decision 8, and a new
     task gets the project's link. Board: `docs/design/canvas/Proj4V2.dc.html` (chosen over the lanes-as-a-list variant).
+    The block appears by itself at the end of every project note, as Obsidian's backlinks-in-document do: only shown,
+    nothing is written into the note.
 
 Rejected on the way: tasks written in the project notes, read from many files. It broke manual order (two files have no
 common «above»), sections shared across files and the one-file iPhone app; moving a taken task into the file and back
@@ -75,7 +77,6 @@ fixed that but made lines travel between files. One file wins.
 ## Open (technical, for the backend)
 
 - Where the switch of grouping is: board.
-- How the block gets into a project note.
 
 ## Ideas for later
 
