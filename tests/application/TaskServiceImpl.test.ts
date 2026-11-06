@@ -803,6 +803,42 @@ describe("lineOf", () => {
 	});
 });
 
+describe("find", () => {
+	const TREE = "## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\t- [x] B1\n\t- [ ] B2\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	it("gives the task at its place with every subtask, a subtask with the text of its task", async () => {
+		const { svc } = setup(TREE);
+		const b = (await svc.dayView(T)).list.find((i) => i.text === "B")!;
+		const found = await svc.find(b.key, b.text);
+		expect(found?.allSubtasks.map((s) => [s.text, s.status])).toEqual([["B1", "done"], ["B2", "todo"]]);
+		expect((await svc.find(b.allSubtasks[1].key, "B2"))?.parentText).toBe("B");
+	});
+
+	it("follows the task to where it moved, its line the same", async () => {
+		const { svc } = setup(TREE);
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.remove(a.key);
+		expect((await svc.find(b.key, b.text))?.key.index).toBe(0);
+	});
+
+	it("keeps the task at its place whose text is the one asked for, its other fields changed", async () => {
+		const { svc } = setup(TREE);
+		const b = (await svc.dayView(T)).list[1];
+		await svc.setPriority(b.key, "p1");
+		expect((await svc.find(b.key, "B"))?.priority?.prefix).toBe("p1");
+		await svc.rename((await svc.find(b.key, "B"))!.key, "Bee");
+		expect((await svc.find(b.key, "Bee"))?.text).toBe("Bee");
+	});
+
+	it("gives null once the task is gone from its place and its line from the file", async () => {
+		const { svc } = setup(TREE);
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.setStatus(a.key, "done");
+		expect(await svc.find(a.key, a.text)).toBeNull();
+		expect((await svc.find(b.key, b.text))?.text).toBe("B");
+	});
+});
+
 describe("applyAll", () => {
 	it("changes several tasks in one write", async () => {
 		const { store, svc } = setup("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n- [ ] C\n\n## Soon\n\n## Done\n");

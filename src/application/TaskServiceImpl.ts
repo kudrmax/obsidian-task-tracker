@@ -8,7 +8,7 @@ import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch 
 import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type ReminderKind, type SectionKey, type Slot, type TaskStatus } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
-import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
+import { flatten, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
 import {
 	StaleTaskError,
@@ -354,6 +354,17 @@ export class TaskServiceImpl implements TaskService {
 
 	async remove(key: TaskKey): Promise<void> {
 		await this.mutate((doc) => ops.remove(doc, this.entryOf(doc, key)));
+	}
+
+	async find(key: TaskKey, text: string): Promise<TaskItem | null> {
+		const { doc, today } = await this.readNormalized();
+		const atPlace = doc.find(key.section, key.index, key.path);
+		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
+		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
+		if (!entry) return null;
+		const parent = entry.path.length > 0 ? doc.find(entry.section, entry.index, entry.path.slice(0, -1)) : undefined;
+		const settings = this.settings.get();
+		return toItem(entry, today, itemLevels(this.levels(settings), usableLabels(settings.labels)), parent?.task.text ?? null);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {

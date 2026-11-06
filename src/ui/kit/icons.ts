@@ -41,6 +41,7 @@ const DRAWINGS = {
 	label: { d: "M3.5 4.5a1 1 0 0 1 1-1h7.1a1 1 0 0 1 .7.3l8.4 8.4a1 1 0 0 1 0 1.4l-7.1 7.1a1 1 0 0 1-1.4 0l-8.4-8.4a1 1 0 0 1-.3-.7z" },
 	removeSection: { d: "M4 6h9 M4 12h9 M4 18h9 M16 9l5 5 M21 9l-5 5" },
 	subtask: { d: "M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4" },
+	fullScreen: { d: "M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5" },
 	openFile: { d: "M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" },
 	check: { d: "M5 12.5l4.5 4.5L19 7" },
 	google: { d: "M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5H7z" },

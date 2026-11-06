@@ -144,6 +144,7 @@ export class DemoTaskService implements TaskService {
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			labels: [],
 			subtasks: [],
+			allSubtasks: [],
 			progress: null,
 			collapsed: false,
 			parentText: null,
@@ -160,14 +161,14 @@ export class DemoTaskService implements TaskService {
 		return this.sections[section].map((_, i) => this.item(section, i));
 	}
 
-	private find(key: TaskKey): DemoTask {
+	private taskOf(key: TaskKey): DemoTask {
 		const t = this.sections[key.section][key.index];
 		if (!t || this.raw(t) !== key.raw) throw new StaleTaskError();
 		return t;
 	}
 
 	private take(key: TaskKey): DemoTask {
-		const t = this.find(key);
+		const t = this.taskOf(key);
 		this.sections[key.section].splice(key.index, 1);
 		return t;
 	}
@@ -317,7 +318,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
-		const t = this.find(key);
+		const t = this.taskOf(key);
 		t.text = draft.text.trim() || t.text;
 		t.priority = draft.priority;
 		if (draft.repeat !== undefined) t.repeat = draft.repeat;
@@ -331,12 +332,12 @@ export class DemoTaskService implements TaskService {
 			const t = this.take(key);
 			t.status = status;
 			this.sections.done.unshift(t);
-		} else this.find(key).status = status;
+		} else this.taskOf(key).status = status;
 		this.changed();
 	}
 
 	async setDueDate(key: TaskKey, date: LocalDate | null): Promise<void> {
-		this.find(key).dueDate = date;
+		this.taskOf(key).dueDate = date;
 		this.changed();
 	}
 
@@ -348,12 +349,12 @@ export class DemoTaskService implements TaskService {
 	async unfoldAbove(): Promise<void> {}
 
 	async setPriority(key: TaskKey, priority: string | null): Promise<void> {
-		this.find(key).priority = priority;
+		this.taskOf(key).priority = priority;
 		this.changed();
 	}
 
 	async setRepeat(key: TaskKey, rule: RepeatRule | null): Promise<void> {
-		this.find(key).repeat = rule;
+		this.taskOf(key).repeat = rule;
 		this.changed();
 	}
 
@@ -366,12 +367,12 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async setDescription(key: TaskKey, markdown: string): Promise<void> {
-		this.find(key).description = markdown.trim() === "" || markdown.trim() === DESCRIPTION_TEMPLATE.trim() ? null : markdown;
+		this.taskOf(key).description = markdown.trim() === "" || markdown.trim() === DESCRIPTION_TEMPLATE.trim() ? null : markdown;
 		this.changed();
 	}
 
 	async rename(key: TaskKey, text: string): Promise<void> {
-		this.find(key).text = text;
+		this.taskOf(key).text = text;
 		this.changed();
 	}
 
@@ -381,12 +382,19 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
-		this.find(key);
+		this.taskOf(key);
 		return key.index;
 	}
 
+	async find(key: TaskKey, text: string): Promise<TaskItem | null> {
+		const tasks = this.sections[key.section];
+		const at = tasks[key.index];
+		if (!at || (this.raw(at) !== key.raw && at.text !== text)) return null;
+		return this.item(key.section, key.index);
+	}
+
 	async moveBefore(key: TaskKey, before: TaskKey | null, date: LocalDate): Promise<void> {
-		if (before) this.find(before);
+		if (before) this.taskOf(before);
 		const t = this.take(key);
 		if (!before) this.sections[date === this.today() ? "now" : "soon"].push(t);
 		else {
@@ -397,7 +405,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async setSlot(key: TaskKey, slot: Slot): Promise<void> {
-		const t = this.find(key);
+		const t = this.taskOf(key);
 		t.slot = slot;
 		if (key.section === "now" && slot.date !== this.today()) {
 			this.sections.now.splice(key.index, 1);
@@ -407,20 +415,20 @@ export class DemoTaskService implements TaskService {
 	}
 
 	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
-		const t = this.find(key);
+		const t = this.taskOf(key);
 		if (place) await this.moveBefore(key, place.before, place.date);
 		t.slot = null;
 		this.changed();
 	}
 
 	async moveToList(key: TaskKey, date: LocalDate): Promise<void> {
-		this.find(key).dueDate = date;
+		this.taskOf(key).dueDate = date;
 		if (date === this.today()) this.sections.now.push(this.take(key));
 		this.changed();
 	}
 
 	async moveToSoon(key: TaskKey, date: LocalDate): Promise<void> {
-		this.find(key).dueDate = null;
+		this.taskOf(key).dueDate = null;
 		if (date === this.today()) this.sections.soon.push(this.take(key));
 		this.changed();
 	}

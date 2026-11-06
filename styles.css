@@ -406,14 +406,23 @@ body {
 	--tc-source-row: 56px;
 	--tc-source-icon: var(--tc-icon-l);
 
-	/* Sizes: a description's own screen over the view */
+	/* Sizes: a task over the whole view */
 	--tc-sheet-bar: 44px;
 	--tc-sheet-side: var(--tc-space-20);
-	/* A description's own screen: the title over the text; the text is Obsidian's, in its font, size, spacing and ink. */
+	/* A task over the whole view: its task's name, the title, the subtasks, the description; the text is Obsidian's, in its font, size, spacing and ink. */
 	--tc-font-desc-title: var(--tc-text-22);
 	--tc-leading-desc-title: 28px;
 	--tc-desc-title-gap: var(--tc-space-12);
 	--tc-desc-top: var(--tc-space-8);
+	/* On the desktop the column stands in the middle, as a note's text does. */
+	--tc-full-w: 640px;
+	--tc-full-parent-h: var(--tc-space-20);
+	--tc-full-parent-icon: var(--tc-icon-s);
+	--tc-font-full-parent: var(--tc-text-15);
+	--tc-full-parent-gap: var(--tc-space-6);
+	--tc-full-desc-gap: var(--tc-space-20);
+	/* The last of the screen scrolls clear of the bottom row. */
+	--tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20));
 	--tc-font-desc: var(--font-text);
 	--tc-desc-size: var(--font-text-size);
 	--tc-desc-leading: var(--line-height-normal);
@@ -1203,11 +1212,37 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-quick-panel .tc-menu-tiles.is-place .tc-menu-tile.is-on { background-color: var(--tc-place-on-bg); box-shadow: inset 0 0 0 var(--tc-select-ring) var(--tc-ink-strong); }
 
 
-/* A description's own screen over the whole view: the bar with Close and Edit, or Cancel and Save, the title, the text. */
-.tc-desc-body { position: absolute; left: var(--tc-sheet-side); right: var(--tc-sheet-side); top: var(--tc-sheet-bar); bottom: 0; padding-top: var(--tc-desc-top); overflow-y: auto; display: flex; flex-direction: column; gap: var(--tc-desc-title-gap); }
-.tc-desc-title { flex-shrink: 0; font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+/* A task over the whole view: the bar with Close (and Done while typing), its task's name, the title, the subtasks, the description in Obsidian's editor. */
+/* On the desktop the bar stands over the column, Close over the title's edge. */
+.tc-full > .tc-sheet-bar { max-width: var(--tc-full-w); margin: 0 auto; }
+.tc-full-body { position: absolute; left: 0; right: 0; top: var(--tc-sheet-bar); bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.tc-full-body::-webkit-scrollbar { display: none; }
+.tc-full-column { max-width: var(--tc-full-w); margin: 0 auto; padding: var(--tc-desc-top) var(--tc-sheet-side) var(--tc-full-foot); display: flex; flex-direction: column; }
+.tc-full button.tc-full-parent { align-self: flex-start; height: var(--tc-full-parent-h); margin-bottom: var(--tc-space-8); padding: 0; border: 0; background: none; box-shadow: none; display: flex; align-items: center; gap: var(--tc-full-parent-gap); font-size: var(--tc-font-full-parent); color: var(--tc-muted); cursor: pointer; }
+.tc-full button.tc-full-parent[hidden] { display: none; }
+.tc-full-parent svg { width: var(--tc-full-parent-icon); height: var(--tc-full-parent-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-ring); }
+.tc-full-title { font-size: var(--tc-font-desc-title); line-height: var(--tc-leading-desc-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+/* Rename of the task on screen: the title itself is the field, as big and bold, with no card under it. */
+.task-calendar .tc-full-title .tc-quick-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; font-size: var(--tc-font-desc-title); font-weight: var(--tc-weight-bold); line-height: var(--tc-leading-desc-title); }
+.tc-full-title .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-line { font-weight: var(--tc-weight-bold); }
+.tc-full .tc-list { flex: none; margin-top: var(--tc-desc-title-gap); overflow: visible; }
+.tc-full .tc-list::after { content: none; }
+.tc-full .tc-list:empty { display: none; }
 .tc-desc-text { font-family: var(--tc-font-desc); font-size: var(--tc-desc-size); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
-.tc-desc-sheet .tc-desc-text { flex: 1; min-height: 0; }
+.tc-full-desc { margin-top: var(--tc-full-desc-gap); }
+/* Each subtask's circle, as Select tasks draws it, ticks it: a done one is the accent with a check, its title crossed out and dim. */
+.tc-full .tc-card { padding-left: var(--tc-pick-pad-start); }
+.tc-full .tc-card > .tc-pick { display: flex; cursor: pointer; }
+.tc-full .tc-card > .tc-progress-dot { display: none; }
+:is(.tc-full .tc-card, .tc-lifted).is-done > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+:is(.tc-full .tc-card, .tc-lifted).is-done > .tc-pick svg { visibility: visible; }
+:is(.tc-full .tc-card, .tc-lifted).is-closed > .tc-card-title { color: var(--tc-muted); text-decoration: line-through; }
+/* The bottom row stands as on the main screen: Undo and «⋯» on the left, the plus on the right. */
+.tc-full > button.tc-plus, .tc-full > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); }
+.tc-full > button.tc-plus { right: var(--tc-space-16); }
+.tc-full > .tc-capsule { left: var(--tc-space-16); }
+/* While something is typed in, the keyboard has the foot of the screen: the bottom row stands aside. */
+.tc-full.is-typing > :is(button.tc-plus, .tc-capsule) { display: none; }
 /* Obsidian's editor keeps a note's margins and, on the phone, room for the view's header: here it is a field under the title. */
 .task-calendar .tc-desc-text.is-editing { --file-margins: 0; --view-top-spacing-markdown: 0; --view-bottom-spacing-markdown: 0; }
 .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-editor, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-scroller, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-sizer, .task-calendar .tc-desc-text.is-editing .markdown-source-view.mod-cm6 .cm-contentContainer { padding: 0; margin: 0; max-width: none; min-height: 0; }
@@ -1216,6 +1251,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 /* The buttons' text, inside their own padding, starts and ends on the title's edges (--tc-sheet-side). */
 .tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-sheet-bar); padding: 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
 .tc-sheet-bar > button.tc-btn { height: var(--tc-sheet-bar); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.tc-sheet-bar > button.tc-btn.is-hidden { visibility: hidden; }
 
 /* A level keeps its parts in one row, where Obsidian stacks a setting's parts on the phone. */
 /* The gap is the circles' own: with the grip the row still leaves the card room for its title. */

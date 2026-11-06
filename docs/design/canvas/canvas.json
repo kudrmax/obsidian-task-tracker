@@ -2162,6 +2162,62 @@
    "x": 17270,
    "y": 0
   },
+  "Prio31Look.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1948,
+   "h": 1400,
+   "page": "prio31",
+   "title": "Цвет приоритета в настройках — два варианта"
+  },
+  "Prio31Settings.dc.html": {
+   "x": 0,
+   "y": 1520,
+   "w": 390,
+   "h": 844,
+   "page": "prio31",
+   "title": "Компонент: настройки приоритетов"
+  },
+  "Prio31Final.dc.html": {
+   "x": 2068,
+   "y": 0,
+   "w": 2288,
+   "h": 2140,
+   "page": "prio31",
+   "title": "Цвет приоритета в настройках — итог"
+  },
+  "Prio31Desk.dc.html": {
+   "x": 510,
+   "y": 1520,
+   "w": 1040,
+   "h": 640,
+   "page": "prio31",
+   "title": "Компонент: настройки на Mac"
+  },
+  "SelectFlow.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 2238,
+   "h": 2340,
+   "page": "select",
+   "title": "Выбор нескольких задач на телефоне"
+  },
+  "SelectPhone.dc.html": {
+   "x": 17740,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Служебное: телефон с выбором задач (его показывает доска «Выбор на телефоне»)"
+  },
+  "SelectRow.dc.html": {
+   "x": 0,
+   "y": 2460,
+   "w": 2788,
+   "h": 1400,
+   "page": "select",
+   "title": "Нижний ряд в режиме выбора — три варианта"
+  },
   "Label32V1.dc.html": {
    "x": 0,
    "y": 0,
@@ -2217,6 +2273,38 @@
    "h": 1310,
    "page": "labels32",
    "title": "Вариант 6 — полоски"
+  },
+  "FocusFlow.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 2668,
+   "h": 2400,
+   "page": "focus",
+   "title": "Задача на весь экран — телефон"
+  },
+  "FocusDeskBoard.dc.html": {
+   "x": 0,
+   "y": 2520,
+   "w": 2608,
+   "h": 1300,
+   "page": "focus",
+   "title": "Задача на весь экран — Mac"
+  },
+  "FocusPhone.dc.html": {
+   "x": 18680,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экрана задачи на весь экран, телефон (его показывает «Задача на весь экран»)"
+  },
+  "FocusDesk.dc.html": {
+   "x": 19150,
+   "y": 0,
+   "w": 1200,
+   "h": 800,
+   "page": "components",
+   "title": "Компонент экрана задачи на весь экран, Mac (его показывает «Задача на весь экран»)"
   }
  },
  "createdOnFiles": {
@@ -2905,13 +2993,24 @@
   "Search29Row.dc.html",
   "EmptySecFlow.dc.html",
   "EmptySec.dc.html",
+  "Prio31Settings.dc.html",
+  "Prio31Look.dc.html",
+  "Prio31Desk.dc.html",
+  "Prio31Final.dc.html",
+  "SelectPhone.dc.html",
+  "SelectFlow.dc.html",
+  "SelectRow.dc.html",
   "Label32V1.dc.html",
   "Label32V2.dc.html",
   "Label32V3.dc.html",
   "Label32V4.dc.html",
   "Label32V5.dc.html",
   "Label32Phone.dc.html",
-  "Label32V6.dc.html"
+  "Label32V6.dc.html",
+  "FocusPhone.dc.html",
+  "FocusDesk.dc.html",
+  "FocusFlow.dc.html",
+  "FocusDeskBoard.dc.html"
  ],
  "pages": [
   {
@@ -3019,8 +3118,20 @@
    "name": "Пустая секция"
   },
   {
+   "id": "prio31",
+   "name": "Цвета приоритетов"
+  },
+  {
+   "id": "select",
+   "name": "Выбор на телефоне"
+  },
+  {
    "id": "labels32",
    "name": "Метки"
+  },
+  {
+   "id": "focus",
+   "name": "Задача на весь экран"
   }
  ],
  "title": "Task Calendar",

@@ -176,8 +176,8 @@ describe("the menu", () => {
 	});
 
 	const surface = { rendered: [] as string[], render: vi.fn(async (el: HTMLElement, markdown: string) => { el.innerHTML = '<p>note <a href="x">link</a></p>'; surface.rendered.push(markdown); }), edit: vi.fn() };
-	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01") => {
-		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
+	const open = (task: TaskItem, sections?: SectionChoice, today = "2026-11-01", focused = false) => {
+		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), openFull: focused ? undefined : vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const source = document.body.appendChild(document.createElement("div"));
 		TaskMenu.open({ item: task, source, today, day: today, levels: LEVELS, actions, markdown: surface, sections });
 		return actions;
@@ -444,17 +444,31 @@ describe("the menu", () => {
 		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
 		expect(labels(".tc-menu-tiles.is-move .tc-menu-tile-label")).toEqual(["Tomorrow", "Pick a date"]);
-		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Add subtask", "Open in Obsidian", "Delete"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Add subtask", "Open full screen", "Open in Obsidian", "Delete"]);
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
-	it("opens the task in Obsidian from a row of its own and closes", () => {
+	it("opens the task on the whole screen and in Obsidian from a group of their own, and closes", () => {
 		const actions = open(item());
-		const row = [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((r) => r.textContent === "Open in Obsidian")!;
-		expect(row.classList.contains("is-apart")).toBe(true);
-		row.click();
+		const rows = [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-row")];
+		const full = rows.find((r) => r.textContent === "Open full screen")!;
+		const obsidian = rows.find((r) => r.textContent === "Open in Obsidian")!;
+		expect(full.parentElement).toBe(obsidian.parentElement);
+		expect(full.nextElementSibling).toBe(obsidian);
+		expect(full.classList.contains("is-tall") && obsidian.classList.contains("is-tall")).toBe(true);
+		obsidian.click();
 		expect(actions.openInObsidian).toHaveBeenCalled();
 		expect(document.querySelector(".tc-backdrop")?.classList.contains("is-closing")).toBe(true);
+	});
+
+	it("Open full screen opens the task there; the task already there has no such row", () => {
+		const actions = open(item());
+		row("Open full screen").click();
+		expect(actions.openFull).toHaveBeenCalled();
+		document.body.innerHTML = "";
+		open(item(), undefined, "2026-11-01", true);
+		expect(labels(".tc-menu-row .tc-menu-label")).not.toContain("Open full screen");
+		expect(labels(".tc-menu-row .tc-menu-label")).toContain("Open in Obsidian");
 	});
 
 	it("marks the task's level with a badge, and a tap on it takes the priority off", () => {

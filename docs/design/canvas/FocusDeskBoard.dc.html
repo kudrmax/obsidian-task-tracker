@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача на весь экран — Mac</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 2608px; height: 1300px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 2480px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Задача на весь экран — Mac</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65;">Тот же экран во всё окно вкладки, содержимое — колонкой 640 по центру, как текст заметки. Открывается той же строкой Open full screen в меню задачи. Esc закрывает</div>
+</div>
+<div style="position: absolute; left: 64px; top: 250px; width: 1200px; height: 800px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="FocusDesk" theme="dark" hint-size="1200px,800px"></dc-import></div>
+<div style="position: absolute; left: 64px; top: 1078px; width: 1200px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">Тёмная</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">Под курсором строка подсвечивается, как кнопки на Mac, а кружок окрашивается акцентом — видно, что по нему можно кликнуть. Описание всегда в редакторе: клик в текст ставит курсор</span>
+</div>
+<div style="position: absolute; left: 1344px; top: 250px; width: 1200px; height: 800px; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);"><dc-import name="FocusDesk" theme="light" hint-size="1200px,800px"></dc-import></div>
+<div style="position: absolute; left: 1344px; top: 1078px; width: 1200px;"><span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">Светлая</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2608,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

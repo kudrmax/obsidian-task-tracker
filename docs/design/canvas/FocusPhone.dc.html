@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Задача на весь экран: компонент телефона</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<dc-import name="Screen" foot="prod" plus="true" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<sc-if value="{{onMain}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: 494px; overflow: hidden; background: {{c.bg}}; z-index: 5;">
+<svg width="187" height="494" viewBox="0 0 187 494" style="position: absolute; left: 10px; top: 0; width: 187px; height: 494px;" aria-hidden="true"><path d="{{list.branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{list.rows}}" as="r" hint-placeholder-count="12">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.w}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.meta}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}};">
+<sc-if value="{{r.hasSubs}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+<sc-if value="{{r.desc}}" hint-placeholder-val="{{false}}"><svg width="{{r.iconSize}}" height="{{r.iconSize}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{icons.desc}}"></path></svg></sc-if>
+</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{onFocus}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 54px; width: 390px; height: 722px; background: {{c.bg}}; z-index: 6;"></div>
+
+<div style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; padding: 0 10px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; z-index: 8;">
+<button style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{c.accent}}; font: inherit; font-size: 17px;">Close</button>
+<sc-if value="{{focus.typing}}" hint-placeholder-val="{{false}}"><button style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: {{c.accent}}; font: inherit; font-size: 17px; font-weight: 600;">Done</button></sc-if>
+</div>
+
+<div style="position: absolute; left: 0; top: 98px; width: 390px; height: {{focus.clipH}}px; overflow: hidden; z-index: 7;">
+<div style="position: absolute; left: 20px; top: {{focus.shift}}px; width: 350px; display: flex; flex-direction: column;">
+
+<sc-if value="{{focus.hasParent}}" hint-placeholder-val="{{false}}">
+<button style="align-self: flex-start; height: 20px; margin-bottom: 8px; padding: 0; border: 0; background: transparent; color: {{c.muted}}; font: inherit; font-size: 15px; display: flex; align-items: center; gap: 6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.up}}"></path></svg><span>{{focus.parent}}</span></button>
+</sc-if>
+
+<div style="font-size: 22px; line-height: 28px; font-weight: 700; overflow-wrap: anywhere;">{{focus.title}}</div>
+
+<div style="position: relative; margin-top: 12px; height: {{focus.listH}}px;">
+<svg width="350" height="{{focus.listH}}" viewBox="0 0 350 {{focus.listH}}" style="position: absolute; left: 0; top: 0;" aria-hidden="true"><path d="{{focus.branches}}" fill="none" stroke="{{c.branch}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<sc-for list="{{focus.rows}}" as="r" hint-placeholder-count="8">
+<div style="position: absolute; left: {{r.left}}px; top: {{r.top}}px; width: {{r.w}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 9px; display: flex; align-items: center; gap: 8px;">
+<button aria-label="{{r.aria}}" style="width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; padding: 0; border-radius: 9px; border: {{r.ring}}; background: {{r.dot}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center;"><sc-if value="{{r.done}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.check}}"></path></svg></sc-if></button>
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; color: {{r.ink}}; text-decoration: {{r.deco}}; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.meta}}" hint-placeholder-val="{{false}}">
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}};">
+<sc-if value="{{r.hasSubs}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{r.count}}</span></sc-if>
+<sc-if value="{{r.desc}}" hint-placeholder-val="{{false}}"><svg width="{{r.iconSize}}" height="{{r.iconSize}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{icons.desc}}"></path></svg></sc-if>
+</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+
+<div style="margin-top: 20px; margin-left: -6px; display: flex; flex-direction: column; color: {{md.text}}; font-family: {{md.font}};">
+<sc-for list="{{focus.desc}}" as="it" hint-placeholder-count="5">
+<div style="position: relative; display: flex; align-items: flex-start; padding-left: {{it.pad}}px;">
+<sc-for list="{{it.guides}}" as="g" hint-placeholder-count="0"><span style="position: absolute; left: {{g.x}}px; top: 0; bottom: 0; width: 1px; background: {{md.guide}};"></span></sc-for>
+<span style="width: 24px; height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: 4.8px; height: 4.8px; border-radius: 50%; background: {{md.faint}};"></span></span>
+<div style="flex: 1; min-width: 0; font-size: 16px; line-height: 24px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: 20px; margin-left: 1px; vertical-align: -4px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div>
+</div>
+</sc-for>
+</div>
+
+</div>
+</div>
+
+<sc-if value="{{focus.foot}}" hint-placeholder-val="{{true}}">
+<div role="group" aria-label="Undo and task menu" style="position: absolute; left: 16px; top: 722px; width: 80px; height: 44px; border-radius: 22px; background: {{c.card}}; box-shadow: {{c.control}}; display: flex; z-index: 8;">
+<button aria-label="Undo" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.undo}}"></path></svg></button>
+<button aria-label="Task menu" style="width: 40px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="{{icons.more}}"></path></svg></button>
+</div>
+<button aria-label="Add subtask" style="position: absolute; left: 330px; top: 722px; width: 44px; height: 44px; border: 0; padding: 0; border-radius: 22px; background: {{c.accent}}; color: #FFFFFF; box-shadow: {{c.control}}; display: flex; align-items: center; justify-content: center; z-index: 8;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14 M5 12h14"></path></svg></button>
+</sc-if>
+
+<sc-if value="{{focus.typing}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: 500px; height: 44px; box-sizing: border-box; padding: 0 6px; background: {{c.kbd}}; border-top: 0.5px solid {{c.sep}}; display: flex; align-items: center; gap: 4px; z-index: 9;">
+<button aria-label="Outdent" style="width: 44px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H11 M21 12H11 M21 19H11 M7 8l-4 4 4 4"></path></svg></button>
+<button aria-label="Indent" style="width: 44px; height: 44px; border: 0; padding: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H11 M21 12H11 M21 19H11 M3 8l4 4-4 4"></path></svg></button>
+</div>
+<div style="position: absolute; left: 0; right: 0; top: 544px; height: 300px; box-sizing: border-box; padding: 8px 3px 0; background: {{c.kbd}}; display: flex; flex-direction: column; gap: 11px; z-index: 9;">
+<sc-for list="{{letterRows}}" as="row" hint-placeholder-count="2">
+<div style="display: flex; gap: 5px;">
+<sc-for list="{{row}}" as="k" hint-placeholder-count="11">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+</div>
+</sc-for>
+<div style="display: flex; gap: 5px;">
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+<sc-for list="{{row3}}" as="k" hint-placeholder-count="9">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+</div>
+<div style="display: flex; gap: 5px;">
+<span style="width: 46px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">123</span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Пробел</span>
+<span style="width: 92px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Ввод</span>
+</div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{menu.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.top}}px; width: {{menu.cardW}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: {{menu.pad}}; display: flex; align-items: center; gap: {{menu.gap}}px; z-index: 11;">
+<sc-if value="{{menu.circle}}" hint-placeholder-val="{{false}}"><span style="width: 18px; height: 18px; flex-shrink: 0; box-sizing: border-box; border-radius: 9px; border: 1.5px solid {{c.muted}};"></span></sc-if>
+<div style="flex: 1; min-width: 0; white-space: nowrap;">{{menu.title}}</div>
+<span style="flex-shrink: 0; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: {{c.muted}};">
+<span style="font-size: 12px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">{{menu.count}}</span>
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{icons.desc}}"></path></svg>
+</span>
+</div>
+
+<div style="position: absolute; left: {{menu.left}}px; top: {{menu.panelTop}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.menu}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<div style="padding: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{statusTiles}}" as="r" hint-placeholder-count="3">
+<button style="min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.text}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.d}}"></path><path d="{{r.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: 13px; font-weight: 500; white-space: nowrap;">{{r.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{l.c}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.flag}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}};">{{l.name}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}}; padding: 8px; display: flex; gap: 6px;">
+<sc-for list="{{moveTiles}}" as="m" hint-placeholder-count="2">
+<button style="flex: 1; min-width: 0; height: 66px; border: 0; border-radius: 10px; padding: 0; background: {{c.menuTile}}; color: {{c.accent}}; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.d}}"></path></svg>
+<span style="font-size: 13px; font-weight: 500; color: {{c.text}}; white-space: nowrap;">{{m.label}}</span>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<sc-for list="{{editRows}}" as="r" hint-placeholder-count="3">
+<button style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: {{r.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;">
+<span style="flex: 1; min-width: 0;">{{r.label}}</span>
+<sc-if value="{{r.hasValue}}" hint-placeholder-val="{{false}}"><span style="font-size: 15px; color: {{c.muted}};">{{r.value}}</span></sc-if>
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{r.d}}"></path></svg>
+</button>
+</sc-for>
+</div>
+<div style="border-top: 8px solid {{c.gap}};">
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-bottom: 0.5px solid {{c.sep}}; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Open full screen</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.full}}"></path></svg></button>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Open in Obsidian</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.openFile}}"></path></svg></button>
+</div>
+<button style="width: 100%; height: 52px; box-sizing: border-box; padding: 0 16px; border: 0; border-top: 8px solid {{c.gap}}; background: transparent; color: {{c.danger}}; font: inherit; font-size: 16px; display: flex; align-items: center; gap: 10px; text-align: left;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.del}}"></path></svg></button>
+</div>
+</sc-if>
+
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="0">
+<div style="position: absolute; left: {{m.left}}px; top: {{m.top}}px; width: {{m.width}}px; height: {{m.height}}px; box-sizing: border-box; border: 2px dashed {{c.mark}}; border-radius: {{m.radius}}px; z-index: 20; pointer-events: none;"></div>
+<span style="position: absolute; {{m.tagPos}} height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{m.tag}}</span>
+</sc-for>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"focus","options":["menu","focus","ticked","typing","submenu","sub"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = this.props.view ?? 'focus';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', accent: '#8A5CF5', branch: '#C7C7CC', backdrop: 'rgba(0,0,0,0.22)', menu: 'rgba(250,250,252,0.97)', menuTile: 'rgba(0,0,0,0.05)', gap: '#E5E5EA', sep: '#D1D1D6', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', control: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', danger: '#FF3B30', p1: '#FF3B30', p2: '#FF9500', p3: '#FFCC00', mark: '#FF9500', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', accent: '#9580FF', branch: '#48484A', backdrop: 'rgba(0,0,0,0.55)', menu: 'rgba(44,44,46,0.96)', menuTile: 'rgba(255,255,255,0.08)', gap: '#1C1C1E', sep: '#48484A', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', control: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', danger: '#FF453A', p1: '#FF453A', p2: '#FF9F0A', p3: '#FFD60A', mark: '#FFD60A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+    const md = light
+      ? { font: "Inter, -apple-system, system-ui, sans-serif", text: '#222222', faint: '#ABABAB', guide: 'rgba(0,0,0,0.12)', link: '#8A5CF5', caret: '#8A5CF5' }
+      : { font: "Inter, -apple-system, system-ui, sans-serif", text: '#DADADA', faint: '#666666', guide: 'rgba(255,255,255,0.12)', link: '#A88BFA', caret: '#A88BFA' };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+    const icons = {
+      undo: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
+      more: 'M5 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M12 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z M19 10.4a1.6 1.6 0 1 1 0 3.2a1.6 1.6 0 1 1 0-3.2z',
+      desc: 'M4 6h16 M4 12h16 M4 18h10',
+      check: 'M5 12.5l4.5 4.5L19 7',
+      up: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
+      flag: 'M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5',
+      full: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5',
+      openFile: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      repeat: 'M17 2l3 3-3 3 M4 11V9a4 4 0 0 1 4-4h12 M7 22l-3-3 3-3 M20 13v2a4 4 0 0 1-4 4H4',
+      subtask: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
+      del: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13'
+    };
+    const STEP = 37, CARD = 35, INDENT = 20;
+    const branchesFor = (rows, x0) => {
+      let d = '';
+      rows.forEach((r, i) => {
+        const kids = [];
+        for (let k = i + 1; k < rows.length && rows[k].level > r.level; k++) if (rows[k].level === r.level + 1) kids.push(k);
+        if (!kids.length) return;
+        const x = x0 + r.level * INDENT + INDENT / 2;
+        const mid = (j) => j * STEP + CARD / 2;
+        const last = mid(kids[kids.length - 1]);
+        d += 'M' + x + ' ' + mid(i) + 'V' + (last - 6) + 'Q' + x + ' ' + last + ' ' + (x + 6) + ' ' + last + 'H' + (x + INDENT / 2);
+        kids.slice(0, -1).forEach((k) => { d += 'M' + x + ' ' + mid(k) + 'H' + (x + INDENT / 2); });
+      });
+      return d;
+    };
+    const metaOf = (t) => ({ hasSubs: !!t.count, desc: !!t.desc, meta: !!t.count || !!t.desc, iconSize: t.count ? 11 : 13 });
+
+    const mainTasks = [
+      { title: 'Собраться утром', level: 0, count: '0/5', desc: true },
+      { title: 'Собрать рюкзак', level: 1, count: '0/3', desc: true },
+      { title: 'Ноутбук и зарядка', level: 2 },
+      { title: 'Пропуск в офис', level: 2 },
+      { title: 'Наушники', level: 2 },
+      { title: 'Умыться и побриться', level: 1 },
+      { title: 'Душ', level: 1 },
+      { title: 'Погладить рубашку', level: 1 },
+      { title: 'Выпить витамины', level: 1 },
+      { title: 'Оплатить интернет', level: 0, desc: true },
+      { title: 'Позвонить маме', level: 0 },
+      { title: 'Забрать посылку', level: 0 }
+    ];
+    const list = {
+      rows: mainTasks.map((t, i) => ({ ...t, ...metaOf(t), left: 10 + t.level * INDENT, w: 175 - t.level * INDENT, top: i * STEP })),
+      branches: branchesFor(mainTasks, 0)
+    };
+
+    const isSub = view === 'sub';
+    const ticked = view === 'ticked' || view === 'typing' || view === 'submenu';
+    const morning = [
+      { title: 'Собрать рюкзак', level: 0, count: ticked ? '1/3' : '0/3', desc: true },
+      { title: 'Ноутбук и зарядка', level: 1, done: ticked },
+      { title: 'Пропуск в офис', level: 1 },
+      { title: 'Наушники', level: 1 },
+      { title: 'Умыться и побриться', level: 0, done: ticked },
+      { title: 'Душ', level: 0, done: ticked },
+      { title: 'Погладить рубашку', level: 0 },
+      { title: 'Выпить витамины', level: 0 }
+    ];
+    const backpack = [
+      { title: 'Ноутбук и зарядка', level: 0, done: true },
+      { title: 'Пропуск в офис', level: 0, done: true },
+      { title: 'Наушники', level: 0 },
+      { title: 'Ключи от велосипеда', level: 0 }
+    ];
+    const subs = isSub ? backpack : morning;
+    const frows = subs.map((t, i) => ({
+      ...t, ...metaOf(t),
+      done: !!t.done,
+      left: t.level * INDENT, w: 350 - t.level * INDENT, top: i * STEP,
+      ring: t.done ? '0' : '1.5px solid ' + c.muted,
+      dot: t.done ? c.accent : 'transparent',
+      ink: t.done ? c.muted : c.text,
+      deco: t.done ? 'line-through' : 'none',
+      aria: t.done ? 'Mark ' + t.title + ' as open' : 'Mark ' + t.title + ' as done'
+    }));
+    const link = { color: md.link, deco: 'underline' };
+    const part = (t, style) => ({ t, color: md.text, deco: 'none', ...(style ?? {}) });
+    const item = (level, parts, cursor) => ({ pad: level * 24, guides: Array.from({ length: level }, (_, k) => ({ x: k * 24 + 12 })), parts, cursor: !!cursor });
+    const typing = view === 'typing';
+    const morningDesc = [
+      item(0, [part('Выйти не позже 8:40')]),
+      item(0, [part('Если опаздываю — '), part('такси', link)]),
+      item(0, [part('Зонт, если по '), part('прогнозу', link), part(' дождь')]),
+      item(0, [part('В пятницу без рубашки, дресс-код свободный')]),
+      ...(typing ? [item(0, [part('Проверить, заряжены ли наушники')], true)] : [])
+    ];
+    const backpackDesc = [
+      item(0, [part('Рюкзак висит в шкафу у двери')]),
+      item(0, [part('Зарядку брать короткую, длинная остаётся дома')])
+    ];
+    const listH = frows.length * STEP - 2;
+    const focus = {
+      title: isSub ? 'Собрать рюкзак' : 'Собраться утром',
+      parent: 'Собраться утром',
+      hasParent: isSub,
+      rows: frows,
+      branches: branchesFor(subs, 0),
+      listH,
+      desc: isSub ? backpackDesc : morningDesc,
+      typing,
+      foot: !typing,
+      clipH: typing ? 402 : 678,
+      shift: typing ? -146 : 8
+    };
+
+    const menuOn = view === 'menu' || view === 'submenu';
+    const menu = !menuOn ? { on: false } : view === 'menu'
+      ? { on: true, left: 10, top: 166, cardW: 175, pad: '0 10px 0 14px', gap: 6, circle: false, title: 'Собраться утром', count: '0/5', panelTop: 213 }
+      : { on: true, left: 20, top: 146, cardW: 350, pad: '0 10px 0 9px', gap: 8, circle: true, title: 'Собрать рюкзак', count: '1/3', panelTop: 193 };
+    const editRows = [
+      { label: 'Rename', d: icons.rename },
+      { label: 'Repeat', d: icons.repeat, value: view === 'menu' ? 'Every day' : '' },
+      { label: 'Add subtask', d: icons.subtask }
+    ].map((r, i, a) => ({ ...r, hasValue: !!r.value, sep: i < a.length - 1 ? '0.5px solid ' + c.sep : '0' }));
+
+    const marks = [];
+    const ring = (left, top, width, height, radius, tag, tagPos) => ({ left: left - 4, top: top - 4, width: width + 8, height: height + 8, radius: radius + 4, tag, tagPos });
+    const pos = (left, top) => 'left: ' + left + 'px; top: ' + top + 'px;';
+    const rpos = (right, top) => 'right: ' + right + 'px; top: ' + top + 'px;';
+    const fullRowTop = (m) => m.panelTop + 82 + 90 + 90 + 8 + 132 + 8;
+    if (view === 'menu') marks.push(ring(10, fullRowTop(menu), 300, 52, 0, '← Новая строка', pos(160, fullRowTop(menu) + 16)));
+    if (view === 'submenu') marks.push(ring(20, fullRowTop(menu), 300, 52, 0, '← И у подзадачи', pos(170, fullRowTop(menu) + 16)));
+    if (view === 'focus') {
+      marks.push(ring(20, 106 + 28 + 12, 350, listH, 17.5, '↑ Подзадачи с кружками', rpos(16, 106 + 28 + 12 + listH + 8)));
+      marks.push(ring(16, 722, 80, 44, 22, '↓ ⋯ — меню задачи', pos(12, 692)));
+      marks.push(ring(330, 722, 44, 44, 22, '↓ Подзадача', rpos(10, 692)));
+    }
+    if (view === 'ticked') marks.push(ring(29, 106 + 28 + 12 + 4 * STEP + 8.5, 18, 18 + 2 * STEP, 9, '← Вычеркнул', pos(150, 106 + 28 + 12 + 4 * STEP + 26)));
+    if (view === 'typing') marks.push(ring(14, 98 + 8 - 146 + 28 + 12 + listH + 20 + 4 * 24, 356, 24, 6, '↑ Пишу прямо здесь', rpos(16, 98 + 8 - 146 + 28 + 12 + listH + 20 + 5 * 24 + 10)));
+    if (view === 'sub') marks.push(ring(20, 106, 150, 20, 6, '← Назад к задаче', pos(180, 106)));
+
+    return {
+      c, md, icons, list, focus, menu, editRows,
+      theme: light ? 'light' : 'dark',
+      onMain: view === 'menu',
+      onFocus: view !== 'menu',
+      statusTiles: [
+        { label: 'Done', d: CIRCLE, fd: CIRCLE },
+        { label: 'In progress', d: CIRCLE, fd: 'M12 3a9 9 0 0 1 0 18z' },
+        { label: 'Won’t do', d: CIRCLE + ' M8 12h8', fd: '' }
+      ],
+      levels: [{ name: 'p1', c: c.p1 }, { name: 'p2', c: c.p2 }, { name: 'p3', c: c.p3 }],
+      moveTiles: [
+        { label: 'Tomorrow', d: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14' },
+        { label: 'Pick a date', d: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5' }
+      ],
+      letterRows: [
+        ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'],
+        ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э']
+      ],
+      row3: ['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю'],
+      marks: this.props.marks === false || this.props.marks === 'false' ? [] : marks
+    };
+  }
+}
+</script>
+</body>
+</html>

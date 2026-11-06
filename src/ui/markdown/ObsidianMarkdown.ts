@@ -19,14 +19,18 @@ export class ObsidianMarkdown implements MarkdownSurface {
 		await MarkdownRenderer.render(this.app, markdown, el, this.sourcePath(), this.view);
 	}
 
-	edit(el: HTMLElement, markdown: string, onEscape: () => void): MarkdownEditing {
+	edit(el: HTMLElement, markdown: string, onEscape: () => void, onChange?: () => void): MarkdownEditing {
 		el.removeClass("markdown-rendered");
-		const editor = new EmbeddedEditor(this.app, this.view, this.sourcePath(), el, markdown, { keys: [{ key: "Escape", run: onEscape }] });
+		const editor = new EmbeddedEditor(this.app, this.view, this.sourcePath(), el, markdown, { keys: [{ key: "Escape", run: onEscape }], onChange });
 		return {
 			get value() {
 				return editor.value;
 			},
+			get focused() {
+				return editor.focused;
+			},
 			focus: () => editor.focusEnd(),
+			setValue: (text) => editor.setValue(text),
 			destroy: () => editor.destroy(),
 		};
 	}

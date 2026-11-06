@@ -35,6 +35,7 @@ export function itemLevels(levels: readonly PriorityLevel[], labels: readonly La
 /** The task as the UI sees it on `today`. */
 export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = NO_LEVELS, parentText: string | null = null): TaskItem {
 	const priority = entry.task.priority === null ? null : levels.levelOf(entry.task.priority);
+	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry.task.text));
 	return {
 		key: { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw },
 		text: entry.task.text,
@@ -53,7 +54,8 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		isSubtask: entry.path.length > 0,
 		day: dayOfTask(entry.section, entry.task, today),
 		can: { postpone: canPostpone(entry.section), removeDue: canRemoveDue(entry.task.dueDate, today), remind: canRemind(entry.task.slot) },
-		subtasks: entry.subtasks.filter((sub) => isOpen(sub.task.status)).map((sub) => toItem(sub, today, levels, entry.task.text)),
+		subtasks: allSubtasks.filter((sub) => sub.open),
+		allSubtasks,
 		progress: progressOf(entry),
 		collapsed: entry.task.collapsed && hasOpenSubtask(entry),
 		description: descriptionMarkdown(entry),

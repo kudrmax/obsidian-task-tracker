@@ -58,9 +58,9 @@ interface Stream {
  * A field being typed in and the bar beside it, and the field of a section's name: a finger there edits, it does not
  * swipe. Nor on the divider that sets the columns' widths: a finger there resizes.
  */
-const NOT_SWIPED = ".tc-quick-row, .tc-quick-bar, .tc-group-field, .tc-divider:not(.is-fixed)";
+const NOT_SWIPED = ".tc-quick-row, .tc-quick-bar, .tc-group-field, .tc-divider:not(.is-fixed), .tc-full";
 
-/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed or the columns resized. */
+/** Whether a swipe of the screen may start at `target`: anywhere but where text is being typed, the columns resized, or a task is on the whole screen. */
 export function swipeStartsAt(target: EventTarget | null): boolean {
 	return !(target instanceof Element && target.closest(NOT_SWIPED));
 }
