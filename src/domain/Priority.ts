@@ -1,3 +1,4 @@
+import { taskTitle } from "./TaskTitle";
 /** The colours the settings offer first, in their order; each has its own shade in either theme. */
 export const PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"] as const;
 export type PresetColor = (typeof PRIORITY_COLORS)[number];
@@ -48,6 +49,11 @@ export function priorityOfText(text: string, prefixes: readonly string[]): { pri
 	return { priority: m[1], text: m[2] };
 }
 
+/** The level a typed title starts with and the rest, read off the title its task line gets: on one line, trimmed. */
+export function priorityOfTitle(text: string, prefixes: readonly string[]): { priority: string | null; text: string } {
+	return priorityOfText(taskTitle(text), prefixes);
+}
+
 /** Nothing to write: no text, or a level's prefix with nothing after it. */
 export function isBlankTitle(text: string, prefixes: readonly string[]): boolean {
 	return priorityOfText(text, prefixes).text.trim() === "";
@@ -55,6 +61,6 @@ export function isBlankTitle(text: string, prefixes: readonly string[]): boolean
 
 /** `text` with `prefix` first in place of the one it had; null takes it off. */
 export function withPriority(text: string, prefix: string | null, prefixes: readonly string[]): string {
-	const rest = priorityOfText(text, prefixes).text;
+	const rest = priorityOfTitle(text, prefixes).text;
 	return prefix === null ? rest : `${prefix} ${rest}`;
 }
