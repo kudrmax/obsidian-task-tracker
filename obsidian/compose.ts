@@ -12,7 +12,10 @@ import { GoogleCalendarFeed } from "./infrastructure/GoogleCalendarFeed";
 import { browserLoginDeps, GoogleRedirectLogin } from "./infrastructure/GoogleRedirectLogin";
 import { requestToken } from "./infrastructure/GoogleToken";
 import { obsidianHttp } from "./infrastructure/ObsidianHttp";
+import { ObsidianSync } from "./infrastructure/ObsidianSync";
 import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
+import { SyncRoundTrip } from "./infrastructure/SyncRoundTrip";
+import { SyncWait } from "./infrastructure/SyncWait";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
@@ -25,6 +28,8 @@ export interface Services extends Core {
 	receiveLogin(params: Record<string, string>): Promise<void>;
 	/** Keeps the work calendar export in the plugin's folder for Scriptable. Returns the unsubscribe. */
 	keepWorkExportInstalled(): () => void;
+	/** The iPhone app's Sync button: runs Obsidian Sync and, on the phone, hands back to the app with the result. */
+	syncForApp(): void;
 }
 
 export interface ServicesHost {
@@ -44,6 +49,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
+	const sync = new ObsidianSync(app);
+	const syncRoundTrip = new SyncRoundTrip({ host: host.shortcuts, sync, wait: new SyncWait(sync, windowTimers) });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	const core = composeCore({
 		tasksFile: new VaultTaskFileStore(app, () => tasksFilePath(settings.get()) ?? ""),
@@ -62,6 +69,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		work,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
+		syncForApp: () => syncRoundTrip.run(),
 	};
 }
 
