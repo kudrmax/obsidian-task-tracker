@@ -73,19 +73,19 @@ struct TaskFullScreen: View {
 
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
 
-    /// A subtask as the same capsule as on the main screen, at its depth; a tap opens its own menu.
+    /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { menu(for: row.item) })
+        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
     }
 
-    private func menu(for item: TaskItem) -> UIMenu? {
+    private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private static func branch(_ index: Int, _ rows: [FullRow]) -> Branch {

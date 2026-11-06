@@ -11,15 +11,21 @@ struct TaskCapsule: View {
     var height: CGFloat = CardMetrics.height
     /// Lying over a long task's body or an event on the timeline: ringed in the ground's colour, as the plugin draws it.
     var over = false
+    /// Where the subtask counter is drawn, in the capsule's own space: the card lays its fold button there.
+    var onCounter: ((CGRect) -> Void)?
 
     @Environment(\.colorScheme) private var scheme
 
+    private static let space = "capsule"
+    /// On the timeline the card's content stands at its top, the corner beside the title's first line.
+    private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: onTimeline ? .top : .center, spacing: 6) {
             if selecting { pickCircle }
             // The title never widens the card: it runs on past the room and fades out over its last points.
             Color.clear
-                .frame(maxWidth: .infinity, maxHeight: 18)
+                .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 18)
                 .overlay(alignment: .leading) {
                     Text(card.item.text)
                         .font(.system(size: CardMetrics.title))
@@ -30,45 +36,22 @@ struct TaskCapsule: View {
                 }
                 .mask(fadeMask)
                 .accessibilityElement(children: .combine)
-            // The subtask counter over the description's mark, as the plugin stacks them.
-            if card.item.progress != nil || card.item.description != nil {
-                VStack(spacing: 1) {
-                    if let progress = card.item.progress {
-                        Text(verbatim: "\(progress.done)/\(progress.total)")
-                            .font(.system(size: 12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(meta)
-                            .accessibilityLabel("\(progress.done) of \(progress.total) subtasks done")
-                    }
-                    if card.item.description != nil {
-                        Image(systemName: "text.alignleft")
-                            .font(.system(size: card.item.progress == nil ? 10 : 8, weight: .semibold))
-                            .foregroundStyle(meta)
-                            .accessibilityLabel("Has notes")
-                    }
-                }
-            }
+            if card.item.progress != nil || card.item.description != nil { meta }
+            if let corner = card.corner { stackCorner(corner) }
             if let due = card.due {
-                VStack(spacing: 1) {
-                    HStack(spacing: 2) {
-                        Text(due.day).font(.system(size: 13, weight: .bold)).foregroundStyle(Palette.strong(scheme))
-                        if card.repeats { repeatIcon }
-                    }
-                    .frame(height: 13)
-                    Text(due.month).font(.system(size: 9, weight: .semibold)).kerning(0.3).foregroundStyle(meta)
-                }
-                .frame(width: 24)
+                dueCorner(due)
             } else if card.repeats {
-                repeatIcon
+                repeatIcon.frame(minWidth: 24)
             }
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .frame(maxWidth: .infinity, minHeight: CardMetrics.height, maxHeight: CardMetrics.height)
+        .padding(.top, onTimeline ? (CardMetrics.height - 18) / 2 : 0)
+        .frame(maxWidth: .infinity, minHeight: CardMetrics.height, maxHeight: onTimeline ? .infinity : CardMetrics.height, alignment: onTimeline ? .top : .center)
         .frame(height: max(height, CardMetrics.height), alignment: .top)
         .background(alignment: .topLeading) {
-            if card.item.inProgress {
-                Circle().fill(meta).frame(width: 4, height: 4)
+            if card.item.inProgress, !selecting {
+                Circle().fill(metaInk(shades)).frame(width: 4, height: 4)
                     .offset(x: 5, y: (CardMetrics.height - 4) / 2)
                     .accessibilityLabel("In progress")
             }
@@ -93,11 +76,72 @@ struct TaskCapsule: View {
             }
         }
         .contentShape(.rect(cornerRadius: CardMetrics.radius))
+        .coordinateSpace(.named(Self.space))
+    }
+
+    /// The subtask counter over the description's mark, as the plugin stacks them; either alone when the task has only it.
+    private var meta: some View {
+        let pair = card.item.progress != nil && card.item.description != nil
+        return VStack(spacing: 2) {
+            if let progress = card.item.progress {
+                Text(verbatim: "\(progress.done)/\(progress.total)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(height: pair ? 13 : 18)
+                    .foregroundStyle(metaColor)
+                    .accessibilityLabel("\(progress.done) of \(progress.total) subtasks done")
+            }
+            if card.item.description != nil {
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: pair ? 9 : 11, weight: .semibold))
+                    .frame(height: pair ? 11 : 13)
+                    .foregroundStyle(metaColor)
+                    .accessibilityLabel("Has notes")
+            }
+        }
+        .frame(minWidth: 22)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onCounter?($0) }
+    }
+
+    /// A list card's corner: the due day over its month, the repeat mark beside the day; it grows with what it holds.
+    private func dueCorner(_ due: DueLabel) -> some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 2) {
+                Text(due.day).font(.system(size: 13, weight: .bold)).monospacedDigit().foregroundStyle(Palette.strong(scheme))
+                if card.repeats { repeatIcon }
+            }
+            .frame(height: 13)
+            Text(due.month).font(.system(size: 9, weight: .semibold)).kerning(0.3).frame(height: 9).foregroundStyle(metaColor)
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .frame(minWidth: 24)
+    }
+
+    /// A timeline card's corner: its start when stacked, or its duration when the card is shorter, the two parts one over
+    /// the other in the small type.
+    private func stackCorner(_ parts: [String]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                Text(part).frame(height: 10)
+            }
+        }
+        .font(.system(size: 9, weight: .semibold))
+        .monospacedDigit()
+        .lineLimit(1)
+        .fixedSize()
+        .foregroundStyle(metaColor)
+        .frame(minWidth: 14)
+        .padding(.top, -1)
+        .accessibilityElement(children: .combine)
     }
 
     private var shades: Shades? { card.shades.map { scheme == .dark ? $0.dark : $0.light } }
     private var fill: Color { shades.map { Color(hex: $0.fill) } ?? Palette.card(scheme) }
-    private var meta: Color { shades.map { Color(hex: $0.meta) } ?? Palette.muted }
+    private var metaColor: Color { metaInk(shades) }
+    private func metaInk(_ shades: Shades?) -> Color { shades.map { Color(hex: $0.meta) } ?? Palette.muted }
 
     private var fadeMask: some View {
         HStack(spacing: 0) {
@@ -108,8 +152,8 @@ struct TaskCapsule: View {
 
     private var repeatIcon: some View {
         Image(systemName: "repeat")
-            .font(.system(size: 8, weight: .bold))
-            .foregroundStyle(meta)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(metaColor)
             .accessibilityLabel("Repeats")
     }
 

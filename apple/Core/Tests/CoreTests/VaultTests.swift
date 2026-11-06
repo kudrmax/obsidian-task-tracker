@@ -141,15 +141,22 @@ final class Waits: @unchecked Sendable {
 }
 
 @Suite struct FileWatchTests {
-    @Test func aCoordinatedWriteIsTold() async throws {
+    @Test func everyWriteIsToldAndTheAppsOwnReadsAtOnce() async throws {
         let tests = VaultTests()
         try tests.put("first", "TODOs Tasks.md")
         let vault = try tests.vault()
         let told = Waits()
         let watch = try #require(vault.watchTasksFile { told.record(.zero) })
-        _ = try vault.write(tasks: "second", expecting: "first")
+        _ = try vault.write(tasks: "mine", expecting: "first")
+        let start = Date()
+        #expect(try vault.read().tasks == "mine")
+        #expect(Date().timeIntervalSince(start) < 0.2)
         for _ in 0..<50 where told.count == 0 { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(told.count > 0)
+        #expect(told.count == 1)
+        // Another writer: a reminder's button in the widget's process, iCloud.
+        _ = try tests.vault().write(tasks: "theirs", expecting: "mine")
+        for _ in 0..<50 where told.count == 1 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(told.count > 1)
         watch.cancel()
     }
 }

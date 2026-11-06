@@ -2,7 +2,8 @@ import Core
 import SwiftUI
 
 extension View {
-    /// What a task's menu opens: Pick a Date and Repeat as sheets, Rename, Add Subtask and New Section as alerts with a field.
+    /// What a task's menu opens: Pick a Date, Repeat, Rename and Add Subtask as sheets, New Section as an alert with a field,
+    /// as Notes names a folder.
     func boardSheets(model: BoardModel) -> some View {
         modifier(BoardSheets(model: model))
     }
@@ -18,28 +19,67 @@ private struct BoardSheets: ViewModifier {
                 if let items = model.dateFor { DateSheet(items: items, model: model) }
             }
             .sheet(item: $model.repeatFor) { item in RepeatSheet(item: item, model: model) }
-            .alert("Rename", isPresented: present(\.renaming)) {
-                TextField("Task", text: $text)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") { if let item = model.renaming { Task { await model.rename(item, to: text) } } }
+            .sheet(item: $model.renaming) { item in
+                NameSheet(title: "Rename", action: "Rename", text: item.text) { text in Task { await model.rename(item, to: text) } }
             }
-            .alert("New Subtask", isPresented: present(\.subtaskOf)) {
-                TextField("Task", text: $text)
-                Button("Cancel", role: .cancel) {}
-                Button("Add") { if let item = model.subtaskOf { Task { await model.addSubtask(to: item, text) } } }
+            .sheet(item: $model.subtaskOf) { item in
+                NameSheet(title: "New Subtask", action: "Add") { text in Task { await model.addSubtask(to: item, text) } }
             }
             .alert("New Section", isPresented: present(\.newSection)) {
                 TextField("Name", text: $text)
                 Button("Cancel", role: .cancel) {}
                 Button("Add") { if let item = model.newSection { Task { await model.toSection([item], text) } } }
             }
-            .onChange(of: model.renaming?.id) { text = model.renaming?.text ?? "" }
-            .onChange(of: model.subtaskOf?.id) { text = "" }
             .onChange(of: model.newSection?.id) { text = "" }
     }
 
     private func present<T>(_ path: ReferenceWritableKeyPath<BoardModel, T?>) -> Binding<Bool> {
         Binding(get: { model[keyPath: path] != nil }, set: { if !$0 { model[keyPath: path] = nil } })
+    }
+}
+
+/// A task's title typed on its own small sheet, as Reminders names a new list: the field takes the keyboard at once, the
+/// check writes it and the cross closes untouched.
+struct NameSheet: View {
+    let title: LocalizedStringKey
+    let action: LocalizedStringKey
+    var text = ""
+    let done: (String) -> Void
+    @State private var typed = ""
+    @FocusState private var typing: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Title", text: $typed, axis: .vertical)
+                    .focused($typing)
+                    .submitLabel(.done)
+                    .onSubmit(save)
+                    .onChange(of: typed) { if typed.contains("\n") { save() } }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.tint(.primary) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action, systemImage: "checkmark", action: save)
+                        .buttonStyle(.glassProminent)
+                        .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.height(180)])
+        .defaultFocus($typing, true)
+        .onAppear { typed = text }
+        .task { typing = true }
+    }
+
+    private func save() {
+        let title = typed.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        done(title)
+        dismiss()
     }
 }
 

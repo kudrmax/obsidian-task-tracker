@@ -111,13 +111,14 @@ struct TaskMenu {
 // MARK: UIKit: a card's menu
 
 extension MenuNode {
+    /// `later`: a row that opens a sheet, an alert or a page runs once the menu has gone, as the menu's own end tells.
     @MainActor
-    static func uiMenu(_ nodes: [MenuNode], palette: (String) -> UIColor?) -> UIMenu {
-        UIMenu(children: nodes.map { $0.element(palette) })
+    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: (String) -> UIColor?) -> UIMenu {
+        UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
     @MainActor
-    private func element(_ palette: (String) -> UIColor?) -> UIMenuElement {
+    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
         switch self {
         case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
@@ -125,14 +126,14 @@ extension MenuNode {
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
             return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
-                if opens { Task { @MainActor in try? await Task.sleep(for: .milliseconds(350)); run() } } else { run() }
+                if opens { later { run() } } else { run() }
             }
         case .submenu(let title, let symbol, let subtitle, let children):
-            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(palette) })
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(later, palette) })
             menu.subtitle = subtitle
             return menu
         case .group(let row, let children):
-            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(palette) })
+            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
             if row { menu.preferredElementSize = .medium }
             return menu
         }
