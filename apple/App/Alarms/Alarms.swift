@@ -11,12 +11,20 @@ final class Alarms: AlarmScheduling {
 
     private var manager: AlarmManager { .shared }
 
-    /// Only alarms still to ring: one ringing now is left alone, so a sync never silences it.
+    func id(for reminderID: String) -> String {
+        ids.id(for: reminderID).uuidString
+    }
+
+    /// Only alarms still to ring: one ringing now is left alone, so a sync never silences it. One not set for a fixed
+    /// time is not a reminder's and is listed to be taken away.
     func scheduled() async -> [String: Date] {
         var result: [String: Date] = [:]
         for alarm in (try? manager.alarms) ?? [] where alarm.state == .scheduled {
-            guard case .fixed(let at) = alarm.schedule, let reminderID = ids.reminderID(of: alarm.id) else { continue }
-            result[reminderID] = at
+            guard case .fixed(let at) = alarm.schedule else {
+                result[alarm.id.uuidString] = .distantPast
+                continue
+            }
+            result[alarm.id.uuidString] = at
         }
         return result
     }
@@ -37,11 +45,9 @@ final class Alarms: AlarmScheduling {
             configuration: .alarm(schedule: .fixed(reminder.start), attributes: attributes, stopIntent: stop, secondaryIntent: snooze, sound: AppSettings.alarmSound ? .default : .named("silence.caf")))
     }
 
-    func cancel(_ reminderIDs: [String]) async {
-        for reminderID in reminderIDs {
-            let id = ids.id(for: reminderID)
+    func cancel(_ alarmIDs: [String]) async {
+        for id in alarmIDs.compactMap(UUID.init(uuidString:)) {
             try? manager.cancel(id: id)
-            ids.forget(id)
         }
     }
 }

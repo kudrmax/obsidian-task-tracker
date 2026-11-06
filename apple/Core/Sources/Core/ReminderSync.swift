@@ -2,17 +2,18 @@ import Foundation
 
 public struct DeliveredNotification: Equatable, Sendable {
     public let identifier: String
-    public let reminderID: String
     public let at: Date
 
-    public init(identifier: String, reminderID: String, at: Date) {
+    public init(identifier: String, at: Date) {
         self.identifier = identifier
-        self.reminderID = reminderID
         self.at = at
     }
+
+    var reminderID: String? { NoticeID(identifier: identifier)?.reminderID }
 }
 
-/// The app's own notifications in iOS: planned and already shown.
+/// The app's notifications in iOS, planned and already shown: all of them, as iOS lists them. Which are the reminders'
+/// is told by `NoticeID` alone.
 public protocol NotificationScheduling: Sendable {
     func pending() async -> Set<String>
     func delivered() async -> [DeliveredNotification]
@@ -23,11 +24,13 @@ public protocol NotificationScheduling: Sendable {
     func showProblem(_ reason: String?) async
 }
 
-/// The app's alarms, by reminder id.
+/// The app's alarms, by alarm id: all of them still to ring, whichever task set them.
 public protocol AlarmScheduling: Sendable {
+    /// The one alarm a reminder has.
+    func id(for reminderID: String) -> String
     func scheduled() async -> [String: Date]
     func schedule(_ reminder: Reminder) async throws
-    func cancel(_ reminderIDs: [String]) async
+    func cancel(_ alarmIDs: [String]) async
 }
 
 /// The reminders' Live Activities, by reminder id: when each starts.
@@ -193,11 +196,11 @@ public actor ReminderSync {
         var refusedCard: Error?
         let byID = Dictionary(reminders.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
-        let ringing = Dictionary(reminders.filter { $0.kind == .alarm && $0.start > at }.map { ($0.id, $0.start) }, uniquingKeysWith: { first, _ in first })
+        let ringing = Dictionary(reminders.filter { $0.kind == .alarm && $0.start > at }.map { (alarms.id(for: $0.id), $0) }, uniquingKeysWith: { first, _ in first })
         let set = await alarms.scheduled()
-        await alarms.cancel(set.filter { ringing[$0.key] != $0.value }.map(\.key).sorted())
-        for (id, start) in ringing where set[id] != start {
-            do { try await alarms.schedule(byID[id]!) } catch { failure = failure ?? error }
+        await alarms.cancel(set.filter { ringing[$0.key]?.start != $0.value }.map(\.key).sorted())
+        for (id, reminder) in ringing where set[id] != reminder.start {
+            do { try await alarms.schedule(reminder) } catch { failure = failure ?? error }
         }
 
         let carded = CardPlan.plan(reminders, now: at)
@@ -215,17 +218,17 @@ public actor ReminderSync {
             }
         }
 
-        let told = Set(await notifications.delivered().map(\.reminderID))
+        let told = Set(await notifications.delivered().compactMap(\.reminderID))
         let plan = RepeatPlan.plan(reminders.filter { !onCards.contains($0.id) }, now: at, told: told).map { planned in
             planned.offering(AfterEvent.offer(at: planned.fire, before: byID[planned.reminderID]!.dayEnd, among: meetings))
         }
         let wanted = Set(plan.map(\.identifier))
-        let pending = await notifications.pending()
+        let pending = await notifications.pending().filter(NoticeID.isSyncs)
         await notifications.removePending(pending.subtracting(wanted).sorted())
         for planned in plan where !pending.contains(planned.identifier) {
             do { try await notifications.schedule(planned, reminder: byID[planned.reminderID]!) } catch { failure = failure ?? error }
         }
-        await notifications.removeDelivered(Self.outdated(await notifications.delivered(), of: Set(byID.keys)))
+        await notifications.removeDelivered(Self.outdated(await notifications.delivered().filter { NoticeID.isSyncs($0.identifier) }, of: Set(byID.keys)))
         return (failure, refusedCard)
     }
 
@@ -244,10 +247,11 @@ public actor ReminderSync {
         return (try? rules.meetings(settingsJSON: settingsJSON, texts: texts, from: at, to: end, now: at)) ?? []
     }
 
-    /// Shown notifications to take away: those of reminders that are gone, and all but the latest of each reminder.
+    /// Shown notifications to take away: those of reminders that are gone or that cannot be named, and all but the
+    /// latest of each reminder.
     private static func outdated(_ delivered: [DeliveredNotification], of reminders: Set<String>) -> [String] {
         Dictionary(grouping: delivered, by: \.reminderID).flatMap { id, shown -> [String] in
-            guard reminders.contains(id) else { return shown.map(\.identifier) }
+            guard let id, reminders.contains(id) else { return shown.map(\.identifier) }
             let latest = shown.max { $0.at < $1.at }
             return shown.filter { $0 != latest }.map(\.identifier)
         }

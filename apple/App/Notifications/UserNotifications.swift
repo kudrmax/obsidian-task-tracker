@@ -5,12 +5,11 @@ import UserNotifications
 /// a snooze until it is over.
 final class UserNotifications: NotificationScheduling {
     static let category = "task-reminder"
-    private static let problem = "sync#problem"
+    private static let problem = NoticeID.problem.identifier
 
     static let afterEvent = "afterEvent"
 
     private enum Key {
-        static let reminderID = "reminderID"
         static let date = "date"
         static let afterTitle = "afterTitle"
         static let afterUntil = "afterUntil"
@@ -43,9 +42,9 @@ final class UserNotifications: NotificationScheduling {
         offer.map { "\(category)#\($0)" } ?? category
     }
 
-    static func shownReminder(_ content: UNNotificationContent) -> ShownReminder? {
-        guard let id = content.userInfo[Key.reminderID] as? String, let date = content.userInfo[Key.date] as? String else { return nil }
-        return ShownReminder(id: id, title: content.title, body: content.body, date: date)
+    static func shownReminder(_ request: UNNotificationRequest) -> ShownReminder? {
+        guard let id = NoticeID(identifier: request.identifier)?.reminderID, let date = request.content.userInfo[Key.date] as? String else { return nil }
+        return ShownReminder(id: id, title: request.content.title, body: request.content.body, date: date)
     }
 
     /// When the meeting the notification offered to wait out is over.
@@ -57,20 +56,15 @@ final class UserNotifications: NotificationScheduling {
     static func showFailure(_ reason: String, of reminder: ShownReminder) {
         let content = content(of: reminder)
         content.subtitle = reason
-        center.add(UNNotificationRequest(identifier: "\(reminder.id)#failed", content: content, trigger: nil))
+        center.add(UNNotificationRequest(identifier: NoticeID.failure(reminderID: reminder.id).identifier, content: content, trigger: nil))
     }
 
-    /// Only the reminders', told by their task as `delivered()` tells them: one offering to wait out a meeting has a
-    /// category of its own. The sync leaves the app's other notices (the signature's) alone.
     func pending() async -> Set<String> {
-        Set(await Self.center.pendingNotificationRequests().filter { $0.content.userInfo[Key.reminderID] is String }.map(\.identifier))
+        Set(await Self.center.pendingNotificationRequests().map(\.identifier))
     }
 
     func delivered() async -> [DeliveredNotification] {
-        await Self.center.deliveredNotifications().compactMap { shown in
-            guard let id = shown.request.content.userInfo[Key.reminderID] as? String else { return nil }
-            return DeliveredNotification(identifier: shown.request.identifier, reminderID: id, at: shown.date)
-        }
+        await Self.center.deliveredNotifications().map { DeliveredNotification(identifier: $0.request.identifier, at: $0.date) }
     }
 
     func schedule(_ notification: PlannedNotification, reminder: Reminder) async throws {
@@ -123,7 +117,7 @@ final class UserNotifications: NotificationScheduling {
         content.interruptionLevel = .active
         content.threadIdentifier = reminder.id
         content.categoryIdentifier = category
-        content.userInfo = [Key.reminderID: reminder.id, Key.date: reminder.date]
+        content.userInfo = [Key.date: reminder.date]
         return content
     }
 }

@@ -112,5 +112,5 @@ A free Apple ID signs the app for 7 days; after that it does not open until it i
 
 - **Plate** at the top of Settings, whenever the date is known (not in the simulator): a coloured square with a signature glyph, "N days left" (whole days) or, in the last day, "N hours left" (rounded up), and the date and time it ends. Green while more than 2 days are left, orange from 2 days, red from 1 day. Under it: "Install the app from the Mac again before then."
 - **Notices** 2 days, 1 day, 12 hours, 2 hours and 1 hour before the end, quiet like the reminders. Set again each time the app opens (a fresh install brings a new date); the ones already past are not set.
-- The reminders' sync manages only notifications of the reminder category, so it leaves these alone.
+- Every notification of the app is named by `NoticeID` (Core) and known again by that name only, never by its category or buttons. The reminders' sync owns the reminders' notifications and any it cannot name (an older version's, taken away); these notices and the sync's problem notice have names of their own, so it leaves them alone. Alarms likewise: each reminder's alarm id is made from the reminder, and an alarm no task wants is cancelled.
 - Simulator check: launch argument `-SignatureHoursLeft <hours>`.

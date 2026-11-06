@@ -37,7 +37,7 @@ import Testing
     @Test func identifiersAreStable() {
         let a = RepeatPlan.plan([reminder("A")], now: Fixtures.date(4, 9))
         let b = RepeatPlan.plan([reminder("A")], now: Fixtures.date(4, 9, 30))
-        #expect(a.first?.identifier == "A#0")
+        #expect(a.first?.identifier == notice("A", 0))
         #expect(Set(b.map(\.identifier)).isSubset(of: Set(a.map(\.identifier))))
     }
 
@@ -46,7 +46,7 @@ import Testing
         let tomorrow = reminder("Tomorrow", start: Fixtures.date(5, 8), dayEnd: Fixtures.date(6, 5))
         let plan = RepeatPlan.plan(overdue + [tomorrow], now: Fixtures.date(4, 9))
         #expect(plan.count == RepeatPlan.budget)
-        #expect(plan.contains { $0.identifier == "Tomorrow#0" })
+        #expect(plan.contains { $0.identifier == notice("Tomorrow", 0) })
         #expect(plan == plan.sorted { $0.fire < $1.fire })
     }
 }

@@ -106,6 +106,16 @@ import Testing
         #expect(await notifications.pendingIDs.values.filter { $0.fire == Fixtures.date(4, 10) }.count == 1)
     }
 
+    @Test func aClosedTaskLosesTheDeliveriesThatOfferAMeeting() async {
+        let vault = FakeVault(Fixtures.file(Self.quiet))
+        let standup = CalendarEvent(title: "Standup", start: Fixtures.date(4, 10, 30), end: Fixtures.date(4, 11))
+        _ = await sync(vault, [standup], at: Fixtures.date(4, 9)).sync()
+        #expect(await notifications.pendingIDs.values.contains { $0.after != nil })
+        vault.text = Fixtures.file("- [x] Call ⏰ 2026-11-04 10:00")
+        _ = await sync(vault, [standup], at: Fixtures.date(4, 9)).sync()
+        #expect(await notifications.pendingIDs.isEmpty)
+    }
+
     @Test func googleMeetingsCountAndTheWorkFilterApplies() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         vault.files["calendar/google.json"] = #"{"exportedAt":"2026-11-04T08:00:00Z","events":[{"id":"g","title":"Lunch","start":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 10, 30)))","end":"\#(ISO8601DateFormatter().string(from: Fixtures.date(4, 11)))","allDay":false,"calendar":"Personal"}]}"#

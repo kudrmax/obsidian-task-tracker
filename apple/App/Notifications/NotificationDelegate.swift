@@ -4,7 +4,7 @@ import UserNotifications
 /// Carries out what the person did with a reminder's notification.
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Sendable {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard let reminder = UserNotifications.shownReminder(response.notification.request.content) else { return }
+        guard let reminder = UserNotifications.shownReminder(response.notification.request) else { return }
         let services = AppServices.shared
         if let button = ReminderButton(identifier: response.actionIdentifier) {
             switch button {
