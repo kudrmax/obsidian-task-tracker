@@ -15,8 +15,8 @@ struct TaskFullScreen: View {
     @State private var saving: Task<Void, Never>?
     @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
-    /// The text is being put in the editor from the file, not typed.
-    @State private var placing = false
+    /// The text last put in the editor from the file: a change to anything else is typing.
+    @State private var placed = ""
 
     private var task: TaskItem { current ?? item }
 
@@ -40,7 +40,7 @@ struct TaskFullScreen: View {
                     .scrollDisabled(true)
                     .frame(minHeight: 200)
                     .scrollContentBackground(.hidden)
-                    .onChange(of: text) { if !placing { typed() } }
+                    .onChange(of: text) { if text != placed { typed() } }
             }
             .padding(.horizontal, Layout.margin)
         }
@@ -121,9 +121,8 @@ struct TaskFullScreen: View {
     }
 
     private func place(_ new: String) {
-        placing = true
+        placed = new
         text = new
-        Task { @MainActor in placing = false }
     }
 
     private func typed() {

@@ -130,6 +130,18 @@ a tap and a long press on a card, a drag inside a list, to a subtask, to another
 target and back, the plus the same ways, the menu and its sheets, light and dark — and fixes what is slow, jumpy or not
 iOS before the lead sees it.
 
+### A card's corner (Max's finding 8, screenshot)
+
+On a timeline stack card «Позвонить маме» the repeat icon overlapped the start time «17 / 30»: the corner was a fixed
+24 pt column holding the list card's due date, the repeat mark and the stacked start all at once. As in the plugin
+(`renderMeta`, `fillMeta`, `.tc-due…`, `.tc-meta`, `.tc-block-meta`):
+
+- A list card's corner is the due day over its month, the repeat mark beside the day (or the repeat mark alone); the
+  counter over the notes mark stands before it as its own column. A timeline card's corner is only the stack's two
+  small lines (its start when stacked, its duration when shorter): no due date and no repeat mark there.
+- No column has a fixed width text can overflow: each is at least the plugin's width (24, 22, 14) and grows with what
+  it holds; the title fades out before them.
+
 ## What the contract gives (backend)
 
 Already started in this worktree (uncommitted, check and finish): `core/application/timelineZoom.ts` — `ZoomLevel`,
@@ -193,3 +205,43 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   an unreadable saved zoom → `DEFAULT_ZOOM_HOUR`, clamped). `wholeDayPx` is `null` before the timeline has a height, and
   then the smallest level stands for the whole day. The `Zoom` type (`number | "wholeDay"`) is exported from contracts;
   `obsidian/ui/viewSettings.ts` still declares its own and may switch to it.
+- frontend-swift: the tab bar is a standalone `UITabBar` (iOS 26 glass) bound to the one ribbon, the plus a real
+  `UIControl` beside it (the accent's interactive glass, `UIGlassEffect` tinted). A standalone tab bar draws its glass at
+  most 273 pt wide for three items, inset 21 pt in its bounds: its glass is lined up with the screen's 16 pt margin, so
+  the gap to the plus is wider than the board's 10 pt. TabView could not host one shared content.
+- frontend-swift: the day list and the calendar slide as one unit when the day changes (`.push` from the arrow's side,
+  `.smooth`); SwiftUI's clip does not hold the UIKit-backed columns apart during a transition, so they move together as
+  the day they are. The day before and after are read ahead (`days.step` + a snapshot each) and shown in the same frame;
+  the screen is read anew underneath.
+- frontend-swift: every drop goes through one UIKit `UIDropInteraction` on the window (`BoardDrop`); the lists and the
+  calendar register as places with their frames. So a dropped card's preview flies into the gap or onto the line's time
+  (`previewForDropping`), a cancelled or targetless carry flies home (`previewForCancelling` to where it was lifted), and
+  the cancel target (the plus's own `UIDropInteraction`, proposing `.cancel`) takes over cleanly from the places. SwiftUI's
+  `onDrop` is gone (it offered no drop preview and kept hovering over the plus).
+- frontend-swift: a card is a `UIControl` with a `UIContextMenuInteraction` (preview and dismissal preview = the card's
+  content in its capsule) and a `UIDragInteraction`; a tap only highlights it (an overlay outside the preview, so a lifted
+  card never carries the dim) and clears the search ring. The subtask counter is its own `UIButton` laid exactly where the
+  capsule draws the counter (the capsule reports that frame). **For the lead to confirm with Max: a tap on a card opens
+  nothing; the menu is the long press.**
+- frontend-swift: menu rows that open a sheet or a page run in the context menu's `willEnd` animator's completion (no
+  sleep). Rename, Add Subtask and the plus's new task are small sheets with a focused field (as Reminders names a list);
+  New Section and Rename Section stay alerts with a field, as Notes names a folder.
+- frontend-swift: the tasks file is watched by an `NSFilePresenter` (`Vault.watchTasksFile`) while the scene is active,
+  and read again when the scene comes back; no polling. The app's own reads and writes are coordinated as that presenter
+  (else every read after a write waited ~0.5 s for the system to message it), and the app's own write tells the watch
+  itself, so a reminder's button in the app's process still redraws the screen.
+- frontend-swift: a read finding exactly the text this app last wrote skips the settle wait. Drop to the card in its
+  new place, measured on the simulator: 48–69 ms (write 16–27 ms, the screen's read ~35–50 ms), the drop preview's flight
+  covering it.
+- frontend-swift: a carried card's rows (with its subtasks) collapse to no height and stay in the hierarchy (their drag
+  interaction must outlive the carry); the gap is drawn at the core's level with that level's branch line; a gap that
+  would land in an empty section takes the place of its «No tasks» plate.
+- frontend-swift: the zoom is kept in `UserDefaults` (`timelineZoom`: `wholeDay` or the hour's height, as
+  `rules.zoomAfterPinch` answers) and opened by `rules.zoomShown` at the column's visible height; the pinch is the scroll
+  view's `MagnifyGesture`, the minute under the fingers kept by scrolling to it every frame. The stack is re-laid by
+  `rules.stackTasks` (with `rules.stackCorner`) once per hour height, the grid by `rules.gridAt`/`rules.gridMarks` with
+  the plugin's measures (divisions 5, 15, 30; label gap 40; ticks 5 min / 16 pt).
+- frontend-swift: kept waits, each the system's way for its job: the full screen's description saves 1 s after the last
+  keystroke (the door leaves the debounce to the host), search reads 150 ms after the last keystroke, `Vault`'s settle
+  wait for another app's write, the recorder's meter timer.
+

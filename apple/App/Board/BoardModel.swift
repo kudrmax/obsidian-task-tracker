@@ -47,12 +47,6 @@ struct ListGap: Equatable {
 enum DropTiming {
     private static let log = Logger(subsystem: "com.kudrmax.taskcalendar", category: "drop")
 
-    static func mark(_ what: String, since start: ContinuousClock.Instant) {
-        let elapsed = ContinuousClock.now - start
-        let ms = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
-        log.notice("\(what, privacy: .public) \(ms, format: .fixed(precision: 1)) ms")
-    }
-
     static func report(since start: ContinuousClock.Instant) {
         let elapsed = ContinuousClock.now - start
         let ms = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
@@ -251,15 +245,12 @@ final class BoardModel {
     /// spring, a drop's lands at once (the card is already where the finger let it go).
     func write(_ method: String, _ arguments: [JSONValue], animated: Bool = true) async {
         let board = board
-        let start = ContinuousClock.now
         do {
             try await Task.detached { try board.write(method, arguments) }.value
         } catch {
             problem = Self.words(error)
         }
-        DropTiming.mark("write", since: start)
         await reload(animated: animated)
-        DropTiming.mark("write+read", since: start)
     }
 
     func read<T: Decodable & Sendable>(_ method: String, _ arguments: [JSONValue] = []) async throws -> T {
