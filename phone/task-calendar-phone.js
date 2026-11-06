@@ -19,8 +19,10 @@
   function isValidLocalDate(s) {
     const m = DATE_RE.exec(s);
     if (!m) return false;
-    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-    return formatUtc(d) === s;
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    return year >= 1e3 && month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
   }
   function addDays(date, n) {
     return formatUtc(new Date(utcMs(date) + n * DAY_MS));
@@ -32,8 +34,15 @@
     const m = index - y * 12 + 1;
     return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
   }
+  var MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function isLeapYear(year) {
+    return year % 4 === 0 && year % 100 !== 0 || year % 400 === 0;
+  }
   function daysInMonth(year, month) {
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const index = year * 12 + month - 1;
+    const y = Math.floor(index / 12);
+    const m = index - y * 12;
+    return m === 1 && isLeapYear(y) ? 29 : MONTH_DAYS[m];
   }
   function weekdayOf(date) {
     return (new Date(utcMs(date)).getUTCDay() + 6) % 7;
@@ -566,7 +575,19 @@
     }
     return slicer;
   }
+  var readLines = /* @__PURE__ */ new WeakMap();
+  var KEPT_LINES = 2e4;
   function parseTaskLine(line, markers) {
+    let kept = readLines.get(markers);
+    if (!kept) readLines.set(markers, kept = /* @__PURE__ */ new Map());
+    const known = kept.get(line);
+    if (known !== void 0) return known;
+    if (kept.size >= KEPT_LINES) kept.clear();
+    const parsed = readTaskLine(line, markers);
+    kept.set(line, parsed);
+    return parsed;
+  }
+  function readTaskLine(line, markers) {
     const m = LINE_RE.exec(line);
     if (!m) return null;
     const statusChar = m[3];
@@ -4831,8 +4852,9 @@ ${key.title}`.toLowerCase();
      */
     act(text, line, action2) {
       const at = this.rules.moment();
-      const found = this.find(this.rules.read(text, at).doc, line);
-      if (found) return this.rules.change(text, action2(found), at).text;
+      const { doc } = this.rules.read(text, at);
+      const found = this.find(doc, line);
+      if (found) return this.rules.changeOf(doc, action2(found), at).text;
       const asRead = this.find(this.rules.asRead(text, at), line);
       return asRead ? this.rules.changeAsRead(text, action2(asRead), at).text : null;
     }

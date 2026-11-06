@@ -20,11 +20,14 @@ export function localDateOf(d: Date): LocalDate {
 	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+/** A date of the years 1000–9999 that the calendar has: a month of the year, a day of the month. */
 export function isValidLocalDate(s: string): boolean {
 	const m = DATE_RE.exec(s);
 	if (!m) return false;
-	const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-	return formatUtc(d) === s;
+	const year = Number(m[1]);
+	const month = Number(m[2]);
+	const day = Number(m[3]);
+	return year >= 1000 && month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
 }
 
 export function addDays(date: LocalDate, n: number): LocalDate {
@@ -40,8 +43,18 @@ export function addMonths(date: LocalDate, n: number): LocalDate {
 	return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
 }
 
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isLeapYear(year: number): boolean {
+	return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+/** `month` from 1; a month past either end of the year counts into the next or the last. */
 export function daysInMonth(year: number, month: number): number {
-	return new Date(Date.UTC(year, month, 0)).getUTCDate();
+	const index = year * 12 + month - 1;
+	const y = Math.floor(index / 12);
+	const m = index - y * 12;
+	return m === 1 && isLeapYear(y) ? 29 : MONTH_DAYS[m];
 }
 
 /** 0 = Monday … 6 = Sunday. */
