@@ -117,10 +117,7 @@ describe("the guard itself", () => {
  * Host globals `domain` and `application` still use, each with the branch that removes it. Delete the line when that
  * branch lands: the test fails while a listed exception is no longer needed.
  */
-const TEMPORARY_HOST_GLOBALS: readonly { readonly file: string; readonly name: string; readonly until: string }[] = [
-	{ file: "src/application/CalendarServiceImpl.ts", name: "setTimeout", until: "fix-phone-calendar: the calendar's wait goes through the Timers port" },
-	{ file: "src/application/CalendarServiceImpl.ts", name: "clearTimeout", until: "fix-phone-calendar: the calendar's wait goes through the Timers port" },
-];
+const TEMPORARY_HOST_GLOBALS: readonly { readonly file: string; readonly name: string; readonly until: string }[] = [];
 
 /** What `tsc -p tsconfig.core.json` reports: domain, application and settings without DOM and Node, one line per error. */
 function coreErrors(): string[] {
@@ -172,6 +169,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	sectionChoice: "./sections",
 	DESCRIPTION_TEMPLATE: "../domain/description",
 	textParts: "../domain/TaskText",
+	LINE_BREAK: "../domain/TaskTitle",
+	oneLine: "../domain/TaskTitle",
 	CARD_GAP_MAX: "../settings",
 	CARD_HEIGHT_MAX: "../settings",
 	CARD_HEIGHT_MIN: "../settings",
