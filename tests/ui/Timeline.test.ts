@@ -5,12 +5,13 @@ import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 import { onDay } from "../fakes/itemOnDay";
+import { withShownSpan } from "../fakes/timelineDeps";
 
 /** One card and one gap: how far down a stack the next card stands. */
 const STACK_STEP = DEFAULT_SETTINGS.cardHeight + DEFAULT_SETTINGS.cardGap;
 
 function timeline(zoom: { hourPx: number }, boundary = DayBoundary.MIDNIGHT, tasks: TaskItem[] = []): Timeline {
-	const view = new Timeline(document.createElement("div"), {
+	const view = new Timeline(document.createElement("div"), withShownSpan({
 		theme: () => "dark",
 		date: () => "2026-10-30",
 		today: () => "2026-10-31",
@@ -19,7 +20,7 @@ function timeline(zoom: { hourPx: number }, boundary = DayBoundary.MIDNIGHT, tas
 		tasks: () => tasks,
 		events: () => [],
 		now: () => new Date(2026, 9, 31, 12, 0),
-	});
+	}));
 	view.render();
 	return view;
 }
@@ -78,7 +79,7 @@ describe("Timeline grid", () => {
 
 describe("hour labels by the now line", () => {
 	function hidden(hourPx: number, hours: number, minutes: number): string[] {
-		const view = new Timeline(document.createElement("div"), {
+		const view = new Timeline(document.createElement("div"), withShownSpan({
 			theme: () => "dark",
 			date: () => "2026-10-31",
 			today: () => "2026-10-31",
@@ -87,7 +88,7 @@ describe("hour labels by the now line", () => {
 			tasks: () => [],
 			events: () => [],
 			now: () => new Date(2026, 10, 1, hours, minutes),
-		});
+		}));
 		view.render();
 		return [...view.canvas.querySelectorAll(".tc-hour-label.is-hidden")].map((label) => label.textContent ?? "");
 	}
@@ -238,7 +239,7 @@ describe("tasks the now line has passed", () => {
 	const task = (index: number, start: number, end: number | null, status: TaskItem["status"] = "todo"): TaskItem => onDay({ key: { section: "now", index, path: [], raw: "" }, text: `T${index}`, status, dueDate: null, slot: { date: "2026-10-31", start, end }, reminder: "notification", repeat: null, open: status === "todo" || status === "inProgress", repeatable: true, priority: null, subtasks: [], progress: null, parentText: null, description: null, group: null, list: "now", isSubtask: false }, "2026-10-30");
 
 	function onToday(tasks: TaskItem[], date = "2026-10-31"): HTMLElement[] {
-		const view = new Timeline(document.createElement("div"), {
+		const view = new Timeline(document.createElement("div"), withShownSpan({
 			theme: () => "dark",
 			date: () => date,
 			today: () => "2026-10-31",
@@ -247,7 +248,7 @@ describe("tasks the now line has passed", () => {
 			tasks: () => tasks,
 			events: () => [],
 			now: () => new Date(2026, 9, 31, 12, 0),
-		});
+		}));
 		view.render();
 		return tasks.map((t) => [...view.itemsEl.querySelectorAll<HTMLElement>(".tc-block")].find((b) => b.textContent?.startsWith(t.text))!);
 	}
@@ -313,7 +314,7 @@ describe("the minute's tick", () => {
 
 	function ticking(tasks: TaskItem[]) {
 		const clock = { now: new Date(2026, 9, 31, 12, 0) };
-		const view = new Timeline(document.createElement("div"), {
+		const view = new Timeline(document.createElement("div"), withShownSpan({
 			theme: () => "dark",
 			date: () => "2026-10-31",
 			today: () => "2026-10-31",
@@ -322,7 +323,7 @@ describe("the minute's tick", () => {
 			tasks: () => tasks,
 			events: () => [meeting],
 			now: () => clock.now,
-		});
+		}));
 		view.render();
 		return { view, clock };
 	}
@@ -565,7 +566,7 @@ describe("an event at the day's edges", () => {
 	const event = (start: Date, end: Date): CalendarEvent => ({ id: "e", title: "E", start, end, allDay: false, calendar: "Work", color: "#0A84FF", source: "google", account: null, calendarId: null });
 
 	function spans(boundary: DayBoundary, events: CalendarEvent[]): { start: number; end: number }[] {
-		const view = new Timeline(document.createElement("div"), {
+		const view = new Timeline(document.createElement("div"), withShownSpan({
 			theme: () => "dark",
 			date: () => "2026-10-30",
 			today: () => "2026-10-31",
@@ -574,7 +575,7 @@ describe("an event at the day's edges", () => {
 			tasks: () => [],
 			events: () => events,
 			now: () => new Date(2026, 9, 31, 12, 0),
-		});
+		}));
 		view.render();
 		return (view as unknown as { events: { start: number; end: number }[] }).events.map(({ start, end }) => ({ start, end }));
 	}

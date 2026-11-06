@@ -13,6 +13,7 @@ import { DayBoundary } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
+import { withShownSpan } from "../fakes/timelineDeps";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const TODAY = "2026-11-01";
@@ -98,7 +99,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			renaming: () => controller?.renaming() ?? null,
 		});
 	}
-	const timeline = new Timeline(root.appendChild(document.createElement("div")), {
+	const timeline = new Timeline(root.appendChild(document.createElement("div")), withShownSpan({
 		theme: () => "dark",
 		date: () => day,
 		today: () => TODAY,
@@ -107,7 +108,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		tasks: () => slotted,
 		events: () => [],
 		now: () => new Date(2026, 10, 1, 8, 0),
-	});
+	}));
 	let draws = 0;
 	/** The day column's rows as each drawing left them. */
 	const drawnLeft: string[][] = [];

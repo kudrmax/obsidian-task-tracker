@@ -37,6 +37,7 @@ describe("toItem", () => {
 			status: "inProgress",
 			dueDate: null,
 			slot: { date: T, start: 600, end: 660 },
+			durationMin: 60,
 			reminder: "notification",
 			repeat: null,
 			open: true,

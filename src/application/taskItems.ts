@@ -46,6 +46,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		status: entry.task.status,
 		dueDate: entry.task.dueDate,
 		slot: entry.task.slot,
+		durationMin: entry.task.slot && entry.task.slot.end !== null ? entry.task.slot.end - entry.task.slot.start : null,
 		reminder: entry.task.reminder,
 		repeat: entry.task.repeat?.rule ?? null,
 		open: isOpen(entry.task.status),
