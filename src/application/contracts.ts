@@ -34,6 +34,8 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
+export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** A list in its sections, and whether it shows their headers. */
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */

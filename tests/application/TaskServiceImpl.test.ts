@@ -1340,7 +1340,7 @@ describe("labels", () => {
 
 	it("answers for the bar with the marks the file then has: the priority chosen or typed, else the labels", async () => {
 		const NOW = { kind: "list", list: "now", group: null, before: null } as const;
-		const drafts: [string, string | null, string[]][] = [["p1 Buy milk", null, ["Важное"]], ["Buy milk", null, ["Важное", "Срочное"]], ["Buy milk", "p2", ["Срочное"]], ["p2 Buy milk", "p1", []], ["Buy milk", null, []]];
+		const drafts: [string, string | null, string[]][] = [["p1 Buy milk", null, ["Важное"]], ["Buy milk", null, ["Важное", "Срочное"]], ["Buy milk", "p2", ["Срочное"]], ["p2 Buy milk", "p1", []], ["Buy milk", null, []], ["  p1 Buy milk", null, []], ["\tp1 Buy milk", null, ["Важное"]]];
 		for (const [text, priority, labels] of drafts) {
 			const { svc } = setup("## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n", labelled());
 			const shown = svc.draftMarks(text, priority, labels);

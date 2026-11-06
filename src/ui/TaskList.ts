@@ -1,9 +1,8 @@
-import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListSection, type ListView, listView, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
 import { isEmptyGroup } from "./listGroups";
-import type { PendingText } from "./quick/QuickEntry";
 import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
