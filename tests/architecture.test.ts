@@ -19,8 +19,8 @@ function layerOf(file: string): Layer | null {
 
 const under = (target: string, dir: string): boolean => target.startsWith(`src/${dir}/`);
 
-/** What the iOS app's door may use besides the contract: the phone services it calls today. */
-const PHONE_SERVICES = ["src/application/PhoneCaptureService.ts", "src/application/PhoneMeetingService.ts", "src/application/PhoneReminderService.ts"];
+/** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
+const PHONE_DOOR = "src/application/PhoneDoor.ts";
 
 /** What a layer may import: a path in the repository, or a package's name. */
 const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
@@ -28,7 +28,7 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	application: (t) => under(t, "domain") || under(t, "application") || t === "src/settings.ts",
 	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && layerOf(t) !== "root",
 	ui: (t) => under(t, "ui") || t === "src/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
-	phone: (t) => under(t, "phone") || t === "src/application/contracts.ts" || PHONE_SERVICES.includes(t),
+	phone: (t) => under(t, "phone") || t === "src/application/contracts.ts" || t === PHONE_DOOR,
 	settings: (t) => under(t, "domain"),
 	root: () => true,
 };
@@ -106,6 +106,9 @@ describe("the guard itself", () => {
 		expect(MAY_IMPORT.phone("src/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.phone("src/settings.ts")).toBe(false);
 		expect(MAY_IMPORT.phone("src/application/contracts.ts")).toBe(true);
+		expect(MAY_IMPORT.phone("src/application/PhoneDoor.ts")).toBe(true);
+		expect(MAY_IMPORT.phone("src/application/TaskRules.ts")).toBe(false);
+		expect(MAY_IMPORT.phone("src/application/composeCore.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("src/phone/main.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("src/compose.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("src/ui/TaskCard.ts")).toBe(false);
