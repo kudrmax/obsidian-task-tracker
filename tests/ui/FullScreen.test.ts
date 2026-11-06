@@ -57,12 +57,16 @@ function setup(item = morning()) {
 	};
 	const tasks = {
 		...priorityTitles([]),
-		find: vi.fn(async (): Promise<TaskItem | null> => null),
+		find: vi.fn(async (_key: { readonly raw: string }, _text: string): Promise<TaskItem | null> => null),
 		toggleDone: vi.fn(async () => undefined),
 		fullTree,
 		setDescription: vi.fn(async () => undefined),
-		rename: vi.fn(async (): Promise<TaskItem | null> => null),
+		edit: vi.fn(async (): Promise<TaskItem | null> => null),
 		createInPlace: vi.fn(async () => null),
+		createSection: vi.fn(async () => null),
+		placementOf: () => ({ kind: "now" }) as const,
+		placementOfDay: () => ({ kind: "now" }) as const,
+		dayOfPlacement: () => T,
 	};
 	const deps = {
 		root: document.body.appendChild(document.createElement("div")),
@@ -77,6 +81,7 @@ function setup(item = morning()) {
 		onUndo: vi.fn(),
 		menu: vi.fn(),
 		onClose: vi.fn(),
+		onError: vi.fn(),
 	};
 	const screen = FullScreen.open(deps, item, false);
 	const cards = () => [...screen.el.querySelectorAll<HTMLElement>(".tc-full-list .tc-card")];
@@ -118,14 +123,14 @@ describe("FullScreen", () => {
 		expect(deps.menu).toHaveBeenCalledWith(expect.objectContaining({ text: "Собрать рюкзак" }), cards()[0]);
 	});
 
-	it("writes the description once typing pauses, and nothing when it holds what was written", async () => {
-		const { editor, tasks } = setup();
+	it("writes the description once typing pauses, and nothing more until something is typed again", async () => {
+		const { editor, tasks, screen } = setup();
 		editor.value = "- Выйти в 8:40\n- Зонт";
 		editor.changed();
 		expect(tasks.setDescription).not.toHaveBeenCalled();
 		await vi.advanceTimersByTimeAsync(600);
 		expect(tasks.setDescription).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), "- Выйти в 8:40\n- Зонт");
-		editor.changed();
+		screen.close();
 		await vi.advanceTimersByTimeAsync(600);
 		expect(tasks.setDescription).toHaveBeenCalledOnce();
 	});
@@ -170,14 +175,44 @@ describe("FullScreen", () => {
 
 	it("the plus types a new subtask last under the task; Enter writes it and keeps the field for the next", async () => {
 		const { screen, tasks } = setup();
+		tasks.find.mockResolvedValue(morning());
 		screen.el.querySelector<HTMLElement>("button.tc-plus")!.click();
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")!;
 		expect(field).not.toBeNull();
 		field.value = " Выпить витамины ";
+		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.createInPlace).toHaveBeenCalledWith(" Выпить витамины ", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null });
-		expect(field.value).toBe("");
+		expect(tasks.createInPlace).toHaveBeenCalledWith(" Выпить витамины ", null, { kind: "subtask", parent: expect.objectContaining({ path: [] }), before: null }, null, []);
+		expect(screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")?.value).toBe("");
+	});
+
+	it("Enter on an empty field ends the entry and writes nothing; Escape drops what was typed", async () => {
+		const { screen, tasks } = setup();
+		screen.el.querySelector<HTMLElement>("button.tc-plus")!.click();
+		const field = () => screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea");
+		field()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+		expect(field()).toBeNull();
+		screen.el.querySelector<HTMLElement>("button.tc-plus")!.click();
+		field()!.value = "Зонт";
+		field()!.dispatchEvent(new InputEvent("input"));
+		field()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		expect(field()).toBeNull();
+		await vi.runAllTimersAsync();
+		expect(tasks.createInPlace).not.toHaveBeenCalled();
+	});
+
+	it("a tap elsewhere writes the new subtask and ends the entry", async () => {
+		const { screen, tasks } = setup();
+		screen.el.querySelector<HTMLElement>("button.tc-plus")!.click();
+		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")!;
+		field.value = "Зонт";
+		field.dispatchEvent(new InputEvent("input"));
+		field.blur();
+		field.dispatchEvent(new FocusEvent("blur"));
+		await vi.runAllTimersAsync();
+		expect(tasks.createInPlace).toHaveBeenCalledWith("Зонт", null, expect.objectContaining({ kind: "subtask" }), null, []);
+		expect(screen.el.querySelector(".tc-full-list textarea")).toBeNull();
 	});
 
 	it("a new subtask of a subtask stands where the tree puts it: after that subtask and all its own, a level deeper", () => {
@@ -188,15 +223,17 @@ describe("FullScreen", () => {
 		expect(rows[3].style.getPropertyValue("--tc-level")).toBe("1");
 	});
 
-	it("a subtask's rename sends the text as typed, and the service's answer decides whether anything was written", async () => {
-		const { screen, tasks, deps } = setup();
+	it("a subtask's rename in its card sends the text as typed and ends on Enter", async () => {
+		const { screen, tasks } = setup();
 		screen.rename(backpack());
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-list textarea")!;
 		expect(field.value).toBe("Собрать рюкзак");
+		field.value = "Собрать сумку";
+		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [0] }), "Собрать рюкзак");
-		expect(deps.act).toHaveBeenCalledOnce();
+		expect(tasks.edit).toHaveBeenCalledWith(expect.objectContaining({ path: [0] }), expect.objectContaining({ text: "Собрать сумку" }));
+		expect(screen.el.querySelector(".tc-full-list textarea")).toBeNull();
 	});
 
 	it("Rename of the task on screen turns its title into the field", async () => {
@@ -204,20 +241,45 @@ describe("FullScreen", () => {
 		screen.rename(morning());
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
 		field.value = "Собраться";
+		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), "Собраться");
+		expect(tasks.edit).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), expect.objectContaining({ text: "Собраться" }));
+	});
+
+	it("Escape in the title puts the title back unwritten; a tap elsewhere writes it", async () => {
+		const { screen, tasks } = setup();
+		screen.rename(morning());
+		let field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
+		field.value = "Собраться";
+		field.dispatchEvent(new InputEvent("input"));
+		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		await vi.runAllTimersAsync();
+		expect(screen.el.querySelector(".tc-full-title textarea")).toBeNull();
+		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться утром");
+		expect(tasks.edit).not.toHaveBeenCalled();
+		screen.rename(morning());
+		field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
+		field.value = "Собраться к 9";
+		field.dispatchEvent(new InputEvent("input"));
+		field.dispatchEvent(new FocusEvent("blur"));
+		await vi.runAllTimersAsync();
+		expect(tasks.edit).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), expect.objectContaining({ text: "Собраться к 9" }));
 	});
 
 	it("the renamed title is the task as the service answers with it", async () => {
 		const { screen, tasks } = setup();
-		tasks.rename.mockResolvedValueOnce({ ...morning(), text: "Собраться к 9" });
+		const renamed = { ...morning(), text: "Собраться к 9" };
+		tasks.edit.mockResolvedValueOnce(renamed);
+		tasks.find.mockResolvedValue(renamed);
 		screen.rename(morning());
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
 		field.value = "  Собраться к 9 ";
+		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.rename).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), "  Собраться к 9 ");
+		await screen.refresh();
+		expect(tasks.edit).toHaveBeenCalledWith(expect.objectContaining({ path: [] }), expect.objectContaining({ text: "  Собраться к 9 " }));
 		expect(screen.el.querySelector(".tc-full-title textarea")).toBeNull();
 		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться к 9");
 	});
@@ -225,20 +287,22 @@ describe("FullScreen", () => {
 	it("a change of the file while its title is written waits for it, then reads the task by the key the rename answered with", async () => {
 		const { screen, tasks, deps } = setup();
 		const renamed = { ...morning(), text: "Собраться к 9", key: { section: "now" as const, index: 0, path: [], raw: "- [ ] Собраться к 9" } };
-		tasks.rename.mockResolvedValueOnce(renamed);
-		tasks.find.mockResolvedValue(renamed);
-		deps.act.mockImplementationOnce(async (change: () => Promise<void | boolean>) => {
-			const refreshed = screen.refresh();
-			await change();
-			await refreshed;
+		tasks.find.mockImplementation(async (key: { raw: string }) => (key.raw === renamed.key.raw ? renamed : key.raw === "- [ ] Собраться утром" && !tasks.edit.mock.calls.length ? morning() : null));
+		let refreshed: Promise<void> | null = null;
+		tasks.edit.mockImplementationOnce(async () => {
+			refreshed = screen.refresh();
+			return renamed;
 		});
 		screen.rename(morning());
 		const field = screen.el.querySelector<HTMLTextAreaElement>(".tc-full-title textarea")!;
 		field.value = "Собраться к 9";
+		field.dispatchEvent(new InputEvent("input"));
 		field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
 		await vi.runAllTimersAsync();
-		expect(tasks.find).toHaveBeenCalledWith(renamed.key, "Собраться к 9");
+		await refreshed;
+		expect(tasks.find).toHaveBeenLastCalledWith(renamed.key, "Собраться к 9");
 		expect(deps.onClose).not.toHaveBeenCalled();
+		expect(screen.el.querySelector(".tc-full-title")?.textContent).toBe("Собраться к 9");
 	});
 
 	it("closes on Close and on Escape", () => {

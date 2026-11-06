@@ -980,6 +980,7 @@ export class TaskCalendarView extends ItemView {
 					if (this.full) this.showMenu(task, source, source.classList.contains("tc-card") ? (copy) => FullScreen.mark(copy, task) : undefined, this.full);
 				},
 				onClose: () => (this.full = null),
+				onError: (error) => this.reportFailure(error),
 			},
 			item,
 			editing,

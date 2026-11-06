@@ -176,6 +176,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	placeOfDrop: "./nesting",
 	sameGap: "./nesting",
 	QuickEntrySession: "./QuickEntrySession",
+	SectionNameEntry: "./SectionNameEntry",
 	listView: "./sections",
 	sectionChoice: "./sections",
 	DESCRIPTION_TEMPLATE: "../domain/description",

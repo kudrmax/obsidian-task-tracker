@@ -17,6 +17,7 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 		repeatable: false,
 		priority: null,
 		labels: [],
+		colors: [],
 		group: null,
 		list,
 		isSubtask: false,

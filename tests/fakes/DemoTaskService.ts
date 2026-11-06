@@ -6,7 +6,8 @@ import { fullTree } from "../../src/application/fullTree";
 import { TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../src/domain/Days";
-import { markChoices, typedMarks } from "../../src/domain/Marks";
+import { typedMarks } from "../../src/domain/Marks";
+import { draftMarksOf, markColors } from "../../src/application/marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
@@ -109,13 +110,7 @@ export class DemoTaskService implements TaskService {
 	}
 
 	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
-		const marks = typedMarks(text, priority, labels, this.prefixes());
-		const choices = markChoices(marks);
-		return {
-			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
-			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
-			can: { setPriority: choices.priority, setLabels: choices.labels },
-		};
+		return draftMarksOf(typedMarks(text, priority, labels, this.prefixes()), this.priorityLevels(), this.labelLevels());
 	}
 
 	isBlank(text: string): boolean {
@@ -163,6 +158,7 @@ export class DemoTaskService implements TaskService {
 			repeatable: section !== "done" && (t.status === "todo" || t.status === "inProgress"),
 			priority: DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null,
 			labels: [],
+			colors: markColors(DEFAULT_SETTINGS.priorities.find((l) => l.prefix === t.priority) ?? null, []),
 			subtasks: [],
 			allSubtasks: [],
 			progress: null,
@@ -364,7 +360,7 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
+	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
 		const t = this.taskOf(key);
 		t.text = draft.text.trim() || t.text;
 		t.priority = draft.priority;
@@ -372,6 +368,7 @@ export class DemoTaskService implements TaskService {
 		const current = this.placementOf(this.item(key.section, key.index));
 		if (JSON.stringify(current) !== JSON.stringify(draft.placement)) this.place(this.take(key), draft.placement);
 		this.changed();
+		return null;
 	}
 
 	async setStatus(key: TaskKey, status: TaskStatus): Promise<void> {

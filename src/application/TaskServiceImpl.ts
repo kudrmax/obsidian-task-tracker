@@ -1,6 +1,7 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
-import { markChoices, typedMarks } from "../domain/Marks";
+import { typedMarks } from "../domain/Marks";
+import { draftMarksOf } from "./marks";
 import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
 import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
@@ -122,13 +123,8 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
-		const marks = typedMarks(text, priority, labels, this.priorityLevels().map((l) => l.prefix));
-		const choices = markChoices(marks);
-		return {
-			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
-			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
-			can: { setPriority: choices.priority, setLabels: choices.labels },
-		};
+		const levels = this.priorityLevels();
+		return draftMarksOf(typedMarks(text, priority, labels, levels.map((l) => l.prefix)), levels, this.labelLevels());
 	}
 
 	isBlank(text: string): boolean {
@@ -278,8 +274,12 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate(this.rules.createSubtask(parent, draft));
 	}
 
-	async edit(key: TaskKey, draft: TaskDraft): Promise<void> {
-		await this.mutate(this.rules.edit(key, draft));
+	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
+		const edit = this.rules.edit(key, draft);
+		const change = edit && (await this.mutate(edit.operation));
+		const place = edit?.place() ?? null;
+		if (!change || !place || change.before.serialize() === change.after.serialize()) return null;
+		return this.itemAt(change.after, place, this.today(), this.itemLevels());
 	}
 
 	placementOf(item: TaskItem): Placement {

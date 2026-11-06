@@ -107,6 +107,10 @@ class FakeTasks {
 	columns: Partial<Record<DropColumn, ListCard[]>> = {};
 	/** Labels the settings hold. */
 	labels: { name: string; color: "red" | "orange" }[] = [];
+	/** What an edit answers with: the task as the file then has it. */
+	editAnswer: TaskItem | null = null;
+	/** The renames the view was told of: the text the task had, the text it has now. */
+	readonly renamed: [string, string][] = [];
 
 	entry(): QuickEntrySession {
 		const titles = priorityTitles(
@@ -133,6 +137,7 @@ class FakeTasks {
 				edit: async (k, draft) => {
 					if (!this.cards.some((c) => c.key === k)) throw new StaleTaskError();
 					this.edits.push({ key: k, draft });
+					return this.editAnswer;
 				},
 				placementOf: () => ({ kind: "now" }),
 				placementOfDay: (date) => (date === DAY ? { kind: "now" } : { kind: "date", date }),
@@ -160,6 +165,7 @@ class FakeTasks {
 					this.lastState = state;
 					if (drawnNext !== true) this.see(state);
 				},
+				renamed: (was, now) => this.renamed.push([was.text, now.text]),
 			},
 			new SerialWrites((e) => this.errors.push(e)),
 		);
@@ -621,6 +627,30 @@ describe("QuickEntrySession", () => {
 		expect(tasks.names).toEqual(["P:0", "s1:1", "s2:1"]);
 	});
 
+	it("a rename in a stack writes on Enter and closes; the view is told the task as the file now has it", async () => {
+		const tasks = new FakeTasks(["P"]);
+		tasks.editAnswer = item("P2");
+		const entry = tasks.entry();
+		entry.open({ kind: "stack", parent: key("P") }, { ...item("P"), key: tasks.cards[0].key });
+		entry.type("P2");
+		entry.enter();
+		expect(entry.state).toBeNull();
+		await entry.idle();
+		expect(tasks.edits.map((e) => e.draft.text)).toEqual(["P2"]);
+		expect(tasks.renamed).toEqual([["P", "P2"]]);
+		expect(tasks.created).toEqual([]);
+	});
+
+	it("a rename the service writes nothing for tells the view of none", async () => {
+		const tasks = new FakeTasks(["P"]);
+		const entry = tasks.entry();
+		entry.open({ kind: "stack", parent: key("P") }, { ...item("P"), key: tasks.cards[0].key });
+		entry.blur();
+		await entry.idle();
+		expect(tasks.edits).toHaveLength(1);
+		expect(tasks.renamed).toEqual([]);
+	});
+
 	it("opening another place finishes the open field as a tap elsewhere", async () => {
 		const tasks = new FakeTasks(["A"]);
 		const entry = tasks.entry();
@@ -890,6 +920,19 @@ describe("QuickEntrySession", () => {
 		expect(tasks.created).toEqual([]);
 	});
 
+	it("a field writing a section's name offers no shift, no marks, no repeat and no place; back to a task, it offers them again", () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		tasks.labels = [{ name: "Важное", color: "red" }];
+		const entry = tasks.entry();
+		entry.open(at(1));
+		const task = { indents: true, markable: true, repeatable: true, place: { kind: "now" } };
+		expect(entry.state).toMatchObject(task);
+		entry.toggleSection();
+		expect(entry.state).toMatchObject({ section: true, indents: false, markable: false, repeatable: false, place: null });
+		entry.toggleSection();
+		expect(entry.state).toMatchObject(task);
+	});
+
 	it("a section's field among subtasks goes past them, to the top level", () => {
 		const tasks = new FakeTasks(["A", ["A1", 1], ["A2", 1], "B"]);
 		const entry = tasks.entry();
@@ -980,7 +1023,7 @@ describe("QuickEntrySession", () => {
 		it("the place: the column's for a task at the top level; none for a subtask, a slot or a stack", () => {
 			const entry = new FakeTasks(["A"]).entry();
 			entry.open(at(1));
-			expect(entry.state).toMatchObject({ place: { kind: "now" }, places: ["inbox", "backlog", "soon", "now"] });
+			expect(entry.state).toMatchObject({ place: { kind: "now" }, places: [{ kind: "inbox", on: false }, { kind: "backlog", on: false }, { kind: "soon", on: false }, { kind: "now", on: true }, { kind: "date", on: false, date: null }] });
 			entry.open(inSoon(0));
 			expect(entry.state?.place).toEqual({ kind: "soon" });
 			entry.open(at(1, 1));

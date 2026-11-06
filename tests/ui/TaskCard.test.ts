@@ -180,13 +180,15 @@ describe("a card's colours", () => {
 	const ORANGE = { name: "Срочное", color: "orange" } as const;
 	const attrs = (card: HTMLElement) => [card.dataset.priority, card.dataset.labels, card.getAttribute("data-label0"), card.getAttribute("data-label1")];
 
-	it("tints a card of one label as a priority, and gives a card of several each colour", () => {
+	it("tints a card of one colour as a priority, and gives a card of several each colour, up to four", () => {
 		const card = document.createElement("div");
-		markColours(card, { priority: null, labels: [RED] });
+		markColours(card, { colors: [RED.color] });
 		expect(attrs(card)).toEqual(["red", undefined, null, null]);
-		markColours(card, { priority: null, labels: [RED, ORANGE] });
+		markColours(card, { colors: [RED.color, ORANGE.color] });
 		expect(attrs(card)).toEqual(["red", "2", "red", "orange"]);
-		markColours(card, { priority: null, labels: [] });
+		markColours(card, { colors: ["red", "orange", "blue", "green", "teal"] });
+		expect(card.dataset.labels).toBe("4");
+		markColours(card, { colors: [] });
 		expect(attrs(card)).toEqual([undefined, undefined, null, null]);
 	});
 });

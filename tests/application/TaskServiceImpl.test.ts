@@ -251,6 +251,25 @@ describe("the task sheet", () => {
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] B\n\n## Soon\n\n- [ ] C\n- [ ] A\n\n## Backlog\n\n## Done\n");
 	});
 
+	it("edit answers with the task as it now stands, its key fresh, where it went; null when nothing was written", async () => {
+		const { svc } = setup(FULL);
+		const view = await svc.dayView(T);
+		const renamed = await svc.edit(view.list[0].key, { text: "  A2 ", placement: { kind: "now" }, priority: null });
+		expect([renamed?.text, renamed?.key]).toEqual(["A2", { section: "now", index: 0, path: [], raw: "- [ ] A2" }]);
+		const moved = await svc.edit(renamed!.key, { text: "A3", placement: { kind: "soon" }, priority: null });
+		expect([moved?.text, moved?.key]).toEqual(["A3", { section: "soon", index: 1, path: [], raw: "- [ ] A3" }]);
+		expect(await svc.edit(moved!.key, { text: "A3", placement: { kind: "soon" }, priority: null })).toBeNull();
+	});
+
+	it("edit of a title that is only a priority's prefix writes nothing, as create and rename", async () => {
+		const { store, svc } = setup(FULL);
+		const view = await svc.dayView(T);
+		expect(await svc.edit(view.list[0].key, { text: "p1 ", placement: { kind: "now" }, priority: null })).toBeNull();
+		expect(await svc.rename(view.list[0].key, "p1 ")).toBeNull();
+		expect(await svc.createInPlace("p1 ", null, { kind: "list", list: "now", group: null, before: null })).toBeNull();
+		expect(store.writes).toBe(0);
+	});
+
 	it("edit with blank text writes nothing and a stale key is rejected", async () => {
 		const { store, svc } = setup(FULL);
 		const view = await svc.dayView(T);
@@ -1385,8 +1404,21 @@ describe("labels", () => {
 			const written = (await svc.dayView(T)).list[0];
 			expect({ priority: shown.priority, labels: shown.labels }, text).toEqual({ priority: written.priority, labels: written.labels });
 			expect(shown.can, text).toEqual({ setPriority: written.can.setPriority, setLabels: written.can.setLabels });
+			expect(shown.tint, text).toBe(written.colors[0] ?? null);
 		}
-		expect(setup("## Now\n", labelled()).svc.draftMarks("p1 Buy milk", null, ["Важное"])).toEqual({ priority: { prefix: "p1", color: "red" }, labels: [], can: { setPriority: true, setLabels: false } });
+		expect(setup("## Now\n", labelled()).svc.draftMarks("p1 Buy milk", null, ["Важное"])).toMatchObject({ priority: { prefix: "p1", color: "red" }, labels: [], can: { setPriority: true, setLabels: false }, tint: "red" });
+	});
+
+	it("offers every level and label as a tile: on when the task is written with it, enabled while it may be chosen", () => {
+		const { svc } = setup("## Now\n", labelled());
+		const labelledDraft = svc.draftMarks("Buy milk", null, ["Срочное"]);
+		expect(labelledDraft.tint).toBe("orange");
+		expect(labelledDraft.tiles.labels.map((t) => [t.mark.name, t.on, t.enabled])).toEqual([["Важное", false, true], ["Срочное", true, true]]);
+		expect(labelledDraft.tiles.levels.every((t) => !t.on && !t.enabled)).toBe(true);
+		const prioritized = svc.draftMarks("p2 Buy milk", null, []);
+		expect(prioritized.tiles.levels.filter((t) => t.on).map((t) => t.mark.prefix)).toEqual(["p2"]);
+		expect(prioritized.tiles.labels.every((t) => !t.on && !t.enabled)).toBe(true);
+		expect(svc.draftMarks("Buy milk", null, []).tint).toBeNull();
 	});
 });
 

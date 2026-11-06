@@ -27,7 +27,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName" | "priorityLevels" | "labelLevels">;
+	readonly tasks: QuickEntryTasks & Pick<TaskService, "listName">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -74,7 +74,7 @@ interface MenuField {
 const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", day: "now" };
 
 /** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
-function movesRows(before: EntryState | null, after: EntryState): boolean {
+export function movesRows(before: EntryState | null, after: EntryState): boolean {
 	if (!before || before.spot !== after.spot || before.renaming !== after.renaming || before.section !== after.section) return true;
 	return before.pending.length !== after.pending.length || before.pending.some((line, i) => line.text !== after.pending[i].text || line.level !== after.pending[i].level);
 }
@@ -162,8 +162,6 @@ export class QuickEntryController {
 		this.ring = new PlusRing(deps.root);
 		this.bar = new QuickBar(deps.root, {
 			desktop: () => deps.desktop(),
-			levels: () => deps.tasks.priorityLevels(),
-			labels: () => deps.tasks.labelLevels(),
 			today: () => deps.today(),
 			listName: (list) => deps.tasks.listName(list),
 			placementOfDay: (day) => deps.tasks.placementOfDay(day),
@@ -561,7 +559,7 @@ export class QuickEntryController {
 	private sync(state: EntryState): void {
 		if (this.field && this.field.text !== state.text) this.field.setValue(state.text);
 		this.field?.setSection(state.section === true);
-		if (!state.section) this.field?.setTint(state.marks.priority?.color ?? state.marks.labels[0]?.color ?? null);
+		if (!state.section) this.field?.setTint(state.marks.tint);
 		this.bar.show(state);
 	}
 

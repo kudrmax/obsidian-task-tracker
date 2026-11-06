@@ -4,6 +4,7 @@ import type { GroupedList, Placement, RepeatRule } from "../../src/application/c
 import type { DraftMarks, LabelLevel, PriorityLevel } from "../../src/application/contracts";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
 import { placementOfDay } from "../../src/domain/Days";
+import { draftMarksOf } from "../../src/application/marks";
 
 const LEVELS: readonly PriorityLevel[] = [
 	{ prefix: "p1", color: "red" },
@@ -19,9 +20,9 @@ const LABELS = [
 /** The labels the next bar set up offers: none unless a test gives some. */
 let shownLabels: readonly (typeof LABELS)[number][] = [];
 
-/** The service's answer for a field with this priority and these labels. */
+/** The service's answer for a field with this priority and these labels, over the levels and the labels shown. */
 function marks(priority: PriorityLevel | null = null, labels: readonly LabelLevel[] = []): DraftMarks {
-	return { priority, labels, can: { setPriority: labels.length === 0, setLabels: priority === null } };
+	return draftMarksOf({ priority: priority?.prefix ?? null, labels: labels.map((l) => l.name) }, LEVELS, shownLabels);
 }
 
 const DEFAULT_NAMES: Readonly<Record<GroupedList, string>> = { inbox: "Inbox", backlog: "Backlog", soon: "Soon", now: "Now" };
@@ -32,7 +33,18 @@ const listName = (list: GroupedList) => listNames[list];
 
 const PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
 
-const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), place: { kind: "soon" }, places: PLACES, repeat: null, repeatable: true, repeatDay: "2026-11-01", section: null };
+/** The place button's tiles as the session gives them for a field going to `place`. */
+function placesFor(place: Placement | null): QuickBarState["places"] {
+	return [...PLACES.map((kind) => ({ kind, on: place?.kind === kind })), { kind: "date" as const, on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
+}
+
+const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, marks: marks(), markable: true, place: { kind: "soon" }, places: placesFor({ kind: "soon" }), repeat: null, repeatable: true, repeatDay: "2026-11-01", section: null };
+
+/** The session's state for the bar: the marks over the labels shown now and the places for its place, unless given. */
+function full(state: Partial<QuickBarState> = {}): QuickBarState {
+	const place = state.place === undefined ? STATE.place : state.place;
+	return { ...STATE, marks: marks(), places: placesFor(place), ...state };
+}
 
 const WEEKLY_THU: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [3], dayOfMonth: null, from: null };
 
@@ -50,9 +62,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 	const labelled: string[] = [];
 	const bar = new QuickBar(parent, {
 		desktop: () => desktop,
-		levels: () => LEVELS,
-		labels: () => shownLabels,
-		onLabel: (name: string) => labelled.push(name),
+				onLabel: (name: string) => labelled.push(name),
 		today: () => TODAY,
 		listName,
 		placementOfDay: placementOf,
@@ -62,7 +72,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 		onRepeat: (rule) => repeats.push(rule),
 		onSection: () => sections.push(true),
 	});
-	bar.show({ ...STATE, ...state });
+	bar.show(full(state));
 	return { parent, bar, indents, priorities, places, repeats, sections, labelled };
 }
 
@@ -80,10 +90,10 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
-		bar.show(STATE);
+		bar.show(full());
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(false);
 		bar.hide();
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
@@ -96,7 +106,7 @@ describe("QuickBar", () => {
 		q(parent, ".tc-bar-outdent").click();
 		q(parent, ".tc-bar-indent").click();
 		expect(indents).toEqual([1]);
-		bar.show({ ...STATE, canIndent: false, canOutdent: true });
+		bar.show(full({ canIndent: false, canOutdent: true }));
 		q(parent, ".tc-bar-outdent").click();
 		expect(indents).toEqual([1, -1]);
 	});
@@ -120,10 +130,10 @@ describe("QuickBar", () => {
 		const flag = q(parent, ".tc-bar-flag");
 		expect(flag.dataset.priority).toBeUndefined();
 		expect(flag.classList.contains("is-set")).toBe(false);
-		bar.show({ ...STATE, marks: marks(LEVELS[1]) });
+		bar.show(full({ marks: marks(LEVELS[1]) }));
 		expect(flag.dataset.priority).toBe("orange");
 		expect(flag.classList.contains("is-set")).toBe(true);
-		bar.show(STATE);
+		bar.show(full());
 		expect(flag.dataset.priority).toBeUndefined();
 	});
 
@@ -131,11 +141,11 @@ describe("QuickBar", () => {
 		const { parent, bar } = setup();
 		const label = () => q(parent, ".tc-bar-place .tc-btn-label").textContent;
 		expect(label()).toBe("Soon");
-		bar.show({ ...STATE, place: { kind: "inbox" } });
+		bar.show(full({ place: { kind: "inbox" } }));
 		expect(label()).toBe("Inbox");
-		bar.show({ ...STATE, place: { kind: "now" } });
+		bar.show(full({ place: { kind: "now" } }));
 		expect(label()).toBe("Now");
-		bar.show({ ...STATE, place: { kind: "date", date: "2026-11-05" } });
+		bar.show(full({ place: { kind: "date", date: "2026-11-05" } }));
 		expect(label()).toBe("5 Nov");
 	});
 
@@ -144,13 +154,13 @@ describe("QuickBar", () => {
 		const { parent, bar } = setup();
 		const label = () => q(parent, ".tc-bar-place .tc-btn-label").textContent;
 		expect(label()).toBe("Скоро");
-		bar.show({ ...STATE, place: { kind: "inbox" } });
+		bar.show(full({ place: { kind: "inbox" } }));
 		expect(label()).toBe("Входящие");
-		bar.show({ ...STATE, place: { kind: "backlog" } });
+		bar.show(full({ place: { kind: "backlog" } }));
 		expect(label()).toBe("Когда-нибудь");
-		bar.show({ ...STATE, place: { kind: "now" } });
+		bar.show(full({ place: { kind: "now" } }));
 		expect(label()).toBe("Сейчас");
-		bar.show({ ...STATE, place: { kind: "date", date: "2026-11-05" } });
+		bar.show(full({ place: { kind: "date", date: "2026-11-05" } }));
 		expect(label()).toBe("5 Nov");
 	});
 
@@ -163,7 +173,7 @@ describe("QuickBar", () => {
 		const { parent, bar } = setup({ place: { kind: "inbox" } });
 		const label = () => q<HTMLElement>(parent, ".tc-bar-place .tc-btn-label");
 		expect(label().classList.contains("is-long")).toBe(true);
-		bar.show({ ...STATE, place: { kind: "soon" } });
+		bar.show(full({ place: { kind: "soon" } }));
 		expect(label().classList.contains("is-long")).toBe(false);
 		scroll.mockRestore();
 		client.mockRestore();
@@ -212,10 +222,10 @@ describe("the priority panel", () => {
 		expect(priorities).toEqual(["p1"]);
 	});
 
-	it("opens no panel without levels", () => {
+	it("has no flag while the session says there is nothing to mark", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
-		bar.show(STATE);
+		const bar = new QuickBar(parent, { desktop: () => false, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		bar.show(full({ markable: false }));
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
 });
@@ -330,7 +340,7 @@ describe("the repeat button", () => {
 	it("is not there for a field that cannot repeat: a subtask, a slot", () => {
 		const { parent, bar } = setup({ repeatable: false });
 		expect(q(parent, ".tc-bar-repeat").hidden).toBe(true);
-		bar.show(STATE);
+		bar.show(full());
 		expect(q(parent, ".tc-bar-repeat").hidden).toBe(false);
 	});
 
@@ -339,7 +349,7 @@ describe("the repeat button", () => {
 		const button = q(parent, ".tc-bar-repeat");
 		expect(button.classList.contains("is-set")).toBe(false);
 		expect(button.getAttribute("aria-pressed")).toBe("false");
-		bar.show({ ...STATE, repeat: WEEKLY_THU });
+		bar.show(full({ repeat: WEEKLY_THU }));
 		expect(button.classList.contains("is-set")).toBe(true);
 		expect(button.getAttribute("aria-pressed")).toBe("true");
 	});
@@ -375,7 +385,7 @@ describe("the repeat button", () => {
 		q(parent, ".tc-bar-repeat").click();
 		weekday(parent, "Mon").click();
 		expect(repeats).toEqual([{ ...WEEKLY_THU, days: [0, 3] }]);
-		bar.show({ ...STATE, repeat: repeats[0] });
+		bar.show(full({ repeat: repeats[0] }));
 		segment(parent, "days").click();
 		expect(repeats[1]).toEqual({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null });
 		expect(parent.querySelector(".tc-quick-panel")).not.toBeNull();
@@ -386,7 +396,7 @@ describe("the repeat button", () => {
 		q(parent, ".tc-bar-repeat").click();
 		const kind = q(parent, ".tc-repeat-seg-btn");
 		weekday(parent, "Mon").click();
-		bar.show({ ...STATE, repeat: repeats[0] });
+		bar.show(full({ repeat: repeats[0] }));
 		expect(q(parent, ".tc-repeat-seg-btn")).toBe(kind);
 	});
 
@@ -394,7 +404,7 @@ describe("the repeat button", () => {
 		const { parent, bar, repeats } = setup();
 		q(parent, ".tc-bar-repeat").click();
 		weekday(parent, "Mon").click();
-		bar.show({ ...STATE, repeat: repeats[0] });
+		bar.show(full({ repeat: repeats[0] }));
 		expect(parent.querySelector(".tc-repeat-remove")).not.toBeNull();
 	});
 
@@ -409,7 +419,7 @@ describe("the repeat button", () => {
 	it("closes when the field can no longer repeat", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-repeat").click();
-		bar.show({ ...STATE, repeatable: false });
+		bar.show(full({ repeatable: false }));
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 });
@@ -461,23 +471,23 @@ describe("the panels' opening and closing", () => {
 	it("keeps an open priority panel current as the field's level changes", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-flag").click();
-		bar.show({ ...STATE, marks: marks(LEVELS[2]) });
+		bar.show(full({ marks: marks(LEVELS[2]) }));
 		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([false, false, true]);
 	});
 
 	it("closes the place panel when the field no longer has a place", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-place").click();
-		bar.show({ ...STATE, place: null });
+		bar.show(full({ place: null }));
 		expect(parent.querySelector(".tc-quick-panel")).toBeNull();
 	});
 
 	it("the same place keeps its icon", () => {
 		const { parent, bar } = setup({ place: { kind: "inbox" } });
 		const first = q<SVGElement>(parent, ".tc-bar-place svg");
-		bar.show({ ...STATE, place: { kind: "inbox" } });
+		bar.show(full({ place: { kind: "inbox" } }));
 		expect(q<SVGElement>(parent, ".tc-bar-place svg")).toBe(first);
-		bar.show({ ...STATE, place: { kind: "soon" } });
+		bar.show(full({ place: { kind: "soon" } }));
 		expect(q<SVGElement>(parent, ".tc-bar-place svg")).not.toBe(first);
 		expect(parent.querySelectorAll(".tc-bar-place svg")).toHaveLength(1);
 		expect(q<HTMLElement>(parent, ".tc-bar-place .tc-btn-label").textContent).toBe("Soon");
@@ -487,16 +497,16 @@ describe("the panels' opening and closing", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-place").click();
 		const place = tiles(parent)[0];
-		bar.show(STATE);
+		bar.show(full());
 		expect(tiles(parent)[0]).toBe(place);
-		bar.show({ ...STATE, place: { kind: "inbox" } });
+		bar.show(full({ place: { kind: "inbox" } }));
 		expect(tiles(parent)[0]).not.toBe(place);
 		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([true, false, false, false, false]);
 		q(parent, ".tc-bar-flag").click();
 		const level = tiles(parent)[0];
-		bar.show({ ...STATE, place: { kind: "inbox" } });
+		bar.show(full({ place: { kind: "inbox" } }));
 		expect(tiles(parent)[0]).toBe(level);
-		bar.show({ ...STATE, place: { kind: "inbox" }, marks: marks(LEVELS[0]) });
+		bar.show(full({ place: { kind: "inbox" }, marks: marks(LEVELS[0]) }));
 		expect(tiles(parent)[0]).not.toBe(level);
 		expect(tiles(parent).map((t) => t.classList.contains("is-on"))).toEqual([true, false, false]);
 	});
@@ -505,7 +515,7 @@ describe("the panels' opening and closing", () => {
 		const { parent, bar } = setup();
 		q(parent, ".tc-bar-place").click();
 		tiles(parent)[4].click();
-		bar.show(STATE);
+		bar.show(full());
 		expect(parent.querySelector(".tc-picker")).not.toBeNull();
 	});
 });
@@ -690,7 +700,7 @@ describe("QuickBar on the phone keyboard", () => {
 		expect(section.getAttribute("aria-pressed")).toBe("false");
 		section.click();
 		expect(sections).toHaveLength(1);
-		const on = setup({ section: true });
+		const on = setup({ section: true, indents: false, markable: false, repeatable: false, place: null });
 		expect(q(on.parent, ".tc-bar-section").getAttribute("aria-pressed")).toBe("true");
 		for (const cls of [".tc-bar-outdent", ".tc-bar-flag", ".tc-bar-repeat", ".tc-bar-place"]) expect(q(on.parent, cls).hidden).toBe(true);
 		expect(q(setup().parent, ".tc-bar-section").hidden).toBe(true);
@@ -700,8 +710,8 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
-			bar.show({ ...STATE, section: false });
+			const bar = new QuickBar(parent, { desktop: () => desktop, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, onLabel: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			bar.show(full({ section: false }));
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);
 			for (const node of own) expect(bar.owns(node)).toBe(true);
@@ -735,7 +745,9 @@ describe("the flag's labels", () => {
 	});
 	it("turns tiles off as the service answers, whatever the field shows", () => {
 		shownLabels = LABELS;
-		const { parent } = setup({ marks: { priority: null, labels: [], can: { setPriority: false, setLabels: false } } });
+		const answer = marks();
+		const off = <T,>(tiles: readonly { readonly mark: T; readonly on: boolean }[]) => tiles.map((tile) => ({ ...tile, enabled: false }));
+		const { parent } = setup({ marks: { ...answer, can: { setPriority: false, setLabels: false }, tiles: { levels: off(answer.tiles.levels), labels: off(answer.tiles.labels) } } });
 		q(parent, ".tc-bar-flag").click();
 		expect([...document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles .tc-menu-tile")].every((t) => t.disabled)).toBe(true);
 	});

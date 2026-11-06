@@ -10,6 +10,7 @@ import { repeatable } from "../domain/queries";
 import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
+import { markColors } from "./marks";
 import type { SubtaskProgress, TaskItem, TaskKey } from "./contracts";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
@@ -44,6 +45,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 	const marks = marksOfTask(entry.task);
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
+	const labels = levels.labelsOf(marks.labels);
 	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
 	const description = descriptionMarkdown(entry);
 	return {
@@ -59,7 +61,8 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		open: isOpen(entry.task.status),
 		repeatable: repeatable(entry),
 		priority,
-		labels: levels.labelsOf(marks.labels),
+		labels,
+		colors: markColors(priority, labels),
 		group: entry.group,
 		list: entry.section,
 		isSubtask: entry.path.length > 0,

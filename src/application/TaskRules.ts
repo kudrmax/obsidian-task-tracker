@@ -7,6 +7,7 @@ import { type Column, columnGroups, columnList } from "../domain/queries";
 import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
 import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { EntryTags } from "../domain/EntryTags";
+import { taskTitle } from "../domain/TaskTitle";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
 import {
 	StaleTaskError,
@@ -73,8 +74,9 @@ function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 	return { kind: place.list };
 }
 
-function blank(text: string): boolean {
-	return text.trim() === "";
+/** A section's name of nothing: unlike a title, a level's prefix alone names a section. */
+function blankName(name: string): boolean {
+	return name.trim() === "";
 }
 
 /**
@@ -197,9 +199,19 @@ export class TaskRules {
 		return (doc, today) => ops.createSubtask(doc, this.entryOf(doc, parent), draft, today);
 	}
 
-	edit(key: TaskKey, draft: TaskDraft): Operation | null {
-		if (blank(draft.text)) return null;
-		return (doc, today, _settings, boundary) => ops.placeTask(doc, this.entryOf(doc, key), draft, today, undefined, boundary);
+	/** The task sheet's edit, and where the task stands after it (null before it ran); null for a blank title, a priority alone too. */
+	edit(key: TaskKey, draft: TaskDraft): { readonly operation: Operation; place(): TaskKey | null } | null {
+		if (this.isBlank(draft.text)) return null;
+		let place: TaskKey | null = null;
+		const operation: Operation = (doc, today, _settings, boundary) => {
+			const { doc: tagged, tags } = EntryTags.tag(doc, [this.entryOf(doc, key)]);
+			const entry = tags.find(tagged, 0)!;
+			const edited = ops.placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, undefined, boundary);
+			const moved = tags.find(edited, 0);
+			place = moved && { section: moved.section, index: moved.index, path: moved.path, raw: "" };
+			return tags.untag(edited);
+		};
+		return { operation, place: () => place };
 	}
 
 	setStatus(key: TaskKey, status: TaskStatus): Operation {
@@ -331,7 +343,7 @@ export class TaskRules {
 	}
 
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Operation | null {
-		if (blank(name)) return null;
+		if (blankName(name)) return null;
 		return (doc, today, settings) => ops.createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today, date ?? null);
 	}
 
@@ -345,7 +357,7 @@ export class TaskRules {
 
 	/** Null for a blank name or the section's own: nothing to write. */
 	renameGroup(list: GroupedList, group: string, name: string): Operation | null {
-		if (blank(name) || name.trim() === group) return null;
+		if (blankName(name) || name.trim() === group) return null;
 		return (doc, _today, settings) => {
 			this.groupOf(doc, list, group);
 			return ops.renameGroup(doc, list, group, name, settings.groups.ungrouped);
@@ -431,7 +443,7 @@ export class TaskRules {
 				this.groupOf(doc, change.list, change.group);
 				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
 			case "createGroup":
-				return blank(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
+				return blankName(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
 			case "nest":
 				return first ? ops.nest(doc, entry, first, second) : doc;
 		}

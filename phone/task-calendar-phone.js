@@ -1306,10 +1306,10 @@ ${key.title}`.toLowerCase();
     }
     /** A block's tasks, numbered on from the tasks of the blocks above it in `entries`. */
     readGroup(key, block, index, entries, spans) {
-      const blank2 = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
+      const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
       const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans);
       entries.push(...own);
-      return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank: blank2 };
+      return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
     }
     /** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
     readLevel(section, from, end, parent, group, firstIndex, spans) {
@@ -2001,6 +2001,10 @@ ${key.title}`.toLowerCase();
       );
       return { doc: tagged, tags: new _EntryTags(entries.length) };
     }
+    /** `text` with the n-th mark: written in place of a tagged task's text, it keeps the task tagged. */
+    static marked(text, n) {
+      return text + markOf(n);
+    }
     /** The n-th tagged task where it stands now; null once it is gone. */
     find(doc, n) {
       const mark = markOf(n);
@@ -2100,8 +2104,8 @@ ${key.title}`.toLowerCase();
     if (place.list === "soon" && place.date !== void 0 && place.date > today) return { kind: "day", date: place.date };
     return { kind: place.list };
   }
-  function blank(text) {
-    return text.trim() === "";
+  function blankName(name) {
+    return name.trim() === "";
   }
   var TaskRules = class {
     constructor(settings, clock) {
@@ -2198,9 +2202,19 @@ ${key.title}`.toLowerCase();
       if (this.isBlank(draft.text)) return null;
       return (doc, today) => createSubtask(doc, this.entryOf(doc, parent), draft, today);
     }
+    /** The task sheet's edit, and where the task stands after it (null before it ran); null for a blank title, a priority alone too. */
     edit(key, draft) {
-      if (blank(draft.text)) return null;
-      return (doc, today, _settings, boundary) => placeTask(doc, this.entryOf(doc, key), draft, today, void 0, boundary);
+      if (this.isBlank(draft.text)) return null;
+      let place = null;
+      const operation = (doc, today, _settings, boundary) => {
+        const { doc: tagged, tags } = EntryTags.tag(doc, [this.entryOf(doc, key)]);
+        const entry = tags.find(tagged, 0);
+        const edited = placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, void 0, boundary);
+        const moved = tags.find(edited, 0);
+        place = moved && { section: moved.section, index: moved.index, path: moved.path, raw: "" };
+        return tags.untag(edited);
+      };
+      return { operation, place: () => place };
     }
     setStatus(key, status) {
       return (doc) => setStatus(doc, this.entryOf(doc, key), status);
@@ -2307,7 +2321,7 @@ ${key.title}`.toLowerCase();
       };
     }
     createGroup(key, list, name, date) {
-      if (blank(name)) return null;
+      if (blankName(name)) return null;
       return (doc, today, settings) => createGroup(doc, this.entryOf(doc, key), list, name, settings.groups, today, date ?? null);
     }
     moveGroup(list, group, place) {
@@ -2319,7 +2333,7 @@ ${key.title}`.toLowerCase();
     }
     /** Null for a blank name or the section's own: nothing to write. */
     renameGroup(list, group, name) {
-      if (blank(name) || name.trim() === group) return null;
+      if (blankName(name) || name.trim() === group) return null;
       return (doc, _today, settings) => {
         this.groupOf(doc, list, group);
         return renameGroup(doc, list, group, name, settings.groups.ungrouped);
@@ -2398,7 +2412,7 @@ ${key.title}`.toLowerCase();
           this.groupOf(doc, change.list, change.group);
           return moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
         case "createGroup":
-          return blank(change.name) ? doc : createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
+          return blankName(change.name) ? doc : createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
         case "nest":
           return first ? nest(doc, entry, first, second) : doc;
       }
