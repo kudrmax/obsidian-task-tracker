@@ -28,12 +28,24 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    its width; the card's height does not change. A tap on the icon opens the project note, a tap on the rest of the card
    opens the menu as always. The project's name is in the task menu («Project») and, on the Mac, in a tooltip on hover.
    Board: `docs/design/canvas/Proj2V1.dc.html`.
-8. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project; the Backlog
-   tasks without a project are one more group, «No project», always last, with their sections as in Backlog today. A
-   group is the section header with two additions: it folds (a chevron; a tap on the title folds or unfolds it, the fold
-   is kept on the device; folded, it shows how many tasks it holds) and an arrow button beside the title opens the
-   project note. Board: `docs/design/canvas/Proj1.dc.html`. Any overview of projects later (projects without a next
-   step) is a view of this Backlog, never a screen of its own.
+8. **No new screen. Grouping by project is a way to show a list**, the same everywhere it is on: the list shows project
+   groups (each the section header with two additions: it folds — a chevron, a tap on the title, the fold kept on the
+   device, folded it shows how many tasks it holds — and an arrow button beside the title opens the project note), then
+   «No project», always last. Inside a group, the project's tasks without a section, then its sections in the file's
+   order. Off, the list is as today, project tasks with the mark. Projects never go inside sections. Board:
+   `docs/design/canvas/Proj1.dc.html`. Which lists have it: open. Any overview of projects later (projects without a next
+   step) is a view of these groups, never a screen of its own.
+   - **The file does not change.** A section is one `### Name` for every project: with grouping on, «Дальний бэклог»
+     shows inside each project that has tasks in it, and inside «No project»; off, it is one section with all of them.
+   - **Moving a task** in the grouped view: the line goes under the target section (or into the list's part without a
+     section) right before the visible task it was dropped before, or right after the last visible task of that project
+     there; with none, at the section's end. Into another project's group — the link changes; into «No project» — the link
+     goes. Subtasks go with their parent and are always in its project.
+   - **Section actions in the grouped view touch only that project's part.** Rename inside «Окружение» moves Окружение's
+     tasks into a section with the new name (an existing one or a new heading); the other projects keep theirs. Remove
+     section takes only Окружение's tasks out of it. Sections are reordered only with grouping off. An empty section is not
+     made inside a project: the section button's field inside a project group writes the task straight into the new
+     section, so the section is born with a task of the project.
 9. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project writes its link on
    the line, «No project» takes it off; the task keeps its place in the lane. Board:
    `docs/design/canvas/Proj3Flow.dc.html` (approved). A project group has no plus of its own: the plus at the bottom
@@ -56,7 +68,7 @@ fixed that but made lines travel between files. One file wins.
 
 ## Open (technical, for the backend)
 
-- None so far.
+- Which lists can be grouped by project, and whether grouping is on by default (being decided with Max).
 
 ## Ideas for later
 
