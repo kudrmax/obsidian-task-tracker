@@ -64,7 +64,7 @@ class with tests over a fake Sync.
 
 ## In the app
 
-- The Sync button opens the link; `UIApplication.open` failing → the alert of point 5.
+- The Sync button opens the link; `UIApplication.open` failing → the alert of point 6.
 - `taskcalendar://synced` in `onOpenURL` (next to `RefreshLink`): read the board again and run `AppServices.shared.refresh()`;
   with `error`, show the alert. Parsing the link lives in `apple/Core` with tests, like `RefreshLink`.
 - No progress UI of its own: while Sync runs the app is behind Obsidian.
@@ -75,8 +75,6 @@ class with tests over a fake Sync.
 phone learns of the Mac's changes only after leaving Obsidian: the button is the other way).
 
 ## Decisions
-
-(filled by the frontends)
 
 - **Obsidian: the quiet time is 3 s.** After a counted run ends `synced` with `ready`, the plugin hands back only if no
   new run starts within 3 s; a run in that time restarts the count when it ends. Obsidian-only.
@@ -96,3 +94,18 @@ phone learns of the Mac's changes only after leaving Obsidian: the button is the
 - **Both: the reason is percent-encoded with `encodeURIComponent`** (spaces as `%20`, the apostrophe as is):
   `taskcalendar://synced?error=Obsidian%20Sync%20didn't%20finish%20in%2045%20seconds`. The app reads the decoded query
   item (`URLComponents.queryItems`) and shows it as is.
+- **App: Sync is disabled while no vault is chosen.** Without a vault folder the app has no name to send and the board
+  already shows «Can’t Read Your Tasks» with Open Settings; the button greys out, as Undo does with nothing to undo.
+- **App: a `synced` link with `error` reads the board and rebuilds the reminders too**, then shows the alert: a run that
+  stopped partway may still have brought changes.
+- **App: `error` present but empty** (`?error=` or `?error`) still means Not Synced: the alert shows its title alone.
+- **The reason is read form-encoded as well:** `+` and `%20` both read as a space (`URLSearchParams` writes `+`,
+  `encodeURIComponent` writes `%20`), a literal plus comes as `%2B`; spaces around it are trimmed. The plugin may use
+  either encoder.
+- **The vault name in `obsidian://task-calendar-sync` is percent-encoded except letters, digits and `-._~`**, so a vault
+  named with `&`, `+` or `=` reaches the plugin whole; the plugin reads it with `decodeURIComponent` (Obsidian's own
+  `obsidian://` parsing does).
+- **App: its own reason is written with the typographic apostrophe**, «Obsidian isn’t installed», as the app's other
+  strings («Can’t Read Your Tasks»); the plugin's reasons are shown exactly as they come.
+- **App: no waiting state.** The app does not remember that it sent Max to Obsidian: every `synced` link reads the board,
+  and coming to the front without one reads the file as on any activation (point 7).
