@@ -1428,3 +1428,41 @@ describe("the timeline's cards", () => {
 		expect(later.durationMin).toBeNull();
 	});
 });
+
+describe("the full screen's task", () => {
+	const TRIP = "## Inbox\n\n## Now\n\n- [ ] Trip\n\t- [ ] Pack\n\t\t- [x] Laptop\n\t\t- [ ] Pass\n\t- [-] Wash\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	it("names the task a subtask belongs to by its key, its line as read", async () => {
+		const { svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		const pack = trip.allSubtasks[0];
+		expect(trip.parentKey).toBeNull();
+		expect(pack.parentKey).toEqual(trip.key);
+		expect(pack.allSubtasks[0].parentKey).toEqual(pack.key);
+		expect((await svc.find(pack.parentKey!, pack.parentText!))?.text).toBe("Trip");
+		expect((await svc.find(pack.key, pack.text))?.parentKey).toEqual(trip.key);
+	});
+
+	it("toggleDone ticks an open subtask done and opens a done or given-up one again, by its status in the file", async () => {
+		const { store, svc } = setup(TRIP);
+		const [trip] = (await svc.dayView(T)).list;
+		const [pack, wash] = trip.allSubtasks;
+		await svc.toggleDone(pack.allSubtasks[0].key);
+		await svc.toggleDone(wash.key);
+		await svc.toggleDone(pack.allSubtasks[1].key);
+		expect(store.text).toContain("\t- [ ] Pack\n\t\t- [ ] Laptop\n\t\t- [x] Pass\n\t- [ ] Wash\n");
+	});
+
+	it("rename takes the text as typed and answers with the task as it now stands; a blank or the same title writes nothing", async () => {
+		const { store, svc } = setup(TRIP);
+		const pack = (await svc.dayView(T)).list[0].allSubtasks[0];
+		expect(await svc.rename(pack.key, "  Pack  ")).toBeNull();
+		expect(await svc.rename(pack.key, "   ")).toBeNull();
+		expect(await svc.rename(pack.key, "p1")).toBeNull();
+		expect(store.writes).toBe(0);
+		const renamed = await svc.rename(pack.key, " p1 Pack the bag ");
+		expect(renamed).toMatchObject({ text: "Pack the bag", priority: { prefix: "p1" }, parentText: "Trip" });
+		expect(store.text).toContain("\t- [ ] p1 Pack the bag\n");
+		expect(renamed?.key.raw).toBe("\t- [ ] p1 Pack the bag");
+	});
+});

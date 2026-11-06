@@ -19,6 +19,7 @@ import {
 	type DayView,
 	type DraftMarks,
 	type DroppedTask,
+	type FullTree,
 	type DropTo,
 	type EndList,
 	type GroupedList,
@@ -44,7 +45,8 @@ import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { boundaryOf, parseText, readDocument, sectionNames } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
 import { readsAnew } from "./readingSettings";
-import { itemLevels, toItem } from "./taskItems";
+import { fullTree } from "./fullTree";
+import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import { sameLine, samePlace } from "./taskKeys";
 import type { UndoHistory } from "./UndoHistory";
 import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
@@ -333,12 +335,7 @@ export class TaskServiceImpl implements TaskService {
 		const settings = this.settings.get();
 		const today = this.boundary(settings).dayOf(this.clock.now());
 		const levels = itemLevels(this.levels(settings), usableLabels(settings.labels));
-		return places.map((place) => {
-			const entry = place && change.after.find(place.section, place.index, place.path);
-			if (!place || !entry) return null;
-			const parent = place.path.length > 0 ? change.after.find(place.section, place.index, place.path.slice(0, -1)) : undefined;
-			return toItem(entry, today, levels, parent?.task.text ?? null);
-		});
+		return places.map((place) => (place ? this.itemAt(change.after, place, today, levels) : null));
 	}
 
 	async setReminder(key: TaskKey, reminder: ReminderKind): Promise<void> {
@@ -361,9 +358,20 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate((doc) => ops.stop(doc, this.entryOf(doc, key)));
 	}
 
-	async rename(key: TaskKey, text: string): Promise<void> {
-		if (this.blank(text)) return;
-		await this.mutate((doc) => ops.rename(doc, this.entryOf(doc, key), text));
+	async toggleDone(key: TaskKey): Promise<void> {
+		await this.mutate((doc) => ops.toggleDone(doc, this.entryOf(doc, key)));
+	}
+
+	async rename(key: TaskKey, text: string): Promise<TaskItem | null> {
+		if (this.isBlank(text)) return null;
+		const { doc } = await this.readNormalized();
+		if (ops.rename(doc, this.entryOf(doc, key), text) === doc) return null;
+		const change = await this.mutate((d) => ops.rename(d, this.entryOf(d, key), text));
+		return change && this.itemAt(change.after, key, this.today(), this.itemLevels());
+	}
+
+	fullTree(item: TaskItem): FullTree {
+		return fullTree(item);
 	}
 
 	async setDescription(key: TaskKey, markdown: string): Promise<void> {
@@ -379,10 +387,20 @@ export class TaskServiceImpl implements TaskService {
 		const atPlace = doc.find(key.section, key.index, key.path);
 		const alike = flatten(doc.allTasks()).filter((entry) => entry.raw === key.raw);
 		const entry = atPlace?.raw === key.raw ? atPlace : alike.length === 1 ? alike[0] : atPlace?.task.text === text ? atPlace : undefined;
+		return entry ? this.itemAt(doc, entry, today, this.itemLevels()) : null;
+	}
+
+	/** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
+	private itemAt(doc: TaskDocument, place: Pick<TaskKey, "section" | "index" | "path">, today: LocalDate, levels: ItemLevels): TaskItem | null {
+		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
-		const parent = entry.path.length > 0 ? doc.find(entry.section, entry.index, entry.path.slice(0, -1)) : undefined;
+		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
+		return toItem(entry, today, levels, parent);
+	}
+
+	private itemLevels(): ItemLevels {
 		const settings = this.settings.get();
-		return toItem(entry, today, itemLevels(this.levels(settings), usableLabels(settings.labels)), parent?.task.text ?? null);
+		return itemLevels(this.levels(settings), usableLabels(settings.labels));
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {

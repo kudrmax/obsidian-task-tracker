@@ -154,8 +154,17 @@ export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: Remin
 	return patch(doc, entry, { reminder });
 }
 
+/**
+ * The title as typed: on one line, trimmed, its priority and labels as an edit writes them with the task's own chosen (a
+ * typed prefix is the priority of a task without one). The same title and marks give this very document: nothing to write.
+ */
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
-	return patch(doc, entry, { text: taskTitle(text) });
+	return patch(doc, entry, typed(doc, text, entry.task.priority, entry.task.labels));
+}
+
+/** The circle of a task: an open one is ticked done, a done or given-up one is open again. */
+export function toggleDone(doc: TaskDocument, entry: TaskEntry): TaskDocument {
+	return setStatus(doc, entry, isOpen(entry.task.status) ? "done" : "todo");
 }
 
 /** The description from Markdown: see `TaskDocument.setDescription`. */
