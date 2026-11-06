@@ -36,7 +36,7 @@ struct BoardScreen: View {
             // Measured from the screen's edges, as the tab bar's own round button stands.
             ZStack(alignment: .bottomTrailing) {
                 Color.clear
-                if !model.selecting, model.fullScreen.isEmpty {
+                if !model.selecting, model.fullScreen.isEmpty, !router.capturing {
                     PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme)) { model.carrying = $0 }
                         .frame(width: PlusButton.side, height: PlusButton.side)
                         .padding([.trailing, .bottom], PlusButton.inset)

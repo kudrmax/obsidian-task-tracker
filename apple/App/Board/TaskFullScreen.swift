@@ -58,6 +58,8 @@ struct TaskFullScreen: View {
                 }
             }
         }
+        // A page of its own: no columns, no tab bar, no calendar, as the design has it.
+        .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
         .task { await open() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
