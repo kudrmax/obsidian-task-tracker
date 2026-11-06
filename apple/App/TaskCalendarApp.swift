@@ -9,6 +9,8 @@ struct TaskCalendarApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // Versions before alarms were told by their id kept which task each alarm was for here.
+        UserDefaults.standard.removeObject(forKey: "alarmReminders")
         Task { await UserNotifications.registerCategories() }
         UNUserNotificationCenter.current().delegate = Self.notifications
     }
