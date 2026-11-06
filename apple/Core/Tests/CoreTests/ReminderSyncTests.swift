@@ -43,8 +43,11 @@ actor FakeNotifications: NotificationScheduling {
             holdNext = false
             await withCheckedContinuation { held = $0 }
         }
-        return Set(pendingIDs.keys)
+        return Set(pendingIDs.keys).union(others)
     }
+    /// Pending notifications the sync did not set: an older version's, the signature's.
+    var others: Set<String> = []
+    func leave(_ identifier: String) { others.insert(identifier) }
     func delivered() async -> [DeliveredNotification] { deliveredList }
     func schedule(_ n: PlannedNotification, reminder: Reminder) async throws {
         if scheduleFails { throw CocoaError(.featureUnsupported) }
@@ -55,18 +58,23 @@ actor FakeNotifications: NotificationScheduling {
     func isHolding() -> Bool { held != nil }
     func release() { held?.resume(); held = nil }
     func failNextSchedules() { scheduleFails = true }
-    func removePending(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { pendingIDs[$0] = nil } }
+    func removePending(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { pendingIDs[$0] = nil; others.remove($0) } }
     func removeDelivered(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; deliveredList.removeAll { ids.contains($0.identifier) } }
     func deliver(_ d: DeliveredNotification) { deliveredList.append(d) }
     func reminderIDs() -> Set<String> { Set(pendingIDs.values.map(\.reminderID)) }
 }
 
 actor FakeAlarms: AlarmScheduling {
-    var alarms: [String: Date] = [:]
+    /// By alarm id, as AlarmKit lists them.
+    var set: [String: Date] = [:]
     var calls = 0
-    func scheduled() async -> [String: Date] { alarms }
-    func schedule(_ reminder: Reminder) async throws { calls += 1; alarms[reminder.id] = reminder.start }
-    func cancel(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { alarms[$0] = nil } }
+    nonisolated func id(for reminderID: String) -> String { "alarm:" + reminderID }
+    func scheduled() async -> [String: Date] { set }
+    func schedule(_ reminder: Reminder) async throws { calls += 1; set[id(for: reminder.id)] = reminder.start }
+    func cancel(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { set[$0] = nil } }
+    func leave(_ alarmID: String, at: Date) { set[alarmID] = at }
+    /// By reminder id, for the tests to read.
+    var alarms: [String: Date] { Dictionary(uniqueKeysWithValues: set.map { (String($0.key.dropFirst("alarm:".count)), $0.value) }) }
 }
 
 actor FakeCards: CardScheduling {
@@ -85,6 +93,10 @@ actor FakeCards: CardScheduling {
     func remove(_ ids: [String]) async { if !ids.isEmpty { calls += 1 }; ids.forEach { cards[$0] = nil }; ended.removeAll { ids.contains($0) } }
     func refuseAll() { refuse = true }
     func end(_ id: String) { cards[id] = nil; ended.append(id) }
+}
+
+func notice(_ reminderID: String, _ minutes: Int) -> String {
+    NoticeID.reminder(reminderID: reminderID, minutes: minutes, offer: nil).identifier
 }
 
 @Suite struct ReminderSyncTests {
@@ -133,13 +145,13 @@ actor FakeCards: CardScheduling {
         let planned = await notifications.pendingIDs.values
         #expect(Set(planned.map(\.reminderID)) == Set(lines.dropFirst(CardPlan.budget)))
         #expect(planned.count == lines.count - CardPlan.budget)
-        #expect(planned.allSatisfy { $0.identifier.hasSuffix("#0") })
+        #expect(planned.allSatisfy { $0.minutes == 0 })
     }
 
     @Test func aRefusedCardNotifiesOnceInstead() async {
         await cards.refuseAll()
         let status = await sync(FakeVault(Fixtures.file(Self.pinned))).sync()
-        #expect(await notifications.pendingIDs.values.map(\.identifier) == ["\(Self.pinned)#0"])
+        #expect(await notifications.pendingIDs.values.map(\.identifier) == [notice(Self.pinned, 0)])
         guard case .ok(_, _, let refused) = status else { Issue.record("not ok"); return }
         #expect(refused != nil)
     }
@@ -149,10 +161,10 @@ actor FakeCards: CardScheduling {
         let s = sync(FakeVault(Fixtures.file(Self.pinned)), at: Fixtures.date(4, 11, 20))
         _ = await s.sync()
         let planned = await notifications.pendingIDs.values
-        #expect(planned.map(\.identifier) == ["\(Self.pinned)#0"])
+        #expect(planned.map(\.identifier) == [notice(Self.pinned, 0)])
         #expect(planned.map(\.fire) == [Fixtures.date(4, 11, 20)])
-        await notifications.removePending(["\(Self.pinned)#0"])
-        await notifications.deliver(DeliveredNotification(identifier: "\(Self.pinned)#0", reminderID: Self.pinned, at: Fixtures.date(4, 11, 20)))
+        await notifications.removePending([notice(Self.pinned, 0)])
+        await notifications.deliver(DeliveredNotification(identifier: notice(Self.pinned, 0), at: Fixtures.date(4, 11, 20)))
         _ = await s.sync()
         #expect(await notifications.pendingIDs.isEmpty)
     }
@@ -193,7 +205,7 @@ actor FakeCards: CardScheduling {
         let vault = FakeVault(Fixtures.file(Self.quiet, Self.alarm))
         let s = sync(vault)
         _ = await s.sync()
-        await notifications.deliver(DeliveredNotification(identifier: "\(Self.alarm)#1", reminderID: Self.alarm, at: Fixtures.date(4, 8)))
+        await notifications.deliver(DeliveredNotification(identifier: notice(Self.alarm, 1), at: Fixtures.date(4, 8)))
         vault.text = Fixtures.file(Self.quiet, "- [x] Wake 🚨 2026-11-04 12:00")
         _ = await s.sync()
         #expect(await notifications.reminderIDs() == [Self.quiet])
@@ -201,13 +213,50 @@ actor FakeCards: CardScheduling {
         #expect(await alarms.alarms.isEmpty)
     }
 
+    @Test func aTaskWithATagIsKnownByItsWholeLine() async {
+        let tagged = "- [ ] Record #transcribe ⏰ 2026-11-04 10:00"
+        let vault = FakeVault(Fixtures.file(tagged))
+        let s = sync(vault, at: Fixtures.date(4, 10, 3))
+        await notifications.deliver(DeliveredNotification(identifier: notice(tagged, 0), at: Fixtures.date(4, 10)))
+        _ = await s.sync()
+        #expect(await notifications.deliveredList.count == 1)
+        vault.text = Fixtures.file("- [x] Record #transcribe ⏰ 2026-11-04 10:00")
+        _ = await s.sync()
+        #expect(await notifications.deliveredList.isEmpty)
+        #expect(await notifications.pendingIDs.isEmpty)
+    }
+
+    @Test func whatAnOlderVersionLeftIsTakenAway() async {
+        await notifications.leave("\(Self.quiet)#5")
+        await notifications.leave("\(Self.quiet)#20#after 1762245000 After Standup (40 min)")
+        await notifications.deliver(DeliveredNotification(identifier: "\(Self.quiet)#0", at: Fixtures.date(4, 8)))
+        _ = await sync(FakeVault(Fixtures.file(Self.quiet))).sync()
+        #expect(await notifications.others.isEmpty)
+        #expect(await notifications.deliveredList.isEmpty)
+        #expect(await notifications.reminderIDs() == [Self.quiet])
+    }
+
+    @Test func theSignaturesWarningsAndTheProblemNoticeStay() async {
+        let own = [NoticeID.signing(0).identifier, NoticeID.problem.identifier]
+        for id in own { await notifications.leave(id) }
+        _ = await sync(FakeVault(Fixtures.file(Self.quiet))).sync()
+        #expect(await notifications.others == Set(own))
+    }
+
+    @Test func anAlarmNoTaskWantsIsCancelled() async {
+        await alarms.leave("alarm:- [ ] Gone 🚨 2026-11-04 15:00", at: Fixtures.date(4, 15))
+        await alarms.leave("7E1D3C1A-0000-0000-0000-000000000000", at: Fixtures.date(4, 16))
+        _ = await sync(FakeVault(Fixtures.file(Self.alarm))).sync()
+        #expect(await alarms.set == [alarms.id(for: Self.alarm): Fixtures.date(4, 12)])
+    }
+
     @Test func onlyTheLatestDeliveryStays() async {
         let s = sync(FakeVault(Fixtures.file(Self.quiet)), at: Fixtures.date(4, 10, 3))
         for minute in 0...2 {
-            await notifications.deliver(DeliveredNotification(identifier: "\(Self.quiet)#\(minute)", reminderID: Self.quiet, at: Fixtures.date(4, 10, minute)))
+            await notifications.deliver(DeliveredNotification(identifier: notice(Self.quiet, minute), at: Fixtures.date(4, 10, minute)))
         }
         _ = await s.sync()
-        #expect(await notifications.deliveredList.map(\.identifier) == ["\(Self.quiet)#2"])
+        #expect(await notifications.deliveredList.map(\.identifier) == [notice(Self.quiet, 2)])
     }
 
     @Test func completeWritesAndClears() async {
