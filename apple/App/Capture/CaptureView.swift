@@ -1,23 +1,16 @@
 import Core
 import SwiftUI
 
-/// A new task: typed, recorded, or both, into Inbox or Now.
+/// A new task: typed, recorded, or both, into one of the four lists.
 struct CaptureView: View {
-    let request: CaptureRequest
     let close: () -> Void
 
-    @State private var list: CaptureListOption
+    @State private var list = CaptureListOption.inbox
     @State private var text = ""
     @State private var recorder = VoiceRecorder()
     @State private var failure: String?
     @State private var sending = false
     @FocusState private var typing: Bool
-
-    init(request: CaptureRequest, close: @escaping () -> Void) {
-        self.request = request
-        self.close = close
-        _list = State(initialValue: request.list)
-    }
 
     var body: some View {
         NavigationStack {
@@ -59,9 +52,7 @@ struct CaptureView: View {
                         .disabled(!canSend || sending)
                 }
             }
-            .task {
-                if request.voice { await recorder.start() } else { typing = true }
-            }
+            .onAppear { typing = true }
         }
     }
 

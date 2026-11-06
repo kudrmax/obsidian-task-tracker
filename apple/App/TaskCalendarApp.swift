@@ -18,14 +18,17 @@ struct TaskCalendarApp: App {
         WindowGroup {
             SettingsView()
                 .onOpenURL { url in
-                    guard let back = RefreshLink.back(from: url) else { return }
-                    Task {
-                        await AppServices.shared.refresh()
-                        await UIApplication.shared.open(back)
+                    if let back = RefreshLink.back(from: url) {
+                        Task {
+                            await AppServices.shared.refresh()
+                            await UIApplication.shared.open(back)
+                        }
+                    } else {
+                        router.open(url)
                     }
                 }
-                .fullScreenCover(item: $router.request) { request in
-                    CaptureView(request: request) { router.request = nil }
+                .fullScreenCover(item: $router.request) { _ in
+                    CaptureView { router.request = nil }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
