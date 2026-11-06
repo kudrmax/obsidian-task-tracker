@@ -300,6 +300,7 @@ describe("the day column and the day of a placement", () => {
 	it("a list goes by its section's name in the settings, renamed or not", () => {
 		const { svc } = setup(FULL);
 		expect(svc.listName("inbox")).toBe("Inbox");
+		expect(svc.listName("done")).toBe("Done");
 		expect(svc.listName("backlog")).toBe("Backlog");
 		expect(svc.listName("soon")).toBe("Soon");
 		expect(svc.listName("now")).toBe("Now");

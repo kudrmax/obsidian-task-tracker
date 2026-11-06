@@ -336,7 +336,7 @@ export class DemoTaskService implements TaskService {
 		return placementOfDay(date, this.today());
 	}
 
-	listName(list: GroupedList): string {
+	listName(list: SectionKey): string {
 		return DEFAULT_SETTINGS.sections[list];
 	}
 

@@ -51,9 +51,11 @@ export class DemoCalendarService implements CalendarService {
 		const count = (source: CalendarSource) => events.filter((e) => e.source === source).length;
 		const result: DayEvents = {
 			events,
+			allDay: events.filter((e) => e.allDay),
+			timed: events.filter((e) => !e.allDay),
 			statuses: [
-				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, detail: null, stale: false },
-				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, detail: "iPhone", stale: true },
+				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, updatedDay: "today", detail: null, stale: false },
+				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, updatedDay: "yesterday", detail: "iPhone", stale: true },
 			],
 			stale: true,
 		};

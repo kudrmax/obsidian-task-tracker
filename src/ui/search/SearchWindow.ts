@@ -90,7 +90,7 @@ export class SearchWindow {
 
 	private async find(query: string): Promise<void> {
 		const asked = ++this.asked;
-		const groups = query.trim() === "" ? [] : await this.deps.tasks.search(query);
+		const groups = await this.deps.tasks.search(query);
 		if (asked !== this.asked) return;
 		this.show(query, groups);
 	}
@@ -99,7 +99,7 @@ export class SearchWindow {
 		this.results.textContent = "";
 		this.rows = renderSearchRows(this.results, groups, (section) => this.deps.sectionName(section));
 		for (const row of this.rows) row.el.addEventListener("click", () => this.pick(row.hit));
-		if (groups.length === 0 && query.trim() !== "") el(this.results, "div", "tc-search-empty", "No tasks found");
+		if (groups.length === 0 && query !== "") el(this.results, "div", "tc-search-empty", "No tasks found");
 		this.picked = -1;
 		if (this.deps.desktop) this.walk(1);
 	}

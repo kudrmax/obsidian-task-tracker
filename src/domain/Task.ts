@@ -32,6 +32,11 @@ export interface Slot {
 	readonly end: number | null;
 }
 
+/** The same time: the same day, start and end. */
+export function sameSlot(a: Slot | null, b: Slot | null): boolean {
+	return a !== null && b !== null && a.date === b.date && a.start === b.start && a.end === b.end;
+}
+
 /** What the time of a task does on the phone: a quiet notification, an alarm, a Live Activity on the lock screen, or nothing. Read from the marker before the slot. */
 export type ReminderKind = "notification" | "alarm" | "live" | "none";
 

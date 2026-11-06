@@ -79,12 +79,15 @@ describe("SearchWindow", () => {
 		expect(desc.el.querySelector(".tc-card-title")?.textContent).toBe("Записаться в МФЦ");
 	});
 
-	it("shows nothing for an empty field, and says so when nothing is found", async () => {
+	it("shows nothing for an empty field, and says so when nothing is found, spaces too: the search finds nothing for them", async () => {
 		const search = vi.fn(async (): Promise<readonly SearchGroup[]> => []);
 		const { win, type } = setUp(false, search);
-		await type("   ");
+		await type("zz");
+		await type("");
 		expect(win.el.querySelector(".tc-search-empty")).toBeNull();
-		expect(search).not.toHaveBeenCalled();
+		await type("   ");
+		expect(search).toHaveBeenLastCalledWith("   ");
+		expect(win.el.querySelector(".tc-search-empty")?.textContent).toBe("No tasks found");
 		await type("zz");
 		expect(win.el.querySelector(".tc-search-empty")?.textContent).toBe("No tasks found");
 	});

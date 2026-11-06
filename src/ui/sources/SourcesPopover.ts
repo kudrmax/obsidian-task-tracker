@@ -12,7 +12,6 @@ export interface SourcesPopoverOptions {
 	/** The switch at the bottom; a copy of it stays over the backdrop, and the panel stands over it, centred on it. */
 	readonly anchor: HTMLElement;
 	readonly statuses: readonly SourceStatus[];
-	readonly now: Date;
 	onRefresh(): Promise<void>;
 }
 
@@ -32,7 +31,7 @@ export class SourcesPopover {
 		copy.pin(rect);
 		const panel = Panel.over(this.overlay, { root: "tc-popover", picks: new Picks(() => this.close()), place: (p) => SourcesPopover.over(p, rect) }, false);
 		panel.replace((p) => {
-			for (const status of opts.statuses) SourcesPopover.row(p, sourceText(status, opts.now), status);
+			for (const status of opts.statuses) SourcesPopover.row(p, sourceText(status), status);
 			menuRow(p, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: panel.pick(() => opts.onRefresh()) });
 		});
 		this.overlay.show();

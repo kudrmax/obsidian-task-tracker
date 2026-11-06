@@ -304,7 +304,7 @@ export class TaskServiceImpl implements TaskService {
 		return placementOfDay(date, this.today());
 	}
 
-	listName(list: GroupedList): string {
+	listName(list: SectionKey): string {
 		return this.settings.get().sections[list];
 	}
 

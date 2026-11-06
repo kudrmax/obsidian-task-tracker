@@ -1,3 +1,4 @@
+import { dayRelation, type DayRelation } from "../domain/Days";
 import type { LocalDate } from "../domain/Task";
 import { CalendarPolling } from "./CalendarPolling";
 import { type CalendarKey, keyText } from "./calendarChoice";
@@ -18,6 +19,7 @@ import type {
 	WorkCalendarSetup,
 } from "./contracts";
 import { type EventFeed, type EventFile, SourceProblemError } from "./EventSource";
+import { boundaryOf } from "./documentText";
 import type { Clock, SettingsStore, Timers } from "./ports";
 import { ShownCalendars } from "./shownCalendars";
 
@@ -176,7 +178,13 @@ export class CalendarServiceImpl implements CalendarService {
 		const chosen = this.shown().days().day(date);
 		const events = chosen.events;
 		const shown = (name: CalendarSource) => events.filter((e) => e.source === name).length;
-		return { events, statuses: this.files.map((f) => this.status(f.name, shown(f.name))), stale: chosen.stale };
+		return {
+			events,
+			allDay: events.filter((e) => e.allDay),
+			timed: events.filter((e) => !e.allDay),
+			statuses: this.files.map((f) => this.status(f.name, shown(f.name))),
+			stale: chosen.stale,
+		};
 	}
 
 	private status(source: CalendarSource, shown: number): SourceStatus {
@@ -190,9 +198,16 @@ export class CalendarServiceImpl implements CalendarService {
 			problem,
 			events: shown,
 			updatedAt,
+			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
 			detail: fed ? null : (file?.device ?? null),
 			stale: problem !== null || this.isOld(updatedAt),
 		};
+	}
+
+	/** How the day `at` falls on stands to today, both by the hour the day starts at. */
+	private relationOf(at: Date): DayRelation {
+		const boundary = boundaryOf(this.settings.get());
+		return dayRelation(boundary.dayOf(at), boundary.dayOf(this.clock.now()));
 	}
 
 	private isOld(updatedAt: Date | null): boolean {

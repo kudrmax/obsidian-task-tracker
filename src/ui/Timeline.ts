@@ -1,4 +1,4 @@
-import { type CalendarEvent, type DayBoundary, type ResizeEdge, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
+import { type CalendarEvent, type DayBoundary, type ResizeEdge, samePlace, sameSlot, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
@@ -14,13 +14,16 @@ import type { LocalDate, Slot } from "./types";
 export interface TimelineDeps {
 	theme(): Theme;
 	date(): LocalDate;
-	today(): LocalDate;
+	/** The shown day is today: the now line stands on it. */
+	isToday(): boolean;
 	/** Where the day begins: the first hour line, and where slots and events stand. */
 	boundary(): DayBoundary;
 	hourPx(): number;
+	/** The tasks slotted on the shown day (`DayView.slotted`). */
 	tasks(): readonly TaskItem[];
 	/** Where a slotted task's card stands on the shown day, by the clock: the service's rule. */
 	shownSpan(item: TaskItem): TaskSpan;
+	/** The day's timed events (`DayEvents.timed`). */
 	events(): readonly CalendarEvent[];
 	/** The event is over by the clock: drawn grey (`CalendarService.isPast`). Asked at every tick. */
 	isPast(event: CalendarEvent): boolean;
@@ -292,19 +295,19 @@ export class Timeline {
 		this.frame = null;
 		const boundary = this.deps.boundary();
 		this.hours.forEach(({ label }, index) => (label.textContent = formatHour(boundary.hourAt(index))));
-		const events = this.deps.events().filter((e) => !e.allDay);
+		const events = this.deps.events();
 		const spans = events.map((e) => this.eventSpan(e));
 		const boxes = layoutEvents(spans);
 		this.events = events
 			.map((event, i) => ({ event, span: spans[i], box: boxes[i] }))
 			.sort((a, b) => a.box.layer - b.box.layer)
 			.map(({ event, span, box }) => this.placeEvent(event, span, box.left, box.level));
-		this.tasks = this.deps.tasks().filter((task) => task.slot).map((task) => this.placeTask(task));
+		this.tasks = this.deps.tasks().map((task) => this.placeTask(task));
 		if (stretch) this.keepStretch(stretch);
 		this.itemsEl.appendChild(this.grips);
 		this.nowEl?.remove();
 		this.nowEl = null;
-		if (this.deps.date() === this.deps.today()) {
+		if (this.deps.isToday()) {
 			this.nowEl = el(this.canvas, "div", "tc-now");
 			el(this.nowEl, "span", "tc-now-pill", formatTime(minutesOf(this.deps.now())));
 			el(this.nowEl, "div", "tc-now-line");
@@ -333,7 +336,7 @@ export class Timeline {
 		}
 		const nowMinutes = this.deps.boundary().offsetOf(this.deps.date(), this.deps.now());
 		const nowY = this.yOf(nowMinutes);
-		const today = this.deps.date() === this.deps.today();
+		const today = this.deps.isToday();
 		this.divide(gridAt(hourPx));
 		for (const { minutes, label, line } of [...this.hours, ...this.minor]) {
 			const y = this.yOf(minutes);
@@ -631,10 +634,6 @@ export class Timeline {
 		this.deps.onBlock?.(block, item);
 		return { el: block, item, meta, pill };
 	}
-}
-
-function sameSlot(a: Slot | null, b: Slot | null): boolean {
-	return a !== null && b !== null && a.date === b.date && a.start === b.start && a.end === b.end;
 }
 
 function noDropShown(): DropShown {

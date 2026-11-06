@@ -154,6 +154,7 @@ describe("domain and application run on any host", () => {
 const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	nextProgress: "../domain/Task",
 	REMINDER_KINDS: "../domain/Task",
+	sameSlot: "../domain/Task",
 	sameRule: "../domain/Repeat",
 	repeatParts: "../domain/Repeat",
 	editRepeat: "../domain/RepeatDraft",

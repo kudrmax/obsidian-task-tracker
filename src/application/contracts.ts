@@ -11,6 +11,8 @@ import type { SectionChoice, SectionOffer } from "./sections";
 export type { GroupName, ReminderKind, SectionKey };
 /** What In progress or Stop progress sets on tasks of these statuses. */
 export { nextProgress } from "../domain/Task";
+/** Whether two slots are the same time: the same day, start and end. */
+export { sameSlot } from "../domain/Task";
 /** The kinds a task's reminder is chosen from, in the order the menu offers them. */
 export { REMINDER_KINDS } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
@@ -474,8 +476,8 @@ export interface TaskService {
 	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
-	/** The name a list goes by wherever the screens name a place: its section's name in the settings. A day is named by its date. */
-	listName(list: GroupedList): string;
+	/** The name a list goes by wherever the screens name a place, Done too: its section's name in the settings. A day is named by its date. */
+	listName(list: SectionKey): string;
 	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
 	dayOfPlacement(placement: Placement): LocalDate | null;
 
@@ -725,6 +727,8 @@ export interface SourceStatus {
 	readonly events: number;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
+	/** How the day of `updatedAt` stands to today, by the hour the day starts at; null with no `updatedAt`. The words are the frontend's. */
+	readonly updatedDay: DayRelation | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
 	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
@@ -733,6 +737,10 @@ export interface SourceStatus {
 
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
+	/** Of `events`, those of the whole day: the rows over the timeline. */
+	readonly allDay: readonly CalendarEvent[];
+	/** Of `events`, those on a time: the timeline. */
+	readonly timed: readonly CalendarEvent[];
 	readonly statuses: readonly SourceStatus[];
 	/** A calendar shown on the day comes from a file no longer fresh: the orange dot, Refresh now would help. */
 	readonly stale: boolean;

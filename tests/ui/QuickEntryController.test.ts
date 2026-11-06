@@ -103,7 +103,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const timeline = new Timeline(root.appendChild(document.createElement("div")), withShownSpan({
 		theme: () => "dark",
 		date: () => day,
-		today: () => TODAY,
+		isToday: () => day === TODAY,
 		boundary: () => DayBoundary.MIDNIGHT,
 		hourPx: () => 56,
 		tasks: () => slotted,
