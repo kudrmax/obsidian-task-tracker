@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Placement, RepeatRule } from "../../src/application/contracts";
+import type { GroupedList, Placement, RepeatRule } from "../../src/application/contracts";
 import type { PriorityLevel } from "../../src/application/contracts";
 import { QuickBar, type QuickBarState } from "../../src/ui/quick/QuickBar";
 import { placementOfDay } from "../../src/domain/Days";
@@ -18,6 +18,12 @@ const LABELS = [
 
 /** The labels the next bar set up offers: none unless a test gives some. */
 let shownLabels: readonly (typeof LABELS)[number][] = [];
+
+const DEFAULT_NAMES: Readonly<Record<GroupedList, string>> = { inbox: "Inbox", backlog: "Backlog", soon: "Soon", now: "Now" };
+const RENAMED: Readonly<Record<GroupedList, string>> = { inbox: "Входящие", backlog: "Когда-нибудь", soon: "Скоро", now: "Сейчас" };
+/** The lists' names the next bar set up is given: the default ones unless a test renames them. */
+let listNames = DEFAULT_NAMES;
+const listName = (list: GroupedList) => listNames[list];
 
 const STATE: QuickBarState = { canIndent: true, canOutdent: true, indents: true, priority: null, labels: [], place: { kind: "soon" }, repeat: null, repeatable: true, section: null };
 
@@ -41,6 +47,7 @@ function setup(state: Partial<QuickBarState> = {}, desktop = false, placementOf:
 		labels: () => shownLabels,
 		onLabels: (names: readonly string[]) => labelled.push(names),
 		today: () => TODAY,
+		listName,
 		placementOfDay: placementOf,
 		onIndent: (delta) => indents.push(delta),
 		onPriority: (prefix) => priorities.push(prefix),
@@ -57,6 +64,7 @@ const tiles = (root: ParentNode) => [...root.querySelectorAll<HTMLButtonElement>
 
 afterEach(() => {
 	shownLabels = [];
+	listNames = DEFAULT_NAMES;
 	document.body.innerHTML = "";
 });
 
@@ -65,7 +73,7 @@ describe("QuickBar", () => {
 		const parent = document.createElement("div");
 		const first = document.createElement("span");
 		parent.appendChild(first);
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		expect(parent.lastElementChild?.classList.contains("tc-quick-bar")).toBe(true);
 		expect(q<HTMLElement>(parent, ".tc-quick-bar").hidden).toBe(true);
 		bar.show(STATE);
@@ -124,6 +132,21 @@ describe("QuickBar", () => {
 		expect(label()).toBe("5 Nov");
 	});
 
+	it("names the place by the user's section names", () => {
+		listNames = RENAMED;
+		const { parent, bar } = setup();
+		const label = () => q(parent, ".tc-bar-place .tc-btn-label").textContent;
+		expect(label()).toBe("Скоро");
+		bar.show({ ...STATE, place: { kind: "inbox" } });
+		expect(label()).toBe("Входящие");
+		bar.show({ ...STATE, place: { kind: "backlog" } });
+		expect(label()).toBe("Когда-нибудь");
+		bar.show({ ...STATE, place: { kind: "now" } });
+		expect(label()).toBe("Сейчас");
+		bar.show({ ...STATE, place: { kind: "date", date: "2026-11-05" } });
+		expect(label()).toBe("5 Nov");
+	});
+
 	it("keeps the field focused: pointerdown on the bar and on a panel is cancelled", () => {
 		const { parent } = setup();
 		const down = () => new Event("pointerdown", { bubbles: true, cancelable: true });
@@ -169,7 +192,7 @@ describe("the priority panel", () => {
 
 	it("opens no panel without levels", () => {
 		const parent = document.createElement("div");
-		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+		const bar = new QuickBar(parent, { desktop: () => false, levels: () => [], today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 		bar.show(STATE);
 		expect(q(parent, ".tc-bar-flag").hidden).toBe(true);
 	});
@@ -185,6 +208,13 @@ describe("the place panel", () => {
 		expect(all.map((t) => t.dataset.priority)).toEqual([undefined, undefined, undefined, undefined, undefined]);
 		expect(parent.querySelector(".tc-menu-badge")).toBeNull();
 		expect(parent.querySelectorAll(".tc-menu-tile-row")).toHaveLength(1);
+	});
+
+	it("names its tiles by the user's section names", () => {
+		listNames = RENAMED;
+		const { parent } = setup();
+		q(parent, ".tc-bar-place").click();
+		expect(tiles(parent).map((t) => t.querySelector(".tc-menu-tile-label")?.textContent)).toEqual(["Входящие", "Когда-нибудь", "Скоро", "Сейчас", "Date"]);
 	});
 
 	it("puts Date on for a day", () => {
@@ -648,7 +678,7 @@ describe("QuickBar on the phone keyboard", () => {
 		for (const desktop of [false, true]) {
 			const parent = document.createElement("div");
 			const other = parent.appendChild(document.createElement("span"));
-			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
+			const bar = new QuickBar(parent, { desktop: () => desktop, levels: () => LEVELS, today: () => TODAY, listName, placementOfDay: dayPlacement, onIndent: () => {}, onPriority: () => {}, labels: () => [], onLabels: () => {}, onPlace: () => {}, onRepeat: () => {}, onSection: () => {} });
 			bar.show({ ...STATE, section: false });
 			const own = [...parent.querySelectorAll("*")].filter((node) => !other.contains(node));
 			expect(own.length).toBeGreaterThan(0);

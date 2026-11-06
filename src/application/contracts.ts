@@ -316,6 +316,8 @@ export interface TaskService {
 	dayColumn(date: LocalDate): DayColumn;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
+	/** The name a list goes by wherever the screens name a place: its section's name in the settings. A day is named by its date. */
+	listName(list: GroupedList): string;
 	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
 	dayOfPlacement(placement: Placement): LocalDate | null;
 
