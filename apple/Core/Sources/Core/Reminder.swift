@@ -44,7 +44,7 @@ public protocol TaskRules: Sendable {
     /// The calendars' files in the vault, by path from its folder: the same the plugin's calendar reads.
     func calendarFiles(settingsJSON: String) throws -> [String]
     /// The meetings with a time in those files (`texts` in their order, `nil` for one missing) that overlap `from`–`to`.
-    func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date) throws -> [CalendarEvent]
+    func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date, now: Date) throws -> [CalendarEvent]
     /// A new task last in `list`.
     func capture(list: CaptureList, title: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
 }

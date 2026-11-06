@@ -12,7 +12,7 @@ final class AppServices: Sendable {
     private init() {
         vault = Vault(bookmarks: UserDefaultsBookmarks())
         let rules = Self.rules()
-        sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards())
+        sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport())
         tasks = TaskCapture(vault: vault, rules: rules)
     }
 

@@ -1,3 +1,4 @@
+import Core
 import SwiftUI
 import UserNotifications
 
@@ -16,10 +17,19 @@ struct TaskCalendarApp: App {
     var body: some Scene {
         WindowGroup {
             SettingsView()
+                .onOpenURL { url in
+                    if let back = RefreshLink.back(from: url) {
+                        Task {
+                            await AppServices.shared.refresh()
+                            await UIApplication.shared.open(back)
+                        }
+                    } else {
+                        router.open(url)
+                    }
+                }
                 .fullScreenCover(item: $router.request) { _ in
                     CaptureView { router.request = nil }
                 }
-                .onOpenURL { router.open($0) }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { Refresh.schedule() }

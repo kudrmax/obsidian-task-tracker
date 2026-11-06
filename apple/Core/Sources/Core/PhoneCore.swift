@@ -53,8 +53,8 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         return paths
     }
 
-    public func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date) throws -> [CalendarEvent] {
-        let value = try call("meetings", settingsJSON, texts.map { $0 ?? NSNull() as Any }, Self.ms(from), Self.ms(to))
+    public func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date, now: Date) throws -> [CalendarEvent] {
+        let value = try call("meetings", settingsJSON, texts.map { $0 ?? NSNull() as Any }, Self.ms(from), Self.ms(to), Self.ms(now))
         guard let rows = value.toArray() as? [[String: Any]] else { throw PhoneCoreError.scriptFailed("meetings: not a list") }
         return try rows.map { row in
             guard let title = row["title"] as? String else { throw PhoneCoreError.scriptFailed("not a meeting: \(row)") }
