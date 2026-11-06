@@ -257,17 +257,17 @@ export class TaskCalendarView extends ItemView {
 		this.list = new TaskList(el(this.leftEl, "div"), {
 			items: () => this.unnamed(this.data.day?.list ?? []),
 			day: () => this.selectedDate,
-			grouped: () => this.sectionsOf("left") !== null,
-			sections: () => this.listSectionsOf("left"),
-			onPlate: (plate, group) => this.attachPlate(plate, "left", group),
-			pending: () => this.namingIn("left"),
-			entry: () => this.quick?.entryIn("left") ?? null,
+			grouped: () => this.sectionsOf("day") !== null,
+			sections: () => this.listSectionsOf("day"),
+			onPlate: (plate, group) => this.attachPlate(plate, "day", group),
+			pending: () => this.namingIn("day"),
+			entry: () => this.quick?.entryIn("day") ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("left")?.list ?? "now", this.list!, group),
+			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "left", subtree),
+			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "left", (origins) => acceptsDrop("left", origins), () => this.sectionsOf("left"), true, () => this.haptics.tap());
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap());
 		this.doneEl = el(root, "div", "tc-done");
 		this.doneList = new TaskList(el(this.doneEl, "div"), {
 			items: () => this.data.done,
@@ -369,7 +369,7 @@ export class TaskCalendarView extends ItemView {
 			onScale: (hourPx, anchor) => this.zoom(hourPx, anchor),
 			onRelease: (hourPx) => this.settleZoom(hourPx),
 		});
-		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("left"));
+		new FreeRoomDoubleClick([this.leftEl, this.list.el], () => this.quick?.openAtEnd("day"));
 		new FreeRoomDoubleClick([this.soonEl, this.soonList.el], () => this.quick?.openAtEnd("soon"));
 		new FreeRoomDoubleClick([inboxPane, this.inboxList.el], () => this.quick?.openAtEnd("inbox"));
 		new FreeRoomDoubleClick([backlogPane, this.backlogList.el], () => this.quick?.openAtEnd("backlog"));
@@ -924,14 +924,14 @@ export class TaskCalendarView extends ItemView {
 	 * column Now's for today and Soon's for a later day, whose tasks lie in Soon with that day; a past day's none.
 	 */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
-		if (column !== "left") return { list: column, date: null };
+		if (column !== "day") return { list: column, date: null };
 		const { list, date, sections } = this.deps.tasks.dayColumn(this.selectedDate);
 		return sections ? { list, date } : null;
 	}
 
 	/** The list column a card stands in, when that column shows its sections: there a task's menu offers them, and the task waits for a new section's name. */
 	private sectionColumn(card: HTMLElement): ListColumn | null {
-		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
+		const columns: ListColumn[] = ["day", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
 		return column && this.sectionsOf(column) ? column : null;
 	}
@@ -945,7 +945,7 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
-		return { left: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
+		return { day: this.list, soon: this.soonList, inbox: this.inboxList, backlog: this.backlogList }[column];
 	}
 
 	/** The lists leave out the card waiting for its section's name; its own list draws it last. */

@@ -5,7 +5,7 @@ import { onDay } from "../fakes/itemOnDay";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): ListCard => ({ key: key(name), level, group: null });
-const at = (index: number, level = 0): EntrySpot => ({ kind: "list", column: "left", place: { kind: "gap", index, level, group: null } });
+const at = (index: number, level = 0): EntrySpot => ({ kind: "list", column: "day", place: { kind: "gap", index, level, group: null } });
 const inSoon = (index: number): EntrySpot => ({ kind: "list", column: "soon", place: { kind: "gap", index, level: 0, group: null } });
 const WEEKLY: RepeatRule = { kind: "schedule", every: 1, unit: "week", days: [0], dayOfMonth: null, from: null };
 const AFTER_DONE: RepeatRule = { kind: "afterDone", every: 1, unit: "week", days: [], dayOfMonth: null, from: null };
@@ -933,7 +933,7 @@ describe("QuickEntrySession", () => {
 			for (const day of [DAY, "2026-11-05", "2026-10-28"]) {
 				const tasks = new FakeTasks([]);
 				tasks.day = day;
-				expect(tasks.entry().placeOf("left", task)).toEqual({ kind: "day", date: day, group: "Work", before: key("B") });
+				expect(tasks.entry().placeOf("day", task)).toEqual({ kind: "day", date: day, group: "Work", before: key("B") });
 			}
 		});
 
@@ -1008,7 +1008,7 @@ describe("QuickEntrySession", () => {
 			const changes = entry.state;
 			expect(entry.choosePlace({ kind: "now" })).toBeNull();
 			expect(entry.state).toEqual(changes);
-			expect(entry.choosePlace({ kind: "date", date: "2026-11-05" })).toEqual({ column: "left", day: "2026-11-05" });
+			expect(entry.choosePlace({ kind: "date", date: "2026-11-05" })).toEqual({ column: "day", day: "2026-11-05" });
 			expect(entry.choosePlace({ kind: "backlog" })).toEqual({ column: "backlog", day: null });
 		});
 
@@ -1036,7 +1036,7 @@ describe("QuickEntrySession", () => {
 			tasks.sections = ["Home", "Work"];
 			const entry = tasks.entry();
 			entry.openFromPlus();
-			expect(entry.state?.spot).toEqual({ kind: "list", column: "left", place: { kind: "gap", index: 2, level: 0, group: "Work" } });
+			expect(entry.state?.spot).toEqual({ kind: "list", column: "day", place: { kind: "gap", index: 2, level: 0, group: "Work" } });
 			tasks.mode = "inbox";
 			entry.openFromPlus();
 			expect(entry.state?.spot).toMatchObject({ kind: "list", column: "inbox" });
@@ -1056,7 +1056,7 @@ describe("QuickEntrySession", () => {
 			const entry = tasks.entry();
 			expect(entry.openAtDrop("soon", { kind: "list", column: "soon", before: tasks.cards[1].key })).toBe(true);
 			expect(entry.state?.spot).toEqual(inSoon(1));
-			expect(entry.openAtDrop("left", { kind: "nest", parent: tasks.cards[0].key, before: null })).toBe(true);
+			expect(entry.openAtDrop("day", { kind: "nest", parent: tasks.cards[0].key, before: null })).toBe(true);
 			expect(entry.state?.spot).toEqual(at(1, 1));
 			expect(entry.openAtDrop(null, { kind: "slot", slot: SLOT })).toBe(true);
 			expect(entry.state?.spot).toEqual({ kind: "slot", slot: SLOT });
@@ -1069,9 +1069,9 @@ describe("QuickEntrySession", () => {
 		it("a task is looked for in the columns the window shows first", () => {
 			const tasks = new FakeTasks([]);
 			const found = placed("A", 1);
-			tasks.columns = { left: [placed("Y", 0), found], soon: [placed("X", 0), found], inbox: [], backlog: [] };
+			tasks.columns = { day: [placed("Y", 0), found], soon: [placed("X", 0), found], inbox: [], backlog: [] };
 			const entry = tasks.entry();
-			expect(entry.subtaskSpot(found.key)).toMatchObject({ kind: "list", column: "left" });
+			expect(entry.subtaskSpot(found.key)).toMatchObject({ kind: "list", column: "day" });
 			tasks.mode = "soon";
 			expect(entry.subtaskSpot(found.key)).toEqual({ kind: "list", column: "soon", place: { kind: "gap", index: 2, level: 1, group: null } });
 		});

@@ -241,7 +241,7 @@ export interface TaskStep {
 export type RightMode = "calendar" | "soon" | "inbox";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
-export type DropColumn = "left" | "soon" | "inbox" | "backlog";
+export type DropColumn = "day" | "soon" | "inbox" | "backlog";
 /** Where a task that exists is dragged from. */
 export type DropFrom = DropColumn | "timeline";
 /** Where a drag begins: a task's place, or "new" for the plus that carries a task not yet written. */

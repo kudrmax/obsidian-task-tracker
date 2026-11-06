@@ -282,7 +282,7 @@ describe("DragController: a tap on a list card", () => {
 		const card = document.body.appendChild(document.createElement("div"));
 		const count = card.appendChild(document.createElement("span"));
 		count.className = "tc-count";
-		new DragController(deps).attachCard(card, { key: { section: "now", index: 0, path: [], raw: "- [ ] A" } } as unknown as TaskItem, "left");
+		new DragController(deps).attachCard(card, { key: { section: "now", index: 0, path: [], raw: "- [ ] A" } } as unknown as TaskItem, "day");
 		on(card).dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, isPrimary: true, button: 0, pointerType: "touch" }));
 		card.dispatchEvent(Object.assign(new Event("pointerup", { bubbles: true }), { pointerId: 1, clientX: 20, clientY: 610, pointerType: "touch" }));
 		return { onMenu, count };

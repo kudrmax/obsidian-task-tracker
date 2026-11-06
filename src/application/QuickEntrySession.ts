@@ -97,9 +97,9 @@ export interface PlaceMove {
 
 /** The columns to look for a task in: those the window shows first. */
 const LOOK_IN: Readonly<Record<RightMode, readonly DropColumn[]>> = {
-	calendar: ["left", "soon", "inbox", "backlog"],
-	soon: ["soon", "left", "inbox", "backlog"],
-	inbox: ["inbox", "backlog", "soon", "left"],
+	calendar: ["day", "soon", "inbox", "backlog"],
+	soon: ["soon", "day", "inbox", "backlog"],
+	inbox: ["inbox", "backlog", "soon", "day"],
 };
 
 interface Line extends PendingText {
@@ -241,7 +241,7 @@ export class QuickEntrySession {
 
 	/** The plus tapped: the end of the day column while it shows, of Inbox when the window shows Inbox and Soon. */
 	openFromPlus(): void {
-		this.openAtEnd(this.view.mode() === "inbox" ? "inbox" : "left");
+		this.openAtEnd(this.view.mode() === "inbox" ? "inbox" : "day");
 	}
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
@@ -380,7 +380,7 @@ export class QuickEntrySession {
 		if (!field) return null;
 		const shown = this.shownPlace(field);
 		if (shown && samePlacement(shown, placement)) return null;
-		const column: DropColumn = placement.kind === "now" || placement.kind === "date" ? "left" : placement.kind;
+		const column: DropColumn = placement.kind === "now" || placement.kind === "date" ? "day" : placement.kind;
 		const rename = field.rename && { ...field.rename, moved: true };
 		this.reset({ ...field, rename, run: new Run(this.endOf(column)) });
 		const day = this.tasks.dayOfPlacement(placement);
@@ -401,7 +401,7 @@ export class QuickEntrySession {
 	placeOf(column: DropColumn, result: ListPlace): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
-		if (column !== "left") return { kind: "list", list: column, group, before };
+		if (column !== "day") return { kind: "list", list: column, group, before };
 		return { kind: "day", date: this.view.day(), group, before };
 	}
 
@@ -444,11 +444,11 @@ export class QuickEntrySession {
 		const item = field.rename?.item ?? null;
 		const list = listSpot(field.run.spot);
 		if (list && (field.rename?.moved || !item)) return this.columnPlacement(list.column);
-		return item ? this.tasks.placementOf(item) : this.columnPlacement("left");
+		return item ? this.tasks.placementOf(item) : this.columnPlacement("day");
 	}
 
 	private columnPlacement(column: DropColumn): Placement {
-		return column === "left" ? this.tasks.placementOfDay(this.view.day()) : { kind: column };
+		return column === "day" ? this.tasks.placementOfDay(this.view.day()) : { kind: column };
 	}
 
 	/** After the last card, in the last section, at the top level. */

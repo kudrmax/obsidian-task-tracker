@@ -71,7 +71,7 @@ interface MenuField {
 }
 
 
-const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", left: "now" };
+const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", day: "now" };
 
 /** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
 function movesRows(before: EntryState | null, after: EntryState): boolean {
