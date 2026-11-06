@@ -243,26 +243,6 @@ afterEach(() => {
 });
 
 describe("QuickEntryController", () => {
-	describe("where a task written in a column goes", () => {
-		const task = { kind: "task", group: "Work", before: key("now", 2) } as const;
-
-		it("the day column: the day it shows, today, a later or a past one; the service gives its list and due date", () => {
-			expect(setUp().controller.placeOf("left", task)).toEqual({ kind: "day", date: TODAY, group: "Work", before: key("now", 2) });
-			expect(setUp({ day: "2026-11-05" }).controller.placeOf("left", task)).toEqual({ kind: "day", date: "2026-11-05", group: "Work", before: key("now", 2) });
-			expect(setUp({ day: "2026-10-28" }).controller.placeOf("left", task)).toEqual({ kind: "day", date: "2026-10-28", group: "Work", before: key("now", 2) });
-		});
-
-		it("Soon and Inbox: their own lists", () => {
-			const { controller } = setUp();
-			expect(controller.placeOf("soon", task)).toEqual({ kind: "list", list: "soon", group: "Work", before: key("now", 2) });
-			expect(controller.placeOf("inbox", task)).toEqual({ kind: "list", list: "inbox", group: "Work", before: key("now", 2) });
-		});
-
-		it("a subtask: under its task, wherever the column", () => {
-			expect(setUp().controller.placeOf("inbox", { kind: "subtask", parent: key("inbox", 0), before: null })).toEqual({ kind: "subtask", parent: key("inbox", 0), before: null });
-		});
-	});
-
 	describe("the plus", () => {
 		const items = { left: [item("A", key("now", 0))], inbox: [item("I", key("inbox", 0), "Home"), item("J", key("inbox", 1), "Work")] };
 

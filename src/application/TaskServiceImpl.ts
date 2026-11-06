@@ -1,7 +1,7 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
 import { markChoices, typedMarks } from "../domain/Marks";
-import { priorityOfText, withPriority } from "../domain/Priority";
+import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
 import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
@@ -107,7 +107,7 @@ export class TaskServiceImpl implements TaskService {
 
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
 		const levels = this.priorityLevels();
-		const parsed = priorityOfText(text, levels.map((l) => l.prefix));
+		const parsed = priorityOfTitle(text, levels.map((l) => l.prefix));
 		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
 	}
 

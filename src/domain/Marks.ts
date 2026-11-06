@@ -1,4 +1,5 @@
-import { priorityOfText } from "./Priority";
+import { priorityOfTitle } from "./Priority";
+import { taskTitle } from "./TaskTitle";
 
 /** What tints a task: a priority level's prefix or the labels' names. */
 export interface Marks {
@@ -27,6 +28,6 @@ export function markChoices(marks: Marks): MarkChoices {
  * word is (the text then goes without that word); the labels while there is no priority.
  */
 export function typedMarks(text: string, priority: string | null, labels: readonly string[], prefixes: readonly string[]): Marks & { readonly text: string } {
-	const typed = priority === null ? priorityOfText(text, prefixes) : { text, priority };
+	const typed = priority === null ? priorityOfTitle(text, prefixes) : { text: taskTitle(text), priority };
 	return { text: typed.text, ...marksOf(typed.priority, labels) };
 }

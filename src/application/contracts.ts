@@ -33,6 +33,8 @@ export { samePlacement } from "../domain/operations";
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
 export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+/** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
+export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** A list in its sections, and whether it shows their headers. */
 export { listView, type ListGroup, type ListView } from "./sections";
 /** Where in its list's sections a task, or several, can go from a menu, by the sections offered with the screen. */
@@ -231,6 +233,12 @@ export interface TaskStep {
 	readonly key: TaskKey;
 	readonly change: TaskChange;
 }
+
+/**
+ * Which pair of neighbouring lists the screen shows: Inbox and Soon, Soon and the day's list, or the day's list and the
+ * calendar. Where a frontend keeps it is its own; what quick entry looks at first follows from it.
+ */
+export type RightMode = "calendar" | "soon" | "inbox";
 
 /** The lists a card is dragged from or dropped on: the day list beside the calendar, Soon, and Inbox over Backlog. */
 export type DropColumn = "left" | "soon" | "inbox" | "backlog";

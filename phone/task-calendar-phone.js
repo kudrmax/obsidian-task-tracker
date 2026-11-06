@@ -91,6 +91,15 @@
     return labels.map((name) => ` #${tag}/${name}`).join("");
   }
 
+  // src/domain/TaskTitle.ts
+  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
+  function oneLine(text) {
+    return text.replace(LINE_BREAK, " ");
+  }
+  function taskTitle(text) {
+    return oneLine(text).trim();
+  }
+
   // src/domain/Priority.ts
   function usablePrefix(prefix) {
     return /^\S+$/.test(prefix);
@@ -103,6 +112,9 @@
     const m = FIRST_WORD_RE.exec(text);
     if (!m || !prefixes.includes(m[1])) return { priority: null, text };
     return { priority: m[1], text: m[2] };
+  }
+  function priorityOfTitle(text, prefixes) {
+    return priorityOfText(taskTitle(text), prefixes);
   }
   function isBlankTitle(text, prefixes) {
     return priorityOfText(text, prefixes).text.trim() === "";
@@ -1478,17 +1490,8 @@ ${key.title}`.toLowerCase();
     return { priority: marks.labels.length === 0, labels: marks.priority === null };
   }
   function typedMarks(text, priority, labels, prefixes) {
-    const typed2 = priority === null ? priorityOfText(text, prefixes) : { text, priority };
+    const typed2 = priority === null ? priorityOfTitle(text, prefixes) : { text: taskTitle(text), priority };
     return { text: typed2.text, ...marksOf(typed2.priority, labels) };
-  }
-
-  // src/domain/TaskTitle.ts
-  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
-  function oneLine(text) {
-    return text.replace(LINE_BREAK, " ");
-  }
-  function taskTitle(text) {
-    return oneLine(text).trim();
   }
 
   // src/domain/operations.ts

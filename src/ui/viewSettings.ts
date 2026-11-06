@@ -1,12 +1,11 @@
-import type { ScreenSettings, ScreenSettingsStore } from "../application/contracts";
+import type { RightMode, ScreenSettings, ScreenSettingsStore } from "../application/contracts";
+
+export type { RightMode } from "../application/contracts";
 
 /**
  * The settings of this frontend alone: how Obsidian's screen is laid out, zoomed and painted. They are kept in the
  * plugin's data.json beside the shared ones, but no service reads them and no other frontend has them.
  */
-
-/** Which pair of neighbouring columns the window shows: Inbox and Soon, Soon and Now, or Now and the calendar. */
-export type RightMode = "calendar" | "soon" | "inbox";
 
 /** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
 export interface ZoomLevel {
