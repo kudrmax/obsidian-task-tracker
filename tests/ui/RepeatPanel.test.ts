@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import type { RepeatRule } from "../../src/application/contracts";
+import { repeatDraft, type RepeatRule } from "../../src/application/contracts";
 import { repeatPanel, type RepeatPanelOptions } from "../../src/ui/repeat/RepeatPanel";
 
 afterEach(() => document.body.replaceChildren());
@@ -8,10 +8,10 @@ afterEach(() => document.body.replaceChildren());
 const THURSDAY = "2026-11-05";
 const last = <T>(list: readonly T[]): T | undefined => list[list.length - 1];
 
-function open(opts: Partial<RepeatPanelOptions> = {}): { panel: HTMLElement; changes: RepeatRule[] } {
+function open({ rule = null, ...opts }: Partial<RepeatPanelOptions> & { rule?: RepeatRule | null } = {}): { panel: HTMLElement; changes: RepeatRule[] } {
 	const panel = document.body.appendChild(document.createElement("div"));
 	const changes: RepeatRule[] = [];
-	repeatPanel(panel, { rule: null, day: THURSDAY, onChange: (rule) => changes.push(rule), onRemove: null, ...opts });
+	repeatPanel(panel, { draft: repeatDraft(THURSDAY, rule), onChange: (changed) => changes.push(changed), onRemove: null, ...opts });
 	return { panel, changes };
 }
 
@@ -133,7 +133,7 @@ describe("repeatPanel", () => {
 	it("drawn again into the same panel for a task without a rule, leaves no room for a Remove row it does not have", () => {
 		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null }, onRemove: () => undefined });
 		panel.replaceChildren();
-		repeatPanel(panel, { rule: null, day: THURSDAY, onChange: () => undefined, onRemove: null });
+		repeatPanel(panel, { draft: repeatDraft(THURSDAY, null), onChange: () => undefined, onRemove: null });
 		expect([panel.querySelector(".tc-repeat-remove"), panel.classList.contains("has-remove")]).toEqual([null, false]);
 	});
 

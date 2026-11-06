@@ -92,7 +92,7 @@ export function setStatus(doc: TaskDocument, entry: TaskEntry, status: TaskStatu
 
 /** A schedule of every few units counts from `date`; any other rule as it is. */
 function anchoredRepeat(rule: RepeatRule, date: LocalDate): Repeat {
-	return Repeat.of(rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule);
+	return Repeat.of(Repeat.anchored(rule, date));
 }
 
 /**

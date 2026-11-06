@@ -1,6 +1,7 @@
 import type { GroupName, LocalDate, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import { sameRule } from "../domain/Repeat";
+import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
@@ -217,7 +218,7 @@ export class QuickEntrySession {
 			place,
 			places: ENTRY_PLACES,
 			repeatable: field.run.spot.kind !== "slot",
-			repeatDay: (place && this.tasks.dayOfPlacement(place)) ?? this.view.today(),
+			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.view.today()),
 		};
 	}
 

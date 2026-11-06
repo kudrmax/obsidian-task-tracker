@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { itemLevels, toItem } from "../../src/application/taskItems";
+import { DayBoundary } from "../../src/domain/DayBoundary";
 import { TaskDocument } from "../../src/domain/TaskDocument";
 
 const M = { dueDate: "📅", slot: "⏰" };
@@ -48,6 +49,7 @@ describe("toItem", () => {
 			list: "now",
 			isSubtask: false,
 			day: T,
+			repeatDay: T,
 			can: { postpone: true, removeDue: false, remind: true, setPriority: true, setLabels: true },
 			subtasks: [],
 			allSubtasks: [],
@@ -57,6 +59,13 @@ describe("toItem", () => {
 			parentKey: null,
 			description: null,
 		});
+	});
+
+	it("a new rule's day: the day setRepeat anchors at, its due date, else its slot's by the day's boundary; else today", () => {
+		const doc = parse("## Now\n- [ ] Due 📅 2026-11-03\n- [ ] Slot ⏰ 2026-11-07 10:00\n- [ ] Late ⏰ 2026-11-07 02:00\n- [ ] Plain\n\n## Soon\n\n## Done\n");
+		const days = (boundary?: DayBoundary) => doc.tasks("now").map((e) => toItem(e, T, undefined, null, boundary).repeatDay);
+		expect(days()).toEqual(["2026-11-03", "2026-11-07", "2026-11-07", T]);
+		expect(days(new DayBoundary(4))).toEqual(["2026-11-03", "2026-11-07", "2026-11-06", T]);
 	});
 
 	it("tells the list a task is in and whether it is a subtask, a subtask's list its task's", () => {

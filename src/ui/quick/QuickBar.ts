@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type EntryState, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type EntryState, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, repeatDraft, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -376,8 +376,7 @@ export class QuickBar implements EntryPart {
 	private renderRepeat(parent: HTMLElement): void {
 		const rule = this.state?.repeat ?? null;
 		repeatPanel(parent, {
-			rule,
-			day: this.state?.repeatDay ?? this.deps.today(),
+			draft: repeatDraft(this.state?.repeatDay ?? this.deps.today(), rule),
 			onChange: (changed) => {
 				this.deps.onRepeat(changed);
 				this.restand();

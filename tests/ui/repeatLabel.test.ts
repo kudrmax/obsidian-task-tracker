@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RepeatRule } from "../../src/application/contracts";
-import { ordinal, repeatValue } from "../../src/ui/repeat/repeatLabel";
+import { onTheDay, repeatValue } from "../../src/ui/repeat/repeatLabel";
 
 const rule = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });
 
@@ -27,8 +27,9 @@ describe("repeatValue", () => {
 	});
 });
 
-describe("ordinal", () => {
-	it("1st 2nd 3rd 4th 11th 12th 13th 21st 22nd 23rd 31st", () => {
-		expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "31st"]);
+describe("onTheDay", () => {
+	it("the day a monthly schedule falls on, worded by the domain", () => {
+		expect(onTheDay(rule({ unit: "month", dayOfMonth: 22 }))).toBe("On the 22nd");
+		expect(onTheDay(rule({}))).toBe("");
 	});
 });

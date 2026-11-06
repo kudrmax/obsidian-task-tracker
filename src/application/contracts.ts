@@ -16,6 +16,13 @@ export { REMINDER_KINDS } from "../domain/Task";
 export type { RepeatRule, RepeatUnit, Weekday } from "../domain/Repeat";
 /** Whether two rules are the same but for where they are anchored: the UI asks, never compares rules itself. */
 export { sameRule } from "../domain/Repeat";
+/** The parts a rule is worded with («every 3 weeks», «on the 5th», a weekly schedule's days): the UI composes its summary from them. */
+export { repeatParts, type RepeatParts } from "../domain/Repeat";
+/**
+ * The repeat panel's rules: `repeatDraft(day, rule)` is what it offers and shows for a rule (a new one from `day`, a task's
+ * `repeatDay` or the quick entry's), `editRepeat(draft, change)` the draft after a tap, or null when the tap changes nothing.
+ */
+export { editRepeat, repeatDraft, type RepeatChange, type RepeatDraft, type RepeatKind } from "../domain/RepeatDraft";
 /** Where a day begins: the UI places slots, events and now on the timeline by it. */
 export { DayBoundary } from "../domain/DayBoundary";
 /** A slot on the timeline moved, as long as it is, to lie within its day. */
@@ -125,6 +132,8 @@ export interface TaskItem {
 	readonly isSubtask: boolean;
 	/** The day the task stands on: its slot's, today for Now, else its due date. */
 	readonly day: LocalDate | null;
+	/** The day a new rule on the task is drawn from (`repeatDraft`): the day `setRepeat` anchors it at, else today. */
+	readonly repeatDay: LocalDate;
 	/**
 	 * What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task
 	 * on a time), a priority set (one without labels), labels set (one without a priority).

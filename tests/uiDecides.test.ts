@@ -29,7 +29,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
 	"src/ui/TaskCalendarView.ts": { count: 5, removedBy: "S4 (can.fold) and S9 (TaskService.screenOf)" },
 	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (repeat icon, description mark); they stay" },
-	"src/ui/menu/TaskMenu.ts": { count: 5, removedBy: "S4 (TaskItem.can, togglePriority, toggleLabel) and S8 (the repeat's defaults)" },
+	"src/ui/menu/TaskMenu.ts": { count: 4, removedBy: "S4 (TaskItem.can, togglePriority, toggleLabel)" },
 	"src/ui/search/searchRows.ts": { count: 1, removedBy: "S9 (search returns its groups)" },
 };
 

@@ -1,36 +1,24 @@
-import type { RepeatRule, RepeatUnit, Weekday } from "../../application/contracts";
-import { dayOfMonth, weekdayOf } from "../dates";
+import { editRepeat, type RepeatChange, type RepeatDraft, type RepeatKind, type RepeatRule, type RepeatUnit, type Weekday } from "../../application/contracts";
 import { el } from "../dom";
 import { Button } from "../kit/Button";
 import { menuRow } from "../menu/MenuPanel";
-import type { LocalDate } from "../types";
 import { onTheDay } from "./repeatLabel";
 
 export interface RepeatPanelOptions {
-	readonly rule: RepeatRule | null;
-	/** The day new rules start from: the task's due date, else today (weekday and month day defaults). */
-	readonly day: LocalDate;
+	/** What the panel offers and shows: `repeatDraft` of the task's rule from its `repeatDay`, or the quick entry's. */
+	readonly draft: RepeatDraft;
 	readonly onChange: (rule: RepeatRule) => void;
 	/** Remove repeat, at the bottom: the opener offers it for a task that has a rule. */
 	readonly onRemove: (() => void) | null;
 }
-
-type RepeatKind = RepeatRule["kind"];
 
 interface Choice<T> {
 	readonly value: T;
 	readonly label: string;
 }
 
-const KINDS: readonly Choice<RepeatKind>[] = [
-	{ value: "schedule", label: "Schedule" },
-	{ value: "afterDone", label: "After done" },
-];
-const UNITS: readonly Choice<RepeatUnit>[] = [
-	{ value: "day", label: "days" },
-	{ value: "week", label: "weeks" },
-	{ value: "month", label: "months" },
-];
+const KIND_LABELS: Readonly<Record<RepeatKind, string>> = { schedule: "Schedule", afterDone: "After done" };
+const UNIT_LABELS: Readonly<Record<RepeatUnit, string>> = { day: "days", week: "weeks", month: "months" };
 const WEEKDAYS = [
 	["Mon", "Monday"],
 	["Tue", "Tuesday"],
@@ -60,14 +48,9 @@ class Segments<T> {
 	}
 }
 
-/** The repeat of a task as it is being set: every tap changes it and hands the new rule on at once. */
+/** The repeat of a task as it is being set: every tap goes to `editRepeat`, and a draft it changes is drawn and its rule handed on at once. */
 class RepeatEditor {
-	private kind: RepeatKind;
-	private every: number;
-	private unit: RepeatUnit;
-	/** The weekdays and the month's day stay while another unit or kind is shown, so going back finds them. */
-	private days: readonly Weekday[];
-	private monthDay: number;
+	private draft: RepeatDraft;
 
 	private readonly kinds: Segments<RepeatKind>;
 	private readonly units: Segments<RepeatUnit>;
@@ -77,73 +60,54 @@ class RepeatEditor {
 	private detail: HTMLElement | null = null;
 
 	constructor(private readonly panel: HTMLElement, private readonly opts: RepeatPanelOptions) {
-		const rule = opts.rule;
-		this.kind = rule?.kind ?? "schedule";
-		this.every = rule?.every ?? 1;
-		this.unit = rule?.unit ?? "week";
-		this.days = rule && rule.days.length > 0 ? rule.days : [weekdayOf(opts.day) as Weekday];
-		this.monthDay = rule?.dayOfMonth ?? Number(dayOfMonth(opts.day));
-
+		this.draft = opts.draft;
 		panel.classList.add("is-repeat");
-		this.kinds = new Segments(panel, "tc-repeat-kind", "Repeat kind", KINDS, (kind) => this.change(() => (this.kind = kind), this.kind !== kind));
+		const kinds = this.draft.kinds.map((value) => ({ value, label: KIND_LABELS[value] }));
+		this.kinds = new Segments(panel, "tc-repeat-kind", "Repeat kind", kinds, (to) => this.change({ what: "kind", to }));
 		const row = el(panel, "div", "tc-repeat-every");
 		el(row, "span", "tc-repeat-every-label", "Every");
-		this.fewer = Button.create(row, { kind: "icon", tone: "accent", label: "Fewer", icon: "minus", cls: "tc-repeat-step", onPress: () => this.change(() => this.every--, this.every > 1) });
+		this.fewer = Button.create(row, { kind: "icon", tone: "accent", label: "Fewer", icon: "minus", cls: "tc-repeat-step", onPress: () => this.change({ what: "every", by: -1 }) });
 		this.count = el(row, "span", "tc-repeat-count");
-		Button.create(row, { kind: "icon", tone: "accent", label: "More", icon: "plus", cls: "tc-repeat-step", onPress: () => this.change(() => this.every++) });
-		this.units = new Segments(panel, "tc-repeat-unit", "Unit", UNITS, (unit) => this.change(() => (this.unit = unit), this.unit !== unit));
+		Button.create(row, { kind: "icon", tone: "accent", label: "More", icon: "plus", cls: "tc-repeat-step", onPress: () => this.change({ what: "every", by: 1 }) });
+		const units = this.draft.units.map((value) => ({ value, label: UNIT_LABELS[value] }));
+		this.units = new Segments(panel, "tc-repeat-unit", "Unit", units, (to) => this.change({ what: "unit", to }));
 		const onRemove = opts.onRemove;
 		this.removeRow = onRemove ? menuRow(panel, { label: "Remove repeat", icon: "removeDue", cls: "tc-repeat-remove", onPick: () => onRemove() }) : null;
 		panel.classList.toggle("has-remove", this.removeRow !== null);
 		this.show();
 	}
 
-	private get rule(): RepeatRule {
-		const schedule = this.kind === "schedule";
-		return {
-			kind: this.kind,
-			every: this.every,
-			unit: this.unit,
-			days: schedule && this.unit === "week" ? this.days : [],
-			dayOfMonth: schedule && this.unit === "month" ? this.monthDay : null,
-			from: null,
-		};
-	}
-
-	/** A tap: when it changes anything, the panel shows the new rule and hands it on. */
-	private change(apply: () => void, changes = true): void {
-		if (!changes) return;
-		apply();
+	/** A tap: when it changes anything, the panel shows the new draft and hands its rule on. */
+	private change(change: RepeatChange): void {
+		const next = editRepeat(this.draft, change);
+		if (!next) return;
+		this.draft = next;
 		this.show();
-		this.opts.onChange(this.rule);
-	}
-
-	private toggleDay(day: Weekday): void {
-		const on = this.days.includes(day);
-		this.change(() => (this.days = on ? this.days.filter((d) => d !== day) : [...this.days, day].sort((a, b) => a - b)), !on || this.days.length > 1);
+		this.opts.onChange(next.rule);
 	}
 
 	private show(): void {
-		this.kinds.show(this.kind);
-		this.units.show(this.unit);
-		this.count.textContent = String(this.every);
-		this.fewer.setOff(this.every === 1);
-		this.fewer.el.setAttribute("aria-disabled", String(this.every === 1));
+		const { kind, unit, every, can } = this.draft;
+		this.kinds.show(kind);
+		this.units.show(unit);
+		this.count.textContent = String(every);
+		this.fewer.setOff(!can.fewer);
+		this.fewer.el.setAttribute("aria-disabled", String(!can.fewer));
 		this.detail?.remove();
 		this.detail = this.buildDetail();
 		if (this.detail) this.panel.insertBefore(this.detail, this.removeRow);
 	}
 
-	/** Under the unit: the weekdays of a weekly schedule, the day of a monthly one, nothing otherwise. */
+	/** Under the unit: what the draft says stands there, the weekdays or the month's day. */
 	private buildDetail(): HTMLElement | null {
-		if (this.kind !== "schedule") return null;
-		if (this.unit === "month") return el(null, "div", "tc-repeat-month", onTheDay(this.monthDay));
-		if (this.unit !== "week") return null;
+		const { detail, rule, days } = this.draft;
+		if (detail === "monthDay") return el(null, "div", "tc-repeat-month", onTheDay(rule));
+		if (detail !== "weekdays") return null;
 		const week = el(null, "div", "tc-repeat-week");
 		WEEKDAYS.forEach(([short, name], index) => {
 			const day = index as Weekday;
-			const on = this.days.includes(day);
-			const button = Button.create(week, { kind: "text", label: name, text: short, cls: "tc-repeat-day", onPress: () => this.toggleDay(day) });
+			const on = days.includes(day);
+			const button = Button.create(week, { kind: "text", label: name, text: short, cls: "tc-repeat-day", onPress: () => this.change({ what: "weekday", day }) });
 			button.setOn(on);
 			button.el.setAttribute("aria-pressed", String(on));
 		});

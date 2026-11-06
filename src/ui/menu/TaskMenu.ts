@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, repeatDraft, repeatParts, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -52,8 +52,7 @@ export function statusTiles(item: TaskItem): readonly StatusTile[] {
 }
 
 function repeatRow(rule: RepeatRule | null): EditRow {
-	const weekly = rule !== null && rule.kind === "schedule" && rule.unit === "week";
-	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: weekly ? rule.days : null, icon: "repeat" };
+	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: rule && repeatParts(rule).days, icon: "repeat" };
 }
 
 export type { SectionChoice } from "./SectionChooser";
@@ -468,11 +467,10 @@ export class TaskMenu extends LiftedMenu {
 		this.askFor(null, false);
 		clear(this.panel);
 		clear(this.upper);
-		const { item, actions, today } = this.context;
+		const { item, actions } = this.context;
 		const remove = this.pick(() => actions.setRepeat(null));
 		repeatPanel(this.panel, {
-			rule: item.repeat,
-			day: item.dueDate ?? today,
+			draft: repeatDraft(item.repeatDay, item.repeat),
 			onChange: (rule) => {
 				this.repeatDraft = rule;
 				this.place();

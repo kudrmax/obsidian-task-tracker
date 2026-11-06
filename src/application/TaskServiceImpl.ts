@@ -342,7 +342,7 @@ export class TaskServiceImpl implements TaskService {
 		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
 		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
-		return toItem(entry, today, levels, parent);
+		return toItem(entry, today, levels, parent, this.rules.moment().boundary);
 	}
 
 	async lineOf(key: TaskKey): Promise<number> {
@@ -538,7 +538,8 @@ export class TaskServiceImpl implements TaskService {
 
 	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
 		const levels = this.itemLevels();
-		return (entry) => toItem(entry, today, levels);
+		const { boundary } = this.rules.moment();
+		return (entry) => toItem(entry, today, levels, null, boundary);
 	}
 
 	private itemLevels(): ItemLevels {

@@ -551,6 +551,13 @@ ${key.title}`.toLowerCase();
     const suffix = { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
     return `${n}${suffix}`;
   }
+  function repeatParts({ kind, every, unit, days, dayOfMonth }) {
+    const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
+    const schedule = kind === "schedule";
+    const weekly = schedule && unit === "week";
+    const on = weekly ? `on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : schedule && unit === "month" ? `on the ${ordinal(dayOfMonth ?? 1)}` : null;
+    return { every: head, on, days: weekly ? days : null, afterDone: kind === "afterDone" };
+  }
   function monthIndexOf(date) {
     const { year, month } = partsOf(date);
     return year * 12 + month - 1;
@@ -568,6 +575,11 @@ ${key.title}`.toLowerCase();
       if (problem) throw new Error(`Invalid repeat rule: ${problem}`);
       return new _Repeat(rule);
     }
+    /** A schedule of every few units counts from `date`; any other rule as it is. */
+    static anchored(rule, date) {
+      return rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule;
+    }
+    /** What keeps the rule from being written, or null: every from 1, weekdays for a weekly schedule only and at least one, a month's day for a monthly one only, `from` for a schedule of every few units only. */
     static problemWith({ kind, every, unit, days, dayOfMonth, from }) {
       if (!Number.isInteger(every) || every < 1) return "every must be a whole number from 1";
       const wantsDays = kind === "schedule" && unit === "week";
@@ -614,11 +626,10 @@ ${key.title}`.toLowerCase();
       return inWeekOrder ? days : null;
     }
     format() {
-      const { kind, every, unit, days, dayOfMonth, from } = this.rule;
-      const head = every === 1 ? `every ${unit}` : `every ${every} ${unit}s`;
-      if (kind === "afterDone") return `${head} when done`;
-      const on = unit === "week" ? ` on ${days.map((d) => WEEKDAY_NAMES[d]).join(", ")}` : unit === "month" ? ` on the ${ordinal(dayOfMonth ?? 1)}` : "";
-      return `${head}${on}${from ? ` from ${from}` : ""}`;
+      const { every, on, afterDone } = repeatParts(this.rule);
+      if (afterDone) return `${every} when done`;
+      const from = this.rule.from;
+      return `${every}${on ? ` ${on}` : ""}${from ? ` from ${from}` : ""}`;
     }
     /** Spec §3.2: strictly after max(today, taskDate); afterDone: today + N. */
     next(taskDate, today) {
@@ -636,8 +647,8 @@ ${key.title}`.toLowerCase();
     }
     /** The same rule anchored: `from` set to `date` when every > 1, else unchanged. */
     anchoredAt(date) {
-      const { kind, every } = this.rule;
-      return kind === "schedule" && every > 1 ? new _Repeat({ ...this.rule, from: date }) : this;
+      const rule = _Repeat.anchored(this.rule, date);
+      return rule === this.rule ? this : new _Repeat(rule);
     }
     firstAfter(anchor, base) {
       switch (this.rule.unit) {
@@ -1548,7 +1559,7 @@ ${key.title}`.toLowerCase();
     return patch(doc, entry, { status, statusChar: STATUS_CHARS[status] });
   }
   function anchoredRepeat(rule, date) {
-    return Repeat.of(rule.kind === "schedule" && rule.every > 1 ? { ...rule, from: date } : rule);
+    return Repeat.of(Repeat.anchored(rule, date));
   }
   function setRepeat(doc, entry, rule, today, boundary = DayBoundary.MIDNIGHT) {
     return doc.replace(entry, repeated(entry.task, rule, today, boundary));
