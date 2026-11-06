@@ -1,11 +1,10 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock, LIST_WIDTH_MIN, type RightMode, type ScreenSettings, type ViewSettingsStore, type ZoomLevel } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock, LIST_WIDTH_MIN, type RightMode, type ScreenSettings, type ViewSettingsStore, type ZoomLevel } from "../application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
 import { SearchWindow } from "./search/SearchWindow";
-import { BulkController, type BulkSections } from "./BulkController";
-import type { PickedCard } from "./TaskSelection";
+import { BulkController } from "./BulkController";
 import type { Theme } from "./eventColors";
 import { addDays } from "./dates";
 import { DayData } from "./DayData";
@@ -172,17 +171,18 @@ export class TaskCalendarView extends ItemView {
 			apply: (steps) => this.act(() => this.deps.tasks.applyAll(steps)),
 			today: () => this.today(),
 			day: () => this.selectedDate,
-			levels: () => this.deps.tasks.priorityLevels(),
-			labels: () => this.deps.tasks.labelLevels(),
-			setLabels: async (steps) => {
-				const written: { items: readonly (TaskItem | null)[] } = { items: steps.map(() => null) };
+			menu: (items, cards) => this.deps.tasks.menu(items, this.today(), cards.every((card) => this.sectionColumn(card.card)) ? this.data.offer : null),
+			togglePriority: (keys, prefix) => this.act(() => this.deps.tasks.togglePriority(keys, prefix)),
+			toggleLabel: async (keys, name) => {
+				const written: { items: readonly (TaskItem | null)[] } = { items: keys.map(() => null) };
 				await this.act(async () => {
-					written.items = await this.deps.tasks.setLabelsAll(steps);
+					written.items = await this.deps.tasks.toggleLabel(keys, name);
 				});
 				return written.items;
 			},
+			removeDue: (keys) => this.act(() => this.deps.tasks.removeDue(keys)),
+			carried: (lifted, picked) => this.deps.tasks.carried(lifted, picked),
 			cards: (column) => this.listOf(column)?.cards.map((entry) => entry.card) ?? [],
-			sections: (cards) => this.bulkSections(cards),
 			toSection: (keys, name) => this.act(() => this.deps.tasks.toSection(keys, name)),
 			desktop: () => !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 			isMod: (e) => (Platform.isMacOS ? e.metaKey : e.ctrlKey),
@@ -707,7 +707,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A tap on a card's subtask counter folds its open subtasks away, or shows them again; true when it did, in place of the menu. */
 	private fold(item: TaskItem, target: EventTarget | null): boolean {
-		if (item.subtasks.length === 0 || !onCounter(target)) return false;
+		if (!item.can.fold || !onCounter(target)) return false;
 		this.haptics.tap();
 		void this.act(() => this.deps.tasks.setCollapsed(item.key, !item.collapsed));
 		return true;
@@ -879,14 +879,14 @@ export class TaskCalendarView extends ItemView {
 		field.scrollIntoView({ block: "nearest" });
 	}
 
-	/** A section's menu; No section has none. */
+	/** A section's menu, with what the group may be given; none for a group that may be given nothing (No section). */
 	private showGroupMenu(head: HTMLElement, list: GroupedList, group: ListGroup): void {
 		const name = group.name;
-		if (name === null) return;
+		if (name === null || !(group.can.rename || group.can.remove)) return;
 		GroupMenu.open(head, {
 			name,
-			onRename: () => this.renameInPlace(head, list, name),
-			onRemove: () => void this.act(() => this.deps.tasks.removeGroup(list, name)),
+			onRename: group.can.rename ? () => this.renameInPlace(head, list, name) : undefined,
+			onRemove: group.can.remove ? () => void this.act(() => this.deps.tasks.removeGroup(list, name)) : undefined,
 		});
 	}
 
@@ -900,8 +900,10 @@ export class TaskCalendarView extends ItemView {
 			value: name,
 			onDone: (to) => {
 				this.arbiter.release(NAMING);
-				if (to && to !== name) void this.act(() => this.deps.tasks.renameGroup(list, name, to));
-				else this.render();
+				if (to === null) return this.render();
+				void this.act(async () => {
+					if (!(await this.deps.tasks.renameGroup(list, name, to))) this.render();
+				});
 			},
 		});
 	}
@@ -932,14 +934,6 @@ export class TaskCalendarView extends ItemView {
 		const columns: ListColumn[] = ["left", "soon", "inbox", "backlog"];
 		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
 		return column && this.sectionsOf(column) ? column : null;
-	}
-
-	/** The picked tasks' sections: only when every card stands in a column that shows its sections, and the service offers them some. */
-	private bulkSections(cards: readonly PickedCard[]): BulkSections | null {
-		if (cards.some((card) => !this.sectionColumn(card.card))) return null;
-		const items = cards.map((card) => card.item);
-		const choice = sectionChoice(items, this.data.offer);
-		return choice && { choice, shared: items.every((item) => item.group === items[0].group) };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
@@ -998,33 +992,32 @@ export class TaskCalendarView extends ItemView {
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
 		const tasks = this.deps.tasks;
 		const column = this.sectionColumn(source);
-		const sections = column ? sectionChoice([item], this.data.offer) : null;
+		const offer = column ? this.data.offer : null;
+		const today = this.today();
 		/** The task as the menu last saw it: a label set from the menu gives it a fresh key, which the next action needs. */
 		let current = item;
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
-			sections: sections ?? undefined,
+			menu: (task) => tasks.menu([task], today, offer),
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			markdown: full?.holds(item) ? undefined : this.markdown,
-			today: this.today(),
+			today,
 			day: this.selectedDate,
-			levels: tasks.priorityLevels(),
-			labels: tasks.labelLevels(),
 			actions: {
 				setStatus: (status) => this.act(() => tasks.setStatus(current.key, status)),
 				postpone: (date) => this.act(() => tasks.postpone(current.key, date)),
-				removeDue: () => this.act(() => tasks.setDueDate(current.key, null)),
+				removeDue: () => this.act(() => tasks.removeDue([current.key])),
 				toSection: (name) => this.act(() => tasks.toSection([current.key], name)),
 				newSection: () => {
-					if (column && sections) this.askGroupName(current, column);
+					if (column) this.askGroupName(current, column);
 				},
-				setPriority: (prefix) => this.act(() => tasks.setPriority(current.key, prefix)),
-				setLabels: async (names) => {
+				togglePriority: (prefix) => this.act(() => tasks.togglePriority([current.key], prefix)),
+				toggleLabel: async (name) => {
 					const written: { item: TaskItem | null } = { item: null };
 					await this.act(async () => {
-						written.item = await tasks.setLabels(current.key, names);
+						[written.item] = await tasks.toggleLabel([current.key], name);
 					});
 					if (written.item) current = written.item;
 					return written.item;

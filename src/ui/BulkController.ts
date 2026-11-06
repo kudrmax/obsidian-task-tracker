@@ -1,4 +1,4 @@
-import { type GroupName, keyId, type LabelLevel, type PriorityLevel, type SectionChoice, type TaskChange, type TaskItem, type TaskKey, type TaskStep } from "../application/contracts";
+import { type GroupName, keyId, type TaskChange, type TaskItem, type TaskKey, type TaskMenuModel, type TaskStep } from "../application/contracts";
 import { carriesMany, type DropTarget, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
@@ -6,13 +6,6 @@ import { Button } from "./kit/Button";
 import { PlusRing } from "./quick/PlusRing";
 import { type PickedCard, pickMark, TaskSelection } from "./TaskSelection";
 import type { LocalDate } from "./types";
-
-/** Where the picked tasks can go among their list's sections: only when they all stand in one list that shows them. */
-export interface BulkSections {
-	readonly choice: SectionChoice;
-	/** Every task stands in `choice.current`: it is checked. */
-	readonly shared: boolean;
-}
 
 export interface BulkDeps {
 	/** The view's content: the cancel ring goes in it, where the plus stands, and so do the buttons of Select tasks. */
@@ -22,13 +15,18 @@ export interface BulkDeps {
 	today(): LocalDate;
 	/** The day the day column shows. */
 	day(): LocalDate;
-	levels(): readonly PriorityLevel[];
-	labels(): readonly LabelLevel[];
-	/** Writes each task's labels, the screen shows them, and resolves with the tasks as they then stand, null for one gone. */
-	setLabels(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
+	/** The menu of `items`, the tasks of the picked `cards` as they now stand: sections only when every card stands where its list's sections show. */
+	menu(items: readonly TaskItem[], cards: readonly PickedCard[]): TaskMenuModel;
+	/** A level tapped (`TaskService.togglePriority`); resolves once the screen shows it. */
+	togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void>;
+	/** A label tapped (`TaskService.toggleLabel`): the screen shows it, and it resolves with the tasks as they then stand, null for one gone. */
+	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** Remove due date (`TaskService.removeDue`); resolves once the screen shows it. */
+	removeDue(keys: readonly TaskKey[]): Promise<void>;
+	/** The picked tasks that go along when `lifted` is carried (`TaskService.carried`). */
+	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[];
 	/** The cards of a list, in order. */
 	cards(column: ListColumn): readonly HTMLElement[];
-	sections(cards: readonly PickedCard[]): BulkSections | null;
 	/** The tasks into section `name` of their list, and resolves once the screen shows them. */
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** ⌘-click is for the desktop; on the phone only Select tasks picks. */
@@ -120,9 +118,9 @@ export class BulkController {
 			if (!this.selecting) this.selection.clear();
 			return [];
 		}
-		const id = keyId(item.key);
 		const picked = this.selection.cards;
-		return picked.filter((p) => keyId(p.item.key) !== id && !picked.some((other) => other !== p && other.subtree.includes(p.card)));
+		const along = new Set(this.deps.carried(item.key, picked.map((p) => p.item.key)).map(keyId));
+		return picked.filter((p) => along.has(keyId(p.item.key)));
 	}
 
 	/** Several cards carried: the plus's place cancels the drag. */
@@ -168,10 +166,10 @@ export class BulkController {
 		if (cards.length === 0 || !source) return;
 		/** The tasks as the menu last saw them: labels set from it give them fresh keys, which the next action needs. */
 		let items = cards.map((card) => card.item);
-		const sections = this.deps.sections(cards);
-		const each = (change: (item: TaskItem) => TaskChange) => {
+		const keys = () => items.map((item) => item.key);
+		const each = (change: TaskChange) => {
 			this.stop();
-			return this.deps.apply(items.map((item) => ({ key: item.key, change: change(item) })));
+			return this.deps.apply(items.map((item) => ({ key: item.key, change })));
 		};
 		this.menu = BulkMenu.open({
 			items,
@@ -180,16 +178,20 @@ export class BulkController {
 			at,
 			today: this.deps.today(),
 			day: this.deps.day(),
-			levels: this.deps.levels(),
-			labels: this.deps.labels(),
-			sections: sections ?? undefined,
+			menu: (now) => this.deps.menu(now, cards),
 			actions: {
-				setStatus: (status) => each(() => ({ kind: "status", status })),
-				setPriority: (priority) => each(() => ({ kind: "priority", priority })),
-				postpone: (date) => each(() => ({ kind: "postpone", date })),
-				removeDue: () => each((item) => (item.can.removeDue ? { kind: "dueDate", date: null } : { kind: "dueDate", date: item.dueDate })),
-				setLabels: async (names) => {
-					const written = await this.deps.setLabels(items.map((item, i) => ({ key: item.key, labels: names[i] })));
+				setStatus: (status) => each({ kind: "status", status }),
+				togglePriority: (prefix) => {
+					this.stop();
+					return this.deps.togglePriority(keys(), prefix);
+				},
+				postpone: (date) => each({ kind: "postpone", date }),
+				removeDue: () => {
+					this.stop();
+					return this.deps.removeDue(keys());
+				},
+				toggleLabel: async (name) => {
+					const written = await this.deps.toggleLabel(keys(), name);
 					this.selection.renew(items.flatMap((item, i) => (written[i] ? [{ from: item.key, to: written[i]!.key }] : [])));
 					if (written.some((item) => item === null)) return null;
 					items = written as TaskItem[];
@@ -197,9 +199,9 @@ export class BulkController {
 				},
 				toSection: (name) => {
 					this.stop();
-					return this.deps.toSection(items.map((item) => item.key), name);
+					return this.deps.toSection(keys(), name);
 				},
-				remove: () => each(() => ({ kind: "remove" })),
+				remove: () => each({ kind: "remove" }),
 			},
 			onClose: () => (this.menu = null),
 		});

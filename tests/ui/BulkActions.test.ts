@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TaskItem } from "../../src/application/contracts";
 import { BulkController, type BulkDeps } from "../../src/ui/BulkController";
-import { bulkCanRemoveDue, bulkLevelTiles, bulkMoveTiles, bulkNextPriority, bulkProgress, countLabel } from "../../src/ui/menu/BulkMenu";
+import { carriedWith, taskMenu } from "../../src/application/menus";
+import { countLabel } from "../../src/ui/menu/BulkMenu";
 import { type PickedCard, TaskSelection } from "../../src/ui/TaskSelection";
 import type { TaskDragPayload } from "../../src/ui/drag/DropTarget";
 import { onDay } from "../fakes/itemOnDay";
@@ -27,32 +28,6 @@ describe("the bulk menu", () => {
 	it("counts the tasks", () => {
 		expect(countLabel(1)).toBe("1 task");
 		expect(countLabel(3)).toBe("3 tasks");
-	});
-
-	it("offers In progress unless every task already is", () => {
-		expect(bulkProgress([item({ status: "inProgress" }), item()])).toEqual({ label: "In progress", status: "inProgress" });
-		expect(bulkProgress([item({ status: "inProgress" }), item({ status: "inProgress" })])).toEqual({ label: "Stop progress", status: "todo" });
-	});
-
-	it("marks the level every task shares, none for mixed levels, and a tap on the shared one takes it off", () => {
-		const p1 = { prefix: "p1", color: "red" } as const;
-		const shared = [item({ priority: p1 }), item({ priority: p1 })];
-		expect(bulkLevelTiles(shared, LEVELS).map((t) => t.on)).toEqual([true, false]);
-		expect(bulkLevelTiles([item({ priority: p1 }), item()], LEVELS).map((t) => t.on)).toEqual([false, false]);
-		expect(bulkNextPriority(shared, "p1")).toBeNull();
-		expect(bulkNextPriority([item({ priority: p1 }), item()], "p1")).toBe("p1");
-	});
-
-	it("leaves out Today only when every task already stands on today", () => {
-		const soon = item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] S" } });
-		expect(bulkMoveTiles([item(), item()], T).map((t) => t.id)).toEqual(["tomorrow", "pick"]);
-		expect(bulkMoveTiles([item(), soon], T).map((t) => t.id)).toEqual(["today", "tomorrow", "pick"]);
-	});
-
-	it("offers Remove due date when some task may lose its date, as the item tells", () => {
-		expect(bulkCanRemoveDue([item({ dueDate: T })])).toBe(false);
-		expect(bulkCanRemoveDue([item({ dueDate: T }), item({ dueDate: "2026-11-05" })])).toBe(true);
-		expect(bulkCanRemoveDue([item({ dueDate: "2026-11-05", can: { postpone: true, removeDue: false, remind: false, setPriority: true, setLabels: true } })])).toBe(false);
 	});
 });
 
@@ -100,13 +75,14 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 	const bulk = new BulkController({
 		root: document.body,
 		apply: async () => {},
-		labels: () => [],
-		setLabels: async (steps) => steps.map(() => null),
+		menu: (items) => taskMenu(items, T, LEVELS, [], null),
+		togglePriority: async () => {},
+		toggleLabel: async (keys) => keys.map(() => null),
+		removeDue: async () => {},
+		carried: carriedWith,
 		today: () => T,
 		day: () => T,
-		levels: () => LEVELS,
 		cards: () => [],
-		sections: () => null,
 		toSection: async () => {},
 		desktop: () => true,
 		isMod: (e) => e.metaKey,
@@ -131,12 +107,15 @@ describe("bulk actions", () => {
 		expect(bulk.selection.size).toBe(0);
 	});
 
-	it("carries the other picked cards along, not their own subtasks, and lifting a card not picked lets them go", () => {
-		const bulk = controller();
-		const [a, b, c] = cards([item(), item(), item()]);
-		const withChild = { ...a, subtree: [c.card] };
-		for (const card of [withChild, b, c]) bulk.selection.toggle(card);
-		expect(bulk.carried(b.item).map((p) => p.item)).toEqual([a.item]);
+	it("carries the picked cards the service says go along, and lifting a card not picked lets them go", () => {
+		const carried = vi.fn(carriedWith);
+		const bulk = controller({ carried });
+		const a = item();
+		const child = item({ key: { ...a.key, path: [0], raw: "- [ ] child" } });
+		const [ca, b, c] = cards([a, item(), child]);
+		for (const card of [ca, b, c]) bulk.selection.toggle(card);
+		expect(bulk.carried(b.item).map((p) => p.item)).toEqual([a]);
+		expect(carried).toHaveBeenCalledWith(b.item.key, [a.key, b.item.key, child.key]);
 		const [other] = cards([item()]);
 		expect(bulk.carried(other.item)).toEqual([]);
 		expect(bulk.selection.size).toBe(0);
@@ -156,20 +135,43 @@ describe("bulk actions", () => {
 
 	it("sends the picked tasks to a section in one call and lets them go", async () => {
 		const toSection = vi.fn(async () => {});
-		const sections = vi.fn(() => ({ choice: { names: ["Work"], current: null, ungrouped: "No section" }, shared: true }));
-		const bulk = controller({ sections, toSection });
+		const menu = vi.fn((items: readonly TaskItem[]) => ({ ...taskMenu(items, T, LEVELS, [], null), sections: { choice: { names: ["Work"], current: null, ungrouped: "No section" }, shared: true } }));
+		const bulk = controller({ menu, toSection });
 		const [a, b] = cards([item(), item()]);
 		for (const card of [a, b]) document.body.append(card.card);
 		bulk.selection.toggle(a);
 		bulk.selection.toggle(b);
 		expect(bulk.pick(a, new MouseEvent("click"), "tap")).toBe(true);
-		expect(sections).toHaveBeenCalledWith([a, b]);
+		expect(menu).toHaveBeenCalledWith([a.item, b.item], [a, b]);
 		const row = (label: string) => [...document.querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent?.trim() === label)!;
 		row("Section").click();
 		row("Work").click();
 		await Promise.resolve();
 		expect(toSection).toHaveBeenCalledWith([a.item.key, b.item.key], "Work");
 		expect(bulk.selection.size).toBe(0);
+		document.body.replaceChildren();
+	});
+
+	it("hands a level and Remove due date to the service with every picked task, and lets them go", async () => {
+		const togglePriority = vi.fn(async () => {});
+		const removeDue = vi.fn(async () => {});
+		const open = () => {
+			const bulk = controller({ togglePriority, removeDue });
+			const picked = cards([item({ dueDate: "2026-11-05" }), item()]);
+			for (const card of picked) bulk.selection.toggle(card);
+			bulk.pick(picked[0], new MouseEvent("click"), "tap");
+			return { bulk, keys: picked.map((card) => card.item.key) };
+		};
+		const first = open();
+		document.querySelector<HTMLButtonElement>(".tc-menu-tiles.is-priority .tc-menu-tile")!.click();
+		expect(togglePriority).toHaveBeenCalledWith(first.keys, "p1");
+		expect(first.bulk.selection.size).toBe(0);
+		document.body.replaceChildren();
+		const second = open();
+		const moves = document.querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile");
+		moves[moves.length - 1].click();
+		[...document.querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent?.trim() === "Remove due date")!.click();
+		expect(removeDue).toHaveBeenCalledWith(second.keys);
 		document.body.replaceChildren();
 	});
 

@@ -19,6 +19,13 @@ describe("GroupMenu", () => {
 		expect(open().rows.map((r) => r.querySelector(".tc-menu-label")?.textContent)).toEqual(["Rename", "Remove section"]);
 	});
 
+	it("offers only what the group may be given: no row for an action it has none for", () => {
+		document.body.innerHTML = "";
+		const head = document.body.appendChild(document.createElement("div"));
+		GroupMenu.open(head, { name: "Экскурсия", onRename: () => {} });
+		expect(Array.from(document.querySelectorAll(".tc-panel .tc-menu-row .tc-menu-label")).map((l) => l.textContent)).toEqual(["Rename"]);
+	});
+
 	it("a row does its action and the menu closes", () => {
 		const { rows, picked } = open();
 		rows[1].click();

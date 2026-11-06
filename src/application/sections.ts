@@ -6,6 +6,13 @@ import type { ListSection, TaskItem } from "./contracts";
 export interface ListGroup {
 	readonly name: GroupName;
 	readonly items: readonly TaskItem[];
+	/** What its header's menu offers: a section is renamed or removed; No section has no menu. */
+	readonly can: { readonly rename: boolean; readonly remove: boolean };
+}
+
+function groupOf(name: GroupName, items: readonly TaskItem[]): ListGroup {
+	const section = name !== null;
+	return { name, items, can: { rename: section, remove: section } };
 }
 
 /**
@@ -25,7 +32,7 @@ export interface ListView {
  * empty sections spec §5). One that shows none: all its tasks outside any.
  */
 export function listView(items: readonly TaskItem[], sections: boolean, listSections: readonly ListSection[] = []): ListView {
-	if (!sections) return { showsHeaders: false, groups: [{ name: null, items }] };
+	if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
 	const groups = withEmptySections(byGroup(items), listSections);
 	return { showsHeaders: groups.some((g) => g.name !== null), groups };
 }
@@ -37,7 +44,7 @@ function byGroup(items: readonly TaskItem[]): ListGroup[] {
 		if (group) group.items.push(item);
 		else groups.push({ name: item.group, items: [item] });
 	}
-	return groups;
+	return groups.map((g) => groupOf(g.name, g.items));
 }
 
 function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
@@ -49,14 +56,14 @@ function withEmptySections(groups: readonly ListGroup[], sections: readonly List
 		drawn.forEach((g, j) => {
 			if (above.has(g.name)) at = j + 1;
 		});
-		drawn.splice(at, 0, { name: section.name, items: [] });
+		drawn.splice(at, 0, groupOf(section.name, []));
 	});
 	return drawn;
 }
 
 /** The sections of tasks on a screen, in the order they show, with the list's empty sections where its column draws them. */
 export function shownSections(groups: readonly GroupName[], sections: readonly ListSection[]): readonly GroupName[] {
-	const shown = groups.reduce<ListGroup[]>((all, name) => (all.some((g) => g.name === name) ? all : [...all, { name, items: [] }]), []);
+	const shown = groups.reduce<ListGroup[]>((all, name) => (all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])]), []);
 	return withEmptySections(shown, sections).map((g) => g.name);
 }
 

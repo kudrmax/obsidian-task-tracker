@@ -19,3 +19,8 @@ export function sameTaskTree(a: TaskKey, b: TaskKey): boolean {
 export function keyId(key: TaskKey): string {
 	return `${key.section}:${key.index}:${key.path.join(".")}:${key.raw}`;
 }
+
+/** `a` sits under `b`, at any depth. */
+export function isUnder(a: TaskKey, b: TaskKey): boolean {
+	return a.section === b.section && a.index === b.index && b.path.length < a.path.length && b.path.every((i, k) => a.path[k] === i);
+}

@@ -43,6 +43,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 	const choices = markChoices(marks);
 	const priority = marks.priority === null ? null : levels.levelOf(marks.priority);
 	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry));
+	const description = descriptionMarkdown(entry);
 	return {
 		key: keyOf(entry),
 		text: entry.task.text,
@@ -61,12 +62,21 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
 		day: dayOfTask(entry.section, entry.task, today),
-		can: { postpone: canPostpone(entry.section), removeDue: canRemoveDue(entry.task.dueDate, today), remind: canRemind(entry.task.slot), setPriority: choices.priority, setLabels: choices.labels },
+		can: {
+			postpone: canPostpone(entry.section),
+			removeDue: canRemoveDue(entry.task.dueDate, today),
+			remind: canRemind(entry.task.slot),
+			setPriority: choices.priority,
+			setLabels: choices.labels,
+			stop: entry.task.repeat !== null && repeatable(entry),
+			addDescription: description === null,
+			fold: hasOpenSubtask(entry),
+		},
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,
 		progress: progressOf(entry),
 		collapsed: entry.task.collapsed && hasOpenSubtask(entry),
-		description: descriptionMarkdown(entry),
+		description,
 		parentText: parent?.task.text ?? null,
 		parentKey: parent ? keyOf(parent) : null,
 	};

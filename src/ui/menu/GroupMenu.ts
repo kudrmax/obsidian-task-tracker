@@ -7,8 +7,10 @@ import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
 	readonly name: string;
-	onRename(): void;
-	onRemove(): void;
+	/** None: the group can't be renamed, and the menu has no Rename. */
+	readonly onRename?: () => void;
+	/** None: the group can't be removed, and the menu has no Remove section. */
+	readonly onRemove?: () => void;
 }
 
 /** The menu of a section's header, like a task's: the header stays as it is over the blur, the panel grows out under it. */
@@ -20,10 +22,11 @@ export const GroupMenu = {
 		el(copy.el, "span", "tc-group-name", opts.name);
 		copy.pin(rect, { width: true, height: true });
 		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		const { onRename, onRemove } = opts;
 		panel.replace((p) =>
 			menuGroup(p, [
-				{ label: "Rename", icon: "rename", onPick: panel.pick(opts.onRename) },
-				{ label: "Remove section", icon: "removeSection", onPick: panel.pick(opts.onRemove) },
+				...(onRename ? [{ label: "Rename", icon: "rename", onPick: panel.pick(onRename) } as const] : []),
+				...(onRemove ? [{ label: "Remove section", icon: "removeSection", onPick: panel.pick(onRemove) } as const] : []),
 			]),
 		);
 		overlay.show();

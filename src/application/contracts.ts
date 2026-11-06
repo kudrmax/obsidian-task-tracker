@@ -6,7 +6,7 @@ import type { LabelLevel, LabelPaint } from "../domain/Label";
 import type { PriorityColor, PriorityLevel } from "../domain/Priority";
 import type { DayColumn } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
-import type { SectionOffer } from "./sections";
+import type { SectionChoice, SectionOffer } from "./sections";
 import { DEFAULT_SETTINGS } from "../settings";
 
 export type { GroupName, ReminderKind, SectionKey };
@@ -129,9 +129,19 @@ export interface TaskItem {
 	readonly day: LocalDate | null;
 	/**
 	 * What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task
-	 * on a time), a priority set (one without labels), labels set (one without a priority).
+	 * on a time), a priority set (one without labels), labels set (one without a priority), stopped (a task that repeats and
+	 * may), a description added (one without any), its subtasks folded away (one with an open subtask).
 	 */
-	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean; readonly setPriority: boolean; readonly setLabels: boolean };
+	readonly can: {
+		readonly postpone: boolean;
+		readonly removeDue: boolean;
+		readonly remind: boolean;
+		readonly setPriority: boolean;
+		readonly setLabels: boolean;
+		readonly stop: boolean;
+		readonly addDescription: boolean;
+		readonly fold: boolean;
+	};
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -257,6 +267,54 @@ export interface DroppedTask {
 
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
+
+/** A quick move of a task menu: Today, Tomorrow, or Pick a date, which asks for the day. */
+export type QuickMoveId = "today" | "tomorrow" | "pick";
+
+export interface QuickMove {
+	readonly id: QuickMoveId;
+	/** The day it puts the tasks off to; null for Pick a date. */
+	readonly date: LocalDate | null;
+}
+
+/** A level's tile: on when every task that may have a priority has this one. */
+export interface MenuLevel {
+	readonly level: PriorityLevel;
+	readonly on: boolean;
+}
+
+/** A label's tile: on when every task that may carry labels has it. */
+export interface MenuLabel {
+	readonly label: LabelLevel;
+	readonly on: boolean;
+}
+
+/** Where in their list's sections the tasks can go; `shared`: they all stand in `choice.current`, which is then checked. */
+export interface MenuSections {
+	readonly choice: SectionChoice;
+	readonly shared: boolean;
+}
+
+/**
+ * The menu of one task, or of several picked at once, as `TaskService.menu` reads it: what its groups offer, what is on and
+ * what can't be pressed. A tap on a level writes `togglePriority`, on a label `toggleLabel`, Remove due date `removeDue`.
+ */
+export interface TaskMenuModel {
+	/** What the progress tile sets on them all: In progress, or todo (Stop progress) when every one is in progress. */
+	readonly progress: TaskStatus;
+	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */
+	readonly levels: { readonly tiles: readonly MenuLevel[]; readonly disabled: boolean };
+	/** In the settings' order; `disabled` while none of the tasks may carry labels (they have a priority). */
+	readonly labels: { readonly tiles: readonly MenuLabel[]; readonly disabled: boolean };
+	/** Today, Tomorrow, Pick a date: a move is offered when one of the tasks doesn't stand on its day already; none for tasks put off nowhere. */
+	readonly moves: readonly QuickMove[];
+	/** Pick a date offers Remove due date: one of the tasks has a due date that can be taken off. */
+	readonly removeDue: boolean;
+	/** The due date they all have, which Pick a date shows picked; null when they differ or have none. */
+	readonly dueDate: LocalDate | null;
+	/** Only when a section offer was given and the tasks can go among one list's sections. */
+	readonly sections: MenuSections | null;
+}
 
 /** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
 export interface ScreenView {
@@ -384,6 +442,26 @@ export interface TaskService {
 	setLabelsAll(steps: readonly { readonly key: TaskKey; readonly labels: readonly string[] }[]): Promise<readonly (TaskItem | null)[]>;
 	/** How the phone reminds of a task on a time: the marker before its slot. */
 	setReminder(key: TaskKey, reminder: ReminderKind): Promise<void>;
+	/**
+	 * A tap on level `prefix` in a menu of these tasks: taken off them all when every one that may have a priority has it,
+	 * else set on them all (a task with labels keeps its labels and gets none). One write.
+	 */
+	togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void>;
+	/**
+	 * A tap on label `name` in a menu of these tasks: taken off them all when every one that may carry labels has it, else
+	 * put last on each that lacks it; a task with a priority keeps none. One write; each task as it then stands, in the order
+	 * given, its key fresh; null for one gone.
+	 */
+	toggleLabel(keys: readonly TaskKey[], name: string): Promise<readonly (TaskItem | null)[]>;
+	/** Remove due date in a menu of these tasks: the due date goes from each that can lose it (not today's); the rest stay as they are. One write. */
+	removeDue(keys: readonly TaskKey[]): Promise<void>;
+	/**
+	 * The menu of one task, or of several picked at once, on `today` (see `TaskMenuModel`). With `offer`, the tasks stand
+	 * where their list's sections are shown and the menu offers them (`sectionChoice`).
+	 */
+	menu(items: readonly TaskItem[], today: LocalDate, offer?: SectionOffer | null): TaskMenuModel;
+	/** The picked tasks that go along when `lifted`, one of them, is carried: all but itself and those under another picked one, which go with it. */
+	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[];
 	/** Folds the task's subtasks away on the screen, or shows them again: the marker on its line. A task without an open subtask has nothing to fold. */
 	setCollapsed(key: TaskKey, collapsed: boolean): Promise<void>;
 	/** The tasks a subtask sits under show their subtasks again, so its card stands in the list. */
@@ -482,8 +560,8 @@ export interface TaskService {
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
-	/** A blank name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. */
-	renameGroup(list: GroupedList, group: string, name: string): Promise<void>;
+	/** A blank or the same name changes nothing; a name the list has merges the two; the No section name hands the tasks to it. Resolves true when it wrote. */
+	renameGroup(list: GroupedList, group: string, name: string): Promise<boolean>;
 	/** The heading goes; its tasks, in order, join the end of No section. */
 	removeGroup(list: GroupedList, group: string): Promise<void>;
 	/**

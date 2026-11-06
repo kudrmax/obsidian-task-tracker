@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, nextProgress, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type Weekday } from "../../application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type PriorityLevel, REMINDER_KINDS, type ReminderKind, type RepeatRule, sameRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -41,13 +41,13 @@ export function progressLabel(next: TaskStatus): string {
 	return next === "todo" ? "Stop progress" : "In progress";
 }
 
-/** The status group: Done first, the most used; Stop last for a task that repeats. */
-export function statusTiles(item: TaskItem): readonly StatusTile[] {
+/** The status group: Done first, the most used; the progress tile named for what it sets; Stop last for a task that may be stopped. */
+export function statusTiles(item: TaskItem, progress: TaskStatus): readonly StatusTile[] {
 	return [
 		{ id: "done", label: "Done", icon: "done" },
-		{ id: "progress", label: progressLabel(nextProgress([item.status])), icon: "progress" },
+		{ id: "progress", label: progressLabel(progress), icon: "progress" },
 		{ id: "wontdo", label: "Won’t do", icon: "wontdo" },
-		...(item.repeat !== null && item.repeatable ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
+		...(item.can.stop ? [{ id: "stop", label: "Stop", icon: "stop" } as const] : []),
 	];
 }
 
@@ -65,7 +65,7 @@ export function editRows(item: TaskItem, sections: SectionChoice | null = null):
 	return [
 		{ id: "rename", label: "Rename", value: "", icon: "rename" },
 		...(item.can.remind ? [{ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" } as const] : []),
-		...(item.description === null ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
+		...(item.can.addDescription ? [{ id: "description", label: "Add description", value: "", icon: "description" } as const] : []),
 		...(item.repeatable ? [repeatRow(item.repeat)] : []),
 		...(sections ? [{ id: "section", label: "Section", value: sections.current ?? "", icon: "section" } as const] : []),
 		{ id: "subtask", label: "Add subtask", value: "", icon: "subtask" },
@@ -76,9 +76,9 @@ export interface LevelTile extends PriorityLevel {
 	readonly on: boolean;
 }
 
-/** The priority group's tiles, in the settings' order, the task's own on. */
-export function priorityTiles(item: TaskItem, levels: readonly PriorityLevel[]): readonly LevelTile[] {
-	return levels.map((level) => ({ prefix: level.prefix, color: level.color, on: level.prefix === item.priority?.prefix }));
+/** The priority group's tiles as the menu's model has them. */
+export function priorityTiles(model: TaskMenuModel): readonly LevelTile[] {
+	return model.levels.tiles.map(({ level, on }) => ({ prefix: level.prefix, color: level.color, on }));
 }
 
 export interface LabelTile extends LabelLevel {
@@ -86,20 +86,9 @@ export interface LabelTile extends LabelLevel {
 	readonly on: boolean;
 }
 
-/** The label group's tiles, in the settings' order, the task's own on. */
-export function labelTiles(item: TaskItem, labels: readonly LabelLevel[]): readonly LabelTile[] {
-	return labels.map((label) => ({ name: label.name, color: label.color, title: labelTitle(label.name), on: item.labels.some((l) => l.name === label.name) }));
-}
-
-/** A tap on a label puts it on the task beside the others; on one the task has it takes that one off. */
-export function nextLabels(item: TaskItem, name: string): readonly string[] {
-	const names = item.labels.map((l) => l.name);
-	return names.includes(name) ? names.filter((n) => n !== name) : [...names, name];
-}
-
-/** A tap on a level sets it; on the task's own level it takes the priority off. */
-export function nextPriority(item: TaskItem, prefix: string): string | null {
-	return item.priority?.prefix === prefix ? null : prefix;
+/** The label group's tiles as the menu's model has them, named with spaces. */
+export function labelTiles(model: TaskMenuModel): readonly LabelTile[] {
+	return model.labels.tiles.map(({ label, on }) => ({ name: label.name, color: label.color, title: labelTitle(label.name), on }));
 }
 
 export interface MenuActions {
@@ -111,9 +100,10 @@ export interface MenuActions {
 	toSection(name: GroupName): Promise<void>;
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
-	setPriority(prefix: string | null): Promise<void>;
-	/** The task's labels become these names; the task as it then stands, null once it is gone. */
-	setLabels(names: readonly string[]): Promise<TaskItem | null>;
+	/** A tap on a level (`TaskService.togglePriority`). */
+	togglePriority(prefix: string): Promise<void>;
+	/** A tap on a label (`TaskService.toggleLabel`); the task as it then stands, null once it is gone. */
+	toggleLabel(name: string): Promise<TaskItem | null>;
 	setReminder(kind: ReminderKind): Promise<void>;
 	/** The task repeats by `rule` from now on; null: it repeats no more. */
 	setRepeat(rule: RepeatRule | null): Promise<void>;
@@ -140,15 +130,11 @@ export interface TaskMenuContext {
 	readonly today: LocalDate;
 	/** The day on screen: the copy of a card leaves out a due date on it, as the list does. */
 	readonly day: LocalDate;
-	/** The priority levels the submenu offers. */
-	readonly levels: readonly PriorityLevel[];
-	/** The labels the menu offers, after the levels; none without them. */
-	readonly labels?: readonly LabelLevel[];
+	/** The menu's groups for the task as it stands (`TaskService.menu`): asked again once a label changed it. */
+	readonly menu: (item: TaskItem) => TaskMenuModel;
 	readonly actions: MenuActions;
 	/** Dresses the copy over the blur: a selected timeline card gives its copy the dots that stretch it. */
 	readonly lifted?: (copy: HTMLElement, close: () => void) => void;
-	/** The sections a list card can go to; none for any other. */
-	readonly sections?: SectionChoice;
 	/** A timeline card's subtasks stand between its copy and the panel; a tap on one opens its own menu instead. */
 	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
@@ -332,10 +318,11 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		this.panel.classList.remove("is-picker", "is-repeat", "has-remove");
-		const { item, actions, levels, labels } = this.context;
+		const { item, actions } = this.context;
+		const model = this.context.menu(item);
 		const statuses: Record<StatusTileId, () => void> = {
 			done: this.pick(() => actions.setStatus("done")),
-			progress: this.pick(() => actions.setStatus(nextProgress([item.status]))),
+			progress: this.pick(() => actions.setStatus(model.progress)),
 			wontdo: () => this.askFor("wontdo"),
 			stop: () => this.askFor("stop"),
 		};
@@ -347,20 +334,20 @@ export class TaskMenu extends LiftedMenu {
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
-		const tiles = statusTiles(item);
+		const tiles = statusTiles(item, model.progress);
 		if (this.asking === "wontdo" || this.asking === "stop") this.askGroup(this.asking);
 		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
-		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: !item.can.setPriority, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
+		const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: !item.can.setLabels, onPick: () => void this.toggleLabel(tile.name) }));
+		const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
 		if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
-		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
+		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({
 			label,
 			icon,
 			onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
 		}));
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
-		const rows = editRows(item, this.context.sections ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
+		const rows = editRows(item, model.sections?.choice ?? null).filter((row) => !(this.inStack && row.id === "subtask"));
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
 		const openFull = actions.openFull;
 		menuGroup(this.panel, [
@@ -381,7 +368,7 @@ export class TaskMenu extends LiftedMenu {
 		if (this.labelling) return;
 		this.labelling = true;
 		try {
-			const next = await this.context.actions.setLabels(nextLabels(this.context.item, name));
+			const next = await this.context.actions.toggleLabel(name);
 			if (this.isClosed) return;
 			if (!next) return this.close();
 			this.context = { ...this.context, item: next };
@@ -431,7 +418,7 @@ export class TaskMenu extends LiftedMenu {
 
 	/** The sections of the task's list, its own checked, then the tasks outside any; New section asks for a name. */
 	private showSections(): void {
-		const sections = this.context.sections;
+		const sections = this.context.menu(this.context.item).sections?.choice;
 		if (!sections) return;
 		this.askFor(null, false);
 		clear(this.panel);
@@ -499,11 +486,12 @@ export class TaskMenu extends LiftedMenu {
 		clear(this.panel);
 		clear(this.upper);
 		const { item, actions, today } = this.context;
+		const model = this.context.menu(item);
 		datePage(this.panel, {
 			today,
-			selected: item.dueDate,
+			selected: model.dueDate,
 			onPick: (date) => this.pick(() => actions.postpone(date))(),
-			onRemove: item.can.removeDue ? this.pick(() => actions.removeDue()) : undefined,
+			onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
 		});
 		this.place();
 	}
