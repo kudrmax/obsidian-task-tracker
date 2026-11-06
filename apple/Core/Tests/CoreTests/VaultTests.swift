@@ -21,8 +21,8 @@ final class MemoryBookmarks: BookmarkStore, @unchecked Sendable {
         try text.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    func vault() throws -> Vault {
-        let vault = Vault(bookmarks: MemoryBookmarks(), settle: .milliseconds(50))
+    func vault(settle: Duration = .milliseconds(50)) throws -> Vault {
+        let vault = Vault(bookmarks: MemoryBookmarks(), settle: settle)
         try vault.choose(folder: folder)
         return vault
     }
@@ -68,7 +68,8 @@ final class MemoryBookmarks: BookmarkStore, @unchecked Sendable {
 
     @Test func aFileStillBeingWrittenIsReadAgain() async throws {
         try put("first", "TODOs Tasks.md")
-        let vault = try vault()
+        // The wait is far longer than the writer's delay: a busy test run must not let the read finish first.
+        let vault = try vault(settle: .milliseconds(400))
         Task.detached { try? await Task.sleep(for: .milliseconds(20)); try? self.put("second", "TODOs Tasks.md") }
         #expect(try vault.read().tasks == "second")
     }
