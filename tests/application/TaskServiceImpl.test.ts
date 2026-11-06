@@ -288,6 +288,20 @@ describe("the day column and the day of a placement", () => {
 		expect(svc.dayOfPlacement({ kind: "soon" })).toBeNull();
 	});
 
+	it("a list goes by its section's name in the settings, renamed or not", () => {
+		const { svc } = setup(FULL);
+		expect(svc.listName("inbox")).toBe("Inbox");
+		expect(svc.listName("backlog")).toBe("Backlog");
+		expect(svc.listName("soon")).toBe("Soon");
+		expect(svc.listName("now")).toBe("Now");
+		const sections = { inbox: "Входящие", now: "Сейчас", soon: "Скоро", backlog: "Когда-нибудь", done: "Готово" };
+		const renamed = setup(FULL, new FakeSettingsStore({ ...DEFAULT_SETTINGS, sections })).svc;
+		expect(renamed.listName("inbox")).toBe("Входящие");
+		expect(renamed.listName("backlog")).toBe("Когда-нибудь");
+		expect(renamed.listName("soon")).toBe("Скоро");
+		expect(renamed.listName("now")).toBe("Сейчас");
+	});
+
 	it("today follows the hour the day starts at", () => {
 		const night = new TaskServiceImpl(new InMemoryTaskFileStore(FULL), new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 4 }), { now: () => new Date(2026, 9, 31, 2, 0) });
 		expect(night.dayColumn(T)).toEqual({ list: "now", date: null, sections: true });

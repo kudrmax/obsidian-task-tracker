@@ -296,6 +296,10 @@ export class DemoTaskService implements TaskService {
 		return placementOfDay(date, this.today());
 	}
 
+	listName(list: GroupedList): string {
+		return DEFAULT_SETTINGS.sections[list];
+	}
+
 	dayOfPlacement(placement: Placement): LocalDate | null {
 		return dayOfPlacement(placement, this.today());
 	}
