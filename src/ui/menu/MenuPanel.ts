@@ -19,7 +19,6 @@ export interface MenuRowSpec {
 	readonly danger?: boolean;
 	readonly onPick: () => void;
 	readonly root?: MenuRowRoot;
-	readonly size?: "row" | "tall";
 	/** Stands apart from what is over it by a thick line. */
 	readonly apart?: boolean;
 	/** One of a list to choose from: its label fades out, its check is the accent. */
@@ -34,7 +33,7 @@ export interface MenuRowSpec {
 }
 
 function rowClass(spec: MenuRowSpec): string {
-	const kinds = [spec.size === "tall" && "is-tall", spec.apart && "is-apart", spec.choice && "is-choice", spec.quiet && "is-quiet", spec.add && "is-add"];
+	const kinds = [spec.apart && "is-apart", spec.choice && "is-choice", spec.quiet && "is-quiet", spec.add && "is-add"];
 	return ["tc-btn", spec.root ?? "tc-menu-row", ...kinds, spec.cls, spec.danger && "is-danger"].filter(Boolean).join(" ");
 }
 

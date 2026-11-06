@@ -28,8 +28,8 @@ export class MoreMenu {
 		const panel = Panel.over(this.overlay, { root: "tc-panel", cls: "is-more", picks: new Picks(() => this.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		panel.replace((p) =>
 			menuGroup(p, [
-				{ label: "Search", icon: "search", size: "tall", onPick: panel.pick(() => opts.onSearch()) },
-				{ label: "Select tasks", icon: "select", size: "tall", onPick: panel.pick(() => opts.onSelect()) },
+				{ label: "Search", icon: "search", onPick: panel.pick(() => opts.onSearch()) },
+				{ label: "Select tasks", icon: "select", onPick: panel.pick(() => opts.onSelect()) },
 			]),
 		);
 		this.overlay.show();

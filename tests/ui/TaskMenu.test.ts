@@ -455,7 +455,8 @@ describe("the menu", () => {
 		const obsidian = rows.find((r) => r.textContent === "Open in Obsidian")!;
 		expect(full.parentElement).toBe(obsidian.parentElement);
 		expect(full.nextElementSibling).toBe(obsidian);
-		expect(full.classList.contains("is-tall") && obsidian.classList.contains("is-tall")).toBe(true);
+		const rename = rows.find((r) => r.textContent === "Rename")!;
+		expect([full.className, obsidian.className]).toEqual([rename.className, rename.className]);
 		obsidian.click();
 		expect(actions.openInObsidian).toHaveBeenCalled();
 		expect(document.querySelector(".tc-backdrop")?.classList.contains("is-closing")).toBe(true);

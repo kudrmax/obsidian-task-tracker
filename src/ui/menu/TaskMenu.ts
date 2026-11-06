@@ -364,11 +364,11 @@ export class TaskMenu extends LiftedMenu {
 		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
 		const openFull = actions.openFull;
 		menuGroup(this.panel, [
-			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", size: "tall", onPick: this.pick(() => openFull()) } as const] : []),
-			{ label: "Open in Obsidian", icon: "openFile", size: "tall", onPick: this.pick(() => actions.openInObsidian()) },
+			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
+			{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
 		]);
 		if (this.asking === "delete") this.askGroup("delete");
-		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, size: "tall", apart: true, onPick: () => this.askFor("delete") });
+		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: () => this.askFor("delete") });
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}

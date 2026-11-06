@@ -22,5 +22,5 @@ export function sectionChooser(panel: HTMLElement, spec: SectionChooserSpec): vo
 	for (const name of spec.choice.names) row(name, name, false);
 	row(null, spec.choice.ungrouped, true);
 	const onNew = spec.onNew;
-	if (onNew) menuRow(panel, { label: "New section", icon: "plus", size: "tall", apart: true, add: true, onPick: () => onNew() });
+	if (onNew) menuRow(panel, { label: "New section", icon: "plus", apart: true, add: true, onPick: () => onNew() });
 }
