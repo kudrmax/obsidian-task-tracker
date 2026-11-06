@@ -77,3 +77,22 @@ phone learns of the Mac's changes only after leaving Obsidian: the button is the
 ## Decisions
 
 (filled by the frontends)
+
+- **Obsidian: the quiet time is 3 s.** After a counted run ends `synced` with `ready`, the plugin hands back only if no
+  new run starts within 3 s; a run in that time restarts the count when it ends. Obsidian-only.
+- **Obsidian: a run already going when the link comes doesn't count.** The plugin lets it end, then calls
+  `requestSync()` itself, and that run is the one judged. Obsidian-only.
+- **Obsidian: only the status a run ends with is judged.** An `error` shown mid-run (a file retry) or left over from
+  before the link is ignored (`requestSync()` clears it). A run that ends with `ready` false (the reconnect hadn't had the
+  server's answer) is not judged either: the plugin waits for the next run, which Sync starts on the server's answer or
+  on its own 30-second timer, inside the 45 s. Outside a run, `paused` or off end the wait at once. Obsidian-only.
+- **Obsidian: a second link while waiting joins the first wait**: one notice, one hand-back. Obsidian-only.
+- **Obsidian: the adapter's defaults.** Without `getStatus`, `requestSync`, `on` or `offref` (or with the core plugin
+  disabled, or a status it doesn't know) Sync is off. `syncing` missing → a run is going when the status is `syncing`;
+  `ready` missing → taken as true, so a renamed field can't hold every tap to the 45 s. Obsidian-only.
+- **Obsidian: leaving is the page's `visibilitychange` with `document.hidden` true** (what iOS fires on «‹ Tasks», home,
+  another app); the wait ends with nothing opened. Obsidian-only.
+- **Obsidian: on the Mac the handler only calls `requestSync()`**: no notice, no wait, nothing opened.
+- **Both: the reason is percent-encoded with `encodeURIComponent`** (spaces as `%20`, the apostrophe as is):
+  `taskcalendar://synced?error=Obsidian%20Sync%20didn't%20finish%20in%2045%20seconds`. The app reads the decoded query
+  item (`URLComponents.queryItems`) and shows it as is.

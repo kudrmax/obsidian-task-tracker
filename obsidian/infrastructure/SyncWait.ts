@@ -31,23 +31,33 @@ export const SYNC_REASONS = {
 	timeout: "Obsidian Sync didn't finish in 45 seconds",
 } as const;
 
-export type SyncOutcome = { readonly synced: true } | { readonly synced: false; readonly reason: string };
+/** Leaving Obsidian: the phone hides it when Max goes back to the app, home or elsewhere. */
+export interface LeaveSignal {
+	/** Calls `listener` when Obsidian leaves the screen. Returns the unsubscribe. */
+	onLeave(listener: () => void): () => void;
+}
 
-const SYNCED: SyncOutcome = { synced: true };
-const failed = (reason: string): SyncOutcome => ({ synced: false, reason });
+/** `left`: Max left Obsidian before the end; nobody waits for an answer any more. */
+export type SyncOutcome = { readonly kind: "synced" } | { readonly kind: "failed"; readonly reason: string } | { readonly kind: "left" };
+
+const SYNCED: SyncOutcome = { kind: "synced" };
+const LEFT: SyncOutcome = { kind: "left" };
+const failed = (reason: string): SyncOutcome => ({ kind: "failed", reason });
 
 /**
  * Finished: a run that started after the request has ended with the server ready and the status `synced`, and no new
  * run started for SYNC_QUIET_MS. A run already going when the request came is let finish and followed by a fresh one.
+ * Leaving Obsidian ends the wait at once.
  */
 export class SyncWait {
 	constructor(
 		private readonly sync: SyncControl,
 		private readonly timers: Timers,
+		private readonly leave: LeaveSignal,
 	) {}
 
 	run(): Promise<SyncOutcome> {
-		return new Promise((resolve) => new Waiting(this.sync, this.timers, resolve).start());
+		return new Promise((resolve) => new Waiting(this.sync, this.timers, this.leave, resolve).start());
 	}
 }
 
@@ -59,10 +69,12 @@ class Waiting {
 	private quiet: number | null = null;
 	private timeout: number | null = null;
 	private unsubscribe: () => void = () => undefined;
+	private stopLeave: () => void = () => undefined;
 
 	constructor(
 		private readonly sync: SyncControl,
 		private readonly timers: Timers,
+		private readonly leave: LeaveSignal,
 		private readonly resolve: (outcome: SyncOutcome) => void,
 	) {}
 
@@ -73,6 +85,7 @@ class Waiting {
 		this.running = first.running;
 		this.stale = first.running;
 		this.timeout = this.timers.set(() => this.finish(failed(SYNC_REASONS.timeout)), SYNC_TIMEOUT_MS);
+		this.stopLeave = this.leave.onLeave(() => this.finish(LEFT));
 		this.unsubscribe = this.sync.onChange(() => this.step());
 		if (!this.stale) this.sync.request();
 		this.step();
@@ -118,6 +131,7 @@ class Waiting {
 		this.stopQuiet();
 		if (this.timeout !== null) this.timers.clear(this.timeout);
 		this.unsubscribe();
+		this.stopLeave();
 		this.resolve(outcome);
 	}
 }

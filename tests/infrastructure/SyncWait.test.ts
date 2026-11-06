@@ -3,12 +3,29 @@ import { SYNC_QUIET_MS, SYNC_REASONS, SYNC_TIMEOUT_MS, SyncWait, type SyncOutcom
 import { FakeSync } from "../fakes/FakeSync";
 import { FakeTimers } from "../fakes/FakeTimers";
 
+/** Obsidian on screen until `leave` hides it. */
+class FakeScreen {
+	private readonly listeners = new Set<() => void>();
+	get listening(): number {
+		return this.listeners.size;
+	}
+	onLeave(listener: () => void): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	}
+	leave(): void {
+		for (const listener of [...this.listeners]) listener();
+	}
+}
+
 function waiting(sync: FakeSync) {
 	const timers = new FakeTimers();
+	const screen = new FakeScreen();
 	let outcome: SyncOutcome | null = null;
-	void new SyncWait(sync, timers).run().then((o) => (outcome = o));
+	void new SyncWait(sync, timers, screen).run().then((o) => (outcome = o));
 	return {
 		timers,
+		screen,
 		outcome: async () => {
 			await Promise.resolve();
 			return outcome;
@@ -23,8 +40,9 @@ function waiting(sync: FakeSync) {
 	};
 }
 
-const SYNCED = { synced: true };
-const failed = (reason: string) => ({ synced: false, reason });
+const SYNCED = { kind: "synced" };
+const LEFT = { kind: "left" };
+const failed = (reason: string) => ({ kind: "failed", reason });
 
 describe("SyncWait", () => {
 	it("is done when its run ends synced and Sync stays still for the quiet time", async () => {
@@ -137,6 +155,26 @@ describe("SyncWait", () => {
 		expect(await w.outcome()).toEqual(failed(SYNC_REASONS.timeout));
 		expect(sync.listening).toBe(0);
 		sync.finish("synced");
+		expect(w.timers.delays).toEqual([]);
+	});
+
+	it("ends at once when Max leaves Obsidian, and stays ended when Sync finishes later", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		w.screen.leave();
+		expect(await w.outcome()).toEqual(LEFT);
+		expect([w.timers.delays, sync.listening, w.screen.listening]).toEqual([[], 0, 0]);
+		sync.finish("synced");
+		expect(w.timers.delays).toEqual([]);
+		expect(await w.outcome()).toEqual(LEFT);
+	});
+
+	it("ends when Max leaves in the quiet time", async () => {
+		const sync = new FakeSync();
+		const w = waiting(sync);
+		sync.finish("synced");
+		w.screen.leave();
+		expect(await w.outcome()).toEqual(LEFT);
 		expect(w.timers.delays).toEqual([]);
 	});
 

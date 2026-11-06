@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import { Notice, type App } from "obsidian";
 import { calendarPath } from "../core/application/calendarFile";
 import { composeCore, type Core } from "../core/application/composeCore";
 import { tasksFilePath } from "../core/application/documentText";
@@ -15,7 +15,7 @@ import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { ObsidianSync } from "./infrastructure/ObsidianSync";
 import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
 import { SyncRoundTrip } from "./infrastructure/SyncRoundTrip";
-import { SyncWait } from "./infrastructure/SyncWait";
+import { SyncWait, type LeaveSignal } from "./infrastructure/SyncWait";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
@@ -50,7 +50,7 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
 	const sync = new ObsidianSync(app);
-	const syncRoundTrip = new SyncRoundTrip({ host: host.shortcuts, sync, wait: new SyncWait(sync, windowTimers) });
+	const syncRoundTrip = new SyncRoundTrip({ host: { ...host.shortcuts, notice: showNotice }, sync, wait: new SyncWait(sync, windowTimers, documentHidden) });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	const core = composeCore({
 		tasksFile: new VaultTaskFileStore(app, () => tasksFilePath(settings.get()) ?? ""),
@@ -78,6 +78,23 @@ const windowTicker: Ticker = {
 	every: (ms, tick) => {
 		const id = window.setInterval(tick, ms);
 		return () => window.clearInterval(id);
+	},
+};
+
+/** A notice kept until hidden. */
+function showNotice(text: string): () => void {
+	const notice = new Notice(text, 0);
+	return () => notice.hide();
+}
+
+/** iOS hides the page when Obsidian leaves the screen: back to the app, home or another app. */
+const documentHidden: LeaveSignal = {
+	onLeave: (listener) => {
+		const changed = () => {
+			if (document.hidden) listener();
+		};
+		document.addEventListener("visibilitychange", changed);
+		return () => document.removeEventListener("visibilitychange", changed);
 	},
 };
 
