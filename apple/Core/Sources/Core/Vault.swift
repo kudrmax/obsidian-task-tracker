@@ -36,6 +36,8 @@ public protocol TasksVault: Sendable {
     func read(path: String) -> String?
     /// Writes another file of the vault whole, its folder made if missing.
     func write(path: String, text: String) throws
+    /// The plugin's settings, `data.json`'s text; empty for none: the plugin's defaults.
+    func settingsJSON() -> String
     /// The tasks file, by path from the vault folder.
     func tasksFilePath() throws -> String
     /// A new file in `folder` (by path from the vault folder, made if missing), never over another: a taken name gets
@@ -45,8 +47,6 @@ public protocol TasksVault: Sendable {
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
 public final class Vault: TasksVault, @unchecked Sendable {
-    static let settingsPath = ".obsidian/plugins/task-calendar/data.json"
-
     private let bookmarks: BookmarkStore
     private let rule: TasksFileRule
     /// A file changed this recently may still be being written: wait this long and read it again.
@@ -70,7 +70,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
 
     public func read() throws -> (tasks: String, settingsJSON: String) {
         try withFolder { folder in
-            let settingsJSON = Self.settings(in: folder)
+            let settingsJSON = settings(in: folder)
             let path = try tasksFile(settingsJSON)
             let file = folder.appendingPathComponent(path)
             guard FileManager.default.fileExists(atPath: file.path) else { throw VaultError.tasksFileMissing(path) }
@@ -80,7 +80,7 @@ public final class Vault: TasksVault, @unchecked Sendable {
 
     public func write(tasks: String, expecting old: String) throws -> Bool {
         try withFolder { folder in
-            let file = folder.appendingPathComponent(try tasksFile(Self.settings(in: folder)))
+            let file = folder.appendingPathComponent(try tasksFile(settings(in: folder)))
             var written = false
             var failure: Error?
             var coordination: NSError?
@@ -98,8 +98,12 @@ public final class Vault: TasksVault, @unchecked Sendable {
         }
     }
 
+    public func settingsJSON() -> String {
+        (try? withFolder { folder in settings(in: folder) }) ?? ""
+    }
+
     public func tasksFilePath() throws -> String {
-        try withFolder { folder in try tasksFile(Self.settings(in: folder)) }
+        try withFolder { folder in try tasksFile(settings(in: folder)) }
     }
 
     public func save(_ data: Data, in path: String, named name: String) throws -> String {
@@ -181,8 +185,9 @@ public final class Vault: TasksVault, @unchecked Sendable {
     }
 
     /// The plugin's `data.json`, empty for none: the plugin's defaults.
-    private static func settings(in folder: URL) -> String {
-        (try? coordinatedRead(folder.appendingPathComponent(settingsPath))) ?? ""
+    private func settings(in folder: URL) -> String {
+        guard let path = try? rule.settingsFile() else { return "" }
+        return (try? Self.coordinatedRead(folder.appendingPathComponent(path))) ?? ""
     }
 
     private static func coordinatedRead(_ file: URL) throws -> String {

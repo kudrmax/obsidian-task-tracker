@@ -6,17 +6,21 @@ final class AppServices: Sendable {
     static let shared = AppServices()
 
     let vault: Vault
-    /// The lists a new task goes into, as the plugin names them.
-    let captureLists: [CaptureList]
+    private let rules: TaskRules
     private let sync: ReminderSync
     private let tasks: TaskCapture
 
     private init() {
         let rules = Self.rules()
+        self.rules = rules
         vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
-        captureLists = (try? rules.captureLists()) ?? []
         sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
+    }
+
+    /// The lists a new task goes into, by their headings' names, in the order the screen offers them: the first is where Siri's goes.
+    func captureLists() -> [CaptureList] {
+        (try? rules.captureLists(settingsJSON: vault.settingsJSON())) ?? []
     }
 
     func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {

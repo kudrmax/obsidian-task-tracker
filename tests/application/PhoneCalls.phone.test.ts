@@ -64,6 +64,14 @@ describe("calendars.files and calendars.meetings", () => {
 		expect(ok(callDoor("calendars.files", [], context({ settings: JSON.stringify({ workCalendarFile: "cal/w.json" }) }))).result).toEqual(phoneDoor.calendarFiles(JSON.stringify({ workCalendarFile: "cal/w.json" })));
 	});
 
+	it("name each file by the source a context's `calendars` hands its text in under", () => {
+		expect(ok(callDoor("calendars.sources", [], context({ settings: JSON.stringify({ workCalendarFile: "cal/w.json" }) }))).result).toEqual([
+			{ source: "google", path: "calendar/google.json" },
+			{ source: "iphone", path: "calendar/iphone.json" },
+			{ source: "work", path: "cal/w.json" },
+		]);
+	});
+
 	it("carry the old choice of calendars over once, as calendars.events does, and meet the same meetings", () => {
 		const from = new Date(2026, 10, 4, 0).getTime();
 		const to = new Date(2026, 10, 5, 0).getTime();

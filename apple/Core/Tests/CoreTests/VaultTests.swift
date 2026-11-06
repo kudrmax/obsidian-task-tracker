@@ -8,6 +8,12 @@ final class MemoryBookmarks: BookmarkStore, @unchecked Sendable {
     func save(_ data: Data) { self.data = data }
 }
 
+/// The core's rule for the tasks file, with the plugin's settings kept in another file.
+struct SettingsElsewhere: TasksFileRule {
+    func tasksFile(settingsJSON: String) throws -> String? { "TODOs Tasks.md" }
+    func settingsFile() throws -> String { "elsewhere/data.json" }
+}
+
 @Suite struct VaultTests {
     let folder: URL = {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("vault-\(UUID().uuidString)")
@@ -36,6 +42,17 @@ final class MemoryBookmarks: BookmarkStore, @unchecked Sendable {
         let read = try vault().read()
         #expect(read.tasks == "## Now\n")
         #expect(read.settingsJSON == settings)
+    }
+
+    @Test func thePluginSettingsAreWhereTheCoreSaysAndReadAlone() throws {
+        #expect(try Self.rules.settingsFile() == ".obsidian/plugins/task-calendar/data.json")
+        let settings = #"{"sections":{"inbox":"Входящие"}}"#
+        try put(settings, "elsewhere/data.json")
+        try put("## Входящие\n", "TODOs Tasks.md")
+        let vault = Vault(bookmarks: MemoryBookmarks(), rule: SettingsElsewhere())
+        try vault.choose(folder: folder)
+        #expect(vault.settingsJSON() == settings)
+        #expect(try vault.read().settingsJSON == settings)
     }
 
     @Test func withoutPluginSettingsTheDefaultFile() throws {

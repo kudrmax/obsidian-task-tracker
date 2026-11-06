@@ -1,16 +1,41 @@
 import Foundation
 
-/// A list a task is written into from the phone, by the plugin's name of it (`TaskRules.captureLists`).
+/// A list a task is written into from the phone (`TaskRules.captureLists`): `key` the plugin's, `name` its heading's.
 public struct CaptureList: Hashable, Sendable {
+    public let key: String
     public let name: String
 
-    public init(_ name: String) {
+    public init(key: String, name: String) {
+        self.key = key
         self.name = name
     }
 }
 
+/// What the new task screen hands the core: the words typed, the recording's file name as saved and its tag as typed.
+public struct CaptureTask: Sendable {
+    public let list: CaptureList
+    public let typed: String
+    public let recording: String?
+    public let tag: String
+
+    public init(list: CaptureList, typed: String, recording: String? = nil, tag: String = "") {
+        self.list = list
+        self.typed = typed
+        self.recording = recording
+        self.tag = tag
+    }
+}
+
+/// What a capture wrote: the file's new text, or nothing for a task with no words and no recording.
+public enum CaptureWrite: Equatable, Sendable {
+    case written(text: String)
+    case blank
+}
+
 public enum CaptureOutcome: Equatable, Sendable {
     case saved
+    /// Nothing typed and nothing recorded: nothing was written.
+    case blank
     case failed(String)
 }
 
@@ -60,26 +85,23 @@ public final class TaskCapture: Sendable {
         self.now = now
     }
 
-    /// `recording`: an `m4a` file's bytes, or none; `tag` follows its link, empty for none. Nothing to write when both are empty.
+    /// `recording`: an `m4a` file's bytes, or none; `tag` follows its link, empty for none.
     public func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
         let at = now()
-        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !typed.isEmpty || recording != nil else { return .saved }
         do {
-            var parts = typed.isEmpty ? [] : [typed]
+            var saved: String?
             if let recording {
                 let folder = AttachmentFolder.path(appJSON: vault.read(path: AttachmentFolder.appSettingsPath), notePath: try vault.tasksFilePath())
-                parts.append("[[\(try vault.save(recording, in: folder, named: Self.recordingName(at)))]]")
-                if let tag = Self.tag(tag) { parts.append(tag) }
+                saved = try vault.save(recording, in: folder, named: Self.recordingName(at))
             }
-            let title = parts.joined(separator: " ")
+            let task = CaptureTask(list: list, typed: text, recording: saved, tag: tag)
             // A second try reads again: the file may have changed between the read and the write.
             for _ in 0..<2 {
                 let file = try vault.read()
-                guard case .changed(let written) = try rules.capture(list: list, title: title, text: file.tasks, settingsJSON: file.settingsJSON, now: at) else {
-                    return .failed(Self.failure)
+                switch try rules.capture(task, text: file.tasks, settingsJSON: file.settingsJSON, now: at) {
+                case .blank: return .blank
+                case .written(let written): if try vault.write(tasks: written, expecting: file.tasks) { return .saved }
                 }
-                if try vault.write(tasks: written, expecting: file.tasks) { return .saved }
             }
             return .failed(Self.failure)
         } catch VaultError.noAccess {
@@ -98,12 +120,6 @@ public final class TaskCapture: Sendable {
     /// The name Obsidian's audio recorder gives a recording.
     static func recordingName(_ at: Date) -> String {
         "Recording \(format("yyyyMMddHHmmss", at)).\(recordingExtension)"
-    }
-
-    /// `#name` from what was typed in the settings, with or without the `#`; nil for nothing.
-    static func tag(_ typed: String) -> String? {
-        let name = typed.trimmingCharacters(in: .whitespaces).drop { $0 == "#" }
-        return name.isEmpty ? nil : "#\(name)"
     }
 
     private static func format(_ pattern: String, _ date: Date) -> String {

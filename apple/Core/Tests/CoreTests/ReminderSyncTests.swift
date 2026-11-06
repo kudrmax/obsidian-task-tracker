@@ -8,18 +8,23 @@ final class FakeVault: TasksVault, @unchecked Sendable {
     var readFails: VaultError?
     var changeBeforeWrite: String?
     var files: [String: String] = [:]
+    var settings = ""
+    /// Names already in the vault: a recording saved under one gets a number, as Obsidian numbers it.
+    var taken: Set<String> = []
     init(_ text: String) { self.text = text }
+    func settingsJSON() -> String { settings }
     func read(path: String) -> String? { files[path] }
     func write(path: String, text: String) throws { files[path] = text }
     func read() throws -> (tasks: String, settingsJSON: String) {
         if let error = readFails { throw error }
-        return (text, "")
+        return (text, settings)
     }
     var saved: [String: Data] = [:]
     func tasksFilePath() throws -> String { "TODOs Tasks.md" }
     func save(_ data: Data, in folder: String, named name: String) throws -> String {
-        saved[folder.isEmpty ? name : "\(folder)/\(name)"] = data
-        return name
+        let free = taken.contains(name) ? (name as NSString).deletingPathExtension + " 1." + (name as NSString).pathExtension : name
+        saved[folder.isEmpty ? free : "\(folder)/\(free)"] = data
+        return free
     }
     func write(tasks: String, expecting old: String) throws -> Bool {
         if writeFails { throw CocoaError(.fileWriteNoPermission) }

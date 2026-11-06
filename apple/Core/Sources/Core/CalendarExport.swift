@@ -69,25 +69,3 @@ public struct PhoneExport: Sendable {
         self.validUntil = validUntil
     }
 }
-
-/// When the phone's calendars are written again.
-public enum CalendarExport {
-    /// Sync carries every write: the same calendars are written again only to say they are still fresh, at most this often.
-    static let freshStep: TimeInterval = 10 * 60
-
-    /// `new` says nothing `old` did not, and `old` is not yet due to be called fresh again.
-    static func adds(_ new: String, over old: String?, at now: Date) -> Bool {
-        guard let old, let before = parsed(old), let after = parsed(new) else { return true }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let written = (before["exportedAt"] as? String).flatMap(iso.date(from:)), now.timeIntervalSince(written) < freshStep else { return true }
-        var a = before, b = after
-        a["exportedAt"] = nil
-        b["exportedAt"] = nil
-        return !NSDictionary(dictionary: a).isEqual(to: b)
-    }
-
-    private static func parsed(_ text: String) -> [String: Any]? {
-        (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any]
-    }
-}

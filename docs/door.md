@@ -16,10 +16,12 @@ Built from `src/phone/main.ts` → `src/application/PhoneDoor.ts` (the functions
 | `call(method, argsJson, contextJson)` | a method name, its arguments as a JSON list, the context as JSON | the answer as JSON (below) |
 | `methods()` | — | every method `call` answers, `space.name` |
 | `tasksFile(settingsJson)` | `data.json`'s text, `""` for the defaults | the tasks file's path from the vault folder; `null` for a blank setting (no tasks file: say so) |
+| `settingsFile()` | — | `".obsidian/plugins/task-calendar/data.json"`: where the plugin's settings are, the text a context's `settings` is |
 | `iphoneCalendarFile()` | — | `"calendar/iphone.json"`: where the app writes the phone's calendars |
 | `iphoneCalendarText(exportJson)` | `PhoneExport` as JSON (below) | that file's text, in the format every calendar writer uses |
+| `iphoneCalendarAdds(newText, oldText, nowMs)` | the export `iphoneCalendarText` wrote now, the file as it is (`null`: none), the moment | whether to write it: always, but for the same calendars and events written less than 10 minutes ago (a file missing or unreadable is written over) |
 | `oneLine(text)` | a title | the title on one line: a line break reads as one space |
-| `reminders`, `complete`, `silence`, `snooze`, `capture`, `calendarFiles`, `meetings` | as before | as before, byte for byte (kept for the app as it is): each is a wrapper over its method of `call` (below); a blank title and a task gone answer `{ changed: false, reason: "stale" }`, any other error throws |
+| `reminders`, `complete`, `silence`, `snooze`, `capture`, `calendarFiles`, `meetings` | as before | as before, byte for byte, for installs of the app from before `call`; the app calls `call` alone now. Each is a wrapper over its method of `call` (below); a blank title and a task gone answer `{ changed: false, reason: "stale" }`, any other error throws |
 
 `tasksFile` follows the plugin: the setting as saved, `TODOs Tasks.md` when `data.json` has none, no file for a blank
 one. The app's own default for a blank setting goes.
@@ -116,6 +118,7 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - `known()`: every calendar the files list, and whether it is shown.
 - `setShown(account, title, shown)`: answers the new `data.json` in `settings`.
 - `files()`: the calendars' files by path from the vault folder, Google's, the phone's and the work file, in that order.
+- `sources()`: the same files as `{ source, path }`: `source` is the key `context.calendars` takes the file's text under.
 - `meetings(fromMs, toMs)`: the timed events of the calendars shown that overlap `from`–`to`, `{ title, startMs, endMs }`,
   over the files in `context.calendars` (a file missing or broken adds none), by the same reading as `events`: the old
   choice of calendars is carried over the same way, answering the new `data.json` in `settings` once.
@@ -135,11 +138,17 @@ Over `context.tasks` (`tasksFileMissing` without it), at `context.nowMs`:
   `tasks`, a step of the history; `staleTask` when no reminding task has that line. A reminder still shown after its day
   ended is found in the file as it is, before today's tidying erased its slot.
 
-### `capture.add(list, title)`: a task typed or spoken on the phone
+### `capture.*`: a task typed or spoken on the phone
 
-Written last in `list` (`rules.constants().LISTS`), as the plugin's quick entry puts it, on one line; in Now with
-today's date. A blank title answers `blank`. A title that is only a priority prefix (`p1`) is written as the task's
-text: the phone's capture writes what it was told, unlike the plugin's quick entry, which writes nothing for it.
+`add(list, typed, recording?, tag?)`: written last in `list` (`rules.constants().LISTS`), as the plugin's quick entry
+puts it, on one line; in Now with today's date. The title is the words typed, then `[[recording]]` (the recording's file
+name as the host saved it, `null` for none), then the tag (as typed in the app's settings, with or without its `#`;
+blank for none), which goes only with a recording. No words and no recording answer `blank`. A title that is only a
+priority prefix (`p1`) is written as the task's text: the phone's capture writes what it was told, unlike the plugin's
+quick entry, which writes nothing for it.
+
+`lists()`: the lists a new task goes into, `{ list, name }`, `name` the heading's name by the settings, in the order the
+phone's new task screen offers them: Inbox, Now, Soon, Backlog. The first is where a task told to Siri goes.
 
 ### `settings.*`: `SettingsService`
 
@@ -278,12 +287,23 @@ core uses nothing of the locale (`Intl`, `localeCompare`, `toLocale…`) nor rea
 (`src/domain/IsoMoment.ts`), field by field (`tests/architecture.test.ts`). `tests/application/PhoneDoor.daylight.test.ts`
 crosses New York's changes of the clocks (2026-03-08, 2026-11-01): a day ends at its next start by the clock.
 
-## What the iOS app no longer needs of its own
+## The iOS app
+
+Every rule the app needs it asks of the door; its own Swift keeps only what the plugin has no part of: the reminders'
+plan on the phone (`RepeatPlan`, `CardPlan`, `AfterEvent`), files by bookmark, where Obsidian puts an attachment
+(`AttachmentFolder`, from the vault's `.obsidian/app.json`) and the name Obsidian's recorder gives a recording. Its tests
+(`apple/Core/Tests`) run the door in JavaScriptCore: the reads that rely on a lookbehind (`tasks.search`) and on reading
+dates field by field (`calendars.events`), a write and `history.undo`, and New York's changes of the clocks in a
+JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process reads its zone once).
+
+### What it no longer needs of its own
 
 - `Vault.defaultTasksFile` and `Vault.tasksFile(in:)`: `tasksFile(settingsJson)` (a blank setting is no file, as in the plugin).
-- `CalendarExport.path` and `CalendarExport.text(...)`: `iphoneCalendarFile()` and `iphoneCalendarText(...)`.
-  `CalendarExport.adds` compares parsed files and keeps working.
-- The old functions: `call` answers each (`reminders.*`, `capture.add`, `calendars.files`, `calendars.meetings`) with
-  error codes, strict JSON and the old calendar choice carried over.
+- `CalendarExport.path`, `CalendarExport.text(...)` and `CalendarExport.adds`: `iphoneCalendarFile()`,
+  `iphoneCalendarText(...)` and `iphoneCalendarAdds(...)`.
+- `Vault.settingsPath`: `settingsFile()`.
+- The task's title from the words, the recording and the tag, and what is blank: `capture.add`.
+- The old functions: the app calls `reminders.*`, `capture.add`, `calendars.sources`, `calendars.meetings` through
+  `call`, by their error codes (`staleTask`, `blank`).
 - `TaskCapture.oneLine`: `capture` writes the title on one line already; `oneLine` where the app shows it before.
-- `CaptureList`'s cases: `rules.constants().LISTS`, the lists `capture` takes.
+- `CaptureList`'s cases and their titles: `capture.lists()`, by the headings' names.

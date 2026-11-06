@@ -24,7 +24,7 @@ struct FakeExporter: CalendarExporting {
     @Test func thePluginReadsWhatTheAppWrites() throws {
         let standup = ExportedEvent(id: "s", title: "Standup", start: Fixtures.date(4, 10, 30), end: Fixtures.date(4, 11), allDay: false, calendarId: "ek-work")
         let meetings = try rules.meetings(
-            settingsJSON: "", texts: [nil, Self.export([standup]), nil], from: Fixtures.date(4, 9), to: Fixtures.date(5, 0), now: Fixtures.date(4, 9))
+            settingsJSON: "", calendars: ["iphone": Self.export([standup])], from: Fixtures.date(4, 9), to: Fixtures.date(5, 0), now: Fixtures.date(4, 9))
         #expect(meetings == [CalendarEvent(title: "Standup", start: Fixtures.date(4, 10, 30), end: Fixtures.date(4, 11))])
     }
 
