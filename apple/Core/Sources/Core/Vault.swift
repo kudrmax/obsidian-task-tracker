@@ -32,6 +32,11 @@ public protocol TasksVault: Sendable {
     func read(path: String) -> String?
     /// Writes another file of the vault whole, its folder made if missing.
     func write(path: String, text: String) throws
+    /// The tasks file, by path from the vault folder.
+    func tasksFilePath() throws -> String
+    /// A new file in `folder` (by path from the vault folder, made if missing), never over another: a taken name gets
+    /// a number, as Obsidian numbers it. Returns the name written.
+    func save(_ data: Data, in folder: String, named name: String) throws -> String
 }
 
 /// The Obsidian vault folder the app was given once, read and written through file coordination.
@@ -85,6 +90,25 @@ public final class Vault: TasksVault, @unchecked Sendable {
         }
     }
 
+    public func tasksFilePath() throws -> String {
+        try withFolder { folder in Self.tasksFile(in: (try? Self.coordinatedRead(folder.appendingPathComponent(Self.settingsPath))) ?? "") }
+    }
+
+    public func save(_ data: Data, in path: String, named name: String) throws -> String {
+        try withFolder { vault in
+            let folder = path.isEmpty ? vault : vault.appendingPathComponent(path, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let free = Self.availableName(name, in: folder)
+            var failure: Error?
+            var coordination: NSError?
+            NSFileCoordinator().coordinate(writingItemAt: folder.appendingPathComponent(free), options: [], error: &coordination) { url in
+                do { try data.write(to: url, options: .withoutOverwriting) } catch { failure = error }
+            }
+            if let error = coordination ?? failure { throw error }
+            return free
+        }
+    }
+
     public func read(path: String) -> String? {
         try? withFolder { folder in try Self.coordinatedRead(folder.appendingPathComponent(path)) }
     }
@@ -125,6 +149,18 @@ public final class Vault: TasksVault, @unchecked Sendable {
             text = try Self.coordinatedRead(file)
         }
         return text
+    }
+
+    private static func availableName(_ name: String, in folder: URL) -> String {
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var candidate = name
+        var number = 1
+        while FileManager.default.fileExists(atPath: folder.appendingPathComponent(candidate).path) {
+            candidate = "\(base) \(number).\(ext)"
+            number += 1
+        }
+        return candidate
     }
 
     private static func modified(_ file: URL) -> Date? {

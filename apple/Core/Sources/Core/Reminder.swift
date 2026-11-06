@@ -1,7 +1,8 @@
 import Foundation
 
 public enum ReminderKind: String, Sendable {
-    case notification, alarm
+    /// `live`: a Live Activity on the lock screen, from the start until the task is done or moved.
+    case notification, alarm, live
 }
 
 /// A task on a time, as the phone reminds of it: from `start` until its plugin day ends at `dayEnd`.
@@ -44,4 +45,6 @@ public protocol TaskRules: Sendable {
     func calendarFiles(settingsJSON: String) throws -> [String]
     /// The meetings with a time in those files (`texts` in their order, `nil` for one missing) that overlap `from`–`to`.
     func meetings(settingsJSON: String, texts: [String?], from: Date, to: Date, now: Date) throws -> [CalendarEvent]
+    /// A new task last in `list`.
+    func capture(list: CaptureList, title: String, text: String, settingsJSON: String, now: Date) throws -> ActionResult
 }

@@ -18,6 +18,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: Core
+      - target: TaskCalendarCards
     configFiles:
       Debug: App/Config/Base.xcconfig
       Release: App/Config/Base.xcconfig
@@ -38,9 +39,38 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSAlarmKitUsageDescription: Alarms for tasks set to a time
         NSCalendarsFullAccessUsageDescription: Writes this iPhone's calendars to your vault for Task Calendar
+        NSMicrophoneUsageDescription: Records a task you say instead of typing
+        NSSupportsLiveActivities: true
         BGTaskSchedulerPermittedIdentifiers: [com.kudrmax.taskcalendar.refresh]
         UIBackgroundModes: [fetch]
         CFBundleURLTypes:
           - CFBundleURLName: com.kudrmax.taskcalendar.refresh
             CFBundleURLSchemes: [taskcalendar]
         LSApplicationQueriesSchemes: [obsidian]
+  TaskCalendarCards:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Cards
+      - path: App/Cards/TaskCardAttributes.swift
+      - path: App/Cards/CardIntents.swift
+      - path: App/Reminders/ReminderButton.swift
+      - path: App/Capture/CaptureIntents.swift
+    configFiles:
+      Debug: App/Config/Base.xcconfig
+      Release: App/Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kudrmax.taskcalendar.cards
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: WIDGET
+    info:
+      path: Cards/Info.plist
+      properties:
+        CFBundleDisplayName: Task Calendar
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

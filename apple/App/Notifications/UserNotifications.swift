@@ -7,11 +7,7 @@ final class UserNotifications: NotificationScheduling {
     static let category = "task-reminder"
     private static let problem = "sync#problem"
 
-    enum Action {
-        static let done = "done"
-        static let snoozes = ["snooze15": 15, "snooze30": 30, "snooze60": 60]
-        static let afterEvent = "afterEvent"
-    }
+    static let afterEvent = "afterEvent"
 
     private enum Key {
         static let reminderID = "reminderID"
@@ -33,14 +29,12 @@ final class UserNotifications: NotificationScheduling {
 
     private static func category(after offer: String?) -> UNNotificationCategory {
         let snooze = UNNotificationActionIcon(systemImageName: "clock.arrow.circlepath")
-        var actions = [
-            UNNotificationAction(identifier: Action.done, title: "Done", options: [], icon: UNNotificationActionIcon(systemImageName: "checkmark")),
-            UNNotificationAction(identifier: "snooze15", title: "15 min", options: [], icon: snooze),
-            UNNotificationAction(identifier: "snooze30", title: "30 min", options: [], icon: snooze),
-            UNNotificationAction(identifier: "snooze60", title: "1 hour", options: [], icon: snooze),
-        ]
+        var actions = ReminderButton.all.map { button in
+            let icon = button == .done ? UNNotificationActionIcon(systemImageName: "checkmark") : snooze
+            return UNNotificationAction(identifier: button.identifier, title: button.title, options: [], icon: icon)
+        }
         if let offer {
-            actions.append(UNNotificationAction(identifier: Action.afterEvent, title: offer, options: [], icon: UNNotificationActionIcon(systemImageName: "calendar.badge.clock")))
+            actions.append(UNNotificationAction(identifier: afterEvent, title: offer, options: [], icon: UNNotificationActionIcon(systemImageName: "calendar.badge.clock")))
         }
         return UNNotificationCategory(identifier: categoryID(after: offer), actions: actions, intentIdentifiers: [], options: [.customDismissAction])
     }
@@ -90,7 +84,8 @@ final class UserNotifications: NotificationScheduling {
         let request = UNNotificationRequest(
             identifier: notification.identifier,
             content: content,
-            trigger: UNCalendarNotificationTrigger(dateMatching: when, repeats: false))
+            // One due already, a card's task that started before its card could be shown, is delivered at once.
+            trigger: notification.fire > Date() ? UNCalendarNotificationTrigger(dateMatching: when, repeats: false) : nil)
         try await Self.center.add(request)
         if notification.after != nil { await Self.registerCategories() }
     }

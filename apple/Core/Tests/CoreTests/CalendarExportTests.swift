@@ -30,7 +30,7 @@ struct FakeExporter: CalendarExporting {
     @Test func aSyncWritesIphoneJsonBeforeItReadsTheMeetings() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         let standup = ExportedEvent(id: "s", title: "Standup", start: Fixtures.date(4, 10, 30), end: Fixtures.date(4, 11), allDay: false, calendarId: "ek-work")
-        let sync = ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: Self.export([standup])), now: { Fixtures.date(4, 9) })
+        let sync = ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), calendar: FakeExporter(text: Self.export([standup])), now: { Fixtures.date(4, 9) })
         _ = await sync.sync()
         #expect(vault.files["calendar/iphone.json"] == Self.export([standup]))
         let first = await notifications.pendingIDs.values.first { $0.fire == Fixtures.date(4, 10) }
@@ -43,9 +43,9 @@ struct FakeExporter: CalendarExporting {
             CalendarExport.text(calendars: [Self.work], events: [], from: Fixtures.date(3, 0), to: Fixtures.date(30, 0), exportedAt: Fixtures.date(4, 9, minute), device: "iPhone", validUntil: nil)
         }
         vault.files["calendar/iphone.json"] = at(0)
-        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: at(5)), now: { Fixtures.date(4, 9, 5) }).sync()
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), calendar: FakeExporter(text: at(5)), now: { Fixtures.date(4, 9, 5) }).sync()
         #expect(vault.files["calendar/iphone.json"] == at(0))
-        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: at(10)), now: { Fixtures.date(4, 9, 10) }).sync()
+        _ = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), calendar: FakeExporter(text: at(10)), now: { Fixtures.date(4, 9, 10) }).sync()
         #expect(vault.files["calendar/iphone.json"] == at(10))
     }
 
@@ -59,7 +59,7 @@ struct FakeExporter: CalendarExporting {
     @Test func noCalendarAccessLeavesTheFileAloneAndSetsTheRemindersAllTheSame() async {
         let vault = FakeVault(Fixtures.file(Self.quiet))
         vault.files["calendar/iphone.json"] = "kept"
-        let status = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), calendar: FakeExporter(text: nil), now: { Fixtures.date(4, 9) }).sync()
+        let status = await ReminderSync(vault: vault, rules: rules, notifications: notifications, alarms: FakeAlarms(), cards: FakeCards(), calendar: FakeExporter(text: nil), now: { Fixtures.date(4, 9) }).sync()
         #expect(status == .ok(reminders: 1, at: Fixtures.date(4, 9)))
         #expect(vault.files["calendar/iphone.json"] == "kept")
     }
