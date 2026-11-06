@@ -1,4 +1,4 @@
-import type { CalendarSource } from "../application/contracts";
+import type { CalendarEvent, CalendarSource } from "../application/contracts";
 
 export interface EventColors {
 	readonly bg: string;
@@ -28,6 +28,14 @@ const toHex = (c: readonly number[]) => `#${c.map((v) => Math.round(v).toString(
 
 const linear = (v: number) => Math.pow(v / WHITE, 2.2);
 const luminance = ([r, g, b]: readonly number[]) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+
+/** The colour of an event whose calendar's file gives none: each source its own. */
+const SOURCE_COLORS: Readonly<Record<CalendarSource, string>> = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
+
+/** The event's calendar colour, or its source's when the file gives none. */
+export function eventHex(event: Pick<CalendarEvent, "color" | "source">): string {
+	return event.color ?? SOURCE_COLORS[event.source];
+}
 
 export function bgAlphaFor(source: CalendarSource): number {
 	return source === "work" ? WORK_BG_ALPHA : EVENT_BG_ALPHA;

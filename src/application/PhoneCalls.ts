@@ -12,7 +12,7 @@ import { textParts } from "../domain/TaskText";
 import { oneLine } from "../domain/TaskTitle";
 import { samePlacement } from "../domain/operations";
 import { sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
-import { CalendarDay } from "./calendarDay";
+import { CalendarDay, type CalendarReading } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, readCalendarFile } from "./calendarFile";
 import { cardDue } from "./cardDue";
 import { type CalendarEvent, type CalendarSource, type DayEvents, type DropColumn, type GroupName, StaleTaskError, type SourceProblem, type SourceStatus, TasksFileMissingError } from "./contracts";
@@ -21,6 +21,7 @@ import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, p
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
+import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
@@ -39,12 +40,14 @@ import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } f
 export interface DoorContext {
 	/** The tasks file's text; null when there is no tasks file (`tasksFile` says where it is). */
 	readonly tasks: string | null;
-	/** The plugin's `data.json`, as text; empty for the defaults. */
-	readonly settings: string;
+	/** The plugin's `data.json`, as text; empty or left out for the defaults. */
+	readonly settings?: string;
 	/** The moment of the call, epoch milliseconds. */
 	readonly nowMs: number;
 	/** The calendars' files' texts (`calendarFile` says where each is); a source left out or null has no file. */
 	readonly calendars?: Partial<Record<CalendarSource, string | null>>;
+	/** The calendar sources the host fetches itself, their files' device saying nothing; Google's alone when left out. */
+	readonly fetched?: readonly CalendarSource[];
 	/** The steps of undo as the door last answered them; none before the first. */
 	readonly history?: UndoState;
 }
@@ -132,9 +135,12 @@ class Call {
 	readonly writes: TaskWrites;
 	readonly effects: Effects = {};
 	private text: string | null;
+	/** `data.json` as handed in: what a change of the settings is written over. */
+	private readonly settingsText: string;
 
 	constructor(readonly context: DoorContext) {
-		this.current = settingsOf(context.settings ?? "");
+		this.settingsText = context.settings ?? "";
+		this.current = settingsOf(this.settingsText);
 		const clock: Clock = { now: () => new Date(context.nowMs) };
 		const store: SettingsStore = {
 			get: () => this.current,
@@ -199,7 +205,7 @@ class Call {
 	saveSettings(patch: Partial<TaskCalendarSettings>): void {
 		this.current = { ...this.current, ...patch };
 		this.changed = { ...this.changed, ...patch };
-		const raw = this.context.settings.trim() === "" ? {} : (JSON.parse(this.context.settings) as Record<string, unknown>);
+		const raw = this.settingsText.trim() === "" ? {} : (JSON.parse(this.settingsText) as Record<string, unknown>);
 		this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
 	}
 
@@ -360,13 +366,13 @@ const BOUNDARY: Readonly<Record<string, Handler>> = {
 	clamp: (c, [slot, step]) => boundaryOf(c).clamp(slot as A, step as number),
 };
 
-function wireEvent(e: CalendarEvent, now: Date): WireEvent {
+function wireEvent(e: CalendarEvent, calendar: CalendarDay): WireEvent {
 	const { start, end, ...rest } = e;
-	return { ...rest, startMs: start.getTime(), endMs: end.getTime(), past: end.getTime() <= now.getTime() };
+	return { ...rest, startMs: start.getTime(), endMs: end.getTime(), past: calendar.isPast(e) };
 }
 
-function wireDay(day: DayEvents, now: Date): WireDayEvents {
-	const wire = (events: readonly CalendarEvent[]) => events.map((e) => wireEvent(e, now));
+function wireDay(day: DayEvents, calendar: CalendarDay): WireDayEvents {
+	const wire = (events: readonly CalendarEvent[]) => events.map((e) => wireEvent(e, calendar));
 	return {
 		events: wire(day.events),
 		allDay: wire(day.allDay),
@@ -376,8 +382,11 @@ function wireDay(day: DayEvents, now: Date): WireDayEvents {
 	};
 }
 
-/** The calendars' rules over the files' texts handed in: a missing file is `fileMissing`, a broken one `failed`. On the phone the old choice of calendars is carried over once, as the plugin does there. */
-function calendarDay(c: Call): CalendarDay {
+/** The sources the plugin fetches itself when the host does not say. */
+const FETCHED_BY_DEFAULT: readonly CalendarSource[] = ["google"];
+
+/** The calendars' files as handed in: a missing file is `fileMissing`, a broken one `failed`. */
+function readingOf(c: Call): CalendarReading {
 	const files = new Map<CalendarSource, CalendarFile>();
 	const problems = new Map<CalendarSource, SourceProblem>();
 	for (const source of CALENDAR_SOURCES) {
@@ -392,7 +401,13 @@ function calendarDay(c: Call): CalendarDay {
 			problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
 		}
 	}
-	const reading = { sources: CALENDAR_SOURCES, files, problem: (s: CalendarSource) => problems.get(s) ?? null, fed: (s: CalendarSource) => s === "google" };
+	const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
+	return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => fetched.includes(s) };
+}
+
+/** The calendars' rules over the files handed in. On the phone the old choice of calendars is carried over once, as the plugin does there. */
+function calendarDay(c: Call): CalendarDay {
+	const reading = readingOf(c);
 	const day = new CalendarDay(reading, c.settings, c.now);
 	const carried = day.carryOver(true);
 	if (!carried) return day;
@@ -401,8 +416,11 @@ function calendarDay(c: Call): CalendarDay {
 }
 
 const CALENDARS: Readonly<Record<string, Handler>> = {
-	events: (c, [date]) => wireDay(calendarDay(c).events(date as string), c.now),
-	isPast: (c, [event]) => (event as { endMs: number }).endMs <= c.context.nowMs,
+	events: (c, [date]) => {
+		const day = calendarDay(c);
+		return wireDay(day.events(date as string), day);
+	},
+	isPast: (c, [event]) => new CalendarDay(readingOf(c), c.settings, c.now).isPast({ end: new Date((event as { endMs: number }).endMs) }),
 	known: (c) => calendarDay(c).known(),
 	setShown: (c, [account, title, shown]) => {
 		c.saveSettings(calendarDay(c).shownChange(account as string, title as string, shown as boolean));
@@ -443,7 +461,6 @@ const SETTINGS_METHODS: readonly string[] = [
 	"setUngrouped",
 	"setGoogleClientId",
 	"setWorkCalendarFile",
-	"setWorkCalendars",
 ];
 
 const SETTINGS: Readonly<Record<string, Handler>> = Object.fromEntries(
@@ -458,6 +475,11 @@ const SETTINGS: Readonly<Record<string, Handler>> = Object.fromEntries(
 
 /** The SettingsService methods the door leaves to the host: the client secret's field binds an Obsidian text field to the saved secret. */
 export const HOST_SETTINGS_METHODS: readonly string[] = ["bindClientSecret"];
+
+/** What a screen reads of the shared settings, as ScreenSettingsStore gives it. */
+const SCREEN_SETTINGS: Readonly<Record<string, Handler>> = {
+	get: (c) => screenSettingsOf(c.settings),
+};
 
 const HISTORY: Readonly<Record<string, Handler>> = {
 	undo: (c) => c.undo("undo"),
@@ -599,11 +621,31 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	calendars: CALENDARS,
 	history: HISTORY,
 	settings: SETTINGS,
+	screenSettings: SCREEN_SETTINGS,
 	entry: ENTRY,
 	sectionName: SECTION_NAME,
 	repeatPage: REPEAT_PAGE,
 	description: DESCRIPTION,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
+};
+
+/** An interface of contracts.ts the door answers in `space`, but for the methods the host keeps; or one the host owns whole, and why. */
+export type DoorCoverage = { readonly space: string; readonly host: readonly string[] } | { readonly hostOwned: string };
+
+/** Every interface of contracts.ts with a method: where the door answers it, or why a host keeps it. */
+export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
+	TaskService: { space: "tasks", host: HOST_TASK_METHODS },
+	DayService: { space: "days", host: HOST_DAY_METHODS },
+	UndoService: { space: "history", host: ["onChange"] },
+	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS },
+	SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },
+	ScreenSettingsStore: { space: "screenSettings", host: ["onChange"] },
+	GoogleAccount: { hostOwned: "Google's login is a browser's consent and a token fetched over the network, and whether one is kept goes with it: the door makes no request" },
+	WorkCalendarSetup: { hostOwned: "the Scriptable script and the Shortcuts export are the Obsidian plugin's fallback on the iPhone; an app writes calendar/iphone.json itself (iphoneCalendarText)" },
+	DayEventsAsk: { hostOwned: "`calendars.events` answers the day over the files handed in; fetching them afresh is the host's" },
+	PolledScreen: { hostOwned: "the frontend implements it for keepFresh, which is the host's" },
+	CalendarPoll: { hostOwned: "keepFresh answers it, and polling is the host's" },
+	SecretField: { hostOwned: "the frontend implements it for bindClientSecret, which is the host's" },
 };
 
 /** Every method the door answers, `space.name`, in order. */
@@ -635,8 +677,33 @@ function errorOf(e: unknown): { readonly code: DoorErrorCode; readonly message: 
 	return { code: "failed", message };
 }
 
-/** `callDoor` over text: the arguments and the context as JSON, the answer as JSON. */
-export function callDoorJson(method: string, argsJson: string, contextJson: string): string {
+/**
+ * A value as JSON text. Strict, it refuses what JSON would change on the way: a Date (a string), a field set to undefined
+ * (dropped), a function, a class's instance, a Map, a number JSON cannot hold. The tests call the door strict.
+ */
+export function plainJson(value: unknown, strict = false): string {
+	if (strict) checkPlain(value, "answer");
+	return JSON.stringify(value);
+}
+
+function checkPlain(value: unknown, path: string): void {
+	if (value === null || typeof value === "string" || typeof value === "boolean") return;
+	if (typeof value === "number") {
+		if (!Number.isFinite(value)) throw new Error(`${path} is ${value}: no JSON number`);
+		return;
+	}
+	if (Array.isArray(value)) return value.forEach((v, i) => checkPlain(v, `${path}[${i}]`));
+	if (typeof value !== "object") throw new Error(`${path} is ${typeof value}: no JSON value`);
+	const proto = Object.getPrototypeOf(value);
+	if (proto !== Object.prototype && proto !== null) throw new Error(`${path} is a ${(value as object).constructor?.name ?? "class"}: no plain object`);
+	for (const [key, v] of Object.entries(value)) {
+		if (v === undefined) throw new Error(`${path}.${key} is undefined: JSON drops it`);
+		checkPlain(v, `${path}.${key}`);
+	}
+}
+
+/** `callDoor` over text: the arguments and the context as JSON, the answer as JSON; strict, an answer that is no plain JSON throws. */
+export function callDoorJson(method: string, argsJson: string, contextJson: string, strict = false): string {
 	let args: unknown;
 	let context: DoorContext;
 	try {
@@ -645,5 +712,5 @@ export function callDoorJson(method: string, argsJson: string, contextJson: stri
 	} catch (e) {
 		return JSON.stringify({ ok: false, error: { code: "badArguments", message: e instanceof Error ? e.message : String(e) } });
 	}
-	return JSON.stringify(callDoor(method, args as unknown[], context));
+	return plainJson(callDoor(method, args as unknown[], context), strict);
 }

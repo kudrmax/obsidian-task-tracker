@@ -1,5 +1,4 @@
 import type { TaskCalendarSettings } from "../settings";
-import type { CalendarOption } from "./contracts";
 
 /** The tasks file as text. Implemented over the Obsidian vault; in tests, in memory. */
 export interface TaskFileStore {
@@ -45,9 +44,4 @@ export interface GoogleLogin {
 	isLoggedIn(): boolean;
 	login(): Promise<string>;
 	logout(): Promise<void>;
-}
-
-/** The calendars of the Google account logged in, asked afresh. Implemented by GoogleCalendarSource. */
-export interface GoogleCalendarList {
-	listCalendars(): Promise<readonly CalendarOption[]>;
 }

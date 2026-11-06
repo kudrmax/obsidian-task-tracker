@@ -43,7 +43,6 @@ export class SettingsServiceImpl implements SettingsService {
 			googleClientId: s.google.clientId,
 			refreshSeconds: s.google.refreshSeconds,
 			workCalendarFile: s.workCalendarFile,
-			workCalendars: s.workCalendarTitles.join(", "),
 			dayStartHours: DAY_START_HOURS,
 			googleClientReady: s.google.clientId !== "",
 		};
@@ -167,10 +166,6 @@ export class SettingsServiceImpl implements SettingsService {
 
 	setWorkCalendarFile(workCalendarFile: string): Promise<void> {
 		return this.store.update({ workCalendarFile });
-	}
-
-	setWorkCalendars(text: string): Promise<void> {
-		return this.store.update({ workCalendarTitles: text.split(",").map((t) => t.trim()).filter((t) => t !== "") });
 	}
 
 	private get settings(): TaskCalendarSettings {

@@ -1,10 +1,10 @@
 import type { CalendarEvent } from "../application/contracts";
 import { PROPERTY } from "./design";
 import { clear, el } from "./dom";
-import { bgAlphaFor, eventColors, type Theme } from "./eventColors";
+import { bgAlphaFor, eventColors, eventHex, type Theme } from "./eventColors";
 
 export function paintEvent(target: HTMLElement, event: CalendarEvent, theme: Theme): void {
-	const colors = eventColors(event.color, bgAlphaFor(event.source), theme);
+	const colors = eventColors(eventHex(event), bgAlphaFor(event.source), theme);
 	target.style.setProperty(PROPERTY.eventBg, colors.bg);
 	target.style.setProperty(PROPERTY.eventBar, colors.bar);
 	target.style.setProperty(PROPERTY.eventText, colors.text);

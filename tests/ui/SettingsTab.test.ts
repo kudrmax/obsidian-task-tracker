@@ -63,9 +63,6 @@ const loggedOut: GoogleAccount = {
 	isLoggedIn: () => false,
 	login: async () => "",
 	logout: async () => undefined,
-	listCalendars: async () => [],
-	setShown: async () => undefined,
-	isShown: () => true,
 };
 const work: WorkCalendarSetup = { scriptableLoader: () => "loader", export: () => undefined };
 

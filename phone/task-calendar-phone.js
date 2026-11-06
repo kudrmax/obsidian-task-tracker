@@ -1780,7 +1780,6 @@
     if (source === "iphone") return IPHONE_CALENDAR_FILE;
     return settings.workCalendarFile;
   }
-  var DEFAULT_COLOR = { google: "#4285F4", iphone: "#0A84FF", work: "#0A84FF" };
   var dateOrNull = (text) => text ? new Date(text) : null;
   function readCalendarFile(text, source) {
     const content = JSON.parse(text);
@@ -1791,7 +1790,7 @@
       end: new Date(e.end),
       allDay: e.allDay,
       calendar: e.calendar,
-      color: e.color ?? DEFAULT_COLOR[source],
+      color: e.color ?? null,
       source,
       account: e.account ?? null,
       calendarId: e.calendarId ?? null
@@ -3000,6 +2999,19 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/application/ScreenSettingsImpl.ts
+  function screenSettingsOf(settings) {
+    return {
+      longPressMs: settings.longPressMs,
+      scrollToHour: settings.scrollToHour,
+      tasksFile: settings.tasksFile,
+      sections: settings.sections,
+      ungrouped: settings.groups.ungrouped,
+      priorities: settings.priorities,
+      labels: settings.labels
+    };
+  }
+
   // src/application/SettingsServiceImpl.ts
   function countOf(text) {
     const n = Number(text);
@@ -3036,7 +3048,6 @@ ${key.title}`.toLowerCase();
         googleClientId: s.google.clientId,
         refreshSeconds: s.google.refreshSeconds,
         workCalendarFile: s.workCalendarFile,
-        workCalendars: s.workCalendarTitles.join(", "),
         dayStartHours: DAY_START_HOURS,
         googleClientReady: s.google.clientId !== ""
       };
@@ -3134,9 +3145,6 @@ ${key.title}`.toLowerCase();
     }
     setWorkCalendarFile(workCalendarFile) {
       return this.store.update({ workCalendarFile });
-    }
-    setWorkCalendars(text) {
-      return this.store.update({ workCalendarTitles: text.split(",").map((t) => t.trim()).filter((t) => t !== "") });
     }
     get settings() {
       return this.store.get();
@@ -4722,7 +4730,8 @@ ${key.title}`.toLowerCase();
       /** What the call changed of the settings, every key it wrote. */
       this.changed = {};
       this.effects = {};
-      this.current = settingsOf(context.settings ?? "");
+      this.settingsText = context.settings ?? "";
+      this.current = settingsOf(this.settingsText);
       const clock = { now: () => new Date(context.nowMs) };
       const store = {
         get: () => this.current,
@@ -4778,7 +4787,7 @@ ${key.title}`.toLowerCase();
     saveSettings(patch2) {
       this.current = { ...this.current, ...patch2 };
       this.changed = { ...this.changed, ...patch2 };
-      const raw = this.context.settings.trim() === "" ? {} : JSON.parse(this.context.settings);
+      const raw = this.settingsText.trim() === "" ? {} : JSON.parse(this.settingsText);
       this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
     }
     setText(text, step) {
@@ -4921,12 +4930,12 @@ ${key.title}`.toLowerCase();
     offsetOfHour: (c, [hour]) => boundaryOf2(c).offsetOfHour(hour),
     clamp: (c, [slot, step]) => boundaryOf2(c).clamp(slot, step)
   };
-  function wireEvent(e, now) {
+  function wireEvent(e, calendar) {
     const { start, end, ...rest } = e;
-    return { ...rest, startMs: start.getTime(), endMs: end.getTime(), past: end.getTime() <= now.getTime() };
+    return { ...rest, startMs: start.getTime(), endMs: end.getTime(), past: calendar.isPast(e) };
   }
-  function wireDay(day, now) {
-    const wire = (events) => events.map((e) => wireEvent(e, now));
+  function wireDay(day, calendar) {
+    const wire = (events) => events.map((e) => wireEvent(e, calendar));
     return {
       events: wire(day.events),
       allDay: wire(day.allDay),
@@ -4935,7 +4944,8 @@ ${key.title}`.toLowerCase();
       stale: day.stale
     };
   }
-  function calendarDay(c) {
+  var FETCHED_BY_DEFAULT = ["google"];
+  function readingOf(c) {
     const files = /* @__PURE__ */ new Map();
     const problems = /* @__PURE__ */ new Map();
     for (const source of CALENDAR_SOURCES) {
@@ -4950,7 +4960,11 @@ ${key.title}`.toLowerCase();
         problems.set(source, { kind: "failed", detail: e instanceof Error ? e.message : String(e) });
       }
     }
-    const reading = { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => s === "google" };
+    const fetched = c.context.fetched ?? FETCHED_BY_DEFAULT;
+    return { sources: CALENDAR_SOURCES, files, problem: (s) => problems.get(s) ?? null, fed: (s) => fetched.includes(s) };
+  }
+  function calendarDay(c) {
+    const reading = readingOf(c);
     const day = new CalendarDay(reading, c.settings, c.now);
     const carried = day.carryOver(true);
     if (!carried) return day;
@@ -4958,8 +4972,11 @@ ${key.title}`.toLowerCase();
     return new CalendarDay(reading, c.settings, c.now);
   }
   var CALENDARS = {
-    events: (c, [date]) => wireDay(calendarDay(c).events(date), c.now),
-    isPast: (c, [event]) => event.endMs <= c.context.nowMs,
+    events: (c, [date]) => {
+      const day = calendarDay(c);
+      return wireDay(day.events(date), day);
+    },
+    isPast: (c, [event]) => new CalendarDay(readingOf(c), c.settings, c.now).isPast({ end: new Date(event.endMs) }),
     known: (c) => calendarDay(c).known(),
     setShown: (c, [account, title, shown]) => {
       c.saveSettings(calendarDay(c).shownChange(account, title, shown));
@@ -4991,8 +5008,7 @@ ${key.title}`.toLowerCase();
     "movePreset",
     "setUngrouped",
     "setGoogleClientId",
-    "setWorkCalendarFile",
-    "setWorkCalendars"
+    "setWorkCalendarFile"
   ];
   var SETTINGS = Object.fromEntries(
     SETTINGS_METHODS.map((name) => [
@@ -5003,6 +5019,9 @@ ${key.title}`.toLowerCase();
       }
     ])
   );
+  var SCREEN_SETTINGS = {
+    get: (c) => screenSettingsOf(c.settings)
+  };
   var HISTORY = {
     undo: (c) => c.undo("undo"),
     redo: (c) => c.undo("redo"),
@@ -5118,6 +5137,7 @@ ${key.title}`.toLowerCase();
     calendars: CALENDARS,
     history: HISTORY,
     settings: SETTINGS,
+    screenSettings: SCREEN_SETTINGS,
     entry: ENTRY,
     sectionName: SECTION_NAME,
     repeatPage: REPEAT_PAGE,
@@ -5148,7 +5168,26 @@ ${key.title}`.toLowerCase();
     if (e instanceof SyntaxError) return { code: "badArguments", message };
     return { code: "failed", message };
   }
-  function callDoorJson(method, argsJson, contextJson) {
+  function plainJson(value, strict = false) {
+    if (strict) checkPlain(value, "answer");
+    return JSON.stringify(value);
+  }
+  function checkPlain(value, path) {
+    if (value === null || typeof value === "string" || typeof value === "boolean") return;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) throw new Error(`${path} is ${value}: no JSON number`);
+      return;
+    }
+    if (Array.isArray(value)) return value.forEach((v, i) => checkPlain(v, `${path}[${i}]`));
+    if (typeof value !== "object") throw new Error(`${path} is ${typeof value}: no JSON value`);
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) throw new Error(`${path} is a ${value.constructor?.name ?? "class"}: no plain object`);
+    for (const [key, v] of Object.entries(value)) {
+      if (v === void 0) throw new Error(`${path}.${key} is undefined: JSON drops it`);
+      checkPlain(v, `${path}.${key}`);
+    }
+  }
+  function callDoorJson(method, argsJson, contextJson, strict = false) {
     let args;
     let context;
     try {
@@ -5157,7 +5196,7 @@ ${key.title}`.toLowerCase();
     } catch (e) {
       return JSON.stringify({ ok: false, error: { code: "badArguments", message: e instanceof Error ? e.message : String(e) } });
     }
-    return JSON.stringify(callDoor(method, args, context));
+    return plainJson(callDoor(method, args, context), strict);
   }
 
   // src/application/TaskReminders.ts
