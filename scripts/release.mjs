@@ -43,6 +43,7 @@ if (git("tag", "--list", version) !== "") fail(`tag ${version} already exists`);
 
 if (!existsSync("node_modules")) run("npm", ["ci"]);
 run("npx", ["vitest", "run"]);
+run("npm", ["run", "test:apple"]);
 run("npm", ["run", "build"]);
 
 const banner = readFileSync("main.js", "utf8").split("\n", 1)[0];

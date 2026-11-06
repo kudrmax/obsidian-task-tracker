@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-task-tracker",
-	"version": "0.4.167",
+	"version": "0.4.168",
 	"private": true,
 	"main": "main.js",
 	"scripts": {
@@ -8,6 +8,7 @@
 		"dev": "node esbuild.config.mjs",
 		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"test": "vitest run",
+		"test:apple": "swift test --package-path apple/Core",
 		"release": "node scripts/release.mjs"
 	},
 	"license": "MIT",
