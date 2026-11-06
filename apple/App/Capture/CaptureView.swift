@@ -1,15 +1,17 @@
 import Core
 import SwiftUI
 
-/// A new task: typed, recorded, or both, into one of the four lists.
+/// A new task: typed, recorded, or both, into one of the four lists. Once added, the screen is empty for the next one.
 struct CaptureView: View {
-    let close: () -> Void
+    let recorder: VoiceRecorder
 
     @State private var list = CaptureListOption.inbox
     @State private var text = ""
-    @State private var recorder = VoiceRecorder()
     @State private var failure: String?
     @State private var sending = false
+    /// The list the last task went into, told of until the next one is typed.
+    @State private var added: CaptureListOption?
+    private let router = CaptureRouter.shared
     @FocusState private var typing: Bool
 
     var body: some View {
@@ -28,6 +30,10 @@ struct CaptureView: View {
                         .focused($typing)
                         .submitLabel(.done)
 
+                    if let added {
+                        Label("Added to \(added.title)", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
                     if let failure {
                         Label(failure, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
@@ -41,14 +47,14 @@ struct CaptureView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollDismissesKeyboard(.interactively)
-            .interactiveDismissDisabled(canSend)
+            .contentShape(.rect)
+            .onTapGesture { typing = true }
             .navigationTitle("New Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", systemImage: "xmark") {
-                        recorder.discard()
-                        close()
+                if canSend {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Clear", systemImage: "xmark") { clear() }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -57,123 +63,64 @@ struct CaptureView: View {
                 }
                 recorderItems
             }
-            .onAppear { typing = true }
+            // Focused a moment after the screen appears: focused at once, iOS leaves the keyboard's bar out.
+            .task {
+                try? await Task.sleep(for: .milliseconds(300))
+                typing = true
+            }
+            .onChange(of: router.asked) { typing = true }
+            .onChange(of: text) { if !text.isEmpty { added = nil } }
+            .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
         }
     }
 
-    /// The recording's controls in the system bottom bar, drawn and animated by iOS as every toolbar is; above the
-    /// keyboard while typing, as Notes has them.
+    /// The recording's controls above the keyboard while typing, as Notes has them; without the keyboard they are in the
+    /// bar above the tab bar (`RecorderAccessory`). Declared always: iOS shows them only with the keyboard.
     @ToolbarContentBuilder
     private var recorderItems: some ToolbarContent {
-        if typing {
-            switch recorder.state {
-            case .idle:
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    recordButton
-                    Spacer()
-                }
-            case .recording, .paused:
-                ToolbarItemGroup(placement: .keyboard) {
-                    discardButton
-                    Spacer()
-                }
-                ToolbarItem(placement: .keyboard) { elapsed }
-                    .sharedBackgroundVisibility(.hidden)
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    pauseButton
-                    stopButton
-                }
-            case .finished:
-                ToolbarItemGroup(placement: .keyboard) {
-                    discardButton
-                    Spacer()
-                }
-                ToolbarItem(placement: .keyboard) { voiceNote }
-                    .sharedBackgroundVisibility(.hidden)
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                }
+        let controls = RecorderControls(recorder: recorder)
+        switch recorder.state {
+        case .idle:
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
+                    .tint(.red)
+                Spacer()
             }
-        } else {
-            switch recorder.state {
-            case .idle:
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-                ToolbarItem(placement: .bottomBar) { recordButton }
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-            case .recording, .paused:
-                ToolbarItem(placement: .bottomBar) { discardButton }
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-                ToolbarItem(placement: .status) { elapsed }
-                    .sharedBackgroundVisibility(.hidden)
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-                ToolbarItemGroup(placement: .bottomBar) {
-                    pauseButton
-                    stopButton
-                }
-            case .finished:
-                ToolbarItem(placement: .bottomBar) { discardButton }
-                ToolbarSpacer(.flexible, placement: .bottomBar)
-                ToolbarItem(placement: .status) { voiceNote }
-                    .sharedBackgroundVisibility(.hidden)
-                ToolbarSpacer(.flexible, placement: .bottomBar)
+        case .recording, .paused:
+            ToolbarItemGroup(placement: .keyboard) {
+                controls.discard
+                Spacer()
+            }
+            ToolbarItem(placement: .keyboard) { controls.elapsed }
+                .sharedBackgroundVisibility(.hidden)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                controls.pauseOrResume
+                controls.stop
+            }
+        case .finished:
+            ToolbarItemGroup(placement: .keyboard) {
+                controls.discard
+                Spacer()
+            }
+            ToolbarItem(placement: .keyboard) { controls.voiceNote }
+                .sharedBackgroundVisibility(.hidden)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
             }
         }
-    }
-
-    private var recordButton: some View {
-        Button("Record", systemImage: "mic.fill") { Task { await recorder.start() } }
-            .buttonStyle(.glassProminent)
-            .tint(.red)
-    }
-
-    private var discardButton: some View {
-        Button("Discard", systemImage: "trash", role: .destructive) { recorder.discard() }
-    }
-
-    @ViewBuilder
-    private var pauseButton: some View {
-        if recorder.state == .recording {
-            Button("Pause", systemImage: "pause.fill") { recorder.pause() }
-        } else {
-            Button("Resume", systemImage: "mic.fill") { recorder.resume() }
-        }
-    }
-
-    private var stopButton: some View {
-        Button("Stop", systemImage: "stop.fill") { recorder.finish() }
-    }
-
-    private var elapsed: some View {
-        VStack(spacing: 0) {
-            Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                .font(.headline.monospacedDigit())
-                .contentTransition(.numericText())
-            Text(recorder.state == .recording ? "Recording" : "Paused")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .fixedSize()
-    }
-
-    private var voiceNote: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Image(systemName: "waveform")
-                    .foregroundStyle(.red)
-                Text("Voice note")
-            }
-            .font(.headline)
-            Text(Duration.seconds(recorder.elapsed), format: .time(pattern: .minuteSecond))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
-        .fixedSize()
     }
 
     private var canSend: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || recorder.state != .idle
+    }
+
+    private func clear() {
+        recorder.discard()
+        text = ""
+        failure = nil
+        added = nil
     }
 
     private func send() async {
@@ -186,8 +133,8 @@ struct CaptureView: View {
         let outcome = await Task.detached { AppServices.shared.capture(list: target, text: typed, recording: recording, tag: tag) }.value
         switch outcome {
         case .saved:
-            recorder.discard()
-            close()
+            clear()
+            added = list
         case .failed(let reason):
             failure = reason
         }
