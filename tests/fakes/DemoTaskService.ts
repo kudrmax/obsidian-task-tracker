@@ -1,9 +1,10 @@
-import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
+import { markChoices, typedMarks } from "../../src/domain/Marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
@@ -105,6 +106,16 @@ export class DemoTaskService implements TaskService {
 		return { text: parsed.text, priority: this.priorityLevels().find((l) => l.prefix === parsed.priority) ?? null };
 	}
 
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
+		const marks = typedMarks(text, priority, labels, this.prefixes());
+		const choices = markChoices(marks);
+		return {
+			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
+			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
+			can: { setPriority: choices.priority, setLabels: choices.labels },
+		};
+	}
+
 	isBlank(text: string): boolean {
 		return isBlankTitle(text, this.prefixes());
 	}
@@ -160,7 +171,7 @@ export class DemoTaskService implements TaskService {
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot) },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null },
 		};
 	}
 

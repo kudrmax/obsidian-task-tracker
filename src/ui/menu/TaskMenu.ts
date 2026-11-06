@@ -350,9 +350,9 @@ export class TaskMenu extends LiftedMenu {
 		const tiles = statusTiles(item);
 		if (this.asking === "wontdo" || this.asking === "stop") this.askGroup(this.asking);
 		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: statuses[tile.id] }))]);
-		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: item.labels.length > 0, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
+		const levelTiles = priorityTiles(item, levels).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: !item.can.setPriority, onPick: this.pick(() => actions.setPriority(nextPriority(item, tile.prefix))) }));
 		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: item.priority !== null, onPick: () => void this.toggleLabel(tile.name) }));
+		const tagTiles = labelTiles(item, labels ?? []).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: !item.can.setLabels, onPick: () => void this.toggleLabel(tile.name) }));
 		if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
 		const moves = moveTiles(item, this.context.today).map(({ label, icon, date }): MenuTileSpec => ({
 			label,

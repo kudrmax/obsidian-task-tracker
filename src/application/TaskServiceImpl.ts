@@ -1,5 +1,6 @@
 import { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
+import { markChoices, typedMarks } from "../domain/Marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../domain/Priority";
 import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
@@ -16,6 +17,7 @@ import {
 	type DayColumn,
 	type DaySpan,
 	type DayView,
+	type DraftMarks,
 	type DroppedTask,
 	type DropTo,
 	type EndList,
@@ -137,6 +139,16 @@ export class TaskServiceImpl implements TaskService {
 		const levels = this.priorityLevels();
 		const parsed = priorityOfText(text, levels.map((l) => l.prefix));
 		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
+	}
+
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
+		const marks = typedMarks(text, priority, labels, this.prefixes());
+		const choices = markChoices(marks);
+		return {
+			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
+			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
+			can: { setPriority: choices.priority, setLabels: choices.labels },
+		};
 	}
 
 	isBlank(text: string): boolean {
