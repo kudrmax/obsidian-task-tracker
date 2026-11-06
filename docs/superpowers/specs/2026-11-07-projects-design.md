@@ -49,6 +49,10 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
     1 or 2. A checkbox outside these sections is a plain checklist the plugin never reads. A section the plugin needs and
     the note lacks is added at the note's end when it first writes there.
 13. **«No project» keeps the file's Backlog as it is**: its sections show inside the group as they do in Backlog today.
+14. **Sections are shared by name across files.** «Evening» on the screen is one section for every file: a project task
+    dragged into it is written under `### Evening` in its note's section, and shows in the same «Evening» as the tasks of
+    `TODOs Tasks.md`, with the mark. The section rules are reused as they are, per file: a section emptied in a file goes
+    from that file.
 
 ## How it is used
 
@@ -67,6 +71,7 @@ The task menu's «Project»: board `docs/design/canvas/Proj3Flow.dc.html` (appro
 ## Open (technical, for the backend)
 
 - How the iPhone app reads tasks spread over many files.
+- Order inside a column or section when its tasks come from several files (being decided with Max).
 
 ## Ideas for later
 
