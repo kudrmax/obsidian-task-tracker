@@ -44,8 +44,8 @@ describe("BulkMenu (block 3)", () => {
 			return card;
 		});
 		const done = async () => undefined;
-		const actions: BulkActions = { setStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, remove: done, toggleLabel: async () => null };
-		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: (items) => taskMenu(items, "2026-11-04", [], [], null), actions, onClose: () => {} });
+		const actions: BulkActions = { pickStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, remove: done, toggleLabel: async () => null };
+		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: (items) => taskMenu(items, "2026-11-04", [], [], null, { kind: "bulk" }), actions, onClose: () => {} });
 		expect(lifted.length).toBeGreaterThanOrEqual(5);
 		expect(lifted.every((count) => count === 0)).toBe(true);
 		expect(document.querySelectorAll(".tc-lifted").length).toBe(5);
@@ -60,8 +60,8 @@ describe("the bulk menu draws its model", () => {
 
 	const open = (model: Partial<TaskMenuModel>, items = [item(0), item(1)]) => {
 		const cards = items.map(() => document.body.appendChild(document.createElement("div")));
-		const actions = { setStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
-		const base = taskMenu(items, "2026-11-04", [P1], [RED, BLUE], null);
+		const actions = { pickStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
+		const base = taskMenu(items, "2026-11-04", [P1], [RED, BLUE], null, { kind: "bulk" });
 		BulkMenu.open({ items, cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: () => ({ ...base, ...model }), actions, onClose: () => {} });
 		return actions;
 	};
@@ -73,13 +73,51 @@ describe("the bulk menu draws its model", () => {
 		expect(tiles("is-labels").map((t) => [t.classList.contains("is-on"), t.disabled])).toEqual([[false, true], [true, true]]);
 	});
 
-	it("names the progress tile for what the model says it sets, and sets that", async () => {
-		const actions = open({ progress: "todo" });
+	it("names the progress tile for what the model says it sets, and hands that tile to the service", async () => {
+		const actions = open({ statuses: [{ id: "done", confirm: false }, { id: "stopProgress", confirm: false }, { id: "wontDo", confirm: false }] });
 		const progress = tiles("is-status")[1];
 		expect(progress.textContent).toContain("Stop progress");
 		progress.click();
 		await Promise.resolve();
-		expect(actions.setStatus).toHaveBeenCalledWith("todo");
+		expect(actions.pickStatus).toHaveBeenCalledWith("stopProgress");
+	});
+
+	it("gives tasks up and deletes them at once, as the model says neither asks", async () => {
+		const actions = open({});
+		tiles("is-status")[2].click();
+		await Promise.resolve();
+		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
+		document.body.replaceChildren();
+		const again = open({});
+		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Delete 2 tasks"))!.click();
+		await Promise.resolve();
+		expect(again.remove).toHaveBeenCalled();
+	});
+
+	it("asks first where the model says so, the picked tasks named", async () => {
+		const actions = open({ statuses: [{ id: "done", confirm: false }, { id: "inProgress", confirm: false }, { id: "wontDo", confirm: true }], remove: { confirm: true } });
+		tiles("is-status")[2].click();
+		expect(actions.pickStatus).not.toHaveBeenCalled();
+		expect(document.querySelector(".tc-menu-ask-question")?.textContent).toBe("Won’t do “2 tasks”?");
+		document.querySelector<HTMLButtonElement>(".tc-menu-ask-btn:last-child")!.click();
+		await Promise.resolve();
+		expect(actions.pickStatus).toHaveBeenCalledWith("wontDo");
+	});
+
+	it("draws no moves group when no picked task may be put off", () => {
+		open({ moves: [] });
+		expect(document.querySelector(".tc-menu-tiles.is-move")).toBeNull();
+	});
+
+	it("offers Section where the model's edits have it", () => {
+		open({});
+		expect(document.body.textContent).not.toContain("Section");
+		document.body.replaceChildren();
+		const choice = { names: ["Work"], current: "Work", ungrouped: "No section" };
+		open({ edits: ["section"], sections: { choice, options: [{ name: "Work", checked: true }, { name: null, checked: false }], create: false } });
+		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Section"))!.click();
+		expect([...document.querySelectorAll(".tc-menu-group .tc-menu-label")].map((l) => l.textContent)).toEqual(["Work", "No section"]);
+		expect(document.body.textContent).not.toContain("New section");
 	});
 
 	it("hands a tapped level and label to the service's toggles", async () => {

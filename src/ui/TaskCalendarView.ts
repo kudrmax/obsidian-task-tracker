@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock } from "../application/contracts";
 import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -162,10 +162,12 @@ export class TaskCalendarView extends ItemView {
 		});
 		this.bulk = new BulkController({
 			root: this.contentEl,
-			apply: (steps) => this.act(() => this.deps.tasks.applyAll(steps)),
+			pickStatus: (keys, id) => this.act(() => this.deps.tasks.pickStatus(keys, id)),
+			postpone: (keys, date) => this.act(() => this.deps.tasks.postponeAll(keys, date)),
+			remove: (keys) => this.act(() => this.deps.tasks.removeAll(keys)),
 			today: () => this.today(),
 			day: () => this.selectedDate,
-			menu: (items, cards) => this.deps.tasks.menu(items, this.today(), cards.every((card) => this.sectionColumn(card.card)) ? this.data.offer : null),
+			menu: (picked) => this.deps.tasks.bulkMenu(picked, this.menuScreen()),
 			togglePriority: (keys, prefix) => this.act(() => this.deps.tasks.togglePriority(keys, prefix)),
 			toggleLabel: async (keys, name) => {
 				const written: { items: readonly (TaskItem | null)[] } = { items: keys.map(() => null) };
@@ -913,11 +915,23 @@ export class TaskCalendarView extends ItemView {
 		return this.deps.tasks.columnSections(column, this.selectedDate);
 	}
 
-	/** The list column a card stands in, when that column shows its sections: there a task's menu offers them, and the task waits for a new section's name. */
-	private sectionColumn(card: HTMLElement): ListColumn | null {
+	/** The list column a card stands in, if any. */
+	private columnOf(card: HTMLElement): ListColumn | null {
 		const columns: ListColumn[] = ["day", "soon", "inbox", "backlog"];
-		const column = columns.find((c) => this.listOf(c)?.el.contains(card));
-		return column && this.sectionsOf(column) ? column : null;
+		return columns.find((c) => this.listOf(c)?.el.contains(card)) ?? null;
+	}
+
+	/** Where a card pressed for its menu stands: a timeline card's stack, the whole screen, the timeline, a list column, else Done. */
+	private menuFrom(source: HTMLElement, full: FullScreen | undefined): MenuFrom {
+		if (source.closest(".tc-menu-subtasks")) return "stack";
+		if (full) return "full";
+		if (source.classList.contains("tc-block")) return "timeline";
+		return this.columnOf(source) ?? "done";
+	}
+
+	/** The screen a menu opens over (`TaskService.menu`). */
+	private menuScreen(): MenuScreen {
+		return { today: this.today(), day: this.selectedDate, offer: this.data.offer };
 	}
 
 	private listOf(column: ListColumn): TaskList | null {
@@ -975,22 +989,23 @@ export class TaskCalendarView extends ItemView {
 	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
 		const tasks = this.deps.tasks;
-		const column = this.sectionColumn(source);
-		const offer = column ? this.data.offer : null;
-		const today = this.today();
+		const from = this.menuFrom(source, full);
+		const column = this.columnOf(source);
+		const screen = this.menuScreen();
+		const today = screen.today;
 		/** The task as the menu last saw it: a label set from the menu gives it a fresh key, which the next action needs. */
 		let current = item;
 		return TaskMenu.open({
 			item,
 			source,
 			lifted,
-			menu: (task) => tasks.menu([task], today, offer),
+			menu: (task) => tasks.menu(task, from, screen),
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			markdown: full?.holds(item) ? undefined : this.markdown,
 			today,
 			day: this.selectedDate,
 			actions: {
-				setStatus: (status) => this.act(() => tasks.setStatus(current.key, status)),
+				pickStatus: (id) => this.act(() => tasks.pickStatus([current.key], id)),
 				postpone: (date) => this.act(() => tasks.postpone(current.key, date)),
 				removeDue: () => this.act(() => tasks.removeDue([current.key])),
 				toSection: (name) => this.act(() => tasks.toSection([current.key], name)),
@@ -1008,7 +1023,6 @@ export class TaskCalendarView extends ItemView {
 				},
 				setReminder: (kind) => this.act(() => tasks.setReminder(current.key, kind)),
 				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
-				stop: () => this.act(() => tasks.stop(current.key)),
 				rename: (menu) => (full ? full.rename(current) : this.quick?.rename(current, menu)),
 				openDescription: (editing) => this.openFull(current, editing),
 				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),

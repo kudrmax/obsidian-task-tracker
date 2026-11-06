@@ -36,10 +36,14 @@ import {
 	type TaskItem,
 	type TaskKey,
 	type TaskMenuModel,
+	type MenuFrom,
+	type MenuScreen,
+	type MenuStatusId,
+	type PickedTask,
 	type TaskService,
 	type TaskStep,
 } from "./contracts";
-import { carriedWith, taskMenu, toggledLabels, toggledPriority } from "./menus";
+import { carriedWith, menuOffer, taskMenu, tileStatus, toggledLabels, toggledPriority } from "./menus";
 import { runDrop } from "./drops";
 import { samePlace } from "./taskKeys";
 import { offeredNames, type SectionOffer, shownSections } from "./sections";
@@ -355,8 +359,33 @@ export class TaskServiceImpl implements TaskService {
 		await this.applyAll(steps);
 	}
 
-	menu(items: readonly TaskItem[], today: LocalDate, offer: SectionOffer | null = null): TaskMenuModel {
-		return taskMenu(items, today, this.priorityLevels(), this.labelLevels(), offer);
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
+		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+	}
+
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
+		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+	}
+
+	async pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void> {
+		const status = tileStatus(id);
+		if (keys.length === 1) return status === null ? this.stop(keys[0]) : this.setStatus(keys[0], status);
+		await this.applyAll(keys.map((key) => ({ key, change: status === null ? { kind: "stop" } : { kind: "status", status } })));
+	}
+
+	async postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void> {
+		const items = await this.itemsAt(keys);
+		const steps = items.flatMap((item): TaskStep[] => (item.can.postpone ? [{ key: item.key, change: { kind: "postpone", date } }] : []));
+		if (steps.length === 0) return;
+		if (keys.length === 1) return this.postpone(steps[0].key, date);
+		await this.applyAll(steps);
+	}
+
+	async removeAll(keys: readonly TaskKey[]): Promise<void> {
+		if (keys.length === 1) return this.remove(keys[0]);
+		await this.applyAll(keys.map((key) => ({ key, change: { kind: "remove" } })));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
