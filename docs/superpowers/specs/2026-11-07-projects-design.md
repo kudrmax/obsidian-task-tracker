@@ -34,7 +34,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    «No project», always last. Inside a group, the project's tasks without a section, then its sections in the file's
    order. Off, the list is as today, project tasks with the mark. Projects never go inside sections. Board:
    `docs/design/canvas/Proj1.dc.html`. Backlog and Soon have it (on by default in Backlog, off in Soon,
-   switched per list and kept on the device); Inbox, Now and the day columns never group by project. Any overview of projects later (projects without a next
+   switched per list and kept on the device: a tap on the column's title, «Backlog» or «Soon», opens
+   its menu with one row, Group by project, with a check; board `docs/design/canvas/Proj5V1.dc.html`); Inbox, Now and the day columns never group by project. Any overview of projects later (projects without a next
    step) is a view of these groups, never a screen of its own.
    - **The file does not change.** A section is one `### Name` for every project: with grouping on, «Дальний бэклог»
      shows inside each project that has tasks in it, and inside «No project»; off, it is one section with all of them.
@@ -76,7 +77,6 @@ fixed that but made lines travel between files. One file wins.
 
 ## Open (technical, for the backend)
 
-- Where the switch of grouping is: board.
 
 ## Ideas for later
 
