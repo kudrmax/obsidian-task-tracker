@@ -1,0 +1,2 @@
+// The signing team is personal: Team.xcconfig holds DEVELOPMENT_TEAM and stays out of git.
+#include? "Team.xcconfig"

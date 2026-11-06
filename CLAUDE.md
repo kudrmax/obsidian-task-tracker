@@ -1,5 +1,9 @@
 # Task Calendar
 
+## One repository, one core, several frontends
+
+This repository holds the whole product: the core (the tasks file and every rule about it, TypeScript), the Obsidian plugin (a frontend of that core) and the Apple apps in `apple/` (Swift frontends: the iPhone app today, a Mac app later). The core is one code, never a copy or a port: the plugin bundles it into `main.js`, the apps run `phone/task-calendar-phone.js` (built from `src/phone`, committed, `tests/phone/build.test.ts` keeps it the build of the current source) in JavaScriptCore through `apple/Core`. A rule a Swift frontend needs is added to the core and asked for through the door (`docs/door.md`), never written again in Swift. `manifest.json`, `versions.json` and `README.md` stay at the root: Obsidian and BRAT look for them there. The apps are installed from Xcode, never as GitHub releases of this repository: BRAT takes the highest release as the plugin's. `kudrmax/task-calendar-ios` is the apps' old repository, archived.
+
 ## The screen is decided
 
 `docs/design/README.md` and the boards in `docs/design/canvas/` are the approved design; `docs/superpowers/specs/2026-10-30-task-calendar-design.md` is the spec behind them. Where they disagree, the design wins. The main screen is transferred **pixel for pixel** (every size, colour, radius, font, mask and shadow from `canvas/Screen.dc.html`), except Obsidian's own chrome. A screen the design doesn't show is built only as `docs/design/README.md`'s last section says, and gets designed before it is polished.
@@ -16,7 +20,7 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 `src/domain` (pure: the file, the tasks, the rules), `src/application` (`contracts.ts` is the API the UI talks to; services), `src/infrastructure` (vault, Google, the work file), `src/ui` (the view). `ui` imports `application` only, never `domain` internals or `infrastructure`. `src/settings.ts` and `src/application/contracts.ts` are shared contracts: change them only with the whole team, never in a side branch alone.
 
-**The UI decides nothing.** A second frontend in Swift is coming (`../task-calendar-ios`). Everything it would have to repeat lives in `application`: what is offered and what is disabled, what a tap writes, defaults, where a new task goes, what counts as the same, empty or overdue. The UI gets the decision ready (a field in `TaskItem.can`, a service method, a ready menu model) and only draws and turns gestures into minutes and places. The test: if the Swift version would have to write this line, it doesn't belong here.
+**The UI decides nothing.** The Swift frontends in `apple/` use the same core. Everything it would have to repeat lives in `application`: what is offered and what is disabled, what a tap writes, defaults, where a new task goes, what counts as the same, empty or overdue. The UI gets the decision ready (a field in `TaskItem.can`, a service method, a ready menu model) and only draws and turns gestures into minutes and places. The test: if the Swift version would have to write this line, it doesn't belong here.
 
 `domain` and `application` are pure: no host globals (`window`, `document`, `setTimeout`, `localStorage`…), they get the clock and timers through ports. `src/phone` is the iOS app's door, `globalThis.TaskCalendarPhone`: its functions keep their names, arguments and results (adding is fine), the app calls them. `tests/architecture.test.ts` guards the imports, the host globals (`tsconfig.core.json`) and what `contracts.ts` re-exports; `tests/uiDecides.test.ts` trips on task fields compared in `src/ui`. Don't loosen them or raise a baseline: move the decision into `application`.
 
@@ -44,3 +48,26 @@ Delete only with `trash`, never `rm`.
 ## Branches
 
 `master` is the only long-lived branch; the main clone stays on it. Every piece of work is a branch from a fresh master in its own worktree under `.worktrees/`. Once Max approves: merge `origin/master` into the branch and run the tests there; then, in the main clone, `git pull --ff-only`, `git merge --no-ff <branch>` and `git push origin master` at once, then the release. No PRs. (`mvp` was removed on 2026-11-05: it only mirrored master.)
+
+## The Apple apps
+
+`apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `phone/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
+
+### Installing on the iPhone
+
+`~/Applications/Install TaskCalendar.app` (Launchpad: «Install TaskCalendar») builds `origin/master` of this repository in Release (the project in `apple/`) and installs it on Max's iPhone over Wi-Fi or a cable, renewing the free 7-day signature. Max starts it with a click; Claude runs it whenever a build should reach the phone:
+
+```bash
+"$HOME/Applications/Install TaskCalendar.app/Contents/Resources/install.command"
+```
+
+Only what is on `origin/master` gets in: the installer warns about local commits that are not pushed and builds without them. So push master before running it.
+
+### Reading the phone without opening the app
+
+Opening Task Calendar runs a sync, which wipes the evidence of why reminders went wrong: read the phone from the Mac instead. The iPhone must be on a **cable** and unlocked (over Wi-Fi `devicectl` often reports it unavailable).
+
+- The app's saved state (the latest sync): `xcrun devicectl device copy from --device <id from xcrun devicectl list devices> --domain-type appDataContainer --domain-identifier com.kudrmax.taskcalendar --source Library/Preferences/com.kudrmax.taskcalendar.plist --destination <scratch>/prefs.plist`, then `plutil -p`.
+- The system log: `log collect --device-udid` needs root, so use `pymobiledevice3` from a venv in the scratchpad: `pymobiledevice3 syslog collect --start-time <epoch> <out>.logarchive`, then `log show <out>.logarchive --predicate …`.
+- Shortcuts automations log in `siriactionsd` (`com.apple.shortcuts:Triggers`): `App.InFocus: BundleID: …, isStarting: …` names the app a trigger watches and says whether it fired. The intents log in the app's own process (`com.apple.appintents`: `SyncRemindersIntent.perform() finished`).
+- 2026-11-06: reminders stopped updating because the «Update Reminders» automation watched Task Calendar itself instead of Obsidian closing; the log showed it in a minute.

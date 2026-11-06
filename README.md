@@ -74,16 +74,32 @@ The export itself comes with the plugin and updates with it; Scriptable holds on
 
 ## Reminders (iPhone)
 
-A task put on a time reminds at its start, on the phone, through the Task Calendar iOS app (`kudrmax/task-calendar-ios`), which reads the tasks file with the plugin's own rules (`phone/task-calendar-phone.js`, built from `src/phone`). The marker before the time picks the kind: `⏰` a quiet notification that repeats until Done or a snooze, `🚨` an alarm, `🔕` none. Due dates alone do not remind.
+A task put on a time reminds at its start, on the phone, through the Task Calendar iPhone app in [`apple/`](apple/), which reads the tasks file with the plugin's own rules: it runs the same core (`phone/task-calendar-phone.js`, built from `src/phone`) in JavaScriptCore. The marker before the time picks the kind: `⏰` a quiet notification that repeats until Done or a snooze, `🚨` an alarm, `🔕` none. Due dates alone do not remind.
 
 Setup, step by step: [docs/plugin/notifications.md](docs/plugin/notifications.md).
 
 ## Development
 
+One repository, one core, several frontends. The core (`src/domain`, `src/application`, the door in `src/phone`) is TypeScript; the Obsidian plugin bundles it into `main.js`, and the Apple apps in `apple/` run it in JavaScriptCore as `phone/task-calendar-phone.js`. The rules of the tasks file exist once, in the core.
+
 ```bash
 npm install
-npm test
+npm test             # the core and the plugin
+npm run test:apple   # the Swift side, against the same core
 npm run build
 ```
+
+### The iPhone app
+
+Xcode 26 or newer, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+
+```bash
+cd apple
+echo "DEVELOPMENT_TEAM = <your team id>" > App/Config/Team.xcconfig
+xcodegen generate
+open TaskCalendar.xcodeproj
+```
+
+The team id is in Xcode → Settings → Accounts (personal team).
 
 `docs/plugin/` is the plugin's documentation (setup guides), `docs/design/README.md` is the approved design, `docs/superpowers/specs/` the spec, `docs/superpowers/plans/` the implementation plan. Builds are tried in a separate Obsidian with a scratch vault, never in the real one (see `CLAUDE.md`).
