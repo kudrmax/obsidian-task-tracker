@@ -48,6 +48,11 @@ export class CalendarDay {
 		};
 	}
 
+	/** The timed events of the calendars shown that overlap `from`–`to`: the phone's meetings. */
+	timedBetween(from: Date, to: Date): CalendarEvent[] {
+		return this.shown().days().timedBetween(from, to);
+	}
+
 	/** The event is over by the clock: it is drawn grey. */
 	isPast(event: Pick<CalendarEvent, "end">): boolean {
 		return event.end.getTime() <= this.now.getTime();
@@ -94,6 +99,7 @@ export class CalendarDay {
 			events: shown,
 			updatedAt,
 			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
+			updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
 			stale: problem !== null || this.isOld(updatedAt),
 		};

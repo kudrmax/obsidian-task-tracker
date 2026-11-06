@@ -96,7 +96,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			items: () => items[column] ?? [],
 			day: () => null,
 			grouped: () => column !== "day" || dayColumn(day, TODAY).sections,
-			entry: () => controller?.entryIn(column) ?? null,
+			entry: (drawing) => controller?.entryIn(column, drawing) ?? null,
 			renaming: () => controller?.renaming() ?? null,
 		});
 	}

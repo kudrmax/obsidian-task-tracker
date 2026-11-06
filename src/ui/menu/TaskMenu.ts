@@ -349,8 +349,9 @@ export class TaskMenu extends LiftedMenu {
 			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
 			{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
 		]);
+		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup("delete");
-		else menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: model.remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+		else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}

@@ -1,34 +1,12 @@
-import type { GroupedList } from "../domain/Lists";
-import { MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
-import type { TaskCalendarSettings } from "../settings";
-import { tasksFilePath } from "./documentText";
-import { CALENDAR_SOURCES, type CalendarFile, calendarPath, IPHONE_CALENDAR_FILE, type PhoneExport, phoneCalendarText, readCalendarFile } from "./calendarFile";
-import { callDoorJson, doorMethods, settingsOf } from "./PhoneCalls";
 import { oneLine } from "../domain/TaskTitle";
+import { tasksFilePath } from "./documentText";
+import { IPHONE_CALENDAR_FILE, type PhoneExport, phoneCalendarText } from "./calendarFile";
 import type { CalendarSource } from "./contracts";
-import type { Clock, SettingsStore } from "./ports";
-import { ShownCalendars } from "./shownCalendars";
-import { TaskReminders } from "./TaskReminders";
-import { TaskRules } from "./TaskRules";
+import type { GroupedList } from "../domain/Lists";
+import { callDoorJson, type DoorAnswer, type DoorContext, doorMethods, settingsOf, type WireMeeting, type WireReminder } from "./PhoneCalls";
+import { CALENDAR_SOURCES } from "./calendarFile";
 
-/** A reminder on the wire: the task's line as its id, times in epoch milliseconds. */
-export interface WireReminder {
-	/** The task's line as read: an action finds the task by it. */
-	readonly id: string;
-	readonly title: string;
-	readonly body: string;
-	readonly kind: "notification" | "alarm" | "live";
-	/** The slot's date, `YYYY-MM-DD`. */
-	readonly date: string;
-	readonly startMs: number;
-	readonly dayEndMs: number;
-}
-
-export interface WireMeeting {
-	readonly title: string;
-	readonly startMs: number;
-	readonly endMs: number;
-}
+export type { WireMeeting, WireReminder } from "./PhoneCalls";
 
 /** What an action did: the file's new text, or that the task it names is no longer there. */
 export type PhoneAction = { readonly changed: true; readonly text: string } | { readonly changed: false; readonly reason: "stale" };
@@ -36,100 +14,67 @@ export type PhoneAction = { readonly changed: true; readonly text: string } | { 
 /** The lists the phone writes a new task into. */
 export type CaptureList = GroupedList;
 
-/** The reminder's time as the app shows it: `10:00`, or `10:00–11:00`. */
-function timeText(start: number, end: number | null): string {
-	return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
-}
-
 const STALE: PhoneAction = { changed: false, reason: "stale" };
 
-function action(text: string | null): PhoneAction {
-	return text === null ? STALE : { changed: true, text };
+/** A method of `call` as the functions the app called before it answer: the result, or the error thrown. */
+function answerOf(method: string, args: readonly unknown[], context: DoorContext): Extract<DoorAnswer, { ok: true }> | Extract<DoorAnswer, { ok: false }> {
+	return JSON.parse(callDoorJson(method, JSON.stringify(args), JSON.stringify(context))) as DoorAnswer;
 }
 
-/** The settings as they are for one call: the phone only reads them. */
-function fixedSettings(settings: TaskCalendarSettings): SettingsStore {
-	return { get: () => settings, update: async () => undefined, onChange: () => () => undefined };
+function resultOf<R>(method: string, args: readonly unknown[], context: DoorContext): R {
+	const answer = answerOf(method, args, context);
+	if (!answer.ok) throw new Error(answer.error.message);
+	return answer.result as R;
 }
 
-/** One call's view of the tasks file: the plugin's rules under the settings given, at the moment given. */
-class Call {
-	readonly rules: TaskRules;
-	readonly reminders: TaskReminders;
-
-	constructor(settingsJson: string, nowMs: number) {
-		const clock: Clock = { now: () => new Date(nowMs) };
-		this.rules = new TaskRules(fixedSettings(settingsOf(settingsJson)), clock);
-		this.reminders = new TaskReminders(this.rules, clock);
-	}
+/** An action as the app took it before `call`: the new text, or stale for a task gone and a blank title. */
+function actionOf(method: string, args: readonly unknown[], context: DoorContext & { readonly tasks: string }): PhoneAction {
+	const answer = answerOf(method, args, context);
+	if (answer.ok) return { changed: true, text: answer.tasks ?? context.tasks };
+	if (answer.error.code === "staleTask" || answer.error.code === "blank") return STALE;
+	throw new Error(answer.error.message);
 }
 
 /**
  * The iOS app's door, `globalThis.TaskCalendarPhone`, called through JavaScriptCore: plain strings and numbers in and out,
- * times in epoch milliseconds, no state between calls. Each call reads the text it is given with the same rules the
- * plugin's services read and write the vault's file with, and gives the new text back for the app to write.
+ * times in epoch milliseconds, no state between calls. `call` answers every method by name; the functions before it
+ * (`reminders` … `meetings`) are kept for the app as it is, each a wrapper over its method of `call`.
  */
 export const phoneDoor = {
+	/** `reminders.list`. */
 	reminders(text: string, settingsJson: string, nowMs: number): WireReminder[] {
-		return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
-			id: key.raw,
-			title,
-			body: timeText(startMinute, endMinute),
-			kind,
-			date,
-			startMs: start.getTime(),
-			dayEndMs: dayEnd.getTime(),
-		}));
+		return resultOf("reminders.list", [], { tasks: text, settings: settingsJson, nowMs });
 	},
 
+	/** `reminders.complete`. */
 	complete(text: string, settingsJson: string, id: string, nowMs: number): PhoneAction {
-		const { rules, reminders } = new Call(settingsJson, nowMs);
-		return action(reminders.act(text, id, (key) => rules.setStatus(key, "done")));
+		return actionOf("reminders.complete", [id], { tasks: text, settings: settingsJson, nowMs });
 	},
 
-	/** The task stays on its time; it no longer reminds. */
+	/** `reminders.silence`: the task stays on its time; it no longer reminds. */
 	silence(text: string, settingsJson: string, id: string, nowMs: number): PhoneAction {
-		const { rules, reminders } = new Call(settingsJson, nowMs);
-		return action(reminders.act(text, id, (key) => rules.setReminder(key, "none")));
+		return actionOf("reminders.silence", [id], { tasks: text, settings: settingsJson, nowMs });
 	},
 
+	/** `reminders.snooze`. */
 	snooze(text: string, settingsJson: string, id: string, minutes: number, nowMs: number): PhoneAction {
-		const { rules, reminders } = new Call(settingsJson, nowMs);
-		return action(reminders.act(text, id, (key) => rules.snooze(key, minutes)));
+		return actionOf("reminders.snooze", [id, minutes], { tasks: text, settings: settingsJson, nowMs });
 	},
 
-	/**
-	 * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it. Only an empty title writes
-	 * nothing: one of only a priority is written, unlike the plugin's `createInPlace`, as the phone always did.
-	 */
+	/** `capture.add`; a blank title answers stale here. */
 	capture(text: string, settingsJson: string, list: CaptureList, title: string, nowMs: number): PhoneAction {
-		if (title.trim() === "") return STALE;
-		const { rules } = new Call(settingsJson, nowMs);
-		return action(rules.change(text, rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
+		return actionOf("capture.add", [list, title], { tasks: text, settings: settingsJson, nowMs });
 	},
 
-	/** The calendars' files in the vault, in the order `meetings` takes their texts. */
+	/** `calendars.files`: the calendars' files in the vault, in the order `meetings` takes their texts. */
 	calendarFiles(settingsJson: string): string[] {
-		const settings = settingsOf(settingsJson);
-		return CALENDAR_SOURCES.map((source) => calendarPath(source, settings));
+		return resultOf("calendars.files", [], { tasks: null, settings: settingsJson, nowMs: 0 });
 	},
 
-	/** The timed meetings that overlap `from`–`to`, as the calendar on screen shows them; a file missing (`null`) or unreadable adds none. */
+	/** `calendars.meetings`, the files' texts in `calendarFiles`' order; a file missing (`null`) or unreadable adds none. */
 	meetings(settingsJson: string, texts: readonly (string | null)[], fromMs: number, toMs: number, nowMs: number): WireMeeting[] {
-		const files = new Map<CalendarSource, CalendarFile>();
-		CALENDAR_SOURCES.forEach((source, i) => {
-			const text = texts[i];
-			if (text === null || text === undefined) return;
-			try {
-				files.set(source, readCalendarFile(text, source));
-			} catch {
-				// A broken file is no file.
-			}
-		});
-		return new ShownCalendars(files, settingsOf(settingsJson), new Date(nowMs))
-			.days()
-			.timedBetween(new Date(fromMs), new Date(toMs))
-			.map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+		const calendars = Object.fromEntries(CALENDAR_SOURCES.map((source, i) => [source, texts[i] ?? null])) as Record<CalendarSource, string | null>;
+		return resultOf("calendars.meetings", [fromMs, toMs], { tasks: null, settings: settingsJson, nowMs, calendars });
 	},
 
 	/**

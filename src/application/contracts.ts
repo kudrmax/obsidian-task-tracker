@@ -44,7 +44,7 @@ export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
-export { QuickEntrySession, type EntrySpot, type EntryState, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
+export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type WriteLine } from "./QuickEntrySession";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -70,7 +70,7 @@ export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
 export { type LabelLevel, labelTitle, sameLabels } from "../domain/Label";
-export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel } from "../domain/Priority";
+export { isPresetColor, PRIORITY_COLORS, type PresetColor, type PriorityColor, type PriorityLevel, usableColor } from "../domain/Priority";
 export type { DayColumn, DayRelation, EndList, GroupedList, GroupPlace, Placement, TaskDraft, TaskScreen };
 
 /**
@@ -396,6 +396,10 @@ export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "sec
  * on a label keeps the menu open, drawn again for the tasks as they then stand, and the bulk menu its picked tasks; any
  * other pick closes it and lets the picked tasks go.
  */
+/**
+ * What a task's menu or the bulk menu offers, every row but the frontend's own navigation: the Obsidian plugin's Open
+ * full screen and Open in Obsidian are its own ways out of the menu, drawn above Delete, and no part of the model.
+ */
 export interface TaskMenuModel {
 	/** Done, the progress tile, Won't do, in this order; Stop last on one task that may be stopped. A task done or given up has them all too. */
 	readonly statuses: readonly MenuStatus[];
@@ -418,8 +422,8 @@ export interface TaskMenuModel {
 	readonly edits: readonly MenuEditId[];
 	/** The Reminder page's rows, Off last; none without the Reminder row. */
 	readonly reminders: readonly MenuReminder[];
-	/** Delete asks first in one task's menu; the bulk menu's Delete N tasks writes at once. */
-	readonly remove: { readonly confirm: boolean };
+	/** Delete, offered on every task (null: not offered); it asks first in one task's menu, the bulk menu's Delete N tasks writes at once. */
+	readonly remove: { readonly confirm: boolean } | null;
 }
 
 /** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
@@ -665,9 +669,10 @@ export interface TaskService {
 	/**
 	 * The minute a drag, a drop or a stretch on the timeline stands at, `minute` minutes from the day's start, the timeline
 	 * drawn `hourPx` pixels an hour: the nearest step, within the day. The step is the finest of 5, 15, 30 and 60 minutes a
-	 * finger still moves by without jitter (9 px): 30 at 28 px an hour, 15 at 56, 5 from 112 on.
+	 * finger moves at least `tolerancePx` for, the frontend's touch tolerance in the same units (the plugin's 9 px: 30 at
+	 * 28 px an hour, 15 at 56, 5 from 112 on).
 	 */
-	snap(minute: number, hourPx: number): number;
+	snap(minute: number, hourPx: number, tolerancePx: number): number;
 	/** The slot of a new task let go or long-tapped on the timeline of `day` at `start`: no duration, as `dropSpan` places it. */
 	newSlot(day: LocalDate, start: number): Slot;
 	/**
@@ -759,6 +764,9 @@ export interface TaskService {
 export type DayChange = "passed" | "moved";
 
 /** Which day today is and where it begins, by the clock and the hour the settings start the day at. */
+/** Where a day's timeline opens, minutes from the day's start: on the now line (today), or at an hour (another day). */
+export type DayOpening = { readonly kind: "now"; readonly minute: number } | { readonly kind: "hour"; readonly minute: number };
+
 export interface DayService {
 	today(): LocalDate;
 	/** Where a day begins: the timeline places slots, events and now by it. */
@@ -767,6 +775,8 @@ export interface DayService {
 	relation(date: LocalDate): DayRelation;
 	/** The day `days` after `date`, before it for a negative count: the step of the day arrows and of the screens past today. */
 	step(date: LocalDate, days: number): LocalDate;
+	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
+	openAt(date: LocalDate): DayOpening;
 	/**
 	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
 	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
@@ -836,6 +846,8 @@ export interface SourceStatus {
 	readonly updatedAt: Date | null;
 	/** How the calendar date of `updatedAt` stands to the clock's (calendar days, not the plugin's day); null with no `updatedAt`. The words are the frontend's. */
 	readonly updatedDay: DayRelation | null;
+	/** The calendar date of `updatedAt` by the clock (not the plugin's day), the date shown for an update before yesterday; null with no `updatedAt`. */
+	readonly updatedDate: LocalDate | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
 	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
@@ -965,7 +977,11 @@ export type CountField = "longPressMs" | "scrollToHour" | "staleAfterMinutes" | 
 export interface SettingsForm {
 	readonly tasksFile: string;
 	readonly sections: SectionNames;
+	/** The sections' names the tab edits, in the order it shows them. */
+	readonly sectionOrder: readonly (keyof SectionNames)[];
 	readonly markers: Readonly<Record<Marker, string>>;
+	/** The line markers the tab edits, in the order it shows them. */
+	readonly markerOrder: readonly Marker[];
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];

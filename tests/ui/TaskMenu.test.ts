@@ -449,6 +449,13 @@ describe("the menu", () => {
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
+	it("draws Delete only where the model offers it", () => {
+		const actions = open(item());
+		document.body.replaceChildren();
+		TaskMenu.open({ item: item(), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", menu: (task) => ({ ...menuOf(LEVELS)(task), remove: null }), actions });
+		expect(labels(".tc-menu-label")).not.toContain("Delete");
+	});
+
 	it("opens the task on the whole screen and in Obsidian from a group of their own, and closes", () => {
 		const actions = open(item());
 		const rows = [...panel().querySelectorAll<HTMLButtonElement>(".tc-menu-row")];

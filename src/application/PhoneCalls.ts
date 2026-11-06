@@ -1,9 +1,9 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
-import { addDays, MINUTES_PER_DAY } from "../domain/LocalDate";
+import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import { DESCRIPTION_TEMPLATE } from "../domain/description";
-import { isPresetColor, PRIORITY_COLORS } from "../domain/Priority";
+import { isPresetColor, PRIORITY_COLORS, usableColor } from "../domain/Priority";
 import { labelTitle, sameLabels } from "../domain/Label";
 import { sameRule, repeatParts } from "../domain/Repeat";
 import { editRepeat, repeatDraft } from "../domain/RepeatDraft";
@@ -13,9 +13,21 @@ import { oneLine } from "../domain/TaskTitle";
 import { samePlacement } from "../domain/operations";
 import { sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
 import { CalendarDay, type CalendarReading } from "./calendarDay";
-import { CALENDAR_SOURCES, type CalendarFile, readCalendarFile } from "./calendarFile";
+import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { cardDue } from "./cardDue";
-import { type CalendarEvent, type CalendarSource, type DayEvents, type DropColumn, type GroupName, StaleTaskError, type SourceProblem, type SourceStatus, TasksFileMissingError } from "./contracts";
+import {
+	type CalendarEvent,
+	type CalendarSource,
+	type DayEvents,
+	type DropColumn,
+	type GroupedList,
+	type GroupName,
+	StaleTaskError,
+	type SourceProblem,
+	type SourceStatus,
+	type TaskKey,
+	TasksFileMissingError,
+} from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
@@ -25,11 +37,13 @@ import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
-import { type Snapshot, TaskReads } from "./TaskReads";
-import { TaskRules } from "./TaskRules";
+import { type Read, type Snapshot, TaskReads } from "./TaskReads";
+import { type Operation, TaskRules } from "./TaskRules";
+import { TaskReminders } from "./TaskReminders";
 import { TaskWrites, type Write } from "./TaskWrites";
-import { type UndoState, UndoSteps } from "./UndoSteps";
+import { type UndoState, UndoSteps, type UndoWay } from "./UndoSteps";
 import { snapMinute } from "./snapGrid";
+import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
 
@@ -68,8 +82,31 @@ export type DoorAnswer =
 	  }
 	| { readonly ok: false; readonly error: { readonly code: DoorErrorCode; readonly message: string } };
 
-/** `staleTask`: a task or section the call names is no longer there as read. `tasksFileMissing`: the call needs the tasks file. */
-export type DoorErrorCode = "staleTask" | "tasksFileMissing" | "unknownMethod" | "badArguments" | "failed";
+/**
+ * `staleTask`: a task or section the call names is no longer there as read. `tasksFileMissing`: the call needs the tasks
+ * file. `blank`: a task to write has no title.
+ */
+export type DoorErrorCode = "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed";
+
+/** A reminder on the wire: the task's line as its id, times in epoch milliseconds. */
+export interface WireReminder {
+	/** The task's line as read: an action finds the task by it. */
+	readonly id: string;
+	readonly title: string;
+	readonly body: string;
+	readonly kind: "notification" | "alarm" | "live";
+	/** The slot's date, `YYYY-MM-DD`. */
+	readonly date: string;
+	readonly startMs: number;
+	readonly dayEndMs: number;
+}
+
+/** A timed meeting on the wire, times in epoch milliseconds. */
+export interface WireMeeting {
+	readonly title: string;
+	readonly startMs: number;
+	readonly endMs: number;
+}
 
 /** A calendar event on the wire: times in epoch ms, and whether it is over at the call's moment. */
 export interface WireEvent extends Omit<CalendarEvent, "start" | "end"> {
@@ -134,6 +171,7 @@ class Call {
 	readonly reads: TaskReads;
 	readonly writes: TaskWrites;
 	readonly effects: Effects = {};
+	readonly clock: Clock;
 	private text: string | null;
 	/** `data.json` as handed in: what a change of the settings is written over. */
 	private readonly settingsText: string;
@@ -142,6 +180,7 @@ class Call {
 		this.settingsText = context.settings ?? "";
 		this.current = settingsOf(this.settingsText);
 		const clock: Clock = { now: () => new Date(context.nowMs) };
+		this.clock = clock;
 		const store: SettingsStore = {
 			get: () => this.current,
 			update: async (patch) => this.saveSettings(patch),
@@ -174,13 +213,27 @@ class Call {
 
 	snapshot(): Snapshot {
 		const at = this.rules.moment();
-		return { doc: this.rules.read(this.tasks(), at).doc, today: at.today, boundary: at.boundary };
+		const text = this.tasks();
+		return { text, doc: this.rules.read(text, at).doc, today: at.today, boundary: at.boundary };
+	}
+
+	/** A read as it asks: the file tidied first, read, or missing. */
+	ask<R>(read: Read<R>): R {
+		if (read.tidies) this.normalize();
+		if (!read.reads) return read.answer(null);
+		if (!this.hasTasks() && read.missing) return read.missing();
+		return read.answer(this.snapshot());
 	}
 
 	/** The file tidied for today, as the plugin's service writes it before a screen: no step. */
 	normalize(): void {
 		if (this.text === null || !this.rules.read(this.text).changed) return;
 		this.setText(this.rules.change(this.text, (d) => d).text, false);
+	}
+
+	/** A text the call wrote as one action: a step of the history. */
+	write(text: string): void {
+		this.setText(text, true);
 	}
 
 	/** A write as one action: its operation over the text, the new text a step of the history. */
@@ -193,7 +246,7 @@ class Call {
 	}
 
 	/** The tasks text a step back or forward leaves. */
-	undo(way: "undo" | "redo"): string {
+	undo(way: UndoWay): string {
 		const steps = new UndoSteps(this.context.history);
 		const { outcome, text } = steps.step(way, this.tasks());
 		this.effects.history = steps.state;
@@ -236,17 +289,13 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	isBlank: (c, [text]) => c.reads.isBlank(text as string),
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
-	screen: (c, [date]) => {
-		if (!c.hasTasks()) return c.reads.missingScreen(date as string);
-		c.normalize();
-		return c.reads.screen(KEPT(c), date as string);
-	},
+	screen: (c, [date]) => c.ask(c.reads.screenRead(date as string)),
 	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
 	backlogView: (c) => c.reads.backlogView(KEPT(c)),
 	doneView: (c) => c.reads.doneView(KEPT(c)),
-	search: (c, [query]) => (c.reads.searches(query as string) ? c.reads.search(KEPT(c), query as string) : []),
+	search: (c, [query]) => c.ask(c.reads.searchRead(query as string)),
 	screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item as A),
 	reveal: (c, [item]) => {
 		c.run(c.writes.revealUnfold(item as A));
@@ -275,8 +324,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key as A, labels as A)),
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
 	setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key as A, reminder as A)),
-	togglePriority: (c, [keys, prefix]) => ((keys as A[]).length === 0 ? undefined : c.run(c.writes.togglePriority(KEPT(c), keys as A, prefix as string))),
-	toggleLabel: (c, [keys, name]) => ((keys as A[]).length === 0 ? [] : c.run(c.writes.toggleLabel(KEPT(c), keys as A, name as string))),
+	togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys as A, prefix as string))),
+	toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys as A, name as string))),
 	removeDue: (c, [keys]) => c.run(c.writes.removeDue(KEPT(c), keys as A)),
 	menu: (c, [item, from, screen]) => c.reads.menu(item as A, from as A, screen as A),
 	bulkMenu: (c, [picked, screen]) => c.reads.bulkMenu(picked as A, screen as A),
@@ -293,10 +342,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	fullTree: (c, [item]) => c.reads.fullTree(item as A),
 	setDescription: (c, [key, markdown]) => c.run(c.writes.setDescription(key as A, markdown as string)),
 	remove: (c, [key]) => c.run(c.writes.remove(key as A)),
-	lineOf: (c, [key]) => {
-		c.normalize();
-		return c.reads.lineOf(c.tasks(), key as A);
-	},
+	lineOf: (c, [key]) => c.ask(c.reads.lineOfRead(key as A)),
 	find: (c, [key, text]) => c.reads.find(KEPT(c), key as A, text as string),
 	moveBefore: (c, [key, before, date]) => c.run(c.writes.moveBefore(key as A, (before ?? null) as A, date as string)),
 	nest: (c, [key, parent, before]) => c.run(c.writes.nest(key as A, parent as A, (before ?? null) as A)),
@@ -304,7 +350,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	shownSpan: (c, [item, day]) => c.reads.shownSpan(item as A, day as string),
 	dropSpan: (c, [item, from, start]) => c.reads.dropSpan((item ?? null) as A, from as A, start as number),
 	newSlot: (c, [day, start]) => c.reads.newSlot(day as string, start as number),
-	snap: (_c, [minute, hourPx]) => snapMinute(minute as number, hourPx as number),
+	snap: (_c, [minute, hourPx, tolerancePx]) => snapMinute(minute as number, hourPx as number, tolerancePx as number),
 	stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item as A, day as string, edge as A, minute as number),
 	resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key as A, day as string, edge as A, minute as number, min as number)),
 	clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key as A, (place ?? undefined) as A)),
@@ -316,17 +362,11 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key as A, list as A, name as string, (date ?? undefined) as A)),
 	toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys as A, (name ?? null) as A)),
 	moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list as A, (group ?? null) as A, place as A)),
-	renameGroup: (c, [list, group, name]) => {
-		const rename = c.writes.renameGroup(list as A, group as string, name as string);
-		return rename.operation ? c.run(rename.plan(KEPT(c))) : false;
-	},
+	renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list as A, group as string, name as string))),
 	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
-	drop: (c, [tasks, to, day]) => {
-		const drop = c.writes.drop(tasks as A, to as A, day as string);
-		return c.run(drop.plan(drop.reads ? KEPT(c) : null));
-	},
+	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -345,6 +385,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	today: (c) => c.rules.today(),
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
+	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
 };
@@ -425,7 +466,24 @@ const CALENDARS: Readonly<Record<string, Handler>> = {
 	setShown: (c, [account, title, shown]) => {
 		c.saveSettings(calendarDay(c).shownChange(account as string, title as string, shown as boolean));
 	},
+	files: (c) => calendarFiles(c),
+	meetings: (c, [fromMs, toMs]) => meetings(c, fromMs as number, toMs as number),
 };
+
+/** The calendars' files in the vault, by path from the vault folder, in the order the calendar reads them. */
+function calendarFiles(c: Call): string[] {
+	return CALENDAR_SOURCES.map((source) => calendarPath(source, c.settings));
+}
+
+/** The timed meetings of the calendars shown that overlap `from`–`to`; a file missing or unreadable adds none. */
+function meetings(c: Call, fromMs: number, toMs: number): WireMeeting[] {
+	return calendarDay(c)
+		.timedBetween(new Date(fromMs), new Date(toMs))
+		.map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+}
+
+/** The door's own calendar calls for the phone, beside CalendarService's. */
+const PHONE_CALENDAR_METHODS: readonly string[] = ["files", "meetings"];
 
 /** The CalendarService methods the door leaves to the host: it fetches, polls and watches the files, and calls `events` again. */
 export const HOST_CALENDAR_METHODS: readonly string[] = ["onChange", "keepFresh"];
@@ -481,6 +539,49 @@ const SCREEN_SETTINGS: Readonly<Record<string, Handler>> = {
 	get: (c) => screenSettingsOf(c.settings),
 };
 
+/** The reminder's time as the app shows it: `10:00`, or `10:00–11:00`. */
+function reminderTime(start: number, end: number | null): string {
+	return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
+}
+
+/** An action on the reminding task whose line is `id`: the file written, or staleTask when no such task is left. */
+function onReminder(c: Call, id: string, action: (key: TaskKey) => Operation): void {
+	const text = new TaskReminders(c.rules, c.clock).act(c.tasks(), id, action);
+	if (text === null) throw new DoorError("staleTask", `no reminding task ${id}`);
+	c.write(text);
+}
+
+/** The phone's reminders: which tasks ring and when, and the actions on a reminder shown. */
+const REMINDERS: Readonly<Record<string, Handler>> = {
+	list: (c) =>
+		new TaskReminders(c.rules, c.clock).ringing(c.tasks()).map(
+			({ key, startMinute, endMinute, start, dayEnd, title, kind, date }): WireReminder => ({
+				id: key.raw,
+				title,
+				body: reminderTime(startMinute, endMinute),
+				kind,
+				date,
+				startMs: start.getTime(),
+				dayEndMs: dayEnd.getTime(),
+			}),
+		),
+	complete: (c, [id]) => onReminder(c, id as string, (key) => c.rules.setStatus(key, "done")),
+	/** The task stays on its time; it no longer reminds. */
+	silence: (c, [id]) => onReminder(c, id as string, (key) => c.rules.setReminder(key, "none")),
+	snooze: (c, [id, minutes]) => onReminder(c, id as string, (key) => c.rules.snooze(key, minutes as number)),
+};
+
+/**
+ * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it. A blank title is `blank`; a
+ * title of only a priority is written, unlike the plugin's `createInPlace`: the phone's capture writes what it was told.
+ */
+const CAPTURE: Readonly<Record<string, Handler>> = {
+	add: (c, [list, title]) => {
+		if ((title as string).trim() === "") throw new DoorError("blank", "the task has no title");
+		c.write(c.rules.change(c.tasks(), c.rules.placeNew(title as string, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
+	},
+};
+
 const HISTORY: Readonly<Record<string, Handler>> = {
 	undo: (c) => c.undo("undo"),
 	redo: (c) => c.undo("redo"),
@@ -519,6 +620,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	labelTitle,
 	sameLabels,
 	isPresetColor,
+	usableColor,
 	acceptsDrop,
 	placesInGap,
 };
@@ -626,18 +728,23 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	sectionName: SECTION_NAME,
 	repeatPage: REPEAT_PAGE,
 	description: DESCRIPTION,
+	reminders: REMINDERS,
+	capture: CAPTURE,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 
-/** An interface of contracts.ts the door answers in `space`, but for the methods the host keeps; or one the host owns whole, and why. */
-export type DoorCoverage = { readonly space: string; readonly host: readonly string[] } | { readonly hostOwned: string };
+/**
+ * An interface of contracts.ts the door answers in `space`, but for the methods the host keeps, with the door's own calls
+ * in that space beside it (`own`); or one the host owns whole, and why.
+ */
+export type DoorCoverage = { readonly space: string; readonly host: readonly string[]; readonly own?: readonly string[] } | { readonly hostOwned: string };
 
 /** Every interface of contracts.ts with a method: where the door answers it, or why a host keeps it. */
 export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
 	TaskService: { space: "tasks", host: HOST_TASK_METHODS },
 	DayService: { space: "days", host: HOST_DAY_METHODS },
 	UndoService: { space: "history", host: ["onChange"] },
-	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS },
+	CalendarService: { space: "calendars", host: HOST_CALENDAR_METHODS, own: PHONE_CALENDAR_METHODS },
 	SettingsService: { space: "settings", host: HOST_SETTINGS_METHODS },
 	ScreenSettingsStore: { space: "screenSettings", host: ["onChange"] },
 	GoogleAccount: { hostOwned: "Google's login is a browser's consent and a token fetched over the network, and whether one is kept goes with it: the door makes no request" },

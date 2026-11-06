@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SourceStatus } from "../../src/application/contracts";
 import { sourceText } from "../../src/ui/sources/sourceText";
 
-const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", problem: null, events: 7, updatedAt: null, updatedDay: null, detail: null, stale: false, ...extra });
+const status = (extra: Partial<SourceStatus>): SourceStatus => ({ source: "google", kind: "synced", problem: null, events: 7, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: false, ...extra });
 
 describe("sourceText", () => {
 	it("says Google was updated today at its time", () => {
@@ -26,8 +26,8 @@ describe("sourceText", () => {
 	});
 
 	it("dates an older update, and shows an error's text with no time", () => {
-		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2), updatedDay: "other" })).time).toBe("3 Oct 08:02");
-		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2), updatedDay: "other" })).sub).toBe("Updated 3 Oct");
+		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2), updatedDay: "other", updatedDate: "2026-10-03" })).time).toBe("3 Oct 08:02");
+		expect(sourceText(status({ updatedAt: new Date(2026, 9, 3, 8, 2), updatedDay: "other", updatedDate: "2026-10-03" })).sub).toBe("Updated 3 Oct");
 		const failed = sourceText(status({ problem: { kind: "loggedOut" }, stale: true }));
 		expect(failed.sub).toBe("not logged in");
 		expect(failed.time).toBe("");

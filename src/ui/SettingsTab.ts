@@ -20,15 +20,16 @@ export interface SettingsTabDeps {
 
 const MINUTES_PER_HOUR = 60;
 
-const MARKERS: readonly (readonly [Marker, string, string])[] = [
-	["dueDateMarker", "Due date marker", "Precedes the due date on a task line."],
-	["slotMarker", "Slot marker", "Precedes the time slot on a task line."],
-	["alarmSlotMarker", "Alarm marker", "Precedes the time slot of a task that rings as an alarm on the phone."],
-	["liveSlotMarker", "Live Activity marker", "Precedes the time slot of a task the phone shows as a Live Activity on the lock screen."],
-	["silentSlotMarker", "No-reminder marker", "Precedes the time slot of a task the phone does not remind of."],
-	["repeatMarker", "Repeat marker", "Precedes the repeat rule on a task line."],
-	["collapsedMarker", "Collapsed marker", "Marks a task whose subtasks are hidden."],
-];
+/** Each line marker's name and description on the tab; which markers and in what order is the form's. */
+const MARKERS: Readonly<Record<Marker, readonly [string, string]>> = {
+	dueDateMarker: ["Due date marker", "Precedes the due date on a task line."],
+	slotMarker: ["Slot marker", "Precedes the time slot on a task line."],
+	alarmSlotMarker: ["Alarm marker", "Precedes the time slot of a task that rings as an alarm on the phone."],
+	liveSlotMarker: ["Live Activity marker", "Precedes the time slot of a task the phone shows as a Live Activity on the lock screen."],
+	silentSlotMarker: ["No-reminder marker", "Precedes the time slot of a task the phone does not remind of."],
+	repeatMarker: ["Repeat marker", "Precedes the repeat rule on a task line."],
+	collapsedMarker: ["Collapsed marker", "Marks a task whose subtasks are hidden."],
+};
 
 const PAINT_NAMES: Readonly<Record<LabelPaint, string>> = { stripes: "Stripes", blend: "Blend" };
 
@@ -47,6 +48,7 @@ interface ColourRows {
 	readonly deleteTooltip: string;
 }
 
+/** Each section's name on the tab; which sections and in what order is the form's. */
 const SECTION_LABELS: Readonly<Record<keyof SectionNames, string>> = {
 	inbox: "Inbox",
 	now: "Now",
@@ -106,11 +108,12 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private tasksFilePage(el: HTMLElement): void {
 		this.text(el, "File path", "Markdown file with the task sections.", this.settings.tasksFile, (path) => this.service.setTasksFile(path));
 		new Setting(el).setName("Section headings").setDesc("Heading text after ##.").setHeading();
-		for (const key of Object.keys(SECTION_LABELS) as (keyof SectionNames)[]) {
+		for (const key of this.settings.sectionOrder) {
 			this.text(el, SECTION_LABELS[key], "", this.settings.sections[key], (name) => this.service.setSection(key, name));
 		}
 		new Setting(el).setName("Line markers").setDesc("Lines written with an old marker are no longer read: change them in the file by hand.").setHeading();
-		for (const [marker, name, desc] of MARKERS) {
+		for (const marker of this.settings.markerOrder) {
+			const [name, desc] = MARKERS[marker];
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
 		this.text(el, "Label tag", "The tag's part before the slash: a task tagged #label/<name> has the label of that name. One word.", this.settings.labelTag, (tag) => this.service.setLabelTag(tag));

@@ -16,6 +16,48 @@ export type EntrySpot =
 	| { readonly kind: "stack"; readonly parent: TaskKey };
 
 /** A text entered and not yet written, at the level it was entered at. */
+/** What a list is about to draw: its cards in order, and the sections it draws, in order. */
+export interface EntryDrawing {
+	readonly cards: readonly ListCard[];
+	readonly sections: readonly GroupName[];
+}
+
+/**
+ * Where a list draws the field: before its first header (`top`); in section `section` (its index among the sections
+ * drawn) before the card at `card` (an index among all the cards; the section's last card's next for its end), its No
+ * tasks plate gone unless `keepsPlate`; or after everything (`end`).
+ */
+export type EntryAt =
+	| { readonly kind: "top" }
+	| { readonly kind: "in"; readonly section: number; readonly card: number; readonly keepsPlate: boolean }
+	| { readonly kind: "end" };
+
+/** The field as a list draws it: its place, the texts typed before it, whether it names a section, and where it stands. */
+export interface ListEntry {
+	readonly place: GapPlace;
+	readonly pending: readonly PendingText[];
+	readonly section: boolean;
+	readonly at: EntryAt;
+}
+
+/**
+ * Where the field at `place` stands among what a list draws. Without headers, at its card, or at the end. With headers, in
+ * its section: at its card, or at the section's end for a place outside the section's cards (where `placeOfGap` writes
+ * it); a place outside every section before the first header; a section not drawn, after everything.
+ */
+export function entryAt(drawing: EntryDrawing, place: GapPlace, section: boolean): EntryAt {
+	const { cards, sections } = drawing;
+	if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
+	const at = sections.indexOf(place.group);
+	if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
+	const start = cards.findIndex((card) => sections.indexOf(card.group) >= at);
+	const from = start < 0 ? cards.length : start;
+	let end = from;
+	while (end < cards.length && cards[end].group === place.group) end++;
+	const card = place.index >= from && place.index <= end ? place.index : end;
+	return { kind: "in", section: at, card, keepsPlate: section };
+}
+
 export interface PendingText {
 	readonly text: string;
 	readonly level: number;
@@ -217,11 +259,17 @@ export class QuickEntry {
 	}
 
 	/** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
-	listEntry(column: DropColumn): { readonly place: GapPlace; readonly pending: readonly PendingText[]; readonly section: boolean } | null {
+	/**
+	 * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
+	 * (the look's cards and sections when left out); `at` is where among them the field stands.
+	 */
+	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
 		const state = this.state;
 		const list = state && listSpot(state.spot);
 		if (!state || !list || list.column !== column) return null;
-		return { place: list.place, pending: state.pending, section: state.section === true };
+		const section = state.section === true;
+		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
+		return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
 	}
 
 	/** A double click on a list's free room: the field after the last card, in the last section, at the top level. */

@@ -16,8 +16,8 @@ export interface ListGroup {
 	readonly rows: readonly ListRow[];
 	/** A section with no task: its header stands over the No tasks plate. No section is never empty. */
 	readonly empty: boolean;
-	/** What its header's menu offers: a section is renamed or removed; No section has no menu. */
-	readonly can: { readonly rename: boolean; readonly remove: boolean };
+	/** What its header's menu offers, the section it names: a section is renamed or removed; No section has no menu (null). */
+	readonly menu: { readonly section: string; readonly rename: boolean; readonly remove: boolean } | null;
 }
 
 function rowsOf(items: readonly TaskItem[], level = 0): ListRow[] {
@@ -26,7 +26,7 @@ function rowsOf(items: readonly TaskItem[], level = 0): ListRow[] {
 
 function groupOf(name: GroupName, items: readonly TaskItem[]): ListGroup {
 	const section = name !== null;
-	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, can: { rename: section, remove: section } };
+	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
 }
 
 /**

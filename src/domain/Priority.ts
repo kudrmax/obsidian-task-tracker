@@ -15,6 +15,11 @@ export function isPresetColor(color: string): color is PresetColor {
 	return (PRIORITY_COLORS as readonly string[]).includes(color);
 }
 
+/** A colour a level or a label may be drawn in: a preset, or a code as the settings write it (`#RRGGBB`, `hexColor`). */
+export function usableColor(color: string): color is PriorityColor {
+	return isPresetColor(color) || hexColor(color) === color;
+}
+
 const HEX_RE = /^#?([0-9a-f]{6})$/i;
 
 /** A colour's code as typed or pasted, with or without its `#`: six hex digits make `#RRGGBB`, anything else none. */

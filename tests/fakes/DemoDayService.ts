@@ -1,4 +1,5 @@
-import type { DayBoundary, DayService } from "../../src/application/contracts";
+import type { DayBoundary, DayOpening, DayService } from "../../src/application/contracts";
+import { dayOpening } from "../../src/application/DayServiceImpl";
 import type { Clock, SettingsStore } from "../../src/application/ports";
 import { DayBoundary as Boundary } from "../../src/domain/DayBoundary";
 import { type DayRelation, dayRelation } from "../../src/domain/Days";
@@ -26,6 +27,10 @@ export class DemoDayService implements DayService {
 
 	step(date: LocalDate, days: number): LocalDate {
 		return addDays(date, days);
+	}
+
+	openAt(date: LocalDate): DayOpening {
+		return dayOpening(date, this.boundary(), this.today(), this.clock.now(), this.settings.get().scrollToHour);
 	}
 
 	onDayChange(): () => void {

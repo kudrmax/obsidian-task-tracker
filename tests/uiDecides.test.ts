@@ -9,6 +9,14 @@ import { describe, expect, it } from "vitest";
  */
 const ROOT = resolve(__dirname, "..");
 
+/** A task's field read as a condition: compared, negated, tested in an `if`, or as the left of `&&`, `||` or `?:`. */
+function tested(field: string, compared = true): RegExp {
+	const f = `\\.${field}\\b`;
+	const forms = [`${f}\\s*(?:&&|\\|\\||\\?(?![.?:]))`, `!\\s*(?:\\w+\\.)*\\w+${f}`, `\\bif\\s*\\(\\s*(?:\\w+\\.)*\\w+${f}\\s*\\)`];
+	if (compared) forms.push(`${f}\\s*[!=]==`);
+	return new RegExp(forms.join("|"), "g");
+}
+
 const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] = [
 	{ name: "which list a task is in", pattern: /\.list\s*[!=]==/g },
 	{ name: "whether a task repeats", pattern: /\bitem\.repeat\b(?!\s*[,)\]}])/g },
@@ -27,6 +35,11 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "a task's status switched on", pattern: /\bswitch\s*\(\s*[\w.]*\.status\s*\)/g },
 	{ name: "whether a task's list is one of these", pattern: /\.includes\(\s*[\w.]*\.list\s*\)/g },
 	{ name: "whether a task is closed", pattern: /!\s*(?:\w+\.)*(?:item|task|subtask)\.open\b/g },
+	{ name: "whether a task is on a time", pattern: tested("slot") },
+	{ name: "a task's reminder compared", pattern: /\.reminder\s*[!=]==/g },
+	{ name: "a task's section compared", pattern: /\.group\s*[!=]==|[!=]==\s*(?:\w+\.)*group\b(?!\s*\.)/g },
+	{ name: "whether a task's subtasks are folded", pattern: tested("collapsed") },
+	{ name: "whether a task has a due date", pattern: tested("dueDate", false) },
 	{ name: "a task's fields taken apart to decide", pattern: /\{[^}]*\b(?:list|status|priority|dueDate|isSubtask|open)\b[^}]*\}\s*=\s*(?:\w+\.)*(?:item|task)\b/g },
 ];
 
@@ -36,6 +49,8 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
 	"src/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
+	"src/ui/drag/ListDrop.ts": { count: 2, removedBy: "none: a gap's rectangle is drawn under the header of the section its place names, among that section's cards; it stays" },
+	"src/ui/drag/listPlace.ts": { count: 2, removedBy: "none: where a finger stands among the headers drawn, each header found by the section it heads; it stays" },
 	"src/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
 };
 
@@ -96,5 +111,11 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("if (!item.open) go(); if (!this.panel.open) stay();")).toEqual(["1: whether a task is closed"]);
 		expect(hitsIn("const { list, status } = item;")).toEqual(["1: a task's fields taken apart to decide"]);
 		expect(hitsIn("const { day, onSubtask } = this.context;")).toEqual([]);
+		expect(hitsIn("if (item.slot !== null) a(); if (!item.slot) b(); const t = item.slot ? 1 : 2;")).toEqual(["1: whether a task is on a time", "1: whether a task is on a time", "1: whether a task is on a time"]);
+		expect(hitsIn("drawSlot(item.slot); const { slot } = item.slot ?? x;")).toEqual([]);
+		expect(hitsIn('if (item.reminder === "none") a();')).toEqual(["1: a task's reminder compared"]);
+		expect(hitsIn("if (item.group === name || head.group !== null) a();")).toEqual(["1: a task's section compared", "1: a task's section compared"]);
+		expect(hitsIn("if (item.collapsed) a(); setCollapsed(key, item.collapsed);")).toEqual(["1: whether a task's subtasks are folded"]);
+		expect(hitsIn("if (item.dueDate !== null) a(); const d = item.dueDate && 1;")).toEqual(["1: a task's due date compared", "1: whether a task has a due date"]);
 	});
 });

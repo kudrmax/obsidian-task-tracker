@@ -2,10 +2,10 @@ import type { GroupName, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
 import type { DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
-import type { GapPlace, ListCard, ListPlace } from "./nesting";
-import { type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type PendingText, type PlaceMove, QuickEntry } from "./QuickEntry";
+import type { ListCard, ListPlace } from "./nesting";
+import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PlaceMove, QuickEntry } from "./QuickEntry";
 
-export { ENTRY_PLACES, type EntrySpot, type EntryState, type PendingText, type PlaceChoice, type PlaceMove } from "./QuickEntry";
+export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingText, type PlaceChoice, type PlaceMove } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
 export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createInPlace" | "createSection" | "edit">;
@@ -56,8 +56,9 @@ export class QuickEntrySession {
 		return this.entry.renaming;
 	}
 
-	listEntry(column: DropColumn): { readonly place: GapPlace; readonly pending: readonly PendingText[]; readonly section: boolean } | null {
-		return this.entry.listEntry(column);
+	/** What `column`'s list draws for the field, among what it is about to draw (`drawn`); none when the field stands elsewhere. */
+	listEntry(column: DropColumn, drawn?: EntryDrawing): ListEntry | null {
+		return this.entry.listEntry(column, drawn);
 	}
 
 	openAtEnd(column: DropColumn): void {

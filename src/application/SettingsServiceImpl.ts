@@ -10,6 +10,12 @@ function countOf(text: string): number | null {
 	return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/** The sections' names the settings edit, in their order on the tab. */
+const SECTION_ORDER: readonly (keyof SectionNames)[] = ["inbox", "now", "soon", "backlog", "done"];
+
+/** The line markers the settings edit, in their order on the tab. */
+const MARKER_ORDER: readonly Marker[] = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
+
 /** Day starts at: any hour of the day. */
 const DAY_START_HOURS: readonly number[] = Array.from({ length: 24 }, (_, hour) => hour);
 
@@ -22,6 +28,8 @@ export class SettingsServiceImpl implements SettingsService {
 		return {
 			tasksFile: s.tasksFile,
 			sections: s.sections,
+			sectionOrder: SECTION_ORDER,
+			markerOrder: MARKER_ORDER,
 			markers: {
 				dueDateMarker: s.dueDateMarker,
 				slotMarker: s.slotMarker,

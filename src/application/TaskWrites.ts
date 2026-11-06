@@ -19,7 +19,7 @@ import type {
 } from "./contracts";
 import { dropMoves, type DropMove, readDrop } from "./drops";
 import { tileStatus, toggledLabels, toggledPriority } from "./menus";
-import type { Snapshot, TaskReads } from "./TaskReads";
+import type { Read, Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
 
@@ -128,17 +128,27 @@ export class TaskWrites {
 		return nothing(this.rules.setReminder(key, reminder));
 	}
 
-	togglePriority(s: Snapshot, keys: readonly TaskKey[], prefix: string): Write<void> {
-		if (keys.length === 0) return nothing(null);
+	/** No task picked reads and writes nothing. */
+	togglePriority(keys: readonly TaskKey[], prefix: string): Read<Write<void>> {
+		return { reads: keys.length > 0, answer: (s) => (s ? this.togglePriorityOf(s, keys, prefix) : nothing(null)) };
+	}
+
+	private togglePriorityOf(s: Snapshot, keys: readonly TaskKey[], prefix: string): Write<void> {
 		const priority = toggledPriority(this.reads.itemsAt(s, keys), prefix);
 		if (keys.length === 1) return this.setPriority(keys[0], priority);
 		return this.applyAll(keys.map((key) => ({ key, change: { kind: "priority", priority } })));
 	}
 
-	toggleLabel(s: Snapshot, keys: readonly TaskKey[], name: string): Write<readonly (TaskItem | null)[]> {
-		if (keys.length === 0) return { operation: null, answer: () => [] };
-		const labels = toggledLabels(this.reads.itemsAt(s, keys), name);
-		return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+	/** No task picked reads and writes nothing. */
+	toggleLabel(keys: readonly TaskKey[], name: string): Read<Write<readonly (TaskItem | null)[]>> {
+		return {
+			reads: keys.length > 0,
+			answer: (s) => {
+				if (!s) return { operation: null, answer: () => [] };
+				const labels = toggledLabels(this.reads.itemsAt(s, keys), name);
+				return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+			},
+		};
 	}
 
 	removeDue(s: Snapshot, keys: readonly TaskKey[]): Write<void> {
@@ -276,12 +286,12 @@ export class TaskWrites {
 	}
 
 	/** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
-	renameGroup(list: GroupedList, group: string, name: string): { readonly operation: Operation | null; plan(s: Snapshot): Write<boolean> } {
+	renameGroup(list: GroupedList, group: string, name: string): Read<Write<boolean>> {
 		const operation = this.rules.renameGroup(list, group, name);
 		return {
-			operation,
-			plan: (s) => {
-				if (!operation || operation(s.doc, s.today, this.rules.moment().settings, s.boundary) === s.doc) return { operation: null, answer: () => false };
+			reads: operation !== null,
+			answer: (s) => {
+				if (!operation || !s || operation(s.doc, s.today, this.rules.moment().settings, s.boundary) === s.doc) return { operation: null, answer: () => false };
 				return { operation, answer: () => true };
 			},
 		};
@@ -310,11 +320,11 @@ export class TaskWrites {
 	 * What a drop means: the moves, and whether one of them sets a time and so reads the task's duration first. It answers
 	 * the tasks' keys as the file now has them, in their order; one not found again is left out.
 	 */
-	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): { readonly reads: boolean; plan(s: Snapshot | null): Write<readonly TaskKey[]> } {
+	drop(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Read<Write<readonly TaskKey[]>> {
 		const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
 		return {
 			reads: moves.kind === "one" && moves.move.kind === "toTime",
-			plan: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
+			answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps)),
 		};
 	}
 

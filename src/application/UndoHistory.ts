@@ -37,17 +37,15 @@ export class UndoHistory implements UndoService {
 
 	/** A step whose lines were edited since can't be made: it is dropped, and the file stays as it is. */
 	private async step(way: UndoWay): Promise<UndoOutcome> {
-		const patch = this.steps.take(way);
-		if (!patch) return "nothing";
-		let made = false;
+		if (!(way === "undo" ? this.steps.canUndo() : this.steps.canRedo())) return "nothing";
+		let outcome: UndoOutcome = "nothing";
 		await this.store.write((text) => {
-			const next = UndoSteps.make(way, patch, text);
-			made = next !== null;
-			return next ?? text;
+			const made = this.steps.step(way, text);
+			outcome = made.outcome;
+			return made.text;
 		});
-		if (made) this.steps.made(way, patch);
 		this.emit();
-		return made ? "done" : "conflict";
+		return outcome;
 	}
 
 	private emit(): void {

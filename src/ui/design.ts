@@ -100,6 +100,8 @@ export const EASING = {
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
 export const LAYOUT = {
+	/** The least a finger moves on the timeline for one step of the snapped time: under it the time would flicker between neighbours. */
+	snapTolerance: 9,
 	/** The start of a description stands this far from the copy of its card, and goes past the menu with less room than three lines and its padding. */
 	descPeekGap: 10,
 	descPeekLeast: 88,

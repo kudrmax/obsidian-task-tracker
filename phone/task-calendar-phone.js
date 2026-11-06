@@ -1,6 +1,15 @@
 // Task Calendar: built from src/phone by `node phone/build.mjs`. Do not edit.
 "use strict";
 (() => {
+  // src/domain/TaskTitle.ts
+  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
+  function oneLine(text) {
+    return text.replace(LINE_BREAK, " ");
+  }
+  function taskTitle(text) {
+    return oneLine(text).trim();
+  }
+
   // src/domain/LocalDate.ts
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
   var TIME_RE = /^(\d{2}):(\d{2})$/;
@@ -175,19 +184,13 @@
     cancelled: "-"
   };
 
-  // src/domain/TaskTitle.ts
-  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
-  function oneLine(text) {
-    return text.replace(LINE_BREAK, " ");
-  }
-  function taskTitle(text) {
-    return oneLine(text).trim();
-  }
-
   // src/domain/Priority.ts
   var PRIORITY_COLORS = ["red", "orange", "yellow", "green", "teal", "blue"];
   function isPresetColor(color) {
     return PRIORITY_COLORS.includes(color);
+  }
+  function usableColor(color) {
+    return isPresetColor(color) || hexColor(color) === color;
   }
   var HEX_RE = /^#?([0-9a-f]{6})$/i;
   function hexColor(text) {
@@ -1771,6 +1774,30 @@
     return JSON.stringify([settings.sections, settings.groups.ungrouped, settings.groups.presets, markersOf(settings)]);
   }
 
+  // src/domain/IsoMoment.ts
+  var ISO = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+  var MINUTE_MS2 = 6e4;
+  function isoMoment(text) {
+    const m = ISO.exec(text.trim());
+    if (!m) return new Date(Number.NaN);
+    const [, y, mo, d, h, mi, s, fraction, zone] = m;
+    const ms = fraction === void 0 ? 0 : Math.floor(Number(`0.${fraction}`) * 1e3);
+    const fields = [Number(y), Number(mo) - 1, Number(d), Number(h ?? 0), Number(mi ?? 0), Number(s ?? 0), ms];
+    if (!valid(fields)) return new Date(Number.NaN);
+    if (h === void 0) return new Date(Date.UTC(...fields));
+    if (zone === void 0) return new Date(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]);
+    return new Date(Date.UTC(...fields) - offsetMinutes(zone) * MINUTE_MS2);
+  }
+  function valid([, month, day, hour, minute, second]) {
+    return month <= 11 && day >= 1 && day <= 31 && hour <= 24 && minute <= 59 && second <= 59;
+  }
+  function offsetMinutes(zone) {
+    if (zone === "Z") return 0;
+    const digits = zone.slice(1).replace(":", "");
+    const minutes = Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2));
+    return zone.startsWith("-") ? -minutes : minutes;
+  }
+
   // src/application/calendarFile.ts
   var GOOGLE_CALENDAR_FILE = "calendar/google.json";
   var IPHONE_CALENDAR_FILE = "calendar/iphone.json";
@@ -1780,14 +1807,14 @@
     if (source === "iphone") return IPHONE_CALENDAR_FILE;
     return settings.workCalendarFile;
   }
-  var dateOrNull = (text) => text ? new Date(text) : null;
+  var dateOrNull = (text) => text ? isoMoment(text) : null;
   function readCalendarFile(text, source) {
     const content = JSON.parse(text);
     const events = (content.events ?? []).map((e) => ({
       id: e.id,
       title: e.title,
-      start: new Date(e.start),
-      end: new Date(e.end),
+      start: isoMoment(e.start),
+      end: isoMoment(e.end),
       allDay: e.allDay,
       calendar: e.calendar,
       color: e.color ?? null,
@@ -1799,7 +1826,7 @@
     return {
       events,
       calendars: listed2.map((c) => ({ title: c.calendar, account: c.account ?? null, calendarId: c.calendarId ?? null, color: c.color ?? null, ...c.sourceId ? { sourceId: c.sourceId } : {} })),
-      exportedAt: new Date(content.exportedAt),
+      exportedAt: isoMoment(content.exportedAt),
       device: content.device ?? null,
       from: dateOrNull(content.from),
       to: dateOrNull(content.to),
@@ -2182,7 +2209,7 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/shownCalendars.ts
-  var MINUTE_MS2 = 6e4;
+  var MINUTE_MS3 = 6e4;
   var ShownCalendars = class {
     constructor(files, settings, now) {
       this.files = files;
@@ -2202,13 +2229,13 @@ ${key.title}`.toLowerCase();
       return new CalendarDays(this.choice(this.hidden()), new DayBoundary(this.settings.dayStartHour));
     }
     choice(hidden) {
-      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS2, this.now);
+      return new CalendarChoice(this.files, hidden, this.settings.staleAfterMinutes * MINUTE_MS3, this.now);
     }
   };
 
   // src/application/calendarDay.ts
   var KINDS2 = { google: "synced", iphone: "exported", work: "exported" };
-  var MINUTE_MS3 = 6e4;
+  var MINUTE_MS4 = 6e4;
   var CalendarDay = class {
     constructor(reading, settings, now) {
       this.reading = reading;
@@ -2227,6 +2254,10 @@ ${key.title}`.toLowerCase();
         statuses: this.reading.sources.map((source) => this.status(source, shown(source))),
         stale: chosen.stale
       };
+    }
+    /** The timed events of the calendars shown that overlap `from`–`to`: the phone's meetings. */
+    timedBetween(from, to) {
+      return this.shown().days().timedBetween(from, to);
     }
     /** The event is over by the clock: it is drawn grey. */
     isPast(event) {
@@ -2266,6 +2297,7 @@ ${key.title}`.toLowerCase();
         events: shown,
         updatedAt,
         updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
+        updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
         detail: this.reading.fed(source) ? null : file?.device ?? null,
         stale: problem !== null || this.isOld(updatedAt)
       };
@@ -2276,7 +2308,7 @@ ${key.title}`.toLowerCase();
     }
     isOld(updatedAt) {
       if (updatedAt === null) return true;
-      return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS3;
+      return this.now.getTime() - updatedAt.getTime() > this.settings.staleAfterMinutes * MINUTE_MS4;
     }
   };
 
@@ -2360,6 +2392,18 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/QuickEntry.ts
+  function entryAt(drawing, place, section) {
+    const { cards, sections } = drawing;
+    if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
+    const at = sections.indexOf(place.group);
+    if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
+    const start = cards.findIndex((card2) => sections.indexOf(card2.group) >= at);
+    const from = start < 0 ? cards.length : start;
+    let end = from;
+    while (end < cards.length && cards[end].group === place.group) end++;
+    const card = place.index >= from && place.index <= end ? place.index : end;
+    return { kind: "in", section: at, card, keepsPlate: section };
+  }
   var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
   function emptySession() {
     return { field: null, runs: {}, jobs: [], next: 0 };
@@ -2410,11 +2454,17 @@ ${key.title}`.toLowerCase();
       return this.session.field?.rename?.item.key ?? null;
     }
     /** What `column`'s list draws for the field: its gap, the texts waiting before it, and whether it is a section's name; null when it stands elsewhere. */
-    listEntry(column) {
+    /**
+     * What `column`'s list draws for the field: none when it stands elsewhere. `drawn` is what the list is about to draw
+     * (the look's cards and sections when left out); `at` is where among them the field stands.
+     */
+    listEntry(column, drawn) {
       const state = this.state;
       const list = state && listSpot(state.spot);
       if (!state || !list || list.column !== column) return null;
-      return { place: list.place, pending: state.pending, section: state.section === true };
+      const section = state.section === true;
+      const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
+      return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
     }
     /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
     openAtEnd(column) {
@@ -2885,7 +2935,7 @@ ${key.title}`.toLowerCase();
   }
   function groupOf(name, items) {
     const section = name !== null;
-    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, can: { rename: section, remove: section } };
+    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
@@ -3017,6 +3067,8 @@ ${key.title}`.toLowerCase();
     const n = Number(text);
     return text.trim() !== "" && Number.isFinite(n) && n >= 0 ? n : null;
   }
+  var SECTION_ORDER = ["inbox", "now", "soon", "backlog", "done"];
+  var MARKER_ORDER = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
   var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
   var SettingsServiceImpl = class {
     constructor(store) {
@@ -3027,6 +3079,8 @@ ${key.title}`.toLowerCase();
       return {
         tasksFile: s.tasksFile,
         sections: s.sections,
+        sectionOrder: SECTION_ORDER,
+        markerOrder: MARKER_ORDER,
         markers: {
           dueDateMarker: s.dueDateMarker,
           slotMarker: s.slotMarker,
@@ -3610,6 +3664,10 @@ ${key.title}`.toLowerCase();
     withPriority(text, prefix) {
       return withPriority(text, prefix, this.priorityLevels().map((l) => l.prefix));
     }
+    /** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
+    screenRead(date) {
+      return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s, date) };
+    }
     screen(s, date) {
       return {
         day: this.dayView(s, date),
@@ -3663,6 +3721,10 @@ ${key.title}`.toLowerCase();
     listSections({ doc }) {
       return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)]));
     }
+    /** A query that finds nothing reads no file. */
+    searchRead(query) {
+      return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
+    }
     search(s, query) {
       const fuzzy = FuzzyQuery.of(query);
       if (!fuzzy || !s) return [];
@@ -3692,10 +3754,6 @@ ${key.title}`.toLowerCase();
         if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
       }
       return groups;
-    }
-    /** A query that finds nothing reads no file: the service asks before it reads. */
-    searches(query) {
-      return FuzzyQuery.of(query) !== null;
     }
     screenOf({ doc, today }, item) {
       const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
@@ -3730,6 +3788,10 @@ ${key.title}`.toLowerCase();
       if (!entry) return null;
       const parent = place.path.length > 0 ? doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null : null;
       return toItem(entry, today, this.itemLevels(), parent, this.rules.moment().boundary);
+    }
+    /** The task's line in the file once tidied for today, from 0. */
+    lineOfRead(key) {
+      return { reads: true, tidies: true, answer: (s) => this.lineOf(s.text, key) };
     }
     /** The task's line in the file as it stands, unnormalized, from 0. */
     lineOf(text, key) {
@@ -4217,6 +4279,58 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/application/TaskReminders.ts
+  var HOUR_MINUTES4 = 60;
+  function clockOf(date, minutes) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day, 0, minutes);
+  }
+  function keyOf2(entry) {
+    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
+  }
+  var TaskReminders = class {
+    constructor(rules, clock) {
+      this.rules = rules;
+      this.clock = clock;
+    }
+    /** The open tasks on a time that remind, until their day ends, by start. */
+    ringing(text) {
+      const at = this.rules.moment();
+      const now = this.clock.now();
+      return openSlotted(this.rules.read(text, at).doc).filter((e) => e.task.reminder !== "none").map((e) => this.reminder(e, e.task.slot, at)).filter((r) => r.dayEnd > now).sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    /**
+     * The text after `action` on the reminding task whose line is `line`, the first of two alike; null when no such task is
+     * left. A reminder still shown after its day ended names a slot that today's normalizing has already erased: it is
+     * found in the file as it is.
+     */
+    act(text, line, action) {
+      const at = this.rules.moment();
+      const { doc } = this.rules.read(text, at);
+      const found = this.find(doc, line);
+      if (found) return this.rules.changeOf(doc, action(found), at).text;
+      const asRead = this.find(this.rules.asRead(text, at), line);
+      return asRead ? this.rules.changeAsRead(text, action(asRead), at).text : null;
+    }
+    find(doc, line) {
+      const entry = openSlotted(doc).find((e) => e.raw === line);
+      return entry ? keyOf2(entry) : null;
+    }
+    reminder(entry, slot, at) {
+      const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
+      return {
+        key: keyOf2(entry),
+        title: plainText(entry.task.text),
+        startMinute: slot.start,
+        endMinute: slot.end,
+        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
+        date: slot.date,
+        start: clockOf(slot.date, slot.start),
+        dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES4)
+      };
+    }
+  };
+
   // src/application/TaskWrites.ts
   var nothing = (operation) => ({ operation, answer: () => void 0 });
   var TaskWrites = class {
@@ -4290,16 +4404,25 @@ ${key.title}`.toLowerCase();
     setReminder(key, reminder) {
       return nothing(this.rules.setReminder(key, reminder));
     }
-    togglePriority(s, keys, prefix) {
-      if (keys.length === 0) return nothing(null);
+    /** No task picked reads and writes nothing. */
+    togglePriority(keys, prefix) {
+      return { reads: keys.length > 0, answer: (s) => s ? this.togglePriorityOf(s, keys, prefix) : nothing(null) };
+    }
+    togglePriorityOf(s, keys, prefix) {
       const priority = toggledPriority(this.reads.itemsAt(s, keys), prefix);
       if (keys.length === 1) return this.setPriority(keys[0], priority);
       return this.applyAll(keys.map((key) => ({ key, change: { kind: "priority", priority } })));
     }
-    toggleLabel(s, keys, name) {
-      if (keys.length === 0) return { operation: null, answer: () => [] };
-      const labels = toggledLabels(this.reads.itemsAt(s, keys), name);
-      return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+    /** No task picked reads and writes nothing. */
+    toggleLabel(keys, name) {
+      return {
+        reads: keys.length > 0,
+        answer: (s) => {
+          if (!s) return { operation: null, answer: () => [] };
+          const labels = toggledLabels(this.reads.itemsAt(s, keys), name);
+          return this.setLabelsAll(keys.map((key, i) => ({ key, labels: labels[i] })));
+        }
+      };
     }
     removeDue(s, keys) {
       const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.can.removeDue ? [{ key: item.key, change: { kind: "dueDate", date: null } }] : []);
@@ -4412,9 +4535,9 @@ ${key.title}`.toLowerCase();
     renameGroup(list, group, name) {
       const operation = this.rules.renameGroup(list, group, name);
       return {
-        operation,
-        plan: (s) => {
-          if (!operation || operation(s.doc, s.today, this.rules.moment().settings, s.boundary) === s.doc) return { operation: null, answer: () => false };
+        reads: operation !== null,
+        answer: (s) => {
+          if (!operation || !s || operation(s.doc, s.today, this.rules.moment().settings, s.boundary) === s.doc) return { operation: null, answer: () => false };
           return { operation, answer: () => true };
         }
       };
@@ -4443,7 +4566,7 @@ ${key.title}`.toLowerCase();
       const moves = dropMoves(tasks, readDrop(to, (column) => this.reads.columnSections(column, day)), day);
       return {
         reads: moves.kind === "one" && moves.move.kind === "toTime",
-        plan: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps))
+        answer: (s) => this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps))
       };
     }
     /** The dropped tasks where `write` left them. */
@@ -4705,13 +4828,17 @@ ${key.title}`.toLowerCase();
   // src/application/snapGrid.ts
   var MINUTES_PER_HOUR = 60;
   var SNAP_STEPS = [5, 15, 30, 60];
-  var SNAP_STEP_PX = 9;
-  function snapStep(hourPx) {
-    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= SNAP_STEP_PX) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+  function snapStep(hourPx, tolerance) {
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
   }
-  function snapMinute(minute, hourPx) {
-    const step = snapStep(hourPx);
+  function snapMinute(minute, hourPx, tolerance) {
+    const step = snapStep(hourPx, tolerance);
     return Math.min(MINUTES_PER_DAY, Math.max(0, Math.round(minute / step) * step));
+  }
+
+  // src/application/DayServiceImpl.ts
+  function dayOpening(date, boundary, today, now, hour) {
+    return date === today ? { kind: "now", minute: boundary.offsetOf(date, now) } : { kind: "hour", minute: boundary.offsetOfHour(hour) };
   }
 
   // src/application/PhoneCalls.ts
@@ -4733,6 +4860,7 @@ ${key.title}`.toLowerCase();
       this.settingsText = context.settings ?? "";
       this.current = settingsOf(this.settingsText);
       const clock = { now: () => new Date(context.nowMs) };
+      this.clock = clock;
       const store = {
         get: () => this.current,
         update: async (patch2) => this.saveSettings(patch2),
@@ -4760,12 +4888,24 @@ ${key.title}`.toLowerCase();
     }
     snapshot() {
       const at = this.rules.moment();
-      return { doc: this.rules.read(this.tasks(), at).doc, today: at.today, boundary: at.boundary };
+      const text = this.tasks();
+      return { text, doc: this.rules.read(text, at).doc, today: at.today, boundary: at.boundary };
+    }
+    /** A read as it asks: the file tidied first, read, or missing. */
+    ask(read) {
+      if (read.tidies) this.normalize();
+      if (!read.reads) return read.answer(null);
+      if (!this.hasTasks() && read.missing) return read.missing();
+      return read.answer(this.snapshot());
     }
     /** The file tidied for today, as the plugin's service writes it before a screen: no step. */
     normalize() {
       if (this.text === null || !this.rules.read(this.text).changed) return;
       this.setText(this.rules.change(this.text, (d) => d).text, false);
+    }
+    /** A text the call wrote as one action: a step of the history. */
+    write(text) {
+      this.setText(text, true);
     }
     /** A write as one action: its operation over the text, the new text a step of the history. */
     run(write) {
@@ -4811,17 +4951,13 @@ ${key.title}`.toLowerCase();
     isBlank: (c, [text]) => c.reads.isBlank(text),
     withPriority: (c, [text, prefix]) => c.reads.withPriority(text, prefix ?? null),
     draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text, priority ?? null, labels ?? []),
-    screen: (c, [date]) => {
-      if (!c.hasTasks()) return c.reads.missingScreen(date);
-      c.normalize();
-      return c.reads.screen(KEPT(c), date);
-    },
+    screen: (c, [date]) => c.ask(c.reads.screenRead(date)),
     dayView: (c, [date]) => c.reads.dayView(KEPT(c), date),
     soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
     inboxView: (c) => c.reads.inboxView(KEPT(c)),
     backlogView: (c) => c.reads.backlogView(KEPT(c)),
     doneView: (c) => c.reads.doneView(KEPT(c)),
-    search: (c, [query]) => c.reads.searches(query) ? c.reads.search(KEPT(c), query) : [],
+    search: (c, [query]) => c.ask(c.reads.searchRead(query)),
     screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item),
     reveal: (c, [item]) => {
       c.run(c.writes.revealUnfold(item));
@@ -4850,8 +4986,8 @@ ${key.title}`.toLowerCase();
     setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key, labels)),
     setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps)),
     setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key, reminder)),
-    togglePriority: (c, [keys, prefix]) => keys.length === 0 ? void 0 : c.run(c.writes.togglePriority(KEPT(c), keys, prefix)),
-    toggleLabel: (c, [keys, name]) => keys.length === 0 ? [] : c.run(c.writes.toggleLabel(KEPT(c), keys, name)),
+    togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys, prefix))),
+    toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys, name))),
     removeDue: (c, [keys]) => c.run(c.writes.removeDue(KEPT(c), keys)),
     menu: (c, [item, from, screen]) => c.reads.menu(item, from, screen),
     bulkMenu: (c, [picked, screen]) => c.reads.bulkMenu(picked, screen),
@@ -4868,10 +5004,7 @@ ${key.title}`.toLowerCase();
     fullTree: (c, [item]) => c.reads.fullTree(item),
     setDescription: (c, [key, markdown]) => c.run(c.writes.setDescription(key, markdown)),
     remove: (c, [key]) => c.run(c.writes.remove(key)),
-    lineOf: (c, [key]) => {
-      c.normalize();
-      return c.reads.lineOf(c.tasks(), key);
-    },
+    lineOf: (c, [key]) => c.ask(c.reads.lineOfRead(key)),
     find: (c, [key, text]) => c.reads.find(KEPT(c), key, text),
     moveBefore: (c, [key, before, date]) => c.run(c.writes.moveBefore(key, before ?? null, date)),
     nest: (c, [key, parent, before]) => c.run(c.writes.nest(key, parent, before ?? null)),
@@ -4879,7 +5012,7 @@ ${key.title}`.toLowerCase();
     shownSpan: (c, [item, day]) => c.reads.shownSpan(item, day),
     dropSpan: (c, [item, from, start]) => c.reads.dropSpan(item ?? null, from, start),
     newSlot: (c, [day, start]) => c.reads.newSlot(day, start),
-    snap: (_c, [minute, hourPx]) => snapMinute(minute, hourPx),
+    snap: (_c, [minute, hourPx, tolerancePx]) => snapMinute(minute, hourPx, tolerancePx),
     stretch: (c, [item, day, edge, minute]) => c.reads.stretch(item, day, edge, minute),
     resize: (c, [key, day, edge, minute, min]) => c.run(c.writes.resize(KEPT(c), key, day, edge, minute, min)),
     clearSlot: (c, [key, place]) => c.run(c.writes.clearSlot(key, place ?? void 0)),
@@ -4891,17 +5024,11 @@ ${key.title}`.toLowerCase();
     createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key, list, name, date ?? void 0)),
     toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys, name ?? null)),
     moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list, group ?? null, place)),
-    renameGroup: (c, [list, group, name]) => {
-      const rename2 = c.writes.renameGroup(list, group, name);
-      return rename2.operation ? c.run(rename2.plan(KEPT(c))) : false;
-    },
+    renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list, group, name))),
     removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
     createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
     applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps)),
-    drop: (c, [tasks, to, day]) => {
-      const drop = c.writes.drop(tasks, to, day);
-      return c.run(drop.plan(drop.reads ? KEPT(c) : null));
-    },
+    drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks, to, day))),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -4915,6 +5042,7 @@ ${key.title}`.toLowerCase();
     today: (c) => c.rules.today(),
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
+    openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
@@ -4980,8 +5108,16 @@ ${key.title}`.toLowerCase();
     known: (c) => calendarDay(c).known(),
     setShown: (c, [account, title, shown]) => {
       c.saveSettings(calendarDay(c).shownChange(account, title, shown));
-    }
+    },
+    files: (c) => calendarFiles(c),
+    meetings: (c, [fromMs, toMs]) => meetings(c, fromMs, toMs)
   };
+  function calendarFiles(c) {
+    return CALENDAR_SOURCES.map((source) => calendarPath(source, c.settings));
+  }
+  function meetings(c, fromMs, toMs) {
+    return calendarDay(c).timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+  }
   var SETTINGS_METHODS = [
     "form",
     "setTasksFile",
@@ -5022,6 +5158,37 @@ ${key.title}`.toLowerCase();
   var SCREEN_SETTINGS = {
     get: (c) => screenSettingsOf(c.settings)
   };
+  function reminderTime(start, end) {
+    return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
+  }
+  function onReminder(c, id, action) {
+    const text = new TaskReminders(c.rules, c.clock).act(c.tasks(), id, action);
+    if (text === null) throw new DoorError("staleTask", `no reminding task ${id}`);
+    c.write(text);
+  }
+  var REMINDERS = {
+    list: (c) => new TaskReminders(c.rules, c.clock).ringing(c.tasks()).map(
+      ({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
+        id: key.raw,
+        title,
+        body: reminderTime(startMinute, endMinute),
+        kind,
+        date,
+        startMs: start.getTime(),
+        dayEndMs: dayEnd.getTime()
+      })
+    ),
+    complete: (c, [id]) => onReminder(c, id, (key) => c.rules.setStatus(key, "done")),
+    /** The task stays on its time; it no longer reminds. */
+    silence: (c, [id]) => onReminder(c, id, (key) => c.rules.setReminder(key, "none")),
+    snooze: (c, [id, minutes]) => onReminder(c, id, (key) => c.rules.snooze(key, minutes))
+  };
+  var CAPTURE = {
+    add: (c, [list, title]) => {
+      if (title.trim() === "") throw new DoorError("blank", "the task has no title");
+      c.write(c.rules.change(c.tasks(), c.rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
+    }
+  };
   var HISTORY = {
     undo: (c) => c.undo("undo"),
     redo: (c) => c.undo("redo"),
@@ -5058,6 +5225,7 @@ ${key.title}`.toLowerCase();
     labelTitle,
     sameLabels,
     isPresetColor,
+    usableColor,
     acceptsDrop,
     placesInGap
   };
@@ -5142,6 +5310,8 @@ ${key.title}`.toLowerCase();
     sectionName: SECTION_NAME,
     repeatPage: REPEAT_PAGE,
     description: DESCRIPTION,
+    reminders: REMINDERS,
+    capture: CAPTURE,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
   function doorMethods() {
@@ -5199,127 +5369,51 @@ ${key.title}`.toLowerCase();
     return plainJson(callDoor(method, args, context), strict);
   }
 
-  // src/application/TaskReminders.ts
-  var HOUR_MINUTES4 = 60;
-  function clockOf(date, minutes) {
-    const [year, month, day] = date.split("-").map(Number);
-    return new Date(year, month - 1, day, 0, minutes);
-  }
-  function keyOf2(entry) {
-    return { section: entry.section, index: entry.index, path: entry.path, raw: entry.raw };
-  }
-  var TaskReminders = class {
-    constructor(rules, clock) {
-      this.rules = rules;
-      this.clock = clock;
-    }
-    /** The open tasks on a time that remind, until their day ends, by start. */
-    ringing(text) {
-      const at = this.rules.moment();
-      const now = this.clock.now();
-      return openSlotted(this.rules.read(text, at).doc).filter((e) => e.task.reminder !== "none").map((e) => this.reminder(e, e.task.slot, at)).filter((r) => r.dayEnd > now).sort((a, b) => a.start.getTime() - b.start.getTime());
-    }
-    /**
-     * The text after `action` on the reminding task whose line is `line`, the first of two alike; null when no such task is
-     * left. A reminder still shown after its day ended names a slot that today's normalizing has already erased: it is
-     * found in the file as it is.
-     */
-    act(text, line, action2) {
-      const at = this.rules.moment();
-      const { doc } = this.rules.read(text, at);
-      const found = this.find(doc, line);
-      if (found) return this.rules.changeOf(doc, action2(found), at).text;
-      const asRead = this.find(this.rules.asRead(text, at), line);
-      return asRead ? this.rules.changeAsRead(text, action2(asRead), at).text : null;
-    }
-    find(doc, line) {
-      const entry = openSlotted(doc).find((e) => e.raw === line);
-      return entry ? keyOf2(entry) : null;
-    }
-    reminder(entry, slot, at) {
-      const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
-      return {
-        key: keyOf2(entry),
-        title: plainText(entry.task.text),
-        startMinute: slot.start,
-        endMinute: slot.end,
-        kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
-        date: slot.date,
-        start: clockOf(slot.date, slot.start),
-        dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES4)
-      };
-    }
-  };
-
   // src/application/PhoneDoor.ts
-  function timeText(start, end) {
-    return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
-  }
   var STALE = { changed: false, reason: "stale" };
-  function action(text) {
-    return text === null ? STALE : { changed: true, text };
+  function answerOf(method, args, context) {
+    return JSON.parse(callDoorJson(method, JSON.stringify(args), JSON.stringify(context)));
   }
-  function fixedSettings(settings) {
-    return { get: () => settings, update: async () => void 0, onChange: () => () => void 0 };
+  function resultOf(method, args, context) {
+    const answer = answerOf(method, args, context);
+    if (!answer.ok) throw new Error(answer.error.message);
+    return answer.result;
   }
-  var Call2 = class {
-    constructor(settingsJson, nowMs) {
-      const clock = { now: () => new Date(nowMs) };
-      this.rules = new TaskRules(fixedSettings(settingsOf(settingsJson)), clock);
-      this.reminders = new TaskReminders(this.rules, clock);
-    }
-  };
+  function actionOf(method, args, context) {
+    const answer = answerOf(method, args, context);
+    if (answer.ok) return { changed: true, text: answer.tasks ?? context.tasks };
+    if (answer.error.code === "staleTask" || answer.error.code === "blank") return STALE;
+    throw new Error(answer.error.message);
+  }
   var phoneDoor = {
+    /** `reminders.list`. */
     reminders(text, settingsJson, nowMs) {
-      return new Call2(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
-        id: key.raw,
-        title,
-        body: timeText(startMinute, endMinute),
-        kind,
-        date,
-        startMs: start.getTime(),
-        dayEndMs: dayEnd.getTime()
-      }));
+      return resultOf("reminders.list", [], { tasks: text, settings: settingsJson, nowMs });
     },
+    /** `reminders.complete`. */
     complete(text, settingsJson, id, nowMs) {
-      const { rules, reminders } = new Call2(settingsJson, nowMs);
-      return action(reminders.act(text, id, (key) => rules.setStatus(key, "done")));
+      return actionOf("reminders.complete", [id], { tasks: text, settings: settingsJson, nowMs });
     },
-    /** The task stays on its time; it no longer reminds. */
+    /** `reminders.silence`: the task stays on its time; it no longer reminds. */
     silence(text, settingsJson, id, nowMs) {
-      const { rules, reminders } = new Call2(settingsJson, nowMs);
-      return action(reminders.act(text, id, (key) => rules.setReminder(key, "none")));
+      return actionOf("reminders.silence", [id], { tasks: text, settings: settingsJson, nowMs });
     },
+    /** `reminders.snooze`. */
     snooze(text, settingsJson, id, minutes, nowMs) {
-      const { rules, reminders } = new Call2(settingsJson, nowMs);
-      return action(reminders.act(text, id, (key) => rules.snooze(key, minutes)));
+      return actionOf("reminders.snooze", [id, minutes], { tasks: text, settings: settingsJson, nowMs });
     },
-    /**
-     * A task typed or spoken on the phone, last in `list` as the plugin's quick entry puts it. Only an empty title writes
-     * nothing: one of only a priority is written, unlike the plugin's `createInPlace`, as the phone always did.
-     */
+    /** `capture.add`; a blank title answers stale here. */
     capture(text, settingsJson, list, title, nowMs) {
-      if (title.trim() === "") return STALE;
-      const { rules } = new Call2(settingsJson, nowMs);
-      return action(rules.change(text, rules.placeNew(title, null, { kind: "list", list, group: null, before: null })).text);
+      return actionOf("capture.add", [list, title], { tasks: text, settings: settingsJson, nowMs });
     },
-    /** The calendars' files in the vault, in the order `meetings` takes their texts. */
+    /** `calendars.files`: the calendars' files in the vault, in the order `meetings` takes their texts. */
     calendarFiles(settingsJson) {
-      const settings = settingsOf(settingsJson);
-      return CALENDAR_SOURCES.map((source) => calendarPath(source, settings));
+      return resultOf("calendars.files", [], { tasks: null, settings: settingsJson, nowMs: 0 });
     },
-    /** The timed meetings that overlap `from`–`to`, as the calendar on screen shows them; a file missing (`null`) or unreadable adds none. */
+    /** `calendars.meetings`, the files' texts in `calendarFiles`' order; a file missing (`null`) or unreadable adds none. */
     meetings(settingsJson, texts, fromMs, toMs, nowMs) {
-      const files = /* @__PURE__ */ new Map();
-      CALENDAR_SOURCES.forEach((source, i) => {
-        const text = texts[i];
-        if (text === null || text === void 0) return;
-        try {
-          files.set(source, readCalendarFile(text, source));
-        } catch {
-        }
-      });
-      return new ShownCalendars(files, settingsOf(settingsJson), new Date(nowMs)).days().timedBetween(new Date(fromMs), new Date(toMs)).map((e) => ({ title: e.title, startMs: e.start.getTime(), endMs: e.end.getTime() }));
+      const calendars = Object.fromEntries(CALENDAR_SOURCES.map((source, i) => [source, texts[i] ?? null]));
+      return resultOf("calendars.meetings", [fromMs, toMs], { tasks: null, settings: settingsJson, nowMs, calendars });
     },
     /**
      * Every call of the services a frontend makes, by name (`tasks.screen`, `entry.enter`, …: see `docs/door.md`): the

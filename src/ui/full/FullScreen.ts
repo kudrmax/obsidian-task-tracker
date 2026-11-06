@@ -341,7 +341,8 @@ export class FullScreen {
 		const at = state && this.fieldPlace(state);
 		if (!state || !at) return null;
 		return {
-			place: { kind: "gap", index: at.index, level: at.level, group: null },
+			at: { kind: "in", section: 0, card: at.index, keepsPlate: true },
+			level: at.level,
 			pending: state.pending.map((line) => ({ text: line.text, level: at.level })),
 			field: (row: HTMLElement) => {
 				const field = (this.field ??= this.openField(row));

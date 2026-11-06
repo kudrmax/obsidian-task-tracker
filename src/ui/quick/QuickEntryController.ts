@@ -1,4 +1,4 @@
-import { type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
+import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../application/contracts";
 import type { RightMode } from "../viewSettings";
 import { SHOWN_LISTS } from "../screens";
 import type { EntryPart } from "./EntryPart";
@@ -281,9 +281,9 @@ export class QuickEntryController {
 	}
 
 	/** What `column`'s list draws for the entry: none when the field stands elsewhere. */
-	entryIn(column: ListColumn): ListEntryInput | null {
-		const entry = this.state && this.entry.listEntry(column);
-		return entry ? { ...entry, field: (row) => this.fieldIn(row) } : null;
+	entryIn(column: ListColumn, drawing: EntryDrawing): ListEntryInput | null {
+		const entry = this.state && this.entry.listEntry(column, drawing);
+		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, field: (row) => this.fieldIn(row) } : null;
 	}
 
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */

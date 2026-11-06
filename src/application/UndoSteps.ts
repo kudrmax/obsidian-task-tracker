@@ -49,17 +49,17 @@ export class UndoSteps {
 	}
 
 	/** The next step that way, taken off; null when there is none. */
-	take(way: UndoWay): TextPatch | null {
+	private take(way: UndoWay): TextPatch | null {
 		return (way === "undo" ? this.done : this.undone).pop() ?? null;
 	}
 
 	/** `text` with the step taken back or done again; null when its lines were edited since. */
-	static make(way: UndoWay, patch: TextPatch, text: string): string | null {
+	private static make(way: UndoWay, patch: TextPatch, text: string): string | null {
 		return way === "undo" ? patch.revert(text) : patch.apply(text);
 	}
 
 	/** A step made: it can be made the other way now. A step that could not be made is dropped. */
-	made(way: UndoWay, patch: TextPatch): void {
+	private made(way: UndoWay, patch: TextPatch): void {
 		(way === "undo" ? this.undone : this.done).push(patch);
 	}
 

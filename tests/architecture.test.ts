@@ -151,7 +151,45 @@ describe("domain and application run on any host", () => {
 		const LOCALE = /\bIntl\b|\.localeCompare\s*\(|\.toLocale\w*\s*\(/;
 		expect(core.filter((file) => LOCALE.test(withoutComments(readFileSync(join(ROOT, file), "utf8"))))).toEqual([]);
 	});
+	it("read no date from text the engine's own way: no Date.parse, no Date's toString or toDateString, new Date of one argument only of epoch ms (a text goes through isoMoment)", () => {
+		const core = [...files("src/domain"), ...files("src/application"), "src/settings.ts"].filter(isSource);
+		const ENGINE = /\bDate\.parse\s*\(|\.to(?:Date|Time|UTC|GMT)?String\s*\(\s*\)/;
+		const found = core.flatMap((file) => {
+			const text = withoutComments(readFileSync(join(ROOT, file), "utf8"));
+			const engine = ENGINE.test(text) ? [`${file}: Date.parse or toString`] : [];
+			return [...engine, ...oneArgumentDates(text).filter((arg) => !EPOCH_MS.test(arg)).map((arg) => `${file}: new Date(${arg})`)];
+		});
+		expect(found).toEqual([]);
+	});
+	it("tells a date read from text from one of epoch ms", () => {
+		const args = oneArgumentDates("new Date(text); new Date(e.startMs); new Date(a, b); new Date(now.getTime() + f(1, 2)); new Date(); new Date(Number.NaN); new Date(Date.UTC(1, 2))");
+		expect(args).toEqual(["text", "e.startMs", "now.getTime() + f(1, 2)", "Number.NaN", "Date.UTC(1, 2)"]);
+		expect(args.filter((a) => !EPOCH_MS.test(a))).toEqual(["text"]);
+	});
 });
+
+/** A single argument of `new Date(...)` that reads as epoch milliseconds: a …Ms or …ms value, a getTime(), Date.UTC, NaN. */
+const EPOCH_MS = /(?:Ms|ms)\b|\.getTime\(\)|\bDate\.UTC\(|\bNumber\.NaN\b/;
+
+/** The argument of each `new Date(...)` of exactly one argument in `text`. */
+function oneArgumentDates(text: string): string[] {
+	const found: string[] = [];
+	for (const m of text.matchAll(/\bnew Date\(/g)) {
+		let depth = 1;
+		let commas = 0;
+		let i = m.index! + m[0].length;
+		const start = i;
+		for (; i < text.length && depth > 0; i++) {
+			const ch = text[i];
+			if (ch === "(" || ch === "[" || ch === "{") depth++;
+			else if (ch === ")" || ch === "]" || ch === "}") depth--;
+			else if (ch === "," && depth === 1) commas++;
+		}
+		const arg = text.slice(start, i - 1).trim();
+		if (arg !== "" && commas === 0) found.push(arg);
+	}
+	return found;
+}
 
 /**
  * The runtime values contracts.ts hands the UI, by where they come from. Anything else it re-exports is a type. A new
@@ -196,6 +234,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	labelTitle: "../domain/Label",
 	sameLabels: "../domain/Label",
 	isPresetColor: "../domain/Priority",
+	usableColor: "../domain/Priority",
 	PRIORITY_COLORS: "../domain/Priority",
 	acceptsDrop: "./drops",
 	placesInGap: "./drops",

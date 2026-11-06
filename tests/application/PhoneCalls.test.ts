@@ -55,6 +55,8 @@ const FILE = [
 	"",
 ].join("\n");
 
+const LUNCH = "- [ ] Lunch ⏰ 2026-11-04 13:00-14:00 🔁 every day";
+
 function service(text: string | null = FILE): { store: InMemoryTaskFileStore; svc: TaskServiceImpl } {
 	const store = new InMemoryTaskFileStore(text);
 	return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(settingsFrom(JSON.parse(SETTINGS))), clock, new UndoHistory(store)) };
@@ -161,7 +163,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "dropSpan", args: (s) => [named(s, "Morning run"), "timeline", 600] },
 	{ method: "dropSpan", args: () => [null, "new", 1430] },
 	{ method: "newSlot", args: () => [T, 615] },
-	{ method: "snap", args: () => [617, 56] },
+	{ method: "snap", args: () => [617, 56, 9] },
 	{ method: "stretch", args: (s) => [named(s, "Morning run"), T, "end", 540] },
 	{ method: "resize", args: (s) => [key(s, "Morning run"), T, "end", 540, 15] },
 	{ method: "resize", args: (s) => [key(s, "Morning run"), T, "end", 480, 15] },
@@ -271,13 +273,14 @@ describe("the door's coverage", () => {
 				continue;
 			}
 			const declared = interfaceMethods(name);
-			expect({ name, methods: [...offered(coverage.space), ...coverage.host].sort() }).toEqual({ name, methods: [...declared].sort() });
+			expect({ name, methods: [...offered(coverage.space), ...coverage.host].sort() }).toEqual({ name, methods: [...declared, ...(coverage.own ?? [])].sort() });
+			for (const own of coverage.own ?? []) expect({ name, own, declared: declared.includes(own) }).toEqual({ name, own, declared: false });
 		}
 	});
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -409,6 +412,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.relation", LATER),
 		plain("days.step", T, -3),
 		plain("days.boundary"),
+		plain("days.openAt", LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
 		plain("boundary.dayOf", NOW.getTime()),
 		plain("boundary.dayOfSlot", { date: T, start: 30, end: null }),
@@ -421,6 +425,12 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("calendars.isPast", { endMs: NOW.getTime() }),
 		plain("calendars.known"),
 		plain("calendars.setShown", "max@gmail.com", "Personal", false),
+		plain("calendars.files"),
+		plain("calendars.meetings", NOW.getTime() - 3_600_000 * 9, NOW.getTime() + 3_600_000 * 12),
+		plain("reminders.list"),
+		...["complete", "silence"].map((m) => plain(`reminders.${m}`, LUNCH)),
+		plain("reminders.snooze", LUNCH, 15),
+		plain("capture.add", "inbox", "Buy milk"),
 		plain("screenSettings.get"),
 		...SETTINGS_CASES.map(([m, ...a]) => ({ method: `settings.${m}`, args: a, context: context(FILE, { settings: DATA }) })),
 		plain("history.undo"),
@@ -461,6 +471,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.labelTitle", "Very_Fast"),
 		plain("rules.sameLabels", [], []),
 		plain("rules.isPresetColor", "red"),
+		plain("rules.usableColor", "#12AB34"),
 		plain("rules.acceptsDrop", "inbox", ["soon"]),
 		plain("rules.placesInGap", "soon", "day", false),
 		...[

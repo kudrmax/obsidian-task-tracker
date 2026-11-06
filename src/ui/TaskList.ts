@@ -1,4 +1,4 @@
-import { type GapPlace, type GroupName, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
+import { type EntryAt, type EntryDrawing, type GroupName, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
@@ -6,7 +6,10 @@ import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
-	readonly place: GapPlace;
+	/** Where among the cards and sections drawn the field stands. */
+	readonly at: EntryAt;
+	/** The level the field stands at. */
+	readonly level: number;
 	readonly pending: readonly PendingText[];
 	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
 	readonly section?: boolean;
@@ -26,8 +29,8 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
-	/** The task being typed, which takes its place among the cards without being one of them; null when none is. */
-	entry?(): ListEntryInput | null;
+	/** The task being typed, which takes its place among the cards about to be drawn (`drawing`) without being one of them; null when none is. */
+	entry?(drawing: EntryDrawing): ListEntryInput | null;
 	/**
 	 * The task whose text the field edits, wherever the field stands: its card keeps its place among the cards, hidden, and
 	 * the branches pass it by.
@@ -52,6 +55,11 @@ export interface ListEntry {
 const QUICK_ROW = "tc-quick-row";
 export const PLATE = "tc-group-empty";
 
+/** What a list about to draw `view` shows the field among. */
+function drawingOf(view: ListView): EntryDrawing {
+	return { cards: view.groups.flatMap((group) => group.rows.map(({ item, level }) => ({ key: item.key, level, group: group.name }))), sections: view.groups.map((group) => group.name) };
+}
+
 /**
  * A column of cards that scrolls: each task with its open subtasks right under it, a level further in, a branch running
  * from the task to each, unless the task folds them away; with sections, a header over each.
@@ -60,6 +68,10 @@ export class TaskList {
 	private entries: ListEntry[] = [];
 	private rendered: readonly ListGroup[] = [];
 	private nodes: HTMLElement[] = [];
+	/** Each empty section's No tasks plate drawn, by its name. */
+	private plates = new Map<GroupName, HTMLElement>();
+	/** Each section's cards as drawn, its subtasks' among them. */
+	private sectionCards = new Map<ListGroup, HTMLElement[]>();
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
@@ -79,31 +91,33 @@ export class TaskList {
 	}
 
 	private draw(): void {
-		const entry = this.deps.entry?.() ?? null;
+		const day = this.deps.day();
+		const items = this.deps.items();
+		const view = this.viewOf(items);
+		const entry = this.deps.entry?.(drawingOf(view)) ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
 		const kept = entry ? this.keptRow() : null;
 		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
 		this.nodes = [];
-		const day = this.deps.day();
-		const items = this.deps.items();
-		const view = this.viewOf(items);
+		this.plates = new Map();
+		this.sectionCards = new Map();
 		this.rendered = view.groups;
 		this.withHeaders = view.showsHeaders;
 		const rows: { node: HTMLElement; level: number }[] = [];
+		const at = entry?.at ?? null;
 		let entered = entry === null;
-		let groupStart = 0;
-		/** At a card's place, or at the end of its section for a place outside that section's cards: where `placeOfGap` writes it. */
-		const enter = (group: GroupName, groupEnd = false): void => {
-			if (entered || !entry || (this.withHeaders && entry.place.group !== group)) return;
-			const { index } = entry.place;
-			const outside = this.withHeaders && groupEnd && (index < groupStart || index > this.entries.length);
-			if (index !== this.entries.length && !outside) return;
+		let section = 0;
+		const enter = (): void => {
+			if (entered || !entry) return;
 			entered = true;
 			this.enterRows(entry, rows, kept);
 		};
+		const enterAtCard = (): void => {
+			if (at?.kind === "in" && at.section === section && at.card === this.entries.length) enter();
+		};
 		const add = ({ item, level }: ListRow, group: GroupName): void => {
-			enter(group);
+			enterAtCard();
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
 			const renamed = renaming !== null && samePlace(renaming, item.key);
@@ -121,17 +135,19 @@ export class TaskList {
 				this.deps.onCard?.(card, item, this.entries.slice(i + 1, end).map((e) => e.card));
 			}
 		};
-		const aboveHeaders = this.withHeaders && entry?.place.group === null && !this.rendered.some((g) => g.name === null);
-		if (aboveHeaders) enter(null, true);
-		for (const group of this.rendered) {
+		if (at?.kind === "top") enter();
+		this.rendered.forEach((group, i) => {
+			section = i;
 			if (this.withHeaders) this.nodes.push(this.header(group));
-			if (group.empty && (entry?.place.group !== group.name || entry.section)) this.nodes.push(this.plate(group));
-			groupStart = this.entries.length;
+			const platesField = at?.kind === "in" && at.section === i && !at.keepsPlate;
+			if (group.empty && !platesField) this.nodes.push(this.plate(group));
+			const groupStart = this.entries.length;
 			for (const row of group.rows) add(row, group.name);
+			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
-			enter(group.name, true);
-		}
-		if (!entered && entry) this.enterRows(entry, rows, kept);
+			enterAtCard();
+		});
+		enter();
 		if (entry) this.markRenamed(renaming);
 		rows.forEach((row, i) => {
 			if (row.level === 0) return;
@@ -170,7 +186,7 @@ export class TaskList {
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		row.classList.toggle("is-section", entry.section === true);
-		put(row, entry.place.level);
+		put(row, entry.level);
 	}
 
 	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */
@@ -198,7 +214,7 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		return this.viewOf(this.deps.items()).groups.flatMap((group) => group.rows.map(({ item, level }) => ({ key: item.key, level, group: group.name })));
+		return drawingOf(this.viewOf(this.deps.items())).cards;
 	}
 
 	private viewOf(items: readonly TaskItem[]): ListView {
@@ -221,7 +237,12 @@ export class TaskList {
 
 	/** The No tasks plate of empty section `name`; null when none is drawn. */
 	plateOf(name: GroupName): HTMLElement | null {
-		return this.nodes.find((node) => node.classList.contains(PLATE) && node.dataset.group === name) ?? null;
+		return this.plates.get(name) ?? null;
+	}
+
+	/** The cards drawn in `group`, one of `groups`, its subtasks' among them. */
+	cardsOf(group: ListGroup): readonly HTMLElement[] {
+		return this.sectionCards.get(group) ?? [];
 	}
 
 	/** Headers, plates and cards in the order they stand. */
@@ -239,6 +260,7 @@ export class TaskList {
 	private plate(group: ListGroup): HTMLElement {
 		const plate = el(this.el, "div", PLATE, "No tasks");
 		plate.dataset.group = group.name ?? "";
+		this.plates.set(group.name, plate);
 		this.deps.onPlate?.(plate, group);
 		return plate;
 	}
