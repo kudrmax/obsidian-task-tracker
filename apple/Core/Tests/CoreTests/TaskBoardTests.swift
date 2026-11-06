@@ -107,3 +107,37 @@ import Testing
         #expect(snapshot.column(of: run.id) == "timeline")
     }
 }
+
+/// The timeline's zoom, its grid and its paints, as the core answers them.
+@Suite struct TimelineZoomTests {
+    let board = TaskBoard(core: try! PhoneCore(script: Fixtures.phoneScript), vault: FakeVault(TaskBoardTests.file))
+    let measures = GridMeasures(divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16)
+
+    @Test func theGridGetsFinerAsTheHourGrows() throws {
+        #expect(try board.gridMarks(hour: 28, measures: measures).isEmpty)
+        let half = try board.gridMarks(hour: 112, measures: measures)
+        #expect(half.contains(GridMark(minute: 30, label: ":30")))
+        let fine = try board.gridMarks(hour: 224, measures: measures)
+        #expect(fine.contains(GridMark(minute: 15, label: ":15")))
+        #expect(fine.contains { $0.minute == 5 })
+    }
+
+    @Test func aPinchMovesFromTheWholeDayToTheLargestLevel() throws {
+        let levels = [28.0, 56, 112, 224]
+        #expect(try board.zoomRange(wholeDay: 30, levels: levels) == [30, 56, 112, 224])
+        #expect(try board.zoomAfterPinch(hour: 30, wholeDay: 30, levels: levels) == nil)
+        #expect(try board.zoomAfterPinch(hour: 80, wholeDay: 30, levels: levels) == 80)
+        #expect(try board.zoomShown(saved: "wholeDay", wholeDay: 30, levels: levels) == 30)
+        #expect(try board.zoomShown(saved: .null, wholeDay: 30, levels: levels) == 56)
+    }
+
+    @Test func theSnapshotCarriesThePastPaintAndTheLevels() throws {
+        let snapshot = try board.snapshot(day: nil, measures: TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
+        #expect(snapshot.timeline.zoomLevels == [28, 56, 112, 224])
+        #expect(snapshot.timeline.pastPaint.dark.bg.hasPrefix("#"))
+        #expect(snapshot.timeline.pastPaint.dark.bar == snapshot.timeline.pastPaint.dark.text)
+        let restacked = try board.stack(snapshot.timeline, measures: TimelineMeasures(hour: 224, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18))
+        #expect(restacked.map(\.id) == snapshot.timeline.slots.map(\.id))
+        #expect(restacked[0].box.height > snapshot.timeline.slots[0].box.height)
+    }
+}

@@ -25,6 +25,9 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let due: DueLabel?
     public let repeats: Bool
     public let shades: Themed<Shades>?
+    /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
+    /// shorter than it; nil for neither, and on a list's card.
+    public let corner: [String]?
     /// The card's identity on the screen: its line as the file has it, so a card moved or ticked keeps it and the lists
     /// animate it to its new place instead of drawing a new card.
     public let id: String
@@ -32,8 +35,9 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// The card goes by `id`: its own, or its task's.
     public func names(_ id: String) -> Bool { self.id == id || item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, id: String? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, id: String? = nil) {
         self.id = id ?? item.id
+        self.corner = corner
         self.item = item
         self.level = level
         self.branch = branch
@@ -83,6 +87,8 @@ public struct BoardSlot: Sendable, Hashable, Identifiable {
     public let card: BoardCard
     public let start: Int
     public let end: Int?
+    /// The start the task is put on in the file, which a stacked card shows.
+    public let slotStart: Int
     /// Where its card stands in the stack the core lays out: tasks never share the width.
     public let box: StackBox
     public var id: String { card.id }
@@ -125,6 +131,31 @@ public struct BoardHour: Sendable, Hashable {
     public let label: String
 }
 
+/// A line of the grid between the hours (`rules.gridMarks`): its minute from the day's start, and its label (`:30`) or none.
+public struct GridMark: Decodable, Sendable, Hashable {
+    public let minute: Int
+    public let label: String?
+}
+
+/// The frontend's measures of the grid between the hours (`rules.gridAt`).
+public struct GridMeasures: Sendable {
+    public let divisions: [Int]
+    public let labelGap: Double
+    public let tickMinutes: Int
+    public let tickGap: Double
+
+    public init(divisions: [Int], labelGap: Double, tickMinutes: Int, tickGap: Double) {
+        self.divisions = divisions
+        self.labelGap = labelGap
+        self.tickMinutes = tickMinutes
+        self.tickGap = tickGap
+    }
+
+    var json: JSONValue {
+        ["divisions": .array(divisions.map { .number(Double($0)) }), "labelGap": .number(labelGap), "tickMinutes": .number(Double(tickMinutes)), "tickGap": .number(tickGap)]
+    }
+}
+
 /// The calendar beside the day list: minutes from the start of the shown day.
 public struct BoardTimeline: Sendable, Hashable {
     public let hours: [BoardHour]
@@ -135,6 +166,10 @@ public struct BoardTimeline: Sendable, Hashable {
     public let now: Int?
     /// Where the timeline opens.
     public let opening: Int
+    /// An event that is over, whatever its calendar's colour (`rules.pastEventPaint`), on the system's ground.
+    public let pastPaint: Themed<EventPaint>
+    /// The hour's heights a pinch moves between, as the settings keep them (`timeline.zoomLevels`).
+    public let zoomLevels: [Double]
 }
 
 /// Everything the main screen draws for a day, read at one moment through the door.
@@ -269,16 +304,63 @@ extension TaskBoard {
         let eventSpans = JSONValue.array(placed.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
         let boxes: [StackBox] = try rule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
-            let span: JSONValue = ["start": .number(Double(pair.1.start)), "end": pair.1.end.map { .number(Double($0)) } ?? .null]
-            let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
-            let corner: [String]? = try rule("rules.stackCorner", [flags, .number(Double(pair.0.slot?.start ?? pair.1.start)), span])
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: corner.map { DueLabel(day: $0[0], month: $0[1]) }, repeats: pair.0.repeats, shades: try pair.0.colors.first.map { try painter.shades($0) }, id: painter.identity(pair.0))
-            return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, box: box)
+            let start = pair.0.slot?.start ?? pair.1.start
+            let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner, id: painter.identity(pair.0))
+            return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
         let opening: DayOpening = try read("days.openAt", [.string(day)], over: files)
-        return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute)
+        let zoom: [ZoomStep] = try read("timeline.zoomLevels", over: files)
+        let past = Themed<EventPaint>(
+            dark: try rule("rules.pastEventPaint", ["#000000", "#FFFFFF", "dark"]),
+            light: try rule("rules.pastEventPaint", ["#FFFFFF", "#000000", "light"]))
+        return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute, pastPaint: past, zoomLevels: zoom.map(\.hourPx))
     }
+
+    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?) throws -> [String]? {
+        let span: JSONValue = ["start": .number(Double(shownStart)), "end": shownEnd.map { .number(Double($0)) } ?? .null]
+        let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
+        return try rule("rules.stackCorner", [flags, .number(Double(start)), span])
+    }
+
+    /// The timeline's task cards stacked anew at another hour's height (a pinch), each with its corner as it then stands.
+    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures) throws -> [BoardSlot] {
+        guard !timeline.slots.isEmpty else { return [] }
+        let taskSpans = JSONValue.array(timeline.slots.map { ["start": .number(Double($0.start)), "end": $0.end.map { .number(Double($0)) } ?? .null] })
+        let eventSpans = JSONValue.array(timeline.events.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
+        let boxes: [StackBox] = try rule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        return try zip(timeline.slots, boxes).map { slot, box in
+            let old = slot.card
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
+            return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
+        }
+    }
+
+    /// The lines between the hours at an hour's height: the finer the zoom, the finer the labelled division.
+    public func gridMarks(hour: Double, measures: GridMeasures) throws -> [GridMark] {
+        let grid: JSONValue = try rule("rules.gridAt", [.number(hour), measures.json])
+        return try rule("rules.gridMarks", [grid, 24])
+    }
+
+    /// The hour's heights a pinch moves between at this screen's whole-day height, the whole day first.
+    public func zoomRange(wholeDay: Double, levels: [Double]) throws -> [Double] {
+        let steps: [ZoomStep] = try rule("rules.levelsFor", [.number(wholeDay), Self.levels(levels)])
+        return steps.map(\.hourPx)
+    }
+
+    /// What a pinch let go at `hour` settles on, to keep on the device: `nil` for the whole day, else the hour's height.
+    public func zoomAfterPinch(hour: Double, wholeDay: Double, levels: [Double]) throws -> Double? {
+        let settled: JSONValue = try rule("rules.zoomAfterPinch", [.number(hour), .number(wholeDay), Self.levels(levels)])
+        return settled.number
+    }
+
+    /// The hour's height a zoom kept on the device opens at (`saved`: `"wholeDay"`, a height, or nothing yet).
+    public func zoomShown(saved: JSONValue, wholeDay: Double?, levels: [Double]) throws -> Double {
+        try rule("rules.zoomShown", [saved, wholeDay.map(JSONValue.number) ?? .null, Self.levels(levels)])
+    }
+
+    private static func levels(_ levels: [Double]) -> JSONValue { .array(levels.map { ["hourPx": .number($0)] }) }
 }
 
 /// The core's paints, each asked for once per drawing.
@@ -323,6 +405,11 @@ struct Painter {
             dark: try board.rule("rules.eventColors", [.string(hex), .number(alpha), "dark"]),
             light: try board.rule("rules.eventColors", [.string(hex), .number(alpha), "light"]))
     }
+}
+
+/// `ZoomLevel`: a level of the timeline's zoom.
+struct ZoomStep: Decodable, Sendable {
+    let hourPx: Double
 }
 
 /// `ColumnSections`: whose sections a column shows.
