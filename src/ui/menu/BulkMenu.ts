@@ -1,17 +1,17 @@
-import type { GroupName, TaskItem, TaskMenuModel } from "../../application/contracts";
+import type { GroupName, MenuStatusId, TaskItem, TaskMenuModel } from "../../application/contracts";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import { pickMark } from "../TaskSelection";
-import type { LocalDate, TaskStatus } from "../types";
-import { menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
+import type { LocalDate } from "../types";
+import { askGroup, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
 import { datePage } from "./DatePage";
 import { sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { labelTiles, priorityTiles, progressLabel } from "./TaskMenu";
+import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -19,7 +19,8 @@ export function countLabel(count: number): string {
 }
 
 export interface BulkActions {
-	setStatus(status: TaskStatus): Promise<void>;
+	/** A status tile (`TaskService.pickStatus`). */
+	pickStatus(id: MenuStatusId): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the tasks as they then stand, null once one is gone. */
@@ -61,6 +62,8 @@ export class BulkMenu {
 
 	/** A label being written: taps on the labels wait for it. */
 	private labelling = false;
+	/** What the menu asks about now, if the model says a pick asks first. */
+	private asking: Asking | null = null;
 
 	private constructor(private context: BulkMenuContext) {
 		this.overlay = new Overlay(() => this.close());
@@ -111,20 +114,39 @@ export class BulkMenu {
 		const { items, actions } = this.context;
 		const model = this.context.menu(items);
 		el(panel, "div", "tc-menu-title", countLabel(items.length));
-		const statuses: MenuTileSpec[] = [
-			{ label: "Done", icon: "done", onPick: this.pick(() => actions.setStatus("done")) },
-			{ label: progressLabel(model.progress), icon: "progress", onPick: this.pick(() => actions.setStatus(model.progress)) },
-			{ label: "Won’t do", icon: "wontdo", onPick: this.pick(() => actions.setStatus("cancelled")) },
-		];
-		tileGroup(panel, "is-status", [statuses]);
+		const statuses = statusTiles(model).map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }));
+		const asked = this.asking;
+		if (asked !== null && asked !== "delete") this.askGroup(panel, asked);
+		else tileGroup(panel, "is-status", [statuses]);
 		const levels = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
 		if (levels.length > 0) tileGroup(panel, "is-priority", tileRows(levels));
 		const labels = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
 		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
-		tileGroup(panel, "is-move", [moves]);
-		if (model.sections) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
-		menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: this.pick(() => actions.remove()) });
+		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
+		if (model.edits.includes("section")) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
+		if (this.asking === "delete") this.askGroup(panel, "delete");
+		else menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: model.remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+	}
+
+	/** A pick the model says asks first asks in place of what was pressed, the rest of the menu as it is. */
+	private askFor(what: Asking | null): void {
+		this.asking = what;
+		this.showMenu();
+	}
+
+	private askGroup(panel: HTMLElement, what: Asking): void {
+		const { items, actions } = this.context;
+		const { verb, icon, danger } = askLooks(what);
+		askGroup(panel, {
+			verb,
+			title: countLabel(items.length),
+			confirm: verb,
+			icon,
+			danger,
+			onCancel: () => this.askFor(null),
+			onConfirm: this.pick(() => (what === "delete" ? actions.remove() : actions.pickStatus(what))),
+		});
 	}
 
 	/** A label goes on or off the tasks and the menu stays, drawn again for them as the file now has them; one gone closes it. */
@@ -142,16 +164,15 @@ export class BulkMenu {
 		}
 	}
 
-	/** The sections of the tasks' list; the one they all stand in checked. */
+	/** The sections of the tasks' list, as the model offers them. */
 	private showSections(): void {
 		const sections = this.context.menu(this.context.items).sections;
 		if (!sections) return;
-		const { choice, shared } = sections;
 		const { actions } = this.context;
+		this.asking = null;
 		this.panel.replace((panel) =>
 			sectionChooser(panel, {
-				choice,
-				checked: (name) => shared && name === choice.current,
+				sections,
 				onBack: () => this.showMenu(),
 				onPick: (name) => this.pick(() => actions.toSection(name))(),
 			}),
@@ -161,6 +182,7 @@ export class BulkMenu {
 	private showPicker(): void {
 		const { items, actions, today } = this.context;
 		const model = this.context.menu(items);
+		this.asking = null;
 		this.panel.replace((panel) =>
 			datePage(panel, {
 				today,

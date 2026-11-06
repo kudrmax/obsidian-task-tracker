@@ -67,7 +67,10 @@ export function shownSections(groups: readonly GroupName[], sections: readonly L
 	return withEmptySections(shown, sections).map((g) => g.name);
 }
 
-/** Where in its list's sections a task can go: a list card's menu has them; a subtask, a timeline card or a done task none. */
+/**
+ * Where in its list's sections a task can go: the menu of a card in a column that shows its list's sections has them
+ * (`menuOffer`); a subtask, a done task, a timeline card, a stack's subtask and the whole screen none.
+ */
 export interface SectionChoice {
 	/** The sections the list has, in its order, then the presets it lacks, in the settings' order. */
 	readonly names: readonly string[];

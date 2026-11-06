@@ -5,12 +5,14 @@ import { sectionChooser } from "../../src/ui/menu/SectionChooser";
 afterEach(() => document.body.replaceChildren());
 
 const choice = { names: ["Work", "Home"], current: "Home", ungrouped: "No section" };
+const options = (checked: string | null | undefined) => [...choice.names, null].map((name) => ({ name, checked: name === checked }));
+const sections = (checked?: string | null, create = false) => ({ choice, options: options(checked), create });
 const rows = (panel: HTMLElement) => [...panel.querySelectorAll<HTMLElement>("button")].map((row) => [row.className, row.textContent, row.querySelector("svg") !== null]);
 
 describe("sectionChooser", () => {
-	it("the way back, the sections with the current checked, then the tasks outside any, quiet", () => {
+	it("the way back, the sections with the one the model checks checked, then the tasks outside any, quiet", () => {
 		const panel = document.body.appendChild(document.createElement("div"));
-		sectionChooser(panel, { choice, checked: (name) => name === "Home", onBack: () => undefined, onPick: () => undefined });
+		sectionChooser(panel, { sections: sections("Home"), onBack: () => undefined, onPick: () => undefined });
 		expect(rows(panel)).toEqual([
 			["tc-btn tc-menu-back", "Section", true],
 			["tc-btn tc-menu-row is-choice", "Work", false],
@@ -20,10 +22,13 @@ describe("sectionChooser", () => {
 		expect(panel.querySelector(".tc-menu-group")?.children.length).toBe(3);
 	});
 
-	it("New section last, apart, when it can be asked for", () => {
+	it("New section last, apart, where the model offers it", () => {
+		const none = document.body.appendChild(document.createElement("div"));
+		sectionChooser(none, { sections: sections(undefined, false), onBack: () => undefined, onPick: () => undefined, onNew: () => undefined });
+		expect(none.textContent).not.toContain("New section");
 		const panel = document.body.appendChild(document.createElement("div"));
 		let added = 0;
-		sectionChooser(panel, { choice, checked: () => false, onBack: () => undefined, onPick: () => undefined, onNew: () => added++ });
+		sectionChooser(panel, { sections: sections(undefined, true), onBack: () => undefined, onPick: () => undefined, onNew: () => added++ });
 		const last = panel.lastElementChild as HTMLElement;
 		expect([last.className, last.textContent]).toEqual(["tc-btn tc-menu-row is-apart is-add", "New section"]);
 		last.click();
@@ -34,7 +39,7 @@ describe("sectionChooser", () => {
 		const panel = document.body.appendChild(document.createElement("div"));
 		const picked: (string | null)[] = [];
 		let back = 0;
-		sectionChooser(panel, { choice, checked: () => false, onBack: () => back++, onPick: (name) => picked.push(name) });
+		sectionChooser(panel, { sections: sections(), onBack: () => back++, onPick: (name) => picked.push(name) });
 		panel.querySelectorAll<HTMLElement>("button").forEach((row) => row.click());
 		expect([back, picked]).toEqual([1, ["Work", "Home", null]]);
 	});

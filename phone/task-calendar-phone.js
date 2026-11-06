@@ -2384,6 +2384,8 @@ ${key.title}`.toLowerCase();
           return postpone(doc, entry, change.date, today);
         case "remove":
           return remove(doc, entry);
+        case "stop":
+          return stop(doc, entry);
         case "moveBefore":
           return moveBefore(doc, entry, first, change.date, today);
         case "moveToList":
