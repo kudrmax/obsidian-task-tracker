@@ -21,6 +21,9 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 5. **A project's step is never «the whole project in Soon».** Each task of a project moves through the lane on its own,
    or stays in the note untaken.
 6. **Project mark on a card.** A task from a project shows which project it belongs to; a tap opens the project note.
+7. **An untaken project task is in Backlog.** Whatever is written in a project note and not taken yet is the project's
+   backlog, so the plugin shows it in Backlog, grouped by project (a nested project: its own group). Taking it is the same
+   move as for any Backlog task: to Soon, Now, a day or the calendar.
 
 ## Open (being planned now)
 
