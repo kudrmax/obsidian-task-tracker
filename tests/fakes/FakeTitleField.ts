@@ -1,4 +1,5 @@
-import { composingKey, oneLine, type TitleField, type TitleFieldFactory, type TitleFieldOptions } from "../../src/ui/quick/TitleField";
+import { oneLine } from "../../src/application/contracts";
+import { composingKey, type TitleField, type TitleFieldFactory, type TitleFieldOptions } from "../../src/ui/quick/TitleField";
 
 /**
  * Obsidian's editor needs Obsidian: tests type in a plain textarea that keeps the same contract. Set `value` and send

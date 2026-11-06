@@ -242,8 +242,8 @@ export class TaskCalendarView extends ItemView {
 			title: () => dayTitle(this.titleDay ?? this.selectedDate, this.today()),
 			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
-			inboxName: () => this.settings.sections.inbox,
-			soonName: () => this.settings.sections.soon,
+			inboxName: () => this.deps.tasks.listName("inbox"),
+			soonName: () => this.deps.tasks.listName("soon"),
 			doneName: () => this.settings.sections.done,
 		});
 		this.leftEl = el(root, "div", "tc-left");
@@ -1091,7 +1091,7 @@ export class TaskCalendarView extends ItemView {
 			if (missing) this.renderMissing(root);
 			this.soonList.render();
 			this.inboxList.render();
-			this.backlogTitle.textContent = this.settings.sections.backlog;
+			this.backlogTitle.textContent = this.deps.tasks.listName("backlog");
 			this.backlogList.render();
 			this.doneList.render();
 		}

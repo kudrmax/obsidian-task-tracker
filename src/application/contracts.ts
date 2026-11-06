@@ -37,6 +37,8 @@ export { sectionChoice, type SectionChoice, type SectionOffer } from "./sections
 export { DESCRIPTION_TEMPLATE } from "../domain/description";
 /** A task's text cut into text and links, each link by its word. */
 export { textParts, type TextPart } from "../domain/TaskText";
+/** A task is one line of the file: a line break in its title reads as one space, the same as the domain writes it. */
+export { LINE_BREAK, oneLine } from "../domain/TaskTitle";
 /** The hour's heights the settings tab writes and reads as text. */
 import type { SectionNames, ViewSettings } from "../settings";
 export type { RightMode, SectionNames, ViewSettings, Zoom, ZoomLevel } from "../settings";
@@ -332,6 +334,8 @@ export interface TaskService {
 	dayColumn(date: LocalDate): DayColumn;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
+	/** The name a list goes by wherever the screens name a place: its section's name in the settings. A day is named by its date. */
+	listName(list: GroupedList): string;
 	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
 	dayOfPlacement(placement: Placement): LocalDate | null;
 

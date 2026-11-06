@@ -13,6 +13,7 @@ import { DayBoundary } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
+import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const TODAY = "2026-11-01";
 const COLUMNS: readonly ListColumn[] = ["left", "soon", "inbox"];
@@ -135,6 +136,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			},
 			placementOf: (): Placement => ({ kind: "now" }),
 			placementOfDay: (date) => placementOfDay(date, TODAY),
+			listName: (list) => DEFAULT_SETTINGS.sections[list],
 			dayOfPlacement: (placement) => dayOfPlacement(placement, TODAY),
 			...priorityTitles([{ prefix: "p1", color: "red" }], labels),
 		},

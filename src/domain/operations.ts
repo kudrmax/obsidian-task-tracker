@@ -7,13 +7,14 @@ import type { Placement, TaskDraft } from "./Placement";
 import { type Column, columnGroups, columnList } from "./queries";
 import { Repeat, type RepeatRule } from "./Repeat";
 import { DEFAULT_REMINDER, isOpen, STATUS_CHARS, type GroupName, type LocalDate, type ReminderKind, type SectionKey, type Slot, type Task, type TaskStatus } from "./Task";
+import { taskTitle } from "./TaskTitle";
 import { type InsertPosition, type TaskDocument, type TaskEntry, type TaskGroup, ungroupedIndex } from "./TaskDocument";
 
 const HOUR_MINUTES = 60;
 const MINUTE_MS = 60_000;
 
 export function newTask(text: string, patch: Partial<Task> = {}): Task {
-	return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch };
+	return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch };
 }
 
 /** The day a task is set for: its due date, else its slot's day. */
@@ -154,7 +155,7 @@ export function setReminder(doc: TaskDocument, entry: TaskEntry, reminder: Remin
 }
 
 export function rename(doc: TaskDocument, entry: TaskEntry, text: string): TaskDocument {
-	return patch(doc, entry, { text: text.trim() });
+	return patch(doc, entry, { text: taskTitle(text) });
 }
 
 /** The description from Markdown: see `TaskDocument.setDescription`. */
@@ -299,8 +300,8 @@ function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, tod
 
 /** A title as typed, with the priority and labels chosen for it, as the file is to get it. */
 function typed(doc: TaskDocument, text: string, priority: string | null, labels: readonly string[]): Marks & { readonly text: string } {
-	const marked = typedMarks(text, priority, labels, doc.priorityPrefixes());
-	return { ...marked, text: marked.text.trim() };
+	const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
+	return { ...marked, text: taskTitle(marked.text) };
 }
 
 /** What an edit writes: the draft's text, its priority or the one typed, and its labels, else the task's own, while there is none. */

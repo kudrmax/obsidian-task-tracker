@@ -26,7 +26,7 @@ export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 export interface QuickEntryControllerDeps {
 	/** The view's content: the plus and the bar go in it, the bar last, at its bottom. */
 	readonly root: HTMLElement;
-	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks">;
+	readonly tasks: Pick<TaskService, "createInPlace" | "createSection" | "edit" | "placementOf" | "placementOfDay" | "listName" | "dayOfPlacement" | "priorityLevels" | "labelLevels" | "parseTitle" | "isBlank" | "withPriority" | "draftMarks">;
 	readonly arbiter: GestureArbiter;
 	readonly drag: Pick<DragController, "beginNew">;
 	/** The field the text is typed in. */
@@ -186,6 +186,7 @@ export class QuickEntryController {
 			levels: () => deps.tasks.priorityLevels(),
 			labels: () => deps.tasks.labelLevels(),
 			today: () => deps.today(),
+			listName: (list) => deps.tasks.listName(list),
 			placementOfDay: (day) => deps.tasks.placementOfDay(day),
 			onIndent: (delta) => this.entry.indent(delta),
 			onSection: () => this.entry.toggleSection(),

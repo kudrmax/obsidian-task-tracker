@@ -59,7 +59,7 @@ Settings → Task Calendar. Настройки лежат в `data.json` пла�
 | Настройка | По умолчанию | Что значит |
 |---|---|---|
 | File path | `TODOs Tasks.md` | Файл задач. |
-| Section headings: Inbox, Now, Soon, Backlog, Done | так же | Текст заголовков `##`. |
+| Section headings: Inbox, Now, Soon, Backlog, Done | так же | Текст заголовков `##`. Этими же именами списки названы в заголовках колонок, на кнопке места и в её плитках. |
 | Due date marker | `📅` | Эмодзи срока. |
 | Slot marker | `⏰` | Эмодзи времени (на iPhone — тихое уведомление). |
 | Alarm marker | `🚨` | Эмодзи времени с будильником на iPhone. |

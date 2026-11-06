@@ -1030,11 +1030,20 @@
     return listed(doc).filter((e) => e.task.slot !== null && isOpen(e.task.status));
   }
 
+  // src/domain/TaskTitle.ts
+  var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
+  function oneLine(text) {
+    return text.replace(LINE_BREAK, " ");
+  }
+  function taskTitle(text) {
+    return oneLine(text).trim();
+  }
+
   // src/domain/operations.ts
   var HOUR_MINUTES3 = 60;
   var MINUTE_MS = 6e4;
   function newTask(text, patch2 = {}) {
-    return { status: "todo", statusChar: STATUS_CHARS.todo, text: text.trim(), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
+    return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], collapsed: false, children: [], ...patch2 };
   }
   function dayOf(task, boundary) {
     return task.dueDate ?? (task.slot ? boundary.dayOfSlot(task.slot) : null);
@@ -1114,8 +1123,8 @@
     return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
   }
   function typed(doc, text, priority, labels) {
-    const marked = typedMarks(text, priority, labels, doc.priorityPrefixes());
-    return { ...marked, text: marked.text.trim() };
+    const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
+    return { ...marked, text: taskTitle(marked.text) };
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1445,9 +1454,59 @@
         text,
         this.settings,
         now,
-        (doc, today, boundary) => createInPlace(doc, title.trim(), null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
+        (doc, today, boundary) => createInPlace(doc, title, null, { kind: "list", list, group: null, before: null, date: null }, today, boundary)
       );
       return { changed: true, text: written };
+    }
+  };
+
+  // src/application/calendarDays.ts
+  function localTime(date, plusDays, hour) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d + plusDays, hour);
+  }
+  var DayWindow = class {
+    constructor(date, boundary) {
+      this.timedStart = localTime(date, 0, boundary.startHour);
+      this.timedEnd = localTime(date, 1, boundary.startHour);
+      this.dateStart = localTime(date, 0, 0);
+      this.dateEnd = localTime(date, 1, 0);
+    }
+    /** What to choose the events from: both spans. */
+    get fetchStart() {
+      return this.dateStart;
+    }
+    get fetchEnd() {
+      return this.timedEnd;
+    }
+    shows(e) {
+      return e.allDay ? this.touches(e, this.dateStart, this.dateEnd) : this.touches(e, this.timedStart, this.timedEnd);
+    }
+    touches(e, start, end) {
+      const overlaps = e.start < end && e.end > start;
+      const startsInside = e.start >= start && e.start < end;
+      return overlaps || e.allDay && startsInside;
+    }
+  };
+  var CalendarDays = class {
+    constructor(choice, boundary) {
+      this.choice = choice;
+      this.boundary = boundary;
+    }
+    day(date) {
+      const span = new DayWindow(date, this.boundary);
+      const chosen = this.choice.day(span.fetchStart, span.fetchEnd);
+      return { events: chosen.events.filter((e) => span.shows(e)), stale: chosen.stale };
+    }
+    /** The timed events that overlap `from`–`to`, each as the day showing it has it, once each, by start. */
+    timedBetween(from, to) {
+      const found = /* @__PURE__ */ new Map();
+      for (let date = this.boundary.dayOf(from); new DayWindow(date, this.boundary).timedStart < to; date = addDays(date, 1)) {
+        for (const e of this.day(date).events) {
+          if (!e.allDay && e.start < to && e.end > from && !found.has(e.id)) found.set(e.id, e);
+        }
+      }
+      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
     }
   };
 
@@ -1635,7 +1694,7 @@ ${e.calendar}`;
     files() {
       return this.sources().map((s) => s.path);
     }
-    /** The timed meetings that overlap `from`–`to`, chosen day by day; a file missing (`null`) or unreadable adds none. */
+    /** The timed meetings that overlap `from`–`to`, chosen day by day as the calendar chooses them, its days cut at the day's start; a file missing (`null`) or unreadable adds none. */
     between(texts, from, to, now) {
       const files = /* @__PURE__ */ new Map();
       this.sources().forEach((source, i) => {
@@ -1648,15 +1707,7 @@ ${e.calendar}`;
       });
       const known = new CalendarChoice(files, [], this.settings.staleAfterMinutes * MINUTE_MS2, now).known();
       const choice = new CalendarChoice(files, hiddenNow(this.settings, known, files.get("google")), this.settings.staleAfterMinutes * MINUTE_MS2, now);
-      const found = /* @__PURE__ */ new Map();
-      for (let day = new Date(from.getFullYear(), from.getMonth(), from.getDate()); day < to; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) {
-        const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
-        const start = day < from ? from : day;
-        for (const e of choice.day(start, next < to ? next : to).events) {
-          if (!e.allDay && !found.has(e.id)) found.set(e.id, { title: e.title, start: e.start, end: e.end });
-        }
-      }
-      return [...found.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+      return new CalendarDays(choice, new DayBoundary(this.settings.dayStartHour)).timedBetween(from, to).map((e) => ({ title: e.title, start: e.start, end: e.end }));
     }
     sources() {
       return [

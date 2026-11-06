@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { CalendarFile } from "../../src/application/calendarFile";
 import { CalendarServiceImpl } from "../../src/application/CalendarServiceImpl";
 import type { CalendarEvent, CalendarSource } from "../../src/application/contracts";
@@ -73,8 +73,8 @@ class FakeClock implements Clock {
 const NO_EXPORT = { export: () => undefined };
 const DAY = "2026-10-30";
 
-function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0, settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), onPhone = false) {
-	return new CalendarServiceImpl(files, feeds, clock, settings, new FakeTimers(), NO_EXPORT, { canMigrate: () => onPhone });
+function service(files: EventFile[], feeds: EventFeed[] = [], clock = new FakeClock(), dayStartHour = 0, settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour }), onPhone = false, timers = new FakeTimers()) {
+	return new CalendarServiceImpl(files, feeds, clock, settings, timers, NO_EXPORT, { canMigrate: () => onPhone });
 }
 
 const refreshed = (calendars: CalendarServiceImpl, date = DAY) => calendars.events(date, "refresh").fresh!();
@@ -143,20 +143,24 @@ describe("CalendarServiceImpl", () => {
 		expect((await refreshed(calendars)).statuses[0].ok).toBe(true);
 	});
 
-	it("a feed silent for 15 s is reported and the file is still shown", async () => {
-		vi.useFakeTimers();
-		try {
-			const file = new FakeFile("google", [event("google", "kept", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
-			const feed = new FakeFeed("google", file);
-			feed.silent = true;
-			const pending = refreshed(service([file], [feed]));
-			await vi.advanceTimersByTimeAsync(15_000);
-			const day = await pending;
-			expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-			expect(day.statuses[0].message).toBe("no answer in 15 s");
-		} finally {
-			vi.useRealTimers();
-		}
+	it("a feed silent for 15 s is reported and the file is still shown, timed by the service's timers", async () => {
+		const file = new FakeFile("google", [event("google", "kept", new Date(2026, 9, 30, 12), new Date(2026, 9, 30, 13))]);
+		const feed = new FakeFeed("google", file);
+		feed.silent = true;
+		const timers = new FakeTimers();
+		const pending = refreshed(service([file], [feed], new FakeClock(), 0, undefined, false, timers));
+		await Promise.resolve();
+		expect(timers.delays).toEqual([15_000]);
+		timers.fire();
+		const day = await pending;
+		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
+		expect(day.statuses[0].message).toBe("no answer in 15 s");
+	});
+
+	it("a feed that answers clears its timer", async () => {
+		const timers = new FakeTimers();
+		await refreshed(service([new FakeFile("google")], [new FakeFeed("google")], new FakeClock(), 0, undefined, false, timers));
+		expect(timers.delays).toEqual([]);
 	});
 
 	it("a file that cannot be read keeps what it showed before and says why", async () => {
