@@ -27,10 +27,11 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 8. **A project task never leaves its note.** Taken, moved or done, its line stays in the project note; the plugin writes
    where it is in the lane on that line. Done, it stays in the note as `- [x]` and leaves the screen like any done task:
    the note keeps the project's history. The general Done of `TODOs Tasks.md` holds only tasks of that file.
+9. **A project note is a note tagged `#project`**, anywhere in the vault (Max hardly uses folders). The tag counts in the
+   note's properties or in its text; the project's name is the note's name.
 
 ## Open (being planned now)
 
-- How a project note is recognised (folder, frontmatter, tag).
 - How the lane is written on a project task's line (technical, decided by the backend).
 - Where the plugin shows projects: a screen of projects inside the plugin or only the notes.
 - What the project mark on a card looks like, on the phone and the desktop.
