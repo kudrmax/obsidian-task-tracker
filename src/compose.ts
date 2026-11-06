@@ -1,12 +1,9 @@
 import type { App } from "obsidian";
-import { CalendarServiceImpl } from "./application/CalendarServiceImpl";
-import type { CalendarService, DayService, GoogleAccount, TaskService, UndoService, WorkCalendarSetup } from "./application/contracts";
-import { DayServiceImpl } from "./application/DayServiceImpl";
+import { calendarPath } from "./application/calendarFile";
+import { composeCore, type Core } from "./application/composeCore";
+import type { CalendarSource, GoogleAccount, WorkCalendarSetup } from "./application/contracts";
 import { GoogleAccountService } from "./application/GoogleAccountService";
 import { systemClock, type Clock, type SettingsStore, type Ticker, type Timers } from "./application/ports";
-import { TaskServiceImpl } from "./application/TaskServiceImpl";
-import { UndoHistory } from "./application/UndoHistory";
-import { GOOGLE_CALENDAR_FILE, IPHONE_CALENDAR_FILE } from "./application/calendarFile";
 import { CalendarFileSource } from "./infrastructure/CalendarFileSource";
 import { GoogleAuth } from "./infrastructure/GoogleAuth";
 import { GoogleCalendarApi } from "./infrastructure/GoogleCalendarApi";
@@ -20,11 +17,7 @@ import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
 import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastructure/WorkCalendarShortcut";
 
-export interface Services {
-	readonly tasks: TaskService;
-	readonly days: DayService;
-	readonly undo: UndoService;
-	readonly calendars: CalendarService;
+export interface Services extends Core {
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	/** Google's answer from the obsidian:// handler, turned into the refresh token. */
@@ -39,27 +32,31 @@ export interface ServicesHost {
 }
 
 export function createServices(app: App, host: ServicesHost, settings: SettingsStore, clock: Clock = systemClock): Services {
-	const store = new VaultTaskFileStore(app, () => settings.get().tasksFile);
-	const history = new UndoHistory(store);
 	const token = (fields: Record<string, string>) => requestToken(obsidianHttp, settings.get().google.clientId, settings.get().google.clientSecret, fields);
 	const login = new GoogleRedirectLogin(browserLoginDeps(token));
 	const auth = new GoogleAuth(settings, login, token, clock);
 	const googleApi = new GoogleCalendarApi(auth, settings, clock, obsidianHttp);
 	const watcher = new VaultPathWatcher(app.vault);
-	const googleFile = new CalendarFileSource("google", () => GOOGLE_CALENDAR_FILE, app.vault.adapter, watcher);
-	const iphoneFile = new CalendarFileSource("iphone", () => IPHONE_CALENDAR_FILE, app.vault.adapter, watcher);
-	const workFile = new CalendarFileSource("work", () => settings.get().workCalendarFile, app.vault.adapter, watcher);
+	const calendarFile = (source: CalendarSource) => new CalendarFileSource(source, () => calendarPath(source, settings.get()), app.vault.adapter, watcher);
+	const calendarFiles = { google: calendarFile("google"), iphone: calendarFile("iphone"), work: calendarFile("work") };
 	const googleFeed = new GoogleCalendarFeed(googleApi, auth, app.vault.adapter, settings, clock);
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
-	const tasks = new TaskServiceImpl(store, settings, clock, history);
-	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => iphoneFile.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
+	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
+	const core = composeCore({
+		tasksFile: new VaultTaskFileStore(app, () => settings.get().tasksFile),
+		settings,
+		clock,
+		ticker: windowTicker,
+		timers: windowTimers,
+		calendarFiles,
+		feeds: [googleFeed],
+		work,
+		isPhone: () => host.shortcuts.isPhone,
+	});
 	return {
-		tasks,
-		days: new DayServiceImpl(clock, settings, tasks, windowTicker),
-		undo: history,
-		calendars: new CalendarServiceImpl([googleFile, iphoneFile, workFile], [googleFeed], clock, settings, windowTimers, work, { canMigrate: () => host.shortcuts.isPhone }),
+		...core,
 		google: new GoogleAccountService(auth, googleApi, settings),
 		work,
 		receiveLogin: (params) => login.receive(params),
