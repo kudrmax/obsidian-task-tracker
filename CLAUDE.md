@@ -56,6 +56,17 @@ Delete only with `trash`, never `rm`.
 
 `master` is the only long-lived branch; the main clone stays on it. Every piece of work is a branch from a fresh master in its own worktree under `.worktrees/`. Once Max approves: merge `origin/master` into the branch and run the tests there; then, in the main clone, `git pull --ff-only`, `git merge --no-ff <branch>` and `git push origin master` at once, then the release. No PRs. (`mvp` was removed on 2026-11-05: it only mirrored master.)
 
+## Agents
+
+A feature that touches more than one layer is built by the project's agents in `.claude/agents/`, the session Max talks to leads them:
+
+- `backend`: `core/`, the contracts and the door.
+- `frontend-obsidian`: `obsidian/`, `styles.css`, `docs/plugin/`.
+- `frontend-swift`: `apple/`.
+- `reviewer`: reads all the diffs against the spec, changes nothing.
+
+The lead writes the feature's spec in `docs/superpowers/specs/` (what Max sees, what the contract gives), then runs `backend` in its own worktree; once its contract is in, `frontend-obsidian` and `frontend-swift` run at the same time, each in its own worktree from the backend's branch; then `reviewer`. The spec is where the frontends meet: a gap either of them closes is decided by that agent and written into the spec, so the other reads the same; they don't pass messages through the lead. Technical and small design decisions stay with the agents; only a product question reaches Max, from the lead, in product words. The lead checks every report against the diff, sends the review's findings back to the side that should fix them, and shows Max the result for approval before the merge.
+
 ## The Apple apps
 
 `apple/` is an XcodeGen project (`project.yml`; the `.xcodeproj`, the Info.plists and the signing team `App/Config/Team.xcconfig` are not in git). `apple/Core` is a Swift package with the bridge to the core and what only Swift can do (files by bookmark, the repeat plan, the reminder sync); `swift test --package-path apple/Core` (`npm run test:apple`) runs its tests on the Mac against the committed `core/task-calendar-phone.js`, and the release runs them too. Everything the app shows is English, controls are stock iOS 26; Apple's guides and UI kits to design from are in `docs/design/apple.md`. Simulator builds take Xcode 26.3 (`DEVELOPER_DIR=/Applications/Xcode-26.3.0.app/Contents/Developer`) and one of the two simulators from `~/.claude/CLAUDE.md`.
