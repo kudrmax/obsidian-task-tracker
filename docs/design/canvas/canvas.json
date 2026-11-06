@@ -2353,6 +2353,30 @@
    "h": 1340,
    "page": "projects",
    "title": "Backlog по проектам"
+  },
+  "Proj4V1.dc.html": {
+   "x": 0,
+   "y": 6840,
+   "w": 3508,
+   "h": 1340,
+   "page": "projects",
+   "title": "Живой блок в заметке. Вариант 1 — разделы сверху вниз, как в файле"
+  },
+  "Proj4V2.dc.html": {
+   "x": 0,
+   "y": 8300,
+   "w": 3508,
+   "h": 1340,
+   "page": "projects",
+   "title": "Живой блок в заметке. Вариант 2 — экран плагина в заметке"
+  },
+  "ProjNote.dc.html": {
+   "x": 22180,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "page": "components",
+   "title": "Компонент заметки проекта с живым блоком (его показывают доски «Проекты»)"
   }
  },
  "createdOnFiles": {
@@ -3073,7 +3097,10 @@
   "Proj2V2.dc.html",
   "Proj3Flow.dc.html",
   "ProjPhone.dc.html",
-  "ProjDesk.dc.html"
+  "ProjDesk.dc.html",
+  "Proj4V1.dc.html",
+  "Proj4V2.dc.html",
+  "ProjNote.dc.html"
  ],
  "pages": [
   {
