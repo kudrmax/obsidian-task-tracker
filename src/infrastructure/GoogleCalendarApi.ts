@@ -1,5 +1,6 @@
 import type { FileCalendar } from "../application/calendarFile";
 import type { CalendarEvent } from "../application/contracts";
+import { SourceProblemError } from "../application/EventSource";
 import type { Clock, SettingsStore } from "../application/ports";
 import type { GoogleAuth } from "./GoogleAuth";
 import type { Http } from "./Http";
@@ -57,7 +58,7 @@ export class GoogleCalendarApi {
 	) {}
 
 	async export(start: Date, end: Date): Promise<GoogleExport> {
-		if (!this.auth.isLoggedIn()) throw new Error("not logged in");
+		if (!this.auth.isLoggedIn()) throw new SourceProblemError({ kind: "loggedOut" }, "not logged in");
 		const list = await this.calendarList();
 		const account = list.find((c) => c.primary)?.id ?? list[0]?.id ?? "";
 		try {

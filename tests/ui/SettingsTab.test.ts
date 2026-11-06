@@ -386,8 +386,8 @@ describe("the settings tab: the calendar sources", () => {
 describe("the settings tab: the calendars shown", () => {
 	it("lists every known calendar under its account on the Calendars page, with a toggle that hides it", async () => {
 		calendars.list = [
-			{ account: "max@gmail.com", title: "Personal", color: null, shown: true },
-			{ account: "max@company.ru", title: "Календарь", color: null, shown: false },
+			{ account: "max@gmail.com", title: "Personal", accountName: "max@gmail.com", name: "Personal", color: null, shown: true },
+			{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: false },
 		];
 		await open();
 		await settled();
@@ -406,8 +406,8 @@ describe("the settings tab: the calendars shown", () => {
 		expect(calendars.asked).toEqual([["max@gmail.com", "Personal", false]]);
 	});
 
-	it("names a calendar under the iPhone heading without repeating iPhone", async () => {
-		calendars.list = [{ account: "", title: "iPhone · Календарь", color: null, shown: true }];
+	it("lists each calendar by its name under its account's name, as the service names them", async () => {
+		calendars.list = [{ account: "", title: "iPhone · Календарь", accountName: "iPhone", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();
@@ -416,7 +416,7 @@ describe("the settings tab: the calendars shown", () => {
 	});
 
 	it("lays the calendars out as rows of the page, so the next heading keeps its space", async () => {
-		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();
@@ -426,7 +426,7 @@ describe("the settings tab: the calendars shown", () => {
 	});
 
 	it("shows the calendars whether or not Google is logged in", async () => {
-		calendars.list = [{ account: "max@company.ru", title: "Календарь", color: null, shown: true }];
+		calendars.list = [{ account: "max@company.ru", title: "Календарь", accountName: "max@company.ru", name: "Календарь", color: null, shown: true }];
 		await open();
 		page("Calendars");
 		await settled();

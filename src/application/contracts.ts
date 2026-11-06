@@ -197,16 +197,20 @@ export interface DayView {
 	readonly slotted: readonly TaskItem[];
 }
 
+/** The task a call names is no longer at its place in the file, as read: the frontend says so and reads the tasks anew. */
 export class StaleTaskError extends Error {
+	readonly code = "staleTask";
 	constructor() {
-		super("The task changed in the file; the view was refreshed");
+		super("stale task");
 		this.name = "StaleTaskError";
 	}
 }
 
+/** No tasks file at `path`: the frontend says so, or offers to create it. */
 export class TasksFileMissingError extends Error {
+	readonly code = "tasksFileMissing";
 	constructor(readonly path: string) {
-		super(`Tasks file not found: ${path}`);
+		super(`tasks file missing: ${path}`);
 		this.name = "TasksFileMissingError";
 	}
 }
@@ -575,17 +579,28 @@ export interface CalendarEvent {
 /** `synced`: the plugin fetches it itself (Google); `exported`: a file another device exports (the work calendar from the iPhone). */
 export type SourceKind = "synced" | "exported";
 
+/**
+ * Why a source has nothing fresh: Google not logged in, its file not in the vault, a feed silent for `seconds`, or any
+ * other failure with the source's own text. The frontend words it.
+ */
+export type SourceProblem =
+	| { readonly kind: "loggedOut" }
+	| { readonly kind: "fileMissing" }
+	| { readonly kind: "noAnswer"; readonly seconds: number }
+	| { readonly kind: "failed"; readonly detail: string };
+
 export interface SourceStatus {
 	readonly source: CalendarSource;
 	readonly kind: SourceKind;
-	readonly ok: boolean;
-	/** "12 events", "not logged in", "file missing", an error text. */
-	readonly message: string;
+	/** Null while the source is fine. */
+	readonly problem: SourceProblem | null;
+	/** How many of the day's events shown come from it. */
+	readonly events: number;
 	/** When this source's data was last fetched successfully (for the work file: its exportedAt). */
 	readonly updatedAt: Date | null;
 	/** The work file's `device` ("iPhone"); nothing for Google. */
 	readonly detail: string | null;
-	/** `updatedAt` older than `settings.staleAfterMinutes`, or not ok: the orange dot. */
+	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
 	readonly stale: boolean;
 }
 
@@ -598,8 +613,13 @@ export interface DayEvents {
 
 /** A calendar some writer's file lists, by account and title, and whether the plugin shows it. */
 export interface ShownCalendar {
+	/** With `title`, the calendar's key: what `setShown` takes back. */
 	readonly account: string;
 	readonly title: string;
+	/** The heading the calendar is listed under: its account, or iPhone for the phone's own calendars no account names. */
+	readonly accountName: string;
+	/** The calendar's name as listed under that heading. */
+	readonly name: string;
 	readonly color: string | null;
 	readonly shown: boolean;
 }

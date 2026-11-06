@@ -322,13 +322,13 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 		const calendars = await this.deps.calendars.known();
 		const el = place.ownerDocument.createElement("div");
 		if (calendars.length > 0) new Setting(el).setName("Calendars shown").setDesc("Which calendars the timeline and the iPhone's reminders show. A new calendar is shown.").setHeading();
-		let account: string | null = null;
+		let heading: string | null = null;
 		for (const calendar of calendars) {
-			if (calendar.account !== account) {
-				account = calendar.account;
-				new Setting(el).setName(account === "" ? "iPhone" : account).setHeading();
+			if (calendar.accountName !== heading) {
+				heading = calendar.accountName;
+				new Setting(el).setName(heading).setHeading();
 			}
-			new Setting(el).setName(calendar.account === "" ? calendar.title.replace(/^iPhone · /, "") : calendar.title).addToggle((t) =>
+			new Setting(el).setName(calendar.name).addToggle((t) =>
 				t.setValue(calendar.shown).onChange((shown) => this.deps.calendars.setShown(calendar.account, calendar.title, shown)),
 			);
 		}

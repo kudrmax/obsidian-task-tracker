@@ -1,6 +1,69 @@
 // Task Calendar: built from src/phone by `node phone/build.mjs`. Do not edit.
 "use strict";
 (() => {
+  // src/domain/LocalDate.ts
+  var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  var TIME_RE = /^(\d{2}):(\d{2})$/;
+  var DAY_MS = 864e5;
+  var HOUR_MINUTES = 60;
+  var MINUTES_PER_DAY = 1440;
+  function pad2(n) {
+    return n < 10 ? `0${n}` : String(n);
+  }
+  function formatUtc(d) {
+    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+  }
+  function localDateOf(d) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+  function isValidLocalDate(s) {
+    const m = DATE_RE.exec(s);
+    if (!m) return false;
+    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return formatUtc(d) === s;
+  }
+  function addDays(date, n) {
+    return formatUtc(new Date(utcMs(date) + n * DAY_MS));
+  }
+  function addMonths(date, n) {
+    const { year, month, day } = partsOf(date);
+    const index = year * 12 + (month - 1) + n;
+    const y = Math.floor(index / 12);
+    const m = index - y * 12 + 1;
+    return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
+  }
+  function daysInMonth(year, month) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+  }
+  function weekdayOf(date) {
+    return (new Date(utcMs(date)).getUTCDay() + 6) % 7;
+  }
+  function partsOf(date) {
+    const m = DATE_RE.exec(date);
+    if (!m) throw new Error(`Not a date: ${date}`);
+    return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+  }
+  function daysBetween(from, to) {
+    return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);
+  }
+  function utcMs(date) {
+    const m = DATE_RE.exec(date);
+    if (!m) throw new Error(`Not a date: ${date}`);
+    return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  function minutesToHHMM(minutes) {
+    return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+  }
+  function parseHHMM(s) {
+    const m = TIME_RE.exec(s);
+    if (!m) return null;
+    const hours = Number(m[1]);
+    const minutes = Number(m[2]);
+    if (hours > 24 || minutes > 59) return null;
+    const total = hours * HOUR_MINUTES + minutes;
+    return total > MINUTES_PER_DAY ? null : total;
+  }
+
   // src/domain/Label.ts
   function usableLabelName(name) {
     return /^[^\s#]+$/.test(name);
@@ -143,69 +206,6 @@ ${e.calendar}`;
     return [...seen.values()];
   }
 
-  // src/domain/LocalDate.ts
-  var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-  var TIME_RE = /^(\d{2}):(\d{2})$/;
-  var DAY_MS = 864e5;
-  var HOUR_MINUTES = 60;
-  var MINUTES_PER_DAY = 1440;
-  function pad2(n) {
-    return n < 10 ? `0${n}` : String(n);
-  }
-  function formatUtc(d) {
-    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-  }
-  function localDateOf(d) {
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  }
-  function isValidLocalDate(s) {
-    const m = DATE_RE.exec(s);
-    if (!m) return false;
-    const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-    return formatUtc(d) === s;
-  }
-  function addDays(date, n) {
-    return formatUtc(new Date(utcMs(date) + n * DAY_MS));
-  }
-  function addMonths(date, n) {
-    const { year, month, day } = partsOf(date);
-    const index = year * 12 + (month - 1) + n;
-    const y = Math.floor(index / 12);
-    const m = index - y * 12 + 1;
-    return `${String(y).padStart(4, "0")}-${pad2(m)}-${pad2(Math.min(day, daysInMonth(y, m)))}`;
-  }
-  function daysInMonth(year, month) {
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
-  }
-  function weekdayOf(date) {
-    return (new Date(utcMs(date)).getUTCDay() + 6) % 7;
-  }
-  function partsOf(date) {
-    const m = DATE_RE.exec(date);
-    if (!m) throw new Error(`Not a date: ${date}`);
-    return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
-  }
-  function daysBetween(from, to) {
-    return Math.round((utcMs(to) - utcMs(from)) / DAY_MS);
-  }
-  function utcMs(date) {
-    const m = DATE_RE.exec(date);
-    if (!m) throw new Error(`Not a date: ${date}`);
-    return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  }
-  function minutesToHHMM(minutes) {
-    return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
-  }
-  function parseHHMM(s) {
-    const m = TIME_RE.exec(s);
-    if (!m) return null;
-    const hours = Number(m[1]);
-    const minutes = Number(m[2]);
-    if (hours > 24 || minutes > 59) return null;
-    const total = hours * HOUR_MINUTES + minutes;
-    return total > MINUTES_PER_DAY ? null : total;
-  }
-
   // src/domain/DayBoundary.ts
   var HOUR_MINUTES2 = 60;
   var DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES2;
@@ -330,6 +330,8 @@ ${e.calendar}`;
   // src/application/calendarChoice.ts
   var keyText = (key) => `${key.account}
 ${key.title}`.toLowerCase();
+  var PHONE_ACCOUNT = "iPhone";
+  var apart = (title) => `${PHONE_ACCOUNT} · ${title}`;
   var GOOGLE_ORDER = ["google", "iphone", "work"];
   var OTHER_ORDER = ["iphone", "work"];
   var CalendarChoice = class {
@@ -351,7 +353,9 @@ ${key.title}`.toLowerCase();
         for (const calendar of this.files.get(source)?.calendars ?? []) {
           const key = this.keyOf(source, calendar);
           const text = keyText(key);
-          if (!found.has(text)) found.set(text, { key, color: calendar.color, google: source === "google" || this.isGoogle(key) });
+          if (found.has(text)) continue;
+          const name = source === "work" && key.title === apart(calendar.title) ? calendar.title : key.title;
+          found.set(text, { key, accountName: key.account === "" ? PHONE_ACCOUNT : key.account, name, color: calendar.color, google: source === "google" || this.isGoogle(key) });
         }
       }
       return [...found.values()].sort(
@@ -410,7 +414,7 @@ ${key.title}`.toLowerCase();
         }
       }
       if (titled.size === 1) return [...titled.values()][0];
-      return { account: "", title: titled.size === 0 ? ref.title : `iPhone · ${ref.title}` };
+      return { account: "", title: titled.size === 0 ? ref.title : apart(ref.title) };
     }
   };
   function phoneAccountOf(calendar) {
@@ -1008,9 +1012,9 @@ ${key.title}`.toLowerCase();
       const core = this.lines.slice(block.headingLine ?? content.first, content.last);
       if (block.headingLine === null) core.unshift(`### ${this.ungroupedName()}`);
       const cut = this.cutOf(section, from);
-      const apart = Array(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
+      const apart2 = Array(cut.to - cut.from - (content.last - (block.headingLine ?? content.first))).fill("");
       const last = before === this.blockLists.get(section).length;
-      const moved = last ? [...apart, ...core] : [...core, ...apart];
+      const moved = last ? [...apart2, ...core] : [...core, ...apart2];
       return this.withLines(this.cutAndInsert(cut, this.groupStartLine(section, before), moved));
     }
     renameGroup(section, index, name) {
@@ -1464,12 +1468,12 @@ ${key.title}`.toLowerCase();
       return entry ? keyOf(entry) : null;
     }
     reminder(entry, slot, at) {
-      const start = minutesToHHMM(slot.start);
       const nextDay = addDays(at.boundary.dayOfSlot(slot), 1);
       return {
         key: keyOf(entry),
         title: plainText(entry.task.text),
-        body: slot.end === null ? start : `${start}–${minutesToHHMM(slot.end % MINUTES_PER_DAY)}`,
+        startMinute: slot.start,
+        endMinute: slot.end,
         kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
         date: slot.date,
         start: clockOf(slot.date, slot.start),
@@ -2033,7 +2037,8 @@ ${key.title}`.toLowerCase();
   var DEFAULT_CARD_SIZE = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
   var StaleTaskError = class extends Error {
     constructor() {
-      super("The task changed in the file; the view was refreshed");
+      super("stale task");
+      this.code = "staleTask";
       this.name = "StaleTaskError";
     }
   };
@@ -2417,6 +2422,9 @@ ${key.title}`.toLowerCase();
   };
 
   // src/application/PhoneDoor.ts
+  function timeText(start, end) {
+    return end === null ? minutesToHHMM(start) : `${minutesToHHMM(start)}–${minutesToHHMM(end % MINUTES_PER_DAY)}`;
+  }
   var STALE = { changed: false, reason: "stale" };
   function action(text) {
     return text === null ? STALE : { changed: true, text };
@@ -2436,9 +2444,12 @@ ${key.title}`.toLowerCase();
   };
   var phoneDoor = {
     reminders(text, settingsJson, nowMs) {
-      return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, start, dayEnd, ...rest }) => ({
+      return new Call(settingsJson, nowMs).reminders.ringing(text).map(({ key, startMinute, endMinute, start, dayEnd, title, kind, date }) => ({
         id: key.raw,
-        ...rest,
+        title,
+        body: timeText(startMinute, endMinute),
+        kind,
+        date,
         startMs: start.getTime(),
         dayEndMs: dayEnd.getTime()
       }));

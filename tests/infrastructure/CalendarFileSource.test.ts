@@ -92,7 +92,7 @@ describe("CalendarFileSource", () => {
 	});
 
 	it("throws 'file missing' when the file is not there", async () => {
-		await expect(source([], "calendar/other.json").read()).rejects.toThrow("file missing");
+		await expect(source([], "calendar/other.json").read()).rejects.toMatchObject({ problem: { kind: "fileMissing" }, message: "file missing" });
 	});
 
 	it("reads and parses the file once while it stays the same", async () => {

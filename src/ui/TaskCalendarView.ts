@@ -16,6 +16,7 @@ import { ListDrop } from "./drag/ListDrop";
 import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu } from "./menu/GroupMenu";
+import { failureText } from "./failureText";
 import { GroupNameField } from "./GroupNameField";
 import { TimelineDrop } from "./drag/TimelineDrop";
 import { GestureArbiter } from "./gestures";
@@ -769,7 +770,7 @@ export class TaskCalendarView extends ItemView {
 			if ((await change()) === false) return;
 		} catch (error) {
 			if (!(error instanceof StaleTaskError)) throw error;
-			new Notice(error.message);
+			new Notice(failureText(error));
 		}
 		await this.data.tasks();
 	}
@@ -791,7 +792,7 @@ export class TaskCalendarView extends ItemView {
 
 	/** A write the screen did not wait for failed: said as any failed change is, and the lists show the file as it is. */
 	private reportFailure(error: unknown): void {
-		new Notice(error instanceof Error ? error.message : String(error));
+		new Notice(failureText(error));
 		void this.data.tasks();
 	}
 

@@ -1,3 +1,4 @@
+import { SourceProblemError } from "../application/EventSource";
 import type { Clock, SettingsStore } from "../application/ports";
 import type { TokenResponse } from "./GoogleToken";
 
@@ -40,7 +41,7 @@ export class GoogleAuth {
 	/** Calls that come while the token is being refreshed share that refresh; one answered after a logout is not kept. */
 	async accessToken(): Promise<string> {
 		const { refreshToken } = this.settings.get().google;
-		if (!refreshToken) throw new Error("not logged in");
+		if (!refreshToken) throw new SourceProblemError({ kind: "loggedOut" }, "not logged in");
 		if (this.accessTokenValue && this.clock.now().getTime() < this.expiresAt - EXPIRY_MARGIN_MS) return this.accessTokenValue;
 		if (this.refreshing?.refreshToken === refreshToken) return this.refreshing.promise;
 		const refreshing = { refreshToken, promise: this.refresh(refreshToken) };

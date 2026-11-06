@@ -12,10 +12,11 @@ import type {
 	PolledScreen,
 	ShownCalendar,
 	SourceKind,
+	SourceProblem,
 	SourceStatus,
 	WorkCalendarSetup,
 } from "./contracts";
-import type { EventFeed, EventFile } from "./EventSource";
+import { type EventFeed, type EventFile, SourceProblemError } from "./EventSource";
 import type { Clock, SettingsStore, Timers } from "./ports";
 import { ShownCalendars } from "./shownCalendars";
 
@@ -27,12 +28,9 @@ const MINUTE_MS = 60_000;
 /** A feed silent this long counts as failed: its file keeps what it had, and the next refresh asks afresh. */
 const ANSWER_TIMEOUT_MS = 15_000;
 
-function countMessage(n: number): string {
-	return n === 1 ? "1 event" : `${n} events`;
-}
-
-function messageOf(e: unknown): string {
-	return e instanceof Error ? e.message : String(e);
+function problemOf(e: unknown): SourceProblem {
+	if (e instanceof SourceProblemError) return e.problem;
+	return { kind: "failed", detail: e instanceof Error ? e.message : String(e) };
 }
 
 /**
@@ -41,8 +39,8 @@ function messageOf(e: unknown): string {
  */
 export class CalendarServiceImpl implements CalendarService {
 	private readonly lastRead = new Map<CalendarSource, CalendarFile>();
-	private readonly fileProblems = new Map<CalendarSource, string>();
-	private readonly feedProblems = new Map<CalendarSource, string>();
+	private readonly fileProblems = new Map<CalendarSource, SourceProblem>();
+	private readonly feedProblems = new Map<CalendarSource, SourceProblem>();
 
 	constructor(
 		private readonly files: readonly EventFile[],
@@ -59,7 +57,7 @@ export class CalendarServiceImpl implements CalendarService {
 	async known(): Promise<readonly ShownCalendar[]> {
 		await this.readFiles();
 		const hidden = new Set(this.hidden().map(keyText));
-		return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, color: c.color, shown: !hidden.has(keyText(c.key)) }));
+		return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, accountName: c.accountName, name: c.name, color: c.color, shown: !hidden.has(keyText(c.key)) }));
 	}
 
 	async setShown(account: string, title: string, shown: boolean): Promise<void> {
@@ -123,7 +121,7 @@ export class CalendarServiceImpl implements CalendarService {
 			this.feeds.map((feed) =>
 				this.answerWithin(feed.refresh(force), ANSWER_TIMEOUT_MS).then(
 					() => this.feedProblems.delete(feed.name),
-					(e) => this.feedProblems.set(feed.name, messageOf(e)),
+					(e) => this.feedProblems.set(feed.name, problemOf(e)),
 				),
 			),
 		).then(() => undefined);
@@ -137,7 +135,7 @@ export class CalendarServiceImpl implements CalendarService {
 						this.lastRead.set(file.name, read);
 						this.fileProblems.delete(file.name);
 					},
-					(e) => this.fileProblems.set(file.name, messageOf(e)),
+					(e) => this.fileProblems.set(file.name, problemOf(e)),
 				),
 			),
 		).then(() => this.carryOver());
@@ -162,7 +160,7 @@ export class CalendarServiceImpl implements CalendarService {
 	private answerWithin<T>(answer: Promise<T>, ms: number): Promise<T> {
 		let timer: number | undefined;
 		const silence = new Promise<never>((_, reject) => {
-			timer = this.timers.set(() => reject(new Error(`no answer in ${ms / 1000} s`)), ms);
+			timer = this.timers.set(() => reject(new SourceProblemError({ kind: "noAnswer", seconds: ms / SECOND_MS }, `no answer in ${ms / SECOND_MS} s`)), ms);
 		});
 		return Promise.race([answer, silence]).finally(() => {
 			if (timer !== undefined) this.timers.clear(timer);
@@ -184,8 +182,8 @@ export class CalendarServiceImpl implements CalendarService {
 		return {
 			source,
 			kind: KINDS[source],
-			ok: problem === null,
-			message: problem ?? countMessage(shown),
+			problem,
+			events: shown,
 			updatedAt,
 			detail: fed ? null : (file?.device ?? null),
 			stale: problem !== null || this.isOld(updatedAt),
