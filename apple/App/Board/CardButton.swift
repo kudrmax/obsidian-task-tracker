@@ -21,6 +21,8 @@ struct CardButton: UIViewRepresentable {
     var onTouch: () -> Void = {}
     /// The card was lifted to carry (true), or the carry ended (false).
     var onCarry: (Bool) -> Void = { _ in }
+    /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
+    var onFold: (() -> Void)?
 
     func makeUIView(context: Context) -> CardControl {
         let control = CardControl(content: configuration.makeContentView())
@@ -50,6 +52,7 @@ struct CardButton: UIViewRepresentable {
         control.menuMaker = menu
         control.onTouch = onTouch
         control.onCarry = onCarry
+        control.onFold = onFold
         control.accessibilityLabel = card.item.title
     }
 }
@@ -59,6 +62,7 @@ final class CardControl: UIView, UIDragInteractionDelegate {
     var menuMaker: () -> UIMenu? = { nil }
     var onTouch: () -> Void = {}
     var onCarry: (Bool) -> Void = { _ in }
+    var onFold: (() -> Void)?
     /// What the card is drawn from: it is drawn anew only when this changes, not on every pass of the screen.
     struct Look: Equatable {
         let card: BoardCard
@@ -89,7 +93,7 @@ final class CardControl: UIView, UIDragInteractionDelegate {
         tapMenu.menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] done in
             done(self?.menuMaker()?.children ?? [])
         }])
-        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
         let drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
@@ -100,13 +104,22 @@ final class CardControl: UIView, UIDragInteractionDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 
-    @objc private func tapped() {
+    @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
-        tapMenu.performPrimaryAction()
+        // The counter sits on the right, before the due date: a tap there folds, anywhere else opens the menu.
+        if let onFold, tap.location(in: self).x > bounds.width - Self.counterReach {
+            UISelectionFeedbackGenerator().selectionChanged()
+            onFold()
+        } else {
+            tapMenu.performPrimaryAction()
+        }
     }
 
+    private static let counterReach: CGFloat = 64
+
     override func accessibilityActivate() -> Bool {
-        tapped()
+        onTouch()
+        tapMenu.performPrimaryAction()
         return true
     }
 

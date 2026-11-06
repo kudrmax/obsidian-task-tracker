@@ -243,7 +243,8 @@ struct CardRow: View {
                 menu: { model.cardMenu(card.item) { question = $0 } },
                 ringed: model.found == card.id,
                 onTouch: { model.found = nil },
-                onCarry: { model.carrying = $0 })
+                onCarry: { model.carrying = $0 },
+                onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil)
                 .frame(height: CardMetrics.height)
                 // While something is carried the card lies under a cover: the list's own target takes the drop.
                 .overlay { if model.carrying { Color.clear.contentShape(.rect) } }

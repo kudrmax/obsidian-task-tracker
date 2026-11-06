@@ -30,17 +30,23 @@ struct TaskCapsule: View {
                 }
                 .mask(fadeMask)
                 .accessibilityElement(children: .combine)
-            if let progress = card.item.progress, card.item.can.fold || card.item.collapsed {
-                Text(verbatim: "\(progress.done)/\(progress.total)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(meta)
-                    .accessibilityLabel("\(progress.done) of \(progress.total) subtasks done")
-            }
-            if card.item.description != nil {
-                Image(systemName: "text.alignleft")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(meta)
-                    .accessibilityLabel("Has notes")
+            // The subtask counter over the description's mark, as the plugin stacks them.
+            if card.item.progress != nil || card.item.description != nil {
+                VStack(spacing: 1) {
+                    if let progress = card.item.progress {
+                        Text(verbatim: "\(progress.done)/\(progress.total)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(meta)
+                            .accessibilityLabel("\(progress.done) of \(progress.total) subtasks done")
+                    }
+                    if card.item.description != nil {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: card.item.progress == nil ? 10 : 8, weight: .semibold))
+                            .foregroundStyle(meta)
+                            .accessibilityLabel("Has notes")
+                    }
+                }
             }
             if let due = card.due {
                 VStack(spacing: 1) {
@@ -68,6 +74,16 @@ struct TaskCapsule: View {
             }
         }
         .background(fill, in: .rect(cornerRadius: CardMetrics.radius))
+        .background(alignment: .bottom) {
+            // Its subtasks folded away: a card peeking out under it.
+            if card.item.collapsed {
+                RoundedRectangle(cornerRadius: CardMetrics.radius)
+                    .fill(fill.opacity(0.55))
+                    .frame(height: CardMetrics.height)
+                    .padding(.horizontal, 8)
+                    .offset(y: 4)
+            }
+        }
         .background {
             if over { RoundedRectangle(cornerRadius: CardMetrics.radius + 1.5).fill(Color(.systemBackground)).padding(-1.5) }
         }

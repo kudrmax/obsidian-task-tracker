@@ -67,11 +67,13 @@ struct BoardScreen: View {
         .menuQuestions($question, model: model)
         .task { await model.reload() }
         .onChange(of: scene) { if scene == .active { Task { await model.reload() } } }
-        .task {
-            // The tasks file changes outside the app too: Obsidian, Sync, a reminder's button.
+        .task(id: scene) {
+            // The tasks file changes outside the app too: Obsidian, Sync, a reminder's button. Watched while the app is
+            // in front; the task starts again with every change of the scene.
+            guard scene == .active else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
-                if scene == .active { await model.reloadIfChanged() }
+                try? await Task.sleep(for: .seconds(2))
+                await model.reloadIfChanged()
             }
         }
     }

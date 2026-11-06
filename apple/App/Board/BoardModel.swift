@@ -74,7 +74,9 @@ final class BoardModel {
 
     /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button.
     func reloadIfChanged() async {
-        // Not under a carry: a card drawn anew mid-drag would lose the drag.
+        // Not under a carry: a card drawn anew mid-drag would lose the drag. A carry whose end never came (its card
+        // was drawn anew) is over after a while.
+        if carrying, Date.now.timeIntervalSince(carriedAt) > 20 { carrying = false }
         guard !carrying else { return }
         let board = board
         let text = try? await Task.detached { try board.files().tasks }.value
@@ -277,7 +279,10 @@ final class BoardModel {
 
     var newTaskAt: NewTaskSpot?
     /// A card or the plus is being carried: the cards lie under a cover then, so every drop lands on the lists' own targets.
-    var carrying = false
+    var carrying = false {
+        didSet { if carrying { carriedAt = .now } }
+    }
+    @ObservationIgnored private var carriedAt = Date.distantPast
 
     /// A card or the plus let go in a list: before card `index` of its cards (past the last: the list's end) at `level`,
     /// past the headers `passed` (the section it lands in is the last of them).

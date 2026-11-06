@@ -27,6 +27,7 @@ struct SearchScreen: View {
                 }
             }
             .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, CardMetrics.height)
             .overlay {
                 if !query.isEmpty, groups.isEmpty { ContentUnavailableView.search(text: query) }
             }
@@ -50,8 +51,9 @@ struct SearchScreen: View {
                 .font(.system(size: CardMetrics.title))
                 .lineLimit(1)
             if let description = hit.description {
-                Label { parts(description).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1) } icon: {
-                    Image(systemName: "text.alignleft").font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Image(systemName: "text.alignleft").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                    parts(description).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
         }
