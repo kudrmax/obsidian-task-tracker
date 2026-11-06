@@ -29,11 +29,14 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    the note keeps the project's history. The general Done of `TODOs Tasks.md` holds only tasks of that file.
 9. **A project note is a note tagged `#project`**, anywhere in the vault (Max hardly uses folders). The tag counts in the
    note's properties or in its text; the project's name is the note's name.
+10. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project note; the
+    Backlog tasks of `TODOs Tasks.md` are one more group, «No project». A tap on a group's title opens the project note.
+    Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 
 ## Open (being planned now)
 
 - How the lane is written on a project task's line (technical, decided by the backend).
-- Where the plugin shows projects: a screen of projects inside the plugin or only the notes.
+- How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
 
