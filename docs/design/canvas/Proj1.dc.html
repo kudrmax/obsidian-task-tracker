@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Backlog по проектам</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; width: 3508px; height: 1340px; background: #F5F5F2; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+<div style="position: absolute; left: 64px; top: 36px; width: 3380px; display: flex; flex-direction: column; gap: 12px;">
+<div style="font-size: 64px; line-height: 76px; font-weight: 700; color: #1C1C1E;">Backlog по проектам</div>
+<div style="font-size: 20px; line-height: 26px; color: #6B6A65; max-width: 1600px;">Backlog — в нижней половине первой колонки, под Inbox. Каждый проект — своя группа с тем же заголовком, что у секции, «No project» — задачи из файла задач, всегда последней. Тап по заголовку сворачивает и разворачивает группу, у свёрнутой справа число невзятых задач. Стрелка рядом с именем — та же, что у Open in Obsidian, — открывает заметку проекта; сам заголовок заметку не открывает. Новая задача — плюсом внизу справа, как всегда. Пунктиром обведено новое</div>
+</div>
+<sc-for list="{{frames}}" as="p" hint-placeholder-count="4">
+<div style="position: absolute; left: {{p.left}}px; top: {{p.top}}px; width: {{p.w}}px; height: {{p.h}}px; overflow: hidden; border-radius: {{p.r}}px; box-shadow: 0 0 0 1px #D6D2C4, 0 18px 40px rgba(0,0,0,0.18);">
+<sc-if value="{{p.phone}}" hint-placeholder-val="{{true}}"><dc-import name="ProjPhone" view="{{p.view}}" look="{{p.look}}" theme="{{p.theme}}" hint-size="390px,844px"></dc-import></sc-if>
+<sc-if value="{{p.desk}}" hint-placeholder-val="{{false}}"><dc-import name="ProjDesk" view="{{p.view}}" look="{{p.look}}" theme="{{p.theme}}" hint-size="1200px,800px"></dc-import></sc-if>
+</div>
+<div style="position: absolute; left: {{p.left}}px; top: {{p.capTop}}px; width: {{p.w}}px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; line-height: 23px; font-weight: 600; color: #1C1C1E;">{{p.name}}</span>
+<span style="font-size: 16px; line-height: 21px; color: #3A3A3C;">{{p.cap}}</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3508,"height":1340}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { frames: [{"phone": true, "desk": false, "view": "backlog", "look": "project", "theme": "dark", "left": 64, "top": 330, "w": 390, "h": 844, "r": 34, "capTop": 1190, "name": "Телефон, тёмная", "cap": "«Окружение» развёрнут: шеврон вниз, его задачи под заголовком. «Стать счастливым» и «No project» свёрнуты: шеврон вправо, справа по 2 задачи. У «No project» нет стрелки: заметки за ним нет"}, {"phone": true, "desk": false, "view": "backlog", "look": "project", "theme": "light", "left": 494, "top": 330, "w": 390, "h": 844, "r": 34, "capTop": 1190, "name": "Телефон, светлая", "cap": ""}, {"phone": false, "desk": true, "view": "backlog", "look": "project", "theme": "dark", "left": 964, "top": 330, "w": 1200, "h": 800, "r": 12, "capTop": 1146, "name": "Mac, тёмная", "cap": "На Mac то же"}, {"phone": false, "desk": true, "view": "backlog", "look": "project", "theme": "light", "left": 2244, "top": 330, "w": 1200, "h": 800, "r": 12, "capTop": 1146, "name": "Mac, светлая", "cap": ""}] };
+  }
+}
+</script>
+</body>
+</html>
