@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
+import { type DraftMarks, type GroupedList, type LabelLevel, labelTitle, type Placement, type PriorityLevel, type RepeatRule, samePlacement } from "../../application/contracts";
 import { DESIGN } from "../design";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
@@ -17,9 +17,8 @@ export interface QuickBarState {
 	readonly canOutdent: boolean;
 	/** The field shifts at all: a field on the calendar does not, and has no shift buttons. */
 	readonly indents: boolean;
-	readonly priority: PriorityLevel | null;
-	/** The labels chosen, in the settings' order; none while there is a priority. */
-	readonly labels: readonly LabelLevel[];
+	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. */
+	readonly marks: DraftMarks;
 	/** Where the field stands; null for a field with no place of its own (a subtask, a slot): no place button. */
 	readonly place: Placement | null;
 	readonly repeat: RepeatRule | null;
@@ -158,7 +157,7 @@ export class QuickBar implements EntryPart {
 		this.outdent.disabled = !state.canOutdent;
 		this.indent.disabled = !state.canIndent;
 		this.flag.hidden = !this.marks() || section;
-		const color = state.priority?.color ?? state.labels[0]?.color ?? null;
+		const color = state.marks.priority?.color ?? state.marks.labels[0]?.color ?? null;
 		this.flag.classList.toggle("is-set", color !== null);
 		if (color) this.flag.dataset.priority = color;
 		else delete this.flag.dataset.priority;
@@ -336,7 +335,7 @@ export class QuickBar implements EntryPart {
 	private drawnKey(kind: PanelKind): string {
 		const state = this.state;
 		if (kind === "repeat") return JSON.stringify([kind, state?.repeat != null, this.repeatDay()]);
-		return JSON.stringify([kind, this.levels(), this.deps.labels(), state?.priority?.prefix ?? null, state?.labels.map((l) => l.name) ?? [], state?.place ?? null, this.deps.today()]);
+		return JSON.stringify([kind, this.levels(), this.deps.labels(), state?.marks ?? null, state?.place ?? null, this.deps.today()]);
 	}
 
 	/** The day a new rule starts from: the field's own, else today. */
@@ -371,19 +370,20 @@ export class QuickBar implements EntryPart {
 
 	/**
 	 * The flag's panel: the levels, a pick that closes it; under them the labels, each tap putting one on or taking it off
-	 * while the panel stays for the next. A priority and labels don't go together: while one is set the other's tiles are off.
+	 * while the panel stays for the next. The tiles of what the service says may not be chosen now are off.
 	 */
 	private renderLevels(parent: HTMLElement): void {
-		const current = this.state?.priority ?? null;
-		const chosen = this.state?.labels.map((l) => l.name) ?? [];
+		const marks = this.state?.marks;
+		const current = marks?.priority ?? null;
+		const chosen = marks?.labels.map((l) => l.name) ?? [];
 		const levels = this.levels().map((level): MenuTileSpec => {
 			const on = level.prefix === current?.prefix;
-			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: chosen.length > 0, onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
+			return { label: level.prefix, icon: "priority", color: level.color, on, disabled: !(marks?.can.setPriority ?? true), onPick: this.picked(() => this.deps.onPriority(on ? null : level.prefix)) };
 		});
 		if (levels.length > 0) markLongLabels(tileGroup(parent, "is-priority", tileRows(levels)));
 		const labels = this.deps.labels().map((label): MenuTileSpec => {
 			const on = chosen.includes(label.name);
-			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: current !== null, onPick: () => this.deps.onLabels(on ? chosen.filter((n) => n !== label.name) : [...chosen, label.name]) };
+			return { label: labelTitle(label.name), icon: "label", color: label.color, on, disabled: !(marks?.can.setLabels ?? true), onPick: () => this.deps.onLabels(on ? chosen.filter((n) => n !== label.name) : [...chosen, label.name]) };
 		});
 		if (labels.length > 0) markLongLabels(tileGroup(parent, "is-labels", tileRows(labels)));
 	}

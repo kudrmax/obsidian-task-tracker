@@ -147,6 +147,29 @@
     cancelled: "-"
   };
 
+  // src/domain/Priority.ts
+  function usablePrefix(prefix) {
+    return /^\S+$/.test(prefix);
+  }
+  function usableLevels(levels) {
+    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
+  }
+  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
+  function priorityOfText(text, prefixes) {
+    const m = FIRST_WORD_RE.exec(text);
+    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
+    return { priority: m[1], text: m[2] };
+  }
+
+  // src/domain/Marks.ts
+  function marksOf(priority, labels) {
+    return { priority, labels: priority === null ? labels : [] };
+  }
+  function typedMarks(text, priority, labels, prefixes) {
+    const typed2 = priority === null ? priorityOfText(text, prefixes) : { text, priority };
+    return { text: typed2.text, ...marksOf(typed2.priority, labels) };
+  }
+
   // src/domain/description.ts
   var INDENT_RE = /^[ \t]*/;
   var DESCRIPTION_TEMPLATE = "- ";
@@ -344,20 +367,6 @@
   }
   function labelTags(tag, labels) {
     return labels.map((name) => ` #${tag}/${name}`).join("");
-  }
-
-  // src/domain/Priority.ts
-  function usablePrefix(prefix) {
-    return /^\S+$/.test(prefix);
-  }
-  function usableLevels(levels) {
-    return levels.filter((level, i) => usablePrefix(level.prefix) && levels.findIndex((l) => l.prefix === level.prefix) === i);
-  }
-  var FIRST_WORD_RE = /^(\S+)\s+(.*)$/;
-  function priorityOfText(text, prefixes) {
-    const m = FIRST_WORD_RE.exec(text);
-    if (!m || !prefixes.includes(m[1])) return { priority: null, text };
-    return { priority: m[1], text: m[2] };
   }
 
   // src/domain/TaskLine.ts
@@ -575,6 +584,10 @@
     }
     static empty(all) {
       return _TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
+    }
+    /** The prefixes of the priority levels the file is read with. */
+    priorityPrefixes() {
+      return this.markers.priorities ?? [];
     }
     serialize() {
       return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
@@ -1109,8 +1122,9 @@
   function toList(doc, entry, date, today) {
     return date === today ? moveInto(doc, entry, "now", "end", today) : setDueDate(doc, entry, date);
   }
-  function marksOf(priority, labels) {
-    return { priority: labels.length > 0 ? null : priority, labels };
+  function typed(doc, text, priority, labels) {
+    const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
+    return { ...marked, text: taskTitle(marked.text) };
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1149,8 +1163,8 @@
     if (before !== null && before.section === list) return before.index;
     return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
   }
-  function createInPlace(doc, text, priority, place, today, boundary, repeat, labels = []) {
-    const marks = marksOf(priority, labels);
+  function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = []) {
+    const { text, ...marks } = typed(doc, typedText, priority, labels);
     switch (place.kind) {
       case "subtask":
         return intoUnfolded(

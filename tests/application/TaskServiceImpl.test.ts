@@ -1331,4 +1331,24 @@ describe("labels", () => {
 		const again = await svc.setLabels(items[0]!.key, []);
 		expect(again?.labels).toEqual([]);
 	});
+
+	it("tells what each task may be given: a priority while it has no labels, labels while it has no priority", async () => {
+		const { svc } = setup("## Now\n\n- [ ] A\n- [ ] p1 B\n- [ ] C #label/Важное\n- [ ] p1 D #label/Важное\n", labelled());
+		const can = (await svc.dayView(T)).list.map((item) => [item.can.setPriority, item.can.setLabels]);
+		expect(can).toEqual([[true, true], [true, false], [false, true], [true, false]]);
+	});
+
+	it("answers for the bar with the marks the file then has: the priority chosen or typed, else the labels", async () => {
+		const NOW = { kind: "list", list: "now", group: null, before: null } as const;
+		const drafts: [string, string | null, string[]][] = [["p1 Buy milk", null, ["Важное"]], ["Buy milk", null, ["Важное", "Срочное"]], ["Buy milk", "p2", ["Срочное"]], ["p2 Buy milk", "p1", []], ["Buy milk", null, []]];
+		for (const [text, priority, labels] of drafts) {
+			const { svc } = setup("## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n", labelled());
+			const shown = svc.draftMarks(text, priority, labels);
+			await svc.createInPlace(text, priority, NOW, null, labels);
+			const written = (await svc.dayView(T)).list[0];
+			expect({ priority: shown.priority, labels: shown.labels }, text).toEqual({ priority: written.priority, labels: written.labels });
+			expect(shown.can, text).toEqual({ setPriority: written.can.setPriority, setLabels: written.can.setLabels });
+		}
+		expect(setup("## Now\n", labelled()).svc.draftMarks("p1 Buy milk", null, ["Важное"])).toEqual({ priority: { prefix: "p1", color: "red" }, labels: [], can: { setPriority: true, setLabels: false } });
+	});
 });
