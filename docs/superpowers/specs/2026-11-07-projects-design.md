@@ -12,8 +12,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 ## Decided
 
 1. **There are tasks and projects, nothing else.** No areas, goals or other levels. «Be happy» is a project like any other.
-2. **A project can sit inside a project**, to any depth. A task belongs to the project it is written in:
-   Project 1 → its tasks; Project 2 inside Project 1 → Project 2's tasks.
+2. **No nesting in the plugin.** Projects are flat: a task belongs to the project whose note it is written in. If Max
+   thinks of one project as part of another and links their notes, that is his notes' business; the plugin ignores it.
 3. **A project is a note in the vault.** The note holds free text (why, thoughts, observations) and the project's tasks,
    written right in the note.
 4. **The plugin reads tasks from project notes too**, not only from `TODOs Tasks.md` (as the Tasks plugin does). This
@@ -22,7 +22,7 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
    or stays in the note untaken.
 6. **Project mark on a card.** A task from a project shows which project it belongs to; a tap opens the project note.
 7. **An untaken project task is in Backlog.** Whatever is written in a project note and not taken yet is the project's
-   backlog, so the plugin shows it in Backlog, grouped by project (a nested project: its own group). Taking it is the same
+   backlog, so the plugin shows it in Backlog, grouped by project. Taking it is the same
    move as for any Backlog task: to Soon, Now, a day or the calendar.
 8. **A project task never leaves its note.** Taken, moved or done, its line stays in the project note; the plugin writes
    where it is in the lane on that line. Done, it stays in the note as `- [x]` and leaves the screen like any done task:
@@ -36,7 +36,6 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 - Where the plugin shows projects: a screen of projects inside the plugin or only the notes.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
-- How a nested project is written: a separate note linked from its parent, or a heading inside the parent's note.
 
 ## Ideas for later
 
