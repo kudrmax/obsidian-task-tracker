@@ -23,12 +23,11 @@ describe("editing the labels", () => {
 		expect(now().labels).toEqual([{ name: "Label_2", color: "#123456" }]);
 	});
 
-	it("writes a tag folder of one word only, and the paint", async () => {
+	it("writes a tag folder of one word only", async () => {
 		const { svc, now } = service();
 		await svc.setLabelTag(" tags ");
 		await svc.setLabelTag("two words");
-		await svc.setLabelPaint("blend");
-		expect([now().labelTag, now().labelPaint]).toEqual(["tags", "blend"]);
+		expect(now().labelTag).toBe("tags");
 	});
 });
 
@@ -116,7 +115,7 @@ describe("SettingsServiceImpl", () => {
 	it("shows the tab its fields, the texts as the fields hold them, and no secret", () => {
 		const google = { ...DEFAULT_SETTINGS.google, clientId: "id", clientSecret: "secret", refreshToken: "token" };
 		const form = service({ google, workCalendarTitles: ["A", "B"] }).svc.form();
-		expect(form).toMatchObject({ zoomLevels: "28, 56, 112, 224", workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
+		expect(form).toMatchObject({ workCalendars: "A, B", googleClientId: "id", refreshSeconds: 60, ungrouped: "No section", presets: ["Morning", "Afternoon", "Evening"] });
 		expect(form.markers).toEqual({ dueDateMarker: "📅", slotMarker: "⏰", alarmSlotMarker: "🚨", liveSlotMarker: "📌", silentSlotMarker: "🔕", repeatMarker: "🔁", collapsedMarker: "📁" });
 		expect(JSON.stringify(form)).not.toMatch(/secret|token/);
 	});
@@ -130,14 +129,6 @@ describe("SettingsServiceImpl", () => {
 		await svc.setCount("staleAfterMinutes", "2.5");
 		await svc.setCount("refreshSeconds", "0");
 		expect(now()).toMatchObject({ longPressMs: 0, scrollToHour: 7, staleAfterMinutes: 2.5, google: { ...DEFAULT_SETTINGS.google, refreshSeconds: 0 } });
-	});
-
-	it("writes zoom levels that read and nothing for the rest", async () => {
-		const { svc, now, writes } = service();
-		await svc.setZoomLevels("28, x");
-		expect(writes()).toBe(0);
-		await svc.setZoomLevels("40, 80");
-		expect(now().zoomLevels).toEqual([{ hourPx: 40 }, { hourPx: 80 }]);
 	});
 
 	it("writes a blank No section as the default, any other name trimmed", async () => {
@@ -180,11 +171,21 @@ describe("SettingsServiceImpl", () => {
 		expect(now().google).toEqual({ ...google, clientSecret: "other", clientId: "id2" });
 	});
 
-	it("writes the card's size and the day's start as given", async () => {
+	it("writes the day's start as given", async () => {
 		const { svc, now } = service();
-		await svc.setCardSize("cardHeight", 30);
-		await svc.setCardSize("cardGap", 0);
 		await svc.setDayStartHour(0);
-		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0, dayStartHour: 0 });
+		expect(now().dayStartHour).toBe(0);
+	});
+});
+
+describe("reading a colour code", () => {
+	const SHADES = { red: "#FF453A", orange: "#FF9F0A", yellow: "#FFD60A", green: "#30D158", teal: "#40C8E0", blue: "#0A84FF" } as const;
+
+	it("reads a preset's own shade as that preset, any other code as itself, and nothing for text that is no colour", () => {
+		const { svc } = service();
+		expect(svc.colourOf("ff453a", SHADES)).toBe("red");
+		expect(svc.colourOf(" #0a84ff ", SHADES)).toBe("blue");
+		expect(svc.colourOf("123456", SHADES)).toBe("#123456");
+		expect(svc.colourOf("zz", SHADES)).toBeNull();
 	});
 });

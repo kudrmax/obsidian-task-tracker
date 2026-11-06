@@ -7,10 +7,6 @@ export interface LabelLevel {
 	readonly color: PriorityColor;
 }
 
-/** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
-export type LabelPaint = "stripes" | "blend";
-export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
-
 /** A label's name as the screen shows it: the tag's underscores read as spaces. */
 export function labelTitle(name: string): string {
 	return name.replace(/_/g, " ");

@@ -1,5 +1,6 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock, LIST_WIDTH_MIN, type RightMode, type ScreenSettings, type ViewSettingsStore, type ZoomLevel } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, sectionChoice, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock } from "../application/contracts";
+import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
 import { FoundCard } from "./FoundCard";
@@ -78,7 +79,7 @@ export interface ViewDeps {
 	/** The plugin's own changes of the tasks file, taken back by the corner button and Cmd+Z. */
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
-	readonly settings: ViewSettingsStore;
+	readonly settings: ShownSettingsStore;
 	readonly clock: Clock;
 	/** Apple's Calendar at the event. */
 	openInCalendar(event: CalendarEvent): void;
@@ -127,7 +128,7 @@ export class TaskCalendarView extends ItemView {
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
 	/** The settings the screen last followed: a change is weighed against them. */
-	private seen: ScreenSettings;
+	private seen: ShownSettings;
 	private readonly arbiter = new GestureArbiter();
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	private readonly drag: DragController;
@@ -873,7 +874,7 @@ export class TaskCalendarView extends ItemView {
 			onDone: (name) => {
 				this.naming = null;
 				this.arbiter.release(NAMING);
-				if (name) void this.act(() => this.deps.tasks.toSection([item.key], name));
+				if (name !== null) void this.act(() => this.deps.tasks.toSection([item.key], name));
 				else this.render();
 			},
 		});
@@ -901,7 +902,7 @@ export class TaskCalendarView extends ItemView {
 			value: name,
 			onDone: (to) => {
 				this.arbiter.release(NAMING);
-				if (to && to !== name) void this.act(() => this.deps.tasks.renameGroup(list, name, to));
+				if (to !== null) void this.act(() => this.deps.tasks.renameGroup(list, name, to));
 				else this.render();
 			},
 		});

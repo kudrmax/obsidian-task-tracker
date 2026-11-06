@@ -3,7 +3,6 @@ import { DemoDayService } from "../tests/fakes/DemoDayService";
 import { DEMO_NOW, FixedClock } from "../tests/fakes/DemoClock";
 import { DemoTaskService } from "../tests/fakes/DemoTaskService";
 import TaskCalendarPlugin from "./main";
-import { ViewSettingsImpl } from "./application/ViewSettingsImpl";
 import type { UndoService } from "./application/contracts";
 import type { ViewDeps } from "./ui/TaskCalendarView";
 
@@ -19,7 +18,7 @@ export default class DemoTaskCalendarPlugin extends TaskCalendarPlugin {
 			days,
 			undo: NO_UNDO,
 			calendars: new DemoCalendarService(),
-			settings: new ViewSettingsImpl(this),
+			settings: this.shownSettings(),
 			clock,
 			openInCalendar: () => undefined,
 		};

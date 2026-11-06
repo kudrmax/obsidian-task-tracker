@@ -125,17 +125,8 @@
     calendarsMigrated: false,
     google: { clientId: "", clientSecret: "", refreshToken: "", calendarIds: [], refreshSeconds: 60 },
     longPressMs: 250,
-    zoom: 56,
-    zoomLevels: [
-      { hourPx: 28 },
-      { hourPx: 56 },
-      { hourPx: 112 },
-      { hourPx: 224 }
-    ],
     scrollToHour: 9,
     dayStartHour: 5,
-    listShare: 0.5,
-    rightMode: "calendar",
     staleAfterMinutes: 180,
     priorities: [
       { prefix: "p1", color: "red" },
@@ -143,10 +134,7 @@
     ],
     labelTag: "label",
     labels: [],
-    labelPaint: "stripes",
-    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
-    cardHeight: 35,
-    cardGap: 2
+    groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
   };
   function settingsFrom(saved) {
     const s = saved ?? {};
@@ -2034,7 +2022,6 @@ ${key.title}`.toLowerCase();
   }
 
   // src/application/contracts.ts
-  var DEFAULT_CARD_SIZE = { height: DEFAULT_SETTINGS.cardHeight, gap: DEFAULT_SETTINGS.cardGap };
   var StaleTaskError = class extends Error {
     constructor() {
       super("stale task");
@@ -2162,9 +2149,10 @@ ${key.title}`.toLowerCase();
       return index;
     }
     /** Section `name` of the task's list, null outside any; a task of Soon keeps its due date. A task of Done goes nowhere. */
-    sectionChange(entry, name) {
+    sectionChange(entry, typed2) {
       const list = entry.section;
-      if (list === "done" || entry.group === name) return null;
+      const name = typed2 === null ? null : typed2.trim();
+      if (list === "done" || name === "" || entry.group === name) return null;
       const date = (list === "soon" ? entry.task.dueDate : null) ?? void 0;
       return name === null ? { kind: "moveToGroup", list, group: null, before: null, date } : { kind: "createGroup", list, name, date };
     }
@@ -2315,7 +2303,9 @@ ${key.title}`.toLowerCase();
         return moveGroupTo(doc, list, group, place);
       };
     }
+    /** Null for a blank name or the section's own: nothing to write. */
     renameGroup(list, group, name) {
+      if (blank(name) || name.trim() === group) return null;
       return (doc, _today, settings) => {
         this.groupOf(doc, list, group);
         return renameGroup(doc, list, group, name, settings.groups.ungrouped);

@@ -1,5 +1,8 @@
-import type { SettingsStore } from "../application/ports";
-import { type DeviceState, partition, type SharedSettings, settingsFrom, sharedOf, type TaskCalendarSettings } from "../settings";
+/** What the settings object is: its defaults over what was saved, and which of its keys belong to the device. */
+export interface SettingsSchema<T extends object> {
+	from(saved: unknown): T;
+	readonly device: readonly (keyof T & string)[];
+}
 
 export const DEVICE_STATE_KEY = "task-calendar:device";
 
@@ -17,18 +20,22 @@ export interface SettingsPersistence {
  * once and is written over the file's freshest copy, one write after another, so a token Sync just brought is never
  * lost. A read of the file that changes nothing (our own write coming back, the same file from Sync) tells nobody.
  */
-export class PluginSettings implements SettingsStore {
-	private file: TaskCalendarSettings = settingsFrom(null);
-	private readonly pending: Partial<SharedSettings>[] = [];
-	private device: Partial<DeviceState> = {};
-	private current: TaskCalendarSettings = settingsFrom(null);
+export class PluginSettings<T extends object> {
+	private file: T;
+	private readonly pending: Partial<T>[] = [];
+	private device: Partial<T> = {};
+	private current: T;
 	private queue: Promise<void> = Promise.resolve();
 	private readonly listeners = new Set<() => void>();
 
 	constructor(
 		private readonly host: SettingsPersistence,
 		private readonly path: string,
-	) {}
+		private readonly schema: SettingsSchema<T>,
+	) {
+		this.file = schema.from(null);
+		this.current = schema.from(null);
+	}
 
 	/** The vault path of data.json: a `raw` event for it means the file may have changed. */
 	owns(path: string): boolean {
@@ -38,7 +45,7 @@ export class PluginSettings implements SettingsStore {
 	/** The first read, at load: always tells the listeners. */
 	async load(): Promise<void> {
 		await this.enqueue(async () => {
-			this.file = settingsFrom(await this.host.loadData());
+			this.file = this.schema.from(await this.host.loadData());
 			this.device = this.savedDevice();
 			this.recompute();
 			this.emit();
@@ -49,19 +56,19 @@ export class PluginSettings implements SettingsStore {
 	async reload(): Promise<void> {
 		await this.enqueue(async () => {
 			const before = JSON.stringify(this.current);
-			this.file = settingsFrom(await this.host.loadData());
+			this.file = this.schema.from(await this.host.loadData());
 			this.device = this.savedDevice();
 			this.recompute();
 			if (JSON.stringify(this.current) !== before) this.emit();
 		});
 	}
 
-	get(): TaskCalendarSettings {
+	get(): T {
 		return this.current;
 	}
 
-	async update(patch: Partial<TaskCalendarSettings>): Promise<void> {
-		const { device, shared } = partition(patch);
+	async update(patch: Partial<T>): Promise<void> {
+		const { device, shared } = this.partition(patch);
 		if (Object.keys(device).length) {
 			this.device = { ...this.device, ...device };
 			this.host.saveLocalStorage(DEVICE_STATE_KEY, this.device);
@@ -81,12 +88,12 @@ export class PluginSettings implements SettingsStore {
 		return () => this.listeners.delete(listener);
 	}
 
-	private async persist(shared: Partial<SharedSettings>): Promise<void> {
-		let fresh: TaskCalendarSettings | null = null;
+	private async persist(shared: Partial<T>): Promise<void> {
+		let fresh: T | null = null;
 		try {
-			fresh = settingsFrom(await this.host.loadData());
-			const next = settingsFrom({ ...fresh, ...shared });
-			if (JSON.stringify(sharedOf(next)) !== JSON.stringify(sharedOf(fresh))) await this.host.saveData(sharedOf(next));
+			fresh = this.schema.from(await this.host.loadData());
+			const next = this.schema.from({ ...fresh, ...shared });
+			if (JSON.stringify(this.fileOf(next)) !== JSON.stringify(this.fileOf(fresh))) await this.host.saveData(this.fileOf(next));
 			this.file = next;
 		} catch (e) {
 			if (fresh) this.file = fresh;
@@ -106,13 +113,30 @@ export class PluginSettings implements SettingsStore {
 	}
 
 	private recompute(): void {
-		const patched = Object.assign({}, this.file, ...this.pending) as TaskCalendarSettings;
-		this.current = { ...settingsFrom(patched), ...this.device };
+		const patched = Object.assign({}, this.file, ...this.pending) as T;
+		this.current = { ...this.schema.from(patched), ...this.device };
 	}
 
-	private savedDevice(): Partial<DeviceState> {
-		const saved = this.host.loadLocalStorage(DEVICE_STATE_KEY) as Partial<DeviceState> | null;
+	private savedDevice(): Partial<T> {
+		const saved = this.host.loadLocalStorage(DEVICE_STATE_KEY) as Partial<T> | null;
 		return saved ?? {};
+	}
+
+	/** A patch split into the part that goes to the device and the part that goes to the synced file. */
+	private partition(patch: Partial<T>): { device: Partial<T>; shared: Partial<T> } {
+		const device: Record<string, unknown> = {};
+		const shared: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(patch)) (this.isDevice(key) ? device : shared)[key] = value;
+		return { device: device as Partial<T>, shared: shared as Partial<T> };
+	}
+
+	/** The settings without the device's part: what the synced file holds. */
+	private fileOf(settings: T): Partial<T> {
+		return Object.fromEntries(Object.entries(settings).filter(([key]) => !this.isDevice(key))) as Partial<T>;
+	}
+
+	private isDevice(key: string): boolean {
+		return (this.schema.device as readonly string[]).includes(key);
 	}
 
 	private emit(): void {

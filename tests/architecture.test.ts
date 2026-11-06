@@ -11,7 +11,7 @@ type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "set
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
 
 function layerOf(file: string): Layer | null {
-	if (["src/main.ts", "src/demo.ts", "src/compose.ts"].includes(file)) return "root";
+	if (["src/main.ts", "src/demo.ts", "src/compose.ts", "src/settingsFile.ts"].includes(file)) return "root";
 	if (file === "src/settings.ts") return "settings";
 	const m = /^src\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
@@ -174,16 +174,9 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	textParts: "../domain/TaskText",
 	LINE_BREAK: "../domain/TaskTitle",
 	oneLine: "../domain/TaskTitle",
-	CARD_GAP_MAX: "../settings",
-	CARD_HEIGHT_MAX: "../settings",
-	CARD_HEIGHT_MIN: "../settings",
-	LIST_WIDTH_MAX: "../settings",
-	LIST_WIDTH_MIN: "../settings",
 	sameLevels: "../settings",
-	LABEL_PAINTS: "../domain/Label",
 	labelTitle: "../domain/Label",
 	sameLabels: "../domain/Label",
-	hexColor: "../domain/Priority",
 	isPresetColor: "../domain/Priority",
 	PRIORITY_COLORS: "../domain/Priority",
 	acceptsDrop: "./drops",

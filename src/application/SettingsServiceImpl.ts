@@ -1,8 +1,8 @@
 import { labelNameOf, usableLabelTag } from "../domain/Label";
-import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
-import type { CardField, CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
+import { hexColor, type PresetColor } from "../domain/Priority";
+import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
-import { formatZoomLevels, parseZoomLevels } from "./zoomLevelsText";
 
 /** A count as typed: a number of zero or more, or nothing. */
 function countOf(text: string): number | null {
@@ -31,15 +31,11 @@ export class SettingsServiceImpl implements SettingsService {
 			priorities: s.priorities,
 			labelTag: s.labelTag,
 			labels: s.labels,
-			labelPaint: s.labelPaint,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
-			cardHeight: s.cardHeight,
-			cardGap: s.cardGap,
 			longPressMs: s.longPressMs,
 			dayStartHour: s.dayStartHour,
 			scrollToHour: s.scrollToHour,
-			zoomLevels: formatZoomLevels(s.zoomLevels),
 			staleAfterMinutes: s.staleAfterMinutes,
 			googleClientId: s.google.clientId,
 			refreshSeconds: s.google.refreshSeconds,
@@ -66,17 +62,8 @@ export class SettingsServiceImpl implements SettingsService {
 		await this.store.update(field === "refreshSeconds" ? this.google({ refreshSeconds: n }) : { [field]: n });
 	}
 
-	setCardSize(field: CardField, px: number): Promise<void> {
-		return this.store.update({ [field]: px });
-	}
-
 	setDayStartHour(dayStartHour: number): Promise<void> {
 		return this.store.update({ dayStartHour });
-	}
-
-	async setZoomLevels(text: string): Promise<void> {
-		const zoomLevels = parseZoomLevels(text);
-		if (zoomLevels) await this.store.update({ zoomLevels });
 	}
 
 	renameLevel(index: number, prefix: string): Promise<void> {
@@ -132,8 +119,10 @@ export class SettingsServiceImpl implements SettingsService {
 		return this.saveLabels(moved(this.settings.labels, from, to));
 	}
 
-	setLabelPaint(labelPaint: LabelPaint): Promise<void> {
-		return this.store.update({ labelPaint });
+	colourOf(text: string, shades: Readonly<Record<PresetColor, string>>): PriorityColor | null {
+		const hex = hexColor(text);
+		if (!hex) return null;
+		return PRIORITY_COLORS.find((preset) => shades[preset].toUpperCase() === hex) ?? hex;
 	}
 
 	renamePreset(index: number, name: string): Promise<void> {

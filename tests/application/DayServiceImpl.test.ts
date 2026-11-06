@@ -107,7 +107,7 @@ describe("DayServiceImpl", () => {
 	it("another hour for the day's start tells the day moved, without normalizing, and the next minute of that day tells nothing", async () => {
 		const { settings, ticker, log, listen } = setUp(new Date(2026, 10, 6, 4, 30), 4);
 		listen(() => false);
-		await settings.update({ zoom: 112 });
+		await settings.update({ longPressMs: 400 });
 		expect(log).toEqual([]);
 		await settings.update({ dayStartHour: 5 });
 		expect(log).toEqual(["moved"]);

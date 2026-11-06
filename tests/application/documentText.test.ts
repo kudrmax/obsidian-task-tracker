@@ -36,6 +36,6 @@ describe("documentText", () => {
 		expect(readingKey({ ...DEFAULT_SETTINGS, slotMarker: "🕐" })).not.toBe(key);
 		expect(readingKey({ ...DEFAULT_SETTINGS, labels: [{ name: "Fast", color: "blue" }] })).not.toBe(key);
 		expect(readingKey({ ...DEFAULT_SETTINGS, groups: { ...DEFAULT_SETTINGS.groups, presets: ["Night"] } })).not.toBe(key);
-		expect(readingKey({ ...DEFAULT_SETTINGS, zoom: 112, cardHeight: 36, dayStartHour: 3 })).toBe(key);
+		expect(readingKey({ ...DEFAULT_SETTINGS, longPressMs: 400, scrollToHour: 7, dayStartHour: 3 })).toBe(key);
 	});
 });

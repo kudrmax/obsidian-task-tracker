@@ -901,6 +901,12 @@ describe("to a section", () => {
 		`);
 	});
 
+	it("takes the name as typed: trimmed, a blank one and the task's own section writing nothing", async () => {
+		expect(await written(T, ["N1"], "  ")).toBe(FILE);
+		expect(await written(T, ["N3"], " Work ")).toBe(FILE);
+		expect(await written(T, ["N1"], " Work ")).toBe(await written(T, ["N1"], "Work"));
+	});
+
 	it("a task changed in the file since it was read: rejected, nothing written", async () => {
 		const { store, svc } = setup();
 		const n1 = byText(await screen(svc, T)).get("N1")!;

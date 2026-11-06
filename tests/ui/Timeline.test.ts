@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { DayBoundary } from "../../src/application/contracts";
 import type { CalendarEvent, TaskItem } from "../../src/application/contracts";
 import { Timeline } from "../../src/ui/Timeline";
-import { DEFAULT_SETTINGS } from "../../src/settings";
+import { VIEW_DEFAULTS } from "../../src/ui/viewSettings";
 import { onDay } from "../fakes/itemOnDay";
 import { withShownSpan } from "../fakes/timelineDeps";
 
 /** One card and one gap: how far down a stack the next card stands. */
-const STACK_STEP = DEFAULT_SETTINGS.cardHeight + DEFAULT_SETTINGS.cardGap;
+const STACK_STEP = VIEW_DEFAULTS.cardHeight + VIEW_DEFAULTS.cardGap;
 
 function timeline(zoom: { hourPx: number }, boundary = DayBoundary.MIDNIGHT, tasks: TaskItem[] = []): Timeline {
 	const view = new Timeline(document.createElement("div"), withShownSpan({

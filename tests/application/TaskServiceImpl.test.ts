@@ -338,7 +338,7 @@ describe("onChange", () => {
 		const { svc } = setup(FULL, settings);
 		let fired = 0;
 		const off = svc.onChange(() => fired++);
-		await settings.update({ zoom: 112 });
+		await settings.update({ longPressMs: 400 });
 		await settings.update({ dayStartHour: 3 });
 		expect(fired).toBe(0);
 		await settings.update({ dueDateMarker: "🗓" });
@@ -584,6 +584,15 @@ describe("sections", () => {
 		const settings = new FakeSettingsStore({ ...DEFAULT_SETTINGS, groups: { presets: [], ungrouped: "Без секции" } });
 		const { svc } = setup("## Now\n\n### X\n- [ ] B\n### Без секции\n- [ ] A\n", settings);
 		expect((await svc.dayView(T)).list.map((i) => [i.text, i.group])).toEqual([["B", "X"], ["A", null]]);
+	});
+
+	it("renameGroup takes the name as typed: trimmed, a blank one or the section's own writing nothing", async () => {
+		const { store, svc } = setup("## Now\n\n### X\n- [ ] B\n");
+		await svc.renameGroup("now", "X", "  ");
+		await svc.renameGroup("now", "X", " X ");
+		expect(store.writes).toBe(0);
+		await svc.renameGroup("now", "X", " Вечер ");
+		expect(store.text).toContain("### Вечер\n");
 	});
 
 	it("moveToGroup, renameGroup, removeGroup and moveGroup write once each", async () => {
@@ -989,7 +998,7 @@ describe("one parse per version of the file", () => {
 		const { svc } = setup(TEXT, settings);
 		await reload(svc);
 		const parse = vi.spyOn(TaskDocument, "parse");
-		await settings.update({ zoom: 80, listShare: 0.4, rightMode: "calendar", cardHeight: 40 });
+		await settings.update({ longPressMs: 400, scrollToHour: 7, staleAfterMinutes: 10 });
 		await reload(svc);
 		expect(parse).not.toHaveBeenCalled();
 	});

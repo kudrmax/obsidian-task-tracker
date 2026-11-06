@@ -1,4 +1,5 @@
-import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, type RightMode, samePlace, type TaskItem, type TaskKey, type TaskService, type DraftMarks } from "../../application/contracts";
+import { gapOfPlace, type GroupName, type ListCard, type ListPlace, type NewTaskPlace, type Placement, samePlace, type TaskItem, type TaskKey, type TaskService, type DraftMarks } from "../../application/contracts";
+import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
 import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";

@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { PluginSettings, type SettingsPersistence } from "../../src/infrastructure/PluginSettings";
-import { DEFAULT_SETTINGS, sharedOf, type TaskCalendarSettings } from "../../src/settings";
+import { DEFAULT_SETTINGS } from "../../src/settings";
+import { SETTINGS_FILE, type StoredSettings } from "../../src/settingsFile";
+
+/** The file the defaults are written as: every key but the device's. */
+const DEFAULT_FILE: Partial<StoredSettings> = (({ listShare: _s, rightMode: _m, zoom: _z, ...file }) => file)(SETTINGS_FILE.from(null));
 
 const FILE = ".obsidian/plugins/task-calendar/data.json";
 
 class FakeHost implements SettingsPersistence {
-	file: unknown = sharedOf(DEFAULT_SETTINGS);
+	file: unknown = DEFAULT_FILE;
 	readonly local = new Map<string, unknown>();
 	loads = 0;
 	saves = 0;
@@ -37,8 +41,8 @@ class FakeHost implements SettingsPersistence {
 		this.local.set(key, data);
 	}
 
-	fileSettings(): TaskCalendarSettings {
-		return this.file as TaskCalendarSettings;
+	fileSettings(): StoredSettings {
+		return this.file as StoredSettings;
 	}
 }
 
@@ -49,7 +53,7 @@ function opened(): { gate: Promise<void>; open: () => void } {
 }
 
 async function loaded(host = new FakeHost()) {
-	const settings = new PluginSettings(host, FILE);
+	const settings = new PluginSettings(host, FILE, SETTINGS_FILE);
 	await settings.load();
 	host.loads = 0;
 	let told = 0;
@@ -161,14 +165,14 @@ describe("PluginSettings", () => {
 	});
 
 	it("owns only data.json in the plugin folder", () => {
-		const settings = new PluginSettings(new FakeHost(), FILE);
+		const settings = new PluginSettings(new FakeHost(), FILE, SETTINGS_FILE);
 		expect(settings.owns(".obsidian/plugins/task-calendar/data.json")).toBe(true);
 		expect(settings.owns("x/data.json")).toBe(false);
 	});
 
 	it("the first read tells the listeners even when nothing differs from the defaults", async () => {
 		const host = new FakeHost();
-		const settings = new PluginSettings(host, FILE);
+		const settings = new PluginSettings(host, FILE, SETTINGS_FILE);
 		let told = 0;
 		settings.onChange(() => told++);
 		await settings.load();

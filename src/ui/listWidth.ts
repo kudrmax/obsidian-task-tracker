@@ -1,4 +1,4 @@
-import { LIST_WIDTH_MAX, LIST_WIDTH_MIN } from "../application/contracts";
+import { LIST_WIDTH_MAX, LIST_WIDTH_MIN } from "./viewSettings";
 import { DESIGN } from "./design";
 
 /** On a phone the list keeps the design's bounds; a wider window lets it grow until the timeline is as narrow as the list may be. */
