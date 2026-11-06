@@ -1,12 +1,12 @@
-import { MINUTES_PER_DAY, type TaskItem } from "../../application/contracts";
+import type { ResizeEdge, StretchSpan, TaskItem } from "../../application/contracts";
 import { shownCardSize } from "../cardSize";
-import { LAYOUT } from "../design";
-import { stretchedSpan } from "../timelineLayout";
+import { DESIGN, LAYOUT } from "../design";
+import { pxToMinutes } from "../timelineLayout";
 import { capturePointer, releasePointer } from "../dom";
 import { Grips } from "../kit/Grips";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
-import type { ResizeEdge, Timeline } from "../Timeline";
+import type { Timeline } from "../Timeline";
 import type { TimelineDrop } from "./TimelineDrop";
 import type { LocalDate, Slot } from "../types";
 import { DragSession } from "./DragSession";
@@ -43,7 +43,10 @@ export interface DragControllerDeps {
 	/** A card is lifted or settled: the plus hides while it is carried. */
 	onDragging(active: boolean): void;
 	onResult(drag: TaskDragPayload, result: DropResult): Promise<void>;
-	onResize(item: TaskItem, slot: Slot): Promise<void>;
+	/** The card of `item` while its `edge` dot is held at `minute` of the shown day. */
+	stretch(item: TaskItem, edge: ResizeEdge, minute: number): StretchSpan;
+	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */
+	onResize(item: TaskItem, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
 	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
 	/** A card or block double-clicked: its title is renamed in place, no menu. */
@@ -130,7 +133,7 @@ export class DragController {
 
 	private payload(card: HTMLElement, item: TaskItem, from: TaskOrigin, e: PointerEvent): TaskDragPayload {
 		const onTimeline = from === "timeline" && item.slot;
-		const durationMin = onTimeline && item.slot!.end !== null ? item.slot!.end - item.slot!.start : null;
+		const durationMin = onTimeline ? item.durationMin : null;
 		const rect = card.getBoundingClientRect();
 		const grabPx = onTimeline ? e.clientY - rect.top : shownCardSize().height / 2;
 		return { item, from, durationMin, grabPx };
@@ -385,29 +388,26 @@ export class DragController {
 	}
 
 	/**
-	 * A dot moves one edge by 15 minutes at a time and the stack follows. Let go at 40 px or less, the task loses its
-	 * duration; the start dot of a task without one pulls the start earlier, the old start becoming the end.
+	 * A dot moves one edge by a grid step at a time and the stack follows; where it may go and what letting go writes is
+	 * the service's (see `TaskService.stretch` and `resize`).
 	 */
 	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
 		const timeline = this.deps.timeline();
 		if (!timeline || !item.slot || !this.deps.arbiter.claim(RESIZE)) return;
-		const slot = timeline.shownSpan(item);
+		const shown = timeline.shownSpan(item);
 		this.deps.haptics.tap();
 		capturePointer(block, e.pointerId);
 		const step = this.deps.step();
-		let start = slot.start;
-		let end = slot.end ?? slot.start;
+		let minute = edge === "end" ? (shown.end ?? shown.start) : shown.start;
 		/** The span last shown: the stack is laid out again only when a grid step changes it. */
-		let shown = { start, end };
+		let span = this.deps.stretch(item, edge, minute);
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId !== e.pointerId) return;
-			const at = snapMinutes(timeline.minutesAt(ev.clientY), step);
-			if (edge === "end") end = Math.min(MINUTES_PER_DAY, Math.max(start, at));
-			else if (slot.end === null) start = Math.max(0, Math.min(at, slot.start));
-			else start = Math.max(0, Math.min(at, end));
-			if (start === shown.start && end === shown.end) return;
-			shown = { start, end };
-			timeline.stretchTo(block, { start, end }, edge);
+			minute = snapMinutes(timeline.minutesAt(ev.clientY), step);
+			const next = this.deps.stretch(item, edge, minute);
+			if (next.start === span.start && next.end === span.end) return;
+			span = next;
+			timeline.stretchTo(block, span, edge);
 		};
 		/** The screen stays held until the write is done: a second grab of the card, or another gesture, would start from its old time. */
 		const finish = async (ev: PointerEvent, apply: boolean) => {
@@ -416,25 +416,22 @@ export class DragController {
 			document.removeEventListener("pointerup", up);
 			document.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
-			const next = stretchedSpan(slot, { start, end }, edge, timeline.hourPx, shownCardSize().height);
-			const changed = next.start !== slot.start || next.end !== slot.end;
-			if (!apply || !changed) {
-				timeline.stretchTo(block, null, edge);
-				this.deps.arbiter.release(RESIZE);
-				return;
-			}
-			this.deps.haptics.tap();
+			let unchanged = false;
 			try {
-				await this.deps.onResize(item, timeline.slotAt(next.start, next.end));
+				if (apply && (await this.deps.onResize(item, edge, minute, pxToMinutes(shownCardSize().height + DESIGN.itemGap, timeline.hourPx)))) this.deps.haptics.tap();
+				else {
+					unchanged = true;
+					timeline.stretchTo(block, null, edge);
+				}
 			} finally {
-				timeline.endStretch(item.key);
+				if (!unchanged) timeline.endStretch(item.key);
 				this.deps.arbiter.release(RESIZE);
 			}
 		};
 		const report = (error: unknown) => console.error("Task Calendar: resize", error);
 		const up = (ev: PointerEvent) => void finish(ev, true).catch(report);
 		const cancel = (ev: PointerEvent) => void finish(ev, false).catch(report);
-		timeline.stretchTo(block, { start, end }, edge);
+		timeline.stretchTo(block, span, edge);
 		document.addEventListener("pointermove", move);
 		document.addEventListener("pointerup", up);
 		document.addEventListener("pointercancel", cancel);

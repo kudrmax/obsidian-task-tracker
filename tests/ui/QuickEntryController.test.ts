@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import type { NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
+import type { LabelLevel, NewTaskPlace, Placement, RepeatRule, TaskDraft, TaskItem, TaskKey } from "../../src/application/contracts";
 import type { RightMode } from "../../src/application/contracts";
 import type { DragPayload, DropResult, DropTarget, ListColumn } from "../../src/ui/drag/DropTarget";
 import { GestureArbiter } from "../../src/ui/gestures";
@@ -13,6 +13,7 @@ import { DayBoundary } from "../../src/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
+import { withShownSpan } from "../fakes/timelineDeps";
 import { DEFAULT_SETTINGS } from "../../src/settings";
 
 const TODAY = "2026-11-01";
@@ -55,9 +56,11 @@ interface SetUp {
 	 * as a card at the end of the day column, "same" lands nothing.
 	 */
 	drawsOnFresh?: "grows" | "same";
+	/** The labels the settings hold. */
+	labels?: readonly LabelLevel[];
 }
 
-function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false }: SetUp = {}) {
+function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}, slotted = [], desktop, drawsOnFresh, sections = false, labels = [] }: SetUp = {}) {
 	const root = document.createElement("div");
 	document.body.appendChild(root);
 	/** The animation frames asked for, run when the test says. */
@@ -96,7 +99,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			renaming: () => controller?.renaming() ?? null,
 		});
 	}
-	const timeline = new Timeline(root.appendChild(document.createElement("div")), {
+	const timeline = new Timeline(root.appendChild(document.createElement("div")), withShownSpan({
 		theme: () => "dark",
 		date: () => day,
 		today: () => TODAY,
@@ -105,7 +108,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 		tasks: () => slotted,
 		events: () => [],
 		now: () => new Date(2026, 10, 1, 8, 0),
-	});
+	}));
 	let draws = 0;
 	/** The day column's rows as each drawing left them. */
 	const drawnLeft: string[][] = [];
@@ -120,7 +123,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	controller = new QuickEntryController({
 		root,
 		tasks: {
-			labelLevels: () => [],
+			labelLevels: () => labels,
 			createInPlace: async (text, priority, place, repeat) => {
 				created.push({ text, priority, place, ...(repeat ? { repeat } : {}) });
 				if (drawsOnFresh !== "grows") return null;
@@ -136,7 +139,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			placementOfDay: (date) => placementOfDay(date, TODAY),
 			listName: (list) => DEFAULT_SETTINGS.sections[list],
 			dayOfPlacement: (placement) => dayOfPlacement(placement, TODAY),
-			...priorityTitles([{ prefix: "p1", color: "red" }]),
+			...priorityTitles([{ prefix: "p1", color: "red" }], labels),
 		},
 		arbiter: new GestureArbiter(),
 		drag: { beginNew },
@@ -445,6 +448,19 @@ describe("QuickEntryController", () => {
 		items.left = [item("A", key("now", 0)), item("Buy milk", key("now", 1))];
 		render();
 		expect(root.querySelector<HTMLButtonElement>(".tc-bar-indent")!.disabled).toBe(false);
+	});
+
+	it("shows in the field and the bar the marks the task is written with: a typed priority over the labels chosen", () => {
+		const { controller, root, type, field } = setUp({ labels: [{ name: "Важное", color: "blue" }] });
+		controller.openAtEnd("inbox");
+		root.querySelector<HTMLElement>(".tc-bar-flag")!.click();
+		tile(document.body, "Важное").click();
+		expect(root.querySelector<HTMLElement>(".tc-bar-flag")!.dataset.priority).toBe("blue");
+		type("p1 Buy milk");
+		expect(root.querySelector<HTMLElement>(".tc-bar-flag")!.dataset.priority).toBe("red");
+		expect(field()!.dataset.priority).toBe("red");
+		const label = tile(document.body, "Важное") as HTMLButtonElement;
+		expect([label.classList.contains("is-on"), label.disabled]).toEqual([false, true]);
 	});
 
 	it("shows the bar while the field is open, and puts the switch away", () => {

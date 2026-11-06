@@ -1,7 +1,10 @@
-import { DESCRIPTION_TEMPLATE, type DayView, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
+import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskService } from "../../src/application/contracts";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
+import { TimelineSpans } from "../../src/application/TimelineSpans";
+import { DayBoundary } from "../../src/domain/DayBoundary";
 import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
+import { markChoices, typedMarks } from "../../src/domain/Marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
 import { canRemind } from "../../src/domain/Task";
@@ -75,7 +78,11 @@ export class DemoTaskService implements TaskService {
 	private exists = true;
 	private readonly listeners = new Set<() => void>();
 
-	constructor(private readonly clock: Clock) {}
+	/** `boundary`: where the screen's day begins, by which its cards stand on the timeline. */
+	constructor(
+		private readonly clock: Clock,
+		private readonly boundary: () => DayBoundary = () => DayBoundary.MIDNIGHT,
+	) {}
 
 	/** The demo's tasks carry no labels. */
 	labelLevels(): readonly LabelLevel[] {
@@ -97,6 +104,16 @@ export class DemoTaskService implements TaskService {
 	parseTitle(text: string): { readonly text: string; readonly priority: PriorityLevel | null } {
 		const parsed = priorityOfText(text, this.prefixes());
 		return { text: parsed.text, priority: this.priorityLevels().find((l) => l.prefix === parsed.priority) ?? null };
+	}
+
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
+		const marks = typedMarks(text, priority, labels, this.prefixes());
+		const choices = markChoices(marks);
+		return {
+			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
+			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
+			can: { setPriority: choices.priority, setLabels: choices.labels },
+		};
 	}
 
 	isBlank(text: string): boolean {
@@ -137,6 +154,7 @@ export class DemoTaskService implements TaskService {
 			status: t.status,
 			dueDate: t.dueDate,
 			slot: t.slot,
+			durationMin: t.slot && t.slot.end !== null ? t.slot.end - t.slot.start : null,
 			reminder: "notification",
 			repeat: t.repeat ?? null,
 			open: t.status === "todo" || t.status === "inProgress",
@@ -153,7 +171,7 @@ export class DemoTaskService implements TaskService {
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot) },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null },
 		};
 	}
 
@@ -406,6 +424,26 @@ export class DemoTaskService implements TaskService {
 			this.sections[before.section].splice(before.index - shift, 0, t);
 		}
 		this.changed();
+	}
+
+	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
+		return this.timeline().shown({ slot: item.slot!, open: item.open }, day);
+	}
+
+	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {
+		return this.timeline().stretched({ slot: item.slot!, open: item.open }, day, edge, minute);
+	}
+
+	async resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean> {
+		const t = this.taskOf(key);
+		const next = t.slot && this.timeline().resized({ slot: t.slot, open: t.status === "todo" || t.status === "inProgress" }, day, edge, minute, minDurationMin);
+		if (!next) return false;
+		await this.setSlot(key, next);
+		return true;
+	}
+
+	private timeline(): TimelineSpans {
+		return new TimelineSpans(this.boundary(), this.clock.now());
 	}
 
 	async setSlot(key: TaskKey, slot: Slot): Promise<void> {

@@ -23,6 +23,11 @@ export { DayBoundary } from "../domain/DayBoundary";
 export { clampSlot } from "../domain/DayBoundary";
 /** Minutes in a day: the timeline's length. */
 export { MINUTES_PER_DAY } from "../domain/LocalDate";
+/** Minutes from the start of the shown day to a card's start and end; a null end for a task without a duration. */
+export type { Span as DaySpan } from "../domain/DayBoundary";
+import type { Span as DaySpan } from "../domain/DayBoundary";
+import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
+export type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 /** Whether two placements are the same place: the same kind, and for a date the same day. */
 export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
@@ -100,6 +105,8 @@ export interface TaskItem {
 	readonly status: TaskStatus;
 	readonly dueDate: LocalDate | null;
 	readonly slot: Slot | null;
+	/** How long its slot lasts in minutes; null without a slot or without a duration. */
+	readonly durationMin: number | null;
 	/** How the phone reminds of the task at its slot's start; a task without a slot keeps the default. */
 	readonly reminder: ReminderKind;
 	/** The rule after the task's repeat marker; null for a task that does not repeat. */
@@ -110,7 +117,7 @@ export interface TaskItem {
 	readonly repeatable: boolean;
 	/** The level whose prefix starts the task's text, which `text` then goes without. */
 	readonly priority: PriorityLevel | null;
-	/** The labels the task is tagged with, in the settings' order; none while it has a priority. */
+	/** The labels the task is tagged with, in the settings' order; none while it has a priority, which wins on a line with both. */
 	readonly labels: readonly LabelLevel[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
@@ -120,8 +127,11 @@ export interface TaskItem {
 	readonly isSubtask: boolean;
 	/** The day the task stands on: its slot's, today for Now, else its due date. */
 	readonly day: LocalDate | null;
-	/** What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task on a time). */
-	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean };
+	/**
+	 * What may be done to it: put off (not a done task), its due date taken off (one it has, not today's), a reminder (a task
+	 * on a time), a priority set (one without labels), labels set (one without a priority).
+	 */
+	readonly can: { readonly postpone: boolean; readonly removeDue: boolean; readonly remind: boolean; readonly setPriority: boolean; readonly setLabels: boolean };
 
 	/** The open subtasks right under this one, in file order, each with its own. */
 	readonly subtasks: readonly TaskItem[];
@@ -238,6 +248,14 @@ export interface ScreenView {
  * then runs the normalization rules. Rejects with StaleTaskError when `key.raw` no longer matches.
  */
 /** A call that takes the last task out of a section takes the section away; a section left empty any other way stays. */
+/** The marks a task being typed is written with, and what may still be chosen for it: the bar shows exactly these. */
+export interface DraftMarks {
+	readonly priority: PriorityLevel | null;
+	/** In the settings' order; none while there is a priority. */
+	readonly labels: readonly LabelLevel[];
+	readonly can: { readonly setPriority: boolean; readonly setLabels: boolean };
+}
+
 export interface TaskService {
 	/** The levels that mark tasks, in the settings' order: one-word prefixes, the first of two alike. */
 	priorityLevels(): readonly PriorityLevel[];
@@ -294,6 +312,11 @@ export interface TaskService {
 	 * takes an Inbox task to Soon); null when nothing was created.
 	 */
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[]): Promise<TaskKey | null>;
+	/**
+	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
+	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.
+	 */
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks;
 
 	/**
 	 * The task sheet. `inbox`, `backlog`: end of that section, no due date and no slot, even with `slot`. `soon`: end of Soon, no due date. `now`: end of Now, due today. `date` D: due date D, end of Now
@@ -372,6 +395,25 @@ export interface TaskService {
 	 * not today. This and the moves below take a subtask out of its task first: it goes on as a task.
 	 */
 	setSlot(key: TaskKey, slot: Slot): Promise<void>;
+	/**
+	 * Where the card of slotted `item` stands on the timeline of `day`, by the clock: on its time, or on today, an open
+	 * task whose start has passed rides the now line, its duration kept. The file keeps its time.
+	 */
+	shownSpan(item: TaskItem, day: LocalDate): DaySpan;
+	/**
+	 * The card of slotted `item` while its `edge` dot is held at `minute` of `day`: the end no earlier than the start nor
+	 * past the day; the start no earlier than the day nor past the end, and on a task without a duration no later than its
+	 * start, which becomes the end.
+	 */
+	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan;
+	/**
+	 * The `edge` dot let go at `minute` of `day`, a card being `minDurationMin` minutes tall: writes the task's new time as
+	 * `setSlot` does. A span no longer than a card loses its duration and stands at its start; a task without one whose start
+	 * dot was pulled keeps its start. The bottom dot changes only how long the task lasts, so a card riding the now line
+	 * ends where the finger let go while the file keeps its own start; the top dot is a new start and writes it.
+	 * Resolves false, writing nothing, when the time stays as shown.
+	 */
+	resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean>;
 	/** Drop from the timeline back on the list: the slot goes, due date stays; with `place`, the task moves there as `moveBefore` would. */
 	clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void>;
 

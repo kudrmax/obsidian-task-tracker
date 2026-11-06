@@ -1331,4 +1331,100 @@ describe("labels", () => {
 		const again = await svc.setLabels(items[0]!.key, []);
 		expect(again?.labels).toEqual([]);
 	});
+
+	it("tells what each task may be given: a priority while it has no labels, labels while it has no priority", async () => {
+		const { svc } = setup("## Now\n\n- [ ] A\n- [ ] p1 B\n- [ ] C #label/Важное\n- [ ] p1 D #label/Важное\n", labelled());
+		const can = (await svc.dayView(T)).list.map((item) => [item.can.setPriority, item.can.setLabels]);
+		expect(can).toEqual([[true, true], [true, false], [false, true], [true, false]]);
+	});
+
+	it("answers for the bar with the marks the file then has: the priority chosen or typed, else the labels", async () => {
+		const NOW = { kind: "list", list: "now", group: null, before: null } as const;
+		const drafts: [string, string | null, string[]][] = [["p1 Buy milk", null, ["Важное"]], ["Buy milk", null, ["Важное", "Срочное"]], ["Buy milk", "p2", ["Срочное"]], ["p2 Buy milk", "p1", []], ["Buy milk", null, []]];
+		for (const [text, priority, labels] of drafts) {
+			const { svc } = setup("## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n", labelled());
+			const shown = svc.draftMarks(text, priority, labels);
+			await svc.createInPlace(text, priority, NOW, null, labels);
+			const written = (await svc.dayView(T)).list[0];
+			expect({ priority: shown.priority, labels: shown.labels }, text).toEqual({ priority: written.priority, labels: written.labels });
+			expect(shown.can, text).toEqual({ setPriority: written.can.setPriority, setLabels: written.can.setLabels });
+		}
+		expect(setup("## Now\n", labelled()).svc.draftMarks("p1 Buy milk", null, ["Важное"])).toEqual({ priority: { prefix: "p1", color: "red" }, labels: [], can: { setPriority: true, setLabels: false } });
+	});
+});
+
+describe("the timeline's cards", () => {
+	/** A card 40 px tall with its 2 px of gap at 56 px an hour. */
+	const CARD_MIN = (42 / 56) * 60;
+	const LATE = "## Inbox\n\n## Now\n\n- [ ] A 📌 2026-10-30 10:00-11:00\n- [ ] B 📌 2026-10-30 16:00\n- [x] C 📌 2026-10-30 09:00\n\n## Soon\n\n## Backlog\n\n## Done\n";
+
+	/** The day starts at 5:00 by default: 14:20 is minute 560 of it, 10:00 minute 300. */
+	it("shows an open task past its start on the now line, its duration kept, and a closed one on its time", async () => {
+		const { svc } = setup(LATE);
+		const [late, later] = (await svc.dayView(T)).slotted;
+		expect(svc.shownSpan(late, T)).toEqual({ start: 560, end: 620 });
+		expect(svc.shownSpan(later, T)).toEqual({ start: 660, end: null });
+		expect(svc.shownSpan({ ...late, open: false }, T)).toEqual({ start: 300, end: 360 });
+		expect(svc.shownSpan(late, "2026-10-29")).toEqual({ start: 1740, end: 1800 });
+	});
+
+	it("stretches a card from where it is shown", async () => {
+		const { svc } = setup(LATE);
+		const [late, later] = (await svc.dayView(T)).slotted;
+		expect(svc.stretch(late, T, "end", 1000)).toEqual({ start: 560, end: 1000 });
+		expect(svc.stretch(later, T, "start", 600)).toEqual({ start: 600, end: 660 });
+	});
+
+	it("resizes a task: the bottom dot writes the end, the top dot the start", async () => {
+		const { store, svc } = setup(LATE);
+		const later = (await svc.dayView(T)).slotted[1];
+		expect(await svc.resize(later.key, T, "end", 750, CARD_MIN)).toBe(true);
+		expect(store.text).toContain("- [ ] B 📌 2026-10-30 16:00-17:30\n");
+		const stretched = (await svc.dayView(T)).slotted[1];
+		expect(await svc.resize(stretched.key, T, "start", 630, CARD_MIN)).toBe(true);
+		expect(store.text).toContain("- [ ] B 📌 2026-10-30 15:30-17:30\n");
+	});
+
+	it("keeps an overdue task's own start when its bottom dot stretches it on the now line", async () => {
+		const { store, svc } = setup(LATE);
+		const late = (await svc.dayView(T)).slotted[0];
+		expect(await svc.resize(late.key, T, "end", 710, CARD_MIN)).toBe(true);
+		expect(store.text).toContain("- [ ] A 📌 2026-10-30 10:00-12:30\n");
+	});
+
+	it("writes an overdue task's top dot as its new start", async () => {
+		const { store, svc } = setup(LATE);
+		const late = (await svc.dayView(T)).slotted[0];
+		expect(await svc.resize(late.key, T, "start", 540, CARD_MIN)).toBe(true);
+		expect(store.text).toContain("- [ ] A 📌 2026-10-30 14:00-15:20\n");
+	});
+
+	it("takes the duration away from a span no taller than a card", async () => {
+		const { store, svc } = setup(LATE);
+		const late = (await svc.dayView(T)).slotted[0];
+		expect(await svc.resize(late.key, T, "end", 590, CARD_MIN)).toBe(true);
+		expect(store.text).toContain("- [ ] A 📌 2026-10-30 10:00\n");
+	});
+
+	it("writes nothing when the card lets go as it was shown", async () => {
+		const { store, svc } = setup(LATE);
+		const [late, later] = (await svc.dayView(T)).slotted;
+		expect(await svc.resize(late.key, T, "end", 620, CARD_MIN)).toBe(false);
+		expect(await svc.resize(later.key, T, "start", 690, CARD_MIN)).toBe(false);
+		expect(store.writes).toBe(0);
+	});
+
+	it("rejects a key whose line changed", async () => {
+		const { store, svc } = setup(LATE);
+		const late = (await svc.dayView(T)).slotted[0];
+		store.text = store.text!.replace("- [ ] A", "- [ ] A2");
+		await expect(svc.resize(late.key, T, "end", 710, CARD_MIN)).rejects.toBeInstanceOf(StaleTaskError);
+	});
+
+	it("gives a slotted task's duration, none without one", async () => {
+		const { svc } = setup(LATE);
+		const [late, later] = (await svc.dayView(T)).slotted;
+		expect(late.durationMin).toBe(60);
+		expect(later.durationMin).toBeNull();
+	});
 });

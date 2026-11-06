@@ -1,4 +1,4 @@
-import { type CalendarEvent, type DayBoundary, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
+import { type CalendarEvent, type DayBoundary, type ResizeEdge, samePlace, sameTaskTree, type TaskItem, type TaskKey } from "../application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
@@ -8,7 +8,7 @@ import { Grips } from "./kit/Grips";
 import { markColours, renderMeta, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
-import { durationParts, followNow, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
+import { durationParts, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -19,6 +19,8 @@ export interface TimelineDeps {
 	boundary(): DayBoundary;
 	hourPx(): number;
 	tasks(): readonly TaskItem[];
+	/** Where a slotted task's card stands on the shown day, by the clock: the service's rule. */
+	shownSpan(item: TaskItem): TaskSpan;
 	events(): readonly CalendarEvent[];
 	now(): Date;
 	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
@@ -28,8 +30,6 @@ export interface TimelineDeps {
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
 }
-
-export type ResizeEdge = "start" | "end";
 
 interface GridMark {
 	readonly minutes: number;
@@ -207,11 +207,9 @@ export class Timeline {
 		return this.deps.boundary().slotAt(this.deps.date(), start, end);
 	}
 
-	/** Where the card of a slotted task stands: on its time, or on the now line once the task, still open, has passed it. */
+	/** Where the card of a slotted task stands, as the service places it. */
 	shownSpan(item: TaskItem): TaskSpan {
-		const span = this.spanOf(item.slot!);
-		const now = this.nowMinutes();
-		return now !== null && item.open ? followNow(span, now) : span;
+		return this.deps.shownSpan(item);
 	}
 
 	/** The hour's height at which the day, from its first hour's label to its closing one, fills the visible height; null before the timeline is laid out. */
@@ -555,11 +553,6 @@ export class Timeline {
 	private taskSpan(task: PlacedTask): TaskSpan {
 		if (this.stretch?.el === task.el) return this.stretch.span;
 		return this.shownSpan(task.item);
-	}
-
-	/** Minutes from the start of the shown day to now; null on another day than today. */
-	private nowMinutes(): number | null {
-		return this.deps.date() === this.deps.today() ? this.deps.boundary().offsetOf(this.deps.date(), this.deps.now()) : null;
 	}
 
 	private placeBox(el: HTMLElement, top: number, height: number, left: number): void {

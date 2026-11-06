@@ -1,5 +1,6 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
+import { markChoices, typedMarks } from "../domain/Marks";
 import { priorityOfText, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
 import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
@@ -11,7 +12,9 @@ import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableL
 import {
 	TasksFileMissingError,
 	type DayColumn,
+	type DaySpan,
 	type DayView,
+	type DraftMarks,
 	type DroppedTask,
 	type DropTo,
 	type EndList,
@@ -39,6 +42,7 @@ import { readsAnew } from "./readingSettings";
 import { itemLevels, toItem } from "./taskItems";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import type { UndoHistory } from "./UndoHistory";
+import { type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
 interface Normalized {
@@ -85,7 +89,7 @@ export class TaskServiceImpl implements TaskService {
 	constructor(
 		private readonly store: TaskFileStore,
 		private readonly settings: SettingsStore,
-		clock: Clock,
+		private readonly clock: Clock,
 		private readonly history: UndoHistory | null = null,
 	) {
 		this.rules = new TaskRules(settings, clock);
@@ -103,6 +107,16 @@ export class TaskServiceImpl implements TaskService {
 		const levels = this.priorityLevels();
 		const parsed = priorityOfText(text, levels.map((l) => l.prefix));
 		return { text: parsed.text, priority: levels.find((l) => l.prefix === parsed.priority) ?? null };
+	}
+
+	draftMarks(text: string, priority: string | null, labels: readonly string[]): DraftMarks {
+		const marks = typedMarks(text, priority, labels, this.priorityLevels().map((l) => l.prefix));
+		const choices = markChoices(marks);
+		return {
+			priority: this.priorityLevels().find((l) => l.prefix === marks.priority) ?? null,
+			labels: this.labelLevels().filter((l) => marks.labels.includes(l.name)),
+			can: { setPriority: choices.priority, setLabels: choices.labels },
+		};
 	}
 
 	isBlank(text: string): boolean {
@@ -340,6 +354,23 @@ export class TaskServiceImpl implements TaskService {
 		await this.mutate(this.rules.setSlot(key, slot));
 	}
 
+	shownSpan(item: TaskItem, day: LocalDate): DaySpan {
+		return this.timeline().shown(slotted(item), day);
+	}
+
+	stretch(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan {
+		return this.timeline().stretched(slotted(item), day, edge, minute);
+	}
+
+	async resize(key: TaskKey, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean> {
+		const { doc, boundary } = await this.readNormalized();
+		const { slot, status } = this.rules.entryOf(doc, key).task;
+		const next = slot && new TimelineSpans(boundary, this.clock.now()).resized({ slot, open: isOpen(status) }, day, edge, minute, minDurationMin);
+		if (!next) return false;
+		await this.setSlot(key, next);
+		return true;
+	}
+
 	async clearSlot(key: TaskKey, place?: { readonly before: TaskKey | null; readonly date: LocalDate }): Promise<void> {
 		await this.mutate(this.rules.clearSlot(key, place));
 	}
@@ -503,7 +534,18 @@ export class TaskServiceImpl implements TaskService {
 		return this.rules.today();
 	}
 
+	/** The timeline's rules by the clock and the day's boundary now. */
+	private timeline(): TimelineSpans {
+		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+	}
+
 	private emit(): void {
 		for (const listener of this.listeners) listener();
 	}
+}
+
+/** A task on the timeline as its rules read it; one without a slot has no place there. */
+function slotted(item: TaskItem): SlottedTask {
+	if (!item.slot) throw new Error("Task Calendar: the task has no slot on the timeline");
+	return { slot: item.slot, open: item.open };
 }

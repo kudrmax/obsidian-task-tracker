@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationParts, followNow, gridAt, itemBox, layoutEvents, scrollPlace, stackTasks, stretchedSpan, timeParts } from "../../src/ui/timelineLayout";
+import { durationParts, gridAt, itemBox, layoutEvents, scrollPlace, stackTasks, timeParts } from "../../src/ui/timelineLayout";
 
 describe("layoutEvents", () => {
 	it("lays a lone event on the ground across the whole width", () => {
@@ -143,28 +143,6 @@ describe("durationParts and timeParts", () => {
 	});
 });
 
-describe("stretchedSpan", () => {
-	it("keeps a duration taller than a card", () => {
-		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 930 }, "end", 56, 40)).toEqual({ start: 840, end: 930 });
-	});
-
-	it("drops a duration of 40 px or less: 45 minutes at 56 px an hour, 15 at 112", () => {
-		expect(stretchedSpan({ start: 840, end: 960 }, { start: 840, end: 885 }, "end", 56, 40)).toEqual({ start: 840, end: null });
-		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 870 }, "end", 112, 40)).toEqual({ start: 840, end: 870 });
-		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 855 }, "end", 112, 40)).toEqual({ start: 840, end: null });
-	});
-
-	it("measures against the card's height from the settings", () => {
-		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 880 }, "end", 56, 35)).toEqual({ start: 840, end: 880 });
-		expect(stretchedSpan({ start: 840, end: null }, { start: 840, end: 880 }, "end", 56, 40)).toEqual({ start: 840, end: null });
-	});
-
-	it("makes the old start the end when the start dot of a task without a duration is pulled up", () => {
-		expect(stretchedSpan({ start: 840, end: null }, { start: 750, end: 840 }, "start", 56, 40)).toEqual({ start: 750, end: 840 });
-		expect(stretchedSpan({ start: 840, end: null }, { start: 825, end: 840 }, "start", 56, 40)).toEqual({ start: 840, end: null });
-	});
-});
-
 describe("gridAt", () => {
 	it("draws only the hours up to the base zoom: half an hour there is too close for a label", () => {
 		expect(gridAt(28)).toEqual({ labels: 60, lines: 60 });
@@ -214,17 +192,5 @@ describe("scrollPlace", () => {
 		const whole = { canvasTop: 7, canvasHeight: 24 * 24, visible: 7 + 24 * 24 };
 		expect(scrollPlace({ ...whole, y: 21.5 * 24 }, 0.5)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 0 });
 		expect(scrollPlace({ ...whole, y: 24 }, 0.5)).toEqual({ roomTop: 0, roomBottom: 0, scrollTop: 0 });
-	});
-});
-
-describe("followNow", () => {
-	it("leaves a span that starts at now or later alone", () => {
-		expect(followNow({ start: 720, end: null }, 720)).toEqual({ start: 720, end: null });
-		expect(followNow({ start: 780, end: 840 }, 720)).toEqual({ start: 780, end: 840 });
-	});
-
-	it("starts a passed span at now, its duration kept", () => {
-		expect(followNow({ start: 600, end: null }, 720)).toEqual({ start: 720, end: null });
-		expect(followNow({ start: 600, end: 660 }, 720)).toEqual({ start: 720, end: 780 });
 	});
 });

@@ -891,6 +891,10 @@ ${key.title}`.toLowerCase();
     static empty(all) {
       return _TaskDocument.parse("", { inbox: "", now: "", soon: "", done: "" }, { dueDate: "", slot: "" }).ensureSections(all).serialize();
     }
+    /** The prefixes of the priority levels the file is read with. */
+    priorityPrefixes() {
+      return this.markers.priorities ?? [];
+    }
     serialize() {
       return this.lines.join(this.eol) + (this.trailingEol ? this.eol : "");
     }
@@ -1474,6 +1478,18 @@ ${key.title}`.toLowerCase();
     }
   };
 
+  // src/domain/Marks.ts
+  function marksOf(priority, labels) {
+    return { priority, labels: priority === null ? labels : [] };
+  }
+  function markChoices(marks) {
+    return { priority: marks.labels.length === 0, labels: marks.priority === null };
+  }
+  function typedMarks(text, priority, labels, prefixes) {
+    const typed2 = priority === null ? priorityOfText(text, prefixes) : { text, priority };
+    return { text: typed2.text, ...marksOf(typed2.priority, labels) };
+  }
+
   // src/domain/TaskTitle.ts
   var LINE_BREAK = /\s*(?:\r\n|[\n\r\u2028\u2029])\s*/gu;
   function oneLine(text) {
@@ -1562,12 +1578,16 @@ ${key.title}`.toLowerCase();
   function setDueDate(doc, entry, date) {
     return patch(doc, entry, { dueDate: date });
   }
+  function marksOfTask(task) {
+    return marksOf(task.priority, task.labels);
+  }
   function setPriority(doc, entry, priority) {
-    if (priority !== null && entry.task.labels.length > 0) return doc;
-    return patch(doc, entry, { priority });
+    const marks = marksOfTask(entry.task);
+    if (priority !== null && !markChoices(marks).priority) return doc;
+    return patch(doc, entry, marksOf(priority, marks.labels));
   }
   function setLabels(doc, entry, labels) {
-    if (labels.length > 0 && entry.task.priority !== null) return doc;
+    if (labels.length > 0 && !markChoices(marksOfTask(entry.task)).labels) return doc;
     return patch(doc, entry, { labels });
   }
   function setReminder(doc, entry, reminder) {
@@ -1614,7 +1634,8 @@ ${key.title}`.toLowerCase();
   }
   function createSubtask(doc, parent, draft, today) {
     const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
-    const task = newTask(draft.text, { dueDate, ...marksOf(draft.priority, draft.labels ?? []) });
+    const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
+    const task = newTask(text, { dueDate, ...marks });
     return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
   }
   function placeOnTimeline(doc, entry, slot, today, boundary = DayBoundary.MIDNIGHT) {
@@ -1659,10 +1680,13 @@ ${key.title}`.toLowerCase();
   function placeTask(doc, entry, draft, today, slot, boundary = DayBoundary.MIDNIGHT) {
     const { section, dueDate } = placementTarget(draft.placement, today);
     const unsorted = isUndated(section);
-    if (entry === null) return doc.insert(section, "end", withDraftRepeat(newTask(draft.text, { dueDate, slot: unsorted ? null : slot ?? null, ...marksOf(draft.priority, draft.labels ?? []) }), draft, today, boundary));
+    if (entry === null) {
+      const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
+      return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks }), draft, today, boundary));
+    }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
     const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed = { ...entry.task, text: taskTitle(draft.text), ...draftMarks(entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {} };
+    const changed = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {} };
     const edited = doc.replace(entry, withDraftRepeat(changed, draft, today, boundary));
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
@@ -1670,13 +1694,14 @@ ${key.title}`.toLowerCase();
   function placeSubtask(doc, entry, draft, today, boundary) {
     const current = placementOfEntry(entry, today);
     const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
-    return doc.replace(entry, withDraftRepeat({ ...entry.task, text: taskTitle(draft.text), ...draftMarks(entry.task, draft), dueDate }, draft, today, boundary));
+    return doc.replace(entry, withDraftRepeat({ ...entry.task, ...draftMarks(doc, entry.task, draft), dueDate }, draft, today, boundary));
   }
-  function marksOf(priority, labels) {
-    return { priority: labels.length > 0 ? null : priority, labels };
+  function typed(doc, text, priority, labels) {
+    const marked = typedMarks(taskTitle(text), priority, labels, doc.priorityPrefixes());
+    return { ...marked, text: taskTitle(marked.text) };
   }
-  function draftMarks(task, draft) {
-    return marksOf(draft.priority, draft.labels ?? task.labels);
+  function draftMarks(doc, task, draft) {
+    return typed(doc, draft.text, draft.priority, draft.labels ?? task.labels);
   }
   function toEnd(doc, entry, section) {
     const prepared = isUndated(section) ? patch(doc, entry, { dueDate: null, slot: null }) : doc;
@@ -1720,8 +1745,8 @@ ${key.title}`.toLowerCase();
     if (before !== null && before.section === list) return before.index;
     return group === null ? "end" : { endOf: groupIndex(doc, list, group) };
   }
-  function createInPlace(doc, text, priority, place, today, boundary, repeat, labels = []) {
-    const marks = marksOf(priority, labels);
+  function createInPlace(doc, typedText, priority, place, today, boundary, repeat, labels = []) {
+    const { text, ...marks } = typed(doc, typedText, priority, labels);
     switch (place.kind) {
       case "subtask":
         return intoUnfolded(

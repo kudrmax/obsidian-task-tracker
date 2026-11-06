@@ -207,7 +207,12 @@ export class TaskCalendarView extends ItemView {
 				this.contentEl.classList.toggle("is-dragging", active);
 			},
 			onResult: (drag, result) => this.applyDrop(drag, result),
-			onResize: (item, slot) => this.act(() => this.deps.tasks.setSlot(item.key, slot)),
+			stretch: (item, edge, minute) => this.deps.tasks.stretch(item, this.selectedDate, edge, minute),
+			onResize: async (item, edge, minute, minDurationMin) => {
+				let written = false;
+				await this.act(async () => (written = await this.deps.tasks.resize(item.key, this.selectedDate, edge, minute, minDurationMin)));
+				return written;
+			},
 			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
 			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
@@ -336,6 +341,7 @@ export class TaskCalendarView extends ItemView {
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			tasks: () => this.data.day?.slotted ?? [],
+			shownSpan: (item) => this.deps.tasks.shownSpan(item, this.selectedDate),
 			events: () => this.data.events,
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
@@ -757,9 +763,10 @@ export class TaskCalendarView extends ItemView {
 	}
 
 	/** Runs one change to the file and resolves once the screen shows it; a task changed under us is reported instead. */
-	private async act(change: () => Promise<void>): Promise<void> {
+	/** Runs a change of the tasks, then reads them anew; a change that answers false wrote nothing and needs no reading. */
+	private async act(change: () => Promise<void | boolean>): Promise<void> {
 		try {
-			await change();
+			if ((await change()) === false) return;
 		} catch (error) {
 			if (!(error instanceof StaleTaskError)) throw error;
 			new Notice(error.message);

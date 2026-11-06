@@ -87,7 +87,7 @@ describe("the edit group", () => {
 
 	it("offers the reminder by what the task may have, not by its slot", () => {
 		const slot = { date: "2026-11-03", start: 600, end: null };
-		const can = { postpone: true, removeDue: false };
+		const can = { postpone: true, removeDue: false, setPriority: true, setLabels: true };
 		expect(editRows(item({ description: "- note", slot, can: { ...can, remind: false } })).map((r) => r.id)).not.toContain("reminder");
 		expect(editRows(item({ description: "- note", can: { ...can, remind: true } })).map((r) => r.id)).toContain("reminder");
 	});
@@ -133,7 +133,7 @@ describe("the label group", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("can't be pressed while the task has a priority, nor the levels while it has labels", () => {
+	it("can't be pressed while the task has a priority, nor the levels while it has labels: as the task's `can` says", () => {
 		const source = document.body.appendChild(document.createElement("div"));
 		const actions = { setRepeat: vi.fn(async () => {}), stop: vi.fn(async () => {}), setStatus: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), newSection: vi.fn(), setPriority: vi.fn(async () => {}), setLabels: vi.fn(async () => null), setReminder: vi.fn(async () => {}), rename: vi.fn(), openDescription: vi.fn(), addSubtask: vi.fn(), remove: vi.fn(async () => {}), openInObsidian: vi.fn(), openLink: vi.fn() };
 		const disabled = (kind: string) => [...document.querySelectorAll<HTMLButtonElement>(`.tc-menu-tiles.${kind} .tc-menu-tile`)].map((t) => t.disabled);
@@ -144,6 +144,11 @@ describe("the label group", () => {
 		const prioritized = TaskMenu.open({ item: item({ priority: LEVELS[0] }), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, labels: LABELS, actions });
 		expect(disabled("is-labels")).toEqual([true, true]);
 		prioritized.close();
+		document.body.innerHTML = "";
+		const can = { postpone: true, removeDue: false, remind: false, setPriority: false, setLabels: false };
+		const barred = TaskMenu.open({ item: item({ can }), source: document.body.appendChild(document.createElement("div")), today: "2026-11-01", day: "2026-11-01", levels: LEVELS, labels: LABELS, actions });
+		expect([disabled("is-priority"), disabled("is-labels")]).toEqual([[true, true], [true, true]]);
+		barred.close();
 		document.body.innerHTML = "";
 	});
 });
@@ -206,7 +211,7 @@ describe("the menu", () => {
 	});
 
 	it("offers Remove due date in the picker only when the item says its date may go", () => {
-		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false, remind: false } }));
+		open(item({ key: { section: "soon", index: 0, path: [], raw: "- [ ] A" }, dueDate: "2026-11-05", can: { postpone: true, removeDue: false, remind: false, setPriority: true, setLabels: true } }));
 		const tiles = panel().querySelectorAll<HTMLButtonElement>(".tc-menu-tiles.is-move .tc-menu-tile");
 		tiles[tiles.length - 1].click();
 		expect(panel().querySelector(".tc-picker-grid")).not.toBeNull();
