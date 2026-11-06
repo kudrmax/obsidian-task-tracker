@@ -30,12 +30,14 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 9. **A project note is a note tagged `#project`**, anywhere in the vault (Max hardly uses folders). The tag counts in the
    note's properties or in its text; the project's name is the note's name.
 10. **No new screen: Backlog is the projects' view.** Backlog is grouped by project, one group per project note; the
-    Backlog tasks of `TODOs Tasks.md` are one more group, «No project». A tap on a group's title opens the project note.
+    Backlog tasks of `TODOs Tasks.md` are one more group, «No project», always last. A group is the section header with
+    two additions: it folds (a chevron; a tap on the title folds or unfolds it, the fold is kept on the device; folded, it
+    shows how many untaken tasks it holds) and an arrow button beside the title opens the project note.
     Any overview of projects later (projects without a next step) is a view of this Backlog, never a screen of its own.
 11. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project moves the line from
     `TODOs Tasks.md` into that project's note (the end of its `## Tasks`), keeping where it is in the
-    lane; «No project» moves it back into the file. The plus on a project group's title in Backlog writes a new task
-    straight into that note.
+    lane; «No project» moves it back into the file. A project group has no plus of its own: new tasks come from the
+    plus at the bottom right, as everywhere.
 12. **Project tasks live under `## Tasks`.** Only checkboxes in the note's `## Tasks` section (down to the next heading of
     the same or a higher level) are project tasks; every other checkbox is a plain checklist the plugin never reads. A new
     or moved-in task is written at the end of that section; a note without one gets it at its end on the first write.
@@ -57,7 +59,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 ## Open (being planned now)
 
 - How the sections of `TODOs Tasks.md`'s Backlog sit inside the «No project» group.
-- How Backlog grouped by project looks, and the project mark on a card: boards, phone and desktop, dark and light.
+- The project mark on a card and the task menu's «Project»: boards, phone and desktop, dark and light.
+- How the plus at the bottom right writes a new task straight into a project, if at all.
 - What the project mark on a card looks like, on the phone and the desktop.
 - How the iPhone app reads tasks spread over many files.
 
@@ -72,3 +75,4 @@ Approved by Max as directions, to be designed one by one after the core.
 3. **Project status in frontmatter**: active, paused, someday. A paused or someday project stays out of the weekly list.
 4. **Agent.** «Look at the friends project and suggest a step for this week»: Claude reads the note and the diary and puts
    one task in Soon, linked to the project. Belongs in `docs/plugin/agents.md` once projects exist.
+5. **Sections fold too**, like project groups in Backlog: the same chevron and tap on the title.
