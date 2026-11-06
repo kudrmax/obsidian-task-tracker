@@ -1,4 +1,4 @@
-import { type GapPlace, placeOfGap, placesInGap } from "../../application/contracts";
+import { type GapPlace, placeOfDrop, placesInGap, sameGap } from "../../application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import { type ListEntry, PLATE, type TaskList } from "../TaskList";
@@ -6,7 +6,7 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragOrigin, type DragPayload, type DropResult, type DropTarget, type ListColumn, originsOf } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
-import { type PlacedCard, type PlacedHead, placeAt, sameGap } from "./listPlace";
+import { type PlacedCard, type PlacedHead, placeAt } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
@@ -106,10 +106,11 @@ export class ListDrop implements DropTarget {
 				);
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
-		const plate = this.isHome(place) ? null : this.list.plateOf(place.group);
+		const home = this.isHome(place, frame);
+		const plate = home ? null : this.list.plateOf(place.group);
 		this.light(plate);
 		if (plate) this.line.hide();
-		else if (!this.isHome(place)) {
+		else if (!home) {
 			const line = this.lineRect(place, frame);
 			this.line.show(line.left, line.right, line.top, frame, fresh ? { x, y } : null);
 		} else this.line.hide();
@@ -159,17 +160,22 @@ export class ListDrop implements DropTarget {
 		const sections = this.sections();
 		if (!this.placesAnywhere(drag)) return { kind: "list", column: this.column, before: null };
 		if (!this.place) this.preview(x, y, drag);
-		if (!this.place || this.isHome(this.place)) return null;
-		const result = placeOfGap(this.placed(readFrame(this.list.el)), this.place);
+		if (!this.place) return null;
+		const result = placeOfDrop(this.placed(readFrame(this.list.el)), this.place, this.home());
+		if (!result) return null;
 		if (result.kind === "subtask") return { kind: "nest", parent: result.parent, before: result.before };
 		if (sections) return { kind: "group", list: sections.list, date: sections.date, group: result.group, before: result.before };
 		return { kind: "list", column: this.column, before: result.before };
 	}
 
-	/** The place the card was lifted from, at its level: let go there, the card only goes back. Several cards carried have none. */
-	private isHome(place: GapPlace): boolean {
-		const home = this.liftedFrom();
-		return home !== null && !this.carriesMany() && sameGap(place, home) && place.level === home.level;
+	/** The place a card carried alone was lifted from, at its level; several cards carried have none. */
+	private home(): GapPlace | null {
+		return this.carriesMany() ? null : this.liftedFrom();
+	}
+
+	/** The card goes back where it was lifted from: the drop would change nothing, so no line or plate shows. */
+	private isHome(place: GapPlace, frame: ListFrame): boolean {
+		return placeOfDrop(this.placed(frame), place, this.home()) === null;
 	}
 
 	private carriesMany(): boolean {

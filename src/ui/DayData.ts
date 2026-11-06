@@ -1,4 +1,4 @@
-import { type CalendarEvent, type CalendarService, type DayEvents, type DayView, type GroupedList, type ListSection, type SectionOffer, type SourceStatus, type TaskItem, TasksFileMissingError, type TaskService } from "../application/contracts";
+import type { CalendarEvent, CalendarService, DayEvents, DayView, GroupedList, ListSection, SectionOffer, SourceStatus, TaskItem, TaskService } from "../application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -24,19 +24,20 @@ interface TasksState {
 	readonly sections: ListSections;
 	/** The sections the menus offer, read with the lists. */
 	readonly offer: SectionOffer;
+	/** No tasks file: the screen offers to create it. */
 	readonly missing: boolean;
+	/** The day's events, their sources and the switch's dot show: the screen read says when not. */
+	readonly calendars: boolean;
 }
 
 type ListSections = Readonly<Record<GroupedList, readonly ListSection[]>>;
 
 const NO_SECTIONS: ListSections = { inbox: [], backlog: [], soon: [], now: [] };
 
-/** No sections to offer: no file, or nothing read yet. */
+/** No sections to offer: nothing read yet. */
 const NO_OFFER: SectionOffer = { lists: { now: [], soon: [], inbox: [], backlog: [] }, ungrouped: "" };
 
 const NO_EVENTS: DayEvents = { events: [], statuses: [], stale: false };
-
-const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: true } as const;
 
 /**
  * What the screen shows for the selected day, in two parts that load on their own: the tasks, read from the file after
@@ -44,7 +45,7 @@ const MISSING = { day: null, soon: [], inbox: [], backlog: [], done: [], section
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true };
 	private dayEvents: DayEvents = NO_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -99,16 +100,16 @@ export class DayData {
 	}
 
 	get events(): readonly CalendarEvent[] {
-		return this.missing ? [] : this.dayEvents.events;
+		return this.state.calendars ? this.dayEvents.events : [];
 	}
 
 	get statuses(): readonly SourceStatus[] {
-		return this.missing ? [] : this.dayEvents.statuses;
+		return this.state.calendars ? this.dayEvents.statuses : [];
 	}
 
 	/** A calendar shown on the day comes from a file no longer fresh: the switch's dot. */
 	get stale(): boolean {
-		return !this.missing && this.dayEvents.stale;
+		return this.state.calendars && this.dayEvents.stale;
 	}
 
 	/**
@@ -157,12 +158,8 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const date = this.deps.date();
-		try {
-			return { date, ...(await this.deps.tasks.screen(date)), missing: false };
-		} catch (error) {
-			if (error instanceof TasksFileMissingError) return { date, ...MISSING };
-			throw error;
-		}
+		const screen = await this.deps.tasks.screen(date);
+		return { date, ...screen, day: screen.missing ? null : screen.day };
 	}
 
 	/** The data changes, the hooks of the read run on it, and only then is the screen told. */
@@ -177,9 +174,9 @@ export class DayData {
 		}
 	}
 
-	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; a missing file shows none. */
+	/** What the screen draws of a part: the events and the sources' dot, not when each source was last fetched; none while the calendars are not shown. */
 	private drawnOf(part: DayPart): string {
 		if (part === "tasks") return JSON.stringify(this.state);
-		return JSON.stringify([this.missing, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale), this.dayEvents.stale]);
+		return JSON.stringify([this.state.calendars, this.dayEvents.events, this.dayEvents.statuses.map((status) => status.stale), this.dayEvents.stale]);
 	}
 }

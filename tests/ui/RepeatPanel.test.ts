@@ -11,7 +11,7 @@ const last = <T>(list: readonly T[]): T | undefined => list[list.length - 1];
 function open({ rule = null, ...opts }: Partial<RepeatPanelOptions> & { rule?: RepeatRule | null } = {}): { panel: HTMLElement; changes: RepeatRule[] } {
 	const panel = document.body.appendChild(document.createElement("div"));
 	const changes: RepeatRule[] = [];
-	repeatPanel(panel, { draft: repeatDraft(THURSDAY, rule), onChange: (changed) => changes.push(changed), onRemove: null, ...opts });
+	repeatPanel(panel, { draft: repeatDraft(THURSDAY, rule), onChange: (changed) => changes.push(changed), onRemove: () => undefined, ...opts });
 	return { panel, changes };
 }
 
@@ -120,8 +120,8 @@ describe("repeatPanel", () => {
 		expect(changes).toEqual([]);
 	});
 
-	it("shows Remove repeat from the start when the opener offers it, and a change adds or takes none", () => {
-		const { panel } = open({ onRemove: () => undefined });
+	it("shows Remove repeat from the start for a rule there is already, and a change adds or takes none", () => {
+		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null } });
 		expect(panel.querySelectorAll(".tc-repeat-remove")).toHaveLength(1);
 		segment(panel, ".tc-repeat-unit", "days").click();
 		expect([panel.querySelectorAll(".tc-repeat-remove").length, panel.lastElementChild === panel.querySelector(".tc-repeat-remove")]).toEqual([1, true]);
@@ -133,11 +133,11 @@ describe("repeatPanel", () => {
 	it("drawn again into the same panel for a task without a rule, leaves no room for a Remove row it does not have", () => {
 		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null }, onRemove: () => undefined });
 		panel.replaceChildren();
-		repeatPanel(panel, { draft: repeatDraft(THURSDAY, null), onChange: () => undefined, onRemove: null });
+		repeatPanel(panel, { draft: repeatDraft(THURSDAY, null), onChange: () => undefined, onRemove: () => undefined });
 		expect([panel.querySelector(".tc-repeat-remove"), panel.classList.contains("has-remove")]).toEqual([null, false]);
 	});
 
-	it("Remove repeat only with onRemove", () => {
+	it("Remove repeat only for a rule there is already", () => {
 		expect(open().panel.querySelector(".tc-repeat-remove")).toBeNull();
 		let removed = 0;
 		const { panel } = open({ rule: { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null }, onRemove: () => removed++ });

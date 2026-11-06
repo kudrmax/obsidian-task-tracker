@@ -1,5 +1,7 @@
 import type { CalendarEvent, CalendarPoll, CalendarService, CalendarSource, DayEvents, DayEventsAsk, EventsReason, PolledScreen } from "../../src/application/contracts";
+import type { Clock } from "../../src/application/ports";
 import type { LocalDate } from "../../src/ui/types";
+import { DEMO_NOW, FixedClock } from "./DemoClock";
 
 const DEMO_DATE = "2026-10-30";
 
@@ -35,6 +37,12 @@ const WORK_EXPORTED = new Date(2026, 9, 29, 8, 2);
 
 export class DemoCalendarService implements CalendarService {
 	private readonly last = new Map<LocalDate, DayEvents>();
+
+	constructor(private readonly clock: Clock = new FixedClock(DEMO_NOW)) {}
+
+	isPast(event: CalendarEvent): boolean {
+		return event.end.getTime() <= this.clock.now().getTime();
+	}
 
 	private async eventsOn(date: LocalDate): Promise<DayEvents> {
 		const events: CalendarEvent[] = date === DEMO_DATE

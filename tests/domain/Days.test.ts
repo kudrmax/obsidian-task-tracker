@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPostpone, canRemoveDue, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
+import { canPostpone, canRemoveDue, dayColumn, dayOfPlacement, dayOfTask, dayRelation, placementOfDay, taskScreen } from "../../src/domain/Days";
 
 const TODAY = "2026-11-01";
 
@@ -54,5 +54,29 @@ describe("canRemoveDue", () => {
 		expect(canRemoveDue("2026-11-05", TODAY)).toBe(true);
 		expect(canRemoveDue(TODAY, TODAY)).toBe(false);
 		expect(canRemoveDue(null, TODAY)).toBe(false);
+	});
+});
+
+describe("taskScreen", () => {
+	it("shows Done, Inbox and Backlog in their lists, whatever day", () => {
+		expect(taskScreen("done", "2026-11-06")).toEqual({ kind: "list", list: "done" });
+		expect(taskScreen("inbox", null)).toEqual({ kind: "list", list: "inbox" });
+		expect(taskScreen("backlog", null)).toEqual({ kind: "list", list: "backlog" });
+	});
+
+	it("shows a task of Now or Soon on its day, Soon without one", () => {
+		expect(taskScreen("now", "2026-11-06")).toEqual({ kind: "day", date: "2026-11-06" });
+		expect(taskScreen("soon", "2026-11-09")).toEqual({ kind: "day", date: "2026-11-09" });
+		expect(taskScreen("soon", null)).toEqual({ kind: "list", list: "soon" });
+	});
+});
+
+describe("dayRelation", () => {
+	it("tells today, tomorrow, yesterday and any other day, across a month", () => {
+		expect(dayRelation("2026-11-30", "2026-11-30")).toBe("today");
+		expect(dayRelation("2026-12-01", "2026-11-30")).toBe("tomorrow");
+		expect(dayRelation("2026-11-29", "2026-11-30")).toBe("yesterday");
+		expect(dayRelation("2026-12-02", "2026-11-30")).toBe("other");
+		expect(dayRelation("2025-11-30", "2026-11-30")).toBe("other");
 	});
 });

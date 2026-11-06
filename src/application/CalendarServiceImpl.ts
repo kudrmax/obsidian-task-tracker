@@ -3,6 +3,7 @@ import { CalendarPolling } from "./CalendarPolling";
 import { type CalendarKey, keyText } from "./calendarChoice";
 import type { CalendarFile } from "./calendarFile";
 import type {
+	CalendarEvent,
 	CalendarPoll,
 	CalendarService,
 	CalendarSource,
@@ -70,6 +71,10 @@ export class CalendarServiceImpl implements CalendarService {
 		if (reason === "refresh") return { cached, fresh: () => this.eventsOn(date) };
 		if (reason === "peek" && cached) return { cached, fresh: null };
 		return { cached, fresh: () => this.eventsAround(date) };
+	}
+
+	isPast(event: CalendarEvent): boolean {
+		return event.end.getTime() <= this.clock.now().getTime();
 	}
 
 	keepFresh(screen: PolledScreen): CalendarPoll {

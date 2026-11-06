@@ -1,5 +1,5 @@
 import type { DayBoundary } from "../domain/DayBoundary";
-import { dayColumn, dayOfPlacement, placementOfDay } from "../domain/Days";
+import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../domain/Days";
 import { markChoices, typedMarks } from "../domain/Marks";
 import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
@@ -11,7 +11,10 @@ import { flatten, type TaskDocument, type TaskEntry } from "../domain/TaskDocume
 import { type LabelLevel, type PriorityLevel, type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
 import {
 	TasksFileMissingError,
+	type ColumnSections,
 	type DayColumn,
+	type DropColumn,
+	type SearchGroup,
 	type DaySpan,
 	type DayView,
 	type DraftMarks,
@@ -38,6 +41,7 @@ import {
 } from "./contracts";
 import { carriedWith, taskMenu, toggledLabels, toggledPriority } from "./menus";
 import { runDrop } from "./drops";
+import { samePlace } from "./taskKeys";
 import { offeredNames, type SectionOffer, shownSections } from "./sections";
 import { parseText } from "./documentText";
 import type { Clock, SettingsStore, TaskFileStore } from "./ports";
@@ -132,9 +136,30 @@ export class TaskServiceImpl implements TaskService {
 	}
 
 	async screen(date: LocalDate): Promise<ScreenView> {
-		await this.normalize();
-		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer(date)]);
-		return { day, soon, inbox, backlog, done, sections, offer };
+		try {
+			await this.normalize();
+			const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer(date)]);
+			return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true };
+		} catch (error) {
+			if (error instanceof TasksFileMissingError) return this.missingScreen(date);
+			throw error;
+		}
+	}
+
+	/** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
+	private missingScreen(date: LocalDate): ScreenView {
+		const none = { inbox: [], backlog: [], soon: [], now: [] };
+		return {
+			day: { date, list: [], slotted: [] },
+			soon: [],
+			inbox: [],
+			backlog: [],
+			done: [],
+			sections: none,
+			offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
+			missing: true,
+			calendars: false,
+		};
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -177,7 +202,7 @@ export class TaskServiceImpl implements TaskService {
 		return doc.tasks("done").map(this.itemOf(today));
 	}
 
-	async search(query: string): Promise<readonly SearchHit[]> {
+	async search(query: string): Promise<readonly SearchGroup[]> {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy) return [];
 		const { doc, today } = await this.readNormalized();
@@ -199,13 +224,28 @@ export class TaskServiceImpl implements TaskService {
 			}
 			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
 		};
-		const hits: SearchHit[] = [];
-		for (const section of SEARCH_ORDER) {
+		const groups: SearchGroup[] = [];
+		for (const list of SEARCH_ORDER) {
 			ranked.length = 0;
-			for (const entry of doc.tasks(section)) visit(entry);
-			hits.push(...ranked.sort(byQuality).map((r) => r.hit));
+			for (const entry of doc.tasks(list)) visit(entry);
+			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
-		return hits;
+		return groups;
+	}
+
+	async screenOf(item: TaskItem): Promise<TaskScreen> {
+		const { doc, today } = await this.readNormalized();
+		const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : undefined;
+		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
+	}
+
+	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
+		for (const item of items) {
+			if (samePlace(item.key, key)) return item;
+			const inner = this.findIn(item.subtasks, key);
+			if (inner) return inner;
+		}
+		return null;
 	}
 
 	async createInList(date: LocalDate, text: string): Promise<void> {
@@ -247,6 +287,12 @@ export class TaskServiceImpl implements TaskService {
 
 	dayColumn(date: LocalDate): DayColumn {
 		return dayColumn(date, this.today());
+	}
+
+	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null {
+		if (column !== "day") return { list: column, date: null };
+		const { list, date: day, sections } = this.dayColumn(date);
+		return sections ? { list, date: day } : null;
 	}
 
 	placementOfDay(date: LocalDate): Placement {

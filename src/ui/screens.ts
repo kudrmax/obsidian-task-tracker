@@ -1,5 +1,5 @@
+import type { DayService } from "../application/contracts";
 import type { RightMode } from "./viewSettings";
-import { addDays } from "./dates";
 import type { LocalDate } from "./types";
 
 /** The window's places left to right; a place's index is that of the first of the two columns it shows. */
@@ -27,8 +27,8 @@ export interface Screen {
  * Today is where the calendar meets the lists; a past day the arrows reached walks on through the days, as a later one does.
  * From Done the row goes on to Inbox; nothing leads back to Done.
  */
-export function stepScreen(from: Screen, shift: Shift, today: LocalDate): Screen | null {
-	if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
+export function stepScreen(from: Screen, shift: Shift, days: Pick<DayService, "relation" | "step">): Screen | null {
+	if (from.mode === "calendar" && (shift > 0 || days.relation(from.date) !== "today")) return { mode: "calendar", date: days.step(from.date, shift) };
 	const place = placeIndex(from.mode) + shift;
 	return place >= 0 && place < PLACES.length ? { mode: PLACES[place], date: from.date } : null;
 }

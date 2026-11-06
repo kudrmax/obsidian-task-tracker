@@ -1,5 +1,5 @@
 import { ItemView, MarkdownView, Notice, Platform, Scope, type WorkspaceLeaf } from "obsidian";
-import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, samePlace, sameTaskTree, StaleTaskError, type TaskItem, type TaskKey, type TaskService, type UndoService, type Clock } from "../application/contracts";
+import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock } from "../application/contracts";
 import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -7,7 +7,6 @@ import { FoundCard } from "./FoundCard";
 import { SearchWindow } from "./search/SearchWindow";
 import { BulkController } from "./BulkController";
 import type { Theme } from "./eventColors";
-import { addDays } from "./dates";
 import { DayData } from "./DayData";
 import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
@@ -58,18 +57,11 @@ import type { LocalDate } from "./types";
 export const VIEW_TYPE = "task-calendar";
 
 const MINUTE_MS = 60_000;
+/** The place of the screens a list stands at: Backlog under Inbox, Done left of it. */
+const PLACE_OF_LIST: Readonly<Record<Extract<TaskScreen, { kind: "list" }>["list"], Place>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
+
 /** The gesture that holds the screen while a new section's name is typed: no redraw takes the field away. */
 const NAMING = "naming";
-
-/** The task with `key` among `items` and their subtasks. */
-function findTask(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
-	for (const item of items) {
-		if (samePlace(item.key, key)) return item;
-		const inner = findTask(item.subtasks, key);
-		if (inner) return inner;
-	}
-	return null;
-}
 
 export interface ViewDeps {
 	readonly tasks: TaskService;
@@ -246,8 +238,11 @@ export class TaskCalendarView extends ItemView {
 		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
-			title: () => dayTitle(this.titleDay ?? this.selectedDate, this.today()),
-			onStep: (days) => void this.afterEntry(() => this.select(addDays(this.selectedDate, days))),
+			title: () => {
+				const day = this.titleDay ?? this.selectedDate;
+				return dayTitle(day, this.deps.days.relation(day), this.today());
+			},
+			onStep: (days) => void this.afterEntry(() => this.select(this.deps.days.step(this.selectedDate, days))),
 			onToday: () => void this.afterEntry(() => this.select(this.today())),
 			inboxName: () => this.deps.tasks.listName("inbox"),
 			soonName: () => this.deps.tasks.listName("soon"),
@@ -345,6 +340,7 @@ export class TaskCalendarView extends ItemView {
 			tasks: () => this.data.day?.slotted ?? [],
 			shownSpan: (item) => this.deps.tasks.shownSpan(item, this.selectedDate),
 			events: () => this.data.events,
+			isPast: (event) => this.deps.calendars.isPast(event),
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
 			onBlock: (block, item) => {
@@ -392,7 +388,7 @@ export class TaskCalendarView extends ItemView {
 			list: (column) => this.listOf(column),
 			sectioned: (column) => this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
-			task: (key) => findTask(this.data.day?.slotted ?? [], key),
+			task: (key) => this.deps.tasks.findIn(this.data.day?.slotted ?? [], key),
 			dropTargets: () => {
 				const shown = this.shownDrops();
 				return { lists: shown.filter((drop) => drop instanceof ListDrop), timeline: shown.find((drop) => drop instanceof TimelineDrop) ?? null };
@@ -581,7 +577,7 @@ export class TaskCalendarView extends ItemView {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = stepScreen(from, shift, this.today());
+		const to = stepScreen(from, shift, this.deps.days);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);
@@ -604,10 +600,9 @@ export class TaskCalendarView extends ItemView {
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
-			grouped: (date) => this.deps.tasks.dayColumn(date).sections,
 			sections: (date) => {
-				const column = this.deps.tasks.dayColumn(date);
-				return column.sections ? this.data.sections[column.list] : [];
+				const shown = this.deps.tasks.columnSections("day", date);
+				return shown ? this.data.sections[shown.list] : null;
 			},
 			ungroupedName: () => this.settings.ungrouped,
 			listScroll: () => this.list?.el.scrollTop ?? 0,
@@ -739,21 +734,13 @@ export class TaskCalendarView extends ItemView {
 	 */
 	private async reveal(item: TaskItem): Promise<void> {
 		if (item.isSubtask) await this.act(() => this.deps.tasks.unfoldAbove(item.key));
+		const screen = await this.deps.tasks.screenOf(item);
 		this.found.mark(item);
-		if (item.list === "done") {
-			this.atDone = true;
-			this.switcher?.show("done");
-			await this.setMode("inbox");
-		} else {
-			this.atDone = false;
-			const day = item.day ?? item.dueDate;
-			if (item.list === "inbox" || item.list === "backlog") await this.setMode("inbox");
-			else if (day === null) await this.setMode("soon");
-			else {
-				if (day !== this.selectedDate) this.select(day);
-				await this.setMode("calendar");
-			}
-		}
+		const place: Place = screen.kind === "day" ? "calendar" : PLACE_OF_LIST[screen.list];
+		this.atDone = place === "done";
+		if (screen.kind === "day" && screen.date !== this.selectedDate) this.select(screen.date);
+		if (place === "done") this.switcher?.show("done");
+		await this.setMode(place === "done" ? "inbox" : place);
 		this.parts.request("tasks");
 	}
 
@@ -921,14 +908,9 @@ export class TaskCalendarView extends ItemView {
 		plate.addEventListener("click", () => this.quick?.openIn(column, group.name));
 	}
 
-	/**
-	 * Whose sections a column shows (sections spec §5.1): the list its tasks lie in. Inbox and Soon their own; the day
-	 * column Now's for today and Soon's for a later day, whose tasks lie in Soon with that day; a past day's none.
-	 */
+	/** Whose sections a column shows on the selected day (`TaskService.columnSections`). */
 	private sectionsOf(column: ListColumn): ColumnSections | null {
-		if (column !== "day") return { list: column, date: null };
-		const { list, date, sections } = this.deps.tasks.dayColumn(this.selectedDate);
-		return sections ? { list, date } : null;
+		return this.deps.tasks.columnSections(column, this.selectedDate);
 	}
 
 	/** The list column a card stands in, when that column shows its sections: there a task's menu offers them, and the task waits for a new section's name. */
@@ -1098,7 +1080,7 @@ export class TaskCalendarView extends ItemView {
 			this.doneList.render();
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
-		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), this.deps.clock.now());
+		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.events.filter((e) => e.allDay), this.theme(), (event) => this.deps.calendars.isPast(event));
 		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {

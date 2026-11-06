@@ -19,8 +19,13 @@ export interface PeekActions {
 export class DescriptionPeek {
 	private readonly el: HTMLElement;
 
+	/** The peek of `markdown`, the description as the task has it: none for a task without one, or with nothing to draw it with. */
+	static open(overlay: Overlay, picks: Picks, surface: MarkdownSurface | null, markdown: string | null, actions: PeekActions): DescriptionPeek | null {
+		return surface && markdown !== null ? new DescriptionPeek(overlay, picks, surface, markdown, actions) : null;
+	}
+
 	/** `picks`: the menu's, which a tap on the text closes. */
-	constructor(overlay: Overlay, picks: Picks, surface: MarkdownSurface, markdown: string, actions: PeekActions) {
+	private constructor(overlay: Overlay, picks: Picks, surface: MarkdownSurface, markdown: string, actions: PeekActions) {
 		const panel = Panel.over(overlay, { root: "tc-desc-peek", picks });
 		this.el = panel.el;
 		const text = el(this.el, "div", "tc-desc-text");

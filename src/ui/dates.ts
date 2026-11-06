@@ -15,6 +15,7 @@ export function parseLocalDate(date: LocalDate): Date {
 	return new Date(y, m - 1, d);
 }
 
+/** A cell of the month grid, or a timestamp's day, `days` on: the screens' and the tasks' days step by `DayService.step`. */
 export function addDays(date: LocalDate, days: number): LocalDate {
 	const d = parseLocalDate(date);
 	d.setDate(d.getDate() + days);
@@ -64,7 +65,8 @@ export function startOfMonth(date: LocalDate): LocalDate {
 	return `${date.slice(0, 7)}-01`;
 }
 
-export function addMonths(date: LocalDate, months: number): LocalDate {
+/** The month grid's step: the first of the month `months` after `date`'s. A task's date is moved by the services, never by this. */
+export function monthAfter(date: LocalDate, months: number): LocalDate {
 	const d = parseLocalDate(startOfMonth(date));
 	d.setMonth(d.getMonth() + months);
 	return localDateOf(d);

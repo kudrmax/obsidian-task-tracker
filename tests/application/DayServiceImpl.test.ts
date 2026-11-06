@@ -43,6 +43,21 @@ function setUp(at: Date, dayStartHour = 0) {
 }
 
 describe("DayServiceImpl", () => {
+	it("tells how a day stands to today by the hour the day starts at", () => {
+		const { days } = setUp(new Date(2026, 10, 5, 3, 30), 4);
+		expect(days.relation("2026-11-04")).toBe("today");
+		expect(days.relation("2026-11-05")).toBe("tomorrow");
+		expect(days.relation("2026-11-03")).toBe("yesterday");
+		expect(days.relation("2026-11-06")).toBe("other");
+	});
+
+	it("steps days on and back, across months and years", () => {
+		const { days } = setUp(new Date(2026, 10, 5, 12, 0));
+		expect(days.step("2026-11-30", 1)).toBe("2026-12-01");
+		expect(days.step("2027-01-01", -1)).toBe("2026-12-31");
+		expect(days.step("2026-11-05", 7)).toBe("2026-11-12");
+	});
+
 	it("today and the day's boundary follow the clock and the hour the day starts at", async () => {
 		const { days, settings } = setUp(new Date(2026, 10, 5, 3, 30), 4);
 		expect(days.today()).toBe("2026-11-04");

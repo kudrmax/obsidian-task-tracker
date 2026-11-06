@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskKey } from "../../src/application/contracts";
-import { type GapPlace, gapOfPlace, levelRange, type ListCard, fitLevel, placeOfGap, shiftLevel } from "../../src/application/nesting";
+import { type GapPlace, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, fitLevel, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "../../src/application/nesting";
 
 const key = (index: number, path: number[] = []): TaskKey => ({ section: "now", index, path, raw: `${index}${path.join("")}` });
 /** A, its subtasks A0 and A1, A1's subtask A10, then B. */
@@ -102,5 +102,64 @@ describe("the gap a result means", () => {
 	it("puts a place before a card right before it, at its level", () => {
 		expect(gapOfPlace(CARDS, { kind: "subtask", parent: key(0), before: key(0, [1]) })).toEqual({ kind: "gap", index: 2, level: 1, group: null });
 		expect(gapOfPlace(sectioned, { kind: "task", group: "Y", before: key(2) })).toEqual({ kind: "gap", index: 3, level: 0, group: "Y" });
+	});
+});
+
+describe("a drop that changes nothing", () => {
+	const home: GapPlace = { kind: "gap", index: 4, level: 0, group: null };
+
+	it("is none where a card carried alone was lifted from, at its level", () => {
+		expect(placeOfDrop(CARDS, home, home)).toBeNull();
+	});
+
+	it("means its place at another level or gap, and anywhere with no home", () => {
+		expect(placeOfDrop(CARDS, { ...home, level: 1 }, home)).toEqual({ kind: "subtask", parent: key(0), before: null });
+		expect(placeOfDrop(CARDS, { ...home, index: 5 }, home)).toEqual({ kind: "task", group: null, before: null });
+		expect(placeOfDrop(CARDS, home, null)).toEqual({ kind: "task", group: null, before: key(1) });
+	});
+
+	it("sees one gap in two places that differ only by level", () => {
+		expect(sameGap(home, { ...home, level: 1 })).toBe(true);
+		expect(sameGap(home, { ...home, index: 3 })).toBe(false);
+		expect(sameGap(home, { ...home, group: "Morning" })).toBe(false);
+	});
+});
+
+describe("the section of a gap", () => {
+	const cards = [
+		{ level: 0, group: null },
+		{ level: 0, group: "Morning" },
+		{ level: 1, group: "Morning" },
+	];
+
+	it("is the card's above it, at the level its neighbours allow", () => {
+		expect(gapAt(cards, 3, 3.2, [], true)).toEqual({ kind: "gap", index: 3, level: 2, group: "Morning" });
+		expect(gapAt(cards, 1, 0, [], true)).toEqual({ kind: "gap", index: 1, level: 0, group: null });
+	});
+
+	it("is the last header's the finger is past at the gap, which breaks nesting", () => {
+		expect(gapAt(cards, 1, 1, ["Morning"], true)).toEqual({ kind: "gap", index: 1, level: 0, group: "Morning" });
+	});
+
+	it("above every card: No section when headers show, else the first card's", () => {
+		expect(gapAt([{ level: 0, group: "Morning" }], 0, 0, [], true).group).toBeNull();
+		expect(gapAt([{ level: 0, group: "Morning" }], 0, 0, [], false).group).toBe("Morning");
+		expect(gapAt([], 0, 0, [], false).group).toBeNull();
+	});
+});
+
+describe("a lifted section", () => {
+	const groups = [null, "Morning", "Экскурсия"];
+
+	it("goes before the group standing at the slot, or last", () => {
+		expect(groupPlaceOf(groups, 0, 2)).toEqual({ before: "Экскурсия" });
+		expect(groupPlaceOf(groups, 1, 3)).toBe("end");
+		expect(groupPlaceOf(groups, 0, 3)).toBe("end");
+		expect(groupPlaceOf(groups, 2, 0)).toEqual({ before: null });
+	});
+
+	it("moves nothing at its own place", () => {
+		expect(groupPlaceOf(groups, 1, 1)).toBeNull();
+		expect(groupPlaceOf(groups, 1, 2)).toBeNull();
 	});
 });

@@ -1,11 +1,11 @@
-import { DESCRIPTION_TEMPLATE, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchHit, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService } from "../../src/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService } from "../../src/application/contracts";
 import { carriedWith, taskMenu, toggledPriority } from "../../src/application/menus";
 import type { Clock } from "../../src/application/ports";
 import { runDrop } from "../../src/application/drops";
 import { fullTree } from "../../src/application/fullTree";
 import { TimelineSpans } from "../../src/application/TimelineSpans";
 import { DayBoundary } from "../../src/domain/DayBoundary";
-import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay } from "../../src/domain/Days";
+import { canPostpone, canRemoveDue, type DayColumn, dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, taskScreen } from "../../src/domain/Days";
 import { markChoices, typedMarks } from "../../src/domain/Marks";
 import { isBlankTitle, priorityOfText, withPriority } from "../../src/domain/Priority";
 import { FuzzyQuery, matchParts } from "../../src/domain/search";
@@ -202,7 +202,7 @@ export class DemoTaskService implements TaskService {
 	async screen(date: LocalDate): Promise<ScreenView> {
 		await this.normalize();
 		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
-		return { day, soon, inbox, backlog, done, sections, offer };
+		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -237,16 +237,37 @@ export class DemoTaskService implements TaskService {
 	}
 
 	/** The board's tasks have no descriptions: the search looks at titles. */
-	async search(query: string): Promise<readonly SearchHit[]> {
+	async search(query: string): Promise<readonly SearchGroup[]> {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy) return [];
 		const sections: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
-		return sections.flatMap((section) =>
-			this.items(section).flatMap((item) => {
+		return sections.flatMap((list) => {
+			const hits = this.items(list).flatMap((item) => {
 				const found = fuzzy.match(item.text);
 				return found ? [{ item, title: matchParts(item.text, found.found), description: null }] : [];
-			}),
-		);
+			});
+			return hits.length > 0 ? [{ list, hits }] : [];
+		});
+	}
+
+	/** The board's tasks have no subtasks: each shows where it stands. */
+	async screenOf(item: TaskItem): Promise<TaskScreen> {
+		return taskScreen(item.list, item.day);
+	}
+
+	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
+		for (const item of items) {
+			if (item.key.section === key.section && item.key.index === key.index && item.key.path.join() === key.path.join()) return item;
+			const inner = this.findIn(item.subtasks, key);
+			if (inner) return inner;
+		}
+		return null;
+	}
+
+	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null {
+		if (column !== "day") return { list: column, date: null };
+		const { list, date: day, sections } = this.dayColumn(date);
+		return sections ? { list, date: day } : null;
 	}
 
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */

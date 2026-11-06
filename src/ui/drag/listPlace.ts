@@ -1,4 +1,4 @@
-import { fitLevel, type GapPlace, type GroupName, type ListCard } from "../../application/contracts";
+import { fitLevel, type GapPlace, gapAt, type GroupName, type ListCard, sameGap } from "../../application/contracts";
 
 /** A card of the list as the drop sees it: also where it stands. */
 export interface PlacedCard extends ListCard {
@@ -17,11 +17,6 @@ export interface PlacedHead {
 /** The order of a section among the headers; -1 for the tasks outside any while they show no header. */
 function orderOf(heads: readonly PlacedHead[], group: GroupName): number {
 	return heads.findIndex((h) => h.group === group);
-}
-
-/** The same place but perhaps for its level: the same gap in the same section. */
-export function sameGap(a: GapPlace, b: GapPlace): boolean {
-	return a.index === b.index && a.group === b.group;
 }
 
 /**
@@ -58,9 +53,6 @@ function rawPlaceAt(cards: readonly PlacedCard[], y: number, level: number, shif
 	/** Past this a finger is under the header. The first header with no task outside any section above it takes its whole height: above it is where a card leaves every section. */
 	const headEdge = (h: PlacedHead, i: number) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
 	const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
-	let group: GroupName = index > 0 ? cards[index - 1].group : heads.length > 0 ? null : (cards[0]?.group ?? null);
-	heads.forEach((head, i) => {
-		if (head.firstCard === index && y > headEdge(head, i)) group = head.group;
-	});
-	return fitLevel(cards, { kind: "gap", index, level: Math.round(level), group });
+	const passed = heads.filter((head, i) => head.firstCard === index && y > headEdge(head, i)).map((head) => head.group);
+	return gapAt(cards, index, level, passed, heads.length > 0);
 }

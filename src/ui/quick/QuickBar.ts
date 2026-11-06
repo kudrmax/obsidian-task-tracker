@@ -381,7 +381,7 @@ export class QuickBar implements EntryPart {
 				this.deps.onRepeat(changed);
 				this.restand();
 			},
-			onRemove: rule && this.picked(() => this.deps.onRepeat(null)),
+			onRemove: this.picked(() => this.deps.onRepeat(null)),
 		});
 	}
 

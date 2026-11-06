@@ -15,10 +15,8 @@ export interface DayPeekDeps {
 	boundary(): DayBoundary;
 	hourPx(): number;
 	now(): Date;
-	/** Whether the day's list shows its sections. */
-	grouped(date: LocalDate): boolean;
-	/** The groups of the list the day's column shows, where its empty sections stand. */
-	sections(date: LocalDate): readonly ListSection[];
+	/** The groups of the list whose sections the day's column shows, where its empty sections stand; null when it shows none. */
+	sections(date: LocalDate): readonly ListSection[] | null;
 	ungroupedName(): string;
 	/** How far the shown day's list is scrolled: the next day's opens there too. */
 	listScroll(): number;
@@ -57,8 +55,8 @@ export class DayPeek {
 		this.list = new TaskList(el(this.left, "div"), {
 			items: () => this.day?.list ?? [],
 			day: () => date,
-			grouped: () => deps.grouped(date),
-			sections: () => deps.sections(date),
+			grouped: () => deps.sections(date) !== null,
+			sections: () => deps.sections(date) ?? [],
 			ungroupedName: () => deps.ungroupedName(),
 		});
 		this.right = el(this.el, "div", "tc-right");
@@ -73,6 +71,7 @@ export class DayPeek {
 			shownSpan: (item) => deps.tasks.shownSpan(item, date),
 			events: () => this.events,
 			now: () => deps.now(),
+			isPast: (event) => deps.calendars.isPast(event),
 		});
 		const ask = deps.calendars.events(date, "peek");
 		if (ask.cached) this.events = ask.cached.events;
@@ -109,7 +108,7 @@ export class DayPeek {
 	private render(): void {
 		if (this.removed) return;
 		this.list.render();
-		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme(), this.deps.now());
+		renderAllDayRows(this.allDayEl, this.right, this.events.filter((e) => e.allDay), this.deps.theme(), (event) => this.deps.calendars.isPast(event));
 		this.right.style.setProperty(PROPERTY.allDayExtraRows, this.deps.allDayExtraRows());
 		this.timeline.render();
 	}

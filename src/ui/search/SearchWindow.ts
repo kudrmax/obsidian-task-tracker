@@ -1,4 +1,4 @@
-import type { SearchHit, SectionKey, TaskService } from "../../application/contracts";
+import type { SearchGroup, SearchHit, SectionKey, TaskService } from "../../application/contracts";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";
@@ -90,16 +90,16 @@ export class SearchWindow {
 
 	private async find(query: string): Promise<void> {
 		const asked = ++this.asked;
-		const hits = query.trim() === "" ? [] : await this.deps.tasks.search(query);
+		const groups = query.trim() === "" ? [] : await this.deps.tasks.search(query);
 		if (asked !== this.asked) return;
-		this.show(query, hits);
+		this.show(query, groups);
 	}
 
-	private show(query: string, hits: readonly SearchHit[]): void {
+	private show(query: string, groups: readonly SearchGroup[]): void {
 		this.results.textContent = "";
-		this.rows = renderSearchRows(this.results, hits, (section) => this.deps.sectionName(section));
+		this.rows = renderSearchRows(this.results, groups, (section) => this.deps.sectionName(section));
 		for (const row of this.rows) row.el.addEventListener("click", () => this.pick(row.hit));
-		if (hits.length === 0 && query.trim() !== "") el(this.results, "div", "tc-search-empty", "No tasks found");
+		if (groups.length === 0 && query.trim() !== "") el(this.results, "div", "tc-search-empty", "No tasks found");
 		this.picked = -1;
 		if (this.deps.desktop) this.walk(1);
 	}

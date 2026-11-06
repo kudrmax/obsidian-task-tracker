@@ -1,3 +1,4 @@
+import { addDays } from "./LocalDate";
 import type { Placement } from "./Placement";
 import type { LocalDate, SectionKey, Slot } from "./Task";
 
@@ -43,4 +44,22 @@ export function canPostpone(section: SectionKey): boolean {
 /** A due date can be taken off, except today's: a task for today is in Now by that date. */
 export function canRemoveDue(dueDate: LocalDate | null, today: LocalDate): boolean {
 	return dueDate !== null && dueDate !== today;
+}
+
+/** Where a task shows on the screens: a list without days, or the day it stands on. */
+export type TaskScreen = { readonly kind: "list"; readonly list: "done" | "inbox" | "backlog" | "soon" } | { readonly kind: "day"; readonly date: LocalDate };
+
+/** The screen of a task in `section` (its task's for a subtask) standing on `day` (`dayOfTask`): Done, Inbox and Backlog their own; else its day, Soon without one. */
+export function taskScreen(section: SectionKey, day: LocalDate | null): TaskScreen {
+	if (section === "done" || section === "inbox" || section === "backlog") return { kind: "list", list: section };
+	return day === null ? { kind: "list", list: "soon" } : { kind: "day", date: day };
+}
+
+/** How a day stands to today. */
+export type DayRelation = "today" | "tomorrow" | "yesterday" | "other";
+
+export function dayRelation(date: LocalDate, today: LocalDate): DayRelation {
+	if (date === today) return "today";
+	if (date === addDays(today, 1)) return "tomorrow";
+	return date === addDays(today, -1) ? "yesterday" : "other";
 }

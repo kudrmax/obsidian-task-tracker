@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SearchHit, SectionKey, TaskItem } from "../../src/application/contracts";
+import type { SearchGroup, SearchHit, SectionKey, TaskItem } from "../../src/application/contracts";
 import { SearchWindow } from "../../src/ui/search/SearchWindow";
 
 function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): TaskItem {
@@ -36,7 +36,10 @@ const HITS: readonly SearchHit[] = [
 	{ item: item("Оплатить паспорт", "done"), title: [{ text: "Оплатить ", match: false }, { text: "паспорт", match: true }], description: null },
 ];
 
-function setUp(desktop: boolean, search = vi.fn(async (query: string) => (query.trim() ? HITS : []))) {
+/** The search's answer: each hit in a group of its list, in the order given. */
+const GROUPS: readonly SearchGroup[] = HITS.map((hit) => ({ list: hit.item.list, hits: [hit] }));
+
+function setUp(desktop: boolean, search = vi.fn(async (query: string): Promise<readonly SearchGroup[]> => (query.trim() ? GROUPS : []))) {
 	const root = document.createElement("div");
 	root.className = "task-calendar";
 	document.body.appendChild(root);
@@ -58,7 +61,7 @@ describe("SearchWindow", () => {
 		document.body.innerHTML = "";
 	});
 
-	it("groups what it found by section, under the sections' names", async () => {
+	it("draws the groups the search gives, in its order, under the sections' names", async () => {
 		const { win, type } = setUp(false);
 		await type("пас");
 		const heads = [...win.el.querySelectorAll(".tc-group-name")].map((h) => h.textContent);
@@ -77,7 +80,7 @@ describe("SearchWindow", () => {
 	});
 
 	it("shows nothing for an empty field, and says so when nothing is found", async () => {
-		const search = vi.fn(async () => [] as SearchHit[]);
+		const search = vi.fn(async (): Promise<readonly SearchGroup[]> => []);
 		const { win, type } = setUp(false, search);
 		await type("   ");
 		expect(win.el.querySelector(".tc-search-empty")).toBeNull();
@@ -87,12 +90,12 @@ describe("SearchWindow", () => {
 	});
 
 	it("an answer to an older query that comes late is not shown", async () => {
-		let slow: (hits: SearchHit[]) => void = () => {};
-		const search = vi.fn((query: string) => (query === "па" ? new Promise<SearchHit[]>((resolve) => (slow = resolve)) : Promise.resolve([HITS[0]])));
+		let slow: (groups: readonly SearchGroup[]) => void = () => {};
+		const search = vi.fn((query: string) => (query === "па" ? new Promise<readonly SearchGroup[]>((resolve) => (slow = resolve)) : Promise.resolve([GROUPS[0]])));
 		const { win, type } = setUp(false, search);
 		void type("па");
 		await type("пас");
-		slow([...HITS]);
+		slow(GROUPS);
 		await Promise.resolve();
 		expect(win.shown).toHaveLength(1);
 	});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, TasksFileMissingError, type TaskService } from "../../src/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type CalendarService, type DayEvents, type DayEventsAsk, type EventsReason, type ScreenView, type TaskService } from "../../src/application/contracts";
 import { DayData, type DayPart } from "../../src/ui/DayData";
 import type { LocalDate } from "../../src/ui/types";
 import { DemoTaskService } from "../fakes/DemoTaskService";
@@ -21,11 +21,21 @@ const event = (title: string): CalendarEvent => ({
 });
 
 /** A network that answers only when the test lets it. */
+/** The screen `TaskService.screen` reads without a tasks file. */
+const noFile = async (date: LocalDate): Promise<ScreenView> => {
+	const none = { inbox: [], backlog: [], soon: [], now: [] };
+	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false };
+};
+
 class SlowCalendars implements CalendarService {
 	readonly asked: LocalDate[] = [];
 	readonly around: LocalDate[] = [];
 	private readonly waiting: (() => void)[] = [];
 	readonly last = new Map<LocalDate, DayEvents>();
+
+	isPast(): boolean {
+		return false;
+	}
 
 	/** `asked`: the day alone was fetched; `around`: the day with its neighbours. */
 	events(date: LocalDate, reason: EventsReason): DayEventsAsk {
@@ -222,8 +232,8 @@ describe("DayData", () => {
 		expect(titles(data)).toEqual([]);
 	});
 
-	it("shows nothing of a missing file, and no events or statuses with it", async () => {
-		const missing = { screen: async () => { throw new TasksFileMissingError("Tasks.md"); } } as unknown as TaskService;
+	it("shows nothing of a missing file, and no events or statuses while the screen read shows no calendars", async () => {
+		const missing = { screen: noFile } as unknown as TaskService;
 		const { data, calendars } = setup(missing);
 		const opened = data.load();
 		calendars.answer();
@@ -240,7 +250,7 @@ describe("DayData", () => {
 		let gone = true;
 		const demo = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
 		const flaky = new Proxy(demo, {
-			get: (target, name, receiver) => (gone && name === "screen" ? async () => { throw new TasksFileMissingError("Tasks.md"); } : Reflect.get(target, name, receiver)),
+			get: (target, name, receiver) => (gone && name === "screen" ? noFile : Reflect.get(target, name, receiver)),
 		});
 		const { data, calendars, parts } = setup(flaky);
 		const opened = data.load();

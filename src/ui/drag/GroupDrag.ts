@@ -1,4 +1,4 @@
-import type { GroupedList, GroupName, GroupPlace } from "../../application/contracts";
+import { type GroupedList, type GroupName, type GroupPlace, groupPlaceOf } from "../../application/contracts";
 import { capturePointer, el, releasePointer } from "../dom";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
@@ -10,12 +10,6 @@ import { LongPress } from "./LongPress";
 const FOLDED = "is-folded";
 
 const DRAG = "drag";
-
-/** Where a section let go at slot `slot` goes: before the group standing there, or last; null at its own place. */
-export function liftedPlace(groups: readonly GroupName[], lifted: number, slot: number): GroupPlace | null {
-	if (slot === lifted || slot === lifted + 1) return null;
-	return slot >= groups.length ? "end" : { before: groups[slot] };
-}
 
 /** The slot whose place on screen is nearest the finger. */
 export function nearestSlot(places: readonly number[], y: number): number {
@@ -74,7 +68,7 @@ export class GroupDrag {
 			slot = nearestSlot(places, y);
 			if (slot === marked) return;
 			marked = slot;
-			if (liftedPlace(names, lifted, slot) === null) mark.remove();
+			if (groupPlaceOf(names, lifted, slot) === null) mark.remove();
 			else if (slot < heads.length) heads[slot].before(mark);
 			else taskList.el.appendChild(mark);
 		};
@@ -90,7 +84,7 @@ export class GroupDrag {
 			mark.remove();
 			for (const node of [head, ...cards]) node.classList.remove(FOLDED);
 			this.deps.arbiter.release(DRAG);
-			const place = apply ? liftedPlace(names, lifted, slot) : null;
+			const place = apply ? groupPlaceOf(names, lifted, slot) : null;
 			if (!place) return;
 			this.deps.haptics.tap();
 			void this.deps.onMove(list, group.name, place);
