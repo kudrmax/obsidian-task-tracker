@@ -9,7 +9,7 @@
 ```mermaid
 flowchart TB
   google[Google Calendar API] -->|плагин, раз в минуту| gfile[calendar/google.json]
-  app[Приложение Task Calendar на iPhone] --> ifile[calendar/iphone.json]
+  app[Приложение Tasks на iPhone] --> ifile[calendar/iphone.json]
   scriptable[Scriptable на iPhone, запасной] --> wfile[calendar/work.json]
   gfile --> choice[Для каждого календаря — один файл]
   ifile --> choice
@@ -22,7 +22,7 @@ flowchart TB
 | Файл | Кто пишет | Когда |
 |---|---|---|
 | `calendar/google.json` | плагин, из Google Calendar API, на каждом устройстве, где открыт календарь | при открытии вида и смене дня, раз в минуту (Refresh interval), при возвращении в Obsidian |
-| `calendar/iphone.json` | приложение Task Calendar на iPhone, из всех календарей телефона (Exchange, Google, если аккаунт добавлен в iPhone, iCloud) | каждый раз, когда приложение обновляет напоминания: при выходе из Obsidian и при его открытии (автоматизации «Команд»), при кнопках уведомлений, в фоне; по Refresh now |
+| `calendar/iphone.json` | приложение Tasks на iPhone, из всех календарей телефона (Exchange, Google, если аккаунт добавлен в iPhone, iCloud) | каждый раз, когда приложение обновляет напоминания: при выходе из Obsidian и при его открытии (автоматизации «Команд»), при кнопках уведомлений, в фоне; по Refresh now |
 | `calendar/work.json` | Scriptable на iPhone, из всех календарей телефона — запасной путь, если приложение не работает | автоматизации «Команд»; Refresh now, когда приложение не может ([Рабочий календарь на iPhone](work-calendar.md)) |
 
 ## Какой файл берётся
@@ -47,7 +47,7 @@ Settings → Task Calendar → More → Calendars → **Calendars shown**: вс�
 
 ## Окно источников
 
-Долгое нажатие на колёсико, когда открыт календарь. По строке на файл: Google Calendar, iPhone calendars, Work calendar — когда обновлялся («Updated today», «Exported from iPhone») и время; оранжевое время — файл устарел, ошибка — её текст. Внизу **Refresh now**: заново спрашивает Google и обновляет календари телефона. На iPhone он на мгновение открывает приложение Task Calendar, оно записывает календари телефона и возвращает в Obsidian. Если подпись приложения истекла или оно вернулось, ничего не записав, вместо него на мгновение открываются «Команды» с выгрузкой Scriptable.
+Долгое нажатие на колёсико, когда открыт календарь. По строке на файл: Google Calendar, iPhone calendars, Work calendar — когда обновлялся («Updated today», «Exported from iPhone») и время; оранжевое время — файл устарел, ошибка — её текст. Внизу **Refresh now**: заново спрашивает Google и обновляет календари телефона. На iPhone он на мгновение открывает приложение Tasks, оно записывает календари телефона и возвращает в Obsidian. Если подпись приложения истекла или оно вернулось, ничего не записав, вместо него на мгновение открываются «Команды» с выгрузкой Scriptable.
 
 Оранжевая точка на иконке календаря в колёсике — какой-то календарь на экране взят из несвежего файла. Значит, всё, что могло обновиться само, не обновилось: жми Refresh now.
 
@@ -57,4 +57,4 @@ Settings → Task Calendar → More → Calendars → **Calendars shown**: вс�
 
 ## Напоминания
 
-Сами календари не напоминают о задачах. Задача со временем звонит на iPhone через отдельное приложение Task Calendar для iOS — см. [Напоминания на iPhone](notifications.md).
+Сами календари не напоминают о задачах. Задача со временем звонит на iPhone через отдельное приложение Tasks для iOS — см. [Напоминания на iPhone](notifications.md).
