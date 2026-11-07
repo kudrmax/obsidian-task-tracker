@@ -408,11 +408,13 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift (quick entry): the section field is the header's type (15 pt semibold) in the text colour with the
   placeholder «Section name». The task menu's Section › New Section… stays an alert: it names a section to move that task
   into, not a header at the field's place.
-- frontend-obsidian (M9): the fade covers the plugin's lists and the timeline (`ScrollEdges`: `is-under-top`, `is-under-bottom`,
-  masks `--tc-fade-scroll-top/bottom/both` over `--tc-scroll-fade` = half a card); both edges are followed, so Inbox over
-  Backlog fades at its bottom too. Under the foot's own fade the bottom mask is hidden anyway. The full screen and search
-  results keep their edges (not named in M9). An event cut by the timeline's top keeps its title just below the fade
-  (`top: var(--tc-scroll-fade)` while `is-under-top`), so it reads whole instead of half faded.
+- frontend-obsidian (M9): the fade covers the plugin's lists and the timeline (`ScrollEdges`). Each edge's fade is as deep as
+  the content under it, up to `--tc-scroll-fade` (half a card): `--tc-scrolled` and `--tc-scrolled-below` grow with the
+  scroll, so a fade grows in and out and never appears in a step. Both edges are followed, so Inbox over Backlog fades at
+  its bottom too (under the foot's own fade the bottom one is hidden anyway). The full screen and search results keep
+  their edges (not named in M9). An event cut by the timeline's top keeps its title just below the top fade: its sticky
+  offset is the same growing depth, so the title goes with the content until it meets the fade's edge, then holds there;
+  nothing moves in a step.
 - backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
   rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
   rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
