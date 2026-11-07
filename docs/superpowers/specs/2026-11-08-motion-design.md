@@ -189,7 +189,29 @@ every condition that changes the layout is animated by the transaction that chan
 
 ## Decisions
 
-(Filled by the agents as they decide.)
+1. **Backend, R1: identity is the line's own tag.** Every line of a `TaskDocument` carries a tag; every edit of the
+   document (insert, rewrite, move, nest, split, merge, normalize) keeps the tag of each line it keeps or rewrites and
+   gives a fresh one to a line it makes. A task's `id` is its line's tag, so a write's identity follows from what the
+   write did, never from comparing texts. Lines under a rewritten task keep theirs where they stay or are edited in
+   place (an ordered diff inside that one task).
+2. **Backend, R1: `TaskIdentity` keeps the ids between texts** (`core/application/TaskIdentity.ts`): the headings and task
+   lines of the last text with their ids. A text the service did not write (an edit elsewhere) is matched to it by an
+   ordered diff of headings and task lines (place and line): a line left in place keeps its id, and so does a changed
+   block with as many task lines on each side (a line edited in place); anything else is new. Twins are never guessed:
+   a write knows them by tag, an edit elsewhere keeps the one its diff leaves in place.
+3. **Backend, R1: undo carries ids.** Each undo step keeps the ids of the lines it changed (`Hunk.removedIds`,
+   `addedIds`); undo gives a line back the id it had, redo the id it got. The service and the history share one
+   `TaskIdentity` (`composeCore`).
+4. **Backend, R1: ids last as long as their service**, not across restarts; the door has no state, so the host keeps
+   `ids` (`TaskIdState`) from each answer and hands it back, as it does `history`. Without it every call gives new ids.
+5. **Backend, R1: a creation answers what it answered.** `createInPlace` still answers the new task's key, now exactly
+   the line it made (by tag; before, of two twins side by side the first was given). The new task's id is on it in the
+   next read. `tasks.drop` answers the dropped tasks' keys by tag too.
+6. **Backend, R1: a repeating task closed keeps its id** (it goes to Done); its next copy is a new task with a new id.
+7. **Backend, R13: sections have ids the same way.** A section's id is its heading line's tag, kept by the identity like
+   a task's: `ListSection.id` and `ListGroup.id`, the same through rename, move, writes to its tasks and undo; No section
+   is `"none"` in every list. `ProjectGroup.key` (the project's name) already names a project's group; no write renames
+   a project, so it needs no other key.
 
 ## Done when
 

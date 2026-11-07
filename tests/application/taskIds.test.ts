@@ -327,3 +327,64 @@ describe("undo", () => {
 		expect((await svc.dayView(T)).list.map((i) => i.id)).toEqual([first.id, second.id]);
 	});
 });
+
+describe("a section's id", () => {
+	const sectionIds = async (svc: TaskServiceImpl) => Object.fromEntries((await svc.listSections()).now.map((s) => [s.name ?? "", s.id]));
+
+	it("is on every section, No section's too, each its own", async () => {
+		const { svc } = setup();
+		const sections = (await svc.screen(T)).sections.now;
+		expect(sections.map((s) => s.name)).toEqual([null, "Errands"]);
+		expect(new Set(sections.map((s) => s.id)).size).toBe(2);
+		expect(sections.every((s) => typeof s.id === "string" && s.id !== "")).toBe(true);
+	});
+
+	it("stays through a rename, a move, its tasks' writes and re-reads", async () => {
+		const { svc } = setup();
+		await svc.createGroup((await item(svc, "A")).key, "now", "Home");
+		const before = await sectionIds(svc);
+		await svc.renameGroup("now", "Errands", "Chores");
+		await svc.moveGroup("now", "Chores", { before: "Home" });
+		await svc.setStatus((await item(svc, "Shop")).key, "inProgress");
+		await svc.moveToGroup((await item(svc, "Later")).key, "now", "Chores", null);
+		const after = await sectionIds(svc);
+		expect(after.Chores).toBe(before.Errands);
+		expect(after.Home).toBe(before.Home);
+		expect(after[""]).toBe(before[""]);
+		expect(await sectionIds(svc)).toEqual(after);
+	});
+
+	it("is the same on the groups a column draws, and in a list grouped by project", async () => {
+		const { svc } = setup();
+		const screen = await svc.screen(T);
+		const errands = screen.sections.now.find((s) => s.name === "Errands")!;
+		await svc.setProject([(await item(svc, "Later")).key], "P");
+		await svc.toSection([(await item(svc, "Later")).key], "Errands");
+		await svc.setGrouping("soon", true);
+		const grouped = (await svc.screen(T)).projects.soon.groups;
+		const ids = grouped.flatMap((g) => g.sections.filter((s) => s.name === "Errands").map((s) => s.id));
+		expect(ids.length).toBeGreaterThan(0);
+		const soonErrands = (await svc.listSections()).soon.find((s) => s.name === "Errands")!;
+		expect(ids.every((id) => id === soonErrands.id)).toBe(true);
+		expect(soonErrands.id).not.toBe(errands.id);
+	});
+
+	it("a section made gets a new one; renamed elsewhere in place, it keeps its own", async () => {
+		const { store, svc } = setup();
+		const before = await sectionIds(svc);
+		store.text = store.text!.replace("### Errands", "### Errands and more");
+		store.emitChange();
+		expect((await sectionIds(svc))["Errands and more"]).toBe(before.Errands);
+		await svc.createSection("Fresh", { kind: "list", list: "now", group: null, before: null });
+		const fresh = (await sectionIds(svc)).Fresh;
+		expect(Object.values(before)).not.toContain(fresh);
+	});
+
+	it("comes back with undo of a rename", async () => {
+		const { svc, history } = setup();
+		const before = await sectionIds(svc);
+		await svc.renameGroup("now", "Errands", "Chores");
+		await history.undo();
+		expect(await sectionIds(svc)).toEqual(before);
+	});
+});

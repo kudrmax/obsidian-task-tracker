@@ -44,6 +44,8 @@ export interface TaskGroup {
 	readonly index: number;
 	readonly name: GroupName;
 	readonly heading: boolean;
+	/** Who the section is: its heading line's tag, kept through a rename and a move; null without a heading. */
+	readonly id: string | null;
 	readonly entries: readonly TaskEntry[];
 	/** Nothing under the heading but blank lines. */
 	readonly blank: boolean;
@@ -751,7 +753,7 @@ export class TaskDocument {
 		const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
 		const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans, null);
 		entries.push(...own);
-		return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+		return { index, name: block.name, heading: block.headingLine !== null, id: block.headingLine === null ? null : this.rows[block.headingLine].tag, entries: own, blank };
 	}
 
 	/** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */

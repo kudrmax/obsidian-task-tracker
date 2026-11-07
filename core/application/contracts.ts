@@ -126,6 +126,11 @@ export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { r
 
 /** A group of a list where it stands in the file: a section (`name`) or No section (null). */
 export interface ListSection {
+	/**
+	 * Who the section is, as `TaskItem.id` is who a task is: the same through a rename, a move and every write to its
+	 * tasks; a section made gets a new one. No section's is `NO_SECTION_ID`. What a view keys its header by.
+	 */
+	readonly id: string;
 	readonly name: GroupName;
 	/** A section with no task under its heading: a column of its list shows its heading and the No tasks plate. */
 	readonly empty: boolean;

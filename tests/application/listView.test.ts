@@ -28,7 +28,7 @@ const item = (text: string, group: GroupName, subtasks: readonly TaskItem[] = []
 		"2026-11-01",
 	);
 
-const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ name, empty }));
+const sections = (...names: [GroupName, boolean][]) => names.map(([name, empty]) => ({ id: name ?? "none", name, empty }));
 const rows = (items: readonly TaskItem[]) => listView(items, false).groups[0].rows.map(({ item, level }) => [item.text, level]);
 
 describe("a list's rows", () => {

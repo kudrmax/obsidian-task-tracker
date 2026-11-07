@@ -110,6 +110,18 @@ describe("a task's id through the door", () => {
 		expect(Object.values(before)).not.toContain(after["Typed on the Mac"]);
 	});
 
+	it("gives every section an id that a rename keeps, also on the groups of a list grouped by project", () => {
+		const app = new App();
+		app.call("tasks.createGroup", app.item("A").key, "now", "Errands");
+		const sections = () => (app.call("tasks.listSections").result as { now: { id: string; name: string | null }[] }).now;
+		const errands = sections().find((s) => s.name === "Errands")!;
+		app.call("tasks.renameGroup", "now", "Errands", "Chores");
+		expect(sections().find((s) => s.name === "Chores")?.id).toBe(errands.id);
+		expect(sections().find((s) => s.name === null)?.id).toBe("none");
+		app.call("history.undo");
+		expect(sections().find((s) => s.name === "Errands")?.id).toBe(errands.id);
+	});
+
 	it("keeps the door's functions as they were: the old ones answer without ids", () => {
 		const reminders = phone.reminders(FILE, "", NOW);
 		expect(Array.isArray(reminders)).toBe(true);

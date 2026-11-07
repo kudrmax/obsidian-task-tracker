@@ -13,6 +13,11 @@ const D = "2026-11-03";
 const clock: Clock = { now: () => new Date(2026, 9, 30, 14, 20) };
 const FULL = "## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n";
 
+/** Each list's sections but their ids, which a test of what the sections are leaves aside. */
+function unkeyed<S extends { readonly id: string }>(lists: Readonly<Record<string, readonly S[]>>): Record<string, Omit<S, "id">[]> {
+	return Object.fromEntries(Object.entries(lists).map(([list, sections]) => [list, sections.map(({ id: _id, ...rest }) => rest)]));
+}
+
 function setup(text: string | null, settings = new FakeSettingsStore()) {
 	const store = new InMemoryTaskFileStore(text);
 	const svc = new TaskServiceImpl(store, settings, clock);
@@ -1180,7 +1185,7 @@ describe("empty sections", () => {
 
 	it("listSections gives each list's groups in file order, empty sections marked", async () => {
 		const { svc } = setup("## Inbox\n\n### Пусто\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n### E\n### T\nnote\n\n## Soon\n\n### Y\n- [ ] S 📅 2026-11-03\n\n## Backlog\n\n## Done\n");
-		expect(await svc.listSections()).toEqual({
+		expect(unkeyed(await svc.listSections())).toEqual({
 			inbox: [{ name: "Пусто", empty: true }],
 			backlog: [],
 			now: [
@@ -1195,7 +1200,7 @@ describe("empty sections", () => {
 
 	it("listSections names No section where its heading stands", async () => {
 		const { svc } = setup("## Now\n\n### X\n- [ ] B\n### No section\n- [ ] A\n");
-		expect((await svc.listSections()).now).toEqual([
+		expect(unkeyed(await svc.listSections()).now).toEqual([
 			{ name: "X", empty: false },
 			{ name: null, empty: false },
 		]);
@@ -1245,7 +1250,7 @@ describe("empty sections", () => {
 		const [, b] = (await svc.dayView(T)).list;
 		await svc.moveToGroup(b.key, "now", null, null);
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B 📅 2026-10-30\n\n## Soon\n\n## Backlog\n\n## Done\n");
-		expect((await svc.listSections()).now).toEqual([{ name: null, empty: false }]);
+		expect(unkeyed(await svc.listSections()).now).toEqual([{ name: null, empty: false }]);
 		await history.undo();
 		expect(store.text).toBe(text);
 	});
@@ -1255,7 +1260,7 @@ describe("empty sections", () => {
 		const [a] = (await svc.dayView(T)).list;
 		await svc.moveToGroup(a.key, "now", "E", null);
 		expect(store.text).toContain("### E\n- [ ] A 📅 2026-10-30\n");
-		expect((await svc.listSections()).now).toEqual([
+		expect(unkeyed(await svc.listSections()).now).toEqual([
 			{ name: "X", empty: false },
 			{ name: "E", empty: false },
 		]);

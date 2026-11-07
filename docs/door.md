@@ -52,11 +52,12 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `history` | the undo steps as the last answer gave them; left out before the first |
 | `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open) |
 | `grouping` | `GroupingState`, how this device groups its lists by project, as the last answer gave it; left out for the defaults (Backlog grouped, Soon not) |
+| `ids` | `TaskIdState`, who the tasks and sections are, as the last answer gave it; left out before the first (every task and section then gets a new id) |
 
 **Answer** (`DoorAnswer`):
 
 ```
-{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "grouping"?: {…} }
+{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "grouping"?: {…}, "ids"?: {…} }
 { "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
 ```
 
@@ -72,6 +73,10 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
 - `grouping`: the call changed how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`, `tasks.reveal`
   of a task in a folded group). The host keeps it on the device, never synced, and hands it in again.
+- `ids`: who the tasks and sections are after the call (`TaskIdState` in `core/application/TaskIdentity.ts`: the file's
+  headings and task lines with their ids, and where new ids go on from). It comes whenever it changed: after a write, an
+  undo or redo, and a read of a text other than the one it was for. The host keeps it as it is, in memory (never synced,
+  never parsed), and hands it in as `ids` with the next call; a host that leaves it out still gets ids, new ones each call.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
   `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
   write has no title (`capture.add`).
@@ -130,6 +135,23 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
 - A menu's `project.value` is the row's value, ready: the shared project's name, «No project», or empty when they differ.
 - `NewTaskPlace` `list`/`day` take `project` and `section` (a section named in a project's group is born with its first
   task), `slot` takes `project`. `capture.add` writes no project.
+
+#### Ids: who a task or a section is
+
+- `TaskItem.id` (every task and subtask, wherever it is shown: `tasks.screen`'s lists, the timeline, `tasks.search`'s
+  hits, a found task, the items a write answers such as `tasks.rename`, `tasks.edit`, `tasks.setLabels`): the same for
+  the same task across calls while the host hands `ids` back, through every write the door makes to it (status,
+  priority, labels, date, time, repeat, rename, fold, description, a move to another list, section, project or parent,
+  the timeline and back, several at once), through `history.undo`/`redo`, and through an edit elsewhere that leaves its
+  line in place (or edits that one line in place). A task made gets a new id; a removed task's id is gone; a task added
+  elsewhere gets a new one. A view keys its card by `id`; `key` stays what an action names (the task as read).
+- `ListSection.id` (`tasks.screen`'s `sections`, `tasks.listSections`) and `ListGroup.id` (a column's groups, each
+  `ProjectGroup.sections`): who a section is, the same through `tasks.renameGroup`, `tasks.moveGroup`, the writes to its
+  tasks and undo; a section made gets a new one; No section's is `"none"` in every list. A section shown in several
+  project groups has its one id in each. A header is keyed by it, never by its name.
+- `ProjectGroup.key` (the project's name, `""` for No project) already names a project's group; no write of the door
+  renames a project (that is a rename of its note, elsewhere).
+- Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
 
 ### `days.*`: `DayService`
 

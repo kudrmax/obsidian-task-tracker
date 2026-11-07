@@ -1415,7 +1415,7 @@
       const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
       const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans, null);
       entries.push(...own);
-      return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
+      return { index, name: block.name, heading: block.headingLine !== null, id: block.headingLine === null ? null : this.rows[block.headingLine].tag, entries: own, blank };
     }
     /** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
     readLevel(section, from, end, parent, group, firstIndex, spans, parentProject) {
@@ -3621,28 +3621,33 @@ ${key.title}`.toLowerCase();
   function rowsOf2(items, level = 0) {
     return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf2(item.subtasks, level + 1)]);
   }
-  function groupOf(name, items, header = true) {
-    const section = name !== null;
-    return { name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+  var NO_SECTION_ID = "none";
+  function sectionId(name, sections) {
+    if (name === null) return NO_SECTION_ID;
+    return sections.find((s) => s.name === name)?.id ?? `section:${name}`;
   }
-  function projectSection(name, items, project) {
-    const plain = groupOf(name, items, name !== null);
+  function groupOf(name, items, header = true, id = sectionId(name, [])) {
+    const section = name !== null;
+    return { id, name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+  }
+  function projectSection(name, items, project, id = sectionId(name, [])) {
+    const plain = groupOf(name, items, name !== null, id);
     return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
-    const groups = withEmptySections(byGroup(items), listSections);
+    const groups = withEmptySections(byGroup(items, listSections), listSections);
     const showsHeaders = groups.some((g) => g.name !== null);
     return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
   }
-  function byGroup(items) {
+  function byGroup(items, sections) {
     const groups = [];
     for (const item of items) {
       const group = groups.find((g) => g.name === item.group);
       if (group) group.items.push(item);
       else groups.push({ name: item.group, items: [item] });
     }
-    return groups.map((g) => groupOf(g.name, g.items));
+    return groups.map((g) => groupOf(g.name, g.items, true, sectionId(g.name, sections)));
   }
   function withEmptySections(groups, sections) {
     const drawn = [...groups];
@@ -3653,7 +3658,7 @@ ${key.title}`.toLowerCase();
       drawn.forEach((g, j) => {
         if (above.has(g.name)) at = j + 1;
       });
-      drawn.splice(at, 0, groupOf(section.name, []));
+      drawn.splice(at, 0, groupOf(section.name, [], true, section.id));
     });
     return drawn;
   }
@@ -4051,9 +4056,9 @@ ${key.title}`.toLowerCase();
     const names = [null, ...order.filter((name) => name !== null)];
     const filled = names.flatMap((name) => {
       const own = items.filter((item) => item.group === name);
-      return own.length > 0 ? [projectSection(name, own, zone)] : [];
+      return own.length > 0 ? [projectSection(name, own, zone, sectionId(name, sections))] : [];
     });
-    const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone) : g) : filled;
+    const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone, g.id) : g) : filled;
     return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
   }
   function emptyPart(zone) {
@@ -4488,7 +4493,7 @@ ${key.title}`.toLowerCase();
   var NO_PROJECT_SOURCE = { notes: () => [], grouping: () => ({}) };
   var NO_GROUPING = { canGroup: false, on: false, groups: [] };
   function sectionsOf(doc, list) {
-    return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+    return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
   }
   var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
   function byQuality(a, b) {
@@ -5609,67 +5614,55 @@ ${key.title}`.toLowerCase();
     get state() {
       return this.current;
     }
-    /** The tags `text`'s lines are parsed with: the ids its tasks have, reconciled first when the ids are another text's. */
+    /** The tags `text`'s lines are parsed with: the ids its tasks and headings have, reconciled first when the ids are another text's. */
     of(text) {
       if (this.last?.text === text) return this.last.ids;
       const outline = outlineOf(text);
       const known = sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.reconciled(text, outline);
       return this.keep(text, known);
     }
-    /** Every task's id in `text`, by its line. */
+    /** Every task's and heading's id in `text`, by its line. */
     idsOf(text) {
       return this.of(text).known;
     }
-    /** A write left `text`, the document `after`: its tasks are who its lines' tags say. */
+    /** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
     wrote(text, after) {
       const tags = after.lineTags();
-      const known = /* @__PURE__ */ new Map();
-      const lines = outlineOf(text).map(({ line, raw, task }) => {
-        if (task) known.set(line, tags[line]);
-        return { raw, id: task ? tags[line] : null };
-      });
-      this.current = { next: after.nextTag(), lines };
-      this.last = { text, ids: { known, next: this.current.next } };
+      this.commit(text, after.nextTag(), outlineOf(text).map((line) => ({ ...line, id: tags[line.line] })));
     }
-    /** An undo step made `after` of `before`: a line it gave back is the task it was, a line it left is who it was. */
+    /** An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. */
     carried(before, after, step) {
       const was = this.of(before).known;
       const next = this.current.next;
       const given = new Set(step.ids.values());
-      const known = /* @__PURE__ */ new Map();
-      const lines = outlineOf(after).map(({ line, raw, task }) => {
-        if (!task) return { raw, id: null };
-        const origin = step.origins[line];
+      const lines = outlineOf(after).map((line) => {
+        const origin = step.origins[line.line];
         const kept = origin === null || origin === void 0 ? void 0 : was.get(origin);
-        const own = step.ids.get(line) ?? (kept !== void 0 && !given.has(kept) ? kept : `t${next + line}`);
-        known.set(line, own);
-        return { raw, id: own };
+        return { ...line, id: step.ids.get(line.line) ?? (kept !== void 0 && !given.has(kept) ? kept : `t${next + line.line}`) };
       });
-      this.current = { next: next + after.split("\n").length, lines };
-      this.last = { text: after, ids: { known, next: this.current.next } };
+      this.commit(after, next + after.split("\n").length, lines);
     }
     inOrder(outline) {
-      const known = /* @__PURE__ */ new Map();
-      outline.forEach((line, i) => {
-        const id = this.current.lines[i].id;
-        if (line.task && id !== null) known.set(line.line, id);
-      });
-      return known;
+      return new Map(outline.map((line, i) => [line.line, this.current.lines[i].id]));
     }
-    /** The ids of another text carried over to `text`'s task lines by place and line; a task line it added gets a new one. */
+    /** The ids of another text carried over to `text`'s lines by place and line; a line it added gets a new one. */
     reconciled(text, outline) {
       const old = this.current.lines;
       const pairs = matchLines(
         old.map((l) => l.raw),
         outline.map((l) => l.raw),
-        (b, a) => old[b].id !== null === outline[a].task
+        (b, a) => old[b].task === outline[a].task
       );
       const known = /* @__PURE__ */ new Map();
-      for (const [b, a] of pairs) if (old[b].id !== null && outline[a].task) known.set(outline[a].line, old[b].id);
+      for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].line, old[b].id);
       const next = this.current.next;
-      for (const line of outline) if (line.task && !known.has(line.line)) known.set(line.line, `t${next + line.line}`);
-      this.current = { next: next + text.split("\n").length, lines: outline.map((l) => ({ raw: l.raw, id: l.task ? known.get(l.line) : null })) };
+      for (const line of outline) if (!known.has(line.line)) known.set(line.line, `t${next + line.line}`);
+      this.current = { next: next + text.split("\n").length, lines: outline.map((l) => ({ raw: l.raw, task: l.task, id: known.get(l.line) })) };
       return known;
+    }
+    commit(text, next, lines) {
+      this.current = { next, lines: lines.map(({ raw, task, id }) => ({ raw, task, id })) };
+      this.last = { text, ids: { known: new Map(lines.map((l) => [l.line, l.id])), next } };
     }
     keep(text, known) {
       const ids = { known, next: this.current.next };
@@ -5678,7 +5671,7 @@ ${key.title}`.toLowerCase();
     }
   };
   function sameOutline(lines, outline) {
-    return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.id !== null === outline[i].task);
+    return lines.length === outline.length && lines.every((line, i) => line.raw === outline[i].raw && line.task === outline[i].task);
   }
 
   // core/application/snapGrid.ts

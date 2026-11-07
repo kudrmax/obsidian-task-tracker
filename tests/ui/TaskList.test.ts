@@ -86,7 +86,7 @@ describe("TaskList", () => {
 			items: () => [task("A", 0)],
 			day: () => null,
 			grouped: () => true,
-			sections: () => [{ name: null, empty: false }, { name: "Evening", empty: true }],
+			sections: () => [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }],
 			ungroupedName: () => "No section",
 			onPlate: (_plate, group) => plates.push(group.name ?? ""),
 		});
@@ -102,7 +102,7 @@ describe("TaskList", () => {
 			items: () => [task("A", 0)],
 			day: () => null,
 			grouped: () => true,
-			sections: () => [{ name: null, empty: false }, { name: "Evening", empty: true }],
+			sections: () => [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }],
 			entry: (drawing) => ({ at: entryAt(drawing, { kind: "gap", index: 1, level: 0, group: "Evening" }, false), level: 0, pending: [], field: (row) => row }),
 		});
 		list.render();

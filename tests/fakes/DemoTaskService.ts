@@ -4,6 +4,7 @@ import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
 import { keyId } from "../../core/application/taskKeys";
+import { NO_SECTION_ID } from "../../core/application/sections";
 import { fullTree } from "../../core/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
 import { DayBoundary } from "../../core/domain/DayBoundary";
@@ -230,7 +231,7 @@ export class DemoTaskService implements TaskService {
 
 	/** The demo keeps no sections: a list with tasks is No section alone. */
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
-		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ name: null, empty: false }] : []);
+		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ id: NO_SECTION_ID, name: null, empty: false }] : []);
 		return { inbox: groups("inbox"), backlog: groups("backlog"), now: groups("now"), soon: groups("soon") };
 	}
 
