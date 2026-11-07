@@ -2528,6 +2528,16 @@ ${key.title}`.toLowerCase();
     return { bg: towards(lift), bar: towards(ink), text: towards(ink) };
   }
 
+  // core/application/screenPlaces.ts
+  var SCREEN_PLACES = ["inbox", "soon", "calendar"];
+  var SHOWN_LISTS = { inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] };
+  function placeShowing(column, place) {
+    if (SHOWN_LISTS[place].includes(column)) return place;
+    const from = SCREEN_PLACES.indexOf(place);
+    const showing = SCREEN_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
+    return showing.reduce((best, other) => Math.abs(SCREEN_PLACES.indexOf(other) - from) < Math.abs(SCREEN_PLACES.indexOf(best) - from) ? other : best);
+  }
+
   // core/application/timelineZoom.ts
   var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
   var DEFAULT_ZOOM_HOUR = 56;
@@ -2661,6 +2671,25 @@ ${key.title}`.toLowerCase();
     return slot >= groups.length ? "end" : { before: groups[slot] };
   }
 
+  // core/application/fullTree.ts
+  function unfolded(items) {
+    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
+  }
+  function rowsOf(items, level, rows) {
+    for (const item of items) {
+      const at = rows.length;
+      rows.push({ item, level, newSubtask: { index: at + 1, level: level + 1 } });
+      rowsOf(item.subtasks, level + 1, rows);
+      rows[at] = { ...rows[at], newSubtask: { index: rows.length, level: level + 1 } };
+    }
+  }
+  function fullTree(task) {
+    const subtasks = unfolded(task.allSubtasks);
+    const rows = [];
+    rowsOf(subtasks, 0, rows);
+    return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 } };
+  }
+
   // core/application/QuickEntry.ts
   function entryAt(drawing, place, section) {
     const { cards, sections } = drawing;
@@ -2673,6 +2702,20 @@ ${key.title}`.toLowerCase();
     while (end < cards.length && cards[end].group === place.group) end++;
     const card = place.index >= from && place.index <= end ? place.index : end;
     return { kind: "in", section: at, card, keepsPlate: section };
+  }
+  function stackEntry(state, task) {
+    if (!state || state.spot.kind !== "stack") return null;
+    const { rows, newSubtask } = fullTree(task);
+    const renaming = state.renaming;
+    if (renaming) {
+      if (samePlace2(renaming.key, task.key)) return { at: { kind: "title" }, pending: [] };
+      const index = rows.findIndex((row) => samePlace2(row.item.key, renaming.key));
+      return index < 0 ? null : { at: { kind: "row", index, level: rows[index].level }, pending: [] };
+    }
+    const parent = state.spot.parent;
+    const place = samePlace2(parent, task.key) ? newSubtask : rows.find((row) => samePlace2(row.item.key, parent))?.newSubtask;
+    if (!place) return null;
+    return { at: { kind: "new", index: place.index, level: place.level }, pending: state.pending.map(({ text }) => ({ text, level: place.level })) };
   }
   var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
   function emptySession() {
@@ -2735,6 +2778,14 @@ ${key.title}`.toLowerCase();
       const section = state.section === true;
       const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
       return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
+    }
+    /** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
+    stackEntry(task) {
+      return stackEntry(this.state, task);
+    }
+    /** Where a task's full screen types under `parent` or renames it: the stack of its subtasks there, whatever list shows it. */
+    stackSpot(parent) {
+      return { kind: "stack", parent };
     }
     /** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
     openAtEnd(column) {
@@ -3200,12 +3251,12 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/sections.ts
-  function rowsOf(items, level = 0) {
-    return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf(item.subtasks, level + 1)]);
+  function rowsOf2(items, level = 0) {
+    return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf2(item.subtasks, level + 1)]);
   }
   function groupOf(name, items) {
     const section = name !== null;
-    return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
+    return { name, items, rows: rowsOf2(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
   }
   function listView(items, sections, listSections = []) {
     if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
@@ -3797,25 +3848,6 @@ ${key.title}`.toLowerCase();
   function carriedWith(lifted, picked) {
     const id = keyId(lifted);
     return picked.filter((key) => keyId(key) !== id && !picked.some((other) => other !== key && isUnder(key, other)));
-  }
-
-  // core/application/fullTree.ts
-  function unfolded(items) {
-    return items.map((item) => ({ ...item, collapsed: false, subtasks: unfolded(item.allSubtasks) }));
-  }
-  function rowsOf2(items, level, rows) {
-    for (const item of items) {
-      const at = rows.length;
-      rows.push({ item, level, newSubtask: { index: at + 1, level: level + 1 } });
-      rowsOf2(item.subtasks, level + 1, rows);
-      rows[at] = { ...rows[at], newSubtask: { index: rows.length, level: level + 1 } };
-    }
-  }
-  function fullTree(task) {
-    const subtasks = unfolded(task.allSubtasks);
-    const rows = [];
-    rowsOf2(subtasks, 0, rows);
-    return { task, subtasks, rows, newSubtask: { index: rows.length, level: 0 } };
   }
 
   // core/application/taskItems.ts
@@ -5567,9 +5599,10 @@ ${key.title}`.toLowerCase();
     carriedMiddle,
     placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
     branchOf,
-    gapBranch
+    gapBranch,
+    placeShowing
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS };
   var TIMELINE = {
     zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
   };
@@ -5592,6 +5625,8 @@ ${key.title}`.toLowerCase();
     "openAtDrop",
     "subtaskSpot",
     "renameSpot",
+    "stackSpot",
+    "stackEntry",
     "open",
     "type",
     "setPriority",

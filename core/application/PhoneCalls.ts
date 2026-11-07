@@ -20,6 +20,7 @@ import { dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
+import { placeShowing, SCREEN_PLACES, SHOWN_LISTS } from "./screenPlaces";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
@@ -666,10 +667,11 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
 	branchOf,
 	gapBranch,
+	placeShowing,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {
@@ -707,6 +709,8 @@ const ENTRY_METHODS: readonly string[] = [
 	"openAtDrop",
 	"subtaskSpot",
 	"renameSpot",
+	"stackSpot",
+	"stackEntry",
 	"open",
 	"type",
 	"setPriority",

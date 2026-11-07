@@ -377,3 +377,11 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift (quick entry): the section field is the header's type (15 pt semibold) in the text colour with the
   placeholder «Section name». The task menu's Section › New Section… stays an alert: it names a section to move that task
   into, not a header at the field's place.
+- backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
+  rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
+  rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
+  rows: the plugin's fallback to the end for a parent gone from the rows and Swift's `raw` in the comparison are dropped,
+  the keys compared as `samePlace`.
+- backend (R6b): `SCREEN_PLACES`, `SHOWN_LISTS` and `placeShowing(column, place)` live in `core/application/screenPlaces.ts`
+  (contracts; door `rules.constants`, `rules.placeShowing`). A list not shown is shown from the nearest place that shows
+  it, as the plugin's `modeShowing`: the day's list chosen from Inbox turns to Soon, not to Today as Swift's `turn` did.

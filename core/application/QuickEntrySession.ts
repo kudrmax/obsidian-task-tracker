@@ -3,9 +3,9 @@ import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
 import type { DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
 import type { ListCard, ListPlace } from "./nesting";
-import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PlaceMove, QuickEntry } from "./QuickEntry";
+import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
-export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingText, type PlaceChoice, type PlaceMove } from "./QuickEntry";
+export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
 export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createInPlace" | "createSection" | "edit">;
@@ -79,6 +79,15 @@ export class QuickEntrySession {
 
 	openAtDrop(column: DropColumn | null, result: DropTo | null): boolean {
 		return this.entry.openAtDrop(column, result);
+	}
+
+	/** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
+	stackEntry(task: TaskItem): StackEntry | null {
+		return this.entry.stackEntry(task);
+	}
+
+	stackSpot(parent: TaskKey): EntrySpot {
+		return this.entry.stackSpot(parent);
 	}
 
 	subtaskSpot(parent: TaskKey): EntrySpot {
