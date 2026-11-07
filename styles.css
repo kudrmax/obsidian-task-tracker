@@ -962,8 +962,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* An event cut by the timeline's edge keeps its title in view: the title holds to that edge while the event lasts; the event clips without becoming a scroller, so the title sticks to the timeline's. */
 .tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; overflow: clip; }
 .tc-event-body { flex: 1; min-width: 0; align-self: flex-start; position: sticky; top: 0; bottom: 0; padding: var(--tc-space-4) var(--tc-space-6); }
-/* An event cut by the calendar's top keeps its title just below the top fade, where it reads whole: the fade and the title's hold grow together with the scroll, never in a step. */
-.tc-timeline .tc-event-body { top: min(var(--tc-scrolled), var(--tc-scroll-fade)); }
+/* An event cut by the calendar's top keeps its title just below the top fade, where it reads whole. The title of the day's first event holds where it rests (the label's lift, the room over the first hour, the item's inset) until the fade, growing with the scroll, reaches it, then goes down with the fade's edge: it never steps and never goes back. */
+.tc-timeline .tc-event-body { top: max(var(--tc-label-lift) + var(--tc-room-top) + var(--tc-item-inset), min(var(--tc-scrolled), var(--tc-scroll-fade))); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
 .tc-event.is-past { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
 .tc-allday.is-past { background: var(--tc-event-past-bg); }

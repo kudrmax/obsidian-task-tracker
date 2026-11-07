@@ -412,9 +412,10 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   the content under it, up to `--tc-scroll-fade` (half a card): `--tc-scrolled` and `--tc-scrolled-below` grow with the
   scroll, so a fade grows in and out and never appears in a step. Both edges are followed, so Inbox over Backlog fades at
   its bottom too (under the foot's own fade the bottom one is hidden anyway). The full screen and search results keep
-  their edges (not named in M9). An event cut by the timeline's top keeps its title just below the top fade: its sticky
-  offset is the same growing depth, so the title goes with the content until it meets the fade's edge, then holds there;
-  nothing moves in a step.
+  their edges (not named in M9). An event cut by the timeline's top keeps its title just below the top fade, and the
+  title never moves up while the fade grows: its sticky offset is max(where the day's first item rests, the fade's
+  current depth), so the first event's title holds at rest (8 px) until the fade reaches it, then follows the fade's edge
+  down to half a card; nothing steps and nothing goes back.
 - backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
   rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
   rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
