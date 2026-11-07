@@ -273,8 +273,11 @@ final class QuickEntryHost {
     /// A day picked in the bar's date sheet: today is the Now list, as the plugin's picker gives it, so the field stays
     /// where it is when it already stands there.
     func chooseDay(_ day: String) {
-        guard let placement = try? board.read("tasks.placementOfDay", [.string(day)], over: board.settingsOnly()) else { return }
-        choosePlace(placement)
+        do {
+            choosePlace(try board.read("tasks.placementOfDay", [.string(day)], over: board.settingsOnly()))
+        } catch {
+            model?.problem(error)
+        }
     }
 
     /// A label's name as the screen shows it.
@@ -440,7 +443,11 @@ final class QuickEntryHost {
         }
         session = call["session"]
         let job = call["value"]
-        guard let method = job["method"].string, case .array(let args) = job["args"] else { return finish(id) }
+        guard let method = job["method"].string, case .array(let args) = job["args"] else {
+            // Nothing to write: a line waiting for it stops waiting.
+            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
+            return finish(id)
+        }
         let board = board
         let day = model.shownDay
         let written: Result<JSONValue, Error> = await Task.detached {
@@ -473,6 +480,8 @@ final class QuickEntryHost {
                 placeField(over: read)
             }
         }
+        // Written but not read: the screen reads again once this job is done, so the task shows.
+        if read == nil, case .success = written { Task { await model.reload() } }
         return finish(id)
     }
 

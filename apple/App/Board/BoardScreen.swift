@@ -41,9 +41,10 @@ struct BoardScreen: View {
             entrySheet(sheet)
         }
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reloadIfChanged() } }) {
-            CaptureView()
+            CaptureView(focused: router.typing)
         }
-        .sheet(item: $sheet) { sheet in
+        // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
+        .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
             switch sheet {
             case .search: SearchScreen(model: model)
             case .settings: NavigationStack { SettingsView() }
@@ -71,7 +72,7 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }

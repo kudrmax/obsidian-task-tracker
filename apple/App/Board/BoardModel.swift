@@ -146,7 +146,10 @@ final class BoardModel {
     /// A read the file asked for while something was carried or the quick entry wrote: made once they end.
     private var readAfterCarry = false
     /// A drop's write is made: the next read drawn ends its carry.
-    @ObservationIgnored private var dropWritten = false
+    /// The reads started so far, counted as each begins.
+    @ObservationIgnored private var readsStarted = 0
+    /// A drop's write is made: the first read started after it ends its carry (one started before shows the file without it).
+    @ObservationIgnored private var dropReadFrom: Int?
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
@@ -182,11 +185,13 @@ final class BoardModel {
             readAgain = false
             let day = shownDay
             let board = board
+            readsStarted += 1
+            let serial = readsStarted
             do {
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
                 let instant = instantNext
                 instantNext = false
-                show(read, animated: !instant)
+                show(read, animated: !instant, serial: serial)
                 problem = nil
             } catch {
                 problem = Self.words(error)
@@ -196,7 +201,7 @@ final class BoardModel {
 
     /// The screen drawn from `read`; the read after a drop's write in one step with the end of its carry, so the card
     /// stands in its place at once. Any other read leaves a carry as it is.
-    private func show(_ read: BoardSnapshot, animated: Bool) {
+    private func show(_ read: BoardSnapshot, animated: Bool, serial: Int) {
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
@@ -208,8 +213,8 @@ final class BoardModel {
             withTransaction(instant) {
                 snapshot = read
                 entry.screenChanged()
-                if dropWritten {
-                    dropWritten = false
+                if let from = dropReadFrom, serial >= from {
+                    dropReadFrom = nil
                     endCarry()
                 }
             }
@@ -225,8 +230,9 @@ final class BoardModel {
             return
         }
         let board = board
-        let text = try? await Task.detached { try board.files().tasks }.value
-        if text != snapshot?.tasksText { await reload(animated: true) }
+        guard let files = try? await Task.detached(operation: { try board.files() }).value else { return }
+        // The settings count too: a list renamed or a colour changed in Settings or in Obsidian redraws every name.
+        if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload(animated: true) }
     }
 
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
@@ -777,7 +783,7 @@ final class BoardModel {
         } catch {
             problem = Self.words(error)
         }
-        dropWritten = true
+        dropReadFrom = readsStarted + 1
         await reload(animated: false)
     }
 

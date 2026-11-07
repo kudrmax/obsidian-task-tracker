@@ -4,6 +4,8 @@ import UIKit
 
 /// A new task: typed, recorded, or both, into one of the four lists. Once added, the screen is empty for the next one.
 struct CaptureView: View {
+    /// Opened from the plus: the field takes the keyboard as the sheet rises.
+    var focused = false
     /// The lists by their headings' names, read again each time the screen shows: a heading renamed in Obsidian shows here.
     @State private var options: [CaptureList] = []
     @State private var listKey: String?
@@ -29,7 +31,7 @@ struct CaptureView: View {
                 // The task's field takes the page down to the recording's bar, as a note does: a tap anywhere on it types.
                 TextField("New task", text: $text, axis: .vertical)
                     .focused($typing)
-                    .background(FocusOnArrival())
+                    .background { if focused { FocusOnArrival() } }
                     .submitLabel(.done)
                     .padding(Layout.margin)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

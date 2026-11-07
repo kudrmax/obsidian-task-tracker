@@ -335,9 +335,9 @@ struct EventBlock: View {
                     // The title keeps below the top edge and its fade, which grows with the scroll, so it never jumps.
                     let top = geometry.frame(in: .scrollView).minY
                     let fade = SoftEdge.top(at: contentTop - top)
-                    // The title's top on the screen is the larger of where it rests and the fade's depth.
-                    let resting = top + (isTiny ? 0 : 4)
-                    return content.offset(y: min(max(0, fade - resting), max(0, height - titleHeight - (isTiny ? 0 : 8))))
+                    // The padded title stands at the larger of where it rests and the fade's depth, its text 4 pt below,
+                    // as the plugin's.
+                    return content.offset(y: min(max(0, fade - top), max(0, height - titleHeight - (isTiny ? 0 : 8))))
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
         }

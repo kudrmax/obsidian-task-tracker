@@ -440,11 +440,12 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift (typed text): the field moves only between views in the window (`EntryFieldBox` takes it on joining the
   window; a box leaving parks it in a hidden holder in the window), so it keeps first responder and every key; Return
   and the end of editing no longer go through a queued task.
-- frontend-swift (M1/M2): the plus is carried by its own pan (lifts on the first move, a tap still opens capture), as a
-  copy over the window routed to the places through `BoardDrop.carry(at:)`/`letGo()`; let go anywhere, the copy flies
-  back into the slot as one piece (spring), the slot hidden until it lands.
-- frontend-swift (M3): a card's lift preview is a still copy of its capsule, so the card giving its place up never
-  blanks the preview.
+- frontend-swift (M1/M2, revised): the plus is carried by its own pan (lifts on the first move), as a live copy of its
+  glass and symbol over the window (no shadow or scale of its own), routed to the places through
+  `BoardDrop.carry(at:)`/`letGo()`; let go, the copy springs back into the slot, and no new carry starts until it lands.
+  A pan let go within 10 pt of where it started (not on the cancel target) is a tap that trembled: it opens capture.
+- frontend-swift (M3, revised): the lift is of the capsule itself (a still copy kept the menu from ever turning into a
+  drag); the card hides only on the carry's first move (`sessionDidMove`), so the lift never has nothing to show.
 - frontend-swift (M4/M7): the gap is empty room of one card's height, the rows parting (board «3 — Перетаскивание»: no
   dashes, no line with a dot); its level shows by its indent and the branch line of that level drawn into it, the line
   the card will join, sliding with `.snappy` as the finger crosses a level's line. Every row's branch is asked over the
@@ -464,6 +465,19 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   asked of the core.
 - frontend-swift (M9): iOS 26's soft scroll edge shows only under system bars, so the lists and the calendar take a
   gradient mask driven by the scroll: each edge's fade is as deep as the content past it, capped at half a card; a list's
-  empty room after its last row counts as nothing; a cut event's title stands at max(resting, fade depth).
+  empty room after its last row counts as nothing; a cut event's padded title stands at max(0, fade − top), its text 4 pt
+  below, as the plugin's.
 - frontend-swift (M10): the capture field takes first responder as the sheet's view joins the window (a probe beside the
-  SwiftUI field), so the keyboard rises with the sheet; a SwiftUI focus lands only after the presentation.
+  SwiftUI field), so the keyboard rises with the sheet; only when the plus opened it (`CaptureRouter.openTyping`), the
+  lock screen widget's capture opens with the keyboard down as before.
+- frontend-swift (drop place): a carried card's grab (the finger's offset below the card's top) is read in
+  `itemsForBeginning`, while the touch still stands on the card; read at `sessionWillBegin` it came against the lifted
+  preview (−16 pt instead of +17), so the core's `carriedMiddle` put the gap a row and more below the finger.
+- frontend-swift (menu then drag): with the menu open, the finger moving over the menu scrubs its rows (iOS's own
+  behaviour); a move of the capsule itself away from the menu turns into the drag (recorded). Nothing in the app blocks
+  it now that the lift is of the capsule.
+- frontend-swift (R8, revised): the carry of a drop ends with the first read started after the drop's write (a serial
+  counted per read), never with a read already running.
+- frontend-swift (R9, revised): `reloadIfChanged` compares the settings text too, and closing Settings asks it.
+- frontend-swift (entry jobs): a job with nothing to write ends with `unshown`; a task written but not read schedules a
+  read; a failed `placementOfDay` in Date… is shown as the screen's problem.

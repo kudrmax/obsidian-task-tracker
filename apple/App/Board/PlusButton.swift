@@ -128,28 +128,50 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
 
     // MARK: The plus carried
 
-    /// The plus as the finger carries it: a lifted copy over the window, while the slot stands as the cancel target.
+    /// The plus as the finger carries it: a live copy over the window, the same glass and symbol, while the slot stands as
+    /// the cancel target. No shadow or scale of its own: the glass is the plus's look wherever it is.
     private var lifted: UIView?
+    /// The copy flying back into the slot: a new carry waits until it has landed.
+    private var homing: UIView?
+    /// Where the finger came down, in the window.
+    private var start: CGPoint = .zero
+
+    /// A finger that moved no further than this and let go is a tap that trembled, not a carry.
+    private static let tapReach: CGFloat = 10
+
+    private func copy(in window: UIWindow) -> UIView {
+        let frame = convert(bounds, to: window)
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.tintColor = accent
+        let glass = UIVisualEffectView(effect: glassEffect)
+        glass.frame = frame
+        glass.cornerConfiguration = .capsule()
+        glass.clipsToBounds = true
+        glass.isUserInteractionEnabled = false
+        let symbol = UIImageView(image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)))
+        symbol.tintColor = .white
+        symbol.contentMode = .center
+        symbol.frame = glass.bounds
+        symbol.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        glass.contentView.addSubview(symbol)
+        return glass
+    }
 
     @objc private func carry(_ pan: UIPanGestureRecognizer) {
         guard let window else { return }
         let point = pan.location(in: window)
         switch pan.state {
         case .began:
-            guard !cancelling, let copy = snapshotView(afterScreenUpdates: false) else { return }
-            copy.frame = convert(bounds, to: window)
-            copy.layer.shadowColor = UIColor.black.cgColor
-            copy.layer.shadowOpacity = 0.25
-            copy.layer.shadowRadius = 12
-            copy.layer.shadowOffset = CGSize(width: 0, height: 6)
-            copy.isUserInteractionEnabled = false
+            guard !cancelling, homing == nil else { return }
+            start = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: window)
+            let copy = copy(in: window)
             window.addSubview(copy)
             lifted = copy
+            alpha = 0
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             onCarry()
             UIView.animate(springDuration: 0.3, bounce: 0.15, options: [.allowUserInteraction, .beginFromCurrentState]) {
                 copy.center = point
-                copy.transform = CGAffineTransform(scaleX: 1.12, y: 1.12)
             }
         case .changed:
             guard let lifted else { return }
@@ -163,14 +185,16 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
             }
         case .ended:
             guard lifted != nil else { return }
+            let trembled = hypot(point.x - start.x, point.y - start.y) < Self.tapReach && !held
             let onTarget = convert(bounds, to: window).contains(point)
             // Taken by a place, the field opens there and the plus goes back to its slot under the bar all the same.
-            if onTarget || drop?.letGo() != true {
+            if trembled || onTarget || drop?.letGo() != true {
                 drop?.carryOff()
                 onCancel()
             }
             flyHome()
             onEnd()
+            if trembled { open() }
         default:
             guard lifted != nil else { return }
             drop?.carryOff()
@@ -180,19 +204,18 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         }
     }
 
-    /// Let go: the plus flies back into its slot as one piece and stands there
-    /// again, as the system returns a cancelled drag.
+    /// Let go: the plus flies back into its slot as one piece and stands there again, as the system returns a cancelled
+    /// drag; until it lands, a new touch on the plus starts no carry.
     private func flyHome() {
         guard let lifted, let window else { return }
         self.lifted = nil
-        alpha = 0
+        homing = lifted
         UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
-            lifted.transform = .identity
             lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: window)
-            lifted.layer.shadowOpacity = 0
         } completion: { _ in
             self.alpha = 1
             lifted.removeFromSuperview()
+            self.homing = nil
         }
     }
 
