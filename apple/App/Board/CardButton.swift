@@ -108,6 +108,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         didSet { setNeedsLayout() }
     }
     private let fold = UIButton(type: .custom)
+    /// Shows the menu, anchored to the card, when a tap has ended.
+    private lazy var opener = MenuOpener { [weak self] in self?.menuEnded($0) }
     /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
     private let press = UIView()
     private var drag: UIDragInteraction!
@@ -150,9 +152,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }, for: .touchUpInside)
         addSubview(fold)
         addAction(UIAction { [weak self] _ in self?.onTouch() }, for: .touchUpInside)
-        // A tap opens the menu, as the plugin's tap does; a long press lifts the card for the drag.
-        isContextMenuInteractionEnabled = true
-        showsMenuAsPrimaryAction = true
+        // A tap opens the menu once the finger is up, as the plugin's tap does; a long press lifts the card for the drag.
+        opener.isUserInteractionEnabled = false
+        opener.showsMenuAsPrimaryAction = true
+        addSubview(opener)
+        addAction(UIAction { [weak self] _ in self?.openMenu() }, for: .touchUpInside)
         drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
@@ -166,6 +170,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     override func layoutSubviews() {
         super.layoutSubviews()
         press.frame = bounds
+        opener.frame = bounds
         // The counter's own button, as tall as the card and a little wider than the digits, as the plugin's hit area.
         if let counter = counterFrame {
             fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, CardMetrics.height))
@@ -192,21 +197,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     // MARK: The menu
 
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
-        onTouch()
-        guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return nil }
-        return UIContextMenuConfiguration(identifier: id as NSString, previewProvider: nil) { _ in menu }
+    private func openMenu() {
+        guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        opener.menu = menu
+        opener.performPrimaryAction()
     }
 
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        UITargetedPreview(view: content, parameters: capsule)
-    }
-
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        UITargetedPreview(view: content, parameters: capsule)
-    }
-
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+    /// A row that opens a sheet or a page runs once the menu has gone.
+    private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         guard let run = afterMenu else { return }
         afterMenu = nil
         if let animator { animator.addCompletion { run() } } else { run() }
@@ -276,5 +274,23 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private func landed() {
         returning = false
         showsInPlace()
+    }
+}
+
+/// The card's menu, opened by the card once a tap ends rather than on the touch, so a long press stays the drag's.
+final class MenuOpener: UIButton {
+    private let ended: ((any UIContextMenuInteractionAnimating)?) -> Void
+
+    init(ended: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void) {
+        self.ended = ended
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+        super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+        ended(animator)
     }
 }
