@@ -42,7 +42,9 @@ export class GroupDrag {
 		new LongPress(head, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
-			onStart: (e) => this.lift(head, list, taskList, group, e),
+			onStart: (e) => {
+				if (group.reorder) this.lift(head, list, taskList, group, e);
+			},
 			onTap: () => this.deps.onTap(head, list, group),
 		});
 	}

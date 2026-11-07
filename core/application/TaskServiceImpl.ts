@@ -20,6 +20,8 @@ import {
 	type GroupName,
 	type GroupPlace,
 	type ListSection,
+	type ProjectRef,
+	type ProjectZone,
 	type NewTaskPlace,
 	type Placement,
 	type RepeatRule,
@@ -37,7 +39,8 @@ import {
 	type TaskStep,
 } from "./contracts";
 import type { SectionOffer } from "./sections";
-import type { Clock, SettingsStore, TaskFileStore } from "./ports";
+import { type Clock, type GroupingStore, memoryGrouping, NO_PROJECTS, type Projects, type SettingsStore, type TaskFileStore } from "./ports";
+import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
 import { readsAnew } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
@@ -65,6 +68,7 @@ export class TaskServiceImpl implements TaskService {
 	private readonly listeners = new Set<() => void>();
 	private unsubscribeStore: (() => void) | null = null;
 	private unsubscribeSettings: (() => void) | null = null;
+	private unsubscribeProjects: (() => void) | null = null;
 	private normalized: Normalized | null = null;
 	private readonly rules: TaskRules;
 	private readonly reads: TaskReads;
@@ -75,9 +79,11 @@ export class TaskServiceImpl implements TaskService {
 		private readonly settings: SettingsStore,
 		clock: Clock,
 		private readonly history: UndoHistory | null = null,
+		private readonly projects: Projects = NO_PROJECTS,
+		private readonly grouping: GroupingStore = memoryGrouping(),
 	) {
 		this.rules = new TaskRules(settings, clock);
-		this.reads = new TaskReads(this.rules, settings, clock);
+		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
 
@@ -105,8 +111,31 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.withPriority(text, prefix);
 	}
 
-	screen(date: LocalDate): Promise<ScreenView> {
-		return this.ask(this.reads.screenRead(date));
+	screen(date: LocalDate, project?: string): Promise<ScreenView> {
+		return this.ask(this.reads.screenRead(date, project));
+	}
+
+	setProject(keys: readonly TaskKey[], project: string | null): Promise<void> {
+		return this.run(this.writes.setProject(keys, project));
+	}
+
+	projectNotes(): readonly ProjectRef[] {
+		return this.reads.projectNotes();
+	}
+
+	async setGrouping(list: GroupedList, on: boolean): Promise<void> {
+		this.keepGrouping(withGrouping(this.grouping.get(), list, on));
+	}
+
+	async toggleFold(list: GroupedList, key: string): Promise<void> {
+		this.keepGrouping(withFoldToggled(this.grouping.get(), list, key));
+	}
+
+	/** The device's grouping changed: the screens draw their lists again. */
+	private keepGrouping(state: ReturnType<GroupingStore["get"]>): void {
+		if (state === this.grouping.get()) return;
+		this.grouping.set(state);
+		this.emit();
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -137,8 +166,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.doneView(await this.snapshot());
 	}
 
-	search(query: string): Promise<readonly SearchGroup[]> {
-		return this.ask(this.reads.searchRead(query));
+	search(query: string, project?: string): Promise<readonly SearchGroup[]> {
+		return this.ask(this.reads.searchRead(query, project));
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {
@@ -147,6 +176,7 @@ export class TaskServiceImpl implements TaskService {
 
 	async reveal(item: TaskItem): Promise<TaskScreen> {
 		await this.run(this.writes.revealUnfold(item));
+		this.keepGrouping(revealedGrouping(this.grouping.get(), item));
 		return this.screenOf(item);
 	}
 
@@ -386,12 +416,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.moveGroup(list, group, place));
 	}
 
-	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
-		return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
+	async renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Promise<boolean> {
+		return this.run(await this.ask(this.writes.renameGroup(list, group, name, project)));
 	}
 
-	removeGroup(list: GroupedList, group: string): Promise<void> {
-		return this.run(this.writes.removeGroup(list, group));
+	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Promise<void> {
+		return this.run(this.writes.removeGroup(list, group, project));
 	}
 
 	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -421,6 +451,7 @@ export class TaskServiceImpl implements TaskService {
 		this.listeners.add(listener);
 		this.unsubscribeStore ??= this.store.onChange(() => this.emit());
 		this.unsubscribeSettings ??= this.watchReading();
+		this.unsubscribeProjects ??= this.projects.onChange(() => this.emit());
 		return () => {
 			this.listeners.delete(listener);
 			if (this.listeners.size === 0) {
@@ -428,6 +459,8 @@ export class TaskServiceImpl implements TaskService {
 				this.unsubscribeStore = null;
 				this.unsubscribeSettings?.();
 				this.unsubscribeSettings = null;
+				this.unsubscribeProjects?.();
+				this.unsubscribeProjects = null;
 			}
 		};
 	}

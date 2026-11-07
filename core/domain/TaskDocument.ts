@@ -26,6 +26,8 @@ export interface TaskEntry {
 	readonly task: Task;
 	/** The section of its list it sits in; a subtask's is its task's. */
 	readonly group: GroupName;
+	/** The link text of its project: its own field's, a subtask's its top task's whatever its own line says; null for none. */
+	readonly project: string | null;
 	/** The task lines nested right under this one, in file order. */
 	readonly subtasks: readonly TaskEntry[];
 }
@@ -104,6 +106,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
 		a.collapsed === b.collapsed &&
+		a.project === b.project &&
 		sameLines(a.children, b.children)
 	);
 }
@@ -321,10 +324,13 @@ export class TaskDocument {
 		return this.leftBy(entry, this.withLines(this.splice(span.line, span.lineCount, [])));
 	}
 
-	/** A subtask moved here leaves its task and becomes a task of `section`. The section it leaves empty goes, as with `removeEntry`. */
-	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition): TaskDocument {
+	/**
+	 * A subtask moved here leaves its task and becomes a task of `section`, with the project it had through it; `project`
+	 * gives it another one (null: none). The section it leaves empty goes, as with `removeEntry`.
+	 */
+	moveEntry(entry: TaskEntry, section: SectionKey, position: InsertPosition, project?: string | null): TaskDocument {
 		const span = this.spanOf(entry);
-		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, "");
+		const moved = this.ownLines(entry, span, "", project !== undefined ? project : entry.path.length > 0 ? entry.project : entry.task.project);
 		const without = this.withLines(this.splice(span.line, span.lineCount, []));
 		const target = without.insertionLine(section, this.positionAfterRemoval(entry, section, position));
 		return this.leftBy(entry, without.withLines(without.splice(target, 0, moved)));
@@ -397,7 +403,7 @@ export class TaskDocument {
 		if (contains(entry, parent)) throw new Error(`A task cannot go under itself: ${entry.raw}`);
 		const span = this.spanOf(entry);
 		const target = before ? this.spanOf(before).line : this.endOf(parent);
-		const moved = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, this.childIndent(parent));
+		const moved = this.ownLines(entry, span, this.childIndent(parent), null);
 		const without = this.splice(span.line, span.lineCount, []);
 		without.splice(target > span.line ? target - span.lineCount : target, 0, ...moved);
 		return this.leftBy(entry, this.withLines(without));
@@ -474,6 +480,16 @@ export class TaskDocument {
 		const left = group && after.groups(entry.section)[group.index];
 		if (!group || !left?.heading || left.name !== group.name || !left.blank) return after;
 		return after.deleteGroup(entry.section, left.index);
+	}
+
+	/**
+	 * The entry's lines under another indent, its own line written with `project` as its project: a subtask that becomes a
+	 * task takes the one it had through its parent, a task put under another one needs none.
+	 */
+	private ownLines(entry: TaskEntry, span: Span, indent: string, project: string | null): string[] {
+		const lines = reindented(this.lines.slice(span.line, span.line + span.lineCount), entry.indent, indent);
+		if (entry.task.project !== project) lines[0] = formatTaskLine({ indent, bullet: entry.bullet, task: { ...entry.task, project } }, this.markers);
+		return lines;
 	}
 
 	private withLines(lines: readonly string[]): TaskDocument {
@@ -682,13 +698,13 @@ export class TaskDocument {
 	/** A block's tasks, numbered on from the tasks of the blocks above it in `entries`. */
 	private readGroup(key: SectionKey, block: Block, index: number, entries: TaskEntry[], spans: Map<TaskEntry, Span>): TaskGroup {
 		const blank = this.lines.slice(block.start, block.end).every((line) => line.trim() === "");
-		const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans);
+		const own = this.readLevel(key, block.start, block.end, null, block.name, entries.length, spans, null);
 		entries.push(...own);
 		return { index, name: block.name, heading: block.headingLine !== null, entries: own, blank };
 	}
 
 	/** The task lines from `from` to `end` that no task line above them in that range holds, each with its own subtasks. */
-	private readLevel(section: SectionKey, from: number, end: number, parent: Place | null, group: GroupName, firstIndex: number, spans: Map<TaskEntry, Span>): TaskEntry[] {
+	private readLevel(section: SectionKey, from: number, end: number, parent: Place | null, group: GroupName, firstIndex: number, spans: Map<TaskEntry, Span>, parentProject: string | null): TaskEntry[] {
 		const entries: TaskEntry[] = [];
 		let i = from;
 		while (i < end) {
@@ -700,8 +716,9 @@ export class TaskDocument {
 			}
 			const children = this.childrenOf(i, end, parsed.indent.length);
 			const place: Place = parent ? { index: parent.index, path: [...parent.path, entries.length] } : { index: firstIndex + entries.length, path: [] };
-			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans);
-			const entry: TaskEntry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, subtasks };
+			const project = parent ? parentProject : parsed.task.project;
+			const subtasks = this.readLevel(section, i + 1, i + 1 + children.length, place, group, 0, spans, project);
+			const entry: TaskEntry = { section, ...place, raw, indent: parsed.indent, bullet: parsed.bullet, task: { ...parsed.task, children }, group, project, subtasks };
 			entries.push(entry);
 			spans.set(entry, { line: i, lineCount: 1 + children.length });
 			i += 1 + children.length;

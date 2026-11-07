@@ -11,7 +11,7 @@ import { canRemind, isOpen, type LocalDate } from "../domain/Task";
 import type { TaskEntry } from "../domain/TaskDocument";
 import { plainText } from "../domain/TaskText";
 import { markColors } from "./marks";
-import type { SubtaskProgress, TaskItem, TaskKey } from "./contracts";
+import type { ProjectRef, SubtaskProgress, TaskItem, TaskKey } from "./contracts";
 
 /** Of the task's own subtasks, the done ones out of all but those given up. */
 function progressOf(entry: TaskEntry): SubtaskProgress | null {
@@ -28,15 +28,18 @@ function keyOf(entry: TaskEntry): TaskKey {
 export interface ItemLevels {
 	levelOf(prefix: string): PriorityLevel | null;
 	labelsOf(names: readonly string[]): readonly LabelLevel[];
+	/** The project of a task's link text as the screen shows it; null for none. */
+	projectOf(link: string | null): ProjectRef | null;
 }
 
-const NO_LEVELS: ItemLevels = { levelOf: () => null, labelsOf: () => [] };
+const NO_LEVELS: ItemLevels = { levelOf: () => null, labelsOf: () => [], projectOf: () => null };
 
 /** The levels and labels in the settings' order, a level only by a usable prefix, a label by a usable name. */
-export function itemLevels(levels: readonly PriorityLevel[], labels: readonly LabelLevel[]): ItemLevels {
+export function itemLevels(levels: readonly PriorityLevel[], labels: readonly LabelLevel[], projectOf: (link: string | null) => ProjectRef | null = () => null): ItemLevels {
 	return {
 		levelOf: (prefix) => levels.find((l) => l.prefix === prefix) ?? null,
 		labelsOf: (names) => labels.filter((l) => names.includes(l.name)),
+		projectOf,
 	};
 }
 
@@ -64,6 +67,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		labels,
 		colors: markColors(priority, labels),
 		group: entry.group,
+		project: levels.projectOf(entry.project),
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
 		day: dayOfTask(entry.section, entry.task, today),
@@ -78,6 +82,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 			addDescription: description === null,
 			fold: hasOpenSubtask(entry),
 			resize: entry.task.slot !== null,
+			setProject: entry.path.length === 0,
 		},
 		subtasks: allSubtasks.filter((sub) => sub.open),
 		allSubtasks,

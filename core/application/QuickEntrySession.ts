@@ -1,7 +1,7 @@
 import type { GroupName, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import type { Placement } from "../domain/Placement";
-import type { DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
 import type { ListCard, ListPlace } from "./nesting";
 import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
@@ -69,8 +69,8 @@ export class QuickEntrySession {
 		this.entry.openFromPlus();
 	}
 
-	openIn(column: DropColumn, group: GroupName): void {
-		this.entry.openIn(column, group);
+	openIn(column: DropColumn, group: GroupName, project?: ProjectZone): void {
+		this.entry.openIn(column, group, project);
 	}
 
 	openSlot(slot: Slot): void {

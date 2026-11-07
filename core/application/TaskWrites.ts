@@ -10,6 +10,7 @@ import type {
 	GroupPlace,
 	MenuStatusId,
 	NewTaskPlace,
+	ProjectZone,
 	RepeatRule,
 	SectionPlace,
 	TaskDraft,
@@ -122,6 +123,10 @@ export class TaskWrites {
 				return labelled.places().map((place) => (place ? this.reads.itemAt(change.after, place, today) : null));
 			},
 		};
+	}
+
+	setProject(keys: readonly TaskKey[], project: string | null): Write<void> {
+		return nothing(this.rules.setProject(keys, project));
 	}
 
 	setReminder(key: TaskKey, reminder: ReminderKind): Write<void> {
@@ -260,8 +265,8 @@ export class TaskWrites {
 		return nothing(this.rules.moveToEnd(key, section));
 	}
 
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Write<void> {
-		return nothing(this.rules.moveToGroup(key, list, group, before, date));
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Write<void> {
+		return nothing(this.rules.moveToGroup(key, list, group, before, date, project));
 	}
 
 	createGroup(key: TaskKey, list: GroupedList, name: string, date?: LocalDate): Write<void> {
@@ -286,8 +291,8 @@ export class TaskWrites {
 	}
 
 	/** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
-	renameGroup(list: GroupedList, group: string, name: string): Read<Write<boolean>> {
-		const operation = this.rules.renameGroup(list, group, name);
+	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Read<Write<boolean>> {
+		const operation = this.rules.renameGroup(list, group, name, project);
 		return {
 			reads: operation !== null,
 			answer: (s) => {
@@ -297,8 +302,8 @@ export class TaskWrites {
 		};
 	}
 
-	removeGroup(list: GroupedList, group: string): Write<void> {
-		return nothing(this.rules.removeGroup(list, group));
+	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Write<void> {
+		return nothing(this.rules.removeGroup(list, group, project));
 	}
 
 	createSection(name: string, place: SectionPlace): Write<{ readonly list: GroupedList; readonly group: string } | null> {
@@ -347,7 +352,7 @@ export class TaskWrites {
 			case "clearSlot":
 				return this.clearSlot(key, move.place);
 			case "moveToGroup":
-				return this.moveToGroup(key, move.list, move.group, move.before, move.date);
+				return this.moveToGroup(key, move.list, move.group, move.before, move.date, move.project);
 			case "nest":
 				return this.nest(key, move.parent, move.before);
 			case "moveBefore":

@@ -49,7 +49,6 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
 	"obsidian/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
-	"obsidian/ui/drag/ListDrop.ts": { count: 2, removedBy: "none: a gap's rectangle is drawn under the header of the section its place names, among that section's cards; it stays" },
 	"obsidian/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
 };
 

@@ -168,11 +168,12 @@ export class DemoTaskService implements TaskService {
 			parentKey: null,
 			description: t.description ?? null,
 			group: null,
+			project: null,
 			list: section,
 			isSubtask: false,
 			day: dayOfTask(section, t, this.today()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
-			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null },
+			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true },
 		};
 	}
 
@@ -199,7 +200,8 @@ export class DemoTaskService implements TaskService {
 	async screen(date: LocalDate): Promise<ScreenView> {
 		await this.normalize();
 		const [day, soon, inbox, backlog, done, sections, offer] = await Promise.all([this.dayView(date), this.soonWithoutDateView(), this.inboxView(), this.backlogView(), this.doneView(), this.listSections(), this.sectionOffer()]);
-		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true };
+		const off = { canGroup: false, on: false, groups: [] };
+		return { day, soon, inbox, backlog, done, sections, offer, missing: false, calendars: true, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null };
 	}
 
 	async dayView(date: LocalDate): Promise<DayView> {
@@ -241,7 +243,7 @@ export class DemoTaskService implements TaskService {
 		return sections.flatMap((list) => {
 			const hits = this.items(list).flatMap((item) => {
 				const found = fuzzy.match(item.text);
-				return found ? [{ item, title: matchParts(item.text, found.found), description: null }] : [];
+				return found ? [{ item, title: matchParts(item.text, found.found), project: null, description: null }] : [];
 			});
 			return hits.length > 0 ? [{ list, hits }] : [];
 		});
@@ -396,6 +398,17 @@ export class DemoTaskService implements TaskService {
 	async setCollapsed(): Promise<void> {}
 
 	async toggleCollapsed(): Promise<void> {}
+
+	/** The board has no projects. */
+	async setProject(): Promise<void> {}
+
+	projectNotes(): readonly [] {
+		return [];
+	}
+
+	async setGrouping(): Promise<void> {}
+
+	async toggleFold(): Promise<void> {}
 
 	snap(minute: number, hourPx: number, tolerancePx: number): number {
 		return snapMinute(minute, hourPx, tolerancePx);

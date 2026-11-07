@@ -2,7 +2,9 @@ import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
 import { type LocalDate, nextProgress, REMINDER_KINDS, type TaskStatus } from "../domain/Task";
-import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
+import { projectKey } from "../domain/Project";
+import { NO_PROJECT } from "./projects";
+import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
 
@@ -126,8 +128,28 @@ function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of
 	return { choice, options: names.map((name) => ({ name, checked: shared && name === choice.current })), create: of.kind === "task" };
 }
 
+/**
+ * The Project page: the project notes by name, then a task's project that is none of them; checked the one every task
+ * has. Only subtasks: disabled, showing their parent's.
+ */
+export function menuProject(items: readonly TaskItem[], known: readonly ProjectRef[]): MenuProject {
+	const key = (ref: ProjectRef | null) => (ref ? projectKey(ref.name) : "");
+	const first = items[0]?.project ?? null;
+	const shared = items.every((item) => key(item.project) === key(first));
+	const options = [...known];
+	for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
+	const none = items.every((item) => item.project === null);
+	return {
+		value: shared && first ? first.name : none ? NO_PROJECT : "",
+		current: shared ? first : null,
+		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
+		none,
+		disabled: items.every((item) => !item.can.setProject),
+	};
+}
+
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD): TaskMenuModel {
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectRef[] = []): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
 	const edits = menuEdits(items, of, sections);
 	return {
@@ -138,6 +160,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		removeDue: items.some((item) => item.can.removeDue),
 		dueDate: sharedDueDate(items),
 		sections,
+		project: menuProject(items, projects),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
 		remove: { confirm: of.kind === "task" },
