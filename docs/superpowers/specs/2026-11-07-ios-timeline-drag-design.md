@@ -539,3 +539,12 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   place, or the next day once at the calendar, or nothing at the row's end). It is a rule in the plugin's UI, not in the
   core; the app does not write it again. Asked of the backend: move it into `core/application` and offer it through the
   door (e.g. `screen.step({ mode, date }, shift)` → `{ mode, date } | null`), then the app adds the swipe.
+- frontend-obsidian (day turn on the arrows, 2026-11-07): the plugin's day arrows and the day's name run the same
+  `DayTrack` a swipe to another day runs, the whole way with no finger (`ScreenPager.run`): 300 ms
+  (`--tc-duration-slide`), the pager's cubic ease-out, the header switching at half way. The arrow's day is `days.step(day,
+  ±1)`, as before and as the app's arrows: the arrows walk days in every place that shows them (Soon beside the day's
+  list too, and back from today to yesterday), while `days.stepScreen` stays the swipe's row. The name's tap back to
+  today slides one step's worth toward today (today comes in from the left when a later day stands, from the right when
+  an earlier one does); which way today lies is the frontends' ISO date comparison (the app's `day < today` too) — a
+  `days` answer for it would take that line out of both. A tap during a turn stands that turn on its day and starts the
+  next once the screen has drawn that day (at most 1 s), so one day peeks at a time and quick taps walk day by day.
