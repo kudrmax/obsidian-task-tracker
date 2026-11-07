@@ -2,7 +2,8 @@ import Core
 import SwiftUI
 
 extension View {
-    /// What a task's menu opens: Pick a Date and Repeat as sheets, Rename, Add Subtask and New Section as alerts with a field.
+    /// What a task's menu opens: Pick a Date, Repeat, Rename and Add Subtask as sheets, New Section as an alert with a field,
+    /// as Notes names a folder.
     func boardSheets(model: BoardModel) -> some View {
         modifier(BoardSheets(model: model))
     }
@@ -18,23 +19,11 @@ private struct BoardSheets: ViewModifier {
                 if let items = model.dateFor { DateSheet(items: items, model: model) }
             }
             .sheet(item: $model.repeatFor) { item in RepeatSheet(item: item, model: model) }
-            .alert("Rename", isPresented: present(\.renaming)) {
-                TextField("Task", text: $text)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") { if let item = model.renaming { Task { await model.rename(item, to: text) } } }
-            }
-            .alert("New Subtask", isPresented: present(\.subtaskOf)) {
-                TextField("Task", text: $text)
-                Button("Cancel", role: .cancel) {}
-                Button("Add") { if let item = model.subtaskOf { Task { await model.addSubtask(to: item, text) } } }
-            }
             .alert("New Section", isPresented: present(\.newSection)) {
                 TextField("Name", text: $text)
                 Button("Cancel", role: .cancel) {}
                 Button("Add") { if let item = model.newSection { Task { await model.toSection([item], text) } } }
             }
-            .onChange(of: model.renaming?.id) { text = model.renaming?.text ?? "" }
-            .onChange(of: model.subtaskOf?.id) { text = "" }
             .onChange(of: model.newSection?.id) { text = "" }
     }
 
@@ -103,8 +92,27 @@ enum LocalDay {
 
 /// Repeat: what the core's repeat page offers, with system controls. The check saves, the cross closes untouched.
 struct RepeatSheet: View {
-    let item: TaskItem
+    /// The day a new rule starts from, the rule as it stands, and what writing a rule does.
+    let day: String
+    let own: JSONValue
+    let write: (JSONValue) async -> Void
     @Bindable var model: BoardModel
+
+    init(item: TaskItem, model: BoardModel) {
+        day = item.repeatDay
+        own = item.repeatRule
+        write = { [model] rule in await model.setRepeat(item, rule) }
+        self.model = model
+    }
+
+    /// The quick entry's repeat: the rule goes to the field, which writes it with the task.
+    init(day: String, own: JSONValue, model: BoardModel, write: @escaping (JSONValue) async -> Void) {
+        self.day = day
+        self.own = own
+        self.write = write
+        self.model = model
+    }
+
     @State private var draft: RepeatDraft?
     @State private var touched = false
     @State private var editing: Task<Void, Never>?
@@ -163,7 +171,7 @@ struct RepeatSheet: View {
                     }
                     if draft.removable {
                         Section {
-                            Button("Remove Repeat", role: .destructive) { Task { await model.setRepeat(item, .null); dismiss() } }
+                            Button("Remove Repeat", role: .destructive) { Task { await write(.null); dismiss() } }
                         }
                     }
                 }
@@ -179,7 +187,7 @@ struct RepeatSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .task { draft = try? await model.rule("rules.repeatDraft", [.string(item.repeatDay), item.repeatRule]) }
+        .task { draft = try? await model.rule("rules.repeatDraft", [.string(day), own]) }
     }
 
     /// Each change is made over the draft the one before it left: quick taps add up.
@@ -199,8 +207,8 @@ struct RepeatSheet: View {
     private func save() async {
         guard let draft else { return }
         let held: JSONValue = touched ? ["rule": draft.rule] : .null
-        guard let end: [String: JSONValue] = try? await model.rule("repeatPage.end", [item.repeatRule, held]), let rule = end["rule"] else { return }
-        await model.setRepeat(item, rule)
+        guard let end: [String: JSONValue] = try? await model.rule("repeatPage.end", [own, held]), let rule = end["rule"] else { return }
+        await write(rule)
     }
 
     static let weekdays = ["M", "T", "W", "T", "F", "S", "S"]

@@ -11,6 +11,12 @@ enum Palette {
     static let strongDark = Color(hex: "#E5E5EA")
     static let strongLight = Color(hex: "#3A3A3C")
 
+    /// The timeline's lines and marks (`--tc-hour-line`, `--tc-minor-line`, `--tc-minor-label`, `--tc-now`).
+    static func hourLine(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#232325" : "#EFEFF4") }
+    static func minorLine(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#161618" : "#F6F6F9") }
+    static func minorLabel(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#636366" : "#AEAEB2") }
+    static func now(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#D92C24" : "#FF3B30") }
+
     static func accent(_ scheme: ColorScheme) -> Color { scheme == .dark ? accentDark : accentLight }
     static func branch(_ scheme: ColorScheme) -> Color { scheme == .dark ? branchDark : branchLight }
     static func strong(_ scheme: ColorScheme) -> Color { scheme == .dark ? strongDark : strongLight }
@@ -30,7 +36,8 @@ enum CardMetrics {
     static let indent: CGFloat = 20
     static let branchWidth: CGFloat = 1.5
     static let columnInset: CGFloat = 10
-    static let hour: CGFloat = 50
+    /// The hour's height the screen is read at; the timeline stacks its cards anew at the zoom it shows.
+    static let hour: CGFloat = 56
     /// The timeline's measures the core lays out the stack of task cards in, as the plugin's design has them.
     static let timeline = TimelineMeasures(hour: hour, cardHeight: height, cardGap: gap, itemInset: 1, itemGap: 2, overlayInset: 18)
 }

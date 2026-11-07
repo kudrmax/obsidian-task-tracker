@@ -128,3 +128,21 @@ export function eventColors(hex: string, bgAlpha = EVENT_BG_ALPHA, theme: Theme 
 		text: toHex(rgb.map((v) => v + (WHITE - v) * TEXT_MIX)),
 	};
 }
+
+/**
+ * How far a past event moves from the ground towards the text, per theme: its ground a hair, its bar and title well
+ * short of the text. The same shares as styles.css's `--tc-event-past-lift`/`-ink` tokens (and their `-light` twins):
+ * change them together.
+ */
+const PAST_SHARES: Readonly<Record<Theme, { readonly lift: number; readonly ink: number }>> = {
+	dark: { lift: 0.015, ink: 0.125 },
+	light: { lift: 0.012, ink: 0.1 },
+};
+
+/** A past event's paint over the screen's ground and text (`#RRGGBB`), as `color-mix(in srgb, ground, text share)` mixes them. */
+export function pastEventPaint(ground: string, text: string, theme: Theme): EventColors {
+	const [from, to] = [channels(ground), channels(text)];
+	const towards = (share: number) => toHex(from.map((v, i) => v + (to[i] - v) * share));
+	const { lift, ink } = PAST_SHARES[theme];
+	return { bg: towards(lift), bar: towards(ink), text: towards(ink) };
+}

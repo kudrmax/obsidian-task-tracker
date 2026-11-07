@@ -1,4 +1,4 @@
-import { type CalendarEvent, type DayBoundary, type ResizeEdge, samePlace, sameSlot, sameTaskTree, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { type CalendarEvent, type DayBoundary, labelHidesNearNow, type ResizeEdge, samePlace, sameSlot, sameTaskTree, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
@@ -8,7 +8,7 @@ import { Grips } from "./kit/Grips";
 import { markColours, renderMeta, renderProjectMark, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
-import { gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackCorner, stackTasks, type TaskSpan } from "./timelineLayout";
+import { gridAt, type Grid, gridMarks, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackCorner, stackTasks, type TaskSpan } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -36,13 +36,13 @@ export interface TimelineDeps {
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
 }
 
-interface GridMark {
+interface DrawnMark {
 	readonly minutes: number;
 	readonly label: HTMLElement | null;
 	readonly line: HTMLElement;
 }
 
-type HourMark = GridMark & { readonly label: HTMLElement };
+type HourMark = DrawnMark & { readonly label: HTMLElement };
 
 interface PlacedEvent extends PlacedSpan {
 	readonly el: HTMLElement;
@@ -113,7 +113,7 @@ export class Timeline {
 	readonly itemsEl: HTMLElement;
 	private readonly hours: HourMark[] = [];
 	private readonly minorEl: HTMLElement;
-	private minor: GridMark[] = [];
+	private minor: DrawnMark[] = [];
 	private grid: Grid = { labels: MINUTES_PER_HOUR, lines: MINUTES_PER_HOUR };
 	private events: PlacedEvent[] = [];
 	private tasks: PlacedTask[] = [];
@@ -343,7 +343,7 @@ export class Timeline {
 			line.style.setProperty(PROPERTY.y, px(y));
 			label?.style.setProperty(PROPERTY.y, px(y));
 			const lift = label?.classList.contains("is-minor") ? DESIGN.minorLift : DESIGN.labelLift;
-			label?.classList.toggle("is-hidden", today && Math.abs(y - nowY) < lift + DESIGN.nowPillHeight / 2);
+			label?.classList.toggle("is-hidden", labelHidesNearNow(y, today ? nowY : null, lift, DESIGN.nowPillHeight));
 		}
 		for (const { el, event, start, end } of this.events) {
 			markPast(el, this.deps.isPast(event));
@@ -593,12 +593,10 @@ export class Timeline {
 		this.grid = grid;
 		clear(this.minorEl);
 		this.minor = [];
-		for (let minutes = grid.lines; minutes < DESIGN.dayHours * MINUTES_PER_HOUR; minutes += grid.lines) {
-			const minute = minutes % MINUTES_PER_HOUR;
-			if (minute === 0) continue;
+		for (const mark of gridMarks(grid, DESIGN.dayHours)) {
 			const line = el(this.minorEl, "div", "tc-hour-line is-minor");
-			const label = minute % grid.labels === 0 ? el(this.minorEl, "div", "tc-hour-label is-minor", `:${String(minute).padStart(2, "0")}`) : null;
-			this.minor.push({ minutes, label, line });
+			const label = mark.label === null ? null : el(this.minorEl, "div", "tc-hour-label is-minor", mark.label);
+			this.minor.push({ minutes: mark.minute, label, line });
 		}
 	}
 

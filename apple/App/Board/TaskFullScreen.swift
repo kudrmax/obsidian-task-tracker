@@ -8,6 +8,7 @@ struct TaskFullScreen: View {
     let item: TaskItem
     @Bindable var model: BoardModel
     @State private var current: TaskItem?
+    @Environment(\.colorScheme) private var scheme
     @State private var tree: FullTree?
     @State private var listName = ""
     @State private var text = ""
@@ -15,8 +16,8 @@ struct TaskFullScreen: View {
     @State private var saving: Task<Void, Never>?
     @State private var question: MenuQuestion?
     @FocusState private var typing: Bool
-    /// The text is being put in the editor from the file, not typed.
-    @State private var placing = false
+    /// The text last put in the editor from the file: a change to anything else is typing.
+    @State private var placed = ""
 
     private var task: TaskItem { current ?? item }
 
@@ -25,12 +26,22 @@ struct TaskFullScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(listName).font(.subheadline).foregroundStyle(.secondary)
-                    Text(task.text).font(.title2.bold()).strikethrough(task.closed)
+                    if renamesTitle {
+                        EntryCapsule(host: model.entry, style: .title)
+                    } else {
+                        Text(task.text).font(.title2.bold()).strikethrough(task.closed)
+                    }
                 }
-                if let tree, !tree.rows.isEmpty {
+                let rows = stackRows
+                if !rows.isEmpty {
                     VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(Array(tree.rows.enumerated()), id: \.element.item.id) { index, row in
-                            subtask(row, branch: Self.branch(index, tree.rows))
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                            let branch = row.level > 0 ? model.branch(levels: rows.map(\.level), index: index) : nil
+                            switch row {
+                            case .row(let full): subtask(full, branch: branch)
+                            case .pending(_, let text, let level): typed(level: level, branch: branch) { PendingCapsule(text: text) }
+                            case .field(let level): typed(level: level, branch: branch) { EntryCapsule(host: model.entry) }
+                            }
                         }
                     }
                 }
@@ -40,30 +51,43 @@ struct TaskFullScreen: View {
                     .scrollDisabled(true)
                     .frame(minHeight: 200)
                     .scrollContentBackground(.hidden)
-                    .onChange(of: text) { if !placing { typed() } }
+                    .onChange(of: text) { if text != placed { typed() } }
             }
             .padding(.horizontal, Layout.margin)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Add Subtask", systemImage: "plus") { model.subtaskOf = task }
-                    .tint(.primary)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if let menu = menuModel {
-                    Menu("More", systemImage: "ellipsis") {
-                        MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model) { question = $0 }.nodes)
+            if model.entry.isOpen {
+                // While a task is typed the page's buttons give way to the check that ends typing, as on the main screen.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done", systemImage: "checkmark") { model.entry.blur() }
+                        .buttonStyle(.glassProminent)
+                        .tint(Palette.accent(scheme))
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Subtask", systemImage: "plus") { model.entry.addSubtaskInStack(task) }
+                        .tint(.primary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if let menu = menuModel {
+                        Menu("More", systemImage: "ellipsis") {
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true).nodes)
+                        }
+                        .tint(.primary)
                     }
-                    .tint(.primary)
                 }
             }
         }
+        .animation(.snappy, value: model.entry.isOpen)
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
         .task { await open() }
+        .onAppear { follow() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
         .onDisappear {
+            // Back is a tap elsewhere: what was typed in the stack is written.
+            if model.entry.state?.spotKind == "stack" { model.entry.blur() }
             saving?.cancel()
             Task { await save() }
         }
@@ -71,30 +95,95 @@ struct TaskFullScreen: View {
 
     @State private var menuModel: TaskMenuModel?
 
+    /// The quick entry's field in this page's stack: the subtasks read again before a written one is shown, and the
+    /// task as a rename left it.
+    private func follow() {
+        let shown = task
+        model.entry.stackRead = { await refresh() }
+        model.entry.renamed = { item in
+            if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
+        }
+    }
+
+    /// The field stands in this page's stack: the key of the task it types under or renames.
+    private var stackParent: String? {
+        guard let state = model.entry.state, state.spotKind == "stack", let key = try? state.spot["parent"].decode(TaskKey.self) else { return nil }
+        return Self.id(key)
+    }
+
+    private static func id(_ key: TaskKey) -> String {
+        "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)"
+    }
+
+    private var renamesTitle: Bool {
+        stackParent == task.id && model.entry.state?.renaming?.id == task.id
+    }
+
+    /// The subtasks as drawn: a renamed one gives its place to the field; a new one is typed after the last subtask of
+    /// the task it goes under, the texts typed before it waiting there.
+    private var stackRows: [StackRow] {
+        var rows = (tree?.rows ?? []).map(StackRow.row)
+        guard let parent = stackParent, let state = model.entry.state else { return rows }
+        if let renaming = state.renaming {
+            if let at = rows.firstIndex(where: { $0.itemID == renaming.id }) { rows[at] = .field(level: rows[at].level) }
+            return rows
+        }
+        var level = 0
+        var end = rows.count
+        if parent != task.id {
+            guard let at = rows.firstIndex(where: { $0.itemID == parent }) else { return rows }
+            level = rows[at].level + 1
+            end = rows[(at + 1)...].firstIndex { $0.level < level } ?? rows.count
+        }
+        let typed = state.pending.enumerated().map { StackRow.pending(index: $0.offset, text: $0.element.text, level: level) } + [.field(level: level)]
+        rows.insert(contentsOf: typed, at: end)
+        return rows
+    }
+
+    private enum StackRow: Identifiable {
+        case row(FullRow)
+        case pending(index: Int, text: String, level: Int)
+        case field(level: Int)
+
+        var id: String {
+            switch self {
+            case .row(let row): row.item.id
+            case .pending(let index, _, _): "\u{0}pending/\(index)"
+            case .field: "\u{0}entry"
+            }
+        }
+
+        var itemID: String? { if case .row(let row) = self { row.item.id } else { nil } }
+
+        var level: Int {
+            switch self {
+            case .row(let row): row.level
+            case .pending(_, _, let level), .field(let level): level
+            }
+        }
+    }
+
+    private func typed(level: Int, branch: Branch?, @ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch) } }
+            .padding(.leading, CGFloat(level) * CardMetrics.indent)
+    }
+
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
 
-    /// A subtask as the same capsule as on the main screen, at its depth; a tap opens its own menu.
+    /// A subtask as the same capsule as on the main screen, at its depth; a long press shows its own menu.
     private func subtask(_ row: FullRow, branch: Branch?) -> some View {
         let card = BoardCard(item: row.item, level: row.level, branch: row.level > 0 ? branch : nil, due: nil, repeats: row.item.repeats, shades: nil)
-        return CardButton(card: card, menu: { menu(for: row.item) })
+        return CardButton(card: card, menu: { later in menu(for: row.item, later: later) }, draggable: false)
             .frame(height: CardMetrics.height)
             .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
             .padding(.leading, CGFloat(row.level) * CardMetrics.indent)
     }
 
-    private func menu(for item: TaskItem) -> UIMenu? {
+    private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes) { model.ink($0, dark: dark) }
-    }
-
-    private static func branch(_ index: Int, _ rows: [FullRow]) -> Branch {
-        let level = rows[index].level
-        for row in rows[(index + 1)...] {
-            if row.level == level { return .mid }
-            if row.level < level { return .last }
-        }
-        return .last
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private func open() async {
@@ -121,9 +210,8 @@ struct TaskFullScreen: View {
     }
 
     private func place(_ new: String) {
-        placing = true
+        placed = new
         text = new
-        Task { @MainActor in placing = false }
     }
 
     private func typed() {

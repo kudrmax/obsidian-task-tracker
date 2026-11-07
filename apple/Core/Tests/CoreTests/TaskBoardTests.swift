@@ -94,7 +94,7 @@ import Testing
         #expect(day.showsHeaders)
         #expect(day.groups.map(\.header) == ["No section", "Errands"])
         #expect(day.groups[0].cards.map(\.level) == [0, 1])
-        #expect(day.groups[0].cards[1].branch == .last)
+        #expect(day.groups[0].cards[1].branch == Branch(last: true, through: []))
         #expect(snapshot.lists[.inbox]?.title == "Inbox")
         let run = try #require(snapshot.timeline.slots.first)
         #expect(run.card.item.title == "Morning run")
@@ -105,5 +105,100 @@ import Testing
         #expect(snapshot.timeline.now != nil)
         #expect(snapshot.timeline.hours.count == 25)
         #expect(snapshot.column(of: run.id) == "timeline")
+    }
+}
+
+/// The timeline's zoom, its grid and its paints, as the core answers them.
+@Suite struct TimelineZoomTests {
+    let board = TaskBoard(core: try! PhoneCore(script: Fixtures.phoneScript), vault: FakeVault(TaskBoardTests.file))
+    let measures = GridMeasures(divisions: [5, 15, 30], labelGap: 40, tickMinutes: 5, tickGap: 16)
+
+    @Test func theGridGetsFinerAsTheHourGrows() throws {
+        #expect(try board.gridMarks(board.grid(hour: 28, measures: measures)).isEmpty)
+        let half = try board.gridMarks(board.grid(hour: 112, measures: measures))
+        #expect(half.contains(GridMark(minute: 30, label: ":30")))
+        let fine = try board.gridMarks(board.grid(hour: 224, measures: measures))
+        #expect(fine.contains(GridMark(minute: 15, label: ":15")))
+        #expect(fine.contains { $0.minute == 5 })
+    }
+
+    @Test func aListDropIsTheCoresPlace() throws {
+        let cards = [PlacedCard(level: 0, group: nil, top: 0, height: 35), PlacedCard(level: 0, group: nil, top: 37, height: 35)]
+        let place = try board.placeAt(cards, y: 50, level: 0, shift: 0, room: .null, heads: [], held: .null, hysteresis: 6)
+        #expect(place["index"].number == 1)
+        #expect(try board.levelAt(x: 150, left: 0, width: 200, indent: 20) == 2.5)
+        #expect(try board.carriedMiddle(y: 100, grab: 10, cardHeight: 35) == 107.5)
+        #expect(try board.branchOf(levels: [0, 1, 1], index: 1) == Branch(last: false, through: []))
+        #expect(try board.gapBranch(levels: [0, 1], gap: ["kind": "gap", "index": 2, "level": 1, "group": .null]) == Branch(last: true, through: []))
+        #expect(try board.labelHides(y: 100, now: 103, lift: 7, pill: 16))
+        #expect(try !board.labelHides(y: 100, now: nil, lift: 7, pill: 16))
+    }
+
+    @Test func aPinchMovesFromTheWholeDayToTheLargestLevel() throws {
+        let levels = [28.0, 56, 112, 224]
+        #expect(try board.zoomRange(wholeDay: 30, levels: levels) == [30, 56, 112, 224])
+        #expect(try board.zoomAfterPinch(hour: 30, wholeDay: 30, levels: levels) == nil)
+        #expect(try board.zoomAfterPinch(hour: 80, wholeDay: 30, levels: levels) == 80)
+        #expect(try board.zoomShown(saved: "wholeDay", wholeDay: 30, levels: levels) == 30)
+        #expect(try board.zoomShown(saved: .null, wholeDay: 30, levels: levels) == 56)
+    }
+
+    @Test func theSnapshotCarriesThePastPaintAndTheLevels() throws {
+        let snapshot = try board.snapshot(day: nil, measures: TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
+        #expect(snapshot.timeline.zoomLevels == [28, 56, 112, 224])
+        #expect(snapshot.timeline.pastPaint.dark.bg.hasPrefix("#"))
+        #expect(snapshot.timeline.pastPaint.dark.bar == snapshot.timeline.pastPaint.dark.text)
+        let restacked = try board.stack(snapshot.timeline, measures: TimelineMeasures(hour: 224, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18))
+        #expect(restacked.map(\.id) == snapshot.timeline.slots.map(\.id))
+        #expect(restacked[0].box.height > snapshot.timeline.slots[0].box.height)
+    }
+}
+
+extension TaskBoardTests {
+    /// The quick entry as the app drives it: the session and the screen's look handed in, Enter queueing a job, the job
+    /// written through `tasks.<method>`, shown, and done, the next field open the whole time.
+    @Test func aTaskTypedInPlaceIsWrittenByItsJob() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let files = try board.files(now: Fixtures.date(6, 10))
+        let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: files)
+        func look(_ inbox: [TaskItem]) -> JSONValue {
+            let cards = JSONValue.array(inbox.map { ["key": $0.key.json, "level": 0, "group": .null] })
+            return ["cards": ["inbox": cards], "sections": ["inbox": [.null]], "sectioned": ["inbox": true], "day": "2026-11-06", "shown": ["inbox"]]
+        }
+        var session = JSONValue.null
+        func call(_ method: String, _ arguments: [JSONValue], _ inbox: [TaskItem]) throws -> JSONValue {
+            let reply = try board.entry(method, [session, look(inbox)] + arguments)
+            session = reply["session"]
+            return reply
+        }
+        _ = try call("openIn", ["inbox", .null], screen.inbox)
+        _ = try call("type", ["Fresh"], screen.inbox)
+        let entered = try call("enter", [], screen.inbox)
+        #expect(entered["state"]["text"].string == "")
+        #expect(isList(entered["state"]["pending"], of: ["Fresh"]))
+        guard case .array(let jobs) = session["jobs"], let id = jobs.first?["id"].string else { Issue.record("no job queued"); return }
+        let job = try call("call", [.string(id)], screen.inbox)["value"]
+        #expect(job["method"].string == "createInPlace")
+        guard case .array(let args) = job["args"] else { Issue.record("no arguments"); return }
+        let key = try board.write("tasks.createInPlace", args)
+        #expect(vault.text.contains("- [ ] Fresh"))
+        let after: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files(now: Fixtures.date(6, 10)))
+        let coming = JSONValue.object(["inbox": .array(after.inbox.map { ["key": $0.key.json, "level": 0, "group": .null] })])
+        let shown = try call("shown", [.string(id), key, coming], after.inbox)
+        #expect(isList(shown["state"]["pending"], of: []))
+        let done = try call("done", [.string(id)], after.inbox)
+        #expect(done["state"]["text"].string == "")
+        #expect(isList(done["session"]["jobs"], count: 0))
+    }
+
+    private func isList(_ value: JSONValue, of texts: [String]) -> Bool {
+        guard case .array(let items) = value else { return false }
+        return items.map { $0["text"].string ?? "" } == texts
+    }
+
+    private func isList(_ value: JSONValue, count: Int) -> Bool {
+        guard case .array(let items) = value else { return false }
+        return items.count == count
     }
 }

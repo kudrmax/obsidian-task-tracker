@@ -2606,6 +2606,77 @@ ${key.title}`.toLowerCase();
       text: toHex(rgb.map((v) => v + (WHITE - v) * TEXT_MIX))
     };
   }
+  var PAST_SHARES = {
+    dark: { lift: 0.015, ink: 0.125 },
+    light: { lift: 0.012, ink: 0.1 }
+  };
+  function pastEventPaint(ground, text, theme) {
+    const [from, to] = [channels(ground), channels(text)];
+    const towards = (share) => toHex(from.map((v, i) => v + (to[i] - v) * share));
+    const { lift, ink } = PAST_SHARES[theme];
+    return { bg: towards(lift), bar: towards(ink), text: towards(ink) };
+  }
+
+  // core/application/timelineZoom.ts
+  var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
+  var DEFAULT_ZOOM_HOUR = 56;
+  function parseZoomLevels(text) {
+    const levels = [];
+    for (const part of text.split(",")) {
+      const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part);
+      if (!m) return null;
+      const hourPx = Number(m[1]);
+      if (hourPx <= 0) return null;
+      levels.push({ hourPx });
+    }
+    return levels.length > 0 ? levels : null;
+  }
+  function formatZoomLevels(levels) {
+    return levels.map((l) => String(l.hourPx)).join(", ");
+  }
+  function levelsFor(wholeDayPx, levels) {
+    const closer = [...levels].sort((a, b) => a.hourPx - b.hourPx).slice(1).filter((level) => level.hourPx > wholeDayPx);
+    return [{ hourPx: wholeDayPx }, ...closer];
+  }
+  var MINUTES_PER_HOUR2 = 60;
+  function gridAt(hourPx, measures) {
+    const px = (minutes) => minutes / MINUTES_PER_HOUR2 * hourPx;
+    const labels = measures.divisions.find((minutes) => px(minutes) >= measures.labelGap) ?? MINUTES_PER_HOUR2;
+    const ticks = px(measures.tickMinutes) >= measures.tickGap;
+    return { labels, lines: ticks ? measures.tickMinutes : labels };
+  }
+  function gridMarks(grid, dayHours) {
+    const marks = [];
+    for (let minutes = grid.lines; minutes < dayHours * MINUTES_PER_HOUR2; minutes += grid.lines) {
+      const minute = minutes % MINUTES_PER_HOUR2;
+      if (minute === 0) continue;
+      marks.push({ minute: minutes, label: minute % grid.labels === 0 ? `:${String(minute).padStart(2, "0")}` : null });
+    }
+    return marks;
+  }
+  function zoomLevelsOf(saved) {
+    const kept = saved !== null && typeof saved === "object" ? saved.zoomLevels : void 0;
+    if (!Array.isArray(kept) || kept.length === 0) return [...DEFAULT_ZOOM_LEVELS];
+    const levels = kept.map((level) => level !== null && typeof level === "object" ? level.hourPx : void 0);
+    if (!levels.every((hourPx) => typeof hourPx === "number" && Number.isFinite(hourPx) && hourPx > 0)) return [...DEFAULT_ZOOM_LEVELS];
+    return levels.map((hourPx) => ({ hourPx }));
+  }
+  function wholeDayOr(wholeDayPx, levels) {
+    return wholeDayPx ?? Math.min(...levels.map((level) => level.hourPx));
+  }
+  function zoomAfterPinch(hourPx, wholeDayPx, levels) {
+    return hourPx <= levelsFor(wholeDayOr(wholeDayPx, levels), levels)[0].hourPx ? "wholeDay" : hourPx;
+  }
+  function zoomShown(saved, wholeDayPx, levels) {
+    const ends = levelsFor(wholeDayOr(wholeDayPx, levels), levels);
+    const [min, max] = [ends[0].hourPx, ends[ends.length - 1].hourPx];
+    if (saved === "wholeDay") return min;
+    const hourPx = typeof saved === "number" && Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_ZOOM_HOUR;
+    return Math.min(max, Math.max(min, hourPx));
+  }
+  function labelHidesNearNow(y, nowY, lift, pillHeight) {
+    return nowY !== null && Math.abs(y - nowY) < lift + pillHeight / 2;
+  }
 
   // core/application/taskKeys.ts
   function samePlace2(a, b) {
@@ -3318,6 +3389,52 @@ ${key.title}`.toLowerCase();
   }
   function groupKeyOf(item) {
     return item.project ? projectKey(item.project.name) : "";
+  }
+
+  // core/application/listDrop.ts
+  function levelAt(x, list, indent) {
+    return indent > 0 ? (x - (list.left + list.width / 2)) / indent : 0;
+  }
+  function carriedMiddle(y, grabPx, cardHeight) {
+    return y - grabPx + cardHeight / 2;
+  }
+  function gapUnder(header) {
+    return { kind: "gap", index: 0, level: 0, ...header !== null && typeof header === "object" ? header : { group: header } };
+  }
+  function headerOfPlace(place) {
+    return place.project === void 0 ? place.group : { group: place.group, project: place.project };
+  }
+  function orderOf(heads, group) {
+    return heads.findIndex((h) => sameGap(gapUnder(h.group), gapUnder(group)));
+  }
+  function opensList(head, i) {
+    return i === 0 && head.opens === true;
+  }
+  function placeAt(cards, y, level, shift, room, heads = [], held = null, hysteresis = 0) {
+    const at = (finger) => rawPlaceAt(cards, finger, level, shift, room, heads);
+    const place = at(y);
+    if (!held || hysteresis <= 0 || sameGap(place, held)) return place;
+    if (!sameGap(at(y - hysteresis), held) && !sameGap(at(y + hysteresis), held)) return place;
+    return fitLevel(cards, { ...held, level: Math.round(level) });
+  }
+  function rawPlaceAt(cards, y, level, shift, gap, heads) {
+    const top = (i) => cards[i].top + (gap && i >= gap.index ? shift : 0);
+    const headAfterGap = (h) => gap !== null && (h.firstCard > gap.index || h.firstCard === gap.index && orderOf(heads, h.group) > orderOf(heads, headerOfPlace(gap)));
+    const headEdge = (h, i) => h.top + (headAfterGap(h) ? shift : 0) + (i === 0 && h.group !== null ? h.height : h.height / 2);
+    const index = cards.filter((c, i) => y > top(i) + c.height / 2).length;
+    const passed = heads.filter((head, i) => head.firstCard === index && (opensList(head, i) || y > headEdge(head, i))).map((head) => head.group);
+    return gapAt(cards, index, level, passed, heads.length > 0);
+  }
+  function branchOf(levels, index) {
+    const level = levels[index];
+    if (level <= 0) return null;
+    const goesOn = (l) => levels.slice(index + 1).find((next) => next <= l) === l;
+    return { last: !goesOn(level), through: Array.from({ length: level - 1 }, (_, k) => goesOn(k + 1)) };
+  }
+  function gapBranch(cards, gap) {
+    const levels = cards.map((card) => card.level);
+    levels.splice(gap.index, 0, gap.level);
+    return branchOf(levels, gap.index);
   }
 
   // core/application/drops.ts
@@ -5349,10 +5466,10 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/snapGrid.ts
-  var MINUTES_PER_HOUR2 = 60;
+  var MINUTES_PER_HOUR3 = 60;
   var SNAP_STEPS = [5, 15, 30, 60];
   function snapStep(hourPx, tolerance) {
-    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR2 * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
+    return SNAP_STEPS.find((minutes) => minutes / MINUTES_PER_HOUR3 * hourPx >= tolerance) ?? SNAP_STEPS[SNAP_STEPS.length - 1];
   }
   function snapMinute(minute, hourPx, tolerance) {
     const step = snapStep(hourPx, tolerance);
@@ -5786,9 +5903,26 @@ ${key.title}`.toLowerCase();
     eventLeft,
     stackCorner,
     timeParts,
-    durationParts
+    durationParts,
+    pastEventPaint,
+    parseZoomLevels,
+    formatZoomLevels,
+    levelsFor,
+    gridAt,
+    gridMarks,
+    zoomAfterPinch: (hourPx, wholeDayPx, levels) => zoomAfterPinch(hourPx, wholeDayPx ?? null, levels),
+    zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels),
+    labelHidesNearNow: (y, nowY, lift, pillHeight) => labelHidesNearNow(y, nowY ?? null, lift, pillHeight),
+    levelAt,
+    carriedMiddle,
+    placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
+    branchOf,
+    gapBranch
   };
-  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
+  var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
+  var TIMELINE = {
+    zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
+  };
   function lookOf(c, look) {
     return {
       cards: (column) => look.cards[column] ?? [],
@@ -5872,6 +6006,7 @@ ${key.title}`.toLowerCase();
     description: DESCRIPTION,
     reminders: REMINDERS,
     capture: CAPTURE,
+    timeline: TIMELINE,
     rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c, args) => fn(...args)])), constants: () => CONSTANTS }
   };
   function doorMethods() {

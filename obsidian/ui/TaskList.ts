@@ -1,4 +1,4 @@
-import { type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
@@ -226,9 +226,8 @@ export class TaskList {
 			this.deps.onEmpty(plate);
 		}
 		rows.forEach((row, i) => {
-			if (row.level === 0) return;
-			const { through, last } = linesOf(rows.map((r) => r.level), i);
-			branch(row.node, through, last);
+			const lines = branchOf(rows.map((r) => r.level), i);
+			if (lines) branch(row.node, lines.through, lines.last);
 		});
 		const pending = this.deps.pending?.() ?? null;
 		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
@@ -386,16 +385,6 @@ export class TaskList {
 		this.deps.onPlate?.(plate, group, project);
 		return plate;
 	}
-}
-
-/**
- * The branch lines of the row at `i` among rows of these `levels`: whether it is the last of its task's subtasks, and for each
- * task above its own whether that one has a later sibling, so its line goes on past the row.
- */
-function linesOf(levels: readonly number[], i: number): { through: boolean[]; last: boolean } {
-	const goesOn = (level: number): boolean => levels.slice(i + 1).find((l) => l <= level) === level;
-	const through = Array.from({ length: levels[i] - 1 }, (_, k) => goesOn(k + 1));
-	return { through, last: !goesOn(levels[i]) };
 }
 
 /** A subtask's branch from its task, bending in if it is the last; and the lines of the tasks further up that go on past it. */

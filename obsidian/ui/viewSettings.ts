@@ -12,13 +12,9 @@ export type RightMode = "calendar" | "soon" | "inbox";
  */
 
 /** A height of the hour the timeline settles on after a pinch; the step a drag snaps to follows from the height itself. */
-export interface ZoomLevel {
-	/** Height of one hour on the timeline, CSS px. */
-	readonly hourPx: number;
-}
-
-/** Where the timeline was zoomed to: an hour's height, or the whole day, whatever the screen's height. */
-export type Zoom = number | "wholeDay";
+export type { Zoom, ZoomLevel } from "../../core/application/contracts";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, parseZoomLevels, type Zoom, type ZoomLevel } from "../../core/application/contracts";
+export { formatZoomLevels, parseZoomLevels } from "../../core/application/contracts";
 
 /** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
 export type LabelPaint = "stripes" | "blend";
@@ -43,8 +39,8 @@ export interface ViewSettings {
 export const VIEW_DEFAULTS: ViewSettings = {
 	listShare: 0.5,
 	rightMode: "calendar",
-	zoom: 56,
-	zoomLevels: [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }],
+	zoom: DEFAULT_ZOOM_HOUR,
+	zoomLevels: DEFAULT_ZOOM_LEVELS,
 	cardHeight: 35,
 	cardGap: 2,
 	labelPaint: "stripes",
@@ -71,22 +67,6 @@ export function viewSettingsFrom(saved: unknown): ViewSettings {
 }
 
 /** `28, 56, 112` — the hour's heights in pixels, as the settings tab shows them. */
-export function formatZoomLevels(levels: readonly ZoomLevel[]): string {
-	return levels.map((l) => String(l.hourPx)).join(", ");
-}
-
-/** Reads the heights; the old text with a step after each one (`56:30`) still reads, the step dropped. */
-export function parseZoomLevels(text: string): ZoomLevel[] | null {
-	const levels: ZoomLevel[] = [];
-	for (const part of text.split(",")) {
-		const m = /^\s*(\d+)\s*(?::\s*\d+\s*)?$/.exec(part);
-		if (!m) return null;
-		const hourPx = Number(m[1]);
-		if (hourPx <= 0) return null;
-		levels.push({ hourPx });
-	}
-	return levels.length > 0 ? levels : null;
-}
 
 /** Where the view's settings are kept: the plugin's settings file. */
 export interface ViewSettingsFile {
