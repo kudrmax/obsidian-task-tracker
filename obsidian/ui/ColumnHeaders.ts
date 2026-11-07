@@ -37,6 +37,11 @@ export class ColumnHeaders {
 		this.render();
 	}
 
+	/** The title over a column: the day's name over Now, Inbox's and Soon's names. */
+	titleOf(column: "day" | "inbox" | "soon"): HTMLElement {
+		return column === "day" ? this.title.el : column === "inbox" ? this.inboxEl : this.soonEl;
+	}
+
 	render(): void {
 		this.doneEl.textContent = this.opts.doneName();
 		this.inboxEl.textContent = this.opts.inboxName();

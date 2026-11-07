@@ -43,7 +43,7 @@ import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, Timel
 import type { Clock, SettingsStore } from "./ports";
 import { inProject, projectName } from "../domain/Project";
 import { groupSectionNames, listGrouping, ProjectIndex, viewGrouping } from "./projects";
-import type { GroupingState, ListGrouping, ProjectNote, ProjectRef } from "./contracts";
+import type { DropTo, GroupingState, ListGrouping, ProjectNote, ProjectRef } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -187,6 +187,19 @@ export class TaskReads {
 			calendars: true,
 			projects,
 			project: scope.project === null ? null : scope.index.refOf(scope.project, false),
+			titleDrops: this.titleDrops(date, projects),
+		};
+	}
+
+	/** What a drop on each column's title means: into its list, by project where the list groups by it; a day without sections, its end. */
+	private titleDrops(date: LocalDate, projects: Readonly<Record<GroupedList, ListGrouping>>): Readonly<Record<DropColumn, DropTo>> {
+		const title = (list: GroupedList, day: LocalDate | null, grouping: ListGrouping): DropTo => ({ kind: "title", list, date: day, byProject: grouping.on });
+		const day = this.columnSections("day", date);
+		return {
+			day: day ? title(day.list, day.date, projects.now) : { kind: "list", column: "day", before: null },
+			soon: title("soon", null, projects.soon),
+			inbox: title("inbox", null, projects.inbox),
+			backlog: title("backlog", null, projects.backlog),
 		};
 	}
 
@@ -223,6 +236,7 @@ export class TaskReads {
 			calendars: false,
 			projects: off,
 			project: project === undefined ? null : this.index().refOf(project, false),
+			titleDrops: this.titleDrops(date, off),
 		};
 	}
 

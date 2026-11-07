@@ -157,4 +157,12 @@ describe("the iPhone app's actions on a project's task", () => {
 		expect(lineOf(completed, "Call")).toContain(FIELD);
 		expect(lineOf(written("capture.add", ["inbox", "Captured"]), "Captured")).not.toContain("🗂️");
 	});
+
+	it("a drop on a column's title through the door: the screen's target handed back, the project kept", () => {
+		const view = screen(FILE);
+		expect(view.titleDrops.backlog).toEqual({ kind: "title", list: "backlog", date: null, byProject: true });
+		const moved = written("tasks.drop", [[{ key: keyOf("Later"), from: "soon" }], view.titleDrops.backlog, T]);
+		const backlog = moved.slice(moved.indexOf("## Backlog"), moved.indexOf("### Дальний"));
+		expect(backlog.trim().split("\n").filter(Boolean)).toEqual(["## Backlog", `- [ ] Someday ${FIELD}`, `- [ ] Later ${FIELD}`]);
+	});
 });

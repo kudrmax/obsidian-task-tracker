@@ -25,7 +25,7 @@ const event = (title: string): CalendarEvent => ({
 const noFile = async (date: LocalDate): Promise<ScreenView> => {
 	const none = { inbox: [], backlog: [], soon: [], now: [] };
 	const off = { canGroup: false, on: false, groups: [] };
-	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null };
+	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null, titleDrops: { day: { kind: "list", column: "day", before: null }, soon: { kind: "title", list: "soon", date: null, byProject: false }, inbox: { kind: "title", list: "inbox", date: null, byProject: false }, backlog: { kind: "title", list: "backlog", date: null, byProject: false } } };
 };
 
 class SlowCalendars implements CalendarService {
@@ -157,6 +157,16 @@ describe("DayData", () => {
 		expect(calendars.around).toEqual([TODAY, TOMORROW]);
 		expect(calendars.asked).toEqual([]);
 		expect(titles(data)).toEqual([`on ${TOMORROW}`]);
+	});
+
+	it("reads what a drop on each column's title means with the lists; nothing before", async () => {
+		const tasks: TaskService = new DemoTaskService({ now: () => new Date(2026, 9, 30, 14) });
+		const { data } = setup(tasks);
+		expect(data.titleDrop("backlog")).toBeNull();
+		await data.tasks();
+		const { titleDrops } = await tasks.screen(TODAY);
+		expect(data.titleDrop("backlog")).toEqual(titleDrops.backlog);
+		expect(data.titleDrop("day")).toEqual(titleDrops.day);
 	});
 
 	it("reads Backlog with the other lists", async () => {
