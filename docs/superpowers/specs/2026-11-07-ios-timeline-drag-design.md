@@ -335,8 +335,8 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   as Notes names a folder.
 - frontend-swift: the tasks file is watched by an `NSFilePresenter` (`Vault.watchTasksFile`) while the scene is active,
   and read again when the scene comes back; no polling. The app's own reads and writes are coordinated as that presenter
-  (else every read after a write waited ~0.5 s for the system to message it), and the app's own write tells the watch
-  itself, so a reminder's button in the app's process still redraws the screen.
+  (else every read after a write waited ~0.5 s for the system to message it). ~~the app's own write tells the watch
+  itself~~ (superseded by R1 below: only writes made for someone else than the screen tell it).
 - frontend-swift: a read finding exactly the text this app last wrote skips the settle wait. Drop to the card in its
   new place, measured on the simulator: 48–69 ms (write 16–27 ms, the screen's read ~35–50 ms), the drop preview's flight
   covering it.
@@ -375,8 +375,8 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   as the drag begins) and `placeAt` (rest frames, headers, the open room's shift, hysteresis 6); branches are
   `branchOf` / `gapBranch`, drawn with the `through` lines of tasks further up. A carry knows its card, task and column
   from where the card is drawn. The drop places hold the model weakly; the file watch follows the settings' tasks file.
-- frontend-swift (round 2): the ribbon pages by view alignment with no limit per swipe: it settles on the place the
-  swipe's speed reaches, so one fast swipe goes from Today to Inbox.
+- frontend-swift (round 2): ~~the ribbon pages by view alignment with no limit per swipe~~ (superseded by M6: one place
+  per swipe).
 - frontend-swift (quick entry): the app drives the core's `entry.*` as `QuickEntryController` does; the calls run on the
   pure rules' context over the settings as last read (`TaskBoard.entry`), so a keystroke never waits for a read. The jobs
   run one at a time: `entry.call` → `tasks.<method>` → the file read again → `entry.shown`/`unshown` drawn in the same
@@ -424,3 +424,46 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - backend (R6b): `SCREEN_PLACES`, `SHOWN_LISTS` and `placeShowing(column, place)` live in `core/application/screenPlaces.ts`
   (contracts; door `rules.constants`, `rules.placeShowing`). A list not shown is shown from the nearest place that shows
   it, as the plugin's `modeShowing`: the day's list chosen from Inbox turns to Soon, not to Today as Swift's `turn` did.
+- frontend-swift (R1): `Vault.write` no longer tells the watch; the writes the app makes for someone else than the screen
+  (a reminder's button, Siri, a sync, the capture sheet: `AppServices`) call `Vault.tellWatch()`. A watch read asked while
+  a card is carried or the quick entry's jobs run waits for them (`readIfAsked` when the carry or the pump ends).
+- frontend-swift (R2/R3): a job whose `entry.call` fails, or whose read after the write fails, ends with `unshown`; a
+  job the door cannot `done` stays started and stops the pump, so it is never handed out again.
+- frontend-swift (R1, full screen): the stack's subtasks are read as a drawing (`stackRead` hands back a closure) and
+  drawn in the same transaction as `shown`.
+- frontend-swift (R7): the entry ends when the ribbon comes to rest on a place other than the one it rested on (a swipe
+  or a tab), unless the bar's place turned it there; a touch that pans something is never a tap elsewhere (the window's
+  tap requires every pan to fail).
+- frontend-swift (R8): only the read after a drop's write ends the carry; any other read leaves it.
+- frontend-swift (R9): list names are cached per the settings text the screen was last read over (`BoardSnapshot
+  .settingsJSON`, new).
+- frontend-swift (typed text): the field moves only between views in the window (`EntryFieldBox` takes it on joining the
+  window; a box leaving parks it in a hidden holder in the window), so it keeps first responder and every key; Return
+  and the end of editing no longer go through a queued task.
+- frontend-swift (M1/M2): the plus is carried by its own pan (lifts on the first move, a tap still opens capture), as a
+  copy over the window routed to the places through `BoardDrop.carry(at:)`/`letGo()`; let go anywhere, the copy flies
+  back into the slot as one piece (spring), the slot hidden until it lands.
+- frontend-swift (M3): a card's lift preview is a still copy of its capsule, so the card giving its place up never
+  blanks the preview.
+- frontend-swift (M4/M7): the gap is empty room of one card's height, the rows parting (board «3 — Перетаскивание»: no
+  dashes, no line with a dot); its level shows by its indent and the branch line of that level drawn into it, the line
+  the card will join, sliding with `.snappy` as the finger crosses a level's line. Every row's branch is asked over the
+  rows as they stand without the carried ones, so a carried subtask leaves no line hanging. The lifted copy keeps the
+  finger's position (it does not jump to the level's indent): the branch in the gap already says the level, and a copy
+  that snaps sideways under a still finger reads as a glitch.
+- frontend-swift (drop flight): the window's drop delegate implemented `previewForDropping` with `UITargetedPreview`
+  (the context-menu type), which UIKit never calls; with `UITargetedDragPreview` the carried card flies into the gap,
+  or onto its new time on the calendar.
+- frontend-swift (M5): Inbox and Soon are half the screen each, as the plugin's `--tc-half-column`; the day list is half
+  beside Soon and its own width at Today, following the swipe between them.
+- frontend-swift (M6): `OnePlacePerSwipe` scroll target: a swipe settles on the place next to where it started, or back;
+  a tab's scroll goes straight to its place.
+- frontend-swift (M8): the menu's top row holds three medium icons (Done, Rename, Add Subtask: the system's medium row
+  holds three), the other statuses one level down under Status, then Priority, Labels, Move To, Section, Reminder,
+  then Repeat…, Open Full Screen, Open in Obsidian, and Delete alone last. Grouping is drawing, not a rule: nothing
+  asked of the core.
+- frontend-swift (M9): iOS 26's soft scroll edge shows only under system bars, so the lists and the calendar take a
+  gradient mask driven by the scroll: each edge's fade is as deep as the content past it, capped at half a card; a list's
+  empty room after its last row counts as nothing; a cut event's title stands at max(resting, fade depth).
+- frontend-swift (M10): the capture field takes first responder as the sheet's view joins the window (a probe beside the
+  SwiftUI field), so the keyboard rises with the sheet; a SwiftUI focus lands only after the presentation.

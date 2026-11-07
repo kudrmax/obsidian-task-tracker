@@ -1,5 +1,6 @@
 import Core
 import SwiftUI
+import UIKit
 
 /// A new task: typed, recorded, or both, into one of the four lists. Once added, the screen is empty for the next one.
 struct CaptureView: View {
@@ -28,6 +29,7 @@ struct CaptureView: View {
                 // The task's field takes the page down to the recording's bar, as a note does: a tap anywhere on it types.
                 TextField("New task", text: $text, axis: .vertical)
                     .focused($typing)
+                    .background(FocusOnArrival())
                     .submitLabel(.done)
                     .padding(Layout.margin)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -113,6 +115,47 @@ struct CaptureView: View {
             failure = nil
         case .failed(let reason):
             failure = reason
+        }
+    }
+}
+
+/// The text field beside it takes the keyboard the moment the screen joins the window, before the sheet slides up, so
+/// the keyboard rises together with the sheet as in Notes and Reminders. A focus asked from SwiftUI lands only once the
+/// presentation has ended, and the keyboard then comes up after it.
+private struct FocusOnArrival: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+    func updateUIView(_ view: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        private var done = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            focus()
+        }
+
+        /// The field may be laid out after the probe joins the window: asked again on each layout until it takes it.
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            focus()
+        }
+
+        private func focus() {
+            guard window != nil, !done else { return }
+            var scope = superview
+            for _ in 0..<4 {
+                if let field = scope.flatMap(Self.field(in:)) {
+                    done = field.becomeFirstResponder()
+                    return
+                }
+                scope = scope?.superview
+            }
+        }
+
+        private static func field(in view: UIView) -> UIView? {
+            if view is UITextView || view is UITextField { return view }
+            for sub in view.subviews { if let found = field(in: sub) { return found } }
+            return nil
         }
     }
 }

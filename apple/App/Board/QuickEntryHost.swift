@@ -67,6 +67,18 @@ struct ListEntryView: Decodable, Equatable {
     let at: At
 }
 
+/// `StackEntry`: where a task's full screen draws the field among the rows of its subtasks.
+struct StackEntryView: Decodable, Equatable {
+    struct At: Decodable, Equatable {
+        let kind: String
+        let index: Int?
+        let level: Int?
+    }
+
+    let at: At
+    let pending: [EntryView.Pending]
+}
+
 /// Typing tasks in place, the plugin's quick entry: the core's `entry.*` holds every rule of it and the session between
 /// calls; this host hands the session and the screen's look in, draws what the state says, turns keys and taps into
 /// calls, and runs the writes the session queues one at a time, each once the lists show the ones before it.
@@ -94,8 +106,9 @@ final class QuickEntryHost {
         var id: String { rawValue }
     }
 
-    /// The full screen showing the stack the field stands in reads its subtasks again before a written one is shown.
-    @ObservationIgnored var stackRead: (() async -> Void)?
+    /// The full screen showing the stack the field stands in: its subtasks read again after a write, handed back as the
+    /// drawing of them, made in the same drawing as the line it ends.
+    @ObservationIgnored var stackRead: (() async -> (() -> Void))?
     /// A rename written: the task as the file now has it.
     @ObservationIgnored var renamed: ((TaskItem) -> Void)?
 
@@ -103,8 +116,8 @@ final class QuickEntryHost {
     @ObservationIgnored private var pumping = false
     @ObservationIgnored private var started: Set<String> = []
     @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
-    /// The ribbon is turned by the bar's place, which moved the field there: the turn keeps it.
-    @ObservationIgnored private var turning = false
+    /// Where the bar's place turned the ribbon, moving the field there: the ribbon settling there keeps it.
+    @ObservationIgnored private var turnedTo: RibbonPlace?
     /// Counts the fields opened: a tap elsewhere that opened one keeps it.
     @ObservationIgnored private var opened = 0
     @ObservationIgnored private var names: [String: String] = [:]
@@ -155,12 +168,14 @@ final class QuickEntryHost {
 
     /// The full screen's Add Subtask, or a subtask's there: the field last in the stack of `parent`'s subtasks.
     func addSubtaskInStack(_ parent: TaskItem) {
-        opening { call("open", [["kind": "stack", "parent": parent.key.json]]) }
+        guard let spot = value("stackSpot", [parent.key.json]), !spot.isNull else { return }
+        opening { call("open", [spot]) }
     }
 
     /// A rename on the full screen: the title, or a subtask's card there, becomes the field.
     func renameInStack(_ item: TaskItem) {
-        opening { call("open", [["kind": "stack", "parent": item.key.json], item.json]) }
+        guard let spot = value("stackSpot", [item.key.json]), !spot.isNull else { return }
+        opening { call("open", [spot, item.json]) }
     }
 
     private func opening(_ open: () -> Void) {
@@ -203,9 +218,12 @@ final class QuickEntryHost {
         }
     }
 
-    /// The ribbon came to rest on another place by a swipe or a tab: the field there is finished as by a tap elsewhere.
-    func placeChanged() {
-        if !turning { blur() }
+    /// The ribbon came to rest on another place than it rested on before (a swipe, a tab): the field is finished as by a
+    /// tap elsewhere, unless the bar's place turned it there with the field. A swipe that springs back changes nothing.
+    func placeSettled(_ place: RibbonPlace) {
+        let turned = turnedTo
+        turnedTo = nil
+        if place != turned { blur() }
     }
 
     /// Before the screen shows another day: the field is finished, and every text typed is written for the day it was
@@ -228,27 +246,35 @@ final class QuickEntryHost {
         }
     }
 
-    /// The ribbon turned to show `column`; a place that shows it already stays.
+    /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays.
     private func turn(to column: BoardColumn) {
-        guard let model else { return }
-        let showing = Self.shown(at: model.place).contains(column)
-        guard !showing else { return }
-        let place: RibbonPlace = switch column {
-        case .inbox, .backlog: .inbox
-        case .soon: .soon
-        case .day: .today
-        }
-        turning = true
+        guard let model,
+              let key: String = model.ruleNow("rules.placeShowing", [.string(column.rawValue), .string(model.place.key)]),
+              let place = RibbonPlace(key: key), place != model.place else { return }
+        turnedTo = place
         model.go(to: place)
-        turning = false
     }
 
-    /// The name the bar gives a list, as the settings head it.
+    /// The name the bar gives a list, as the settings head it: asked again once the screen is read over other settings.
     func name(_ kind: String) -> String {
+        let settings = model?.snapshot?.settingsJSON
+        if settings != namesSettings {
+            names = [:]
+            namesSettings = settings
+        }
         if let known = names[kind] { return known }
         let found = (try? board.read("tasks.listName", [.string(kind)], over: board.settingsOnly()))?.string ?? kind
         names[kind] = found
         return found
+    }
+
+    @ObservationIgnored private var namesSettings: String?
+
+    /// A day picked in the bar's date sheet: today is the Now list, as the plugin's picker gives it, so the field stays
+    /// where it is when it already stands there.
+    func chooseDay(_ day: String) {
+        guard let placement = try? board.read("tasks.placementOfDay", [.string(day)], over: board.settingsOnly()) else { return }
+        choosePlace(placement)
     }
 
     /// A label's name as the screen shows it.
@@ -258,13 +284,15 @@ final class QuickEntryHost {
 
     // MARK: The door
 
-    private static func shown(at place: RibbonPlace) -> [BoardColumn] {
-        switch place {
-        case .inbox: [.inbox, .backlog, .soon]
-        case .soon: [.soon, .day]
-        case .today: [.day]
+    /// The lists each place of the ribbon shows, in order, as the core's `SHOWN_LISTS` has them.
+    private func shown(at place: RibbonPlace) -> [String] {
+        if shownLists == nil, let constants: [String: JSONValue] = model?.ruleNow("rules.constants", []) {
+            shownLists = constants["SHOWN_LISTS"].flatMap { try? $0.decode([String: [String]].self) }
         }
+        return shownLists?[place.key] ?? []
     }
+
+    @ObservationIgnored private var shownLists: [String: [String]]?
 
     /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, and the lists the
     /// ribbon's place shows.
@@ -277,8 +305,8 @@ final class QuickEntryHost {
             sections[column.rawValue] = .array(list.groups.map(\.name.json))
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
-        let shown = Self.shown(at: model?.place ?? .today)
-        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map { .string($0.rawValue) })]
+        let shown = shown(at: model?.place ?? .today)
+        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
     }
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
@@ -361,6 +389,12 @@ final class QuickEntryHost {
         }
     }
 
+    /// Where `task`'s full screen draws the field, nil when it stands elsewhere.
+    func stackEntry(_ task: TaskItem) -> StackEntryView? {
+        guard state != nil, let entry = answer("stackEntry", [task.json])?["value"], !entry.isNull else { return nil }
+        return try? entry.decode(StackEntryView.self)
+    }
+
     /// The screen was read anew (a write elsewhere, another day): the field keeps its place among the cards as drawn.
     func screenChanged() {
         guard state != nil else { return }
@@ -370,66 +404,90 @@ final class QuickEntryHost {
     // MARK: Jobs
 
     /// The session's writes, one at a time, in order: each made once the lists show the file as of the one before it;
-    /// a task's line leaves the queue in the very drawing that shows its card, so the field never jumps.
+    /// a task's line leaves the queue in the very drawing that shows its card, so the field never jumps. A job the door
+    /// could not end stops the pump: it is never handed out again.
     private func pump() {
         guard !pumping else { return }
         pumping = true
         Task {
             while let id = nextJob() {
                 started.insert(id)
-                await run(id)
+                guard await run(id) else { break }
             }
             pumping = false
             let waiting = idleWaiters
             idleWaiters = []
             for waiter in waiting { waiter.resume() }
+            model?.readIfAsked()
         }
     }
+
+    /// The session's writes are being made: the screen's other reads wait for them.
+    var writing: Bool { pumping }
 
     private func nextJob() -> String? {
         guard case .array(let jobs) = session["jobs"] else { return nil }
         return jobs.lazy.compactMap { $0["id"].string }.first { !self.started.contains($0) }
     }
 
-    private func run(_ id: String) async {
-        guard let model else { return }
-        let call = answer("call", [.string(id)])
-        if let call { session = call["session"] }
-        let job = call?["value"] ?? .null
+    /// Job `id`: its call, its write, the file read again and drawn with the line it ends, then done (`docs/door.md`). Every
+    /// task's line ends shown or unshown, whatever failed on the way. False when the door could not end the job.
+    private func run(_ id: String) async -> Bool {
+        guard let model else { return false }
+        guard let call = answer("call", [.string(id)]) else {
+            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
+            return finish(id)
+        }
+        session = call["session"]
+        let job = call["value"]
         guard let method = job["method"].string, case .array(let args) = job["args"] else { return finish(id) }
         let board = board
         let day = model.shownDay
         let written: Result<JSONValue, Error> = await Task.detached {
             Result { try board.write("tasks." + method, args) }
         }.value
-        let read = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         if case .failure(let error) = written { model.problem(error) }
-        if method == "createInPlace", case .success = written, state?.spotKind == "stack" { await stackRead?() }
+        let read: BoardSnapshot?
+        do {
+            read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
+        } catch {
+            model.problem(error)
+            read = nil
+        }
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
-        var instant = Transaction()
-        instant.disablesAnimations = true
-        withTransaction(instant) {
-            if method == "createInPlace", let read {
-                let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
-                let reply: JSONValue?
-                if case .success(let key) = written {
-                    reply = answer("shown", [.string(id), key, coming], over: read)
-                } else {
-                    reply = answer("unshown", [.string(id)], over: read)
+        let created: JSONValue? = if method == "createInPlace", case .success(let key) = written, read != nil { key } else { nil }
+        let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil
+        drawInstantly {
+            if method == "createInPlace" {
+                var reply: JSONValue?
+                if let created, let read {
+                    let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
+                    reply = answer("shown", [.string(id), created, coming], over: read)
                 }
-                model.draw(read)
+                if reply == nil { reply = answer("unshown", [.string(id)], over: read) }
+                if let read { model.draw(read) }
+                stack?()
                 if let reply { apply(reply, over: read) }
             } else if let read {
                 model.draw(read)
                 placeField(over: read)
             }
         }
-        finish(id)
+        return finish(id)
     }
 
-    private func finish(_ id: String) {
-        if let reply = answer("done", [.string(id)]) { apply(reply) }
+    private func drawInstantly(_ draw: () -> Void) {
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant, draw)
+    }
+
+    /// The job ends; false when the door refused to end it, and it stays started so it is never run again.
+    private func finish(_ id: String) -> Bool {
+        guard let reply = answer("done", [.string(id)]) else { return false }
+        apply(reply)
         started.remove(id)
+        return true
     }
 
     /// Resolves once every write the session queued is made.
@@ -488,7 +546,27 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         take()
     }
 
-    /// The keyboard taken, again a moment later while a drop or a menu still holds the screen and the system refuses it.
+    /// Placed in a box: it takes the keyboard if it has not got it yet.
+    func placed() {
+        take()
+    }
+
+    /// The field waits in the window's holder while no box shows it, the keyboard kept.
+    var isParked: Bool { superview is EntryParking }
+
+    func park(in window: UIWindow) {
+        let parking = window.subviews.lazy.compactMap { $0 as? EntryParking }.first ?? {
+            let made = EntryParking()
+            window.addSubview(made)
+            return made
+        }()
+        translatesAutoresizingMaskIntoConstraints = true
+        parking.addSubview(self)
+        frame = parking.bounds
+    }
+
+    /// The keyboard taken; while a drop or a menu still holds the screen the system refuses it, and it is asked again a
+    /// moment later.
     private func take(tries: Int = 12) {
         guard wanted, !isFirstResponder else { return }
         if window != nil, becomeFirstResponder() { return }
@@ -521,19 +599,37 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         true
     }
 
+    /// A touch that pans something (the ribbon, a list, the calendar) is no tap elsewhere: the ribbon ends the entry only
+    /// if it comes to rest on another place.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf other: UIGestureRecognizer) -> Bool {
+        other is UIPanGestureRecognizer
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         host?.enter()
         return false
     }
 
-    /// The keyboard went: the entry ends as by a tap elsewhere, unless the field only moved to another row, waits off
-    /// screen for the list it moved to (another day being read), or a sheet of the bar took it for a while.
+    /// The keyboard went to something else (another field, a page's editor): the entry ends as by a tap elsewhere, unless
+    /// a sheet of the bar took it for a while. Moving between rows and lists never ends editing: the field stays in the
+    /// window.
     func textFieldDidEndEditing(_ textField: UITextField) {
-        Task { @MainActor [weak self] in
-            guard let self, self.wanted, self.window != nil, !self.isFirstResponder, self.host?.paused != true else { return }
-            self.host?.blur()
-        }
+        guard wanted, host?.paused != true else { return }
+        host?.blur()
     }
+}
+
+/// The window's holder of the field while no box shows it: out of sight, in the window, so the field keeps the keyboard.
+private final class EntryParking: UIView {
+    init() {
+        super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        alpha = 0
+        clipsToBounds = true
+        isUserInteractionEnabled = false
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 }
 
 /// The bar's place over the keyboard: always the bar's own height, whatever the buttons it shows this moment, so the
@@ -557,31 +653,60 @@ struct EntryFieldView: UIViewRepresentable {
     let tint: UIColor
     let font: UIFont
 
-    func makeUIView(context: Context) -> UIView {
-        let box = UIView()
-        place(in: box)
-        return box
+    func makeUIView(context: Context) -> EntryFieldBox {
+        EntryFieldBox(field: host.field)
     }
 
-    func updateUIView(_ box: UIView, context: Context) {
-        place(in: box)
-    }
-
-    private func place(in box: UIView) {
+    func updateUIView(_ box: EntryFieldBox, context: Context) {
         let field = host.field
         field.tintColor = tint
         if field.font != font { field.font = font }
-        guard field.superview !== box else { return }
-        field.removeFromSuperview()
+        box.claimIfFree()
+    }
+}
+
+/// Where the field is drawn. The field only ever moves between views in the window, never out of it, so it keeps the
+/// keyboard and every key typed while it moves: a box takes it once the box is in the window, and a box leaving the
+/// window first parks it in the window's own holder, from which the next box takes it.
+final class EntryFieldBox: UIView {
+    private let field: EntryTextField
+
+    init(field: EntryTextField) {
+        self.field = field
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil { claim() }
+    }
+
+    override func willMove(toWindow newWindow: UIWindow?) {
+        super.willMove(toWindow: newWindow)
+        if newWindow == nil, field.superview === self, let window { field.park(in: window) }
+    }
+
+    /// Takes the field when no other box in the window holds it (it is parked, or not placed yet).
+    func claimIfFree() {
+        guard window != nil, field.superview !== self, field.superview == nil || field.isParked else { return }
+        claim()
+    }
+
+    private func claim() {
+        guard field.superview !== self else { return }
+        // Moved, not removed first: from one view in the window to another it stays the first responder.
         field.translatesAutoresizingMaskIntoConstraints = false
-        box.addSubview(field)
+        addSubview(field)
         NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: box.leadingAnchor),
-            field.trailingAnchor.constraint(equalTo: box.trailingAnchor),
-            field.topAnchor.constraint(equalTo: box.topAnchor),
-            field.bottomAnchor.constraint(equalTo: box.bottomAnchor),
+            field.leadingAnchor.constraint(equalTo: leadingAnchor),
+            field.trailingAnchor.constraint(equalTo: trailingAnchor),
+            field.topAnchor.constraint(equalTo: topAnchor),
+            field.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
-        if host.isOpen { field.begin() }
+        field.placed()
     }
 }
 
@@ -836,7 +961,7 @@ struct EntryDateSheet: View {
                         Button("Done", systemImage: "checkmark") {
                             let day = LocalDay.string(date)
                             dismiss()
-                            host.choosePlace(["kind": "date", "date": .string(day)])
+                            host.chooseDay(day)
                         }
                         .buttonStyle(.glassProminent)
                     }

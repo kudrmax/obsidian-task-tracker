@@ -214,11 +214,16 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         return [item]
     }
 
+    /// The lifted card is a still copy of the capsule standing where it stands, not the card itself: the system would show
+    /// the card through its preview, and the card giving its place up as the carry begins would blank the preview too.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
         let parameters = UIDragPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
-        return UITargetedDragPreview(view: content, parameters: parameters)
+        guard let copy = content.snapshotView(afterScreenUpdates: false) else { return UITargetedDragPreview(view: content, parameters: parameters) }
+        copy.bounds = content.bounds
+        let target = UIDragPreviewTarget(container: self, center: CGPoint(x: content.frame.midX, y: content.frame.midY))
+        return UITargetedDragPreview(view: copy, parameters: parameters, target: target)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }

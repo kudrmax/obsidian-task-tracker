@@ -141,7 +141,7 @@ final class Waits: @unchecked Sendable {
 }
 
 @Suite struct FileWatchTests {
-    @Test func everyWriteIsToldAndTheAppsOwnReadsAtOnce() async throws {
+    @Test func anotherWriterIsToldTheAppsOwnWriteIsNotAndItsReadsAreAtOnce() async throws {
         let tests = VaultTests()
         try tests.put("first", "TODOs Tasks.md")
         let vault = try tests.vault()
@@ -151,12 +151,25 @@ final class Waits: @unchecked Sendable {
         let start = Date()
         #expect(try vault.read().tasks == "mine")
         #expect(Date().timeIntervalSince(start) < 0.2)
-        for _ in 0..<50 where told.count == 0 { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(told.count == 1)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(told.count == 0)
         // Another writer: a reminder's button in the widget's process, iCloud.
         _ = try tests.vault().write(tasks: "theirs", expecting: "mine")
-        for _ in 0..<50 where told.count == 1 { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(told.count > 1)
+        for _ in 0..<50 where told.count == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(told.count > 0)
+        watch.cancel()
+    }
+
+    @Test func aWriteInTheAppForSomeoneElseIsToldWhenAsked() async throws {
+        let tests = VaultTests()
+        try tests.put("first", "TODOs Tasks.md")
+        let vault = try tests.vault()
+        let told = Waits()
+        let watch = try #require(vault.watchTasksFile { told.record(.zero) })
+        _ = try vault.write(tasks: "a reminder's button", expecting: "first")
+        vault.tellWatch()
+        for _ in 0..<50 where told.count == 0 { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(told.count == 1)
         watch.cancel()
     }
 }

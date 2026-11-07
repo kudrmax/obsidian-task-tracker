@@ -1,15 +1,17 @@
 import SwiftUI
 import UIKit
 
-/// The plus beside the tab bar, as in the design: the accent's glass circle with a plus. A tap opens a new task; a long
-/// press lifts the plus itself to carry, and letting it go between cards or on the calendar puts the new task there.
-/// While anything is carried it is the cancel target: a glass circle with a cross that fills and grows under the finger,
-/// and a carry let go on it flies back where it was taken from.
+/// The plus beside the tab bar, as in the design: the accent's glass circle with a plus. A tap opens a new task; moving
+/// the finger lifts the plus at once, with no hold, as the plugin's plus, and letting it go between cards or on the
+/// calendar puts the new task there. While anything is carried it is the cancel target: a glass circle with a cross that
+/// fills and grows under the finger; a carry let go on it, or over no place, flies back where it was taken from.
 struct PlusButton: UIViewRepresentable {
     let open: () -> Void
     let accent: Color
     /// Something is carried: the plus stands as the cancel target.
     let cancelling: Bool
+    /// The places a carried plus is let go on.
+    var drop: BoardDrop?
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -31,12 +33,14 @@ struct PlusButton: UIViewRepresentable {
         control.onCarry = onCarry
         control.onCancel = onCancel
         control.onEnd = onEnd
+        control.drop = drop
         control.cancelling = cancelling
     }
 }
 
-final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteractionDelegate {
+final class PlusControl: UIControl, UIDropInteractionDelegate {
     var open: () -> Void = {}
+    weak var drop: BoardDrop?
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -90,9 +94,7 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             self.open()
         }, for: .touchUpInside)
-        let drag = UIDragInteraction(delegate: self)
-        drag.isEnabled = true
-        addInteraction(drag)
+        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(carry(_:))))
         addInteraction(UIDropInteraction(delegate: self))
         look()
     }
@@ -126,29 +128,73 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
 
     // MARK: The plus carried
 
-    func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
-        guard !cancelling else { return [] }
-        let item = UIDragItem(itemProvider: Carried.provider(Carried.plus))
-        item.localObject = Carried.plus
-        return [item]
+    /// The plus as the finger carries it: a lifted copy over the window, while the slot stands as the cancel target.
+    private var lifted: UIView?
+
+    @objc private func carry(_ pan: UIPanGestureRecognizer) {
+        guard let window else { return }
+        let point = pan.location(in: window)
+        switch pan.state {
+        case .began:
+            guard !cancelling, let copy = snapshotView(afterScreenUpdates: false) else { return }
+            copy.frame = convert(bounds, to: window)
+            copy.layer.shadowColor = UIColor.black.cgColor
+            copy.layer.shadowOpacity = 0.25
+            copy.layer.shadowRadius = 12
+            copy.layer.shadowOffset = CGSize(width: 0, height: 6)
+            copy.isUserInteractionEnabled = false
+            window.addSubview(copy)
+            lifted = copy
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onCarry()
+            UIView.animate(springDuration: 0.3, bounce: 0.15, options: [.allowUserInteraction, .beginFromCurrentState]) {
+                copy.center = point
+                copy.transform = CGAffineTransform(scaleX: 1.12, y: 1.12)
+            }
+        case .changed:
+            guard let lifted else { return }
+            lifted.center = point
+            if convert(bounds, to: window).contains(point) {
+                held = true
+                drop?.carryOff()
+            } else {
+                held = false
+                drop?.carry(at: point)
+            }
+        case .ended:
+            guard lifted != nil else { return }
+            let onTarget = convert(bounds, to: window).contains(point)
+            // Taken by a place, the field opens there and the plus goes back to its slot under the bar all the same.
+            if onTarget || drop?.letGo() != true {
+                drop?.carryOff()
+                onCancel()
+            }
+            flyHome()
+            onEnd()
+        default:
+            guard lifted != nil else { return }
+            drop?.carryOff()
+            onCancel()
+            flyHome()
+            onEnd()
+        }
     }
 
-    func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
-        let parameters = UIDragPreviewParameters()
-        parameters.visiblePath = UIBezierPath(ovalIn: bounds)
-        parameters.backgroundColor = .clear
-        return UITargetedDragPreview(view: self, parameters: parameters)
+    /// Let go: the plus flies back into its slot as one piece and stands there
+    /// again, as the system returns a cancelled drag.
+    private func flyHome() {
+        guard let lifted, let window else { return }
+        self.lifted = nil
+        alpha = 0
+        UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
+            lifted.transform = .identity
+            lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: window)
+            lifted.layer.shadowOpacity = 0
+        } completion: { _ in
+            self.alpha = 1
+            lifted.removeFromSuperview()
+        }
     }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) { onCarry() }
-
-    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
-        if operation == .cancel { onCancel() }
-    }
-
-    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) { onEnd() }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
 
     // MARK: The cancel target
 
