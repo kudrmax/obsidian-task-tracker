@@ -78,6 +78,16 @@ fixed that but made lines travel between files. One file wins.
    project mark; a tap on the mark opens the note.
 4. **Done.** The task leaves the screen and goes to Done with its `🗂️`.
 
+## Drop on a column's title (Max, 2026-11-07)
+
+A task dropped on a list's title («Inbox», «Soon», «Backlog», «Now»/a day's title where the list has one) goes into that
+list keeping its project: in a grouped list to the end of its own project's group (its part without a section; the group
+appears in Soon if it was not there), in an ungrouped list to the end of the list's part without a section. While a
+task is dragged over a list's title, the title lights up exactly as a section header does under a drop; no new element.
+The core gives the title's drop target ready, per list; the UI only draws the light. A drop inside a group still means
+«put it here», the project taken from that group. The iPhone app draws no groups yet, so its drops keep the project
+already; it gets the title drop with its groups.
+
 ## Rules for the core
 
 Decided by the lead after the spec review; the core owns every one, the frontends only draw what it gives.
