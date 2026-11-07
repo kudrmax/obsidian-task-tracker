@@ -16,6 +16,7 @@ import {
 	type GroupName,
 	type GroupPlace,
 	type NewTaskPlace,
+	type ProjectZone,
 	type RepeatRule,
 	type SectionPlace,
 	type TaskChange,
@@ -72,6 +73,11 @@ function columnOfPlace(place: SectionPlace, today: LocalDate): Column {
 	if (place.list === "now") return { kind: "day", date: place.date ?? today };
 	if (place.list === "soon" && place.date !== undefined && place.date > today) return { kind: "day", date: place.date };
 	return { kind: place.list };
+}
+
+/** A place's project and section named for its task, only where it has them. */
+function zoneOf(place: { readonly project?: ProjectZone; readonly section?: string }): { project?: ProjectZone; section?: string } {
+	return { ...(place.project !== undefined && { project: place.project }), ...(place.section !== undefined && place.section.trim() !== "" && { section: place.section.trim() }) };
 }
 
 /** A section's name of nothing: unlike a title, a level's prefix alone names a section. */
@@ -255,6 +261,13 @@ export class TaskRules {
 		return { operation, places: () => places };
 	}
 
+	/** Each task's project; a subtask's line is left alone. */
+	setProject(keys: readonly TaskKey[], project: string | null): Operation | null {
+		if (keys.length === 0) return null;
+		if (keys.length === 1) return (doc) => ops.setProject(doc, this.entryOf(doc, keys[0]), project);
+		return this.applyAll(keys.map((key) => ({ key, change: { kind: "project", project } })));
+	}
+
 	setReminder(key: TaskKey, reminder: ReminderKind): Operation {
 		return (doc) => ops.setReminder(doc, this.entryOf(doc, key), reminder);
 	}
@@ -352,10 +365,10 @@ export class TaskRules {
 		return (doc) => ops.moveToEnd(doc, this.entryOf(doc, key), section);
 	}
 
-	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate): Operation {
-		return (doc, today) => {
+	moveToGroup(key: TaskKey, list: GroupedList, group: GroupName, before: TaskKey | null, date?: LocalDate, project?: ProjectZone): Operation {
+		return (doc, today, _settings, boundary) => {
 			this.groupOf(doc, list, group);
-			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null);
+			return ops.moveToGroup(doc, this.entryOf(doc, key), list, group, before ? this.entryOf(doc, before) : null, today, date ?? null, project, boundary);
 		};
 	}
 
@@ -373,18 +386,19 @@ export class TaskRules {
 	}
 
 	/** Null for a blank name or the section's own: nothing to write. */
-	renameGroup(list: GroupedList, group: string, name: string): Operation | null {
+	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Operation | null {
 		if (blankName(name) || name.trim() === group) return null;
 		return (doc, _today, settings) => {
 			this.groupOf(doc, list, group);
+			if (project !== undefined) return ops.renameGroupIn(doc, list, group, name, settings.groups.ungrouped, project);
 			return ops.renameGroup(doc, list, group, name, settings.groups.ungrouped);
 		};
 	}
 
-	removeGroup(list: GroupedList, group: string): Operation {
+	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Operation {
 		return (doc) => {
 			this.groupOf(doc, list, group);
-			return ops.removeGroup(doc, list, group);
+			return project === undefined ? ops.removeGroup(doc, list, group) : ops.removeGroupIn(doc, list, group, project);
 		};
 	}
 
@@ -408,7 +422,7 @@ export class TaskRules {
 	/** The steps in the file's order, each on its task wherever the earlier ones took it; a move under a task moved too goes along with it. */
 	applyAll(steps: readonly TaskStep[]): Operation | null {
 		if (steps.length === 0) return null;
-		return (doc, today, settings) => {
+		return (doc, today, settings, boundary) => {
 			const named: TaskKey[] = [];
 			const tagOf = (key: TaskKey): number => {
 				const at = named.findIndex((k) => sameKey(k, key));
@@ -425,14 +439,14 @@ export class TaskRules {
 				const entry = tags.find(current, own);
 				if (!entry) continue;
 				const [first, second] = refs.map((ref) => (ref === null ? null : tags.find(current, ref)));
-				current = this.step(current, entry, change, first ?? null, second ?? null, today, settings);
+				current = this.step(current, entry, change, first ?? null, second ?? null, today, settings, boundary);
 			}
 			return tags.untag(current);
 		};
 	}
 
 	/** One step of `applyAll`; `first` and `second` are the tasks its change names, in the order `refsOf` gives them. */
-	private step(doc: TaskDocument, entry: TaskEntry, change: TaskChange, first: TaskEntry | null, second: TaskEntry | null, today: LocalDate, settings: TaskCalendarSettings): TaskDocument {
+	private step(doc: TaskDocument, entry: TaskEntry, change: TaskChange, first: TaskEntry | null, second: TaskEntry | null, today: LocalDate, settings: TaskCalendarSettings, boundary: DayBoundary): TaskDocument {
 		switch (change.kind) {
 			case "status":
 				return ops.setStatus(doc, entry, change.status);
@@ -440,6 +454,8 @@ export class TaskRules {
 				return ops.setPriority(doc, entry, change.priority);
 			case "labels":
 				return ops.setLabels(doc, entry, change.labels);
+			case "project":
+				return ops.setProject(doc, entry, change.project);
 			case "dueDate":
 				return ops.setDueDate(doc, entry, change.date);
 			case "postpone":
@@ -458,7 +474,7 @@ export class TaskRules {
 				return ops.moveToEnd(doc, entry, change.section);
 			case "moveToGroup":
 				this.groupOf(doc, change.list, change.group);
-				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null);
+				return ops.moveToGroup(doc, entry, change.list, change.group, first, today, change.date ?? null, change.project, boundary);
 			case "createGroup":
 				return blankName(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
 			case "nest":
@@ -471,11 +487,11 @@ export class TaskRules {
 		switch (place.kind) {
 			case "list":
 				this.groupOf(doc, place.list, place.group);
-				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null };
+				return { kind: "list", list: place.list, group: place.group, before: before(place.before), date: place.date ?? null, ...zoneOf(place) };
 			case "day": {
 				const { list, date } = dayColumn(place.date, today);
 				this.groupOf(doc, list, place.group);
-				return { kind: "list", list, group: place.group, before: before(place.before), date };
+				return { kind: "list", list, group: place.group, before: before(place.before), date, ...zoneOf(place) };
 			}
 			case "subtask":
 				return { kind: "subtask", parent: this.entryOf(doc, place.parent), before: before(place.before) };

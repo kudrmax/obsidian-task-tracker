@@ -105,6 +105,7 @@ describe("formatTaskLine", () => {
 						statusChar: " ",
 						priority: null,
 						labels: [],
+						project: null,
 						text: "A",
 						dueDate: "2026-11-03",
 						repeat: null,

@@ -18,7 +18,7 @@ export function readDrop(to: DropTo, sections: (column: DropColumn) => ColumnSec
 function listDrop(column: DropColumn, place: ListPlace | null, sections: ColumnSections | null): ReadDrop {
 	if (!place) return { kind: "list", column, before: null };
 	if (place.kind === "subtask") return { kind: "nest", parent: place.parent, before: place.before };
-	if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before };
+	if (sections) return { kind: "group", list: sections.list, date: sections.date, group: place.group, before: place.before, ...(place.project !== undefined && { project: place.project }) };
 	return { kind: "list", column, before: place.before };
 }
 
@@ -60,7 +60,7 @@ function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
 		case "clearSlot":
 			return { kind: "clearSlot" };
 		case "group":
-			return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? undefined };
+			return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? undefined, ...(to.project !== undefined && { project: to.project }) };
 		case "nest":
 			return { kind: "nest", parent: to.parent, before: to.before };
 		case "list":

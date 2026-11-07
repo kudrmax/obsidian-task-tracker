@@ -42,6 +42,7 @@ export class SettingsServiceImpl implements SettingsService {
 			priorities: s.priorities,
 			labelTag: s.labelTag,
 			labels: s.labels,
+			projectTag: s.projectTag,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
 			longPressMs: s.longPressMs,
@@ -105,6 +106,11 @@ export class SettingsServiceImpl implements SettingsService {
 	async setLabelTag(tag: string): Promise<void> {
 		const labelTag = tag.trim();
 		if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+	}
+
+	async setProjectTag(tag: string): Promise<void> {
+		const bare = tag.trim().replace(/^#/, "");
+		if (/^[^\s#]+$/.test(bare)) await this.store.update({ projectTag: `#${bare}` });
 	}
 
 	renameLabel(index: number, title: string): Promise<void> {

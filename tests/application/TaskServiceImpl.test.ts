@@ -1366,7 +1366,11 @@ describe("TaskServiceImpl.screen", () => {
 			offer: await svc.sectionOffer(D),
 			missing: false,
 			calendars: true,
+			projects: screen.projects,
+			project: null,
 		});
+		expect(screen.projects.backlog).toMatchObject({ canGroup: true, on: true });
+		expect(screen.projects.soon).toEqual({ canGroup: true, on: false, groups: [] });
 		expect(screen.done.map((t) => t.text)).toEqual(["Finished"]);
 		expect(screen.day.list.map((t) => t.text)).toEqual(["Later"]);
 	});

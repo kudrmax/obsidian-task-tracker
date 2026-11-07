@@ -5,8 +5,8 @@ import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
-import type { DraftMarks, DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
-import { fitLevel, type GapPlace, gapOfPlace, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
+import type { DraftMarks, DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
+import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
 import { sameLine, samePlace } from "./taskKeys";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
@@ -19,7 +19,27 @@ export type EntrySpot =
 /** What a list is about to draw: its cards in order, and the sections it draws, in order. */
 export interface EntryDrawing {
 	readonly cards: readonly ListCard[];
-	readonly sections: readonly GroupName[];
+	/** In a list grouped by project, each section of each group (`{ group, project }`), the part without a section too. */
+	readonly sections: readonly Header[];
+}
+
+/** A section a card or a place stands in, with its project's part in a grouped list. */
+interface Zone {
+	readonly group: GroupName;
+	readonly project?: ProjectZone;
+}
+
+function zoneOf(header: Header): Zone {
+	return header !== null && typeof header === "object" ? header : { group: header };
+}
+
+function sameZone(a: Zone, b: Zone): boolean {
+	return a.group === b.group && a.project === b.project;
+}
+
+/** Where a header stands among `sections`: -1 when none is it. */
+function zoneIndex(sections: readonly Header[], zone: Zone): number {
+	return sections.findIndex((header) => sameZone(zoneOf(header), zone));
 }
 
 /**
@@ -37,6 +57,8 @@ export interface ListEntry {
 	readonly place: GapPlace;
 	readonly pending: readonly PendingText[];
 	readonly section: boolean;
+	/** The section named for the task being typed, drawn as its header above the field: a section in a project's part is born with its first task. */
+	readonly newSection: string | null;
 	readonly at: EntryAt;
 }
 
@@ -48,12 +70,12 @@ export interface ListEntry {
 export function entryAt(drawing: EntryDrawing, place: GapPlace, section: boolean): EntryAt {
 	const { cards, sections } = drawing;
 	if (!sections.some((name) => name !== null)) return place.index <= cards.length ? { kind: "in", section: 0, card: place.index, keepsPlate: true } : { kind: "end" };
-	const at = sections.indexOf(place.group);
-	if (at < 0) return place.group === null ? { kind: "top" } : { kind: "end" };
-	const start = cards.findIndex((card) => sections.indexOf(card.group) >= at);
+	const at = zoneIndex(sections, place);
+	if (at < 0) return place.group === null && place.project === undefined ? { kind: "top" } : { kind: "end" };
+	const start = cards.findIndex((card) => zoneIndex(sections, card) >= at);
 	const from = start < 0 ? cards.length : start;
 	let end = from;
-	while (end < cards.length && cards[end].group === place.group) end++;
+	while (end < cards.length && sameZone(cards[end], place)) end++;
 	const card = place.index >= from && place.index <= end ? place.index : end;
 	return { kind: "in", section: at, card, keepsPlate: section };
 }
@@ -88,6 +110,11 @@ export interface EntryState {
 	readonly canOutdent: boolean;
 	/** The field writes a section's name; null where it cannot (a rename, a slot, a stack, a column without sections). */
 	readonly section: boolean | null;
+	/**
+	 * The section the task being typed goes into, named first in a project's part (where an empty section is not made):
+	 * its header stands over the field; Escape or an empty Enter drops both.
+	 */
+	readonly newSection: string | null;
 	/** The priority and labels the task is written with, and what may still be chosen: the service's answer for the field. A section's name has no tint. */
 	readonly marks: DraftMarks;
 	/** The flag shows: there is a level or a label to choose, and the field writes a task, not a section's name. */
@@ -118,8 +145,8 @@ export type EntryTasks = Pick<TaskService, "placementOf" | "placementOfDay" | "d
 export interface EntryLook {
 	/** The cards of `column` as it shows the file now; none while it does not show. */
 	cards(column: DropColumn): readonly ListCard[];
-	/** The sections `column` draws, in order; none while it does not show. */
-	sections(column: DropColumn): readonly GroupName[];
+	/** The sections `column` draws, in order (in a list grouped by project, each group's: `{ group, project }`); none while it does not show. */
+	sections(column: DropColumn): readonly Header[];
 	/** The column shows sections, so a section may be written in it. */
 	sectioned(column: DropColumn): boolean;
 	/** The day the day column shows. */
@@ -130,6 +157,8 @@ export interface EntryLook {
 	 * Inbox, Backlog); the plus opens the field in the day's list while it shows, else in Inbox.
 	 */
 	shown(): readonly DropColumn[];
+	/** The project whose own view this is (`ProjectRef.link`): every task written here gets it. None on the main screen. */
+	project?(): string | undefined;
 }
 
 /** A line entered: its text, the level it was entered at, and its marks. */
@@ -166,6 +195,8 @@ export interface EntryField {
 	readonly rename: EntryRename | null;
 	/** The field writes a section's name (empty sections spec §4). */
 	readonly section: boolean;
+	/** The section named in a project's part, which the task being typed is written into. */
+	readonly newSection?: string;
 }
 
 /**
@@ -173,7 +204,7 @@ export interface EntryField {
  * which call of the task service it is. `landing`, of a task written in a list: the column its card lands in.
  */
 export type EntryJob =
-	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; landing?: DropColumn | null; shown?: boolean }
+	| { readonly id: string; readonly kind: "create"; readonly run: string; readonly line: EntryLine; readonly newSection?: string; landing?: DropColumn | null; shown?: boolean }
 	| { readonly id: string; readonly kind: "rename"; readonly home: string; readonly item: TaskItem; readonly draft: TaskDraft }
 	| { readonly id: string; readonly kind: "section"; readonly run: string; readonly name: string; readonly column: DropColumn; readonly place: GapPlace };
 
@@ -244,6 +275,7 @@ export class QuickEntry {
 			indents: task && listSpot(run.spot) !== null,
 			...this.mayShift(field),
 			section: this.maySection(field) ? field.section : null,
+			newSection: field.newSection ?? null,
 			marks,
 			markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
 			place,
@@ -269,7 +301,7 @@ export class QuickEntry {
 		if (!state || !list || list.column !== column) return null;
 		const section = state.section === true;
 		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
-		return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
+		return { place: list.place, pending: state.pending, section, newSection: state.newSection, at: entryAt(drawing, list.place, section || state.newSection !== null) };
 	}
 
 	/** A double click on a list's free room: the field after the last card, in the last section, at the top level. */
@@ -282,10 +314,11 @@ export class QuickEntry {
 		this.openAtEnd(this.look.shown().includes("day") ? "day" : "inbox");
 	}
 
-	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
-	openIn(column: DropColumn, group: GroupName): void {
+	/** The No tasks plate of empty section `group` tapped (in a list grouped by project, of the part `project`): the field of a new task in it. */
+	openIn(column: DropColumn, group: GroupName, project?: ProjectZone): void {
 		const cards = this.look.cards(column);
-		this.open({ kind: "list", column, place: { kind: "gap", index: gapOfPlace(cards, { kind: "task", group, before: null }).index, level: 0, group } });
+		const place = { kind: "task" as const, group, before: null, ...(project !== undefined && { project }) };
+		this.open({ kind: "list", column, place: { ...gapOfPlace(cards, place), level: 0 } });
 	}
 
 	/** A long tap on the timeline's free room let go: the field of a new task in that slot. */
@@ -388,7 +421,8 @@ export class QuickEntry {
 		if (!field || !list || !this.maySection(field)) return;
 		const section = !field.section;
 		const run = section && list.place.level > 0 ? this.newRun({ ...list, place: this.topLevelAfter(list.column, list.place) }) : field.run;
-		this.reset({ ...field, run, section });
+		const { newSection: _dropped, ...rest } = field;
+		this.reset({ ...rest, run, section });
 	}
 
 	enter(): void {
@@ -437,11 +471,19 @@ export class QuickEntry {
 	}
 
 	/** Where a task written in `column` goes: a list's place, or the day column's on the day it shows. */
-	placeOf(column: DropColumn, result: ListPlace): NewTaskPlace {
+	placeOf(column: DropColumn, result: ListPlace, section?: string): NewTaskPlace {
 		if (result.kind === "subtask") return { kind: "subtask", parent: result.parent, before: result.before };
 		const { group, before } = result;
-		if (column !== "day") return { kind: "list", list: column, group, before };
-		return { kind: "day", date: this.look.day(), group, before };
+		const project = result.project !== undefined ? result.project : this.look.project?.();
+		const zone = { ...(project !== undefined && { project }), ...(section !== undefined && { section }) };
+		if (column !== "day") return { kind: "list", list: column, group, before, ...zone };
+		return { kind: "day", date: this.look.day(), group, before, ...zone };
+	}
+
+	/** A slot of the field: the project's own view writes its project there too. */
+	private slotPlace(slot: Slot): NewTaskPlace {
+		const project = this.look.project?.();
+		return project === undefined ? { kind: "slot", slot } : { kind: "slot", slot, project };
 	}
 
 	job(id: string): EntryJob {
@@ -464,14 +506,14 @@ export class QuickEntry {
 				job.landing = null;
 				switch (spot.kind) {
 					case "slot":
-						return { method: "createInPlace", args: [line.text, line.priority, { kind: "slot", slot: spot.slot }, null, line.labels] };
+						return { method: "createInPlace", args: [line.text, line.priority, this.slotPlace(spot.slot), null, line.labels] };
 					case "stack":
 						return { method: "createInPlace", args: [line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels] };
 					case "list": {
 						const cards = this.look.cards(spot.column);
 						const place = fitLevel(cards, { ...spot.place, level: line.level });
 						job.landing = spot.column;
-						return { method: "createInPlace", args: [line.text, line.priority, this.placeOf(spot.column, placeOfGap(cards, place)), line.repeat, line.labels] };
+						return { method: "createInPlace", args: [line.text, line.priority, this.placeOf(spot.column, placeOfGap(cards, place), job.newSection), line.repeat, line.labels] };
 					}
 				}
 				break;
@@ -548,7 +590,7 @@ export class QuickEntry {
 	private topLevelAfter(column: DropColumn, place: GapPlace): GapPlace {
 		const cards = this.look.cards(column);
 		let index = place.index;
-		while (index < cards.length && cards[index].group === place.group && cards[index].level > 0) index++;
+		while (index < cards.length && sameZone(cards[index], place) && cards[index].level > 0) index++;
 		return { ...place, index, level: 0 };
 	}
 
@@ -587,7 +629,8 @@ export class QuickEntry {
 	/** After the last card, in the last section, at the top level. */
 	private endOf(column: DropColumn): EntrySpot {
 		const sections = this.look.sections(column);
-		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, group: sections[sections.length - 1] ?? null } };
+		const last = sections.length > 0 ? zoneOf(sections[sections.length - 1]) : { group: null };
+		return { kind: "list", column, place: { kind: "gap", index: this.look.cards(column).length, level: 0, ...last } };
 	}
 
 	private find(key: TaskKey): { readonly column: DropColumn; readonly index: number } | null {
@@ -609,22 +652,33 @@ export class QuickEntry {
 		}
 	}
 
-	/** The section goes to the queue and the field closes; a blank name writes nothing. */
+	/**
+	 * The section goes to the queue and the field closes; a blank name writes nothing. In a project's part no empty section
+	 * is made: the field asks for its first task, and the two are written together.
+	 */
 	private enterSection(field: EntryField): void {
+		const name = field.text.trim();
+		const list = listSpot(this.run(field.run).spot);
+		if (list && list.place.project !== undefined) {
+			this.reset(name === "" ? null : { ...field, text: "", section: false, newSection: name });
+			return;
+		}
 		this.createSection(field);
 		this.reset(null);
 	}
 
-	/** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower. */
+	/** As in Obsidian: a level shallower, and the end of the entry where it can go no shallower; a section named for a task not typed goes with it. */
 	private enterBlank(): void {
-		if (this.shifted(-1)) this.indent(-1);
+		if (this.session.field?.newSection !== undefined) this.reset(null);
+		else if (this.shifted(-1)) this.indent(-1);
 		else this.reset(null);
 	}
 
 	/** The task goes to the queue; the next field opens at once, without a priority, labels or a repeat. A slot takes one task only. */
 	private enterTask(field: EntryField): void {
 		this.create(field);
-		this.reset(this.run(field.run).spot.kind === "slot" ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
+		const ends = this.run(field.run).spot.kind === "slot" || field.newSection !== undefined;
+		this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
 	}
 
 	/** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
@@ -672,7 +726,7 @@ export class QuickEntry {
 		const run = this.run(field.run);
 		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0 };
 		run.pending.push(line);
-		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
+		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line, ...(field.newSection !== undefined && { newSection: field.newSection }) });
 	}
 
 	/** A job for `run`, which keeps following the cards that land until the job is done. */
@@ -722,7 +776,7 @@ export class QuickEntry {
 		const list = listSpot(run.spot);
 		if (!list) return null;
 		const { place } = list;
-		const unwritten = run.pending.map((line): LevelCard => ({ level: line.level, group: place.group }));
+		const unwritten = run.pending.map((line): LevelCard => ({ level: line.level, group: place.group, ...(place.project !== undefined && { project: place.project }) }));
 		const shown: LevelCard[] = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
 		const shifted = shiftLevel(shown, { ...place, index: place.index + unwritten.length }, delta);
 		return shifted && { ...place, level: shifted.level };
@@ -743,7 +797,7 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 		case "list":
 			return { kind: "task", group: null, before: result.before };
 		case "group":
-			return { kind: "task", group: result.group, before: result.before };
+			return { kind: "task", group: result.group, before: result.before, ...(result.project !== undefined && { project: result.project }) };
 		case "nest":
 			return { kind: "subtask", parent: result.parent, before: result.before };
 		case "place":

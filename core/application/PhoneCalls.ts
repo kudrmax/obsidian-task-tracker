@@ -22,7 +22,8 @@ import {
 	type DayEvents,
 	type DropColumn,
 	type GroupedList,
-	type GroupName,
+	type GroupingState,
+	type ProjectNote,
 	StaleTaskError,
 	type SourceProblem,
 	type SourceStatus,
@@ -30,13 +31,14 @@ import {
 	TasksFileMissingError,
 } from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
-import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
+import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
 import { listView, sectionChoice } from "./sections";
+import { revealedGrouping, withFoldToggled, withGrouping } from "./projects";
 import { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type Operation, TaskRules } from "./TaskRules";
@@ -65,6 +67,10 @@ export interface DoorContext {
 	readonly fetched?: readonly CalendarSource[];
 	/** The steps of undo as the door last answered them; none before the first. */
 	readonly history?: UndoState;
+	/** The notes with the project tag (`ProjectNote`); none when left out: a task's project then comes from its own field alone. */
+	readonly projects?: readonly ProjectNote[];
+	/** How this device groups its lists by project, as the door last answered it; the defaults when left out. */
+	readonly grouping?: GroupingState;
 }
 
 /** A call's answer: the result, and what the host writes back; or the error, by its code. */
@@ -80,6 +86,8 @@ export type DoorAnswer =
 			readonly history?: UndoState;
 			/** The new `data.json` text: the host writes it. */
 			readonly settings?: string;
+			/** The device's grouping after this call: the host keeps it and hands it in again. */
+			readonly grouping?: GroupingState;
 	  }
 	| { readonly ok: false; readonly error: { readonly code: DoorErrorCode; readonly message: string } };
 
@@ -131,12 +139,14 @@ export interface WireDayEvents {
 /** The screen as a quick entry reads it, on the wire: each list's cards and sections, and which lists show. */
 export interface WireLook {
 	readonly cards: Partial<Record<DropColumn, readonly ListCard[]>>;
-	readonly sections?: Partial<Record<DropColumn, readonly GroupName[]>>;
+	readonly sections?: Partial<Record<DropColumn, readonly Header[]>>;
 	readonly sectioned?: Partial<Record<DropColumn, boolean>>;
 	/** The day the day's list shows. */
 	readonly day: string;
 	/** The lists the screen shows, in its order. */
 	readonly shown: readonly DropColumn[];
+	/** The project whose own view the screen is (`ProjectRef.link`); left out for the main screen. */
+	readonly project?: string;
 }
 
 class DoorError extends Error {
@@ -159,6 +169,7 @@ interface Effects {
 	step?: boolean;
 	history?: UndoState;
 	settings?: string;
+	grouping?: GroupingState;
 }
 
 /** One call's world: the rules under the settings given, at the moment given, over the texts given. */
@@ -189,9 +200,19 @@ class Call {
 		};
 		this.store = store;
 		this.rules = new TaskRules(store, clock);
-		this.reads = new TaskReads(this.rules, store, clock);
+		this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
+	}
+
+	/** The device's grouping as this call has it: handed in, with what the call changed. */
+	get grouping(): GroupingState {
+		return this.effects.grouping ?? this.context.grouping ?? {};
+	}
+
+	/** A change of the device's grouping: the answer carries it for the host to keep. */
+	keepGrouping(state: GroupingState): void {
+		if (state !== this.grouping) this.effects.grouping = state;
 	}
 
 	get settings(): TaskCalendarSettings {
@@ -282,6 +303,11 @@ type A = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const KEPT = (call: Call): Snapshot => call.snapshot();
 
+/** An optional project's part: left out, the whole list; `null`, the tasks of no project. */
+function scopeOf(args: readonly unknown[], at: number): string | null | undefined {
+	return args.length > at ? ((args[at] ?? null) as string | null) : undefined;
+}
+
 /** Every TaskService method a frontend calls, by name, over the call's text. */
 const TASKS: Readonly<Record<string, Handler>> = {
 	priorityLevels: (c) => c.reads.priorityLevels(),
@@ -290,7 +316,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	isBlank: (c, [text]) => c.reads.isBlank(text as string),
 	withPriority: (c, [text, prefix]) => c.reads.withPriority(text as string, (prefix ?? null) as string | null),
 	draftMarks: (c, [text, priority, labels]) => c.reads.draftMarks(text as string, (priority ?? null) as string | null, (labels ?? []) as string[]),
-	screen: (c, [date]) => c.ask(c.reads.screenRead(date as string)),
+	screen: (c, [date, project]) => c.ask(c.reads.screenRead(date as string, (project ?? undefined) as string | undefined)),
 	dayView: (c, [date]) => c.reads.dayView(KEPT(c), date as string),
 	soonWithoutDateView: (c) => c.reads.soonWithoutDateView(KEPT(c)),
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
@@ -300,6 +326,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item as A),
 	reveal: (c, [item]) => {
 		c.run(c.writes.revealUnfold(item as A));
+		c.keepGrouping(revealedGrouping(c.grouping, item as A));
 		return c.reads.screenOf(KEPT(c), item as A);
 	},
 	findIn: (c, [items, key]) => c.reads.findIn(items as A, key as A),
@@ -324,6 +351,10 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	setPriority: (c, [key, priority]) => c.run(c.writes.setPriority(key as A, (priority ?? null) as A)),
 	setLabels: (c, [key, labels]) => c.run(c.writes.setLabels(key as A, labels as A)),
 	setLabelsAll: (c, [steps]) => c.run(c.writes.setLabelsAll(steps as A)),
+	setProject: (c, [keys, project]) => c.run(c.writes.setProject(keys as A, (project ?? null) as string | null)),
+	projectNotes: (c) => c.reads.projectNotes(),
+	setGrouping: (c, [list, on]) => c.keepGrouping(withGrouping(c.grouping, list as A, on as boolean)),
+	toggleFold: (c, [list, key]) => c.keepGrouping(withFoldToggled(c.grouping, list as A, key as string)),
 	setReminder: (c, [key, reminder]) => c.run(c.writes.setReminder(key as A, reminder as A)),
 	togglePriority: (c, [keys, prefix]) => c.run(c.ask(c.writes.togglePriority(keys as A, prefix as string))),
 	toggleLabel: (c, [keys, name]) => c.run(c.ask(c.writes.toggleLabel(keys as A, name as string))),
@@ -363,8 +394,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key as A, list as A, name as string, (date ?? undefined) as A)),
 	toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys as A, (name ?? null) as A)),
 	moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list as A, (group ?? null) as A, place as A)),
-	renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list as A, group as string, name as string))),
-	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
+	renameGroup: (c, args) => c.run(c.ask(c.writes.renameGroup(args[0] as A, args[1] as string, args[2] as string, scopeOf(args, 3)))),
+	removeGroup: (c, args) => c.run(c.writes.removeGroup(args[0] as A, args[1] as string, scopeOf(args, 2))),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
 	applyAll: (c, [steps]) => c.run(c.writes.applyAll(steps as A)),
 	drop: (c, [tasks, to, day]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string))),
@@ -507,6 +538,7 @@ const SETTINGS_METHODS: readonly string[] = [
 	"addLevel",
 	"moveLevel",
 	"setLabelTag",
+	"setProjectTag",
 	"renameLabel",
 	"recolourLabel",
 	"removeLabel",
@@ -645,6 +677,7 @@ function lookOf(c: Call, look: WireLook): EntryLook {
 		day: () => look.day,
 		today: () => c.rules.today(),
 		shown: () => look.shown,
+		project: () => look.project ?? undefined,
 	};
 }
 

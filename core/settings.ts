@@ -70,8 +70,14 @@ export interface SourceSettings {
 	readonly staleAfterMinutes: number;
 }
 
+/** Which notes are projects. */
+export interface ProjectSettings {
+	/** A note with exactly this tag, in its properties or its text, is a project: `#project`. */
+	readonly projectTag: string;
+}
+
 /** The settings every frontend shares: the plugin's data.json holds them, with the TS view's own beside them. */
-export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings;
+export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings;
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -98,6 +104,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	labelTag: "label",
 	labels: [],
+	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 };
 

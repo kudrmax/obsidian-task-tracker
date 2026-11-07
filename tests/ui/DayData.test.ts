@@ -24,7 +24,8 @@ const event = (title: string): CalendarEvent => ({
 /** The screen `TaskService.screen` reads without a tasks file. */
 const noFile = async (date: LocalDate): Promise<ScreenView> => {
 	const none = { inbox: [], backlog: [], soon: [], now: [] };
-	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false };
+	const off = { canGroup: false, on: false, groups: [] };
+	return { day: { date, list: [], slotted: [] }, soon: [], inbox: [], backlog: [], done: [], sections: none, offer: { lists: none, ungrouped: "" }, missing: true, calendars: false, projects: { inbox: off, backlog: off, soon: off, now: off }, project: null };
 };
 
 class SlowCalendars implements CalendarService {
