@@ -11,10 +11,16 @@ public struct Themed<Value: Sendable & Hashable>: Sendable, Hashable {
     }
 }
 
-/// How a card's line runs to it from the task above: through it to a later sibling, or ending at it.
-public enum Branch: Sendable, Hashable {
-    case mid
-    case last
+/// A subtask's branch lines (`rules.branchOf`): whether its own line bends in (the last of its task's subtasks) or goes
+/// on to a sibling, and for each task further up, from the outermost subtask level, whether that one's line runs past it.
+public struct Branch: Decodable, Sendable, Hashable {
+    public let last: Bool
+    public let through: [Bool]
+
+    public init(last: Bool, through: [Bool]) {
+        self.last = last
+        self.through = through
+    }
 }
 
 /// A card as a column draws it: its task, how deep it stands, the corner, and its colour.
@@ -25,6 +31,9 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     public let due: DueLabel?
     public let repeats: Bool
     public let shades: Themed<Shades>?
+    /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
+    /// shorter than it; nil for neither, and on a list's card.
+    public let corner: [String]?
     /// The card's identity on the screen: its line as the file has it, so a card moved or ticked keeps it and the lists
     /// animate it to its new place instead of drawing a new card.
     public let id: String
@@ -32,8 +41,9 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// The card goes by `id`: its own, or its task's.
     public func names(_ id: String) -> Bool { self.id == id || item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, id: String? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, id: String? = nil) {
         self.id = id ?? item.id
+        self.corner = corner
         self.item = item
         self.level = level
         self.branch = branch
@@ -63,6 +73,8 @@ public struct BoardList: Sendable, Hashable {
     public let title: String
     public let groups: [BoardGroup]
     public let showsHeaders: Bool
+    /// The column shows sections (`tasks.columnSections`): a section's name may be typed in it.
+    public let sectioned: Bool
     /// Every card of the list in drawing order, as a drop reads the gaps between them.
     public var cards: [BoardCard] { groups.flatMap(\.cards) }
 }
@@ -83,9 +95,19 @@ public struct BoardSlot: Sendable, Hashable, Identifiable {
     public let card: BoardCard
     public let start: Int
     public let end: Int?
+    /// The start the task is put on in the file, which a stacked card shows.
+    public let slotStart: Int
     /// Where its card stands in the stack the core lays out: tasks never share the width.
     public let box: StackBox
     public var id: String { card.id }
+
+    public init(card: BoardCard, start: Int, end: Int?, slotStart: Int, box: StackBox) {
+        self.card = card
+        self.start = start
+        self.end = end
+        self.slotStart = slotStart
+        self.box = box
+    }
 }
 
 /// `StackBox`: a task card's place in the timeline's items area.
@@ -96,6 +118,15 @@ public struct StackBox: Decodable, Sendable, Hashable {
     public let overlay: Bool
     public let stacked: Bool
     public let hiddenDuration: Bool
+
+    public init(top: Double, height: Double, left: Double, overlay: Bool, stacked: Bool, hiddenDuration: Bool) {
+        self.top = top
+        self.height = height
+        self.left = left
+        self.overlay = overlay
+        self.stacked = stacked
+        self.hiddenDuration = hiddenDuration
+    }
 }
 
 /// The frontend's measures of the timeline, which the core lays its blocks out in.
@@ -125,6 +156,71 @@ public struct BoardHour: Sendable, Hashable {
     public let label: String
 }
 
+/// A line of the grid between the hours (`rules.gridMarks`): its minute from the day's start, and its label (`:30`) or none.
+public struct GridMark: Decodable, Sendable, Hashable {
+    public let minute: Int
+    public let label: String?
+}
+
+/// `Grid`: the minutes between the grid's labelled lines and between all its lines.
+public struct GridStep: Decodable, Sendable, Hashable {
+    public let labels: Int
+    public let lines: Int
+}
+
+/// `PlacedCard`: a card of a list as a drop sees it, where it stands without the carried ones.
+public struct PlacedCard: Sendable {
+    public let level: Int
+    public let group: String?
+    public let top: Double
+    public let height: Double
+
+    public init(level: Int, group: String?, top: Double, height: Double) {
+        self.level = level
+        self.group = group
+        self.top = top
+        self.height = height
+    }
+
+    var json: JSONValue { ["level": .number(Double(level)), "group": group.json, "top": .number(top), "height": .number(height)] }
+}
+
+/// `PlacedHead`: a section's header as a drop sees it, and the first card after it.
+public struct PlacedHead: Sendable {
+    public let group: String?
+    public let firstCard: Int
+    public let top: Double
+    public let height: Double
+
+    public init(group: String?, firstCard: Int, top: Double, height: Double) {
+        self.group = group
+        self.firstCard = firstCard
+        self.top = top
+        self.height = height
+    }
+
+    var json: JSONValue { ["group": group.json, "firstCard": .number(Double(firstCard)), "top": .number(top), "height": .number(height)] }
+}
+
+/// The frontend's measures of the grid between the hours (`rules.gridAt`).
+public struct GridMeasures: Sendable {
+    public let divisions: [Int]
+    public let labelGap: Double
+    public let tickMinutes: Int
+    public let tickGap: Double
+
+    public init(divisions: [Int], labelGap: Double, tickMinutes: Int, tickGap: Double) {
+        self.divisions = divisions
+        self.labelGap = labelGap
+        self.tickMinutes = tickMinutes
+        self.tickGap = tickGap
+    }
+
+    var json: JSONValue {
+        ["divisions": .array(divisions.map { .number(Double($0)) }), "labelGap": .number(labelGap), "tickMinutes": .number(Double(tickMinutes)), "tickGap": .number(tickGap)]
+    }
+}
+
 /// The calendar beside the day list: minutes from the start of the shown day.
 public struct BoardTimeline: Sendable, Hashable {
     public let hours: [BoardHour]
@@ -135,6 +231,10 @@ public struct BoardTimeline: Sendable, Hashable {
     public let now: Int?
     /// Where the timeline opens.
     public let opening: Int
+    /// An event that is over, whatever its calendar's colour (`rules.pastEventPaint`), on the system's ground.
+    public let pastPaint: Themed<EventPaint>
+    /// The hour's heights a pinch moves between, as the settings keep them (`timeline.zoomLevels`).
+    public let zoomLevels: [Double]
 }
 
 /// Everything the main screen draws for a day, read at one moment through the door.
@@ -174,13 +274,13 @@ extension TaskBoard {
         let day = wanted ?? today
         let screen: ScreenView = try read("tasks.screen", [.string(day)], over: files)
         let relation: String = try read("days.relation", [.string(day)], over: files)
-        let dayTitle: String = try rule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
+        let dayTitle: String = try readRule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
         var painter = Painter(board: self)
 
         func list(_ column: BoardColumn, _ items: [TaskItem], title: String) throws -> BoardList {
             let sections: ColumnSections? = try read("tasks.columnSections", [.string(column.rawValue), .string(day)], over: files)
             let listSections = sections.flatMap { screen.sections[$0.list] } ?? []
-            let view: ListView = try rule("rules.listView", [.array(items.map(\.json)), .bool(sections != nil), try .encoding(listSections)])
+            let view: ListView = try readRule("rules.listView", [.array(items.map(\.json)), .bool(sections != nil), try .encoding(listSections)])
             let corner = column == .day ? JSONValue.string(day) : .null
             let ungrouped = screen.offer["ungrouped"].string ?? ""
             let groups = try view.groups.map { group in
@@ -191,7 +291,7 @@ extension TaskBoard {
                     empty: group.empty,
                     menu: group.menu)
             }
-            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders)
+            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil)
         }
 
         let name: (String) throws -> String = { try self.read("tasks.listName", [.string($0)], over: files) }
@@ -226,27 +326,18 @@ extension TaskBoard {
     }
 
     private func cards(_ rows: [ListRow], corner: JSONValue, painter: inout Painter) throws -> [BoardCard] {
-        try rows.enumerated().map { index, row in
-            let due: CardDue? = try rule("rules.cardDue", [row.item.json, corner])
+        let levels = JSONValue.array(rows.map { .number(Double($0.level)) })
+        return try rows.enumerated().map { index, row in
+            let due: CardDue? = try readRule("rules.cardDue", [row.item.json, corner])
             return BoardCard(
                 item: row.item,
                 level: row.level,
-                branch: row.level == 0 ? nil : Self.branch(of: index, in: rows),
+                branch: try readRule("rules.branchOf", [levels, .number(Double(index))]),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
                 shades: try row.item.colors.first.map { try painter.shades($0) },
                 id: painter.identity(row.item))
         }
-    }
-
-    /// A subtask's line goes on past it when a sibling follows before the rows climb back over its level.
-    private static func branch(of index: Int, in rows: [ListRow]) -> Branch {
-        let level = rows[index].level
-        for row in rows[(index + 1)...] {
-            if row.level == level { return .mid }
-            if row.level < level { return .last }
-        }
-        return .last
     }
 
     private func timeline(day: String, today: String, screen: ScreenView, events: DayEvents, files: BoardFiles, measures: TimelineMeasures, painter: inout Painter) throws -> BoardTimeline {
@@ -258,27 +349,106 @@ extension TaskBoard {
             (event, try read("boundary.clipToDay", [.string(day), .number(event.startMs), .number(event.endMs)], over: files))
         }
         let spans = timed.map { ["start": JSONValue.number(Double($0.1.start)), "end": .number(Double($0.1.end ?? $0.1.start))] as JSONValue }
-        let levels: [EventLevel] = try rule("rules.eventLevels", [.array(spans)])
+        let levels: [EventLevel] = try readRule("rules.eventLevels", [.array(spans)])
         let placed = try zip(timed, levels).map { pair, level in
-            let left: Double = try rule("rules.overlayLeft", [.number(Double(level.level)), measures.insets])
+            let left: Double = try readRule("rules.overlayLeft", [.number(Double(level.level)), measures.insets])
             return BoardEvent(event: pair.0, start: pair.1.start, end: pair.1.end ?? pair.1.start, level: level.level, layer: level.layer, left: left, paint: try painter.event(pair.0))
         }
         let allDay = try events.allDay.map { BoardEvent(event: $0, start: 0, end: 0, level: 0, layer: 0, left: 0, paint: try painter.event($0)) }
         let shown = try screen.day.slotted.map { item -> (TaskItem, DaySpan) in (item, try read("tasks.shownSpan", [item.json, .string(day)], over: files)) }
         let taskSpans = JSONValue.array(shown.map { ["start": .number(Double($0.1.start)), "end": $0.1.end.map { .number(Double($0)) } ?? .null] })
         let eventSpans = JSONValue.array(placed.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
-        let boxes: [StackBox] = try rule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
-            let span: JSONValue = ["start": .number(Double(pair.1.start)), "end": pair.1.end.map { .number(Double($0)) } ?? .null]
-            let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
-            let corner: [String]? = try rule("rules.stackCorner", [flags, .number(Double(pair.0.slot?.start ?? pair.1.start)), span])
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: corner.map { DueLabel(day: $0[0], month: $0[1]) }, repeats: pair.0.repeats, shades: try pair.0.colors.first.map { try painter.shades($0) }, id: painter.identity(pair.0))
-            return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, box: box)
+            let start = pair.0.slot?.start ?? pair.1.start
+            let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner, id: painter.identity(pair.0))
+            return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
         let opening: DayOpening = try read("days.openAt", [.string(day)], over: files)
-        return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute)
+        let zoom: [ZoomStep] = try read("timeline.zoomLevels", over: files)
+        let past = Themed<EventPaint>(
+            dark: try readRule("rules.pastEventPaint", ["#000000", "#FFFFFF", "dark"]),
+            light: try readRule("rules.pastEventPaint", ["#FFFFFF", "#000000", "light"]))
+        return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute, pastPaint: past, zoomLevels: zoom.map(\.hourPx))
     }
+
+    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?) throws -> [String]? {
+        let span: JSONValue = ["start": .number(Double(shownStart)), "end": shownEnd.map { .number(Double($0)) } ?? .null]
+        let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
+        return try readRule("rules.stackCorner", [flags, .number(Double(start)), span])
+    }
+
+    /// The timeline's task cards stacked anew at another hour's height (a pinch), each with its corner as it then stands.
+    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures) throws -> [BoardSlot] {
+        guard !timeline.slots.isEmpty else { return [] }
+        let taskSpans = JSONValue.array(timeline.slots.map { ["start": .number(Double($0.start)), "end": $0.end.map { .number(Double($0)) } ?? .null] })
+        let eventSpans = JSONValue.array(timeline.events.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
+        let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        return try zip(timeline.slots, boxes).map { slot, box in
+            let old = slot.card
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
+            return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
+        }
+    }
+
+    /// The grid at an hour's height (`rules.gridAt`): the minutes between its labelled lines and between all its lines.
+    public func grid(hour: Double, measures: GridMeasures) throws -> GridStep {
+        try rule("rules.gridAt", [.number(hour), measures.json])
+    }
+
+    /// Every line between the hours of that grid (`rules.gridMarks`).
+    public func gridMarks(_ grid: GridStep) throws -> [GridMark] {
+        try rule("rules.gridMarks", [["labels": .number(Double(grid.labels)), "lines": .number(Double(grid.lines))], 24])
+    }
+
+    /// Whether a grid label at `y` hides under the now pill at `now` (nil: no now line on the day shown).
+    public func labelHides(y: Double, now: Double?, lift: Double, pill: Double) throws -> Bool {
+        try rule("rules.labelHidesNearNow", [.number(y), now.map(JSONValue.number) ?? .null, .number(lift), .number(pill)])
+    }
+
+    /// The gap a finger at `y` (`level` fractional) opens among `cards` as they stand without the carried ones (`rules.placeAt`).
+    public func placeAt(_ cards: [PlacedCard], y: Double, level: Double, shift: Double, room: JSONValue, heads: [PlacedHead], held: JSONValue, hysteresis: Double) throws -> JSONValue {
+        try rule("rules.placeAt", [.array(cards.map(\.json)), .number(y), .number(level), .number(shift), room, .array(heads.map(\.json)), held, .number(hysteresis)])
+    }
+
+    public func levelAt(x: Double, left: Double, width: Double, indent: Double) throws -> Double {
+        try rule("rules.levelAt", [.number(x), ["left": .number(left), "width": .number(width)], .number(indent)])
+    }
+
+    public func carriedMiddle(y: Double, grab: Double, cardHeight: Double) throws -> Double {
+        try rule("rules.carriedMiddle", [.number(y), .number(grab), .number(cardHeight)])
+    }
+
+    /// The branch an open gap draws among `levels` (`rules.gapBranch`).
+    public func gapBranch(levels: [Int], gap: JSONValue) throws -> Branch? {
+        try rule("rules.gapBranch", [.array(levels.map { ["level": .number(Double($0))] }), gap])
+    }
+
+    /// A row's branch among rows of these `levels` (`rules.branchOf`).
+    public func branchOf(levels: [Int], index: Int) throws -> Branch? {
+        try rule("rules.branchOf", [.array(levels.map { .number(Double($0)) }), .number(Double(index))])
+    }
+
+    /// The hour's heights a pinch moves between at this screen's whole-day height, the whole day first.
+    public func zoomRange(wholeDay: Double, levels: [Double]) throws -> [Double] {
+        let steps: [ZoomStep] = try rule("rules.levelsFor", [.number(wholeDay), Self.levels(levels)])
+        return steps.map(\.hourPx)
+    }
+
+    /// What a pinch let go at `hour` settles on, to keep on the device: `nil` for the whole day, else the hour's height.
+    public func zoomAfterPinch(hour: Double, wholeDay: Double, levels: [Double]) throws -> Double? {
+        let settled: JSONValue = try rule("rules.zoomAfterPinch", [.number(hour), .number(wholeDay), Self.levels(levels)])
+        return settled.number
+    }
+
+    /// The hour's height a zoom kept on the device opens at (`saved`: `"wholeDay"`, a height, or nothing yet).
+    public func zoomShown(saved: JSONValue, wholeDay: Double?, levels: [Double]) throws -> Double {
+        try rule("rules.zoomShown", [saved, wholeDay.map(JSONValue.number) ?? .null, Self.levels(levels)])
+    }
+
+    private static func levels(_ levels: [Double]) -> JSONValue { .array(levels.map { ["hourPx": .number($0)] }) }
 }
 
 /// The core's paints, each asked for once per drawing.
@@ -303,26 +473,31 @@ struct Painter {
     mutating func shades(_ color: String) throws -> Themed<Shades> {
         if let known = shadesByColor[color] { return known }
         let shades = Themed<Shades>(
-            dark: try board.rule("rules.shadesOf", [.string(color), "dark"]),
-            light: try board.rule("rules.shadesOf", [.string(color), "light"]))
+            dark: try board.readRule("rules.shadesOf", [.string(color), "dark"]),
+            light: try board.readRule("rules.shadesOf", [.string(color), "light"]))
         shadesByColor[color] = shades
         return shades
     }
 
     mutating func due(_ date: String) throws -> DueLabel {
         if let known = dueByDate[date] { return known }
-        let label: DueLabel = try board.rule("rules.dueLabel", [.string(date)])
+        let label: DueLabel = try board.readRule("rules.dueLabel", [.string(date)])
         dueByDate[date] = label
         return label
     }
 
     func event(_ event: WireEvent) throws -> Themed<EventPaint> {
-        let hex: String = try board.rule("rules.eventHex", [event.json])
-        let alpha: Double = try board.rule("rules.bgAlphaFor", [.string(event.source)])
+        let hex: String = try board.readRule("rules.eventHex", [event.json])
+        let alpha: Double = try board.readRule("rules.bgAlphaFor", [.string(event.source)])
         return Themed(
-            dark: try board.rule("rules.eventColors", [.string(hex), .number(alpha), "dark"]),
-            light: try board.rule("rules.eventColors", [.string(hex), .number(alpha), "light"]))
+            dark: try board.readRule("rules.eventColors", [.string(hex), .number(alpha), "dark"]),
+            light: try board.readRule("rules.eventColors", [.string(hex), .number(alpha), "light"]))
     }
+}
+
+/// `ZoomLevel`: a level of the timeline's zoom.
+struct ZoomStep: Decodable, Sendable {
+    let hourPx: Double
 }
 
 /// `ColumnSections`: whose sections a column shows.

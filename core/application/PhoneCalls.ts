@@ -19,7 +19,8 @@ import { cardDue } from "./cardDue";
 import { dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
-import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, shadesOf } from "./paints";
+import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
+import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
 	type CalendarSource,
@@ -34,6 +35,7 @@ import {
 	TasksFileMissingError,
 } from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
+import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
@@ -650,10 +652,29 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	stackCorner,
 	timeParts,
 	durationParts,
+	pastEventPaint,
+	parseZoomLevels,
+	formatZoomLevels,
+	levelsFor,
+	gridAt,
+	gridMarks,
+	zoomAfterPinch: (hourPx, wholeDayPx, levels) => zoomAfterPinch(hourPx, wholeDayPx ?? null, levels),
+	zoomShown: (saved, wholeDayPx, levels) => zoomShown(saved, wholeDayPx ?? null, levels),
+	labelHidesNearNow: (y, nowY, lift, pillHeight) => labelHidesNearNow(y, nowY ?? null, lift, pillHeight),
+	levelAt,
+	carriedMiddle,
+	placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
+	branchOf,
+	gapBranch,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR };
+
+/** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
+const TIMELINE: Readonly<Record<string, Handler>> = {
+	zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null),
+};
 
 /** A quick entry's look from the wire. */
 function lookOf(c: Call, look: WireLook): EntryLook {
@@ -757,6 +778,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	description: DESCRIPTION,
 	reminders: REMINDERS,
 	capture: CAPTURE,
+	timeline: TIMELINE,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 

@@ -27,7 +27,7 @@ body {
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
-	/* An event that is over, whatever its calendar's colour: the ground barely lifted, the bar and the title faded into it. */
+	/* An event that is over, whatever its calendar's colour: the ground barely lifted, the bar and the title faded into it. The core's `pastEventPaint` (core/application/paints.ts, PAST_SHARES) holds the same shares for the apps: change both together. */
 	--tc-event-past-lift: 1.5%;
 	--tc-event-past-ink: 12.5%;
 	--tc-event-past-lift-light: 1.2%;

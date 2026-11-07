@@ -1,4 +1,4 @@
-import { type GapPlace, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
+import { carriedMiddle, type GapPlace, levelAt, placeOfDrop, placesInGap, sameGap } from "../../../core/application/contracts";
 import { type CardSize, shownCardSize } from "../cardSize";
 import { DESIGN, LAYOUT, tokenPx } from "../design";
 import { type ListEntry, PLATE, type TaskList } from "../TaskList";
@@ -273,18 +273,12 @@ export class ListDrop implements DropTarget {
 
 	/** A card carried along: the gap is picked by its middle, so it goes into the gap its middle is nearest to. */
 	private cardY(y: number, drag: DragPayload, layout: Layout): number {
-		return y - drag.grabPx + layout.size.height / 2;
+		return carriedMiddle(y, drag.grabPx, layout.size.height);
 	}
 
-	/**
-	 * The level for a new task and a carried card alike: on the list's left half as shallow as the neighbours allow; right
-	 * of the middle a level deeper for each indent. So the hand picks a task, a subtask or one under that near the middle
-	 * of the list, never stretching to its left edge, wherever it holds the card.
-	 */
+	/** The level the finger's `x` asks for (`levelAt` in the core), in this list's box and indent. */
 	private levelAt(x: number, frame: ListFrame): number {
-		const r = frame.box;
-		const indent = this.layoutFor(frame).indent;
-		return indent > 0 ? (x - (r.left + r.width / 2)) / indent : 0;
+		return levelAt(x, { left: frame.box.left, width: frame.box.width }, this.layoutFor(frame).indent);
 	}
 
 	/** The drop line: through the middle of the gap, from the left edge of its level, with no height; a card moved to another level where it stood has it in the gap over its dashed place, never on it. */

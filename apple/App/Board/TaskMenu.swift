@@ -32,6 +32,10 @@ struct TaskMenu {
     let menu: TaskMenuModel
     let model: BoardModel
     let ask: (MenuQuestion) -> Void
+    /// Drawn on the full screen: Rename and Add Subtask type in its stack.
+    var inStack = false
+    /// The menu of the task its own full screen shows: no Open Full Screen.
+    var ownPage = false
 
     private var single: Bool { items.count == 1 }
 
@@ -99,10 +103,10 @@ struct TaskMenu {
     private func edits(_ item: TaskItem) -> [MenuNode] {
         let model = model
         var edits: [MenuNode] = []
-        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { model.renaming = item }) }
+        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { [inStack] in if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } }) }
         if menu.edits.contains("repeat") { edits.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
-        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { model.subtaskOf = item }) }
-        edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) })
+        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { [inStack] in if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } }) }
+        if !ownPage { edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
         edits.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
         return edits
     }
@@ -111,13 +115,14 @@ struct TaskMenu {
 // MARK: UIKit: a card's menu
 
 extension MenuNode {
+    /// `later`: a row that opens a sheet, an alert or a page runs once the menu has gone, as the menu's own end tells.
     @MainActor
-    static func uiMenu(_ nodes: [MenuNode], palette: (String) -> UIColor?) -> UIMenu {
-        UIMenu(children: nodes.map { $0.element(palette) })
+    static func uiMenu(_ nodes: [MenuNode], later: @escaping (@escaping @MainActor () -> Void) -> Void, palette: (String) -> UIColor?) -> UIMenu {
+        UIMenu(children: nodes.map { $0.element(later, palette) })
     }
 
     @MainActor
-    private func element(_ palette: (String) -> UIColor?) -> UIMenuElement {
+    private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
         switch self {
         case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
@@ -125,14 +130,14 @@ extension MenuNode {
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
             return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
-                if opens { Task { @MainActor in try? await Task.sleep(for: .milliseconds(350)); run() } } else { run() }
+                if opens { later { run() } } else { run() }
             }
         case .submenu(let title, let symbol, let subtitle, let children):
-            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(palette) })
+            let menu = UIMenu(title: title, image: UIImage(systemName: symbol), children: children.map { $0.element(later, palette) })
             menu.subtitle = subtitle
             return menu
         case .group(let row, let children):
-            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(palette) })
+            let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
             if row { menu.preferredElementSize = .medium }
             return menu
         }
