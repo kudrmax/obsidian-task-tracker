@@ -182,22 +182,23 @@ private struct EntryRow<Content: View>: View {
     }
 }
 
-/// Where a carried card would land: one card's room at the level it would take, outlined in the accent at that depth, a
-/// subtask's with the branch it will join; a new level slides it in or out with the system's spring.
+/// Where a carried card would land: one card's empty room, the rows parting as in an iOS list (board «3 —
+/// Перетаскивание»: no dashes, no line with a dot). Its level shows by the branch of that level drawn into the room, the
+/// line the card will join, which slides with the system's spring as the finger crosses a level's line.
 private struct GapSpace: View {
     let level: Int
     let branch: Branch?
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        RoundedRectangle(cornerRadius: CardMetrics.radius)
-            .fill(Palette.accent(scheme).opacity(0.12))
-            .strokeBorder(Palette.accent(scheme), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+        Color.clear
             .frame(height: CardMetrics.height)
-            .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch) } }
-            .padding(.leading, CGFloat(level) * CardMetrics.indent)
             .frame(maxWidth: .infinity)
-            .transition(.opacity)
+            .overlay(alignment: .topLeading) {
+                if let branch {
+                    BranchLine(branch: branch).padding(.leading, CGFloat(level) * CardMetrics.indent)
+                }
+            }
+            .transition(.identity)
             .accessibilityHidden(true)
     }
 }

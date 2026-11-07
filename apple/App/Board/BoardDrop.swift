@@ -112,9 +112,10 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         self.current = nil
     }
 
-    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedPreview) -> UITargetedPreview? {
+    /// The carried card settles into its place: into the gap, or onto the line's time.
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
         guard let landing, let view = interaction.view else { return nil }
-        let target = UIPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
+        let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
         return defaultPreview.retargetedPreview(with: target)
     }
 }

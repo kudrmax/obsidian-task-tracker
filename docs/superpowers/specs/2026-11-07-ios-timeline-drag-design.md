@@ -437,9 +437,15 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   back into the slot as one piece (spring), the slot hidden until it lands.
 - frontend-swift (M3): a card's lift preview is a still copy of its capsule, so the card giving its place up never
   blanks the preview.
-- frontend-swift (M4/M7): the gap is a dashed accent capsule (12% accent fill) at the level the drop will write, with
-  the branch it joins; every row's branch is asked over the rows as they stand without the carried ones, so a carried
-  subtask leaves no line hanging; the level change slides with `.snappy`.
+- frontend-swift (M4/M7): the gap is empty room of one card's height, the rows parting (board «3 — Перетаскивание»: no
+  dashes, no line with a dot); its level shows by its indent and the branch line of that level drawn into it, the line
+  the card will join, sliding with `.snappy` as the finger crosses a level's line. Every row's branch is asked over the
+  rows as they stand without the carried ones, so a carried subtask leaves no line hanging. The lifted copy keeps the
+  finger's position (it does not jump to the level's indent): the branch in the gap already says the level, and a copy
+  that snaps sideways under a still finger reads as a glitch.
+- frontend-swift (drop flight): the window's drop delegate implemented `previewForDropping` with `UITargetedPreview`
+  (the context-menu type), which UIKit never calls; with `UITargetedDragPreview` the carried card flies into the gap,
+  or onto its new time on the calendar.
 - frontend-swift (M5): Inbox and Soon are half the screen each, as the plugin's `--tc-half-column`; the day list is half
   beside Soon and its own width at Today, following the swipe between them.
 - frontend-swift (M6): `OnePlacePerSwipe` scroll target: a swipe settles on the place next to where it started, or back;
