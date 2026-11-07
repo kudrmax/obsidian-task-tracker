@@ -66,3 +66,11 @@ describe("in Now, which never groups by project, the task shows its project's ma
 		expect(card?.project?.mark).toBe(true);
 	});
 });
+
+describe("grouped Soon shows No project only when it holds something", () => {
+	it("no task without a project: no No project group", async () => {
+		const { svc } = await setup();
+		const titles = (await svc.screen(T)).projects.soon.groups.map((g) => g.title);
+		expect(titles).toEqual(["Сербия"]);
+	});
+});

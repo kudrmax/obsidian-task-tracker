@@ -3809,8 +3809,10 @@ ${key.title}`.toLowerCase();
     if (list === "backlog") for (const ref of projects.known()) refs.set(projectKey(ref.name), ref);
     for (const item of items) if (item.project && !refs.has(projectKey(item.project.name))) refs.set(projectKey(item.project.name), item.project);
     const named = byName([...refs.values()]).map((ref) => groupOf2(list, projectKey(ref.name), ref, items.filter((item) => item.project !== null && projectKey(item.project.name) === projectKey(ref.name)), sections, state, false));
-    const none = groupOf2(list, "", null, items.filter((item) => item.project === null), sections, state, true);
-    return { canGroup: true, on, groups: [...named, none] };
+    const loose = items.filter((item) => item.project === null);
+    const none = groupOf2(list, "", null, loose, sections, state, true);
+    const showsNone = list === "backlog" || loose.length > 0 || sections.some((s) => s.name !== null && s.empty);
+    return { canGroup: true, on, groups: showsNone ? [...named, none] : named };
   }
   function groupOf2(list, key, project, items, sections, state, withEmpty) {
     const zone = project?.link ?? null;
