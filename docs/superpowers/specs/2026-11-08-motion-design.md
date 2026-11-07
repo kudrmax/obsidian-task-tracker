@@ -160,6 +160,26 @@ with its `@State`, so a day turn resets the zoom.
 Fix: the scroll offset is computed for the new height after it is laid out, anchored on the pinch's minute; the
 timeline keeps its state across days.
 
+### R13. iPhone: the motion of a redraw is chosen by who asked for the read (iPhone)
+
+`instantNext` is one flag for every read and concurrent reads merge (`BoardModel.swift:165-202`): after Sync an instant
+`reload()` and an animated return-to-front read race, so the Mac's changes either slide or jump; search, the day turn
+and Undo read instantly over a pushed state. A section's id is its name, so renaming a section recreates its head.
+
+Fix: how a redraw moves follows from the difference between the two snapshots (R10), never from a flag of the call;
+reads are not merged into a different motion. Section heads are identified by a key that survives a rename (the core
+gives one if it is missing).
+
+### R14. iPhone: a page's data arrives after its first frame
+
+The task screen reads its subtasks and list name in `.task` after the push (subtasks appear a frame or two late, the
+title moves by the caption's height); search swaps its results whole after 150 ms; the tab bar hides and returns in one
+frame because `model.fullScreen.isEmpty` is not among the animated values (`BoardScreen.swift:28-35`). The plus on the
+× changes its icon with its own `bounce 0.2` spring while the system flies it home.
+
+Fix: a pushed page gets its data before it is pushed; search results change through the list's id-based transitions;
+every condition that changes the layout is animated by the transaction that changes it; one spring per moving thing.
+
 ### R12. Found along the way
 
 - Obsidian, phone: the autoscroll zone at the list's bottom lies under Obsidian's bottom bar; it must sit above it.
