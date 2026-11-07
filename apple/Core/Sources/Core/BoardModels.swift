@@ -169,6 +169,7 @@ public struct ListGroup: Decodable, Sendable {
     public let rows: [ListRow]
     public let empty: Bool
     public let menu: GroupMenu?
+    public let reorder: Bool?
 }
 
 /// `ListView`: a list in its sections, and whether it shows their headers.

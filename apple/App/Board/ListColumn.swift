@@ -14,28 +14,37 @@ struct ListColumn: View {
     /// Room after the last row, so the last card scrolls over the keyboard.
     static let trailingRoom: CGFloat = 160
 
+    /// The gap the finger points at: drawn by the drop line, the rows standing still.
     private var gap: ListGap? { model.gap?.column == list.column ? model.gap : nil }
+    /// The gap a card let go here flies into: the rows part for it.
+    private var settling: ListGap? { model.settling?.column == list.column ? model.settling : nil }
     private var key: String { "list.\(list.column.rawValue)" }
 
     var body: some View {
         let column = list.column
-        VStack(alignment: .leading, spacing: 8) {
+        let drawn = rows
+        VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
             ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
             ScrollViewReader { scroller in
                 ScrollView {
                     VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(rows) { row in
+                        ForEach(drawn) { row in
                             switch row {
                             case .header(let group, let header):
                                 SectionHeader(title: header, group: group, column: column, model: model)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, head: group.id, $0) }
+                                    // As the plugin's header: room above it but at the list's top, its bottom on the first card.
+                                    .padding(.top, row.id == drawn.first?.id ? 0 : ColumnMetrics.sectionGap)
+                                    .padding(.bottom, -CardMetrics.gap)
                             case .plate(let group):
-                                EmptyPlate { model.entry.openIn(column, group.name) }
+                                EmptyPlate(hot: gap?.group == group.name && gap?.line == nil) { model.entry.openIn(column, group.name) }
                             case .card(let card):
                                 CardRow(card: card, column: column, model: model, question: $question)
                                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { model.rest(column, card: card.id, $0) }
-                            case .gap(let level, let branch):
-                                GapSpace(level: level, branch: branch)
+                            case .gap:
+                                GapSpace()
+                            case .mark(let first):
+                                SectionMark().padding(.top, first ? 0 : ColumnMetrics.sectionGap)
                             case .pending(_, let text, let level, let branch):
                                 EntryRow(level: level, branch: branch) { PendingCapsule(text: text) }
                             case .field(let level, let branch, let section):
@@ -45,6 +54,9 @@ struct ListColumn: View {
                         Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
+                    .overlay(alignment: .topLeading) {
+                        if let line = gap?.line { DropLine(from: line) }
+                    }
                     .coordinateSpace(.named(Self.space))
                     .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
                 }
@@ -79,10 +91,14 @@ struct ListColumn: View {
         }
         var rows: [ListRowView] = []
         if entry?.at.kind == "top" { rows += typed }
+        let slot = model.carry?.section?.column == list.column ? model.sectionSlot : nil
         for (index, group) in list.groups.enumerated() {
+            if slot == index { rows.append(.mark(first: rows.isEmpty)) }
+            // A lifted section folds away, header and tasks, and the list closes over it.
+            if model.isLifted(group, in: list.column) { continue }
             if let header = group.header { rows.append(.header(group, header)) }
             let here = entry.flatMap { $0.at.kind == "in" && $0.at.section == index ? $0 : nil }
-            if group.empty, gap?.group != group.name, here == nil || here?.at.keepsPlate == true { rows.append(.plate(group)) }
+            if group.empty, here == nil || here?.at.keepsPlate == true { rows.append(.plate(group)) }
             var cards = cardRows(of: group)
             if let here {
                 let next = here.at.card.flatMap { list.cards[safe: $0] }
@@ -93,9 +109,11 @@ struct ListColumn: View {
                 if case .card(let card) = row { card.item.id != renaming } else { true }
             }
         }
+        if let slot, slot >= list.groups.count { rows.append(.mark(first: rows.isEmpty)) }
         if entry?.at.kind == "end" { rows += typed }
-        let carried = Set(list.cards.filter(model.isCarried).map(\.id))
-        return entry == nil && gap == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
+        // The card carried keeps its row, a dashed place; its subtasks fold away under it.
+        let carried = Set(list.cards.filter { model.isCarried($0) && !model.isWaiting($0) }.map(\.id))
+        return entry == nil && settling == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
     }
 
     /// The branch lines of every row while the field or a carry's gap stands in the list, or a card of it is carried, as
@@ -120,14 +138,14 @@ struct ListColumn: View {
         }
     }
 
-    /// A group's cards as drawn, with the carry's gap among them when it lands in this group.
+    /// A group's cards as drawn, with the room a card let go flies into when it lands in this group.
     private func cardRows(of group: BoardGroup) -> [ListRowView] {
         var rows = group.cards.map(ListRowView.card)
-        guard let gap, gap.group == group.name else { return rows }
+        guard let gap = settling, gap.group == group.name, !group.empty else { return rows }
         let others = model.others(in: list.column)
         let next = others[safe: gap.at].flatMap { $0.item.group == gap.group ? $0 : nil }
         let at = next.flatMap { card in rows.firstIndex { $0.id == card.id } } ?? rows.count
-        rows.insert(.gap(level: gap.level, branch: gap.branch), at: at)
+        rows.insert(.gap(level: gap.level, branch: nil), at: at)
         return rows
     }
 }
@@ -141,6 +159,8 @@ private enum ListRowView: Identifiable {
     case gap(level: Int, branch: Branch?)
     case pending(index: Int, text: String, level: Int, branch: Branch?)
     case field(level: Int, branch: Branch?, section: Bool)
+    /// Where a carried section would land, before a header or at the list's end.
+    case mark(first: Bool)
 
     static let fieldID = "\u{0}entry"
 
@@ -152,6 +172,7 @@ private enum ListRowView: Identifiable {
         case .gap: "\u{0}gap"
         case .pending(let index, _, _, _): "\u{0}pending/\(index)"
         case .field: Self.fieldID
+        case .mark: "\u{0}mark"
         }
     }
 
@@ -164,7 +185,7 @@ private enum ListRowView: Identifiable {
         switch self {
         case .card(let card): card.level
         case .gap(let level, _), .pending(_, _, let level, _), .field(let level, _, _): level
-        case .header, .plate: nil
+        case .header, .plate, .mark: nil
         }
     }
 }
@@ -182,24 +203,38 @@ private struct EntryRow<Content: View>: View {
     }
 }
 
-/// Where a carried card would land: one card's empty room, the rows parting as in an iOS list (board «3 —
-/// Перетаскивание»: no dashes, no line with a dot). Its level shows by the branch of that level drawn into the room, the
-/// line the card will join, which slides with the system's spring as the finger crosses a level's line.
+/// The room a card let go flies into: the rows part for it as it lands; it draws nothing of its own, the card brings its
+/// branch with it.
 private struct GapSpace: View {
-    let level: Int
-    let branch: Branch?
-
     var body: some View {
         Color.clear
             .frame(height: CardMetrics.height)
             .frame(maxWidth: .infinity)
-            .overlay(alignment: .topLeading) {
-                if let branch {
-                    BranchLine(branch: branch).padding(.leading, CGFloat(level) * CardMetrics.indent)
-                }
-            }
             .transition(.identity)
             .accessibilityHidden(true)
+    }
+}
+
+/// Where a carried card will land, as the plugin shows it (`DropLine`): the calendar's drop line between two cards, from
+/// a dot at the left edge of the level it picks to the list's right edge. The rows stand still under it.
+private struct DropLine: View {
+    let from: CGPoint
+    @Environment(\.colorScheme) private var scheme
+    static let dot: CGFloat = 8
+    static let thickness: CGFloat = 2
+
+    var body: some View {
+        GeometryReader { box in
+            HStack(spacing: 0) {
+                Circle().frame(width: Self.dot, height: Self.dot)
+                Rectangle().frame(height: Self.thickness)
+            }
+            .foregroundStyle(Palette.accent(scheme))
+            .frame(width: max(Self.dot, box.size.width - CardMetrics.columnInset - from.x), height: Self.dot)
+            .offset(x: from.x, y: from.y - Self.dot / 2)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -230,7 +265,7 @@ struct ColumnTitle: View {
         }
         .buttonStyle(.plain)
         .fontWeight(.semibold)
-        .frame(height: 32)
+        .frame(height: ColumnMetrics.titleRow)
         .padding(.horizontal, dayArrows ? 0 : 16)
     }
 
@@ -250,15 +285,20 @@ struct SectionHeader: View {
     @Bindable var model: BoardModel
     @State private var renaming = false
     @State private var name = ""
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Text(title)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(Palette.muted)
-            .frame(maxWidth: .infinity, minHeight: 30, alignment: .bottomLeading)
+            .font(.system(size: ColumnMetrics.groupName, weight: .semibold))
+            .frame(height: ColumnMetrics.groupLeading)
+            .foregroundStyle(group.name == nil ? Palette.muted : Palette.pullInk(scheme))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .padding(.leading, CardMetrics.leading)
-            .padding(.bottom, 4)
+            .padding(.trailing, 4)
+            .frame(height: ColumnMetrics.groupHead)
             .contentShape(.rect)
+            .modifier(SectionLift(group: group, column: column, model: model))
             .contextMenu {
                 if let menu = group.menu {
                     if menu.rename { Button("Rename", systemImage: "pencil") { name = menu.section; renaming = true } }
@@ -275,19 +315,97 @@ struct SectionHeader: View {
     }
 }
 
+/// A long press on a section's header lifts the section, as the plugin's (`GroupDrag`): moving on carries it among the
+/// list's sections; it shows as a card with the section's name and count over two layers of its tasks.
+private struct SectionLift: ViewModifier {
+    let group: BoardGroup
+    let column: BoardColumn
+    let model: BoardModel
+
+    func body(content: Content) -> some View {
+        if group.reorder {
+            content.onDrag {
+                model.startSectionCarry(column, group)
+                return NSItemProvider(object: "section" as NSString)
+            } preview: {
+                SectionFloat(name: group.header ?? "", count: group.cards.filter { $0.level == 0 }.count)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// The lifted section under the finger (`.tc-section-float`): its name and the number of its tasks on a card, two layers
+/// of its tasks beneath.
+private struct SectionFloat: View {
+    let name: String
+    let count: Int
+    @Environment(\.colorScheme) private var scheme
+    static let width: CGFloat = 190
+    static let height: CGFloat = CardMetrics.height + 2
+    static let step = CGSize(width: 7, height: 6)
+
+    var body: some View {
+        let dark = scheme == .dark
+        ZStack(alignment: .topLeading) {
+            layer(Color(hex: dark ? "#1C1C1E" : "#EFEFF2"), depth: 2)
+            layer(Color(hex: dark ? "#242426" : "#F7F7F9"), depth: 1)
+            HStack(spacing: 8) {
+                Text(name)
+                    .font(.system(size: CardMetrics.title, weight: .semibold))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(verbatim: "\(count)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.muted)
+            }
+            .padding(.leading, CardMetrics.leading)
+            .padding(.trailing, 12)
+            .frame(width: Self.width, height: Self.height)
+            .background(Color(hex: dark ? "#2C2C2E" : "#FFFFFF"), in: .capsule)
+        }
+        .frame(width: Self.width, height: Self.height + 2 * Self.step.height, alignment: .top)
+    }
+
+    private func layer(_ fill: Color, depth: CGFloat) -> some View {
+        Capsule().fill(fill)
+            .frame(width: Self.width - 2 * Self.step.width * depth, height: Self.height)
+            .offset(x: Self.step.width * depth, y: Self.step.height * depth)
+    }
+}
+
+/// Where a carried section would land (`.tc-group-drop`): a dashed card's room before a header or at the list's end.
+private struct SectionMark: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: CardMetrics.radius)
+            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            .frame(height: CardMetrics.height)
+            .accessibilityHidden(true)
+    }
+}
+
 /// A section with no task: its dashed plate under the header, as the plugin draws it.
 struct EmptyPlate: View {
+    /// A carried card would land in the section: the plate lights in the accent, as the plugin's (`is-hot`).
+    var hot = false
     /// A tap types a new task in the section.
     var open: (() -> Void)?
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Text("No tasks")
             .font(.system(size: CardMetrics.title))
-            .foregroundStyle(Palette.muted)
+            .foregroundStyle(hot ? Palette.accent(scheme) : Palette.muted)
             .padding(.leading, CardMetrics.leading)
             .frame(maxWidth: .infinity, minHeight: CardMetrics.height, alignment: .leading)
+            .background(hot ? Palette.dropBg(scheme) : .clear, in: .rect(cornerRadius: CardMetrics.radius))
             .overlay {
-                RoundedRectangle(cornerRadius: CardMetrics.radius).strokeBorder(Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                RoundedRectangle(cornerRadius: CardMetrics.radius)
+                    .strokeBorder(hot ? Palette.accent(scheme) : Palette.muted.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: hot ? [] : [4, 3]))
             }
             .contentShape(.rect(cornerRadius: CardMetrics.radius))
             .onTapGesture { open?() }
@@ -304,14 +422,18 @@ struct CardRow: View {
     @Binding var question: MenuQuestion?
 
     var body: some View {
-        let carried = model.isCarried(card)
+        let waiting = model.isWaiting(card)
+        // Its subtasks go with a carried card: they fold away under its dashed place.
+        let carried = model.isCarried(card) && !waiting
         HStack(spacing: 10) {
             if model.selecting {
                 SelectionCircle(on: model.picked.contains(card.id))
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            capsule(carried: carried)
-                .overlay(alignment: .topLeading) { if let branch = card.branch, !carried { BranchLine(branch: branch) } }
+            capsule(carried: carried || waiting)
+                // Behind the card from the lift on, with no fade: the card hides over it once the carried copy leaves.
+                .background { if waiting { WaitingPlace().transition(.identity) } }
+                .overlay(alignment: .topLeading) { if let branch = card.branch, !carried, !waiting { BranchLine(branch: branch) } }
                 .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
         }
         .contentShape(.rect)
@@ -342,6 +464,18 @@ struct CardRow: View {
                 onFold: card.item.can.fold ? { Task { await model.toggleCollapsed(card.item) } } : nil)
                 .frame(height: CardMetrics.height)
         }
+    }
+}
+
+/// Where a carried card was lifted from, as the plugin keeps it (`is-waiting`): a dashed outline of the card. The card itself
+/// hides over it once the carried copy has left.
+private struct WaitingPlace: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: CardMetrics.radius)
+            .strokeBorder(Palette.dash(scheme), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            .accessibilityHidden(true)
     }
 }
 

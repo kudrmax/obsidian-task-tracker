@@ -112,7 +112,8 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     /// The plus, the cancel target, or the cancel target held: each change one system spring.
     private func look() {
         let glassEffect = UIGlassEffect(style: .regular)
-        glassEffect.isInteractive = !cancelling
+        // Not the interactive glass: it would stretch after the finger while the plus itself is carried.
+        glassEffect.isInteractive = false
         if !cancelling { glassEffect.tintColor = accent }
         let image = UIImage(systemName: cancelling ? "xmark" : "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: cancelling ? 21 : 24, weight: .semibold))
         UIView.animate(springDuration: 0.35, bounce: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
@@ -129,54 +130,63 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
     // MARK: The plus carried
 
     /// The plus as the finger carries it: a live copy over the window, the same glass and symbol, while the slot stands as
-    /// the cancel target. No shadow or scale of its own: the glass is the plus's look wherever it is.
+    /// the cancel target, touchable all the while: a finger that comes down on it while the copy flies home catches the copy. No shadow or scale of its own: the glass is the plus's look wherever it is.
     private var lifted: UIView?
-    /// The copy flying back into the slot: a new carry waits until it has landed.
+    /// The copy flying back into the slot.
     private var homing: UIView?
     /// Where the finger came down, in the window.
     private var start: CGPoint = .zero
+    /// The finger has gone further than a tap's tremble at some point of this carry.
+    private var wandered = false
 
     /// A finger that moved no further than this and let go is a tap that trembled, not a carry.
     private static let tapReach: CGFloat = 10
 
+    /// The carried plus: the accent's fill and the plus in one solid piece, lifted by a shadow. A glass made at the lift
+    /// would first materialize empty and grey, so the finger would pull a blob with no plus in it.
     private func copy(in window: UIWindow) -> UIView {
-        let frame = convert(bounds, to: window)
-        let glassEffect = UIGlassEffect(style: .regular)
-        glassEffect.tintColor = accent
-        let glass = UIVisualEffectView(effect: glassEffect)
-        glass.frame = frame
-        glass.cornerConfiguration = .capsule()
-        glass.clipsToBounds = true
-        glass.isUserInteractionEnabled = false
+        let piece = UIView(frame: convert(bounds, to: window))
+        piece.backgroundColor = accent
+        piece.layer.cornerRadius = piece.bounds.height / 2
+        piece.layer.shadowColor = UIColor.black.cgColor
+        piece.layer.shadowOpacity = traitCollection.userInterfaceStyle == .dark ? 0.7 : 0.18
+        piece.layer.shadowRadius = 16
+        piece.layer.shadowOffset = CGSize(width: 0, height: 14)
+        piece.isUserInteractionEnabled = false
         let symbol = UIImageView(image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)))
         symbol.tintColor = .white
         symbol.contentMode = .center
-        symbol.frame = glass.bounds
+        symbol.frame = piece.bounds
         symbol.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        glass.contentView.addSubview(symbol)
-        return glass
+        piece.addSubview(symbol)
+        return piece
     }
 
+    /// Where the finger holds the carried plus, from its middle: it moves with the finger from the first point, no jump.
+    private var grip: CGPoint = .zero
+
     @objc private func carry(_ pan: UIPanGestureRecognizer) {
-        guard let window else { return }
-        let point = pan.location(in: window)
         switch pan.state {
         case .began:
-            guard !cancelling, homing == nil else { return }
-            start = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: window)
-            let copy = copy(in: window)
-            window.addSubview(copy)
-            lifted = copy
-            alpha = 0
+            guard let window, !cancelling else { return }
+            let point = pan.location(in: window)
+            let moved = pan.translation(in: window)
+            start = CGPoint(x: point.x - moved.x, y: point.y - moved.y)
+            wandered = false
+            lifted = catchHoming() ?? {
+                let made = copy(in: window)
+                window.addSubview(made)
+                return made
+            }()
+            if let lifted { grip = CGPoint(x: point.x - lifted.center.x, y: point.y - lifted.center.y) }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             onCarry()
-            UIView.animate(springDuration: 0.3, bounce: 0.15, options: [.allowUserInteraction, .beginFromCurrentState]) {
-                copy.center = point
-            }
         case .changed:
-            guard let lifted else { return }
-            lifted.center = point
-            if convert(bounds, to: window).contains(point) {
+            guard let lifted, let space = lifted.superview else { return }
+            let point = pan.location(in: space)
+            lifted.center = CGPoint(x: point.x - grip.x, y: point.y - grip.y)
+            if hypot(point.x - start.x, point.y - start.y) >= Self.tapReach { wandered = true }
+            if convert(bounds, to: space).contains(point) {
                 held = true
                 drop?.carryOff()
             } else {
@@ -184,9 +194,10 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
                 drop?.carry(at: point)
             }
         case .ended:
-            guard lifted != nil else { return }
-            let trembled = hypot(point.x - start.x, point.y - start.y) < Self.tapReach && !held
-            let onTarget = convert(bounds, to: window).contains(point)
+            guard let lifted, let space = lifted.superview else { return }
+            let point = pan.location(in: space)
+            let trembled = !wandered && hypot(point.x - start.x, point.y - start.y) < Self.tapReach
+            let onTarget = convert(bounds, to: space).contains(point)
             // Taken by a place, the field opens there and the plus goes back to its slot under the bar all the same.
             if trembled || onTarget || drop?.letGo() != true {
                 drop?.carryOff()
@@ -204,19 +215,52 @@ final class PlusControl: UIControl, UIDropInteractionDelegate {
         }
     }
 
+    /// The copy flying home, stopped where it shows now and handed to the finger.
+    private func catchHoming() -> UIView? {
+        guard let homing else { return nil }
+        self.homing = nil
+        let shown = homing.layer.presentation()?.position ?? homing.center
+        homing.layer.removeAllAnimations()
+        homing.center = shown
+        return homing
+    }
+
     /// Let go: the plus flies back into its slot as one piece and stands there again, as the system returns a cancelled
-    /// drag; until it lands, a new touch on the plus starts no carry.
+    /// drag; a finger that comes down on the plus before it lands takes it again from where it flies.
     private func flyHome() {
-        guard let lifted, let window else { return }
+        guard let lifted else { return }
         self.lifted = nil
+        guard let space = lifted.superview, window != nil else { return settle(lifted) }
         homing = lifted
         UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
-            lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: window)
+            lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: space)
         } completion: { _ in
-            self.alpha = 1
-            lifted.removeFromSuperview()
-            self.homing = nil
+            guard self.homing === lifted else { return }
+            self.settle(lifted)
         }
+    }
+
+    /// The copy gone and the plus in its slot again.
+    private func settle(_ copy: UIView) {
+        copy.removeFromSuperview()
+        if homing === copy { homing = nil }
+    }
+
+    /// The plus taken off the screen while carried or flying home (the bar hides): the carry ends and no copy is left.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window == nil else { return }
+        if lifted != nil {
+            let (drop, onCancel, onEnd) = (drop, onCancel, onEnd)
+            // Out of the screen's update that took the plus away.
+            DispatchQueue.main.async {
+                drop?.carryOff()
+                onCancel()
+                onEnd()
+            }
+        }
+        for copy in [lifted, homing].compactMap({ $0 }) { settle(copy) }
+        lifted = nil
     }
 
     // MARK: The cancel target

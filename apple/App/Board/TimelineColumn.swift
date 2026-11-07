@@ -191,14 +191,13 @@ struct TimelineColumn: View {
     private func slotCard(_ slot: BoardSlot) -> some View {
         let tall = CGFloat(slot.box.height)
         if model.selecting {
-            TaskCapsule(card: slot.card, height: tall, over: slot.box.overlay).opacity(0.5)
+            TaskCapsule(card: slot.card, height: tall).opacity(0.5)
         } else {
             CardButton(
                 card: slot.card,
                 menu: { later in model.cardMenu(slot.card.item, ask: { question = $0 }, later: later) },
                 ringed: model.found == slot.id,
                 height: tall,
-                over: slot.box.overlay,
                 carried: model.isCarried(slot.card),
                 onTouch: { model.found = nil },
                 onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
