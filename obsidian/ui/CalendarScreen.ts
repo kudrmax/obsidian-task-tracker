@@ -12,7 +12,7 @@ import { DayData } from "./DayData";
 import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
-import { ListDrop } from "./drag/ListDrop";
+import { type ColumnTitle, ListDrop } from "./drag/ListDrop";
 import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { ColumnMenu, GroupMenu } from "./menu/GroupMenu";
@@ -276,7 +276,7 @@ export class CalendarScreen extends Component {
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
 		});
-		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap());
+		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap(), this.columnTitle("day"));
 		this.doneEl = el(root, "div", "tc-done");
 		this.doneList = new TaskList(el(this.doneEl, "div"), {
 			items: () => this.data.done,
@@ -301,7 +301,7 @@ export class CalendarScreen extends Component {
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
 		});
-		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
+		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap(), this.columnTitle("inbox"));
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
 		const backlogTitle = this.backlogTitle;
 		backlogTitle.addEventListener("click", () => {
@@ -322,7 +322,7 @@ export class CalendarScreen extends Component {
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
 		});
-		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
+		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap(), this.columnTitle("backlog"));
 		this.soonEl = el(root, "div", "tc-soon");
 		this.soonList = new TaskList(el(this.soonEl, "div"), {
 			items: () => this.unnamed(this.data.soon),
@@ -339,7 +339,7 @@ export class CalendarScreen extends Component {
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
 		});
-		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap());
+		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap(), this.columnTitle("soon"));
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
 		el(el(root, "div", "tc-divider is-fixed"), "div", "tc-divider-line");
 		new Divider(el(root, "div"), {
@@ -871,6 +871,14 @@ export class CalendarScreen extends Component {
 		const zoom = zoomAfterPinch(hourPx, this.wholeDayPx(), this.settings.zoomLevels);
 		this.wholeDay = zoom === "wholeDay";
 		void this.deps.settings.set({ zoom });
+	}
+
+	/** A column's title as a place to drop: what a drop there means is the screen's (`ScreenView.titleDrops`). */
+	private columnTitle(column: ListColumn): ColumnTitle {
+		return {
+			el: () => (column === "backlog" ? this.backlogTitle : (this.headers?.titleOf(column) ?? null)),
+			drop: () => this.data.titleDrop(column),
+		};
 	}
 
 	/** The two columns the window shows, as places to drop. */

@@ -276,6 +276,13 @@ Obsidian frontend:
     core, so the guard reaches it too.
 33. **Cmd+Z and Cmd+Shift+Z in a plain field** (search, a section's name) undo and redo the field's own text and go no
     further, so the app's Edit menu never hears them.
+34. **The lit title** (Obsidian frontend): a section header has no light of its own under a drop, so the title takes the
+    light of the drop target it is closest to, the empty section's plate: in its own rounded box (the title's radius
+    and padding, as it has for its tap) the ground `--tc-drop-bg` and the text `--tc-accent`; no border, no new shape.
+    The drop line hides while the title is lit.
+35. **The title's target** is the whole title row across its column (the column's width, the title's height), not the
+    letters only, so a finger finds it. A task or a stack lights it; the plus does not: a new task still lands only
+    between cards, and over the title it keeps the place on the list's top as before.
 
 ## Ideas for later
 
