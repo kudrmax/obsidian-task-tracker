@@ -8,7 +8,7 @@ import { Grips } from "./kit/Grips";
 import { markColours, renderMeta, renderProjectMark, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
-import { durationParts, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
+import { gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackCorner, stackTasks, type TaskSpan } from "./timelineLayout";
 import type { LocalDate, Slot } from "./types";
 
 export interface TimelineDeps {
@@ -571,7 +571,7 @@ export class Timeline {
 	 */
 	private fillMeta(task: PlacedTask, span: TaskSpan, stacked: boolean, hiddenDuration: boolean): void {
 		const stretching = this.stretch?.el === task.el;
-		const parts = stretching ? null : stacked ? timeParts(task.item.slot!.start) : hiddenDuration && span.end !== null ? durationParts(span.end - span.start) : null;
+		const parts = stretching ? null : stackCorner({ stacked, hiddenDuration }, task.item.slot!.start, span);
 		task.meta.classList.toggle("is-hidden", parts === null);
 		const [top, bottom] = task.meta.children;
 		top.textContent = parts?.[0] ?? "";

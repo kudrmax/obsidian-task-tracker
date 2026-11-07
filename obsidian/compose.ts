@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import { Notice, type App } from "obsidian";
 import { calendarPath } from "../core/application/calendarFile";
 import { composeCore, type Core } from "../core/application/composeCore";
 import { tasksFilePath } from "../core/application/documentText";
@@ -12,7 +12,10 @@ import { GoogleCalendarFeed } from "./infrastructure/GoogleCalendarFeed";
 import { browserLoginDeps, GoogleRedirectLogin } from "./infrastructure/GoogleRedirectLogin";
 import { requestToken } from "./infrastructure/GoogleToken";
 import { obsidianHttp } from "./infrastructure/ObsidianHttp";
+import { ObsidianSync } from "./infrastructure/ObsidianSync";
 import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
+import { SyncRoundTrip } from "./infrastructure/SyncRoundTrip";
+import { SyncWait, type LeaveSignal } from "./infrastructure/SyncWait";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
 import { LocalGroupingStore } from "./infrastructure/LocalGroupingStore";
@@ -27,6 +30,10 @@ export interface Services extends Core {
 	receiveLogin(params: Record<string, string>): Promise<void>;
 	/** Keeps the work calendar export in the plugin's folder for Scriptable. Returns the unsubscribe. */
 	keepWorkExportInstalled(): () => void;
+	/** The iPhone app's Sync button: runs Obsidian Sync and, on the phone, hands back to the app with the result. */
+	syncForApp(): void;
+	/** Drops a wait under way, when the plugin unloads. */
+	stopSyncForApp(): void;
 }
 
 export interface ServicesHost {
@@ -46,6 +53,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workExport = new WorkCalendarExportScript(app.vault.adapter, host.pluginDir, settings);
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
+	const sync = new ObsidianSync(app);
+	const syncRoundTrip = new SyncRoundTrip({ host: { ...host.shortcuts, notice: showNotice }, sync, wait: new SyncWait(sync, windowTimers, documentHidden) });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
 	const tasksPath = () => tasksFilePath(settings.get()) ?? "";
 	const projects = new VaultProjects(new ObsidianNoteIndex(app, tasksPath), () => settings.get().projectTag, (listener) => settings.onChange(listener));
@@ -68,6 +77,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		work,
 		receiveLogin: (params) => login.receive(params),
 		keepWorkExportInstalled: () => workExport.keepInstalled(),
+		syncForApp: () => syncRoundTrip.run(),
+		stopSyncForApp: () => syncRoundTrip.stop(),
 	};
 }
 
@@ -76,6 +87,23 @@ const windowTicker: Ticker = {
 	every: (ms, tick) => {
 		const id = window.setInterval(tick, ms);
 		return () => window.clearInterval(id);
+	},
+};
+
+/** A notice kept until hidden. */
+function showNotice(text: string): () => void {
+	const notice = new Notice(text, 0);
+	return () => notice.hide();
+}
+
+/** iOS hides the page when Obsidian leaves the screen: back to the app, home or another app. */
+const documentHidden: LeaveSignal = {
+	onLeave: (listener) => {
+		const changed = () => {
+			if (document.hidden) listener();
+		};
+		document.addEventListener("visibilitychange", changed);
+		return () => document.removeEventListener("visibilitychange", changed);
 	},
 };
 
