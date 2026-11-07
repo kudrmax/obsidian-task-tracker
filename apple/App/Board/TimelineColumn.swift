@@ -59,6 +59,7 @@ struct TimelineColumn: View {
                 }
                 .scrollPosition($position)
                 .scrollIndicators(.hidden)
+                .softTopEdge()
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
                     visible = height

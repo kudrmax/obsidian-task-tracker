@@ -47,6 +47,7 @@ struct ListColumn: View {
                     .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
                 }
                 .scrollIndicators(.hidden)
+                .softTopEdge()
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.rest(column, width: $0) }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
                 // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
@@ -91,21 +92,25 @@ struct ListColumn: View {
             }
         }
         if entry?.at.kind == "end" { rows += typed }
-        return entry == nil ? rows : Self.branched(rows, model: model)
+        let carried = Set(list.cards.filter(model.isCarried).map(\.id))
+        return entry == nil && gap == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
     }
 
-    /// The branch lines of every row while the field stands in the list, as the core draws a subtask's over the levels
-    /// of the list with the field in it: a card above the field keeps its line going down to it.
-    private static func branched(_ rows: [ListRowView], model: BoardModel) -> [ListRowView] {
-        let branches = model.branches(levels: rows.compactMap(\.level))
+    /// The branch lines of every row while the field or a carry's gap stands in the list, or a card of it is carried, as
+    /// the core draws a subtask's over the levels of the rows as they stand: a card above the field or the gap keeps its
+    /// line going down to it, and a carried card's place closes up with no line left hanging into it.
+    private static func branched(_ rows: [ListRowView], carried: Set<String>, model: BoardModel) -> [ListRowView] {
+        let standing = rows.filter { !$0.isCarried(carried) }
+        let branches = model.branches(levels: standing.compactMap(\.level))
         var at = -1
         return rows.map { row in
-            guard let level = row.level else { return row }
+            guard let level = row.level, !row.isCarried(carried) else { return row }
             at += 1
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
                 return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, id: card.id))
+            case .gap: return .gap(level: level, branch: branch)
             case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
             case .field(_, _, let section): return .field(level: level, branch: branch, section: section)
             default: return row
@@ -148,6 +153,10 @@ private enum ListRowView: Identifiable {
         }
     }
 
+    func isCarried(_ carried: Set<String>) -> Bool {
+        if case .card(let card) = self { carried.contains(card.id) } else { false }
+    }
+
     /// The depth of a row that stands among the cards.
     var level: Int? {
         switch self {
@@ -171,21 +180,22 @@ private struct EntryRow<Content: View>: View {
     }
 }
 
-/// Where a carried card would land: one card's room at the level it would take, a subtask's with its branch.
+/// Where a carried card would land: one card's room at the level it would take, outlined in the accent at that depth, a
+/// subtask's with the branch it will join; a new level slides it in or out with the system's spring.
 private struct GapSpace: View {
     let level: Int
     let branch: Branch?
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Color.clear
+        RoundedRectangle(cornerRadius: CardMetrics.radius)
+            .fill(Palette.accent(scheme).opacity(0.12))
+            .strokeBorder(Palette.accent(scheme), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
             .frame(height: CardMetrics.height)
+            .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch) } }
+            .padding(.leading, CGFloat(level) * CardMetrics.indent)
             .frame(maxWidth: .infinity)
-            .overlay(alignment: .topLeading) {
-                if let branch {
-                    BranchLine(branch: branch).padding(.leading, CGFloat(level) * CardMetrics.indent)
-                }
-            }
-            .transition(.identity)
+            .transition(.opacity)
             .accessibilityHidden(true)
     }
 }
@@ -344,4 +354,27 @@ struct SelectionCircle: View {
             .contentTransition(.symbolEffect(.replace))
             .accessibilityLabel(on ? "Selected" : "Not selected")
     }
+}
+
+/// A list or the calendar fades out softly at its top edge, where it scrolls under its title, over half a card's height;
+/// only while something is under that edge, so a list at its top shows no fade. iOS's own soft scroll edge shows only
+/// under the system's bars, and these columns scroll under their own titles: a mask of the same kind.
+private struct SoftTopEdge: ViewModifier {
+    @State private var under: CGFloat = 0
+    private static let fade = CardMetrics.height / 2
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { min(Self.fade, max(0, $0.contentOffset.y + $0.contentInsets.top)) } action: { _, y in under = y }
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: under)
+                    Rectangle()
+                }
+            }
+    }
+}
+
+extension View {
+    func softTopEdge() -> some View { modifier(SoftTopEdge()) }
 }

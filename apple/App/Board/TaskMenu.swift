@@ -24,8 +24,10 @@ indirect enum MenuNode {
     case group(row: Bool, children: [MenuNode])
 }
 
-/// The task's menu as iOS 26 draws a context menu: the statuses in a row on top, then the pages, the edits and the ways
-/// out, Delete last. Every row is the core's `TaskMenuModel`: the menu offers what it offers.
+/// The task's menu as iOS 26 draws a context menu, short enough to fit beside a card anywhere on the screen with no
+/// scroll, as Notes and Files keep theirs: the most used actions as one row of icons on top (Done, Rename, Add Subtask,
+/// Delete), then the other statuses, the places and marks, each a row that opens one level down, and the pages. Every row
+/// is the core's `TaskMenuModel`: the menu offers what it offers.
 @MainActor
 struct TaskMenu {
     let items: [TaskItem]
@@ -40,21 +42,35 @@ struct TaskMenu {
     private var single: Bool { items.count == 1 }
 
     var nodes: [MenuNode] {
-        var nodes: [MenuNode] = [.group(row: true, children: menu.statuses.map { status in
-            .action(title: StatusWords.title(status.id), symbol: StatusWords.symbol(status.id), opens: status.confirm) { [items, model, ask] in
-                if status.confirm { ask(.status(items, status.id)) } else { Task { await model.pickStatus(items, status.id) } }
-            }
-        })]
-        nodes.append(.group(row: false, children: pages))
-        if single, let item = items.first { nodes.append(.group(row: false, children: edits(item))) }
-        if let remove = menu.remove {
-            nodes.append(.group(row: false, children: [
-                .action(title: single ? "Delete" : "Delete \(items.count) Tasks", symbol: "trash", destructive: true, opens: remove.confirm && single) { [items, model, ask] in
-                    if remove.confirm && single { ask(.remove(items)) } else { Task { await model.remove(items) } }
-                },
-            ]))
+        let first = menu.statuses.first { $0.id == "done" } ?? menu.statuses.first
+        let others = menu.statuses.filter { $0.id != first?.id }
+        var row: [MenuNode] = first.map { [status($0)] } ?? []
+        if single, let item = items.first { row += quickEdits(item) }
+        if let remove = remove { row.append(remove) }
+        var nodes: [MenuNode] = [.group(row: true, children: row)]
+        var marks: [MenuNode] = []
+        if !others.isEmpty {
+            marks.append(.submenu(title: "Status", symbol: "circle.dashed", subtitle: nil, children: others.map(status)))
         }
+        marks += pages
+        nodes.append(.group(row: false, children: marks))
+        if single, let item = items.first { nodes.append(.group(row: false, children: opens(item))) }
         return nodes
+    }
+
+    private func status(_ status: MenuStatus) -> MenuNode {
+        let items = items, model = model, ask = ask
+        return .action(title: StatusWords.title(status.id), symbol: StatusWords.symbol(status.id), opens: status.confirm) {
+            if status.confirm { ask(.status(items, status.id)) } else { Task { await model.pickStatus(items, status.id) } }
+        }
+    }
+
+    private var remove: MenuNode? {
+        guard let remove = menu.remove else { return nil }
+        let items = items, model = model, ask = ask, single = single
+        return .action(title: single ? "Delete" : "Delete \(items.count) Tasks", symbol: "trash", destructive: true, opens: remove.confirm && single) {
+            if remove.confirm && single { ask(.remove(items)) } else { Task { await model.remove(items) } }
+        }
     }
 
     private var pages: [MenuNode] {
@@ -100,15 +116,23 @@ struct TaskMenu {
         return pages
     }
 
-    private func edits(_ item: TaskItem) -> [MenuNode] {
-        let model = model
+    /// Rename and Add Subtask, typed in place: the row on top.
+    private func quickEdits(_ item: TaskItem) -> [MenuNode] {
+        let model = model, inStack = inStack
         var edits: [MenuNode] = []
-        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { [inStack] in if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } }) }
-        if menu.edits.contains("repeat") { edits.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
-        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { [inStack] in if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } }) }
-        if !ownPage { edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
-        edits.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
+        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } }) }
+        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } }) }
         return edits
+    }
+
+    /// The pages a task opens: its repeat, its full screen, its line in Obsidian.
+    private func opens(_ item: TaskItem) -> [MenuNode] {
+        let model = model
+        var opens: [MenuNode] = []
+        if menu.edits.contains("repeat") { opens.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
+        if !ownPage { opens.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
+        opens.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
+        return opens
     }
 }
 

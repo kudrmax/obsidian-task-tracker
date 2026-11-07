@@ -71,6 +71,9 @@ struct CaptureView: View {
             }
         }
         .onChange(of: text) { if !text.isEmpty { added = nil } }
+        // The field is focused as the screen appears, so the keyboard rises with it and typing starts at once.
+        .defaultFocus($typing, true)
+        .onAppear { typing = true }
         .task { readLists() }
         .onChange(of: scene) { if scene == .active { readLists() } }
         .sensoryFeedback(.success, trigger: added) { _, new in new != nil }
