@@ -1,4 +1,5 @@
 import type { SearchGroup, SearchHit, SectionKey, TaskService } from "../../../core/application/contracts";
+import { ownUndo } from "../fieldUndo";
 import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";
@@ -50,6 +51,7 @@ export class SearchWindow {
 		this.input.placeholder = "Search tasks";
 		this.input.setAttribute("aria-label", "Search tasks");
 		this.input.addEventListener("input", () => void this.find(this.input.value));
+		ownUndo(this.input);
 		this.input.addEventListener("keydown", (e) => this.onKey(e));
 		this.results = el(null, "div", "tc-search-results");
 		if (deps.desktop) {

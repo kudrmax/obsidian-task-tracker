@@ -1,5 +1,6 @@
 import { SectionNameEntry } from "../../core/application/contracts";
 import { el } from "./dom";
+import { ownUndo } from "./fieldUndo";
 
 export interface GroupNameFieldOptions {
 	readonly value: string;
@@ -17,6 +18,7 @@ export const GroupNameField = {
 		input.value = opts.value;
 		input.enterKeyHint = "done";
 		const entry = new SectionNameEntry((name) => opts.onDone(name));
+		ownUndo(input);
 		input.addEventListener("keydown", (e) => {
 			if (e.key !== "Enter" && e.key !== "Escape") return;
 			e.preventDefault();

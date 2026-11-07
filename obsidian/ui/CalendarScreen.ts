@@ -1048,7 +1048,7 @@ export class CalendarScreen extends Component {
 	}
 
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
-	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
+	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link), this.where.keys);
 
 	/** The task over the whole view; one already open there takes it in over its own. `editing` puts the caret in its description. */
 	private openFull(item: TaskItem, editing: boolean): void {

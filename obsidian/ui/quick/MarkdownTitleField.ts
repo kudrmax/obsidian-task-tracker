@@ -3,6 +3,7 @@ import { EditorView, placeholder } from "@codemirror/view";
 import { type App, Scope } from "obsidian";
 import { el } from "../dom";
 import { type EditorHost, EmbeddedEditor } from "../markdown/EmbeddedEditor";
+import { holdLineCommands } from "../markdown/lineCommands";
 import { LINE_BREAK, oneLine } from "../../../core/application/contracts";
 import { composingKey, type TitleField, type TitleFieldOptions } from "./TitleField";
 
@@ -64,6 +65,7 @@ export class MarkdownTitleField implements TitleField {
 		});
 		this.app = app;
 		this.scope = new Scope(keys);
+		holdLineCommands(app, this.scope);
 		this.scope.register(["Alt"], "Tab", () => {
 			if (!this.composing) events.onSwitch();
 			return false;

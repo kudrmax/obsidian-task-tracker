@@ -253,6 +253,14 @@ Obsidian frontend:
     menus and lifted cards open there, and the card size and the priority and label colours are put on every window.
 31. **The block's lists end one short step under their last card** (20 px over the wheel's row), not the main screen's
     64 px fade: a block sized to its cards has nothing under the wheel to fade, and the board draws it so.
+32. **A task's fields take Obsidian's line commands and do nothing** (the lead's call, after Cmd+L wrote
+    `- [ ] - [ ] **word**[]()`): the hotkeys of the commands that change what a line is (checkbox, lists, headings, quote,
+    callout, code, math, table, rule, line swap, list indent) are taken in the title's and the description's own editor
+    keymap and in their scope, everywhere the fields stand. The core strips a list, checkbox, heading or quote marker from
+    a title's start on every write (`taskTitle`); inline marks stay. The Swift app's title field writes through the same
+    core, so the guard reaches it too.
+33. **Cmd+Z and Cmd+Shift+Z in a plain field** (search, a section's name) undo and redo the field's own text and go no
+    further, so the app's Edit menu never hears them.
 
 ## Ideas for later
 
