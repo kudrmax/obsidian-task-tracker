@@ -244,6 +244,13 @@ body {
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
 	--tc-section-gap: var(--tc-space-10);
+	/* A project group's header (Backlog and Soon grouped by project): the chevron before the title, a little into the padding, turned down while the group is open; the arrow that opens the note. */
+	--tc-group-chevron-out: var(--tc-space-6);
+	--tc-stroke-group-chevron: var(--tc-stroke-2-4);
+	--tc-group-open-turn: 90deg;
+	--tc-stroke-group-open: var(--tc-stroke-2);
+	/* The project's folder on a card, in the date's place and of its width. */
+	--tc-stroke-project-mark: var(--tc-stroke-2);
 	/* A lifted section, and a dragged task with subtasks: two layers under it, each a step further down and narrower by a step on each side. */
 	--tc-stack-step-x: 7px;
 	--tc-stack-step-y: 6px;
@@ -852,6 +859,20 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-group-empty.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); border-width: 0; opacity: 0; }
 .tc-group-name { flex: 1; min-width: 0; overflow: hidden; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-group-head.is-ungrouped .tc-group-name { color: var(--tc-muted); }
+.tc-group-head.is-project { gap: var(--tc-space-6); color: var(--tc-pull-ink); cursor: pointer; }
+.tc-group-head.is-project.is-ungrouped { color: var(--tc-muted); }
+.tc-group-head.is-project .tc-group-name { flex: 0 1 auto; color: inherit; -webkit-mask-image: none; mask-image: none; }
+.tc-group-head.is-project .tc-group-name.is-cut { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-group-chevron, .tc-group-open { width: var(--tc-icon-s); height: var(--tc-leading-group); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.tc-group-chevron { margin-left: calc(-1 * var(--tc-group-chevron-out)); }
+.tc-group-chevron svg, .tc-group-open svg { width: var(--tc-icon-s); height: var(--tc-icon-s); }
+.tc-group-chevron svg { stroke-width: var(--tc-stroke-group-chevron); transform: rotate(var(--tc-group-open-turn)); transition: transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-group-head.is-shut .tc-group-chevron svg { transform: none; }
+.tc-group-open svg { stroke-width: var(--tc-stroke-group-open); }
+.tc-group-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
+.tc-project-mark { width: var(--tc-due-w); height: var(--tc-leading-card); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
+.tc-project-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-project-mark); }
+[data-priority] .tc-project-mark { color: var(--tc-priority-meta); }
 /* A section lifted: its tasks fold away with its header. A task lifted waits as a dashed place where it stood, its subtasks folded away under it; no other card moves, the drop line shows the place. */
 .tc-card.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
 .tc-card.is-lifted, .tc-card.is-arriving { visibility: hidden; }
@@ -1023,6 +1044,9 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); overflow: hidden; pointer-events: none; }
 .tc-link { color: var(--tc-accent); }
 .tc-lifted .tc-link { pointer-events: auto; cursor: pointer; }
+.tc-lifted.is-title { background: none; border-radius: 0; padding: 0 var(--tc-space-4); align-items: center; }
+.tc-lifted-title { font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
+.task-calendar .tc-head-title.has-menu { cursor: pointer; }
 .tc-lifted.is-head { background: none; border-radius: 0; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); align-items: flex-end; }
 /* A lifted section under the finger: its header as a lifted card, its count on the right, two layers of its cards beneath. */
 .tc-section-float { width: var(--tc-float-w); height: var(--tc-float-h); }

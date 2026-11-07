@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarService, DayEvents, DayView, GroupedList, ListSection, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
+import type { CalendarEvent, CalendarService, DayEvents, DayView, GroupedList, ListGrouping, ListSection, ProjectRef, SectionOffer, SourceStatus, TaskItem, TaskService } from "../../core/application/contracts";
 import { Reload } from "./Reload";
 import type { LocalDate } from "./types";
 
@@ -6,6 +6,8 @@ export interface DayDataDeps {
 	readonly tasks: TaskService;
 	readonly calendars: CalendarService;
 	readonly date: () => LocalDate;
+	/** The project whose view this is: the lists hold only its tasks. None for the main screen. */
+	readonly project?: () => string | undefined;
 	/** A part of the data changed: redraw what shows it. Data read the same as shown says nothing. */
 	readonly onUpdate: (part: DayPart) => void;
 }
@@ -28,7 +30,14 @@ interface TasksState {
 	readonly missing: boolean;
 	/** The day's events, their sources and the switch's dot show: the screen read says when not. */
 	readonly calendars: boolean;
+	/** Each list's grouping by project. */
+	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
+	/** The project whose view this is; null on the main screen. */
+	readonly project: ProjectRef | null;
 }
+
+const NOT_GROUPED: ListGrouping = { canGroup: false, on: false, groups: [] };
+const NO_GROUPING: Readonly<Record<GroupedList, ListGrouping>> = { inbox: NOT_GROUPED, backlog: NOT_GROUPED, soon: NOT_GROUPED, now: NOT_GROUPED };
 
 type ListSections = Readonly<Record<GroupedList, readonly ListSection[]>>;
 
@@ -45,7 +54,7 @@ const NO_EVENTS: DayEvents = { events: [], allDay: [], timed: [], statuses: [], 
  * A change to a task never waits for the calendars.
  */
 export class DayData {
-	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true };
+	private state: TasksState = { date: null, day: null, soon: [], inbox: [], backlog: [], done: [], sections: NO_SECTIONS, offer: NO_OFFER, missing: false, calendars: true, projects: NO_GROUPING, project: null };
 	private dayEvents: DayEvents = NO_EVENTS;
 	/** What the screen was last told of each part, to tell only a change. */
 	private readonly shown: Record<DayPart, string> = { tasks: this.drawnOf("tasks"), events: this.drawnOf("events") };
@@ -84,6 +93,16 @@ export class DayData {
 
 	get sections(): ListSections {
 		return this.state.sections;
+	}
+
+	/** How `list` groups by project, as the screen last read it. */
+	grouping(list: GroupedList): ListGrouping {
+		return this.state.projects[list];
+	}
+
+	/** The project whose view the screen is; null on the main screen. */
+	get project(): ProjectRef | null {
+		return this.state.project;
 	}
 
 	/** The sections the menus offer. */
@@ -168,7 +187,8 @@ export class DayData {
 
 	private async readTasks(): Promise<TasksState> {
 		const date = this.deps.date();
-		const screen = await this.deps.tasks.screen(date);
+		const project = this.deps.project?.();
+		const screen = await (project === undefined ? this.deps.tasks.screen(date) : this.deps.tasks.screen(date, project));
 		return { date, ...screen, day: screen.missing ? null : screen.day };
 	}
 

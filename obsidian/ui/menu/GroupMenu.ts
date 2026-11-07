@@ -2,7 +2,7 @@ import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
-import { menuGroup, menuRoom, placePanel } from "./MenuPanel";
+import { menuGroup, menuRoom, menuRow, placePanel } from "./MenuPanel";
 import { Overlay } from "./Overlay";
 
 export interface GroupMenuOptions {
@@ -29,6 +29,36 @@ export const GroupMenu = {
 				...(onRemove ? [{ label: "Remove section", icon: "removeSection", onPick: panel.pick(onRemove) } as const] : []),
 			]),
 		);
+		overlay.show();
+		return { close: () => overlay.close() };
+	},
+};
+
+export interface ColumnMenuOptions {
+	/** The column's title, as it stands over the column. */
+	readonly title: string;
+	/** The list shows its tasks grouped by project now: the row's check. */
+	readonly grouped: boolean;
+	onGroup(on: boolean): void;
+}
+
+/**
+ * The menu of a column's title, Backlog's or Soon's, like a section header's: the title stays over the blur, the panel
+ * under it holds one row, Group by project, checked while the list is grouped.
+ */
+export const ColumnMenu = {
+	open(title: HTMLElement, opts: ColumnMenuOptions): { close(): void } {
+		const overlay = new Overlay(() => overlay.close());
+		const rect = title.getBoundingClientRect();
+		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
+		el(copy.el, "span", "tc-lifted-title", opts.title);
+		copy.pin(rect, { width: true, height: true });
+		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		panel.replace((p) => {
+			const group = menuGroup(p, []);
+			menuRow(group, { label: "Group by project", icon: opts.grouped ? "check" : undefined, choice: true, onPick: panel.pick(() => opts.onGroup(!opts.grouped)) });
+			return group;
+		});
 		overlay.show();
 		return { close: () => overlay.close() };
 	},

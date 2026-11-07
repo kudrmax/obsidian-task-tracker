@@ -55,6 +55,8 @@ export interface QuickEntryControllerDeps {
 	showDay(date: LocalDate): Promise<void>;
 	/** Resolves once the lists show the file as of the last write; `beforeShow` runs once their data is what was read, right before they draw it. */
 	fresh(beforeShow?: () => void): Promise<void>;
+	/** The project whose view the screen is: every task written here gets it. None on the main screen. */
+	project?(): string | undefined;
 	/** Redraws the lists and the timeline, which calls `rendered` once drawn. */
 	render(): void;
 	/** A write that failed. */
@@ -154,6 +156,7 @@ export class QuickEntryController {
 				day: () => deps.day(),
 				today: () => deps.today(),
 				shown: () => SHOWN_LISTS[deps.mode()],
+				project: () => deps.project?.(),
 				fresh: (beforeShow) => this.fresh(beforeShow),
 				onChange: (state, drawnNext) => this.changed(state, drawnNext),
 			},

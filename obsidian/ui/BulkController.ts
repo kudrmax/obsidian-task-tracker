@@ -33,6 +33,8 @@ export interface BulkDeps {
 	cards(column: ListColumn): readonly HTMLElement[];
 	/** The tasks into section `name` of their list, and resolves once the screen shows them. */
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
+	/** The tasks' project (`TaskService.setProject`), and resolves once the screen shows it. */
+	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
 	/** ⌘-click is for the desktop; on the phone only Select tasks picks. */
 	desktop(): boolean;
 	/** ⌘ on a Mac, Ctrl elsewhere. */
@@ -198,6 +200,7 @@ export class BulkController {
 					return items;
 				},
 				toSection: (name) => done((picked) => this.deps.toSection(picked, name)),
+				setProject: (project) => done((picked) => this.deps.setProject(picked, project)),
 				remove: () => done((picked) => this.deps.remove(picked)),
 			},
 			onClose: () => (this.menu = null),

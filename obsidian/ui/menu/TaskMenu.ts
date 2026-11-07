@@ -11,7 +11,7 @@ import { moveTiles } from "./quickMoves";
 import { askGroup, backRow, menuGroup, type MenuRowSpec, menuRow, type MenuTileSpec, tileGroup, tileRows } from "./MenuPanel";
 import type { IconName } from "../kit/icons";
 import { datePage } from "./DatePage";
-import { sectionChooser } from "./SectionChooser";
+import { projectChooser, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 import { repeatPanel } from "../repeat/RepeatPanel";
@@ -74,6 +74,29 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 	return model.edits.map((id) => rows[id]());
 }
 
+/** The Project row: the project the tasks share, No project for none, nothing when they differ; disabled for subtasks, showing their parent's. */
+export interface ProjectRow {
+	readonly label: string;
+	readonly value: string;
+	readonly icon: IconName;
+	readonly disabled: boolean;
+}
+
+export const NO_PROJECT = "No project";
+
+export function projectRow(model: TaskMenuModel): ProjectRow {
+	const { current, none, disabled } = model.project;
+	return { label: "Project", value: current ? current.name : none ? NO_PROJECT : "", icon: "project", disabled };
+}
+
+/** Where the Project row stands among the edit rows: right after Section, or where Section would stand, before Add subtask. */
+export function projectRowAt(rows: readonly EditRow[]): number {
+	const section = rows.findIndex((row) => row.id === "section");
+	if (section >= 0) return section + 1;
+	const subtask = rows.findIndex((row) => row.id === "subtask");
+	return subtask >= 0 ? subtask : rows.length;
+}
+
 export interface LevelTile extends PriorityLevel {
 	readonly on: boolean;
 }
@@ -103,6 +126,8 @@ export interface MenuActions {
 	toSection(name: GroupName): Promise<void>;
 	/** The task waits at the end of its list under a field for the new section's name. */
 	newSection(): void;
+	/** The task's project: a note's link (`ProjectRef.link`), null for No project. */
+	setProject(project: string | null): Promise<void>;
 	/** A tap on a level (`TaskService.togglePriority`). */
 	togglePriority(prefix: string): Promise<void>;
 	/** A tap on a label (`TaskService.toggleLabel`); the task as it then stands, null once it is gone. */
@@ -343,7 +368,10 @@ export class TaskMenu extends LiftedMenu {
 		}));
 		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
 		const rows = editRows(item, model);
-		menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] })));
+		const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
+		const project = projectRow(model);
+		specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
+		menuGroup(this.panel, specs);
 		const openFull = actions.openFull;
 		menuGroup(this.panel, [
 			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
@@ -420,6 +448,20 @@ export class TaskMenu extends LiftedMenu {
 			onBack: () => this.showMenu(),
 			onPick: (name) => this.pick(() => actions.toSection(name))(),
 			onNew: this.pick(() => actions.newSection()),
+		});
+		this.place();
+	}
+
+	/** The Project page in place of the menu, as Section's: the project notes by name, No project last, the current one checked. */
+	private showProjects(): void {
+		this.askFor(null, false);
+		clear(this.panel);
+		clear(this.upper);
+		const { item, actions } = this.context;
+		projectChooser(this.panel, {
+			project: this.context.menu(item).project,
+			onBack: () => this.showMenu(),
+			onPick: (link) => this.pick(() => actions.setProject(link))(),
 		});
 		this.place();
 	}
