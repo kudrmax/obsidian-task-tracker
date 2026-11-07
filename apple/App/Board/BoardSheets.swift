@@ -32,51 +32,6 @@ private struct BoardSheets: ViewModifier {
     }
 }
 
-/// A task's title typed on its own small sheet, as Reminders names a new list: the field takes the keyboard at once, the
-/// check writes it and the cross closes untouched.
-struct NameSheet: View {
-    let title: LocalizedStringKey
-    let action: LocalizedStringKey
-    var text = ""
-    let done: (String) -> Void
-    @State private var typed = ""
-    @FocusState private var typing: Bool
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Title", text: $typed, axis: .vertical)
-                    .focused($typing)
-                    .submitLabel(.done)
-                    .onSubmit(save)
-                    .onChange(of: typed) { if typed.contains("\n") { save() } }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.tint(.primary) }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(action, systemImage: "checkmark", action: save)
-                        .buttonStyle(.glassProminent)
-                        .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-        .presentationDetents([.height(180)])
-        .defaultFocus($typing, true)
-        .onAppear { typed = text }
-        .task { typing = true }
-    }
-
-    private func save() {
-        let title = typed.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
-        done(title)
-        dismiss()
-    }
-}
-
 /// Pick a Date: the system calendar; a tap on a day moves the tasks there and closes. Remove Due Date when the core offers it.
 struct DateSheet: View {
     let items: [TaskItem]

@@ -25,12 +25,22 @@ struct TaskFullScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(listName).font(.subheadline).foregroundStyle(.secondary)
-                    Text(task.text).font(.title2.bold()).strikethrough(task.closed)
+                    if renamesTitle {
+                        EntryCapsule(host: model.entry)
+                    } else {
+                        Text(task.text).font(.title2.bold()).strikethrough(task.closed)
+                    }
                 }
-                if let tree, !tree.rows.isEmpty {
+                let rows = stackRows
+                if !rows.isEmpty {
                     VStack(alignment: .leading, spacing: CardMetrics.gap) {
-                        ForEach(Array(tree.rows.enumerated()), id: \.element.item.id) { index, row in
-                            subtask(row, branch: model.branch(levels: tree.rows.map(\.level), index: index))
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                            let branch = row.level > 0 ? model.branch(levels: rows.map(\.level), index: index) : nil
+                            switch row {
+                            case .row(let full): subtask(full, branch: branch)
+                            case .pending(_, let text, let level): typed(level: level, branch: branch) { PendingCapsule(text: text) }
+                            case .field(let level): typed(level: level, branch: branch) { EntryCapsule(host: model.entry) }
+                            }
                         }
                     }
                 }
@@ -46,13 +56,13 @@ struct TaskFullScreen: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Add Subtask", systemImage: "plus") { model.subtaskOf = task }
+                Button("Add Subtask", systemImage: "plus") { model.entry.addSubtaskInStack(task) }
                     .tint(.primary)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if let menu = menuModel {
                     Menu("More", systemImage: "ellipsis") {
-                        MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model) { question = $0 }.nodes)
+                        MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes)
                     }
                     .tint(.primary)
                 }
@@ -62,14 +72,91 @@ struct TaskFullScreen: View {
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)
         .task { await open() }
+        .onAppear { follow() }
         .onChange(of: model.snapshot?.tasksText) { Task { await refresh() } }
         .onDisappear {
+            // Back is a tap elsewhere: what was typed in the stack is written.
+            if model.entry.state?.spotKind == "stack" { model.entry.blur() }
             saving?.cancel()
             Task { await save() }
         }
     }
 
     @State private var menuModel: TaskMenuModel?
+
+    /// The quick entry's field in this page's stack: the subtasks read again before a written one is shown, and the
+    /// task as a rename left it.
+    private func follow() {
+        let shown = task
+        model.entry.stackRead = { await refresh() }
+        model.entry.renamed = { item in
+            if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
+        }
+    }
+
+    /// The field stands in this page's stack: the key of the task it types under or renames.
+    private var stackParent: String? {
+        guard let state = model.entry.state, state.spotKind == "stack", let key = try? state.spot["parent"].decode(TaskKey.self) else { return nil }
+        return Self.id(key)
+    }
+
+    private static func id(_ key: TaskKey) -> String {
+        "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)"
+    }
+
+    private var renamesTitle: Bool {
+        stackParent == task.id && model.entry.state?.renaming?.id == task.id
+    }
+
+    /// The subtasks as drawn: a renamed one gives its place to the field; a new one is typed after the last subtask of
+    /// the task it goes under, the texts typed before it waiting there.
+    private var stackRows: [StackRow] {
+        var rows = (tree?.rows ?? []).map(StackRow.row)
+        guard let parent = stackParent, let state = model.entry.state else { return rows }
+        if let renaming = state.renaming {
+            if let at = rows.firstIndex(where: { $0.itemID == renaming.id }) { rows[at] = .field(level: rows[at].level) }
+            return rows
+        }
+        var level = 0
+        var end = rows.count
+        if parent != task.id {
+            guard let at = rows.firstIndex(where: { $0.itemID == parent }) else { return rows }
+            level = rows[at].level + 1
+            end = rows[(at + 1)...].firstIndex { $0.level < level } ?? rows.count
+        }
+        let typed = state.pending.enumerated().map { StackRow.pending(index: $0.offset, text: $0.element.text, level: level) } + [.field(level: level)]
+        rows.insert(contentsOf: typed, at: end)
+        return rows
+    }
+
+    private enum StackRow: Identifiable {
+        case row(FullRow)
+        case pending(index: Int, text: String, level: Int)
+        case field(level: Int)
+
+        var id: String {
+            switch self {
+            case .row(let row): row.item.id
+            case .pending(let index, _, _): "\u{0}pending/\(index)"
+            case .field: "\u{0}entry"
+            }
+        }
+
+        var itemID: String? { if case .row(let row) = self { row.item.id } else { nil } }
+
+        var level: Int {
+            switch self {
+            case .row(let row): row.level
+            case .pending(_, _, let level), .field(let level): level
+            }
+        }
+    }
+
+    private func typed(level: Int, branch: Branch?, @ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .overlay(alignment: .topLeading) { if let branch { BranchLine(branch: branch) } }
+            .padding(.leading, CGFloat(level) * CardMetrics.indent)
+    }
 
     @State private var subtaskMenus: [String: TaskMenuModel] = [:]
 
@@ -85,7 +172,7 @@ struct TaskFullScreen: View {
     private func menu(for item: TaskItem, later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu? {
         guard let menu = subtaskMenus[item.id] else { return nil }
         let dark = UITraitCollection.current.userInterfaceStyle == .dark
-        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model) { question = $0 }.nodes, later: later) { model.ink($0, dark: dark) }
+        return MenuNode.uiMenu(TaskMenu(items: [item], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes, later: later) { model.ink($0, dark: dark) }
     }
 
     private func open() async {

@@ -42,6 +42,8 @@ struct EntryView: Decodable, Equatable {
     let `repeat`: JSONValue?
 
     var spotKind: String { spot["kind"].string ?? "" }
+    /// The field writes a section's name.
+    var namesSection: Bool { section == true }
 }
 
 /// `ListEntry`: where a list draws the field and the texts waiting before it.
@@ -80,7 +82,7 @@ final class QuickEntryHost {
     private(set) var lists: [BoardColumn: ListEntryView] = [:]
     /// The field's minute from the day's start, when it stands on the calendar.
     private(set) var slotMinute: Int?
-    /// Bumped whenever the field moves or opens: its list scrolls it into sight.
+    /// Bumped whenever the field opens or moves: what holds it scrolls it into sight.
     private(set) var moved = 0
     /// A sheet of the bar is up (repeat, date): the field gives the keyboard up for it without ending the entry.
     var paused = false
@@ -90,6 +92,28 @@ final class QuickEntryHost {
     enum BarSheet: String, Identifiable {
         case repeating, date
         var id: String { rawValue }
+    }
+
+    /// The full screen showing the stack the field stands in reads its subtasks again before a written one is shown.
+    @ObservationIgnored var stackRead: (() async -> Void)?
+    /// A rename written: the task as the file now has it.
+    @ObservationIgnored var renamed: ((TaskItem) -> Void)?
+
+    @ObservationIgnored private var session: JSONValue = .null
+    @ObservationIgnored private var pumping = false
+    @ObservationIgnored private var started: Set<String> = []
+    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+    /// The ribbon is turned by the bar's place, which moved the field there: the turn keeps it.
+    @ObservationIgnored private var turning = false
+    /// Counts the fields opened: a tap elsewhere that opened one keeps it.
+    @ObservationIgnored private var opened = 0
+    @ObservationIgnored private var names: [String: String] = [:]
+    @ObservationIgnored let field = EntryTextField()
+
+    var isOpen: Bool { state != nil }
+
+    init() {
+        field.host = self
     }
 
     func ask(_ sheet: BarSheet) {
@@ -103,53 +127,50 @@ final class QuickEntryHost {
         if isOpen { field.begin() }
     }
 
-    @ObservationIgnored private var session: JSONValue = .null
-    @ObservationIgnored private var pumping = false
-    @ObservationIgnored private var started: Set<String> = []
-    @ObservationIgnored private var idleWaiters: [CheckedContinuation<Void, Never>] = []
-    @ObservationIgnored let field = EntryTextField()
-
-    var isOpen: Bool { state != nil }
-
-    init() {
-        field.host = self
-    }
-
     // MARK: Opening
 
     /// The plus let go in a list or on the calendar: the field where the drop showed.
     func openAtDrop(_ column: BoardColumn?, _ result: JSONValue) {
-        call("openAtDrop", [column.map { .string($0.rawValue) } ?? .null, result])
+        opening { call("openAtDrop", [column.map { .string($0.rawValue) } ?? .null, result]) }
     }
 
     /// A tap on a «No tasks» plate: the field of a new task in that section.
     func openIn(_ column: BoardColumn, _ group: String?) {
-        call("openIn", [.string(column.rawValue), group.json])
+        opening { call("openIn", [.string(column.rawValue), group.json]) }
     }
 
-    /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar is opened full
-    /// screen, its subtasks the field's stack.
+    /// Add Subtask: the field last among the task's subtasks in its list; a task only on the calendar opens full
+    /// screen, the field last in the stack of its subtasks there.
     func addSubtask(_ parent: TaskItem) {
         guard let spot = value("subtaskSpot", [parent.key.json]) else { return }
         if spot["kind"].string == "stack", model?.fullScreen.last?.id != parent.id { model?.fullScreen.append(parent) }
-        call("open", [spot])
+        opening { call("open", [spot]) }
     }
 
-    /// The full screen's own Add Subtask: the field last in the stack of its subtasks there.
-    func addSubtaskHere(_ parent: TaskItem) {
-        call("open", [["kind": "stack", "parent": parent.key.json]])
+    /// Rename: the card gives its place to the field with its text.
+    func rename(_ item: TaskItem) {
+        guard let spot = value("renameSpot", [item.json, .bool(false)]), !spot.isNull else { return }
+        opening { call("open", [spot, item.json]) }
     }
 
-    /// Rename: the card becomes the field with its text, where it stands.
-    func rename(_ item: TaskItem, inStack: Bool = false) {
-        guard let spot = value("renameSpot", [item.json, .bool(inStack)]), !spot.isNull else { return }
-        if spot["kind"].string == "list", inStack { model?.fullScreen = [] }
-        call("open", [spot, item.json])
+    /// The full screen's Add Subtask, or a subtask's there: the field last in the stack of `parent`'s subtasks.
+    func addSubtaskInStack(_ parent: TaskItem) {
+        opening { call("open", [["kind": "stack", "parent": parent.key.json]]) }
+    }
+
+    /// A rename on the full screen: the title, or a subtask's card there, becomes the field.
+    func renameInStack(_ item: TaskItem) {
+        opening { call("open", [["kind": "stack", "parent": item.key.json], item.json]) }
+    }
+
+    private func opening(_ open: () -> Void) {
+        opened += 1
+        open()
     }
 
     // MARK: Typing
 
-    func typed(_ text: String) { call("type", [.string(text)]) }
+    func typed(_ text: String) { call("type", [.string(text)], animated: false) }
     func enter() { call("enter", []) }
     func indent(_ delta: Int) { call("indent", [.number(Double(delta))]) }
     func toggleSection() { call("toggleSection", []) }
@@ -163,11 +184,40 @@ final class QuickEntryHost {
         call("blur", [])
     }
 
+    /// Leaving the page the field stands on: what was typed there is dropped, as the plugin's full screen does.
+    func escape() {
+        guard state != nil else { return }
+        call("escape", [])
+    }
+
+    /// A touch on the screen outside the field: once the touch has done its own work, the entry ends unless that work
+    /// opened another field.
+    func tappedElsewhere() {
+        guard isOpen, !paused else { return }
+        let mark = opened
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.opened == mark else { return }
+            self.blur()
+        }
+    }
+
+    /// The ribbon came to rest on another place by a swipe or a tab: the field there is finished as by a tap elsewhere.
+    func placeChanged() {
+        if !turning { blur() }
+    }
+
+    /// Before the screen shows another day: the field is finished, and every text typed is written for the day it was
+    /// typed on.
+    func settle() async {
+        blur()
+        await idle()
+    }
+
     /// A place chosen in the bar: the field goes to the end of that column at once and the ribbon goes there; another day
     /// opens once what was typed is written, the field then at the end of that day's list.
     func choosePlace(_ placement: JSONValue) {
-        guard let move = value("choosePlace", [placement]), !move.isNull, let column = move["column"].string.flatMap(BoardColumn.init) else { return }
-        model?.go(to: Self.place(of: column))
+        guard let move = value("choosePlace", [placement], keep: true), !move.isNull, let column = move["column"].string.flatMap(BoardColumn.init) else { return }
+        turn(to: column)
         guard let day = move["day"].string else { return }
         Task {
             await idle()
@@ -176,15 +226,43 @@ final class QuickEntryHost {
         }
     }
 
-    private static func place(of column: BoardColumn) -> RibbonPlace {
-        switch column {
+    /// The ribbon turned to show `column`; a place that shows it already stays.
+    private func turn(to column: BoardColumn) {
+        guard let model else { return }
+        let showing = Self.shown(at: model.place).contains(column)
+        guard !showing else { return }
+        let place: RibbonPlace = switch column {
         case .inbox, .backlog: .inbox
         case .soon: .soon
         case .day: .today
         }
+        turning = true
+        model.go(to: place)
+        turning = false
+    }
+
+    /// The name the bar gives a list, as the settings head it.
+    func name(_ kind: String) -> String {
+        if let known = names[kind] { return known }
+        let found = (try? board.read("tasks.listName", [.string(kind)], over: board.settingsOnly()))?.string ?? kind
+        names[kind] = found
+        return found
+    }
+
+    /// A label's name as the screen shows it.
+    func labelTitle(_ name: String) -> String {
+        model?.ruleNow("rules.labelTitle", [.string(name)]) ?? name
     }
 
     // MARK: The door
+
+    private static func shown(at place: RibbonPlace) -> [BoardColumn] {
+        switch place {
+        case .inbox: [.inbox, .backlog, .soon]
+        case .soon: [.soon, .day]
+        case .today: [.day]
+        }
+    }
 
     /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, and the lists the
     /// ribbon's place shows.
@@ -197,11 +275,7 @@ final class QuickEntryHost {
             sections[column.rawValue] = .array(list.groups.map(\.name.json))
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
-        let shown: [BoardColumn] = switch model?.place ?? .today {
-        case .inbox: [.inbox, .backlog, .soon]
-        case .soon: [.soon, .day]
-        case .today: [.day]
-        }
+        let shown = Self.shown(at: model?.place ?? .today)
         return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map { .string($0.rawValue) })]
     }
 
@@ -219,17 +293,23 @@ final class QuickEntryHost {
         }
     }
 
-    /// A call that may change the session: its state drawn, its jobs run.
+    /// A call that may change the session: its state drawn (the rows parting with the system's spring), its jobs run.
     @discardableResult
-    private func call(_ method: String, _ arguments: [JSONValue]) -> JSONValue? {
+    private func call(_ method: String, _ arguments: [JSONValue], animated: Bool = true) -> JSONValue? {
         guard let reply = answer(method, arguments) else { return nil }
-        apply(reply)
+        if animated {
+            withAnimation(.snappy) { apply(reply) }
+        } else {
+            apply(reply)
+        }
         return reply["value"]
     }
 
-    /// A call for its answer alone (where a field would open).
-    private func value(_ method: String, _ arguments: [JSONValue]) -> JSONValue? {
-        answer(method, arguments)?["value"]
+    /// A call for its answer; `keep` draws the session it leaves too.
+    private func value(_ method: String, _ arguments: [JSONValue], keep: Bool = false) -> JSONValue? {
+        guard let reply = answer(method, arguments) else { return nil }
+        if keep { withAnimation(.snappy) { apply(reply) } }
+        return reply["value"]
     }
 
     private func apply(_ reply: JSONValue, over snapshot: BoardSnapshot? = nil) {
@@ -244,29 +324,33 @@ final class QuickEntryHost {
         let before = state
         state = next
         if field.text != (next?.text ?? "") { field.text = next?.text ?? "" }
-        if next == nil {
+        guard let next else {
             lists = [:]
             slotMinute = nil
             field.end()
             return
         }
+        field.placeholder = next.namesSection ? "Section name" : nil
+        field.font = next.namesSection ? .systemFont(ofSize: 15, weight: .semibold) : .systemFont(ofSize: CardMetrics.title)
         placeField(over: snapshot)
-        if before == nil || before?.spot != next?.spot || before?.pending != next?.pending || before?.section != next?.section { moved += 1 }
+        if before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section { moved += 1 }
         field.begin()
     }
 
     /// Where the field stands in each list, and on the calendar, for the screen as it is about to be drawn.
     private func placeField(over snapshot: BoardSnapshot? = nil) {
-        guard let snapshot = snapshot ?? model?.snapshot, state != nil else { return }
+        guard let snapshot = snapshot ?? model?.snapshot, let state else { return }
         var found: [BoardColumn: ListEntryView] = [:]
-        for (column, list) in snapshot.lists {
-            let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": .array(list.groups.map(\.name.json))]
-            if let entry = answer("listEntry", [.string(column.rawValue), drawn], over: snapshot)?["value"], !entry.isNull {
-                found[column] = try? entry.decode(ListEntryView.self)
+        if state.spotKind == "list" {
+            for (column, list) in snapshot.lists {
+                let drawn: JSONValue = ["cards": Self.listCards(list.cards), "sections": .array(list.groups.map(\.name.json))]
+                if let entry = answer("listEntry", [.string(column.rawValue), drawn], over: snapshot)?["value"], !entry.isNull {
+                    found[column] = try? entry.decode(ListEntryView.self)
+                }
             }
         }
         lists = found
-        if let state, state.spotKind == "slot" {
+        if state.spotKind == "slot" {
             let slot = state.spot["slot"]
             slotMinute = (try? board.read("boundary.spanOf", [slot, .string(snapshot.day)], over: board.settingsOnly()))?["start"].number.map { Int($0) }
         } else {
@@ -317,15 +401,19 @@ final class QuickEntryHost {
         }.value
         let read = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         if case .failure(let error) = written { model.problem(error) }
+        if method == "createInPlace", case .success = written, state?.spotKind == "stack" { await stackRead?() }
+        if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
             if method == "createInPlace", let read {
                 let coming = JSONValue.object(Dictionary(uniqueKeysWithValues: read.lists.map { ($0.key.rawValue, Self.listCards($0.value.cards)) }))
-                let key: JSONValue = (try? written.get()) ?? .null
-                let reply = written.isSuccess
-                    ? answer("shown", [.string(id), key, coming], over: read)
-                    : answer("unshown", [.string(id)], over: read)
+                let reply: JSONValue?
+                if case .success(let key) = written {
+                    reply = answer("shown", [.string(id), key, coming], over: read)
+                } else {
+                    reply = answer("unshown", [.string(id)], over: read)
+                }
                 model.draw(read)
                 if let reply { apply(reply, over: read) }
             } else if let read {
@@ -348,19 +436,23 @@ final class QuickEntryHost {
     }
 }
 
-private extension Result {
-    var isSuccess: Bool { if case .success = self { true } else { false } }
-}
-
 /// The field typed in: the system's text field, kept as one view while the entry is open so the keyboard never drops
 /// between the lines of a batch; its bar over the keyboard is the entry's own.
-final class EntryTextField: UITextField, UITextFieldDelegate {
+final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognizerDelegate {
     weak var host: QuickEntryHost? {
         didSet { if let host { bar.rootView = KeyBar(host: host) } }
     }
     private let bar = UIHostingController(rootView: KeyBar(host: nil))
     /// The entry wants the keyboard: the field takes it again whenever it comes into a window.
     private var wanted = false
+    /// A touch anywhere in the window outside the field: a tap elsewhere.
+    private lazy var elsewhere: UITapGestureRecognizer = {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(tappedElsewhere))
+        tap.cancelsTouchesInView = false
+        tap.delaysTouchesEnded = false
+        tap.delegate = self
+        return tap
+    }()
 
     init() {
         super.init(frame: .zero)
@@ -368,11 +460,13 @@ final class EntryTextField: UITextField, UITextFieldDelegate {
         font = .systemFont(ofSize: CardMetrics.title)
         returnKeyType = .next
         autocorrectionType = .default
+        // As the plugin's field: a level's prefix (`p1 `) is typed as it reads, never capitalised.
+        autocapitalizationType = .none
         borderStyle = .none
         backgroundColor = .clear
         bar.view.backgroundColor = .clear
         bar.sizingOptions = .intrinsicContentSize
-        bar.view.frame = CGRect(x: 0, y: 0, width: 402, height: 60)
+        bar.view.frame = CGRect(x: 0, y: 0, width: 402, height: KeyBar.height)
         bar.view.autoresizingMask = [.flexibleWidth]
         inputAccessoryView = bar.view
         addAction(UIAction { [weak self] _ in
@@ -386,7 +480,15 @@ final class EntryTextField: UITextField, UITextFieldDelegate {
 
     func begin() {
         wanted = true
-        if window != nil, !isFirstResponder { becomeFirstResponder() }
+        take()
+    }
+
+    /// The keyboard taken, again a moment later while a drop or a menu still holds the screen and the system refuses it.
+    private func take(tries: Int = 12) {
+        guard wanted, !isFirstResponder else { return }
+        if window != nil, becomeFirstResponder() { return }
+        guard tries > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.take(tries: tries - 1) }
     }
 
     func end() {
@@ -396,7 +498,22 @@ final class EntryTextField: UITextField, UITextFieldDelegate {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if wanted, window != nil, !isFirstResponder { becomeFirstResponder() }
+        guard let window else { return }
+        if elsewhere.view !== window { window.addGestureRecognizer(elsewhere) }
+        take()
+    }
+
+    @objc private func tappedElsewhere() {
+        host?.tappedElsewhere()
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard wanted, let view = touch.view else { return false }
+        return !view.isDescendant(of: self)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
@@ -414,9 +531,10 @@ final class EntryTextField: UITextField, UITextFieldDelegate {
     }
 }
 
-/// The field in a list's row, on the calendar or in the full screen: the one text field placed in it.
+/// The field in a list's row, on the calendar or on the full screen: the one text field placed in it.
 struct EntryFieldView: UIViewRepresentable {
     let host: QuickEntryHost
+    let tint: UIColor
 
     func makeUIView(context: Context) -> UIView {
         let box = UIView()
@@ -430,7 +548,9 @@ struct EntryFieldView: UIViewRepresentable {
 
     private func place(in box: UIView) {
         let field = host.field
+        field.tintColor = tint
         guard field.superview !== box else { return }
+        field.removeFromSuperview()
         field.translatesAutoresizingMaskIntoConstraints = false
         box.addSubview(field)
         NSLayoutConstraint.activate([
@@ -439,22 +559,26 @@ struct EntryFieldView: UIViewRepresentable {
             field.topAnchor.constraint(equalTo: box.topAnchor),
             field.bottomAnchor.constraint(equalTo: box.bottomAnchor),
         ])
+        if host.isOpen { field.begin() }
     }
 }
 
-/// The capsule a task is typed in, at its place: no frame, the accent cursor, tinted by the priority typed.
+/// The capsule a task is typed in, at its place: a card with no frame, the accent cursor, tinted by the priority or the
+/// label chosen. A section's name is typed where its header will stand, in the header's type.
 struct EntryCapsule: View {
     let host: QuickEntryHost
     var section = false
+    var height: CGFloat = CardMetrics.height
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        EntryFieldView(host: host)
-            .tint(Palette.accent(scheme))
-            .frame(height: section ? 30 : 18)
+        // One field view whatever it writes, so turning it into a section's name never takes the keyboard away.
+        EntryFieldView(host: host, tint: UIColor(Palette.accent(scheme)))
+            .frame(height: 22)
             .padding(.leading, CardMetrics.leading)
-            .padding(.trailing, CardMetrics.trailing)
-            .frame(maxWidth: .infinity, minHeight: section ? 30 : CardMetrics.height, alignment: .leading)
+            .padding(.trailing, section ? 0 : CardMetrics.trailing)
+            .padding(.bottom, section ? 4 : 0)
+            .frame(maxWidth: .infinity, minHeight: section ? 30 : height, maxHeight: section ? 30 : height, alignment: section ? .bottomLeading : .leading)
             .background(section ? Color.clear : fill, in: .rect(cornerRadius: CardMetrics.radius))
             .accessibilityLabel(section ? "Section name" : "New task")
     }
@@ -481,128 +605,162 @@ struct PendingCapsule: View {
     }
 }
 
-/// The bar over the keyboard (board «5 — Новая задача»): left the section button and the outdent–indent pair, right the
-/// priority flag, the repeat and the place menu, as iOS 26 glass groups. Each shows and allows what the entry's state says.
+/// The bar over the keyboard (board «5 — Новая задача», `KeyBar.dc.html`): on the left the section button and the
+/// outdent–indent pair, on the right the priority flag, the repeat and the place menu in one group, iOS 26 glass over a
+/// fade into the ground. Each shows and allows what the entry's state says.
 struct KeyBar: View {
     let host: QuickEntryHost?
+    @Environment(\.colorScheme) private var scheme
+    static let height: CGFloat = 60
 
     var body: some View {
         if let host, let state = host.state {
-            GlassEffectContainer {
+            GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
                     if let section = state.section {
-                        Button { host.toggleSection() } label: { Image(systemName: section ? "number.square.fill" : "number") }
-                            .frame(width: 44, height: 44)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                            .accessibilityLabel("Section")
+                        Button { host.toggleSection() } label: {
+                            Image(systemName: "rectangle.stack")
+                                .symbolVariant(section ? .fill : .none)
+                                .frame(width: 44, height: 44)
+                                .contentShape(.circle)
+                        }
+                        .foregroundStyle(section ? Color.white : Color.primary)
+                        .glassEffect(section ? .regular.tint(Palette.accent(scheme)).interactive() : .regular.interactive(), in: .circle)
+                        .accessibilityLabel("Section")
+                        .accessibilityAddTraits(section ? .isSelected : [])
                     }
                     if state.indents {
                         HStack(spacing: 0) {
-                            Button { host.indent(-1) } label: { Image(systemName: "decrease.indent") }
-                                .frame(width: 44, height: 44)
+                            Button { host.indent(-1) } label: { icon("decrease.indent") }
                                 .disabled(!state.canOutdent)
                                 .accessibilityLabel("Outdent")
-                            Button { host.indent(1) } label: { Image(systemName: "increase.indent") }
-                                .frame(width: 44, height: 44)
+                            Button { host.indent(1) } label: { icon("increase.indent") }
                                 .disabled(!state.canIndent)
                                 .accessibilityLabel("Indent")
                         }
                         .glassEffect(.regular.interactive(), in: .capsule)
                     }
                     Spacer(minLength: 0)
-                    if state.markable || state.repeatable {
+                    if state.markable || state.repeatable || state.place != nil {
                         HStack(spacing: 0) {
                             if state.markable { priority(host, state) }
                             if state.repeatable {
-                                Button { host.ask(.repeating) } label: { Image(systemName: state.repeat?.isNull == false ? "repeat.circle.fill" : "repeat") }
-                                    .frame(width: 44, height: 44)
-                                    .accessibilityLabel("Repeat")
+                                Button { host.ask(.repeating) } label: {
+                                    icon(state.repeat?.isNull == false ? "repeat.circle.fill" : "repeat")
+                                }
+                                .accessibilityLabel("Repeat")
                             }
+                            if state.place != nil { place(host, state) }
                         }
                         .glassEffect(.regular.interactive(), in: .capsule)
                     }
-                    if state.place != nil { place(host, state) }
                 }
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17))
                 .foregroundStyle(.primary)
                 .buttonStyle(.plain)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+            }
+            .frame(height: 44)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+            .background {
+                // The list fades into the ground under the bar, as the board draws it.
+                LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: Color(.systemBackground), location: 0.6)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
             }
         } else {
             Color.clear.frame(height: 1)
         }
     }
 
+    private func icon(_ name: String) -> some View {
+        Image(systemName: name)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+    }
+
+    /// The flag: the levels, a pick that closes the menu; under them the labels, each tap putting one on or taking it off
+    /// while the menu stays for the next.
     private func priority(_ host: QuickEntryHost, _ state: EntryView) -> some View {
         Menu {
-            ForEach(state.marks.tiles.levels, id: \.mark.title) { tile in
-                Toggle(tile.mark.title, isOn: Binding(get: { tile.on }, set: { _ in host.togglePriority(tile.mark.title) }))
+            Section {
+                ForEach(state.marks.tiles.levels, id: \.mark.title) { tile in
+                    Toggle(isOn: Binding(get: { tile.on }, set: { _ in host.togglePriority(tile.mark.title) })) {
+                        Label { Text(tile.mark.title) } icon: { swatch(host, "flag.fill", tile.mark.color) }
+                    }
                     .disabled(!tile.enabled)
+                }
             }
             if !state.marks.tiles.labels.isEmpty {
                 Section("Labels") {
                     ForEach(state.marks.tiles.labels, id: \.mark.title) { tile in
-                        Toggle(tile.mark.title, isOn: Binding(get: { tile.on }, set: { _ in host.toggleLabel(tile.mark.title) }))
-                            .disabled(!tile.enabled)
+                        Toggle(isOn: Binding(get: { tile.on }, set: { _ in host.toggleLabel(tile.mark.title) })) {
+                            Label { Text(host.labelTitle(tile.mark.title)) } icon: { swatch(host, "tag.fill", tile.mark.color) }
+                        }
+                        .disabled(!tile.enabled)
+                        .menuActionDismissBehavior(.disabled)
                     }
                 }
             }
         } label: {
             Image(systemName: state.marks.tint == nil ? "flag" : "flag.fill")
-                .foregroundStyle(tint(host, state))
+                .foregroundStyle(tint(host, state.marks.tint))
                 .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
-        .menuActionDismissBehavior(.disabled)
+        .menuOrder(.fixed)
         .accessibilityLabel("Priority")
     }
 
-    private func tint(_ host: QuickEntryHost, _ state: EntryView) -> AnyShapeStyle {
-        guard let color = state.marks.tint, let ink = host.model?.ink(color, dark: UITraitCollection.current.userInterfaceStyle == .dark) else { return AnyShapeStyle(.primary) }
+    /// A menu row's icon in the mark's colour, as the task's own menu draws it: the system menu draws only original colours.
+    private func swatch(_ host: QuickEntryHost, _ symbol: String, _ color: String) -> Image {
+        let image = UIImage(systemName: symbol) ?? UIImage()
+        guard let ink = host.model?.ink(color, dark: scheme == .dark) else { return Image(uiImage: image) }
+        return Image(uiImage: image.withTintColor(ink, renderingMode: .alwaysOriginal))
+    }
+
+    private func tint(_ host: QuickEntryHost, _ color: String?) -> AnyShapeStyle {
+        guard let color, let ink = host.model?.ink(color, dark: scheme == .dark) else { return AnyShapeStyle(.primary) }
         return AnyShapeStyle(Color(ink))
     }
 
+    /// The place: the lists by the names the settings give them and Date…, a check on the one the field is in.
     private func place(_ host: QuickEntryHost, _ state: EntryView) -> some View {
         Menu {
             ForEach(Array(state.places.enumerated()), id: \.offset) { _, choice in
                 let kind = choice["kind"].string ?? ""
                 if kind == "date" {
-                    Divider()
-                    Button { host.ask(.date) } label: {
-                        Label("Date…", systemImage: choice["on"].bool == true ? "checkmark" : "calendar")
+                    Section {
+                        Button { host.ask(.date) } label: {
+                            Label("Date…", systemImage: choice["on"].bool == true ? "checkmark" : "calendar")
+                        }
                     }
                 } else {
                     Button { host.choosePlace(["kind": .string(kind)]) } label: {
-                        if choice["on"].bool == true { Label(Self.name(kind), systemImage: "checkmark") } else { Text(Self.name(kind)) }
+                        if choice["on"].bool == true { Label(host.name(kind), systemImage: "checkmark") } else { Text(host.name(kind)) }
                     }
                 }
             }
         } label: {
-            Text(Self.title(state.place))
-                .font(.system(size: 15, weight: .semibold))
-                .padding(.horizontal, 16)
-                .frame(height: 44)
+            HStack(spacing: 4) {
+                Text(title(host, state.place)).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
+            }
+            .font(.system(size: 15))
+            .padding(.leading, 6)
+            .padding(.trailing, 14)
+            .frame(height: 44)
+            .contentShape(.rect)
         }
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .menuOrder(.fixed)
         .accessibilityLabel("Place")
     }
 
-    private static func name(_ kind: String) -> String {
-        switch kind {
-        case "inbox": "Inbox"
-        case "backlog": "Backlog"
-        case "soon": "Soon"
-        case "now": "Today"
-        default: kind
-        }
-    }
-
-    private static func title(_ place: JSONValue?) -> String {
+    private func title(_ host: QuickEntryHost, _ place: JSONValue?) -> String {
         guard let place, let kind = place["kind"].string else { return "" }
         if kind == "date", let day = place["date"].string, let date = LocalDay.date(day) { return date.formatted(.dateTime.day().month(.abbreviated)) }
-        return name(kind)
+        return host.name(kind)
     }
-
 }
 
 /// The bar's date sheet: the system calendar; Done puts the field on that day.

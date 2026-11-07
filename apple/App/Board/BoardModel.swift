@@ -250,6 +250,7 @@ final class BoardModel {
     var isToday: Bool { snapshot.map { $0.day == $0.today } ?? true }
 
     func step(_ days: Int) async {
+        await entry.settle()
         guard let day = snapshot?.day else { return }
         let target: String
         if let neighbours, snapshot?.day == day {
@@ -261,6 +262,7 @@ final class BoardModel {
     }
 
     func showToday() async {
+        await entry.settle()
         guard let snapshot, snapshot.day != snapshot.today else { return }
         await turn(to: snapshot.today, motion: snapshot.day < snapshot.today ? 1 : -1)
         shownDay = nil
@@ -643,8 +645,7 @@ final class BoardModel {
             let place: JSONValue = try await rule("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
             if carry.id == Carried.plus {
                 cancelCarry()
-                // The field opens where the drop showed, at the level the gap stood at.
-                entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place.isNull ? ["kind": "task", "group": gap.group.json, "before": .null] : place])
+                entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place])
             } else if !place.isNull, let item = carry.item {
                 await drop(item, from: carry.from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
                 DropTiming.report(since: dropAt)

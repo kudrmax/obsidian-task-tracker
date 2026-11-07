@@ -25,14 +25,16 @@ struct BoardScreen: View {
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model) }
         }
         .overlay {
-            if !model.selecting, model.fullScreen.isEmpty {
+            // The tab bar hides while a task is typed, as in every app.
+            if !model.selecting, model.fullScreen.isEmpty, !model.entry.isOpen {
                 bottomBar.transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.snappy, value: model.selecting)
+        .animation(.snappy, value: model.entry.isOpen)
         .background { DropAnchor(drop: model.dropping) }
-        .sheet(item: Binding(get: { model.newTaskAt }, set: { model.newTaskAt = $0 })) { spot in
-            NameSheet(title: "New Task", action: "Add") { title in Task { await model.create(title, at: spot) } }
+        .sheet(item: Binding(get: { model.entry.sheet }, set: { model.entry.sheet = $0 }), onDismiss: { model.entry.resume() }) { sheet in
+            entrySheet(sheet)
         }
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reloadIfChanged() } }) {
             CaptureView()
@@ -112,6 +114,20 @@ struct BoardScreen: View {
         }
     }
 
+    /// The bar's sheets over the field: its repeat, held by the entry until the task is written, and its date.
+    @ViewBuilder
+    private func entrySheet(_ sheet: QuickEntryHost.BarSheet) -> some View {
+        let entry = model.entry
+        switch sheet {
+        case .repeating:
+            if let state = entry.state {
+                RepeatSheet(day: state.repeatDay, own: state.repeat ?? .null, model: model) { rule in entry.setRepeat(rule) }
+            }
+        case .date:
+            EntryDateSheet(host: entry)
+        }
+    }
+
     @ToolbarContentBuilder
     private var mainBar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -120,6 +136,18 @@ struct BoardScreen: View {
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
+            if model.entry.isOpen {
+                // While a task is typed the «⋯» gives way to the check that ends typing.
+                Button("Done", systemImage: "checkmark") { model.entry.blur() }
+                    .buttonStyle(.glassProminent)
+                    .tint(Palette.accent(scheme))
+            } else {
+                more
+            }
+        }
+    }
+
+    private var more: some View {
             Menu("More", systemImage: "ellipsis") {
                 Button("Search", systemImage: "magnifyingglass") { sheet = .search }
                 Button("Select Tasks", systemImage: "checkmark.circle") { model.startSelection() }
@@ -129,7 +157,6 @@ struct BoardScreen: View {
             }
             .badge(model.snapshot?.calendarsStale == true ? 1 : 0)
             .tint(.primary)
-        }
     }
 
     @ToolbarContentBuilder
@@ -213,7 +240,11 @@ struct Ribbon: View {
                 let near = nearest(x, list: list, width: width)
                 if near != model.place { model.place = near }
             }
-            .onScrollPhaseChange { _, new in phase = new }
+            .onScrollPhaseChange { _, new in
+                phase = new
+                // A swipe to another place finishes the task being typed, as a tap elsewhere.
+                if new == .interacting { model.entry.placeChanged() }
+            }
             .onAppear { position.scrollTo(id: model.place, anchor: .leading) }
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }

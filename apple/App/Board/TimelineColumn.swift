@@ -64,7 +64,9 @@ struct TimelineColumn: View {
                     visible = height
                     settleZoom()
                     open()
+                    reveal(hour)
                 }
+                .onChange(of: model.entry.moved) { reveal(hour) }
                 .simultaneousGesture(zoom)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }
@@ -89,13 +91,20 @@ struct TimelineColumn: View {
                     .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                     .offset(y: top)
             }
-            ForEach(slots) { slot in
+            ForEach(slots.filter { $0.card.item.id != model.entry.state?.renaming?.id }) { slot in
                 slotCard(slot)
                     .padding(.leading, Measure.itemsLeft + CGFloat(slot.box.left))
                     .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                     .offset(y: y(0, hour) + CGFloat(slot.box.top))
             }
             if let now = timeline.now { nowLine(now, hour: hour) }
+            // The quick entry's field at its time, a renamed card's over its own place.
+            if let minute = model.entry.slotMinute {
+                EntryCapsule(host: model.entry)
+                    .padding(.leading, Measure.itemsLeft)
+                    .padding(.trailing, Measure.itemsRight + Measure.itemInset)
+                    .offset(y: y(minute, hour) + Measure.itemInset)
+            }
             if let minute = model.landing { landingLine(minute, hour: hour) }
         }
         .frame(width: width, height: height, alignment: .topLeading)
@@ -105,6 +114,18 @@ struct TimelineColumn: View {
     }
 
     private static let key = "timeline"
+
+    /// The field on the calendar stays in sight above the keyboard.
+    private func reveal(_ hour: CGFloat) {
+        guard let minute = model.entry.slotMinute, visible > 0 else { return }
+        let top = y(minute, hour)
+        let bottom = top + CardMetrics.height + 16
+        if bottom > scroll.y + visible {
+            withAnimation(.snappy) { position.scrollTo(y: bottom - visible) }
+        } else if top < scroll.y {
+            withAnimation(.snappy) { position.scrollTo(y: max(0, top - 16)) }
+        }
+    }
 
     // MARK: The grid
 
