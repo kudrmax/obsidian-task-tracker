@@ -220,6 +220,43 @@ Lead's notes for the simulator: the app's debug build takes `--vault <folder>` (
 vault with tasks and `calendar/iphone.json` sits in the app's data container under `Documents/Vault`. Cyrillic is typed
 into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid>` and the system Paste.
 
+## Review fixes (branch `ios-review-fixes`, after the first install on the phone)
+
+The final review of `ios-timeline-drag` (merged as bbcd27b) found these. Each is fixed at its cause.
+
+**Core (backend first).** Swift wrote quick-entry decisions itself; they move into the core and come through the door,
+and the plugin reads the same functions instead of its own tables:
+
+- R6a. The spots for a rename and for a subtask: Swift built `{kind:"stack", parent}` itself (`QuickEntryHost.swift`
+  ~157–164). It asks the core (`renameSpot`, `subtaskSpot`, and a spot for the task's full screen).
+- R6b. Which lists a place shows and which place shows a column: Swift repeats the plugin's `SHOWN_LISTS` and
+  `modeShowing` (`QuickEntryHost.swift` `shown`, `turn`). One table in the core, through the door; the plugin reads it.
+- R6c. Where the field and the waiting lines stand among a task's subtasks on the full screen: Swift works it out
+  (`TaskFullScreen.swift` `stackRows`). The core answers it as `listEntry` does for lists (`stackEntry`).
+
+**Swift.**
+
+- R1. The app's own write makes the file watch read again, and that read can draw the written card before
+  `entry.shown`: the card and its waiting line show together and the field jumps. The watch does not answer the app's
+  own writes, and no watch read redraws while quick-entry jobs run.
+- R2. When the read after a quick-entry write fails, neither `shown` nor `unshown` is called and a ghost line stays.
+  Every job ends in one of them (door.md step 3).
+- R3. When `entry.call` and `entry.done` both throw, the job loop hands out the same job forever on the main thread. A
+  job that failed is dropped and the loop stops; the app never hangs.
+- R4. «Date…» in the bar: the day goes through `tasks.placementOfDay` before `choosePlace`, as the plugin
+  (`QuickBar.ts`), so today is `now` and the field stays where it is.
+- R7. The entry ends only when the columns actually turn to another place, not when a horizontal swipe starts.
+- R8. A read while a card is carried does not end the carry (the arrow's background read, `reveal`).
+- R9. List names are read again when the settings change.
+- The loss of typed text Max saw: the field must keep the keyboard when it moves to another row or list (no
+  `removeFromSuperview` that drops the first responder, no keys lost while it moves, no `blur` from a stale
+  `textFieldDidEndEditing`). Check by typing fast across Enter, a move to another list, a plate and a rename.
+
+**Docs (frontend-obsidian).** R5: `docs/plugin/app.md` still describes the New Task / Rename / Add Subtask sheets. It
+describes the quick entry in place as the app now has it (the field in the list, Enter, empty Enter, what ends typing,
+«⋯» as the check, the bar over the keyboard and its smaller forms, `p1 `, the long press on the empty calendar, «No
+tasks», rename in place, subtasks on the full screen) and its check steps.
+
 ## Decisions
 
 (Each agent adds here what it decided on a gap, one line each.)
