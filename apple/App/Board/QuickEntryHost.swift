@@ -171,7 +171,9 @@ final class QuickEntryHost {
     // MARK: Typing
 
     func typed(_ text: String) { call("type", [.string(text)], animated: false) }
-    func enter() { call("enter", []) }
+    /// Enter: the text stands where it was typed and the next field is right under it in the same frame, as a line break
+    /// in a text; nothing slides.
+    func enter() { call("enter", [], animated: false) }
     func indent(_ delta: Int) { call("indent", [.number(Double(delta))]) }
     func toggleSection() { call("toggleSection", []) }
     func togglePriority(_ prefix: String) { call("togglePriority", [.string(prefix)]) }
@@ -300,7 +302,9 @@ final class QuickEntryHost {
         if animated {
             withAnimation(.snappy) { apply(reply) }
         } else {
-            apply(reply)
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { apply(reply) }
         }
         return reply["value"]
     }
