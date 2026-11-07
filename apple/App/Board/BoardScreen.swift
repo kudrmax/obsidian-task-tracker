@@ -8,6 +8,7 @@ import UIKit
 struct BoardScreen: View {
     @State private var model = BoardModel()
     @State private var router = CaptureRouter.shared
+    @State private var sync = ObsidianSync.shared
     @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
     /// Where the system lays out the tab bar's search slot, on the screen.
@@ -33,6 +34,9 @@ struct BoardScreen: View {
         .animation(.snappy, value: model.selecting)
         .animation(.snappy, value: model.entry.isOpen)
         .background { DropAnchor(drop: model.dropping) }
+        .notSyncedAlert(sync)
+        // Obsidian hands the phone back after Sync: the board reads the file again.
+        .onChange(of: sync.returns) { Task { await model.reload() } }
         .sheet(item: Binding(get: { model.entry.sheet }, set: { model.entry.sheet = $0 }), onDismiss: { model.entry.resume() }) { sheet in
             entrySheet(sheet)
         }
@@ -133,6 +137,12 @@ struct BoardScreen: View {
         ToolbarItem(placement: .topBarLeading) {
             Button("Undo", systemImage: "arrow.uturn.backward") { Task { await model.undo() } }
                 .disabled(model.snapshot?.canUndo != true)
+                .tint(.primary)
+        }
+        // Sync and «⋯» stand in one glass group, as iOS 26 groups the trailing items.
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Sync", systemImage: "arrow.triangle.2.circlepath") { Task { await ObsidianSync.shared.start() } }
+                .disabled(ObsidianSync.shared.vault == nil)
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarTrailing) {
