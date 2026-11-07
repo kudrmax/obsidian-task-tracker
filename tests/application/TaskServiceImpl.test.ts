@@ -782,13 +782,15 @@ describe("createInPlace", () => {
 		expect(key).toEqual((await svc.inboxView())[0].key);
 	});
 
-	it("gives the first of twins side by side, whichever was typed: a field at either lands under both", async () => {
+	it("gives the very twin typed, side by side with the other: the write knows which line it made", async () => {
 		const { svc } = setup("## Inbox\n\n- [ ] X\n- [ ] Y\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
-		const [, y] = await svc.inboxView();
+		const [x, y] = await svc.inboxView();
 		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: y.key });
 		const inbox = await svc.inboxView();
 		expect(inbox.map((i) => i.text)).toEqual(["X", "X", "Y"]);
-		expect(key).toEqual(inbox[0].key);
+		expect(key).toEqual(inbox[1].key);
+		expect(inbox[0].id).toBe(x.id);
+		expect(inbox[1].id).not.toBe(x.id);
 	});
 
 	it("gives the twin a schedule moved out of Inbox, with an identical task left behind", async () => {
@@ -999,6 +1001,11 @@ describe("one parse per version of the file", () => {
 		return Promise.all([svc.dayView(T), svc.soonWithoutDateView(), svc.inboxView()]);
 	}
 
+	/** What a read gives but the tasks' ids, which last as long as the service that gave them. */
+	function withoutIds(value: unknown): unknown {
+		return JSON.parse(JSON.stringify(value, (k, v) => (k === "id" ? undefined : v)));
+	}
+
 	async function reload(svc: TaskServiceImpl) {
 		await svc.normalize();
 		return views(svc);
@@ -1028,7 +1035,8 @@ describe("one parse per version of the file", () => {
 			const after = parse.mock.calls.length;
 			const seen = await reload(svc);
 			expect(parse).toHaveBeenCalledTimes(after);
-			expect(seen).toEqual(await reload(new TaskServiceImpl(new InMemoryTaskFileStore(store.text), new FakeSettingsStore(), clock)));
+			const fresh = await reload(new TaskServiceImpl(new InMemoryTaskFileStore(store.text), new FakeSettingsStore(), clock));
+			expect(withoutIds(seen)).toEqual(withoutIds(fresh));
 		});
 	}
 

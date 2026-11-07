@@ -52,6 +52,8 @@ import { type Operation, TaskRules } from "./TaskRules";
 import { TaskReminders } from "./TaskReminders";
 import { TaskWrites, type Write } from "./TaskWrites";
 import { type UndoState, UndoSteps, type UndoWay } from "./UndoSteps";
+import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
+import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { dayOpening } from "./DayServiceImpl";
 import { repeatPageEnd } from "./RepeatPage";
@@ -78,6 +80,8 @@ export interface DoorContext {
 	readonly projects?: readonly ProjectNote[];
 	/** How this device groups its lists by project, as the door last answered it; the defaults when left out. */
 	readonly grouping?: GroupingState;
+	/** Who the tasks are (`TaskItem.id`), as the door last answered it; left out before the first: every task a new id. */
+	readonly ids?: TaskIdState;
 }
 
 /** A call's answer: the result, and what the host writes back; or the error, by its code. */
@@ -95,6 +99,8 @@ export type DoorAnswer =
 			readonly settings?: string;
 			/** The device's grouping after this call: the host keeps it and hands it in again. */
 			readonly grouping?: GroupingState;
+			/** Who the tasks are after this call: the host keeps it and hands it in again, so a task keeps its id. */
+			readonly ids?: TaskIdState;
 	  }
 	| { readonly ok: false; readonly error: { readonly code: DoorErrorCode; readonly message: string } };
 
@@ -177,6 +183,7 @@ interface Effects {
 	history?: UndoState;
 	settings?: string;
 	grouping?: GroupingState;
+	ids?: TaskIdState;
 }
 
 /** One call's world: the rules under the settings given, at the moment given, over the texts given. */
@@ -189,8 +196,10 @@ class Call {
 	readonly rules: TaskRules;
 	readonly reads: TaskReads;
 	readonly writes: TaskWrites;
-	readonly effects: Effects = {};
+	private readonly kept: Effects = {};
 	readonly clock: Clock;
+	/** Who the tasks are: handed in, carried through the call's writes. */
+	private readonly identity: TaskIdentity;
 	private text: string | null;
 	/** `data.json` as handed in: what a change of the settings is written over. */
 	private readonly settingsText: string;
@@ -206,10 +215,17 @@ class Call {
 			onChange: () => () => undefined,
 		};
 		this.store = store;
-		this.rules = new TaskRules(store, clock);
+		this.identity = new TaskIdentity(context.ids);
+		this.rules = new TaskRules(store, clock, this.identity);
 		this.reads = new TaskReads(this.rules, store, clock, { notes: () => context.projects ?? [], grouping: () => this.grouping });
 		this.writes = new TaskWrites(this.rules, this.reads);
 		this.text = context.tasks ?? null;
+	}
+
+	/** What the call ended with besides its result: the identity of the tasks when it changed. */
+	get effects(): Effects {
+		const ids = this.identity.state;
+		return ids === (this.context.ids ?? NO_TASK_IDS) ? this.kept : Object.assign(this.kept, { ids });
 	}
 
 	/** The device's grouping as this call has it: handed in, with what the call changed. */
@@ -260,25 +276,35 @@ class Call {
 		this.setText(this.rules.change(this.text, (d) => d).text, false);
 	}
 
-	/** A text the call wrote as one action: a step of the history. */
-	write(text: string): void {
-		this.setText(text, true);
+	/**
+	 * A text the call writes as one action, made of the text it has by the rules: a step of the history, which keeps who
+	 * the tasks were on each side. False when `make` writes nothing (null).
+	 */
+	write(make: (text: string) => string | null): boolean {
+		const before = this.tasks();
+		const was = this.identity.idsOf(before);
+		const text = make(before);
+		if (text === null) return false;
+		this.setText(text, true, { before: was, after: this.identity.idsOf(text) });
+		return true;
 	}
 
 	/** A write as one action: its operation over the text, the new text a step of the history. */
 	run<R>(write: Write<R>): R {
-		if (!write.operation) return write.answer(null);
-		const before = this.tasks();
-		const change = this.rules.change(before, write.operation);
-		this.setText(change.text, true);
-		return write.answer({ before: change.before, after: change.after });
+		const operation = write.operation;
+		if (!operation) return write.answer(null);
+		let change = null as ReturnType<TaskRules["change"]> | null;
+		this.write((text) => (change = this.rules.change(text, operation)).text);
+		return write.answer({ before: change!.before, after: change!.after });
 	}
 
 	/** The tasks text a step back or forward leaves. */
 	undo(way: UndoWay): string {
 		const steps = new UndoSteps(this.context.history);
-		const { outcome, text } = steps.step(way, this.tasks());
+		const before = this.tasks();
+		const { outcome, text, carried } = steps.step(way, before);
 		this.effects.history = steps.state;
+		if (carried) this.identity.carried(before, text, carried);
 		if (text !== this.text) this.setText(text, false);
 		return outcome;
 	}
@@ -291,14 +317,14 @@ class Call {
 		this.effects.settings = JSON.stringify({ ...raw, ...this.changed }, null, 2);
 	}
 
-	private setText(text: string, step: boolean): void {
+	private setText(text: string, step: boolean, ids?: PatchIds): void {
 		const before = this.text;
 		if (text === before) return;
 		this.text = text;
 		this.effects.tasks = text;
 		if (!step) return;
 		const steps = new UndoSteps(this.effects.history ?? this.context.history);
-		if (before !== null && steps.record(before, text)) {
+		if (before !== null && steps.record(before, text, ids)) {
 			this.effects.step = true;
 			this.effects.history = steps.state;
 		}
@@ -587,9 +613,7 @@ function reminderTime(start: number, end: number | null): string {
 
 /** An action on the reminding task whose line is `id`: the file written, or staleTask when no such task is left. */
 function onReminder(c: Call, id: string, action: (key: TaskKey) => Operation): void {
-	const text = new TaskReminders(c.rules, c.clock).act(c.tasks(), id, action);
-	if (text === null) throw new DoorError("staleTask", `no reminding task ${id}`);
-	c.write(text);
+	if (!c.write((text) => new TaskReminders(c.rules, c.clock).act(text, id, action))) throw new DoorError("staleTask", `no reminding task ${id}`);
 }
 
 /** The phone's reminders: which tasks ring and when, and the actions on a reminder shown. */
@@ -624,7 +648,7 @@ const CAPTURE: Readonly<Record<string, Handler>> = {
 	add: (c, [list, typed, recording, tag]) => {
 		const title = captureTitle({ typed: typed as string, recording: (recording ?? null) as string | null, tag: (tag ?? "") as string });
 		if (title === "") throw new DoorError("blank", "the task has no title");
-		c.write(c.rules.change(c.tasks(), c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
+		c.write((text) => c.rules.change(text, c.rules.placeNew(title, null, { kind: "list", list: list as GroupedList, group: null, before: null })).text);
 	},
 	lists: (c) => CAPTURE_LISTS.map((list) => ({ list, name: c.settings.sections[list] })),
 };

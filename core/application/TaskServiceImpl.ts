@@ -46,6 +46,7 @@ import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskR
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
 import type { UndoHistory } from "./UndoHistory";
+import { TaskIdentity } from "./TaskIdentity";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 import { snapMinute } from "./snapGrid";
 
@@ -81,8 +82,9 @@ export class TaskServiceImpl implements TaskService {
 		private readonly history: UndoHistory | null = null,
 		private readonly projects: Projects = NO_PROJECTS,
 		private readonly grouping: GroupingStore = memoryGrouping(),
+		private readonly identity: TaskIdentity = new TaskIdentity(),
 	) {
-		this.rules = new TaskRules(settings, clock);
+		this.rules = new TaskRules(settings, clock, identity);
 		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
@@ -499,11 +501,12 @@ export class TaskServiceImpl implements TaskService {
 		if (!operation) return null;
 		const at = this.rules.moment();
 		let failure: unknown = null;
-		let change = null as { before: string; written: TextChange } | null;
+		let change = null as { before: string; written: TextChange; ids: ReadonlyMap<number, string> } | null;
 		await this.store.write((text) => {
 			try {
+				const ids = this.identity.idsOf(text);
 				const written = this.rules.change(text, operation, at);
-				change = { before: text, written };
+				change = { before: text, written, ids };
 				return written.text;
 			} catch (e) {
 				failure = e;
@@ -512,9 +515,9 @@ export class TaskServiceImpl implements TaskService {
 		});
 		if (failure !== null) throw failure;
 		if (!change) return null;
-		const { before, written } = change;
+		const { before, written, ids } = change;
 		this.normalized = { text: written.text, today: at.today, reading: at.reading, doc: written.after, changed: false };
-		if (record) this.history?.record(before, written.text);
+		if (record) this.history?.record(before, written.text, { before: ids, after: this.identity.idsOf(written.text) });
 		return { before: written.before, after: written.after };
 	}
 

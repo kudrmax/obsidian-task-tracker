@@ -160,6 +160,13 @@ export interface ProjectNote {
 }
 
 export interface TaskItem {
+	/**
+	 * Who the task is for the life of the service: the same through every write the service makes to it (whatever changes
+	 * in its line, wherever it moves), through a re-read of the file and an edit elsewhere that leaves its line in place,
+	 * and through undo. A task made gets a new one; a task removed takes its away. What a view keys its card by; `key` is
+	 * the task as read, what an action names.
+	 */
+	readonly id: string;
 	readonly key: TaskKey;
 	readonly text: string;
 	/** `text` with each link's word in its place: for where a link can't be shown, such as a question about the task. */

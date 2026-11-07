@@ -3,6 +3,7 @@ import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from ".
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
+import { keyId } from "../../core/application/taskKeys";
 import { fullTree } from "../../core/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
 import { DayBoundary } from "../../core/domain/DayBoundary";
@@ -145,8 +146,10 @@ export class DemoTaskService implements TaskService {
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
+		const key = { section, index, path: [], raw: this.raw(t) };
 		return {
-			key: { section, index, path: [], raw: this.raw(t) },
+			id: keyId(key),
+			key,
 			text: t.text,
 			title: plainText(t.text),
 			status: t.status,

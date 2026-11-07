@@ -5,7 +5,7 @@ import { normalize } from "../domain/normalize";
 import * as ops from "../domain/operations";
 import { type Column, columnGroups, columnList } from "../domain/queries";
 import type { LocalDate, ReminderKind, Slot, TaskStatus } from "../domain/Task";
-import { TaskDocument, type TaskEntry } from "../domain/TaskDocument";
+import { type LineIds, TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { EntryTags } from "../domain/EntryTags";
 import { taskTitle } from "../domain/TaskTitle";
 import { type PriorityLevel, type TaskCalendarSettings, usableLevels } from "../settings";
@@ -26,6 +26,7 @@ import {
 } from "./contracts";
 import { boundaryOf, parseText, readDocument, readingKey, sectionNames } from "./documentText";
 import type { Clock, SettingsStore } from "./ports";
+import type { TaskIdentity } from "./TaskIdentity";
 import { isUnder, sameLine, samePlace } from "./taskKeys";
 
 /** An action's change of the document read at `today`; it throws `StaleTaskError` when a task or section it names is gone. */
@@ -94,6 +95,7 @@ export class TaskRules {
 	constructor(
 		private readonly settings: SettingsStore,
 		private readonly clock: Clock,
+		private readonly identity: TaskIdentity | null = null,
 	) {}
 
 	moment(): Moment {
@@ -118,7 +120,7 @@ export class TaskRules {
 	read(text: string, at: Moment = this.moment()): Reading {
 		const { settings, today, boundary } = at;
 		const presets = ops.usablePresets(settings.groups.presets);
-		const parsed = parseText(text, settings);
+		const parsed = parseText(text, settings, this.idsOf(text));
 		const whole = parsed.ensureSections(sectionNames(settings));
 		const doc = normalize(whole, today, boundary, presets);
 		const changed = whole === parsed ? doc !== whole : normalize(parsed, today, boundary, presets) !== parsed;
@@ -128,7 +130,7 @@ export class TaskRules {
 	/** The text after `operation` on the document read and normalized; the result is normalized again. */
 	change(text: string, operation: Operation, at: Moment = this.moment()): TextChange {
 		const { settings, today, boundary } = at;
-		return this.written(readDocument(text, settings, today, boundary), operation, at);
+		return this.written(readDocument(text, settings, today, boundary, this.idsOf(text)), operation, at);
 	}
 
 	/**
@@ -141,12 +143,17 @@ export class TaskRules {
 
 	/** The document as the file has it, with every section, not normalized. */
 	asRead(text: string, at: Moment = this.moment()): TaskDocument {
-		return parseText(text, at.settings).ensureSections(sectionNames(at.settings));
+		return parseText(text, at.settings, this.idsOf(text)).ensureSections(sectionNames(at.settings));
 	}
 
 	/** The text as the file has it, unnormalized and without the sections it lacks: where a line stands in it. */
 	parse(text: string): TaskDocument {
-		return parseText(text, this.settings.get());
+		return parseText(text, this.settings.get(), this.idsOf(text));
+	}
+
+	/** Who the tasks of `text` are, when the rules keep their identity. */
+	private idsOf(text: string): LineIds | undefined {
+		return this.identity?.of(text);
 	}
 
 	/** The document after `operation` on `doc`, already read and normalized at `at`, normalized again. */
@@ -508,6 +515,8 @@ export class TaskRules {
 	private written(doc: TaskDocument, operation: Operation, at: Moment): TextChange {
 		const { settings, today, boundary } = at;
 		const after = normalize(operation(doc, today, settings, boundary), today, boundary, ops.usablePresets(settings.groups.presets));
-		return { text: after.serialize(), before: doc, after };
+		const text = after.serialize();
+		this.identity?.wrote(text, after);
+		return { text, before: doc, after };
 	}
 }

@@ -52,6 +52,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 	const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary));
 	const description = descriptionMarkdown(entry);
 	return {
+		id: entry.id,
 		key: keyOf(entry),
 		text: entry.task.text,
 		title: plainText(entry.task.text),
