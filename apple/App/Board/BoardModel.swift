@@ -24,6 +24,20 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         }
     }
 
+    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's.
+    var key: String {
+        switch self {
+        case .inbox: "inbox"
+        case .soon: "soon"
+        case .today: "calendar"
+        }
+    }
+
+    init?(key: String) {
+        guard let place = Self.allCases.first(where: { $0.key == key }) else { return nil }
+        self = place
+    }
+
     var symbol: String {
         switch self {
         case .inbox: "tray"

@@ -67,6 +67,18 @@ struct ListEntryView: Decodable, Equatable {
     let at: At
 }
 
+/// `StackEntry`: where a task's full screen draws the field among the rows of its subtasks.
+struct StackEntryView: Decodable, Equatable {
+    struct At: Decodable, Equatable {
+        let kind: String
+        let index: Int?
+        let level: Int?
+    }
+
+    let at: At
+    let pending: [EntryView.Pending]
+}
+
 /// Typing tasks in place, the plugin's quick entry: the core's `entry.*` holds every rule of it and the session between
 /// calls; this host hands the session and the screen's look in, draws what the state says, turns keys and taps into
 /// calls, and runs the writes the session queues one at a time, each once the lists show the ones before it.
@@ -156,12 +168,14 @@ final class QuickEntryHost {
 
     /// The full screen's Add Subtask, or a subtask's there: the field last in the stack of `parent`'s subtasks.
     func addSubtaskInStack(_ parent: TaskItem) {
-        opening { call("open", [["kind": "stack", "parent": parent.key.json]]) }
+        guard let spot = value("stackSpot", [parent.key.json]), !spot.isNull else { return }
+        opening { call("open", [spot]) }
     }
 
     /// A rename on the full screen: the title, or a subtask's card there, becomes the field.
     func renameInStack(_ item: TaskItem) {
-        opening { call("open", [["kind": "stack", "parent": item.key.json], item.json]) }
+        guard let spot = value("stackSpot", [item.key.json]), !spot.isNull else { return }
+        opening { call("open", [spot, item.json]) }
     }
 
     private func opening(_ open: () -> Void) {
@@ -232,16 +246,11 @@ final class QuickEntryHost {
         }
     }
 
-    /// The ribbon turned to show `column`; a place that shows it already stays.
+    /// The ribbon turned to the place the core says shows `column` from where it stands; a place showing it stays.
     private func turn(to column: BoardColumn) {
-        guard let model else { return }
-        let showing = Self.shown(at: model.place).contains(column)
-        guard !showing else { return }
-        let place: RibbonPlace = switch column {
-        case .inbox, .backlog: .inbox
-        case .soon: .soon
-        case .day: .today
-        }
+        guard let model,
+              let key: String = model.ruleNow("rules.placeShowing", [.string(column.rawValue), .string(model.place.key)]),
+              let place = RibbonPlace(key: key), place != model.place else { return }
         turnedTo = place
         model.go(to: place)
     }
@@ -275,13 +284,15 @@ final class QuickEntryHost {
 
     // MARK: The door
 
-    private static func shown(at place: RibbonPlace) -> [BoardColumn] {
-        switch place {
-        case .inbox: [.inbox, .backlog, .soon]
-        case .soon: [.soon, .day]
-        case .today: [.day]
+    /// The lists each place of the ribbon shows, in order, as the core's `SHOWN_LISTS` has them.
+    private func shown(at place: RibbonPlace) -> [String] {
+        if shownLists == nil, let constants: [String: JSONValue] = model?.ruleNow("rules.constants", []) {
+            shownLists = constants["SHOWN_LISTS"].flatMap { try? $0.decode([String: [String]].self) }
         }
+        return shownLists?[place.key] ?? []
     }
+
+    @ObservationIgnored private var shownLists: [String: [String]]?
 
     /// The screen as the entry reads it: each list's cards and sections, which show sections, the day, and the lists the
     /// ribbon's place shows.
@@ -294,8 +305,8 @@ final class QuickEntryHost {
             sections[column.rawValue] = .array(list.groups.map(\.name.json))
             sectioned[column.rawValue] = .bool(list.sectioned)
         }
-        let shown = Self.shown(at: model?.place ?? .today)
-        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map { .string($0.rawValue) })]
+        let shown = shown(at: model?.place ?? .today)
+        return ["cards": .object(cards), "sections": .object(sections), "sectioned": .object(sectioned), "day": .string(snapshot.day), "shown": .array(shown.map(JSONValue.string))]
     }
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
@@ -376,6 +387,12 @@ final class QuickEntryHost {
         } else {
             slotMinute = nil
         }
+    }
+
+    /// Where `task`'s full screen draws the field, nil when it stands elsewhere.
+    func stackEntry(_ task: TaskItem) -> StackEntryView? {
+        guard state != nil, let entry = answer("stackEntry", [task.json])?["value"], !entry.isNull else { return nil }
+        return try? entry.decode(StackEntryView.self)
     }
 
     /// The screen was read anew (a write elsewhere, another day): the field keeps its place among the cards as drawn.
