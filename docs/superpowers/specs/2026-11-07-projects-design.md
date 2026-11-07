@@ -97,7 +97,8 @@ Decided by the lead after the spec review; the core owns every one, the frontend
    file. Link text is the shortest one Obsidian would write.
 5. **Groups.** The core gives each groupable list as a ready model: groups in order (projects by name, «No project»
    last), each with title, project, folded, count, `canOpenNote`, and its sections. Count: open top-level tasks of that
-   group in that list. A project without tasks in that list has no group (see Questions). Defaults (Backlog on, Soon off),
+   group in that list. In Backlog every project has a group, an empty one with «No tasks» (a new project shows at once and
+   the plus can be dropped in it); in Soon only projects with tasks there have a group. Defaults (Backlog on, Soon off),
    which lists can group (`TaskList.canGroupByProject`) and the fold state store are the core's, as `ScreenBehaviour`.
 6. **«No section» inside a group.** Inside a project group and inside «No project», the tasks without a section stand
    first without a header, as decision 8 says; the «No section» header appears only with grouping off, as today.
@@ -121,19 +122,17 @@ Decided by the lead after the spec review; the core owns every one, the frontend
 
 ## The iPhone app
 
-It has no task screen today (New Task and Settings only). For projects it changes only through the core: reminders,
-alarms and Live Activities show the title without the link (rule 2); quick entry writes without a project. Grouping, the
-mark and «Project» come to the app when it gets a task screen.
+A big refactor of the app is under way; for now it gets only the minimal changes so nothing breaks: wherever it shows a
+task's title (the task screen, reminders, alarms, Live Activities), the title comes without the project, as the core
+gives it; quick entry writes without a project. Grouping, the mark and «Project» come to the app later, as a feature of
+its own.
 
-## The block in the note: risks to check first
+## The block in the note
 
-The frontend-obsidian agent starts with a spike before anything else: put the plugin's screen at the end of a note in
-Reading and Live Preview, on the desktop and the phone, and report what breaks. Known risks: no public API for an
-in-document footer (backlinks-in-document is core; checked from memory only); the wheel and column swipes inside a
-scrolling note vs Obsidian's own swipes; the block's height (proposed: the height of the phone's screen, its own scroll
-inside); the block's own wheel position, day and divider (proposed: its own, kept per note); calendar events on its
-timeline (proposed: shown, as on the main screen, so the day reads the same); Cmd+Z and Cmd+F only when the focus is in
-the block.
+Other plugins put their own block at the end of a note; the block is built the same way, in Reading and Live Preview,
+on the desktop and the phone. Proposed by the lead, to be checked on the boards: the block's height is the phone screen's,
+with its own scroll inside; its own wheel position, day and divider, kept per note; calendar events on its timeline, as on
+the main screen; Cmd+Z and Cmd+F act on the block only when the focus is in it.
 
 ## Contract
 
@@ -148,7 +147,7 @@ Written by the backend agent from these rules before the frontends start: the `p
 
 ## Questions for Max
 
-1. Does a project with no tasks in a list show its group there (empty, with «No tasks»)?
+1. How the project is written on the line: a bare `[[link]]` or a field with its own emoji, like `📅`.
 
 ## Ideas for later
 
