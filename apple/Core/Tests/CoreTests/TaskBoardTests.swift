@@ -153,3 +153,52 @@ import Testing
         #expect(restacked[0].box.height > snapshot.timeline.slots[0].box.height)
     }
 }
+
+extension TaskBoardTests {
+    /// The quick entry as the app drives it: the session and the screen's look handed in, Enter queueing a job, the job
+    /// written through `tasks.<method>`, shown, and done, the next field open the whole time.
+    @Test func aTaskTypedInPlaceIsWrittenByItsJob() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let files = try board.files(now: Fixtures.date(6, 10))
+        let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: files)
+        func look(_ inbox: [TaskItem]) -> JSONValue {
+            let cards = JSONValue.array(inbox.map { ["key": $0.key.json, "level": 0, "group": .null] })
+            return ["cards": ["inbox": cards], "sections": ["inbox": [.null]], "sectioned": ["inbox": true], "day": "2026-11-06", "shown": ["inbox"]]
+        }
+        var session = JSONValue.null
+        func call(_ method: String, _ arguments: [JSONValue], _ inbox: [TaskItem]) throws -> JSONValue {
+            let reply = try board.entry(method, [session, look(inbox)] + arguments)
+            session = reply["session"]
+            return reply
+        }
+        _ = try call("openIn", ["inbox", .null], screen.inbox)
+        _ = try call("type", ["Fresh"], screen.inbox)
+        let entered = try call("enter", [], screen.inbox)
+        #expect(entered["state"]["text"].string == "")
+        #expect(isList(entered["state"]["pending"], of: ["Fresh"]))
+        guard case .array(let jobs) = session["jobs"], let id = jobs.first?["id"].string else { Issue.record("no job queued"); return }
+        let job = try call("call", [.string(id)], screen.inbox)["value"]
+        #expect(job["method"].string == "createInPlace")
+        guard case .array(let args) = job["args"] else { Issue.record("no arguments"); return }
+        let key = try board.write("tasks.createInPlace", args)
+        #expect(vault.text.contains("- [ ] Fresh"))
+        let after: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files(now: Fixtures.date(6, 10)))
+        let coming = JSONValue.object(["inbox": .array(after.inbox.map { ["key": $0.key.json, "level": 0, "group": .null] })])
+        let shown = try call("shown", [.string(id), key, coming], after.inbox)
+        #expect(isList(shown["state"]["pending"], of: []))
+        let done = try call("done", [.string(id)], after.inbox)
+        #expect(done["state"]["text"].string == "")
+        #expect(isList(done["session"]["jobs"], count: 0))
+    }
+
+    private func isList(_ value: JSONValue, of texts: [String]) -> Bool {
+        guard case .array(let items) = value else { return false }
+        return items.map { $0["text"].string ?? "" } == texts
+    }
+
+    private func isList(_ value: JSONValue, count: Int) -> Bool {
+        guard case .array(let items) = value else { return false }
+        return items.count == count
+    }
+}

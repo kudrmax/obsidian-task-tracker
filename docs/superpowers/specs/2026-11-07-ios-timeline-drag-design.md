@@ -262,8 +262,9 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   capsule draws the counter (the capsule reports that frame). **For the lead to confirm with Max: a tap on a card opens
   nothing; the menu is the long press.**
 - frontend-swift: menu rows that open a sheet or a page run in the context menu's `willEnd` animator's completion (no
-  sleep). Rename, Add Subtask and the plus's new task are small sheets with a focused field (as Reminders names a list);
-  New Section and Rename Section stay alerts with a field, as Notes names a folder.
+  sleep). ~~Rename, Add Subtask and the plus's new task are small sheets with a focused field~~ (superseded by finding 10:
+  they type in place, see «frontend-swift (quick entry)» below); New Section and Rename Section stay alerts with a field,
+  as Notes names a folder.
 - frontend-swift: the tasks file is watched by an `NSFilePresenter` (`Vault.watchTasksFile`) while the scene is active,
   and read again when the scene comes back; no polling. The app's own reads and writes are coordinated as that presenter
   (else every read after a write waited ~0.5 s for the system to message it), and the app's own write tells the watch
@@ -308,3 +309,34 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   from where the card is drawn. The drop places hold the model weakly; the file watch follows the settings' tasks file.
 - frontend-swift (round 2): the ribbon pages by view alignment with no limit per swipe: it settles on the place the
   swipe's speed reaches, so one fast swipe goes from Today to Inbox.
+- frontend-swift (quick entry): the app drives the core's `entry.*` as `QuickEntryController` does; the calls run on the
+  pure rules' context over the settings as last read (`TaskBoard.entry`), so a keystroke never waits for a read. The jobs
+  run one at a time: `entry.call` → `tasks.<method>` → the file read again → `entry.shown`/`unshown` drawn in the same
+  transaction as the new screen → `entry.done`. Nothing of the door was missing.
+- frontend-swift (quick entry): the field is one `UITextField` moved into whichever row, calendar spot or title holds it,
+  so the keyboard never drops between the lines of a batch; the bar is its `inputAccessoryView`, held at a fixed 60 pt
+  (a holder view with that intrinsic height) so the keyboard and the lists never move when the bar's buttons change. Its
+  groups are SwiftUI `glassEffect` capsules in a `GlassEffectContainer` over a fade into the ground, as the board.
+- frontend-swift (quick entry): Enter is drawn with no animation (the text stays where it was typed and the next field
+  is right under it in the same frame); indent, the section button and a place chosen move with `.snappy`.
+- frontend-swift (quick entry): where the field opens: the plus dropped in a list (the drop's level) or on the calendar,
+  a long press on the calendar's empty space (`UILongPressGestureRecognizer`, 0.25 s, the landing line follows the finger
+  and the field opens at its time on release, the plugin's row «Долгий тап по пустому месту календаря»), Add Subtask,
+  Rename, a tap on a «No tasks» plate. A tap on the plus keeps the capture sheet.
+- frontend-swift (quick entry): a tap elsewhere is a window tap recognizer that never cancels the touch: the touch does
+  its own work first, and the entry ends unless that work opened another field. A swipe of the ribbon, the day arrows,
+  Today and Back from the full screen end it the same way (blur, the text kept). The keyboard going away ends it too,
+  except while the field waits off screen for another day's list or a sheet of the bar holds it.
+- frontend-swift (quick entry): the flag is a system menu (levels close it, labels toggle with the menu kept open,
+  disabled tiles as `EntryState` says); the place is a system menu of the lists by `tasks.listName` and Date…, a
+  medium-detent graphical date sheet whose check calls `choosePlace`; another day waits for the queued writes, shows that
+  day and calls `moveToEnd`. Repeat opens the task menu's repeat sheet, its rule held by the session (`setRepeat`).
+- frontend-swift (quick entry): while the field stands in a list every row's branch is asked again (`rules.branchOf`
+  over the levels with the field in, cached per list of levels), so the card above the field keeps its line down to it.
+- frontend-swift (quick entry): the full screen types in its own stack (spot `stack`): its plus and a subtask's Add
+  Subtask open the field after the subtasks, Rename turns the title into the field in the title's own type (nothing
+  moves) or a subtask's card into the field; its top buttons give way to the check while typing; its own menu has no Open
+  Full Screen.
+- frontend-swift (quick entry): the section field is the header's type (15 pt semibold) in the text colour with the
+  placeholder «Section name». The task menu's Section › New Section… stays an alert: it names a section to move that task
+  into, not a header at the field's place.
