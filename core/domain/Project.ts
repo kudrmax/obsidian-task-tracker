@@ -2,19 +2,20 @@
 export const PROJECT_MARKER = "🗂️";
 
 /** The field anywhere in a text: the marker, with or without its variation selector, then a wikilink. */
-const FIELD_RE = /(^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
+const FIELD_RE = /(?:^|\s+)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
 
 /**
  * The project a text names and the text without the field: the link text of the first `🗂️ [[…]]` (no alias, no
- * heading), every such field taken out. A link without the marker, or the marker without a link, stays text.
+ * heading), every such field taken out with the spaces before it, so the rest keeps its own spacing. A link without the
+ * marker, or the marker without a link, stays text.
  */
 export function projectOfText(text: string): { readonly project: string | null; readonly text: string } {
 	let project: string | null = null;
-	const rest = text.replace(FIELD_RE, (_whole, space: string, link: string) => {
+	const rest = text.replace(FIELD_RE, (_whole, link: string) => {
 		project ??= link.trim();
-		return space;
+		return "";
 	});
-	return project === null ? { project, text } : { project, text: rest.replace(/\s{2,}/g, " ").trim() };
+	return project === null ? { project, text } : { project, text: rest.trim() };
 }
 
 /** The field as a line writes it. */

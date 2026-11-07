@@ -3,7 +3,7 @@ import { projectKey, projectName, type ProjectZone } from "../domain/Project";
 import type { GroupName } from "../domain/Task";
 import type { GroupingState, ListGrouping, ListSection, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
 import type { ListPlace } from "./nesting";
-import { groupKeyOf, type ListGroup, projectSection, withEmptySections } from "./sections";
+import { groupKeyOf, type ListGroup, listView, projectSection, withEmptySections } from "./sections";
 
 /** The title of the group of tasks without a project. */
 export const NO_PROJECT = "No project";
@@ -134,19 +134,41 @@ function groupOf(list: GroupedList, key: string, project: ProjectRef | null, ite
 		return own.length > 0 ? [projectSection(name, own, zone)] : [];
 	});
 	const drawn: readonly ListGroup[] = withEmpty ? withEmptySections(filled, sections).map((g) => (g.items.length === 0 ? projectSection(g.name, [], zone) : g)) : filled;
-	const last = drawn[drawn.length - 1];
-	const end: ListPlace = { kind: "task", group: last?.name ?? null, before: null, project: zone };
+	return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
+}
+
+/** The part of an empty group: no header, «No tasks», the place its plate writes and a drop lands. */
+function emptyPart(zone: ProjectZone): ListGroup {
+	return { ...projectSection(null, [], zone), empty: true };
+}
+
+function projectGroup(key: string, project: ProjectRef | null, items: readonly TaskItem[], zone: ProjectZone, drawn: readonly ListGroup[], folded: boolean, titled: boolean): ProjectGroup {
+	const sections = drawn.length > 0 ? drawn : [emptyPart(zone)];
+	const end: ListPlace = { kind: "task", group: sections[sections.length - 1].name, before: null, project: zone };
 	return {
 		key,
 		project,
 		title: project?.name ?? NO_PROJECT,
-		folded: isFolded(state, list, key),
+		folded,
 		count: items.filter((item) => item.open).length,
 		canOpenNote: project?.canOpenNote ?? false,
 		zone,
-		sections: drawn,
+		titled,
+		sections,
 		end,
+		head: { group: folded ? end.group : null, project: zone },
 	};
+}
+
+/**
+ * A list of a project's own view: one untitled group of the project, its sections as the main screen draws them (`shows`:
+ * the column shows sections), each with the project's zone on its menu and none lifted.
+ */
+export function viewGrouping(project: ProjectRef, items: readonly TaskItem[], shows: boolean, sections: readonly ListSection[]): ListGrouping {
+	const zone = project.link;
+	const view = items.length === 0 ? [] : listView(items, shows, sections).groups;
+	const drawn = view.map((g): ListGroup => ({ ...g, menu: g.menu && { ...g.menu, project: zone }, reorder: false }));
+	return { canGroup: false, on: true, groups: [projectGroup(projectKey(project.name), project, items, zone, drawn, false, false)] };
 }
 
 /** The sections a group offers a task's menu: those it shows, in order. */

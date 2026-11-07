@@ -493,14 +493,14 @@
 
   // core/domain/Project.ts
   var PROJECT_MARKER = "🗂️";
-  var FIELD_RE = /(^|\s)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
+  var FIELD_RE = /(?:^|\s+)\u{1F5C2}\u{FE0F}?\s+\[\[([^\[\]|#]+?)(?:#[^\[\]|]*)?(?:\|[^\[\]]*)?\]\](?=\s|$)/gu;
   function projectOfText(text) {
     let project = null;
-    const rest = text.replace(FIELD_RE, (_whole, space, link) => {
+    const rest = text.replace(FIELD_RE, (_whole, link) => {
       project ??= link.trim();
-      return space;
+      return "";
     });
-    return project === null ? { project, text } : { project, text: rest.replace(/\s{2,}/g, " ").trim() };
+    return project === null ? { project, text } : { project, text: rest.trim() };
   }
   function projectField(link) {
     return ` ${PROJECT_MARKER} [[${link}]]`;
@@ -3767,19 +3767,33 @@ ${key.title}`.toLowerCase();
       return own.length > 0 ? [projectSection(name, own, zone)] : [];
     });
     const drawn = withEmpty ? withEmptySections(filled, sections).map((g) => g.items.length === 0 ? projectSection(g.name, [], zone) : g) : filled;
-    const last = drawn[drawn.length - 1];
-    const end = { kind: "task", group: last?.name ?? null, before: null, project: zone };
+    return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
+  }
+  function emptyPart(zone) {
+    return { ...projectSection(null, [], zone), empty: true };
+  }
+  function projectGroup(key, project, items, zone, drawn, folded2, titled) {
+    const sections = drawn.length > 0 ? drawn : [emptyPart(zone)];
+    const end = { kind: "task", group: sections[sections.length - 1].name, before: null, project: zone };
     return {
       key,
       project,
       title: project?.name ?? NO_PROJECT,
-      folded: isFolded(state, list, key),
+      folded: folded2,
       count: items.filter((item) => item.open).length,
       canOpenNote: project?.canOpenNote ?? false,
       zone,
-      sections: drawn,
-      end
+      titled,
+      sections,
+      end,
+      head: { group: folded2 ? end.group : null, project: zone }
     };
+  }
+  function viewGrouping(project, items, shows, sections) {
+    const zone = project.link;
+    const view = items.length === 0 ? [] : listView(items, shows, sections).groups;
+    const drawn = view.map((g) => ({ ...g, menu: g.menu && { ...g.menu, project: zone }, reorder: false }));
+    return { canGroup: false, on: true, groups: [projectGroup(projectKey(project.name), project, items, zone, drawn, false, false)] };
   }
   function groupSectionNames(grouping) {
     return Object.fromEntries(grouping.groups.map((g) => [g.key, g.sections.map((s) => s.name)]));
@@ -4033,10 +4047,12 @@ ${key.title}`.toLowerCase();
     const shared = items.every((item) => key(item.project) === key(first));
     const options = [...known];
     for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
+    const none = items.every((item) => item.project === null);
     return {
+      value: shared && first ? first.name : none ? NO_PROJECT : "",
       current: shared ? first : null,
       options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
-      none: items.every((item) => item.project === null),
+      none,
       disabled: items.every((item) => !item.can.setProject)
     };
   }
@@ -4263,7 +4279,7 @@ ${key.title}`.toLowerCase();
       const all = this.listSections(s);
       const sections = scope.project === null ? all : Object.fromEntries(GROUPED_LISTS.map((list) => [list, all[list].filter((sec) => !sec.empty)]));
       const view = { soon: lists.soon.map(item), inbox: lists.inbox.map(item), backlog: lists.backlog.map(item) };
-      const projects = this.listGroupings(scope, view, sections);
+      const projects = this.listGroupings(scope, { ...view, day: day.list }, sections, date);
       const offer = this.offerOf(s, date, shown, sections, projects);
       return {
         day,
@@ -4278,8 +4294,17 @@ ${key.title}`.toLowerCase();
       };
     }
     /** Each list's grouping by project on this device; none in a project's view. */
-    listGroupings(scope, view, sections) {
-      if (scope.project !== null) return { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
+    listGroupings(scope, view, sections, date) {
+      if (scope.project !== null) {
+        const ref = scope.index.refOf(scope.project, false);
+        const dayList2 = this.columnSections("day", date)?.list ?? null;
+        return {
+          inbox: viewGrouping(ref, view.inbox, true, sections.inbox),
+          backlog: viewGrouping(ref, view.backlog, true, sections.backlog),
+          soon: viewGrouping(ref, view.soon, true, sections.soon),
+          now: viewGrouping(ref, view.day, dayList2 !== null, dayList2 === null ? [] : sections[dayList2])
+        };
+      }
       const state = this.projects.grouping();
       const of = (list) => listGrouping({ list, items: view[list], sections: sections[list], projects: scope.index, state });
       return { inbox: of("inbox"), backlog: of("backlog"), soon: of("soon"), now: NO_GROUPING };
@@ -4336,10 +4361,11 @@ ${key.title}`.toLowerCase();
       return Object.fromEntries(GROUPED_LISTS.map((list) => [list, sectionsOf(doc, list)]));
     }
     /** A query that finds nothing reads no file. */
-    searchRead(query) {
-      return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
+    searchRead(query, project) {
+      return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query, project) };
     }
-    search(s, query) {
+    /** With `project`, only that project's tasks (and their subtasks). */
+    search(s, query, project) {
       const fuzzy = FuzzyQuery.of(query);
       if (!fuzzy || !s) return [];
       const { doc, today } = s;
@@ -4353,22 +4379,22 @@ ${key.title}`.toLowerCase();
         const descriptionText = markdown === null ? "" : plainDescription(markdown);
         const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
         const projectText = entry.project === null || entry.path.length > 0 ? "" : index.refOf(entry.project)?.name ?? projectName(entry.project);
-        const project = projectText === "" ? null : fuzzy.matchWords(projectText);
-        if (title || description || project) {
+        const project2 = projectText === "" ? null : fuzzy.matchWords(projectText);
+        if (title || description || project2) {
           const hit = {
             item: item(entry),
             title: title ? matchParts(titleText, title.found) : [],
-            project: project ? matchParts(projectText, project.found) : null,
+            project: project2 ? matchParts(projectText, project2.found) : null,
             description: description ? snippetParts(descriptionText, description.found) : null
           };
-          ranked.push({ hit, title, description: description ?? project });
+          ranked.push({ hit, title, description: description ?? project2 });
         }
         for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
       };
       const groups = [];
       for (const list of SEARCH_ORDER) {
         ranked.length = 0;
-        for (const entry of doc.tasks(list)) visit(entry);
+        for (const entry of doc.tasks(list)) if (project === void 0 || inProject(entry.project, project)) visit(entry);
         if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
       }
       return groups;
@@ -4818,13 +4844,18 @@ ${key.title}`.toLowerCase();
         return project === void 0 ? removeGroup(doc, list, group) : removeGroupIn(doc, list, group, project);
       };
     }
-    /** A new section `name` at `place`, and the list it goes in; null when the name can't make one there. */
+    /**
+     * A new section `name` at `place`, and the list it goes in; null when the name can't make one there. A place in a
+     * project's part makes none: there a section is born with its first task (`NewTaskPlace.section`), so no other
+     * project's task moves and no empty heading is written.
+     */
     createSection(name, place) {
       const group = name.trim();
       const today = this.today();
       const column = columnOfPlace(place, today);
       const list = columnList(column, today);
       if (list === null || group === "" || group === this.settings.get().groups.ungrouped || group === place.group) return null;
+      if (place.project !== void 0) return null;
       const operation = (doc, today2, settings, boundary) => {
         this.groupOf(doc, list, place.group);
         const before = place.before ? this.entryOf(doc, place.before) : null;
@@ -5608,7 +5639,7 @@ ${key.title}`.toLowerCase();
     inboxView: (c) => c.reads.inboxView(KEPT(c)),
     backlogView: (c) => c.reads.backlogView(KEPT(c)),
     doneView: (c) => c.reads.doneView(KEPT(c)),
-    search: (c, [query]) => c.ask(c.reads.searchRead(query)),
+    search: (c, [query, project]) => c.ask(c.reads.searchRead(query, project ?? void 0)),
     screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item),
     reveal: (c, [item]) => {
       c.run(c.writes.revealUnfold(item));

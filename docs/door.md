@@ -106,10 +106,14 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
 - `TaskItem.project`: `ProjectRef` `{ name, link, note, canOpenNote, mark }` or `null`; `item.can.setProject` (false on a
   subtask). `mark` is the card's folder icon: off in a project's own view.
 - `tasks.screen(date, project?)`: with a project's link or name, that project's view: every list, the timeline and Done
-  hold only its tasks, the empty sections and grouping left out; `screen.project` is the project. Every screen answers
+  hold only its tasks, the empty sections left out; `screen.project` is the project. There every list (`projects.now`:
+  the day column) is one untitled group of the project (`titled` false), so every card, header, plate and place carries
+  its zone, section actions touch only its tasks and no section lifts; `tasks.createSection` with a zoned place writes
+  nothing (a section is born with its first task, `NewTaskPlace.section`). Every screen answers
   `projects`: each list's `ListGrouping` `{ canGroup, on, groups }`. While `on`, the column draws `groups` (each
-  `ProjectGroup`: `key`, `project`, `title`, `folded`, `count`, `canOpenNote`, `zone`, `sections`, `end`) in place of
-  its sections; each section of a group is a `ListGroup` with `header` and `reorder` (no lift while grouped) and a
+  `ProjectGroup`: `key`, `project`, `title`, `folded`, `count`, `canOpenNote`, `zone`, `titled`, `sections`, `end`,
+  `head`) in place of its sections. `sections` is never empty: an empty group has one empty part (`name` null, `empty`,
+  no header), where its plate writes and a drop lands; `head` is what a drop on the group's header means; each section of a group is a `ListGroup` with `header` and `reorder` (no lift while grouped) and a
   `menu.project` that `renameGroup` and `removeGroup` take as their last argument.
 - A card of a grouped list or a project's view carries `project: zone` in `ListCard`; a header a finger passes is
   `{ group, project }` (`rules.gapAt`), so the place (`rules.placeOfDrop`) carries the zone and `tasks.drop` moves the
@@ -121,7 +125,9 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
 - `tasks.setGrouping(list, on)`, `tasks.toggleFold(list, key)`: answer the new `grouping`.
 - `tasks.renameGroup(list, group, name, project?)`, `tasks.removeGroup(list, group, project?)`: with `project` (null: No
   project), only that project's tasks of the section move.
-- `tasks.search` finds a task by its project's name too: `SearchHit.project`, the name in pieces.
+- `tasks.search(query, project?)` finds a task by its project's name too: `SearchHit.project`, the name in pieces. With
+  `project`, only that project's tasks (the search opened from its view).
+- A menu's `project.value` is the row's value, ready: the shared project's name, «No project», or empty when they differ.
 - `NewTaskPlace` `list`/`day` take `project` and `section` (a section named in a project's group is born with its first
   task), `slot` takes `project`. `capture.add` writes no project.
 

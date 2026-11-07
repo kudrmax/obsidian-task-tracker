@@ -3,6 +3,7 @@ import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
 import { type LocalDate, nextProgress, REMINDER_KINDS, type TaskStatus } from "../domain/Task";
 import { projectKey } from "../domain/Project";
+import { NO_PROJECT } from "./projects";
 import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
@@ -137,10 +138,12 @@ export function menuProject(items: readonly TaskItem[], known: readonly ProjectR
 	const shared = items.every((item) => key(item.project) === key(first));
 	const options = [...known];
 	for (const item of items) if (item.project && !options.some((ref) => key(ref) === key(item.project))) options.push({ ...item.project, mark: true });
+	const none = items.every((item) => item.project === null);
 	return {
+		value: shared && first ? first.name : none ? NO_PROJECT : "",
 		current: shared ? first : null,
 		options: options.map((project) => ({ project, checked: shared && first !== null && key(project) === key(first) })),
-		none: items.every((item) => item.project === null),
+		none,
 		disabled: items.every((item) => !item.can.setProject),
 	};
 }

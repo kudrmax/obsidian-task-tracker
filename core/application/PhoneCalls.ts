@@ -328,7 +328,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	inboxView: (c) => c.reads.inboxView(KEPT(c)),
 	backlogView: (c) => c.reads.backlogView(KEPT(c)),
 	doneView: (c) => c.reads.doneView(KEPT(c)),
-	search: (c, [query]) => c.ask(c.reads.searchRead(query as string)),
+	search: (c, [query, project]) => c.ask(c.reads.searchRead(query as string, (project ?? undefined) as string | undefined)),
 	screenOf: (c, [item]) => c.reads.screenOf(KEPT(c), item as A),
 	reveal: (c, [item]) => {
 		c.run(c.writes.revealUnfold(item as A));

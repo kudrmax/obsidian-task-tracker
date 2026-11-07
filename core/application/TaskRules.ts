@@ -402,13 +402,18 @@ export class TaskRules {
 		};
 	}
 
-	/** A new section `name` at `place`, and the list it goes in; null when the name can't make one there. */
+	/**
+	 * A new section `name` at `place`, and the list it goes in; null when the name can't make one there. A place in a
+	 * project's part makes none: there a section is born with its first task (`NewTaskPlace.section`), so no other
+	 * project's task moves and no empty heading is written.
+	 */
 	createSection(name: string, place: SectionPlace): { readonly operation: Operation; readonly list: GroupedList; readonly group: string } | null {
 		const group = name.trim();
 		const today = this.today();
 		const column = columnOfPlace(place, today);
 		const list = columnList(column, today);
 		if (list === null || group === "" || group === this.settings.get().groups.ungrouped || group === place.group) return null;
+		if (place.project !== undefined) return null;
 		const operation: Operation = (doc, today, settings, boundary) => {
 			this.groupOf(doc, list, place.group);
 			const before = place.before ? this.entryOf(doc, place.before) : null;

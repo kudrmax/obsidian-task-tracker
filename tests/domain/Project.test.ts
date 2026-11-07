@@ -167,3 +167,11 @@ describe("section actions of one project's part", () => {
 		expect(removeGroupIn(parse(FILE), "backlog", "Дальний", null).serialize()).toBe("## Backlog\n- [ ] X\n- [ ] E\n### Дальний\n- [ ] F 🗂️ [[P]]\n- [ ] G 🗂️ [[P]]\n### Потом\n- [ ] H\n");
 	});
 });
+
+describe("cutting the field out", () => {
+	it("keeps the text's own spacing: only the seam of the field goes", () => {
+		expect(parseTaskLine("- [ ] T1  two  spaces 🗂️ [[P]]", M)!.task).toMatchObject({ text: "T1  two  spaces", project: "P" });
+		expect(projectOfText("A  B 🗂️ [[P]] C")).toEqual({ project: "P", text: "A  B C" });
+		expect(projectOfText("🗂️ [[P]] A")).toEqual({ project: "P", text: "A" });
+	});
+});

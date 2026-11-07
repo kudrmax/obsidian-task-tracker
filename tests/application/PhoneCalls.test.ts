@@ -105,6 +105,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "search", args: () => ["chil"] },
 	{ method: "search", args: () => ["note"] },
 	{ method: "search", args: () => ["  "] },
+	{ method: "search", args: () => ["chil", "Окружение"] },
 	{ method: "screenOf", args: (s) => [named(s, "Child one")] },
 	{ method: "reveal", args: (s) => [named(s, "Child one")] },
 	{ method: "reveal", args: (s) => [named(s, "Dated")] },

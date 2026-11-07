@@ -230,6 +230,12 @@ Obsidian frontend:
     warns.
 24. **«No section» in the block's Backlog** stays as on the main screen (the lead's call: the block thinks like the
     plugin); board Proj4V2 drew it without.
+25. **The project note's block behaves as one project group everywhere** (the lead's call): every card, header, plate and
+    place in `screen(date, project)` carries the project's zone (`ScreenView.projects`: each list one untitled group,
+    `titled` false; `now` is the day column's); section actions there touch only that project's tasks (`menu.project`),
+    sections there are not reordered (`reorder` false); the section button there asks the name, then the first task, as
+    inside a group (`createSection` with a zoned place writes nothing).
+26. **Search opened from the block searches only that project's tasks** (the lead's call): `search(query, project)`.
 
 ## Ideas for later
 

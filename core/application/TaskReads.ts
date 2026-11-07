@@ -42,7 +42,7 @@ import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
 import { inProject, projectName } from "../domain/Project";
-import { groupSectionNames, listGrouping, ProjectIndex } from "./projects";
+import { groupSectionNames, listGrouping, ProjectIndex, viewGrouping } from "./projects";
 import type { GroupingState, ListGrouping, ProjectNote, ProjectRef } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
@@ -175,7 +175,7 @@ export class TaskReads {
 		const all = this.listSections(s);
 		const sections = scope.project === null ? all : (Object.fromEntries(GROUPED_LISTS.map((list) => [list, all[list].filter((sec) => !sec.empty)])) as unknown as Record<GroupedList, readonly ListSection[]>);
 		const view = { soon: lists.soon.map(item), inbox: lists.inbox.map(item), backlog: lists.backlog.map(item) };
-		const projects = this.listGroupings(scope, view, sections);
+		const projects = this.listGroupings(scope, { ...view, day: day.list }, sections, date);
 		const offer = this.offerOf(s, date, shown, sections, projects);
 		return {
 			day,
@@ -191,8 +191,17 @@ export class TaskReads {
 	}
 
 	/** Each list's grouping by project on this device; none in a project's view. */
-	private listGroupings(scope: Scope, view: Readonly<Record<"soon" | "inbox" | "backlog", readonly TaskItem[]>>, sections: Readonly<Record<GroupedList, readonly ListSection[]>>): Readonly<Record<GroupedList, ListGrouping>> {
-		if (scope.project !== null) return { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
+	private listGroupings(scope: Scope, view: Readonly<Record<"soon" | "inbox" | "backlog" | "day", readonly TaskItem[]>>, sections: Readonly<Record<GroupedList, readonly ListSection[]>>, date: LocalDate): Readonly<Record<GroupedList, ListGrouping>> {
+		if (scope.project !== null) {
+			const ref = scope.index.refOf(scope.project, false)!;
+			const dayList = this.columnSections("day", date)?.list ?? null;
+			return {
+				inbox: viewGrouping(ref, view.inbox, true, sections.inbox),
+				backlog: viewGrouping(ref, view.backlog, true, sections.backlog),
+				soon: viewGrouping(ref, view.soon, true, sections.soon),
+				now: viewGrouping(ref, view.day, dayList !== null, dayList === null ? [] : sections[dayList]),
+			};
+		}
 		const state = this.projects.grouping();
 		const of = (list: "soon" | "inbox" | "backlog") => listGrouping({ list, items: view[list], sections: sections[list], projects: scope.index, state });
 		return { inbox: of("inbox"), backlog: of("backlog"), soon: of("soon"), now: NO_GROUPING };
@@ -259,11 +268,12 @@ export class TaskReads {
 	}
 
 	/** A query that finds nothing reads no file. */
-	searchRead(query: string): Read<readonly SearchGroup[]> {
-		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
+	searchRead(query: string, project?: string): Read<readonly SearchGroup[]> {
+		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query, project) };
 	}
 
-	search(s: Snapshot | null, query: string): readonly SearchGroup[] {
+	/** With `project`, only that project's tasks (and their subtasks). */
+	search(s: Snapshot | null, query: string, project?: string): readonly SearchGroup[] {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy || !s) return [];
 		const { doc, today } = s;
@@ -292,7 +302,7 @@ export class TaskReads {
 		const groups: SearchGroup[] = [];
 		for (const list of SEARCH_ORDER) {
 			ranked.length = 0;
-			for (const entry of doc.tasks(list)) visit(entry);
+			for (const entry of doc.tasks(list)) if (project === undefined || inProject(entry.project, project)) visit(entry);
 			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
 		return groups;

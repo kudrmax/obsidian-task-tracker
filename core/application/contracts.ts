@@ -459,6 +459,8 @@ export interface MenuProject {
 	readonly options: readonly MenuProjectOption[];
 	/** No project, last: checked when no task has one. */
 	readonly none: boolean;
+	/** What the row shows beside «Project»: the shared project's name, «No project» when none has one, nothing when they differ. */
+	readonly value: string;
 	/** The row can't be pressed: only subtasks, whose project is their parent's. */
 	readonly disabled: boolean;
 }
@@ -531,15 +533,20 @@ export interface ProjectGroup {
 	readonly count: number;
 	/** The arrow beside the title: a project with a note. */
 	readonly canOpenNote: boolean;
-	/** What its cards (`ListCard.project`), headers and places carry: the project's link, null for No project. */
+	/** What its cards (`ListCard.project`), headers, plates and places carry: the project's link, null for No project. */
 	readonly zone: ProjectZone;
+	/** It draws its own header (chevron, title, count, arrow): every group of a grouped list; not the one group of a project's view, which is the whole view. */
+	readonly titled: boolean;
 	/**
 	 * What it draws while unfolded: its tasks without a section first, without a header (`header` false), then its
-	 * sections in the file's order; in No project the list's empty sections too. None: the group draws «No tasks».
+	 * sections in the file's order; in No project the list's empty sections too. Never none: an empty group has one empty
+	 * part (`name` null, `empty`, no header), which draws «No tasks» and where its plate writes and a drop lands.
 	 */
 	readonly sections: readonly ListGroup[];
 	/** Where a drop on its title puts a task: the end of the group. */
 	readonly end: ListPlace;
+	/** What a drop on its header means, as a header passed (`Header`): folded, its end; open, its part without a section. */
+	readonly head: { readonly group: GroupName; readonly project: ProjectZone };
 }
 
 export interface ScreenView {
@@ -554,7 +561,11 @@ export interface ScreenView {
 	readonly missing: boolean;
 	/** The day's events, their sources and the switch's dot are shown: not while the tasks file is missing. */
 	readonly calendars: boolean;
-	/** Each list's grouping by project; in a project's own view none groups. */
+	/**
+	 * Each list's grouping by project. In a project's own view every list is one untitled group of that project (`titled`
+	 * false), its sections as the main screen shows them, each card, header, plate and place carrying the project's zone;
+	 * `now` there is the day column's, on whatever day it shows.
+	 */
 	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
 	/** The project whose view this is (the note's block: every list holds only its tasks); null for the main screen. */
 	readonly project: ProjectRef | null;
@@ -610,7 +621,8 @@ export interface TaskService {
 	/**
 	 * Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen
 	 * that says so (`missing`). With `project` (a link or a name), that project's view: every list and the timeline hold
-	 * only its tasks, without the mark, Done too; empty sections and grouping are left out.
+	 * only its tasks, without the mark, Done too; empty sections are left out, and each list is one untitled group of the
+	 * project (`ScreenView.projects`), so every place there carries its zone.
 	 */
 	screen(date: LocalDate, project?: string): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
@@ -627,9 +639,10 @@ export interface TaskService {
 	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
 	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
 	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
-	 * A query of spaces finds nothing. Each list's finds in a group of its own.
+	 * A query of spaces finds nothing. Each list's finds in a group of its own. With `project` (a link or a name), only that
+	 * project's tasks: the search opened from its view.
 	 */
-	search(query: string): Promise<readonly SearchGroup[]>;
+	search(query: string, project?: string): Promise<readonly SearchGroup[]>;
 	/**
 	 * Where a task shows: Done, Inbox or Backlog in its list; another on the day it stands on, Soon without one. A subtask
 	 * shows under its task, so where that task does. Where that is on its screens is the frontend's.
@@ -881,7 +894,8 @@ export interface TaskService {
 	 * column shows below it in its group, in order, go into the new section, written right after that group; the tasks it does
 	 * not show stay. At the end of a group the section is written empty and stays. A blank name or the No section name writes
 	 * nothing; the group's own name writes nothing; a name the list has takes the tasks below to the end of that section.
-	 * One write, one undo step. Gives the section the tasks went to, or null when nothing was written.
+	 * One write, one undo step. Gives the section the tasks went to, or null when nothing was written. A place in a project's
+	 * part (`place.project`) writes nothing: a section there is born with its first task (`NewTaskPlace.section`).
 	 */
 	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null>;
 

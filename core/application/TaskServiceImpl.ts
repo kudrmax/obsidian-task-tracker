@@ -166,8 +166,8 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.doneView(await this.snapshot());
 	}
 
-	search(query: string): Promise<readonly SearchGroup[]> {
-		return this.ask(this.reads.searchRead(query));
+	search(query: string, project?: string): Promise<readonly SearchGroup[]> {
+		return this.ask(this.reads.searchRead(query, project));
 	}
 
 	async screenOf(item: TaskItem): Promise<TaskScreen> {

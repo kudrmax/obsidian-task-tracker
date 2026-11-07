@@ -8,6 +8,7 @@ import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
 
 const T = "2026-11-07";
+const LATER = "2026-11-10";
 const clock: Clock = { now: () => new Date(2026, 10, 7, 14, 20) };
 const NOTES: readonly ProjectNote[] = [
 	{ name: "Окружение", path: "Окружение.md", link: "Окружение" },
@@ -85,7 +86,7 @@ describe("Backlog grouped by project", () => {
 			["Дальний", true, false, ["B3"], { section: "Дальний", rename: true, remove: true, project: "Окружение" }],
 		]);
 		expect(own.end).toEqual({ kind: "task", group: "Дальний", before: null, project: "Окружение" });
-		expect(groups[0].sections).toEqual([]);
+		expect(groups[0].sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
 		expect(groups[3].sections.map((s) => [s.name, s.empty])).toEqual([
 			[null, false],
 			["Пустой", true],
@@ -153,13 +154,13 @@ describe("search", () => {
 });
 
 describe("the project's own view", () => {
-	it("every list and Done hold only its tasks, without the mark; empty sections and grouping go", async () => {
+	it("every list and Done hold only its tasks, without the mark; empty sections go", async () => {
 		const screen = await setup().svc.screen(T, "Окружение");
 		expect(screen.project).toMatchObject({ name: "Окружение", mark: false });
 		expect([screen.inbox, screen.day.list, screen.soon, screen.backlog, screen.done].map((l) => l.map((i) => i.text))).toEqual([["I"], ["N"], ["S2"], ["B1", "B3"], ["D"]]);
 		expect(screen.backlog[0].project?.mark).toBe(false);
 		expect(screen.sections.backlog.some((s) => s.empty)).toBe(false);
-		expect(screen.projects.backlog).toEqual({ canGroup: false, on: false, groups: [] });
+		expect(screen.projects.backlog).toMatchObject({ canGroup: false, on: true });
 	});
 
 	it("a drop with no task to stand before goes after the project's last task there", async () => {
@@ -193,5 +194,75 @@ describe("a found task in a folded group", () => {
 		const screen = await svc.screen(T);
 		await svc.reveal(screen.backlog[0]);
 		expect(grouping.get().folded?.backlog).toEqual([]);
+	});
+});
+
+describe("the project's view as one group of the project (decision 25)", () => {
+	const SOON = "## Now\n\n## Soon\n\n- [ ] A 🗂️ [[P]]\n- [ ] X\n- [ ] B 🗂️ [[P]]\n- [ ] Y\n\n## Done\n";
+
+	it("every list is one untitled group whose cards, headers, plates and places carry the project", async () => {
+		const screen = await setup(FILE).svc.screen(T, "Окружение");
+		for (const list of ["inbox", "backlog", "soon", "now"] as const) {
+			const grouping = screen.projects[list];
+			expect(grouping).toMatchObject({ canGroup: false, on: true });
+			expect(grouping.groups).toHaveLength(1);
+			expect(grouping.groups[0]).toMatchObject({ titled: false, zone: "Окружение", folded: false, head: { group: null, project: "Окружение" } });
+		}
+		const backlog = screen.projects.backlog.groups[0].sections;
+		expect(backlog.map((s) => [s.name, s.header, s.reorder, s.menu?.project])).toEqual([
+			[null, true, false, undefined],
+			["Дальний", true, false, "Окружение"],
+		]);
+	});
+
+	it("an empty list of the view is the group's empty part: «No tasks», where its plate writes", async () => {
+		const screen = await setup(FILE).svc.screen(LATER, "Английский");
+		const part = screen.projects.inbox.groups[0];
+		expect(part.sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
+		expect(part.end).toEqual({ kind: "task", group: null, before: null, project: "Английский" });
+	});
+
+	it("the section field there makes no empty heading and moves no other project's task", async () => {
+		const { svc, store } = setup(SOON, []);
+		const screen = await svc.screen(T, "P");
+		const b = screen.soon[1].key;
+		expect(await svc.createSection("New", { kind: "list", list: "soon", group: null, before: b, project: "P" })).toBeNull();
+		expect(store.text).toBe(SOON);
+		await svc.createInPlace("First", null, { kind: "list", list: "soon", group: null, before: null, project: "P", section: "New" });
+		expect(store.text).toContain("## Soon\n\n- [ ] A 🗂️ [[P]]\n- [ ] X\n- [ ] B 🗂️ [[P]]\n- [ ] Y\n### New\n- [ ] First 🗂️ [[P]]\n\n## Done\n");
+	});
+
+	it("a drop after the view's last task lands right after it, not at the section's end", async () => {
+		const { svc, store } = setup(SOON, []);
+		const screen = await svc.screen(T, "P");
+		const [a] = screen.soon;
+		await svc.drop([{ key: a.key, from: "soon" }], { kind: "place", column: "soon", place: { kind: "task", group: null, before: null, project: "P" } }, T);
+		expect(store.text).toContain("## Soon\n\n- [ ] X\n- [ ] B 🗂️ [[P]]\n- [ ] A 🗂️ [[P]]\n- [ ] Y\n");
+	});
+
+	it("search from the view finds only the project's tasks (decision 26)", async () => {
+		const { svc } = setup();
+		expect((await svc.search("B", "Окружение")).flatMap((g) => g.hits.map((h) => h.item.text))).toEqual(["B1", "B3", "B1a"]);
+		expect((await svc.search("B")).flatMap((g) => g.hits.map((h) => h.item.text))).toEqual(expect.arrayContaining(["B2", "B4"]));
+	});
+});
+
+describe("a grouped list's group, ready to draw", () => {
+	it("an empty group has its empty part; an open group's header means its part without a section, a folded one its end", async () => {
+		const { svc } = setup();
+		await svc.toggleFold("backlog", "окружение");
+		const groups = (await svc.screen(T)).projects.backlog.groups;
+		expect(groups[0].sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
+		expect(groups[0]).toMatchObject({ titled: true, head: { group: null, project: "Английский" } });
+		expect(groups[1].head).toEqual({ group: "Дальний", project: "Окружение" });
+	});
+
+	it("the Project row's value is ready: the shared name, «No project», or nothing when they differ", async () => {
+		const { svc } = setup();
+		const screen = await svc.screen(T);
+		const at = { today: T, day: T, offer: screen.offer };
+		expect(svc.menu(screen.backlog[0], "backlog", at).project.value).toBe("Окружение");
+		expect(svc.menu(screen.backlog[1], "backlog", at).project.value).toBe("No project");
+		expect(svc.bulkMenu([{ item: screen.backlog[0], from: "backlog" }, { item: screen.backlog[1], from: "backlog" }], at).project.value).toBe("");
 	});
 });
