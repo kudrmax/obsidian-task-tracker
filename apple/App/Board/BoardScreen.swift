@@ -209,6 +209,8 @@ struct Ribbon: View {
     @State private var phase = ScrollPhase.idle
     /// The place the ribbon last came to rest on.
     @State private var rested: RibbonPlace?
+    /// How far the ribbon stands from Inbox now.
+    @State private var offset: CGFloat = 0
 
     var body: some View {
         GeometryReader { box in
@@ -220,7 +222,7 @@ struct Ribbon: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
                     column(.inbox, half) {
-                        VStack(spacing: 12) {
+                        VStack(spacing: ColumnMetrics.headGap) {
                             lists(.inbox)
                             lists(.backlog)
                         }
@@ -243,6 +245,7 @@ struct Ribbon: View {
                     .id(RibbonPlace.today)
                 }
                 .scrollTargetLayout()
+                .background { EdgesHold() }
                 }
             .scrollTargetBehavior(OnePlacePerSwipe(stops: [0, half, width]))
             .scrollPosition($position, anchor: .leading)
@@ -250,6 +253,7 @@ struct Ribbon: View {
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
             } action: { _, x in
+                offset = x
                 toToday = min(1, max(0, (x - half) / max(1, half)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
@@ -258,6 +262,17 @@ struct Ribbon: View {
             }
             .onScrollPhaseChange { _, new in
                 phase = new
+                // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
+                // nearer one, as a swipe would.
+                if new == .idle {
+                    let near = nearest(offset, half: half, width: width)
+                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
+                    if abs(offset - stop) > 0.5 {
+                        model.place = near
+                        withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
+                        return
+                    }
+                }
                 // The ribbon at rest on another place finishes the task being typed, as a tap elsewhere.
                 guard new == .idle, model.place != rested else { return }
                 rested = model.place
@@ -384,6 +399,22 @@ struct BulkActions: View {
         Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
             .tint(.red)
             .disabled(items.isEmpty || menu?.remove == nil)
+    }
+}
+
+/// The ribbon stops at Inbox and at Today as it stops at Soon: no rubber band past its ends that the places between
+/// them don't have. SwiftUI keeps no switch for a scroll view's bounce, so it is turned off on the ribbon's own.
+private struct EdgesHold: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+    func updateUIView(_ probe: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            var view = superview
+            while let next = view, !(next is UIScrollView) { view = next.superview }
+            (view as? UIScrollView)?.bounces = false
+        }
     }
 }
 

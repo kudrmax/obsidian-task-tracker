@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, repeatParts, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, repeatParts, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -353,33 +353,50 @@ export class TaskMenu extends LiftedMenu {
 			section: () => this.showSections(),
 			subtask: this.stacks ? () => actions.addSubtask(this) : this.pick(() => actions.addSubtask(this)),
 		};
-		const tiles = statusTiles(model);
-		const asked = this.asking;
-		if (asked !== null && asked !== "delete") this.askGroup(asked);
-		else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
-		const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
-		if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
-		const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
-		if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
-		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({
-			label,
-			icon,
-			onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
-		}));
-		if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
-		const rows = editRows(item, model);
-		const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
-		const project = projectRow(model);
-		specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
-		menuGroup(this.panel, specs);
-		const openFull = actions.openFull;
-		menuGroup(this.panel, [
-			...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
-			{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
-		]);
-		const remove = model.remove;
-		if (this.asking === "delete") this.askGroup("delete");
-		else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+		const draw: Record<MenuGroupId, () => void> = {
+			statuses: () => {
+				const tiles = statusTiles(model);
+				const asked = this.asking;
+				if (asked !== null && asked !== "delete") this.askGroup(asked);
+				else tileGroup(this.panel, tiles.length > 3 ? "is-status is-four" : "is-status", [tiles.map((tile): MenuTileSpec => ({ label: tile.label, icon: tile.icon, onPick: tile.confirm ? () => this.askFor(tile.id) : this.pick(() => actions.pickStatus(tile.id)) }))]);
+			},
+			levels: () => {
+				const levelTiles = priorityTiles(model).map((tile): MenuTileSpec => ({ label: tile.prefix, icon: "priority", color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: this.pick(() => actions.togglePriority(tile.prefix)) }));
+				if (levelTiles.length > 0) tileGroup(this.panel, "is-priority", tileRows(levelTiles));
+			},
+			labels: () => {
+				const tagTiles = labelTiles(model).map((tile): MenuTileSpec => ({ label: tile.title, icon: "label", color: tile.color, on: tile.on, disabled: model.labels.disabled, onPick: () => void this.toggleLabel(tile.name) }));
+				if (tagTiles.length > 0) tileGroup(this.panel, "is-labels", tileRows(tagTiles));
+			},
+			moves: () => {
+				const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({
+					label,
+					icon,
+					onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)),
+				}));
+				if (moves.length > 0) tileGroup(this.panel, "is-move", [moves]);
+			},
+			edits: () => {
+				const rows = editRows(item, model);
+				const specs = rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, onPick: edits[row.id] }));
+				const project = projectRow(model);
+				specs.splice(projectRowAt(rows), 0, { ...project, onPick: () => this.showProjects() });
+				menuGroup(this.panel, specs);
+			},
+			opens: () => {
+				const openFull = actions.openFull;
+				menuGroup(this.panel, [
+					...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
+					{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
+				]);
+			},
+			remove: () => {
+				const remove = model.remove;
+				if (this.asking === "delete") this.askGroup("delete");
+				else if (remove) menuRow(this.panel, { label: "Delete", icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
+			},
+		};
+		for (const group of model.groups) draw[group]();
 		this.place(keepAbove);
 		this.panel.querySelector(".tc-menu-ask")?.scrollIntoView({ block: "nearest" });
 	}

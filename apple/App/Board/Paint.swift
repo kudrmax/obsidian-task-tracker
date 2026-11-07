@@ -20,8 +20,25 @@ enum Palette {
     static func accent(_ scheme: ColorScheme) -> Color { scheme == .dark ? accentDark : accentLight }
     static func branch(_ scheme: ColorScheme) -> Color { scheme == .dark ? branchDark : branchLight }
     static func strong(_ scheme: ColorScheme) -> Color { scheme == .dark ? strongDark : strongLight }
+    /// A section's name over its tasks (`--tc-pull-ink`).
+    static func pullInk(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#AEAEB2" : "#6C6C70") }
+    /// A drop's lit plate (`--tc-drop-bg`) and a waiting place's dashes (`--tc-dash`).
+    static func dropBg(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#251F3D" : "#F1ECFE") }
+    static func dash(_ scheme: ColorScheme) -> Color { Color(hex: scheme == .dark ? "#3A3A3C" : "#C7C7CC") }
     /// A plain card: the ground lifted towards the text.
     static func card(_ scheme: ColorScheme) -> Color { Color(.secondarySystemBackground) }
+}
+
+/// A column's head and sections, as the plugin spaces them: the title's row (`--tc-day-row`), the gap under it to the
+/// list (`--tc-head-gap`), a section's header (`--tc-group-head-h`, its name 13 on a 20 line) and the room above every
+/// header but the first (`--tc-section-gap`).
+enum ColumnMetrics {
+    static let titleRow: CGFloat = 36
+    static let headGap: CGFloat = 4
+    static let groupHead: CGFloat = 26
+    static let groupName: CGFloat = 13
+    static let groupLeading: CGFloat = 20
+    static let sectionGap: CGFloat = 10
 }
 
 /// The card's measures, as the plugin draws a card (`docs/design/README.md`).

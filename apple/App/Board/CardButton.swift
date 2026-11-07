@@ -19,9 +19,8 @@ struct CardButton: UIViewRepresentable {
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
     var ringed = false
     var height: CGFloat = CardMetrics.height
-    var over = false
     var draggable = true
-    /// The card stands in a carry: it gives its place up until the carry ends.
+    /// The card stands in a carry: it hides once the carried copy has left it, until the carry ends.
     var carried = false
     var onTouch: () -> Void = {}
     /// The card was lifted to carry, the finger this far below its top.
@@ -41,7 +40,7 @@ struct CardButton: UIViewRepresentable {
 
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
-            TaskCapsule(card: card, ringed: ringed, height: height, over: over) { [weak control] in control?.counterFrame = $0 }
+            TaskCapsule(card: card, ringed: ringed, height: height) { [weak control] in control?.counterFrame = $0 }
         }
         .margins(.all, 0)
     }
@@ -56,7 +55,7 @@ struct CardButton: UIViewRepresentable {
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        let look = CardControl.Look(card: card, ringed: ringed, height: height, over: over)
+        let look = CardControl.Look(card: card, ringed: ringed, height: height)
         if control.look != look {
             control.look = look
             control.content.configuration = configuration(control: control)
@@ -90,7 +89,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// cancelled carry home.
     var carried = false {
         didSet {
-            guard carried != oldValue, !returning else { return }
+            guard carried != oldValue else { return }
+            // The carry is over (its drop drawn, or cancelled): the next carry starts from the card in its place.
+            if !carried { left = false }
+            guard !returning else { return }
             showsInPlace()
         }
     }
@@ -99,7 +101,6 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         let card: BoardCard
         let ringed: Bool
         let height: CGFloat
-        let over: Bool
     }
     var look: Look?
     let content: UIView & UIContentView
@@ -108,10 +109,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         didSet { setNeedsLayout() }
     }
     private let fold = UIButton(type: .custom)
+    /// Shows the menu, anchored to the card, when a tap has ended.
+    private lazy var opener = MenuOpener { [weak self] in self?.menuEnded($0) }
     /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
     private let press = UIView()
     private var drag: UIDragInteraction!
-    /// A menu row that opens a sheet or a page, run once the menu has gone.
+    /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     /// Where the card stood when it was lifted, in the window: a cancelled carry flies back there.
     private var home: CGPoint?
@@ -150,8 +153,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }, for: .touchUpInside)
         addSubview(fold)
         addAction(UIAction { [weak self] _ in self?.onTouch() }, for: .touchUpInside)
-        // The menu on a long press, the card its lifted preview; the drag on the same view takes over once the finger moves.
-        addInteraction(UIContextMenuInteraction(delegate: self))
+        // A tap opens the menu once the finger is up, as the plugin's tap does; a long press lifts the card for the drag.
+        addSubview(opener)
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
         drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
@@ -165,6 +169,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     override func layoutSubviews() {
         super.layoutSubviews()
         press.frame = bounds
+        opener.frame = bounds
         // The counter's own button, as tall as the card and a little wider than the digits, as the plugin's hit area.
         if let counter = counterFrame {
             fold.frame = CGRect(x: counter.minX - Self.foldReach, y: 0, width: counter.width + Self.foldReach * 2, height: min(bounds.height, CardMetrics.height))
@@ -191,25 +196,25 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     // MARK: The menu
 
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+    @objc private func tapped(_ tap: UITapGestureRecognizer) {
         onTouch()
-        return UIContextMenuConfiguration(identifier: id as NSString, previewProvider: nil) { [weak self] _ in
-            self?.menuMaker { run in self?.afterMenu = run }
+        openMenu(at: tap.location(in: opener))
+    }
+
+    private func openMenu(at point: CGPoint) {
+        guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
+        opener.present(menu, at: point) { [weak self] in
+            guard let self else { return nil }
+            return UITargetedPreview(view: self.content, parameters: self.capsule)
         }
     }
 
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        UITargetedPreview(view: content, parameters: capsule)
-    }
-
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
-        UITargetedPreview(view: content, parameters: capsule)
-    }
-
-    override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+    /// A row that opens a sheet or a page runs once the menu has gone.
+    private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         guard let run = afterMenu else { return }
         afterMenu = nil
-        if let animator { animator.addCompletion { run() } } else { run() }
+        // As the menu starts to go, not when its animation ends: the animator completes about a second later.
+        DispatchQueue.main.async { run() }
     }
 
     // MARK: The carry
@@ -263,8 +268,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         animator.addCompletion { [weak self] _ in self?.landed() }
     }
 
+    /// A drop keeps the card hidden while its write is drawn: it shows again only where the screen then draws it.
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        left = false
+        if !carried { left = false }
         if returning { landed() } else { showsInPlace() }
         onEnd()
     }
@@ -276,5 +282,51 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private func landed() {
         returning = false
         showsInPlace()
+    }
+}
+
+/// The card's menu, opened by the card once a tap ends rather than on the touch, so a long press stays the drag's. It
+/// takes no touches itself; the system's context menu is shown at the tap's point.
+final class MenuOpener: UIView, UIContextMenuInteractionDelegate {
+    private let ended: ((any UIContextMenuInteractionAnimating)?) -> Void
+    private var menu: UIMenu?
+    private var preview: (() -> UITargetedPreview?)?
+    private lazy var interaction = UIContextMenuInteraction(delegate: self)
+
+    init(ended: @escaping ((any UIContextMenuInteractionAnimating)?) -> Void) {
+        self.ended = ended
+        super.init(frame: .zero)
+        addInteraction(interaction)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool { false }
+
+    func present(_ menu: UIMenu, at point: CGPoint, preview: @escaping () -> UITargetedPreview?) {
+        self.menu = menu
+        self.preview = preview
+        let selector = NSSelectorFromString("_presentMenuAtLocation:")
+        guard interaction.responds(to: selector), let method = interaction.method(for: selector) else { return }
+        typealias Present = @convention(c) (AnyObject, Selector, CGPoint) -> Void
+        unsafeBitCast(method, to: Present.self)(interaction, selector, point)
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
+        guard let menu else { return nil }
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in menu }
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
+        preview?()
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, dismissalPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
+        preview?()
+    }
+
+    func contextMenuInteraction(_ interaction: UIContextMenuInteraction, willEndFor configuration: UIContextMenuConfiguration, animator: (any UIContextMenuInteractionAnimating)?) {
+        ended(animator)
     }
 }

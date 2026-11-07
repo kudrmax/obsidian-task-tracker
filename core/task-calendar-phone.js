@@ -4108,10 +4108,12 @@ ${key.title}`.toLowerCase();
       disabled: items.every((item) => !item.can.setProject)
     };
   }
+  var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
   function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = []) {
     const sections = menuSections(items, offer, of);
     const edits = menuEdits(items, of, sections);
     return {
+      groups: MENU_GROUPS,
       statuses: menuStatuses(items, of),
       levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
       labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },

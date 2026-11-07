@@ -446,6 +446,8 @@ export interface MenuReminder {
 
 /** A row of the edit group. */
 export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
+/** A task menu's groups: the statuses, the priorities, the labels, the moves, the edit rows, Open full screen and Open in Obsidian, Delete. */
+export type MenuGroupId = "statuses" | "levels" | "labels" | "moves" | "edits" | "opens" | "remove";
 
 /** A project the Project page offers; `checked` on the one every task has. */
 export interface MenuProjectOption {
@@ -479,6 +481,8 @@ export interface MenuProject {
  * full screen and Open in Obsidian are its own ways out of the menu, drawn above Delete, and no part of the model.
  */
 export interface TaskMenuModel {
+	/** The order every frontend draws the groups in, top to bottom; a group with nothing to offer is skipped. */
+	readonly groups: readonly MenuGroupId[];
 	/** Done, the progress tile, Won't do, in this order; Stop last on one task that may be stopped. A task done or given up has them all too. */
 	readonly statuses: readonly MenuStatus[];
 	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */

@@ -60,6 +60,8 @@ public struct BoardGroup: Sendable, Hashable, Identifiable {
     public let cards: [BoardCard]
     public let empty: Bool
     public let menu: GroupMenu?
+    /// A long press lifts its header to move it among the list's sections (`ListGroup.reorder`).
+    public let reorder: Bool
     public var id: String { name ?? "\u{0}" }
 }
 
@@ -75,6 +77,9 @@ public struct BoardList: Sendable, Hashable {
     public let showsHeaders: Bool
     /// The column shows sections (`tasks.columnSections`): a section's name may be typed in it.
     public let sectioned: Bool
+    /// Whose sections the column shows (`ColumnSections.list`): what `tasks.moveGroup`, `renameGroup` and `removeGroup`
+    /// take; nil for a column that shows none.
+    public let sectionsOf: String?
     /// Every card of the list in drawing order, as a drop reads the gaps between them.
     public var cards: [BoardCard] { groups.flatMap(\.cards) }
 }
@@ -291,9 +296,10 @@ extension TaskBoard {
                     header: view.showsHeaders ? (group.name ?? ungrouped) : nil,
                     cards: try cards(group.rows, corner: corner, painter: &painter),
                     empty: group.empty,
-                    menu: group.menu)
+                    menu: group.menu,
+                    reorder: group.reorder ?? false)
             }
-            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil)
+            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil, sectionsOf: sections?.list)
         }
 
         let name: (String) throws -> String = { try self.read("tasks.listName", [.string($0)], over: files) }
