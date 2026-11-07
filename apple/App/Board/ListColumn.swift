@@ -11,6 +11,8 @@ struct ListColumn: View {
     @Binding var question: MenuQuestion?
 
     private static let space = "list"
+    /// Room after the last row, so the last card scrolls over the keyboard.
+    static let trailingRoom: CGFloat = 160
 
     private var gap: ListGap? { model.gap?.column == list.column ? model.gap : nil }
     private var key: String { "list.\(list.column.rawValue)" }
@@ -40,14 +42,14 @@ struct ListColumn: View {
                                 EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
                             }
                         }
-                        Color.clear.frame(height: 160)
+                        Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
                     .coordinateSpace(.named(Self.space))
                     .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
                 }
                 .scrollIndicators(.hidden)
-                .softTopEdge()
+                .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.rest(column, width: $0) }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
                 // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
@@ -356,25 +358,43 @@ struct SelectionCircle: View {
     }
 }
 
-/// A list or the calendar fades out softly at its top edge, where it scrolls under its title, over half a card's height;
-/// only while something is under that edge, so a list at its top shows no fade. iOS's own soft scroll edge shows only
-/// under the system's bars, and these columns scroll under their own titles: a mask of the same kind.
-private struct SoftTopEdge: ViewModifier {
-    @State private var under: CGFloat = 0
-    private static let fade = CardMetrics.height / 2
+/// A list or the calendar fades out softly at an edge it scrolls past, over half a card's height: at the top under its
+/// title while something is scrolled up there, at the bottom while more is below (where Inbox meets Backlog), as the
+/// plugin's lists do; a list at its top shows no fade there. iOS's own soft scroll edge shows only under the system's bars,
+/// and these columns scroll under their own titles: a mask of the same kind. `trailing` is room at the end of the content
+/// that holds nothing (a list's space to scroll its last card over the keyboard): no fade for it.
+private struct SoftEdges: ViewModifier {
+    var trailing: CGFloat = 0
+    @State private var edges = Edges()
+    static let fade = CardMetrics.height / 2
+
+    struct Edges: Equatable {
+        var top: CGFloat = 0
+        var bottom: CGFloat = 0
+    }
 
     func body(content: Content) -> some View {
         content
-            .onScrollGeometryChange(for: CGFloat.self) { min(Self.fade, max(0, $0.contentOffset.y + $0.contentInsets.top)) } action: { _, y in under = y }
+            .onScrollGeometryChange(for: Edges.self) { geometry in
+                let above = geometry.contentOffset.y + geometry.contentInsets.top
+                let below = geometry.contentSize.height + geometry.contentInsets.bottom - trailing - geometry.contentOffset.y - geometry.containerSize.height
+                return Edges(top: min(Self.fade, max(0, above)), bottom: min(Self.fade, max(0, below)))
+            } action: { _, new in edges = new }
             .mask {
                 VStack(spacing: 0) {
-                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: under)
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top)
                     Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom)
                 }
             }
     }
 }
 
 extension View {
-    func softTopEdge() -> some View { modifier(SoftTopEdge()) }
+    func softEdges(trailing: CGFloat = 0) -> some View { modifier(SoftEdges(trailing: trailing)) }
+}
+
+/// How far a calendar's top fade reaches at a scroll offset: an event cut by the top edge keeps its title under it.
+enum SoftEdge {
+    static func top(at offset: CGFloat) -> CGFloat { min(SoftEdges.fade, max(0, offset)) }
 }

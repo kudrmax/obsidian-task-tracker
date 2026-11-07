@@ -25,9 +25,9 @@ indirect enum MenuNode {
 }
 
 /// The task's menu as iOS 26 draws a context menu, short enough to fit beside a card anywhere on the screen with no
-/// scroll, as Notes and Files keep theirs: the most used actions as one row of icons on top (Done, Rename, Add Subtask,
-/// Delete), then the other statuses, the places and marks, each a row that opens one level down, and the pages. Every row
-/// is the core's `TaskMenuModel`: the menu offers what it offers.
+/// scroll, as Notes and Files keep theirs: the most used actions as one row of three icons on top (Done, Rename, Add
+/// Subtask; the system's medium row holds three), then the other statuses, the places and marks, each a row that opens
+/// one level down, the pages, and Delete last. Every row is the core's `TaskMenuModel`: the menu offers what it offers.
 @MainActor
 struct TaskMenu {
     let items: [TaskItem]
@@ -46,7 +46,6 @@ struct TaskMenu {
         let others = menu.statuses.filter { $0.id != first?.id }
         var row: [MenuNode] = first.map { [status($0)] } ?? []
         if single, let item = items.first { row += quickEdits(item) }
-        if let remove = remove { row.append(remove) }
         var nodes: [MenuNode] = [.group(row: true, children: row)]
         var marks: [MenuNode] = []
         if !others.isEmpty {
@@ -55,6 +54,7 @@ struct TaskMenu {
         marks += pages
         nodes.append(.group(row: false, children: marks))
         if single, let item = items.first { nodes.append(.group(row: false, children: opens(item))) }
+        if let remove { nodes.append(.group(row: false, children: [remove])) }
         return nodes
     }
 

@@ -599,6 +599,12 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         true
     }
 
+    /// A touch that pans something (the ribbon, a list, the calendar) is no tap elsewhere: the ribbon ends the entry only
+    /// if it comes to rest on another place.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRequireFailureOf other: UIGestureRecognizer) -> Bool {
+        other is UIPanGestureRecognizer
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         host?.enter()
         return false
