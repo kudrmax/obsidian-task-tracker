@@ -27,16 +27,21 @@ final class AppServices: Sendable {
     }
 
     func capture(list: CaptureList, text: String, recording: Data?, tag: String = "") -> CaptureOutcome {
-        tasks.capture(list: list, text: text, recording: recording, tag: tag)
+        let outcome = tasks.capture(list: list, text: text, recording: recording, tag: tag)
+        vault.tellWatch()
+        return outcome
     }
 
     @discardableResult
     func refresh() async -> SyncStatus {
-        LastSync.save(await sync.sync())
+        let status = LastSync.save(await sync.sync())
+        vault.tellWatch()
+        return status
     }
 
     func resetAlarms() async {
         LastSync.save(await sync.resetAlarms())
+        vault.tellWatch()
     }
 
     func complete(_ reminder: ShownReminder) async {
@@ -55,7 +60,9 @@ final class AppServices: Sendable {
         report(await sync.silence(reminderID: reminder.id), for: reminder)
     }
 
+    /// A reminder's button wrote the file in the app's process: the screen is told, as of any write but its own.
     private func report(_ status: SyncStatus, for reminder: ShownReminder) {
+        vault.tellWatch()
         LastSync.save(status)
         if case .failed(let reason) = status { UserNotifications.showFailure(reason, of: reminder) }
     }

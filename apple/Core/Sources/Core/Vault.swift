@@ -99,9 +99,6 @@ public final class Vault: TasksVault, @unchecked Sendable {
                 }
             }
             if let error = coordination ?? failure { throw error }
-            // The app's own write is coordinated as the watch, so the system does not tell it: told here, for the
-            // screen when a reminder's button or Siri wrote in the app's process.
-            if written { watching.watch?.presentedItemOperationQueue.addOperation { [watch = watching.watch] in watch?.presentedItemDidChange() } }
             return written
         }
     }
@@ -154,6 +151,14 @@ public final class Vault: TasksVault, @unchecked Sendable {
         let watch = FileWatch(file, changed)
         watching.watch = watch
         return watch
+    }
+
+    /// The app wrote the tasks file in its own process for someone other than the screen (a reminder's button, Siri, the
+    /// capture sheet): its writes are coordinated as the watch, which the system therefore does not tell, so it is told
+    /// here. The screen's own writes are never told: it reads and draws after each of them itself.
+    public func tellWatch() {
+        guard let watch = watching.watch else { return }
+        watch.presentedItemOperationQueue.addOperation { watch.presentedItemDidChange() }
     }
 
     private func coordinator() -> NSFileCoordinator { NSFileCoordinator(filePresenter: watching.watch) }

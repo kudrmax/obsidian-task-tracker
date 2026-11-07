@@ -206,6 +206,8 @@ struct Ribbon: View {
     @AppStorage("listShare") private var listShare: Double = 0.5
     @State private var dragStart: CGFloat?
     @State private var phase = ScrollPhase.idle
+    /// The place the ribbon last came to rest on.
+    @State private var rested: RibbonPlace?
 
     var body: some View {
         GeometryReader { box in
@@ -252,10 +254,15 @@ struct Ribbon: View {
             }
             .onScrollPhaseChange { _, new in
                 phase = new
-                // A swipe to another place finishes the task being typed, as a tap elsewhere.
-                if new == .interacting { model.entry.placeChanged() }
+                // The ribbon at rest on another place finishes the task being typed, as a tap elsewhere.
+                guard new == .idle, model.place != rested else { return }
+                rested = model.place
+                model.entry.placeSettled(model.place)
             }
-            .onAppear { position.scrollTo(id: model.place, anchor: .leading) }
+            .onAppear {
+                rested = model.place
+                position.scrollTo(id: model.place, anchor: .leading)
+            }
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }
                 withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }

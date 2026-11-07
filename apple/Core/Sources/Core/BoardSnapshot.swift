@@ -252,6 +252,8 @@ public struct BoardSnapshot: Sendable {
     public let menus: [String: TaskMenuModel]
     /// The tasks file's text it was read from: the screen reads again only when it changes.
     public let tasksText: String?
+    /// The plugin's settings (`data.json`) it was read over: what is named by them is asked again when they change.
+    public let settingsJSON: String
 
     /// The task the screen shows under `id`, a card's (`BoardCard.id`) or its task's (`TaskItem.id`), anywhere.
     public func item(_ id: String) -> TaskItem? {
@@ -322,7 +324,8 @@ extension TaskBoard {
             calendarsStale: events.stale,
             canUndo: canUndo,
             menus: menus,
-            tasksText: files.tasks)
+            tasksText: files.tasks,
+            settingsJSON: files.settingsJSON)
     }
 
     private func cards(_ rows: [ListRow], corner: JSONValue, painter: inout Painter) throws -> [BoardCard] {

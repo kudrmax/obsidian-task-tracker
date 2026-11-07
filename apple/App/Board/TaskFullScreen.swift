@@ -99,7 +99,7 @@ struct TaskFullScreen: View {
     /// task as a rename left it.
     private func follow() {
         let shown = task
-        model.entry.stackRead = { await refresh() }
+        model.entry.stackRead = { await readStack() }
         model.entry.renamed = { item in
             if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
         }
@@ -195,8 +195,7 @@ struct TaskFullScreen: View {
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        if let found: TaskItem = try? await model.read("tasks.find", [task.key.json, .string(task.text)]) { current = found }
-        tree = try? await model.rule("tasks.fullTree", [task.json])
+        await readStack()()
         listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
         menuModel = await model.menu(for: task, from: "full")
         var menus: [String: TaskMenuModel] = [:]
@@ -206,6 +205,17 @@ struct TaskFullScreen: View {
         if let read {
             draft = read["state"] ?? draft
             if let replace = read["replace"]?.string { place(replace) }
+        }
+    }
+
+    /// The task and its subtasks as the file has them, handed back as their drawing: the quick entry draws a written
+    /// subtask in the same step as the line it ends.
+    private func readStack() async -> () -> Void {
+        let found: TaskItem? = try? await model.read("tasks.find", [task.key.json, .string(task.text)])
+        let read: FullTree? = try? await model.rule("tasks.fullTree", [(found ?? task).json])
+        return {
+            if let found { current = found }
+            tree = read
         }
     }
 
