@@ -180,14 +180,14 @@ export interface MenuRoom {
 }
 
 export function menuRoom(): MenuRoom {
-	const probe = el(document.body, "div", "tc-safe-probe");
+	const probe = el(activeDocument.body, "div", "tc-safe-probe");
 	const style = getComputedStyle(probe);
 	const margin = tokenPx(probe, "--tc-whole-margin");
 	const room: MenuRoom = {
 		top: (parseFloat(style.paddingTop) || 0) + margin,
-		bottom: window.innerHeight - (parseFloat(style.paddingBottom) || 0) - margin,
-		right: window.innerWidth,
-		windowHeight: window.innerHeight,
+		bottom: activeWindow.innerHeight - (parseFloat(style.paddingBottom) || 0) - margin,
+		right: activeWindow.innerWidth,
+		windowHeight: activeWindow.innerHeight,
 	};
 	probe.remove();
 	return room;

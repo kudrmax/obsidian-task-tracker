@@ -1,6 +1,7 @@
 import { Prec, type Extension } from "@codemirror/state";
 import { type EditorView, keymap, type ViewUpdate } from "@codemirror/view";
 import type { App, Editor, TFile } from "obsidian";
+import { lineCommandKeys } from "./lineCommands";
 
 /** The parts of Obsidian's own markdown editor in use here; Obsidian doesn't publish them. */
 interface ObsidianEditor {
@@ -117,7 +118,8 @@ export class EmbeddedEditor {
 				const searching = () => this.editorSuggest?.currentSuggest?.isOpen === true;
 				const take = (run: () => boolean | void) => () => !searching() && run() !== false;
 				const keys = (hooks.keys ?? []).map(({ key, run, shift }) => ({ key, run: take(run), shift: shift && take(shift), stopPropagation: true }));
-				const local = [...super.buildLocalExtensions(), ...(hooks.extensions ?? [])];
+				const lineKeys = lineCommandKeys(app).map((key) => ({ key, run: () => true, preventDefault: true, stopPropagation: true }));
+				const local = [...super.buildLocalExtensions(), ...(hooks.extensions ?? []), Prec.highest(keymap.of(lineKeys))];
 				return keys.length === 0 ? local : [...local, Prec.highest(keymap.of(keys))];
 			}
 

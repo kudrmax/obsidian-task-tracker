@@ -82,7 +82,7 @@ export type ShownSettingsSource = Pick<ShownSettingsStore, "get" | "set" | "onCh
 export interface ScreenPlace {
 	/** The project whose view this screen is (its note's block): every list, Done and the timeline hold only its tasks. */
 	readonly project?: () => string | undefined;
-	/** The plugin's own view keeps Obsidian's status bar out of its way and shows the undo capsule; a note's block does neither. */
+	/** The plugin's own view shows the undo capsule; a note's block doesn't. Both keep Obsidian's status bar off their foot. */
 	readonly view: boolean;
 	/** The keys of a note's block, over Obsidian's: its fields' own keys stand over them, so none reaches the note. */
 	readonly keys?: Scope;
@@ -244,8 +244,8 @@ export class CalendarScreen extends Component {
 		const root = this.contentEl;
 		clear(root);
 		root.classList.add("task-calendar", "tc-view");
-		if (this.where.view) this.unsubscribe.push(StatusBarRoom.hold(root.ownerDocument));
-		else root.classList.add("is-block");
+		this.unsubscribe.push(StatusBarRoom.hold(root.ownerDocument));
+		if (!this.where.view) root.classList.add("is-block");
 		this.restoreZoom();
 		this.fitListWidth();
 		this.headers = new ColumnHeaders(root, {
@@ -460,9 +460,11 @@ export class CalendarScreen extends Component {
 			this.deps.settings.onChange(() => this.onSettings()),
 			this.deps.days.onDayChange((change) => this.onDayChange(change), () => this.canTick()),
 		);
-		this.registerDomEvent(window, "focus", () => this.poll?.wake());
-		this.registerDomEvent(document, "visibilitychange", () => {
-			if (document.hidden) return;
+		const doc = root.ownerDocument;
+		const win = doc.defaultView ?? window;
+		this.registerDomEvent(win, "focus", () => this.poll?.wake());
+		this.registerDomEvent(doc, "visibilitychange", () => {
+			if (doc.hidden) return;
 			this.poll?.wake();
 			this.catchUpTick();
 		});
@@ -472,17 +474,17 @@ export class CalendarScreen extends Component {
 			e.stopPropagation();
 		}, { passive: false });
 		for (const type of ["touchstart", "touchend", "touchcancel"] as const) this.registerDomEvent(root, type, (e) => e.stopPropagation(), { passive: true });
-		this.registerDomEvent(document, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
-		this.registerDomEvent(document, "pointerdown", () => this.found.clear(), { capture: true });
-		this.registerDomEvent(document, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
-		this.registerDomEvent(document, "keydown", (e) => this.bulk.onKey(e));
+		this.registerDomEvent(doc, "pointerdown", (e) => this.deselectUnless(e.target), { capture: true });
+		this.registerDomEvent(doc, "pointerdown", () => this.found.clear(), { capture: true });
+		this.registerDomEvent(doc, "pointerdown", (e) => this.bulk.onPress(e.target), { capture: true });
+		this.registerDomEvent(doc, "keydown", (e) => this.bulk.onKey(e));
 		this.arbiter.onIdle(() => {
 			this.parts.flush();
 			this.catchUpTick();
 		});
 		this.registerEvent(this.app.workspace.on("css-change", () => this.parts.request("events")));
-		this.registerInterval(window.setInterval(() => this.tick(), MINUTE_MS));
-		this.poll = this.deps.calendars.keepFresh({ refresh: () => this.data.calendars(), hidden: () => document.hidden || !this.contentEl.isShown() });
+		this.registerInterval(win.setInterval(() => this.tick(), MINUTE_MS));
+		this.poll = this.deps.calendars.keepFresh({ refresh: () => this.data.calendars(), hidden: () => this.hidden() });
 		this.render();
 		await this.data.load();
 	}
@@ -498,7 +500,12 @@ export class CalendarScreen extends Component {
 	}
 
 	private canTick(): boolean {
-		return !(document.hidden || !this.contentEl.isShown() || this.arbiter.busy);
+		return !(this.hidden() || this.arbiter.busy);
+	}
+
+	/** Its window hidden, or the screen itself out of sight: a popout window's screen asks its own window. */
+	private hidden(): boolean {
+		return this.contentEl.ownerDocument.hidden || !this.contentEl.isShown();
 	}
 
 	/** The minute missed while hidden or held is ticked once, the day's check with it. */
@@ -565,7 +572,7 @@ export class CalendarScreen extends Component {
 
 	/** The tokens follow Obsidian's theme by themselves; the event colours the code computes follow it here. */
 	private theme(): Theme {
-		return document.body.classList.contains("theme-light") ? "light" : "dark";
+		return this.contentEl.ownerDocument.body.classList.contains("theme-light") ? "light" : "dark";
 	}
 
 	/** A view not laid out yet has no width to take a share of: it keeps the design's width until it has one. */
@@ -1041,7 +1048,7 @@ export class CalendarScreen extends Component {
 	}
 
 	/** Descriptions are drawn and edited by Obsidian itself, their links made from the tasks file. */
-	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link));
+	private readonly markdown = new ObsidianMarkdown(this.app, this, () => this.settings.tasksFile, (link) => this.openLink(link), this.where.keys);
 
 	/** The task over the whole view; one already open there takes it in over its own. `editing` puts the caret in its description. */
 	private openFull(item: TaskItem, editing: boolean): void {

@@ -80,7 +80,7 @@ export class BulkMenu {
 
 	/** A copy of a picked card over the blur, at `rect`, where the card stands, read before any copy; cards out of sight have none. */
 	private lift(card: HTMLElement, rect: DOMRect): void {
-		if (rect.width === 0 || rect.bottom < 0 || rect.top > window.innerHeight) return;
+		if (rect.width === 0 || rect.bottom < 0 || rect.top > activeWindow.innerHeight) return;
 		const item = this.context.items[this.context.cards.indexOf(card)];
 		const copy = LiftedCopy.over(this.overlay, el(null, "div", "tc-lifted is-selected"), true);
 		fillCard(copy.el, item, { day: this.context.day });

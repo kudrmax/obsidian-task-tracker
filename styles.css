@@ -250,11 +250,21 @@ body {
 	--tc-group-open-turn: 90deg;
 	--tc-stroke-group-open: var(--tc-stroke-2);
 	/*
-	 * A project note's block: the plugin's screen under the note's text, framed by a hairline, as tall as a phone's screen
-	 * leaves room for it; Obsidian's navigation and status bar take nothing from it, they stand under the note.
+	 * A project note's block: the plugin's screen under the note's text, framed by a hairline, as tall as the columns in its
+	 * window need: at least the board's block, at most a phone's screen less Obsidian's bars, its lists scrolling only past
+	 * that. Obsidian's navigation and status bar take nothing from it, they stand under the note.
 	 */
-	--tc-block-top: 44px;
-	--tc-block-h: min(640px, 78vh);
+	--tc-block-top: var(--p-spacing, var(--tc-space-16));
+	/* Inside the frame, as the board: the titles' row 8 down from its top line, the cards 8 under the titles, the wheel 12 over its bottom line. */
+	--tc-block-inset: var(--tc-space-8);
+	--tc-block-foot: var(--tc-space-6);
+	/* Over the wheel the board leaves one short step under the last card, not the main screen's long fade: a block sized to its cards has nothing under the wheel to fade. */
+	--tc-block-fade: var(--tc-space-20);
+	/* Live Preview's room past the note's end, which the editor keeps under its text: the block rises over it, so it follows the text as in Reading view. Set on the block. */
+	--tc-block-lift: 0px;
+	--tc-block-inbox-share: 50%;
+	--tc-block-min-h: 321px;
+	--tc-block-max-h: min(640px, 78vh);
 	--tc-radius-block: 14px;
 	--tc-block-chrome: 0px;
 	/* The project's folder on a card, in the date's place and of its width. */
@@ -1060,9 +1070,14 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); overflow: hidden; pointer-events: none; }
 .tc-link { color: var(--tc-accent); }
 .tc-lifted .tc-link { pointer-events: auto; cursor: pointer; }
-.tc-project-block { margin-top: var(--tc-block-top); height: var(--tc-block-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
+.tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); height: var(--tc-block-min-h); min-height: var(--tc-block-min-h); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
 /* The block's foot stands on its own frame: the measures made of Obsidian's chrome are made again without it. */
-.tc-project-block > .task-calendar.is-block { --tc-chrome-room: var(--tc-block-chrome); --tc-keyboard-room: var(--tc-block-chrome); --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade)); --tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20)); }
+.tc-project-block > .task-calendar.is-block { --tc-day-row-top: var(--tc-block-inset); --tc-columns-top: calc(var(--tc-block-inset) + var(--tc-day-row) + var(--tc-block-inset)); --tc-chrome-room: var(--tc-block-foot); --tc-foot-fade: var(--tc-block-fade); --tc-keyboard-room: var(--tc-block-chrome); --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade)); --tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20)); }
+/* In the block every list is as tall as its cards, and Inbox and Backlog stack as the board draws them: the block grows to show them all. At its tallest Inbox keeps its cards up to half the column and Backlog scrolls in the rest. */
+.tc-project-block .tc-list { flex: 0 1 auto; }
+.tc-project-block .tc-pane.is-inbox { flex: 0 0 auto; }
+.tc-project-block.is-full .tc-pane.is-inbox { max-height: var(--tc-block-inbox-share); }
+.tc-project-block .tc-pane.is-backlog { flex: 1 1 auto; }
 .tc-lifted.is-title { background: none; border-radius: 0; padding: 0 var(--tc-space-4); align-items: center; }
 .tc-lifted-title { font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
 .task-calendar .tc-head-title.has-menu { cursor: pointer; }
