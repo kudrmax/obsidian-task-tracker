@@ -684,6 +684,24 @@ final class BoardModel {
         withAnimation(.snappy(duration: 0.15)) { landing = nil }
     }
 
+    /// A long press on the calendar's empty space, held at `minute` of the grid: the line shows where a new task will
+    /// stand, as the plus carried there.
+    func pressCalendar(at minute: Double) {
+        if landing == nil { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        hover(minute: minute, hourHeight: calendarHour)
+    }
+
+    func cancelCalendarPress() {
+        leaveCalendar()
+    }
+
+    /// The long press let go: the field of a new task at the line's time.
+    func releaseCalendar() {
+        guard carry == nil, let minute = landing else { return leaveCalendar() }
+        leaveCalendar()
+        entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
+    }
+
     /// Let go over the calendar: the card settles at the time the line shows.
     private func landOnCalendar() -> CGRect? {
         guard let carry, let minute = landing, snapshot != nil else { return nil }

@@ -331,7 +331,6 @@ final class QuickEntryHost {
             return
         }
         field.placeholder = next.namesSection ? "Section name" : nil
-        field.font = next.namesSection ? .systemFont(ofSize: 15, weight: .semibold) : .systemFont(ofSize: CardMetrics.title)
         placeField(over: snapshot)
         if before == nil || before?.spot != next.spot || before?.pending.count != next.pending.count || before?.section != next.section { moved += 1 }
         field.begin()
@@ -535,6 +534,7 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
 struct EntryFieldView: UIViewRepresentable {
     let host: QuickEntryHost
     let tint: UIColor
+    let font: UIFont
 
     func makeUIView(context: Context) -> UIView {
         let box = UIView()
@@ -549,6 +549,7 @@ struct EntryFieldView: UIViewRepresentable {
     private func place(in box: UIView) {
         let field = host.field
         field.tintColor = tint
+        if field.font != font { field.font = font }
         guard field.superview !== box else { return }
         field.removeFromSuperview()
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -564,23 +565,55 @@ struct EntryFieldView: UIViewRepresentable {
 }
 
 /// The capsule a task is typed in, at its place: a card with no frame, the accent cursor, tinted by the priority or the
-/// label chosen. A section's name is typed where its header will stand, in the header's type.
+/// label chosen. A section's name is typed where its header will stand, in the header's type; the full screen's title is
+/// renamed in the title's own type, so nothing around it moves.
 struct EntryCapsule: View {
+    enum Style {
+        case card, section, title
+    }
+
     let host: QuickEntryHost
-    var section = false
+    var style = Style.card
     var height: CGFloat = CardMetrics.height
     @Environment(\.colorScheme) private var scheme
 
+    init(host: QuickEntryHost, section: Bool = false, height: CGFloat = CardMetrics.height) {
+        self.host = host
+        style = section ? .section : .card
+        self.height = height
+    }
+
+    init(host: QuickEntryHost, style: Style) {
+        self.host = host
+        self.style = style
+    }
+
     var body: some View {
         // One field view whatever it writes, so turning it into a section's name never takes the keyboard away.
-        EntryFieldView(host: host, tint: UIColor(Palette.accent(scheme)))
-            .frame(height: 22)
-            .padding(.leading, CardMetrics.leading)
-            .padding(.trailing, section ? 0 : CardMetrics.trailing)
-            .padding(.bottom, section ? 4 : 0)
-            .frame(maxWidth: .infinity, minHeight: section ? 30 : height, maxHeight: section ? 30 : height, alignment: section ? .bottomLeading : .leading)
-            .background(section ? Color.clear : fill, in: .rect(cornerRadius: CardMetrics.radius))
-            .accessibilityLabel(section ? "Section name" : "New task")
+        EntryFieldView(host: host, tint: UIColor(Palette.accent(scheme)), font: font)
+            .frame(height: style == .title ? font.lineHeight.rounded(.up) : 22)
+            .padding(.leading, style == .title ? 0 : CardMetrics.leading)
+            .padding(.trailing, style == .card ? CardMetrics.trailing : 0)
+            .padding(.bottom, style == .section ? 4 : 0)
+            .frame(maxWidth: .infinity, minHeight: rowHeight, maxHeight: rowHeight, alignment: style == .section ? .bottomLeading : .leading)
+            .background(style == .card ? fill : Color.clear, in: .rect(cornerRadius: CardMetrics.radius))
+            .accessibilityLabel(style == .section ? "Section name" : style == .title ? "Title" : "New task")
+    }
+
+    private var rowHeight: CGFloat? {
+        switch style {
+        case .card: height
+        case .section: 30
+        case .title: nil
+        }
+    }
+
+    private var font: UIFont {
+        switch style {
+        case .card: .systemFont(ofSize: CardMetrics.title)
+        case .section: .systemFont(ofSize: 15, weight: .semibold)
+        case .title: UIFont(descriptor: UIFont.preferredFont(forTextStyle: .title2).fontDescriptor.withSymbolicTraits(.traitBold) ?? UIFont.preferredFont(forTextStyle: .title2).fontDescriptor, size: 0)
+        }
     }
 
     private var fill: Color {

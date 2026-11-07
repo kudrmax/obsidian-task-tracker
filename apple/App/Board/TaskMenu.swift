@@ -34,6 +34,8 @@ struct TaskMenu {
     let ask: (MenuQuestion) -> Void
     /// Drawn on the full screen: Rename and Add Subtask type in its stack.
     var inStack = false
+    /// The menu of the task its own full screen shows: no Open Full Screen.
+    var ownPage = false
 
     private var single: Bool { items.count == 1 }
 
@@ -104,7 +106,7 @@ struct TaskMenu {
         if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { [inStack] in if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } }) }
         if menu.edits.contains("repeat") { edits.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
         if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { [inStack] in if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } }) }
-        edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) })
+        if !ownPage { edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
         edits.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
         return edits
     }

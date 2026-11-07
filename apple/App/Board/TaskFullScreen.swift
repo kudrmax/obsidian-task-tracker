@@ -8,6 +8,7 @@ struct TaskFullScreen: View {
     let item: TaskItem
     @Bindable var model: BoardModel
     @State private var current: TaskItem?
+    @Environment(\.colorScheme) private var scheme
     @State private var tree: FullTree?
     @State private var listName = ""
     @State private var text = ""
@@ -26,7 +27,7 @@ struct TaskFullScreen: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(listName).font(.subheadline).foregroundStyle(.secondary)
                     if renamesTitle {
-                        EntryCapsule(host: model.entry)
+                        EntryCapsule(host: model.entry, style: .title)
                     } else {
                         Text(task.text).font(.title2.bold()).strikethrough(task.closed)
                     }
@@ -55,19 +56,29 @@ struct TaskFullScreen: View {
             .padding(.horizontal, Layout.margin)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Add Subtask", systemImage: "plus") { model.entry.addSubtaskInStack(task) }
-                    .tint(.primary)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if let menu = menuModel {
-                    Menu("More", systemImage: "ellipsis") {
-                        MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true).nodes)
+            if model.entry.isOpen {
+                // While a task is typed the page's buttons give way to the check that ends typing, as on the main screen.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done", systemImage: "checkmark") { model.entry.blur() }
+                        .buttonStyle(.glassProminent)
+                        .tint(Palette.accent(scheme))
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add Subtask", systemImage: "plus") { model.entry.addSubtaskInStack(task) }
+                        .tint(.primary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if let menu = menuModel {
+                        Menu("More", systemImage: "ellipsis") {
+                            MenuNodes(nodes: TaskMenu(items: [task], menu: menu, model: model, ask: { question = $0 }, inStack: true, ownPage: true).nodes)
+                        }
+                        .tint(.primary)
                     }
-                    .tint(.primary)
                 }
             }
         }
+        .animation(.snappy, value: model.entry.isOpen)
         // A page of its own: no columns, no tab bar, no calendar, as the design has it.
         .toolbar(.hidden, for: .tabBar)
         .menuQuestions($question, model: model)

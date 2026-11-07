@@ -82,6 +82,10 @@ struct TimelineColumn: View {
         let slots = model.stacked(timeline, hour: hour)
         let height = max(y(24 * 60, hour) + Measure.labelLift, slots.map { y(0, hour) + CGFloat($0.box.top + $0.box.height) }.max() ?? 0)
         return ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(width: width, height: height)
+                .contentShape(.rect)
+                .gesture(newSlot(hour: hour))
             grid(hour: hour)
             ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
                 let top = y(event.start, hour) + Measure.itemInset
@@ -114,6 +118,14 @@ struct TimelineColumn: View {
     }
 
     private static let key = "timeline"
+
+    /// A long press on the empty calendar: the line follows the finger while held, and the field of a new task opens at
+    /// its time when let go.
+    private func newSlot(hour: CGFloat) -> CalendarPress {
+        CalendarPress(
+            moved: { y in model.pressCalendar(at: Double(max(0, y - Measure.labelLift) / hour * 60)) },
+            ended: { done in if done { model.releaseCalendar() } else { model.cancelCalendarPress() } })
+    }
 
     /// The field on the calendar stays in sight above the keyboard.
     private func reveal(_ hour: CGFloat) {
@@ -369,5 +381,31 @@ struct FadeEnd: View {
 enum BoardTime {
     static func label(_ minute: Int, hours: [BoardHour]) -> String {
         "\(hours[safe: minute / 60]?.label ?? "--"):\(String(format: "%02d", minute % 60))"
+    }
+}
+
+/// The system's long press (its delay, its slop that leaves a pan to the scroll view), reporting where the finger is in
+/// the calendar's own space.
+struct CalendarPress: UIGestureRecognizerRepresentable {
+    let moved: (CGFloat) -> Void
+    let ended: (Bool) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+        let press = UILongPressGestureRecognizer()
+        press.minimumPressDuration = 0.25
+        return press
+    }
+
+    func handleUIGestureRecognizerAction(_ press: UILongPressGestureRecognizer, context: Context) {
+        switch press.state {
+        case .began, .changed:
+            moved(context.converter.localLocation.y)
+        case .ended:
+            ended(true)
+        case .cancelled, .failed:
+            ended(false)
+        default:
+            break
+        }
     }
 }
