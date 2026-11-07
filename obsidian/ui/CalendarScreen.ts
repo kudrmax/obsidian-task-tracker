@@ -45,7 +45,7 @@ import { PinchZoom, type ZoomAnchor } from "./PinchZoom";
 import { type ScreenPart, ScreenParts } from "./ScreenParts";
 import { settingsEffect } from "./settingsEffect";
 import { StatusBarRoom } from "./StatusBarRoom";
-import { type Place, type Shift, stepScreen } from "./screens";
+import { type Place, type Shift } from "./screens";
 import { Swipe, swipeStartsAt } from "./Swipe";
 import { DayPeek } from "./DayPeek";
 import { ScreenPager, type ScreenTrack } from "./ScreenPager";
@@ -609,7 +609,7 @@ export class CalendarScreen extends Component {
 		this.landed();
 		const root = this.contentEl;
 		const from = { mode: this.place(), date: this.selectedDate };
-		const to = stepScreen(from, shift, this.deps.days);
+		const to = this.deps.days.stepScreen(from, shift);
 		if (!to) return new EdgeTrack(edgeParts(root, from.mode), root.clientWidth);
 		if (to.mode !== from.mode) {
 			window.clearTimeout(this.switching);

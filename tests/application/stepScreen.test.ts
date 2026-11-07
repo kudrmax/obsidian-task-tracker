@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { dayRelation } from "../../core/domain/Days";
-import { addDays } from "../../core/domain/LocalDate";
-import { placeIndex, stepScreen } from "../../obsidian/ui/screens";
+import { stepScreen } from "../../core/application/screenPlaces";
+import { placeIndex } from "../../obsidian/ui/screens";
 
 const TODAY = "2026-11-01";
-/** The days as DayService tells them, with TODAY for today. */
-const DAYS = { relation: (date: string) => dayRelation(date, TODAY), step: addDays };
+const DAYS = TODAY;
 
 describe("stepScreen", () => {
 	it("walks the screens left to right: Inbox and Soon, Soon and Now, Now and the calendar, then on through the days", () => {

@@ -20,7 +20,7 @@ import { dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
-import { placeShowing, SCREEN_PLACES, SHOWN_LISTS } from "./screenPlaces";
+import { placeShowing, SCREEN_PLACES, type ScreenAt, SHOWN_LISTS, stepScreen } from "./screenPlaces";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, formatZoomLevels, gridAt, gridMarks, labelHidesNearNow, levelsFor, parseZoomLevels, zoomAfterPinch, zoomLevelsOf, zoomShown } from "./timelineZoom";
 import {
 	type CalendarEvent,
@@ -424,6 +424,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	today: (c) => c.rules.today(),
 	relation: (c, [date]) => dayRelation(date as string, c.rules.today()),
 	step: (_c, [date, days]) => addDays(date as string, days as number),
+	stepScreen: (c, [from, shift]) => stepScreen(from as ScreenAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),

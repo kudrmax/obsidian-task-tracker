@@ -133,7 +133,7 @@ parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a remind
 
 ### `days.*`: `DayService`
 
-`today()`, `relation(date)`, `step(date, days)`, `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
+`today()`, `relation(date)`, `step(date, days)`, `stepScreen({mode, date}, shift)` (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends), `boundary()` (`{ startHour }`), `openAt(date)`: where the day's
 timeline opens, minutes from the day's start: `{ kind: "now", minute }` for today (the now line, which the plugin holds
 at half the height), `{ kind: "hour", minute }` for another day (the settings' `scrollToHour`, at the top). `onDayChange` and `catchUp` are the
 host's: it checks the clock (once a minute while a screen is open), and when `days.today` answers another day it calls

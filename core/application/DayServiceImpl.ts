@@ -1,6 +1,7 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { type DayRelation, dayRelation } from "../domain/Days";
 import { addDays } from "../domain/LocalDate";
+import { type ScreenAt, stepScreen } from "./screenPlaces";
 import type { LocalDate } from "../domain/Task";
 import type { DayChange, DayOpening, DayService, TaskService } from "./contracts";
 import { boundaryOf } from "./documentText";
@@ -47,6 +48,10 @@ export class DayServiceImpl implements DayService {
 
 	step(date: LocalDate, days: number): LocalDate {
 		return addDays(date, days);
+	}
+
+	stepScreen(from: ScreenAt, shift: -1 | 1): ScreenAt | null {
+		return stepScreen(from, shift, this.today());
 	}
 
 	openAt(date: LocalDate): DayOpening {

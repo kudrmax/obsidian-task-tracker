@@ -2627,6 +2627,14 @@ ${key.title}`.toLowerCase();
     const showing = SCREEN_PLACES.filter((other) => SHOWN_LISTS[other].includes(column));
     return showing.reduce((best, other) => Math.abs(SCREEN_PLACES.indexOf(other) - from) < Math.abs(SCREEN_PLACES.indexOf(best) - from) ? other : best);
   }
+  function spotIndex(spot) {
+    return spot === "done" ? -1 : SCREEN_PLACES.indexOf(spot);
+  }
+  function stepScreen(from, shift, today) {
+    if (from.mode === "calendar" && (shift > 0 || from.date !== today)) return { mode: "calendar", date: addDays(from.date, shift) };
+    const place = spotIndex(from.mode) + shift;
+    return place >= 0 && place < SCREEN_PLACES.length ? { mode: SCREEN_PLACES[place], date: from.date } : null;
+  }
 
   // core/application/timelineZoom.ts
   var DEFAULT_ZOOM_LEVELS = [{ hourPx: 28 }, { hourPx: 56 }, { hourPx: 112 }, { hourPx: 224 }];
@@ -5764,6 +5772,7 @@ ${key.title}`.toLowerCase();
     today: (c) => c.rules.today(),
     relation: (c, [date]) => dayRelation(date, c.rules.today()),
     step: (_c, [date, days]) => addDays(date, days),
+    stepScreen: (c, [from, shift]) => stepScreen(from, shift, c.rules.today()),
     openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
