@@ -187,6 +187,15 @@ Backend (the core's contract):
     case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
     note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
 
+iPhone app (the minimum that keeps it from breaking):
+
+11. **The app reads the door as loose JSON**, key by key (`[String: Any]` in `PhoneCore`): the new optional fields
+    (`TaskItem.project`, `ScreenView.projects`/`project`, `SearchHit.project`, `menu.project`, the answer's `grouping`)
+    are ignored by what it reads today (capture, reminders, calendars). No decoder changed.
+12. **The app hands in neither `projects` nor `grouping`**, and drops a `grouping` answer: it draws no task lists yet,
+    so Backlog grouped by default changes nothing it shows. When the app's lists come, it keeps `grouping` per device as
+    the Obsidian frontend does (decision 8) and draws the groups.
+
 ## Ideas for later
 
 Approved by Max as directions, to be designed one by one after the core.
