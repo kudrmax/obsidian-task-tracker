@@ -34,15 +34,14 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
     /// shorter than it; nil for neither, and on a list's card.
     public let corner: [String]?
-    /// The card's identity on the screen: its line as the file has it, so a card moved or ticked keeps it and the lists
-    /// animate it to its new place instead of drawing a new card.
-    public let id: String
+    /// The card's identity on the screen: its task's id, the core's, so a card changed, moved or ticked stays the same
+    /// card and the lists move it to its new place instead of drawing a new one.
+    public var id: String { item.id }
 
-    /// The card goes by `id`: its own, or its task's.
-    public func names(_ id: String) -> Bool { self.id == id || item.id == id }
+    /// The card shows the task `id`.
+    public func names(_ id: String) -> Bool { item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, id: String? = nil) {
-        self.id = id ?? item.id
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil) {
         self.corner = corner
         self.item = item
         self.level = level
@@ -54,6 +53,8 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
 }
 
 public struct BoardGroup: Sendable, Hashable, Identifiable {
+    /// Who the section is, the core's: its header stays the same header through a rename.
+    public let id: String
     public let name: String?
     /// The header's words: the section's name, or the No section name when the column shows headers.
     public let header: String?
@@ -62,7 +63,6 @@ public struct BoardGroup: Sendable, Hashable, Identifiable {
     public let menu: GroupMenu?
     /// A long press lifts its header to move it among the list's sections (`ListGroup.reorder`).
     public let reorder: Bool
-    public var id: String { name ?? "\u{0}" }
 }
 
 /// The lists the screen shows: the day list beside the calendar, Soon, Inbox over Backlog.
@@ -292,6 +292,7 @@ extension TaskBoard {
             let ungrouped = screen.offer["ungrouped"].string ?? ""
             let groups = try view.groups.map { group in
                 BoardGroup(
+                    id: group.id,
                     name: group.name,
                     header: view.showsHeaders ? (group.name ?? ungrouped) : nil,
                     cards: try cards(group.rows, corner: corner, painter: &painter),
@@ -344,8 +345,7 @@ extension TaskBoard {
                 branch: try readRule("rules.branchOf", [levels, .number(Double(index))]),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
-                shades: try row.item.colors.first.map { try painter.shades($0) },
-                id: painter.identity(row.item))
+                shades: try row.item.colors.first.map { try painter.shades($0) })
         }
     }
 
@@ -371,7 +371,7 @@ extension TaskBoard {
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
             let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner, id: painter.identity(pair.0))
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner)
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -397,7 +397,7 @@ extension TaskBoard {
         let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end))
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }
@@ -465,15 +465,6 @@ struct Painter {
     let board: TaskBoard
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
-    private var seen: [String: Int] = [:]
-
-    /// A card's identity: its line, and which of the same lines it is when the file has two alike.
-    mutating func identity(_ item: TaskItem) -> String {
-        let line = "\(item.list)|\(item.key.raw)"
-        let count = seen[line, default: 0]
-        seen[line] = count + 1
-        return count == 0 ? line : "\(line)#\(count)"
-    }
 
     init(board: TaskBoard) {
         self.board = board

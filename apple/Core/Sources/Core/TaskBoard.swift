@@ -6,6 +6,17 @@ public struct BoardFiles: Sendable {
     public let settingsJSON: String
     public let calendars: [String: String]
     public let now: Date
+    /// The board's writes made before these files were read: an answer over them tells who the tasks are only while no
+    /// write came after.
+    let generation: Int
+
+    init(tasks: String?, settingsJSON: String, calendars: [String: String], now: Date, generation: Int = -1) {
+        self.tasks = tasks
+        self.settingsJSON = settingsJSON
+        self.calendars = calendars
+        self.now = now
+        self.generation = generation
+    }
 }
 
 public enum BoardError: Error, Equatable {
@@ -29,6 +40,11 @@ public final class TaskBoard: @unchecked Sendable {
     /// One write at a time: each is made over the file and the undo steps the one before it left.
     private let writing = NSLock()
     private var history: DoorHistory?
+    /// Who the tasks and sections are, as the last answer over the file gave it: handed in with every call over the file,
+    /// so a task keeps its `id` through every write, read and undo (`docs/door.md`, «Ids»).
+    private var ids: DoorIds?
+    /// The writes made so far: an answer over files read before the last write never replaces the ids that write gave.
+    private var generation = 0
     private var calendarSources: [CalendarFile]?
 
     /// `pure`: a second core for the pure rules a screen asks in the same frame; the reading core when none is given.
@@ -43,6 +59,7 @@ public final class TaskBoard: @unchecked Sendable {
         let settings = vault.settingsJSON()
         lock.lock()
         settingsSeen = settings
+        let generation = generation
         lock.unlock()
         let tasks: String?
         do {
@@ -58,12 +75,14 @@ public final class TaskBoard: @unchecked Sendable {
         for file in sources(settings) {
             if let text = vault.read(path: file.path) { calendars[file.source] = text }
         }
-        return BoardFiles(tasks: tasks, settingsJSON: settings, calendars: calendars, now: now)
+        return BoardFiles(tasks: tasks, settingsJSON: settings, calendars: calendars, now: now, generation: generation)
     }
 
     /// A read over `files`: nothing is written but the tidying a read does, which the next write carries along.
     public func read(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles) throws -> JSONValue {
-        try answer(method, arguments, files).result
+        let reply = try answer(method, arguments, files)
+        keep(reply.ids, over: files)
+        return reply.result
     }
 
     public func read<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], over files: BoardFiles, as type: T.Type = T.self) throws -> T {
@@ -118,6 +137,7 @@ public final class TaskBoard: @unchecked Sendable {
             if let settings = reply.settings { try vault.write(path: try core.settingsFile(), text: settings) }
             guard let tasks = reply.tasks else {
                 keep(reply.history)
+                keep(reply.ids, over: files)
                 return reply.result
             }
             if let old = files.tasks {
@@ -126,6 +146,7 @@ public final class TaskBoard: @unchecked Sendable {
                 try vault.write(path: try vault.tasksFilePath(), text: tasks)
             }
             keep(reply.history)
+            keepWritten(reply.ids)
             return reply.result
         }
         throw BoardError.busy
@@ -150,13 +171,16 @@ public final class TaskBoard: @unchecked Sendable {
         let tasks: String?
         let settings: String?
         let history: DoorHistory?
+        let ids: DoorIds?
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
-        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: Self.ungrouped)
+        // Ids name the lines of a file: a call made over none (a menu, a pure rule) neither takes them nor gives them back.
+        let ids = files.tasks == nil ? nil : keptIds()
+        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: Self.ungrouped, ids: ids)
         do {
             let reply = try (lane ?? core).call(method, arguments.map(\.any), context: context)
-            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history)
+            return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history, ids: files.tasks == nil ? nil : reply.ids)
         } catch PhoneCoreError.refused(let code, let message) {
             throw BoardError.refused(code: code, message: message)
         } catch PhoneCoreError.scriptFailed(let message) {
@@ -179,6 +203,28 @@ public final class TaskBoard: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return history
+    }
+
+    private func keptIds() -> DoorIds? {
+        lock.lock()
+        defer { lock.unlock() }
+        return ids
+    }
+
+    /// The ids an answer over `files` gave, unless a write came after those files were read: its ids are newer.
+    private func keep(_ next: DoorIds?, over files: BoardFiles) {
+        guard let next else { return }
+        lock.lock()
+        if files.generation == generation { ids = next }
+        lock.unlock()
+    }
+
+    /// A write's ids: the file now holds the text they name, and every read made before it is older.
+    private func keepWritten(_ next: DoorIds?) {
+        lock.lock()
+        generation += 1
+        if let next { ids = next }
+        lock.unlock()
     }
 
     private func keep(_ next: DoorHistory?) {
