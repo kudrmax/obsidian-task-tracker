@@ -220,6 +220,74 @@ Lead's notes for the simulator: the app's debug build takes `--vault <folder>` (
 vault with tasks and `calendar/iphone.json` sits in the app's data container under `Documents/Vault`. Cyrillic is typed
 into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid>` and the system Paste.
 
+## Review fixes (branch `ios-review-fixes`, after the first install on the phone)
+
+The final review of `ios-timeline-drag` (merged as bbcd27b) found these. Each is fixed at its cause.
+
+**Core (backend first).** Swift wrote quick-entry decisions itself; they move into the core and come through the door,
+and the plugin reads the same functions instead of its own tables:
+
+- R6a. The spots for a rename and for a subtask: Swift built `{kind:"stack", parent}` itself (`QuickEntryHost.swift`
+  ~157–164). It asks the core (`renameSpot`, `subtaskSpot`, and a spot for the task's full screen).
+- R6b. Which lists a place shows and which place shows a column: Swift repeats the plugin's `SHOWN_LISTS` and
+  `modeShowing` (`QuickEntryHost.swift` `shown`, `turn`). One table in the core, through the door; the plugin reads it.
+- R6c. Where the field and the waiting lines stand among a task's subtasks on the full screen: Swift works it out
+  (`TaskFullScreen.swift` `stackRows`). The core answers it as `listEntry` does for lists (`stackEntry`).
+
+**Swift.**
+
+- R1. The app's own write makes the file watch read again, and that read can draw the written card before
+  `entry.shown`: the card and its waiting line show together and the field jumps. The watch does not answer the app's
+  own writes, and no watch read redraws while quick-entry jobs run.
+- R2. When the read after a quick-entry write fails, neither `shown` nor `unshown` is called and a ghost line stays.
+  Every job ends in one of them (door.md step 3).
+- R3. When `entry.call` and `entry.done` both throw, the job loop hands out the same job forever on the main thread. A
+  job that failed is dropped and the loop stops; the app never hangs.
+- R4. «Date…» in the bar: the day goes through `tasks.placementOfDay` before `choosePlace`, as the plugin
+  (`QuickBar.ts`), so today is `now` and the field stays where it is.
+- R7. The entry ends only when the columns actually turn to another place, not when a horizontal swipe starts.
+- R8. A read while a card is carried does not end the carry (the arrow's background read, `reveal`).
+- R9. List names are read again when the settings change.
+- The loss of typed text Max saw: the field must keep the keyboard when it moves to another row or list (no
+  `removeFromSuperview` that drops the first responder, no keys lost while it moves, no `blur` from a stale
+  `textFieldDidEndEditing`). Check by typing fast across Enter, a move to another list, a plate and a rename.
+
+**Max's findings on the phone (Swift).**
+
+- M1. The plus is dragged at once: no hold before it lifts (a tap still opens the capture sheet).
+- M2. The plus flying back after a cancelled or targetless drag still dissolves and grows. It flies back to its place
+  as one piece, the way the system returns a cancelled drag preview, and lands in its slot.
+- M3. A card flickers for a moment when its drag starts (screen recording). The lift is one smooth system lift, no
+  frame where the row and its preview both show or both vanish.
+- M4. While dragging it is unclear whether the drop makes a task or a subtask. The gap shows the level the drop will
+  write, indented with its branch line as in the plugin, and moves between levels with an animation as the finger
+  crosses the level's line.
+- M5. The Soon column is as narrow as the calendar. The columns' widths are the plugin's (the ribbon's `d, W−d`
+  pattern applies to which column, check `obsidian/ui` and the board), Soon is not tied to the calendar's width.
+- M6. A swipe can fly through every place at once. Paging goes one place per swipe, as in the plugin.
+- M7. A subtask being dragged keeps its vertical branch line hanging. The carried subtask shows no stray line: the
+  branch closes up as the row leaves, and the gap draws the line it will join.
+
+- M8. The task's menu scrolls by a few points: it must fit without scrolling for a card anywhere on the screen
+  (top, middle, bottom of a column and of the calendar, a task with every option offered). As stock iOS menus do:
+  the most used actions as one row of medium icon buttons at the top (`preferredElementSize = .medium`, as Notes and
+  Files), the rest as rows; rarely used ones may go one level down into a submenu, never deeper. Nothing is removed.
+
+- M9. A scrolled list's cards are cut by a hard line under its title (Inbox, Backlog, Soon, the day: screenshot,
+  a card's sliver under «Backlog»). Every scrolling list and the calendar fade out softly at the edge they scroll
+  under instead: a short vertical fade (the height of about half a card), shown only while content is actually
+  under that edge, so a list at its top shows no fade. In the app: iOS 26's own soft scroll-edge effect where it
+  applies, otherwise a gradient mask of the same kind. In the plugin the same, as a `mask-image` from a new `--tc-…`
+  token, so both look alike (frontend-obsidian, both platforms).
+
+- M10. A tap on the plus opens the capture screen with the text field already focused: the keyboard is up and the
+  cursor in the field as the screen appears, so typing starts at once (voice stays one tap away).
+
+**Docs (frontend-obsidian).** R5: `docs/plugin/app.md` still describes the New Task / Rename / Add Subtask sheets. It
+describes the quick entry in place as the app now has it (the field in the list, Enter, empty Enter, what ends typing,
+«⋯» as the check, the bar over the keyboard and its smaller forms, `p1 `, the long press on the empty calendar, «No
+tasks», rename in place, subtasks on the full screen) and its check steps.
+
 ## Decisions
 
 (Each agent adds here what it decided on a gap, one line each.)
@@ -267,8 +335,8 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   as Notes names a folder.
 - frontend-swift: the tasks file is watched by an `NSFilePresenter` (`Vault.watchTasksFile`) while the scene is active,
   and read again when the scene comes back; no polling. The app's own reads and writes are coordinated as that presenter
-  (else every read after a write waited ~0.5 s for the system to message it), and the app's own write tells the watch
-  itself, so a reminder's button in the app's process still redraws the screen.
+  (else every read after a write waited ~0.5 s for the system to message it). ~~the app's own write tells the watch
+  itself~~ (superseded by R1 below: only writes made for someone else than the screen tell it).
 - frontend-swift: a read finding exactly the text this app last wrote skips the settle wait. Drop to the card in its
   new place, measured on the simulator: 48–69 ms (write 16–27 ms, the screen's read ~35–50 ms), the drop preview's flight
   covering it.
@@ -307,8 +375,8 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
   as the drag begins) and `placeAt` (rest frames, headers, the open room's shift, hysteresis 6); branches are
   `branchOf` / `gapBranch`, drawn with the `through` lines of tasks further up. A carry knows its card, task and column
   from where the card is drawn. The drop places hold the model weakly; the file watch follows the settings' tasks file.
-- frontend-swift (round 2): the ribbon pages by view alignment with no limit per swipe: it settles on the place the
-  swipe's speed reaches, so one fast swipe goes from Today to Inbox.
+- frontend-swift (round 2): ~~the ribbon pages by view alignment with no limit per swipe~~ (superseded by M6: one place
+  per swipe).
 - frontend-swift (quick entry): the app drives the core's `entry.*` as `QuickEntryController` does; the calls run on the
   pure rules' context over the settings as last read (`TaskBoard.entry`), so a keystroke never waits for a read. The jobs
   run one at a time: `entry.call` → `tasks.<method>` → the file read again → `entry.shown`/`unshown` drawn in the same
@@ -340,3 +408,76 @@ into the simulator by `printf '…' | LANG=en_US.UTF-8 xcrun simctl pbcopy <udid
 - frontend-swift (quick entry): the section field is the header's type (15 pt semibold) in the text colour with the
   placeholder «Section name». The task menu's Section › New Section… stays an alert: it names a section to move that task
   into, not a header at the field's place.
+- frontend-obsidian (M9): the fade covers the plugin's lists and the timeline (`ScrollEdges`). Each edge's fade is as deep as
+  the content under it, up to `--tc-scroll-fade` (half a card): `--tc-scrolled` and `--tc-scrolled-below` grow with the
+  scroll, so a fade grows in and out and never appears in a step. Both edges are followed, so Inbox over Backlog fades at
+  its bottom too (under the foot's own fade the bottom one is hidden anyway). The full screen and search results keep
+  their edges (not named in M9). An event cut by the timeline's top keeps its title just below the top fade, and the
+  title never moves up while the fade grows: its sticky offset is max(where the day's first item rests, the fade's
+  current depth), so the first event's title holds at rest (8 px) until the fade reaches it, then follows the fade's edge
+  down to half a card; nothing steps and nothing goes back.
+- backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
+  rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
+  rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
+  rows: the plugin's fallback to the end for a parent gone from the rows and Swift's `raw` in the comparison are dropped,
+  the keys compared as `samePlace`.
+- backend (R6b): `SCREEN_PLACES`, `SHOWN_LISTS` and `placeShowing(column, place)` live in `core/application/screenPlaces.ts`
+  (contracts; door `rules.constants`, `rules.placeShowing`). A list not shown is shown from the nearest place that shows
+  it, as the plugin's `modeShowing`: the day's list chosen from Inbox turns to Soon, not to Today as Swift's `turn` did.
+- frontend-swift (R1): `Vault.write` no longer tells the watch; the writes the app makes for someone else than the screen
+  (a reminder's button, Siri, a sync, the capture sheet: `AppServices`) call `Vault.tellWatch()`. A watch read asked while
+  a card is carried or the quick entry's jobs run waits for them (`readIfAsked` when the carry or the pump ends).
+- frontend-swift (R2/R3): a job whose `entry.call` fails, or whose read after the write fails, ends with `unshown`; a
+  job the door cannot `done` stays started and stops the pump, so it is never handed out again.
+- frontend-swift (R1, full screen): the stack's subtasks are read as a drawing (`stackRead` hands back a closure) and
+  drawn in the same transaction as `shown`.
+- frontend-swift (R7): the entry ends when the ribbon comes to rest on a place other than the one it rested on (a swipe
+  or a tab), unless the bar's place turned it there; a touch that pans something is never a tap elsewhere (the window's
+  tap requires every pan to fail).
+- frontend-swift (R8): only the read after a drop's write ends the carry; any other read leaves it.
+- frontend-swift (R9): list names are cached per the settings text the screen was last read over (`BoardSnapshot
+  .settingsJSON`, new).
+- frontend-swift (typed text): the field moves only between views in the window (`EntryFieldBox` takes it on joining the
+  window; a box leaving parks it in a hidden holder in the window), so it keeps first responder and every key; Return
+  and the end of editing no longer go through a queued task.
+- frontend-swift (M1/M2, revised): the plus is carried by its own pan (lifts on the first move), as a live copy of its
+  glass and symbol over the window (no shadow or scale of its own), routed to the places through
+  `BoardDrop.carry(at:)`/`letGo()`; let go, the copy springs back into the slot, and no new carry starts until it lands.
+  A pan let go within 10 pt of where it started (not on the cancel target) is a tap that trembled: it opens capture.
+- frontend-swift (M3, revised): the lift is of the capsule itself (a still copy kept the menu from ever turning into a
+  drag); the card hides only on the carry's first move (`sessionDidMove`), so the lift never has nothing to show.
+- frontend-swift (M4/M7): the gap is empty room of one card's height, the rows parting (board «3 — Перетаскивание»: no
+  dashes, no line with a dot); its level shows by its indent and the branch line of that level drawn into it, the line
+  the card will join, sliding with `.snappy` as the finger crosses a level's line. Every row's branch is asked over the
+  rows as they stand without the carried ones, so a carried subtask leaves no line hanging. The lifted copy keeps the
+  finger's position (it does not jump to the level's indent): the branch in the gap already says the level, and a copy
+  that snaps sideways under a still finger reads as a glitch.
+- frontend-swift (drop flight): the window's drop delegate implemented `previewForDropping` with `UITargetedPreview`
+  (the context-menu type), which UIKit never calls; with `UITargetedDragPreview` the carried card flies into the gap,
+  or onto its new time on the calendar.
+- frontend-swift (M5): Inbox and Soon are half the screen each, as the plugin's `--tc-half-column`; the day list is half
+  beside Soon and its own width at Today, following the swipe between them.
+- frontend-swift (M6): `OnePlacePerSwipe` scroll target: a swipe settles on the place next to where it started, or back;
+  a tab's scroll goes straight to its place.
+- frontend-swift (M8): the menu's top row holds three medium icons (Done, Rename, Add Subtask: the system's medium row
+  holds three), the other statuses one level down under Status, then Priority, Labels, Move To, Section, Reminder,
+  then Repeat…, Open Full Screen, Open in Obsidian, and Delete alone last. Grouping is drawing, not a rule: nothing
+  asked of the core.
+- frontend-swift (M9): iOS 26's soft scroll edge shows only under system bars, so the lists and the calendar take a
+  gradient mask driven by the scroll: each edge's fade is as deep as the content past it, capped at half a card; a list's
+  empty room after its last row counts as nothing; a cut event's padded title stands at max(0, fade − top), its text 4 pt
+  below, as the plugin's.
+- frontend-swift (M10): the capture field takes first responder as the sheet's view joins the window (a probe beside the
+  SwiftUI field), so the keyboard rises with the sheet; only when the plus opened it (`CaptureRouter.openTyping`), the
+  lock screen widget's capture opens with the keyboard down as before.
+- frontend-swift (drop place): a carried card's grab (the finger's offset below the card's top) is read in
+  `itemsForBeginning`, while the touch still stands on the card; read at `sessionWillBegin` it came against the lifted
+  preview (−16 pt instead of +17), so the core's `carriedMiddle` put the gap a row and more below the finger.
+- frontend-swift (menu then drag): with the menu open, the finger moving over the menu scrubs its rows (iOS's own
+  behaviour); a move of the capsule itself away from the menu turns into the drag (recorded). Nothing in the app blocks
+  it now that the lift is of the capsule.
+- frontend-swift (R8, revised): the carry of a drop ends with the first read started after the drop's write (a serial
+  counted per read), never with a read already running.
+- frontend-swift (R9, revised): `reloadIfChanged` compares the settings text too, and closing Settings asks it.
+- frontend-swift (entry jobs): a job with nothing to write ends with `unshown`; a task written but not read schedules a
+  read; a failed `placementOfDay` in Date… is shown as the screen's problem.

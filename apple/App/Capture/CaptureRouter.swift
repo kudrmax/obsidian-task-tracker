@@ -9,8 +9,17 @@ final class CaptureRouter {
     static let url = URL(string: "taskcalendar://new-task")!
 
     var capturing = false
+    /// The sheet opens typing: the plus asks for it; the lock screen widget opens it as before, the keyboard down.
+    var typing = false
 
     func open() {
+        typing = false
+        capturing = true
+    }
+
+    /// The plus: the sheet with its field focused as it rises.
+    func openTyping() {
+        typing = true
         capturing = true
     }
 

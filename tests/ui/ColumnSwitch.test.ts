@@ -102,6 +102,15 @@ describe("ColumnSwitch", () => {
 		);
 	});
 
+	it("from Done, a tapped icon turns to the place nearest Inbox that shows its column", () => {
+		const s = setUp("done");
+		s.tap(0);
+		expect(s.changes).toEqual(["inbox"]);
+		const now = setUp("done");
+		now.tap(2);
+		expect(now.changes).toEqual(["soon"]);
+	});
+
 	it("moves to the nearest place that shows a tapped column, and stays for a column already shown", () => {
 		const s = setUp("calendar");
 		s.tap(3);

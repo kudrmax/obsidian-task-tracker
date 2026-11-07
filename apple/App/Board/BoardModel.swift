@@ -24,6 +24,20 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
         }
     }
 
+    /// The core's name of the place (`SCREEN_PLACES`): Today is the calendar's.
+    var key: String {
+        switch self {
+        case .inbox: "inbox"
+        case .soon: "soon"
+        case .today: "calendar"
+        }
+    }
+
+    init?(key: String) {
+        guard let place = Self.allCases.first(where: { $0.key == key }) else { return nil }
+        self = place
+    }
+
     var symbol: String {
         switch self {
         case .inbox: "tray"
@@ -129,8 +143,13 @@ final class BoardModel {
 
     /// A read asked for while one runs: it runs again once that one ends, so the screen always ends on the latest ask.
     private var readAgain = false
-    /// A read the file asked for while something was carried: made once the carry ends.
+    /// A read the file asked for while something was carried or the quick entry wrote: made once they end.
     private var readAfterCarry = false
+    /// A drop's write is made: the next read drawn ends its carry.
+    /// The reads started so far, counted as each begins.
+    @ObservationIgnored private var readsStarted = 0
+    /// A drop's write is made: the first read started after it ends its carry (one started before shows the file without it).
+    @ObservationIgnored private var dropReadFrom: Int?
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
@@ -166,11 +185,13 @@ final class BoardModel {
             readAgain = false
             let day = shownDay
             let board = board
+            readsStarted += 1
+            let serial = readsStarted
             do {
                 let read = try await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
                 let instant = instantNext
                 instantNext = false
-                show(read, animated: !instant)
+                show(read, animated: !instant, serial: serial)
                 problem = nil
             } catch {
                 problem = Self.words(error)
@@ -178,8 +199,9 @@ final class BoardModel {
         } while readAgain
     }
 
-    /// The screen drawn from `read`; a drop's in one step with the end of its carry, so the card stands in its place at once.
-    private func show(_ read: BoardSnapshot, animated: Bool) {
+    /// The screen drawn from `read`; the read after a drop's write in one step with the end of its carry, so the card
+    /// stands in its place at once. Any other read leaves a carry as it is.
+    private func show(_ read: BoardSnapshot, animated: Bool, serial: Int) {
         if animated {
             withAnimation(.snappy) {
                 snapshot = read
@@ -191,20 +213,26 @@ final class BoardModel {
             withTransaction(instant) {
                 snapshot = read
                 entry.screenChanged()
-                endCarry()
+                if let from = dropReadFrom, serial >= from {
+                    dropReadFrom = nil
+                    endCarry()
+                }
             }
         }
     }
 
-    /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button.
+    /// Reads again only when the tasks file changed under the screen: Obsidian, Sync, a reminder's button. While a card is
+    /// carried or the quick entry's writes run, the read waits for them: the entry draws each of its writes itself, in
+    /// the same drawing as the line it ends.
     func reloadIfChanged() async {
-        guard carried == nil else {
+        guard carried == nil, !entry.writing else {
             readAfterCarry = true
             return
         }
         let board = board
-        let text = try? await Task.detached { try board.files().tasks }.value
-        if text != snapshot?.tasksText { await reload(animated: true) }
+        guard let files = try? await Task.detached(operation: { try board.files() }).value else { return }
+        // The settings count too: a list renamed or a colour changed in Settings or in Obsidian redraws every name.
+        if files.tasks != snapshot?.tasksText || files.settingsJSON != snapshot?.settingsJSON { await reload(animated: true) }
     }
 
     /// The tasks file watched while the screen shows: a coordinated write elsewhere (iCloud, a reminder's button) reads again.
@@ -494,10 +522,14 @@ final class BoardModel {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) { endCarry() }
-        if readAfterCarry {
-            readAfterCarry = false
-            Task { await reloadIfChanged() }
-        }
+        readIfAsked()
+    }
+
+    /// A read the file asked for while a carry or the quick entry's writes held it: made now.
+    func readIfAsked() {
+        guard readAfterCarry, carried == nil, !entry.writing else { return }
+        readAfterCarry = false
+        Task { await reloadIfChanged() }
     }
 
     /// The drag session ended, whatever came of it: a carry still standing ends now, unless its drop is still being
@@ -744,7 +776,15 @@ final class BoardModel {
 
     private func drop(_ item: TaskItem, from: String, to: JSONValue) async {
         guard let day = snapshot?.day else { return }
-        await write("tasks.drop", [[["key": item.key.json, "from": .string(from)]], to, .string(day)], animated: false)
+        let board = board
+        let arguments: [JSONValue] = [[["key": item.key.json, "from": .string(from)]], to, .string(day)]
+        do {
+            try await Task.detached { try board.write("tasks.drop", arguments) }.value
+        } catch {
+            problem = Self.words(error)
+        }
+        dropReadFrom = readsStarted + 1
+        await reload(animated: false)
     }
 
     /// Where a card carried alone was lifted from in its own list: let go there at its level, nothing is written.

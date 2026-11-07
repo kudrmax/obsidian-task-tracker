@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-allday-extra-rows, --tc-y,
- * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
+ * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -271,6 +271,8 @@ body {
 	--tc-fade-block-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent);
 	--tc-fade-tile-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-tile)), transparent calc(100% - var(--tc-space-8)));
 	--tc-fade-peek-bottom: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent);
+	/* A list or the calendar fades out softly at an edge content is scrolled under, over half a card's height; the fade grows in with the first pixels of scroll. */
+	--tc-scroll-fade: calc(var(--tc-card-h) / 2);
 	/*
 	 * The bottom of the view fades into the background over every column at once: it starts this far above the topmost
 	 * control of the foot (the switch's track), half gone and nearly gone at the next
@@ -463,6 +465,8 @@ body {
 	/* Empty room over the day's first hour and under its last; the code sets it on the canvas. */
 	--tc-room-top: 0px;
 	--tc-room-bottom: 0px;
+	--tc-scrolled: 0px;
+	--tc-scrolled-below: 0px;
 	--tc-block-pad-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2);
 	--tc-select-ring: 1.5px;
 	--tc-ring-selected: inset 0 0 0 var(--tc-select-ring) var(--tc-accent);
@@ -850,6 +854,8 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-list::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
 .tc-list::-webkit-scrollbar { display: none; }
+/* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line. Each fade is as deep as the content under its edge, up to its full height, so it grows in and out with the scroll and never appears in a step; a list at rest at an edge shows none there. */
+:is(.tc-list, .tc-timeline):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
@@ -985,6 +991,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* An event cut by the timeline's edge keeps its title in view: the title holds to that edge while the event lasts; the event clips without becoming a scroller, so the title sticks to the timeline's. */
 .tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; overflow: clip; }
 .tc-event-body { flex: 1; min-width: 0; align-self: flex-start; position: sticky; top: 0; bottom: 0; padding: var(--tc-space-4) var(--tc-space-6); }
+/* An event cut by the calendar's top keeps its title just below the top fade, where it reads whole. The title of the day's first event holds where it rests (the label's lift, the room over the first hour, the item's inset) until the fade, growing with the scroll, reaches it, then goes down with the fade's edge: it never steps and never goes back. */
+.tc-timeline .tc-event-body { top: max(var(--tc-label-lift) + var(--tc-room-top) + var(--tc-item-inset), min(var(--tc-scrolled), var(--tc-scroll-fade))); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
 .tc-event.is-past { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
 .tc-allday.is-past { background: var(--tc-event-past-bg); }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { type DropColumn, type EntrySpot, type EntryState, type ListCard, type NewTaskPlace, QuickEntrySession, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type WriteLine } from "../../core/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
-import { SHOWN_LISTS as SHOWN } from "../../obsidian/ui/screens";
+import { SHOWN_LISTS as SHOWN } from "../../core/application/contracts";
 import { onDay } from "../fakes/itemOnDay";
+import { toItem } from "../../core/application/taskItems";
+import { TaskDocument } from "../../core/domain/TaskDocument";
 
 const key = (name: string): TaskKey => ({ section: "now", index: 0, path: [], raw: name });
 const card = (name: string, level = 0): ListCard => ({ key: key(name), level, group: null });
@@ -1150,5 +1152,59 @@ describe("QuickEntrySession", () => {
 			expect(entry.renameSpot({ ...item("A"), slot: SLOT }, false)).toEqual({ kind: "slot", slot: SLOT });
 			expect(entry.renameSpot(item("A"), false)).toBeNull();
 		});
+	});
+});
+
+describe("the full screen's stack", () => {
+	const MORNING = "## Now\n- [ ] Morning\n\t- [ ] Pack\n\t\t- [ ] Laptop\n\t\t- [ ] Pass\n\t- [ ] Tea\n- [ ] Other\n";
+	const SECTIONS = { inbox: "Inbox", backlog: "Backlog", now: "Now", soon: "Soon", done: "Done" };
+	const tasks = TaskDocument.parse(MORNING, SECTIONS, { dueDate: "📅", slot: "⏰", collapsed: "🔽" }).tasks("now").map((t) => toItem(t, DAY));
+	const morning = tasks[0];
+	const [pack, tea] = morning.allSubtasks;
+	const [laptop] = pack.allSubtasks;
+	const other = tasks[1];
+
+	it("a field on the full screen stands in the stack of the task it types under or renames, wherever its lists show it", () => {
+		const entry = new FakeTasks([]).entry();
+		expect(entry.stackSpot(pack.key)).toEqual({ kind: "stack", parent: pack.key });
+	});
+
+	it("nothing on a task's page while no field stands in a stack, or the stack is another task's", () => {
+		const entry = new FakeTasks([]).entry();
+		expect(entry.stackEntry(morning)).toBeNull();
+		entry.open(at(0));
+		expect(entry.stackEntry(morning)).toBeNull();
+		entry.open(entry.stackSpot(other.key));
+		expect(entry.stackEntry(morning)).toBeNull();
+	});
+
+	it("a new subtask of the page's task: after every row at the first depth, the texts typed before it waiting there", () => {
+		const entry = new FakeTasks([]).entry();
+		entry.open(entry.stackSpot(morning.key));
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "new", index: 4, level: 0 }, pending: [] });
+		entry.type("Shoes");
+		entry.enter();
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "new", index: 4, level: 0 }, pending: [{ text: "Shoes", level: 0 }] });
+	});
+
+	it("a new subtask of a subtask: after it and all its own, a level deeper, the waiting texts at that level", () => {
+		const entry = new FakeTasks([]).entry();
+		entry.open(entry.stackSpot(pack.key));
+		entry.type("Charger");
+		entry.enter();
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "new", index: 3, level: 1 }, pending: [{ text: "Charger", level: 1 }] });
+		entry.open(entry.stackSpot(laptop.key));
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "new", index: 2, level: 2 }, pending: [] });
+		expect(entry.stackEntry(pack)).toEqual({ at: { kind: "new", index: 1, level: 1 }, pending: [] });
+	});
+
+	it("a renamed subtask gives its row to the field; the page's own task renamed is its title", () => {
+		const entry = new FakeTasks([]).entry();
+		entry.open(entry.stackSpot(tea.key), tea);
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "row", index: 3, level: 0 }, pending: [] });
+		entry.open(entry.stackSpot(morning.key), morning);
+		expect(entry.stackEntry(morning)).toEqual({ at: { kind: "title" }, pending: [] });
+		entry.open(entry.stackSpot(other.key), other);
+		expect(entry.stackEntry(morning)).toBeNull();
 	});
 });

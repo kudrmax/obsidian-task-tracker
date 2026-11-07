@@ -61,6 +61,9 @@ export const PROPERTY = {
 	stackEnd: "--tc-stack-end",
 	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
 	roomTop: "--tc-room-top",
+	/** How much of a scroller's content is under its top edge, and under its bottom edge, up to the tallest card: its fades grow with them. */
+	scrolled: "--tc-scrolled",
+	scrolledBelow: "--tc-scrolled-below",
 	roomBottom: "--tc-room-bottom",
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",

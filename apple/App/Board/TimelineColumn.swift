@@ -59,6 +59,7 @@ struct TimelineColumn: View {
                 }
                 .scrollPosition($position)
                 .scrollIndicators(.hidden)
+                .softEdges()
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
                     visible = height
@@ -90,7 +91,7 @@ struct TimelineColumn: View {
             ForEach(timeline.events.sorted { $0.layer < $1.layer }) { event in
                 let top = y(event.start, hour) + Measure.itemInset
                 let length = CGFloat(event.end - event.start) / 60 * hour - Measure.itemGap
-                EventBlock(event: event, paint: paint(event), height: max(length, 1))
+                EventBlock(event: event, paint: paint(event), height: max(length, 1), contentTop: top)
                     .padding(.leading, Measure.itemsLeft + CGFloat(event.left))
                     .padding(.trailing, Measure.itemsRight + Measure.itemInset)
                     .offset(y: top)
@@ -310,6 +311,8 @@ struct EventBlock: View {
     let event: BoardEvent
     let paint: EventPaint
     let height: CGFloat
+    /// Where the block stands in the calendar's content: with where it shows, how far the calendar is scrolled.
+    var contentTop: CGFloat = 0
 
     /// Shorter than this, a block takes the small type and no padding over its title (`tinyItemHeight`).
     private static let tiny: CGFloat = 24
@@ -328,9 +331,13 @@ struct EventBlock: View {
                 .foregroundStyle(Color(hex: paint.text))
                 .padding(.horizontal, isTiny ? 5 : 6)
                 .padding(.top, isTiny ? 0 : 4)
-                .visualEffect { [height, titleHeight, isTiny] content, geometry in
+                .visualEffect { [height, titleHeight, isTiny, contentTop] content, geometry in
+                    // The title keeps below the top edge and its fade, which grows with the scroll, so it never jumps.
                     let top = geometry.frame(in: .scrollView).minY
-                    return content.offset(y: min(max(0, -top), max(0, height - titleHeight - (isTiny ? 0 : 8))))
+                    let fade = SoftEdge.top(at: contentTop - top)
+                    // The padded title stands at the larger of where it rests and the fade's depth, its text 4 pt below,
+                    // as the plugin's.
+                    return content.offset(y: min(max(0, fade - top), max(0, height - titleHeight - (isTiny ? 0 : 8))))
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
         }

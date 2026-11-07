@@ -99,44 +99,29 @@ struct TaskFullScreen: View {
     /// task as a rename left it.
     private func follow() {
         let shown = task
-        model.entry.stackRead = { await refresh() }
+        model.entry.stackRead = { await readStack() }
         model.entry.renamed = { item in
             if item.key.section == shown.key.section, item.key.index == shown.key.index, item.key.path == shown.key.path { current = item }
         }
     }
 
-    /// The field stands in this page's stack: the key of the task it types under or renames.
-    private var stackParent: String? {
-        guard let state = model.entry.state, state.spotKind == "stack", let key = try? state.spot["parent"].decode(TaskKey.self) else { return nil }
-        return Self.id(key)
-    }
-
-    private static func id(_ key: TaskKey) -> String {
-        "\(key.section)/\(key.index)/\(key.path.map(String.init).joined(separator: "."))/\(key.raw)"
-    }
-
     private var renamesTitle: Bool {
-        stackParent == task.id && model.entry.state?.renaming?.id == task.id
+        model.entry.stackEntry(task)?.at.kind == "title"
     }
 
-    /// The subtasks as drawn: a renamed one gives its place to the field; a new one is typed after the last subtask of
-    /// the task it goes under, the texts typed before it waiting there.
+    /// The subtasks as drawn, with the field and the texts waiting before it where the core puts them.
     private var stackRows: [StackRow] {
         var rows = (tree?.rows ?? []).map(StackRow.row)
-        guard let parent = stackParent, let state = model.entry.state else { return rows }
-        if let renaming = state.renaming {
-            if let at = rows.firstIndex(where: { $0.itemID == renaming.id }) { rows[at] = .field(level: rows[at].level) }
-            return rows
+        guard let entry = model.entry.stackEntry(task), let index = entry.at.index, let level = entry.at.level else { return rows }
+        switch entry.at.kind {
+        case "row" where rows.indices.contains(index):
+            rows[index] = .field(level: level)
+        case "new" where index <= rows.count:
+            let typed = entry.pending.enumerated().map { StackRow.pending(index: $0.offset, text: $0.element.text, level: $0.element.level) }
+            rows.insert(contentsOf: typed + [.field(level: level)], at: index)
+        default:
+            break
         }
-        var level = 0
-        var end = rows.count
-        if parent != task.id {
-            guard let at = rows.firstIndex(where: { $0.itemID == parent }) else { return rows }
-            level = rows[at].level + 1
-            end = rows[(at + 1)...].firstIndex { $0.level < level } ?? rows.count
-        }
-        let typed = state.pending.enumerated().map { StackRow.pending(index: $0.offset, text: $0.element.text, level: level) } + [.field(level: level)]
-        rows.insert(contentsOf: typed, at: end)
         return rows
     }
 
@@ -153,7 +138,6 @@ struct TaskFullScreen: View {
             }
         }
 
-        var itemID: String? { if case .row(let row) = self { row.item.id } else { nil } }
 
         var level: Int {
             switch self {
@@ -195,8 +179,7 @@ struct TaskFullScreen: View {
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        if let found: TaskItem = try? await model.read("tasks.find", [task.key.json, .string(task.text)]) { current = found }
-        tree = try? await model.rule("tasks.fullTree", [task.json])
+        await readStack()()
         listName = (try? await model.read("tasks.listName", [.string(task.list)])) ?? ""
         menuModel = await model.menu(for: task, from: "full")
         var menus: [String: TaskMenuModel] = [:]
@@ -206,6 +189,17 @@ struct TaskFullScreen: View {
         if let read {
             draft = read["state"] ?? draft
             if let replace = read["replace"]?.string { place(replace) }
+        }
+    }
+
+    /// The task and its subtasks as the file has them, handed back as their drawing: the quick entry draws a written
+    /// subtask in the same step as the line it ends.
+    private func readStack() async -> () -> Void {
+        let found: TaskItem? = try? await model.read("tasks.find", [task.key.json, .string(task.text)])
+        let read: FullTree? = try? await model.rule("tasks.fullTree", [(found ?? task).json])
+        return {
+            if let found { current = found }
+            tree = read
         }
     }
 

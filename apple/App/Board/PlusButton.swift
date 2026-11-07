@@ -1,15 +1,17 @@
 import SwiftUI
 import UIKit
 
-/// The plus beside the tab bar, as in the design: the accent's glass circle with a plus. A tap opens a new task; a long
-/// press lifts the plus itself to carry, and letting it go between cards or on the calendar puts the new task there.
-/// While anything is carried it is the cancel target: a glass circle with a cross that fills and grows under the finger,
-/// and a carry let go on it flies back where it was taken from.
+/// The plus beside the tab bar, as in the design: the accent's glass circle with a plus. A tap opens a new task; moving
+/// the finger lifts the plus at once, with no hold, as the plugin's plus, and letting it go between cards or on the
+/// calendar puts the new task there. While anything is carried it is the cancel target: a glass circle with a cross that
+/// fills and grows under the finger; a carry let go on it, or over no place, flies back where it was taken from.
 struct PlusButton: UIViewRepresentable {
     let open: () -> Void
     let accent: Color
     /// Something is carried: the plus stands as the cancel target.
     let cancelling: Bool
+    /// The places a carried plus is let go on.
+    var drop: BoardDrop?
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -31,12 +33,14 @@ struct PlusButton: UIViewRepresentable {
         control.onCarry = onCarry
         control.onCancel = onCancel
         control.onEnd = onEnd
+        control.drop = drop
         control.cancelling = cancelling
     }
 }
 
-final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteractionDelegate {
+final class PlusControl: UIControl, UIDropInteractionDelegate {
     var open: () -> Void = {}
+    weak var drop: BoardDrop?
     var onCarry: () -> Void = {}
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -90,9 +94,7 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             self.open()
         }, for: .touchUpInside)
-        let drag = UIDragInteraction(delegate: self)
-        drag.isEnabled = true
-        addInteraction(drag)
+        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(carry(_:))))
         addInteraction(UIDropInteraction(delegate: self))
         look()
     }
@@ -126,29 +128,96 @@ final class PlusControl: UIControl, UIDragInteractionDelegate, UIDropInteraction
 
     // MARK: The plus carried
 
-    func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
-        guard !cancelling else { return [] }
-        let item = UIDragItem(itemProvider: Carried.provider(Carried.plus))
-        item.localObject = Carried.plus
-        return [item]
+    /// The plus as the finger carries it: a live copy over the window, the same glass and symbol, while the slot stands as
+    /// the cancel target. No shadow or scale of its own: the glass is the plus's look wherever it is.
+    private var lifted: UIView?
+    /// The copy flying back into the slot: a new carry waits until it has landed.
+    private var homing: UIView?
+    /// Where the finger came down, in the window.
+    private var start: CGPoint = .zero
+
+    /// A finger that moved no further than this and let go is a tap that trembled, not a carry.
+    private static let tapReach: CGFloat = 10
+
+    private func copy(in window: UIWindow) -> UIView {
+        let frame = convert(bounds, to: window)
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.tintColor = accent
+        let glass = UIVisualEffectView(effect: glassEffect)
+        glass.frame = frame
+        glass.cornerConfiguration = .capsule()
+        glass.clipsToBounds = true
+        glass.isUserInteractionEnabled = false
+        let symbol = UIImageView(image: UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)))
+        symbol.tintColor = .white
+        symbol.contentMode = .center
+        symbol.frame = glass.bounds
+        symbol.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        glass.contentView.addSubview(symbol)
+        return glass
     }
 
-    func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
-        let parameters = UIDragPreviewParameters()
-        parameters.visiblePath = UIBezierPath(ovalIn: bounds)
-        parameters.backgroundColor = .clear
-        return UITargetedDragPreview(view: self, parameters: parameters)
+    @objc private func carry(_ pan: UIPanGestureRecognizer) {
+        guard let window else { return }
+        let point = pan.location(in: window)
+        switch pan.state {
+        case .began:
+            guard !cancelling, homing == nil else { return }
+            start = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: window)
+            let copy = copy(in: window)
+            window.addSubview(copy)
+            lifted = copy
+            alpha = 0
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onCarry()
+            UIView.animate(springDuration: 0.3, bounce: 0.15, options: [.allowUserInteraction, .beginFromCurrentState]) {
+                copy.center = point
+            }
+        case .changed:
+            guard let lifted else { return }
+            lifted.center = point
+            if convert(bounds, to: window).contains(point) {
+                held = true
+                drop?.carryOff()
+            } else {
+                held = false
+                drop?.carry(at: point)
+            }
+        case .ended:
+            guard lifted != nil else { return }
+            let trembled = hypot(point.x - start.x, point.y - start.y) < Self.tapReach && !held
+            let onTarget = convert(bounds, to: window).contains(point)
+            // Taken by a place, the field opens there and the plus goes back to its slot under the bar all the same.
+            if trembled || onTarget || drop?.letGo() != true {
+                drop?.carryOff()
+                onCancel()
+            }
+            flyHome()
+            onEnd()
+            if trembled { open() }
+        default:
+            guard lifted != nil else { return }
+            drop?.carryOff()
+            onCancel()
+            flyHome()
+            onEnd()
+        }
     }
 
-    func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) { onCarry() }
-
-    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
-        if operation == .cancel { onCancel() }
+    /// Let go: the plus flies back into its slot as one piece and stands there again, as the system returns a cancelled
+    /// drag; until it lands, a new touch on the plus starts no carry.
+    private func flyHome() {
+        guard let lifted, let window else { return }
+        self.lifted = nil
+        homing = lifted
+        UIView.animate(springDuration: 0.4, bounce: 0.15, options: [.allowUserInteraction]) {
+            lifted.center = self.convert(CGPoint(x: self.bounds.midX, y: self.bounds.midY), to: window)
+        } completion: { _ in
+            self.alpha = 1
+            lifted.removeFromSuperview()
+            self.homing = nil
+        }
     }
-
-    func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) { onEnd() }
-
-    func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
 
     // MARK: The cancel target
 

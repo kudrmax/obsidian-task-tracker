@@ -1,3 +1,4 @@
+import { ScrollEdges } from "./ScrollEdges";
 import { type CalendarEvent, type DayBoundary, labelHidesNearNow, type ResizeEdge, samePlace, sameSlot, sameTaskTree, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
@@ -131,6 +132,7 @@ export class Timeline {
 	private anchor: Anchor | null = null;
 	private readonly grips: HTMLElement;
 	private readonly sizeWatch: ResizeObserver;
+	private readonly edges: ScrollEdges;
 	/** A finger on the screen, anywhere: the anchor goes, and the keyboard it may bring shrinks the view under a still timeline. */
 	private readonly touched = () => (this.anchor = null);
 
@@ -147,6 +149,7 @@ export class Timeline {
 		this.minorEl = el(this.canvas, "div");
 		this.itemsEl = el(this.canvas, "div", "tc-items");
 		this.grips = el(null, "div", "tc-grips");
+		this.edges = new ScrollEdges(this.el, this.canvas);
 		this.sizeWatch = new ResizeObserver(() => {
 			this.frame = null;
 			this.deps.onResize?.();
@@ -168,6 +171,7 @@ export class Timeline {
 	/** The view closes: the timeline stops watching its size. */
 	destroy(): void {
 		this.sizeWatch.disconnect();
+		this.edges.destroy();
 		for (const type of TOUCHES) this.el.ownerDocument.removeEventListener(type, this.touched, { capture: true });
 	}
 

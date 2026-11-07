@@ -41,9 +41,10 @@ struct BoardScreen: View {
             entrySheet(sheet)
         }
         .sheet(isPresented: $router.capturing, onDismiss: { Task { await model.reloadIfChanged() } }) {
-            CaptureView()
+            CaptureView(focused: router.typing)
         }
-        .sheet(item: $sheet) { sheet in
+        // Settings may have renamed a list or changed a colour: the screen reads again when it closes.
+        .sheet(item: $sheet, onDismiss: { Task { await model.reloadIfChanged() } }) { sheet in
             switch sheet {
             case .search: SearchScreen(model: model)
             case .settings: NavigationStack { SettingsView() }
@@ -71,7 +72,7 @@ struct BoardScreen: View {
         ZStack(alignment: .topLeading) {
             PlaceTabs(place: model.place, choose: { model.go(to: $0) }, slot: { plusSlot = $0 })
             if let slot = plusSlot {
-                PlusButton(open: { router.capturing = true }, accent: Palette.accent(scheme), cancelling: model.carrying, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -206,20 +207,25 @@ struct Ribbon: View {
     @AppStorage("listShare") private var listShare: Double = 0.5
     @State private var dragStart: CGFloat?
     @State private var phase = ScrollPhase.idle
+    /// The place the ribbon last came to rest on.
+    @State private var rested: RibbonPlace?
 
     var body: some View {
         GeometryReader { box in
             let width = box.size.width
-            let list = listWidth(width)
+            let half = width / 2
+            // As the plugin's ribbon: Inbox and Soon are half the screen each, and so is the day list beside Soon; at Today
+            // the day list takes its own width and the calendar the rest, the day list's width following the swipe there.
+            let list = half + (listWidth(width) - half) * toToday
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
-                    column(.inbox, list) {
+                    column(.inbox, half) {
                         VStack(spacing: 12) {
                             lists(.inbox)
                             lists(.backlog)
                         }
                     }
-                    column(.soon, width - list) { lists(.soon) }
+                    column(.soon, half) { lists(.soon) }
                     // The day list and the calendar are one day: they slide together when it changes.
                     dayPart {
                         HStack(spacing: 0) {
@@ -237,25 +243,30 @@ struct Ribbon: View {
                     .id(RibbonPlace.today)
                 }
                 .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
+                }
+            .scrollTargetBehavior(OnePlacePerSwipe(stops: [0, half, width]))
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
             } action: { _, x in
-                toToday = min(1, max(0, (x - list) / max(1, width - list)))
+                toToday = min(1, max(0, (x - half) / max(1, half)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(x, list: list, width: width)
+                let near = nearest(x, half: half, width: width)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
                 phase = new
-                // A swipe to another place finishes the task being typed, as a tap elsewhere.
-                if new == .interacting { model.entry.placeChanged() }
+                // The ribbon at rest on another place finishes the task being typed, as a tap elsewhere.
+                guard new == .idle, model.place != rested else { return }
+                rested = model.place
+                model.entry.placeSettled(model.place)
             }
-            .onAppear { position.scrollTo(id: model.place, anchor: .leading) }
+            .onAppear {
+                rested = model.place
+                position.scrollTo(id: model.place, anchor: .leading)
+            }
             .onChange(of: model.asked) {
                 guard let asked = model.asked else { return }
                 withAnimation(.smooth) { position.scrollTo(id: asked.place, anchor: .leading) }
@@ -264,8 +275,8 @@ struct Ribbon: View {
     }
 
     /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe.
-    private func nearest(_ x: CGFloat, list: CGFloat, width: CGFloat) -> RibbonPlace {
-        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, list), (.today, width)]
+    private func nearest(_ x: CGFloat, half: CGFloat, width: CGFloat) -> RibbonPlace {
+        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, half), (.today, width)]
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
     }
 
@@ -373,5 +384,28 @@ struct BulkActions: View {
         Button("Delete", systemImage: "trash", role: .destructive) { Task { await model.remove(items) } }
             .tint(.red)
             .disabled(items.isEmpty || menu?.remove == nil)
+    }
+}
+
+/// The ribbon pages as the plugin's: a swipe, however fast or long, comes to rest on the place next to the one it started
+/// from, or back on it; a tab's own scroll goes straight where it was asked.
+private struct OnePlacePerSwipe: ScrollTargetBehavior {
+    /// Where each place's left edge stands in the ribbon, left to right.
+    let stops: [CGFloat]
+
+    func updateTarget(_ target: inout ScrollTarget, context: TargetContext) {
+        var x = target.rect.minX
+        if context.velocity.dx != 0 {
+            let start = context.originalTarget.rect.minX
+            let from = nearest(start)
+            let lower = stops.last { $0 < from } ?? from
+            let upper = stops.first { $0 > from } ?? from
+            x = min(upper, max(lower, x))
+        }
+        target.rect.origin.x = nearest(x)
+    }
+
+    private func nearest(_ x: CGFloat) -> CGFloat {
+        stops.min { abs($0 - x) < abs($1 - x) } ?? x
     }
 }

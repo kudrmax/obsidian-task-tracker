@@ -86,11 +86,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var draggable = true {
         didSet { drag.isEnabled = draggable }
     }
-    /// Gone from its place while carried; back in it once the system has flown a cancelled carry home.
+    /// Gone from its place while carried, once the carried card has left it; back in it once the system has flown a
+    /// cancelled carry home.
     var carried = false {
         didSet {
             guard carried != oldValue, !returning else { return }
-            alpha = carried ? 0 : 1
+            showsInPlace()
         }
     }
     /// What the card is drawn from: it is drawn anew only when this changes, not on every pass of the screen.
@@ -114,6 +115,11 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private var afterMenu: (@MainActor () -> Void)?
     /// Where the card stood when it was lifted, in the window: a cancelled carry flies back there.
     private var home: CGPoint?
+    /// The carried card has moved off its place: only then does the card hide, so the lift (from a long press or from the
+    /// open menu) always has the capsule itself to lift, and no frame shows neither.
+    private var left = false
+    /// How far below the card's top the finger held it as the drag began.
+    private var grab: CGFloat = 0
     /// A cancelled carry is flying home: the card shows again once it lands.
     private var returning = false
 
@@ -209,16 +215,27 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     // MARK: The carry
 
     func dragInteraction(_ interaction: UIDragInteraction, itemsForBeginning session: UIDragSession) -> [UIDragItem] {
+        // Where the finger holds the card, read while the touch still stands on it: once the lift (or the menu's) has
+        // begun, the session reports the point against the lifted preview, which is no longer where the card stands.
+        grab = session.location(in: self).y
         let item = UIDragItem(itemProvider: Carried.provider(id))
         item.localObject = id
         return [item]
     }
 
+    /// The capsule itself is lifted: from an open menu the system turns the menu's preview, this capsule, into the carried
+    /// card, and only a lift of the same view lets the menu give way to the drag.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
         let parameters = UIDragPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
         return UITargetedDragPreview(view: content, parameters: parameters)
+    }
+
+    func dragInteraction(_ interaction: UIDragInteraction, sessionDidMove session: UIDragSession) {
+        guard !left else { return }
+        left = true
+        showsInPlace()
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionIsRestrictedToDraggingApplication session: UIDragSession) -> Bool { true }
@@ -227,7 +244,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
         home = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
-        onCarry(session.location(in: self).y)
+        onCarry(grab)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
@@ -247,12 +264,17 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        if returning { landed() }
+        left = false
+        if returning { landed() } else { showsInPlace() }
         onEnd()
+    }
+
+    private func showsInPlace() {
+        alpha = carried && left ? 0 : 1
     }
 
     private func landed() {
         returning = false
-        alpha = carried ? 0 : 1
+        showsInPlace()
     }
 }

@@ -59,6 +59,30 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         current = nil
     }
 
+    // MARK: The plus, carried by the finger itself
+
+    /// The plus held at `point` of the window: the place under it shows where the new task would stand.
+    func carry(at point: CGPoint) {
+        let key = place(at: point)
+        if key != current { leave() }
+        current = key
+        guard let key, let place = places[key] else { return }
+        place.hover(CGPoint(x: point.x - place.origin.x, y: point.y - place.origin.y))
+    }
+
+    /// The plus held over no place (the cancel target, the bars).
+    func carryOff() { leave() }
+
+    /// The plus let go: true when a place took it.
+    func letGo() -> Bool {
+        guard let current, let place = places[current] else { return false }
+        self.current = nil
+        _ = place.land()
+        return true
+    }
+
+    // MARK: A system carry
+
     func dropInteraction(_ interaction: UIDropInteraction, canHandle session: any UIDropSession) -> Bool {
         session.localDragSession != nil
     }
@@ -88,9 +112,10 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         self.current = nil
     }
 
-    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedPreview) -> UITargetedPreview? {
+    /// The carried card settles into its place: into the gap, or onto the line's time.
+    func dropInteraction(_ interaction: UIDropInteraction, previewForDropping item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
         guard let landing, let view = interaction.view else { return nil }
-        let target = UIPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
+        let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
         return defaultPreview.retargetedPreview(with: target)
     }
 }

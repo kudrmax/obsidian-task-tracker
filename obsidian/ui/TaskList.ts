@@ -1,3 +1,4 @@
+import { ScrollEdges } from "./ScrollEdges";
 import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
@@ -128,6 +129,7 @@ export class TaskList {
 	private slot: HTMLElement | null = null;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
 	private drawnCards: readonly ListCard[] | null = null;
+	private readonly edges: ScrollEdges;
 	/** Watches the list's width: a project's title cut or whole again fades or not. */
 	private readonly sizes: ResizeObserver | null;
 
@@ -136,12 +138,14 @@ export class TaskList {
 		private readonly deps: TaskListDeps,
 	) {
 		el.classList.add("tc-list");
+		this.edges = new ScrollEdges(el);
 		this.sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => this.fadeCutTitles());
 		this.sizes?.observe(el);
 	}
 
-	/** The list is gone from the screen: it stops watching its width. */
+	/** The list goes away with its view or its peek: it stops following its scroll and size. */
 	destroy(): void {
+		this.edges.destroy();
 		this.sizes?.disconnect();
 	}
 
@@ -149,6 +153,7 @@ export class TaskList {
 		this.drawnCards = null;
 		this.draw();
 		this.drawnCards = null;
+		this.edges.update();
 		this.fadeCutTitles();
 	}
 

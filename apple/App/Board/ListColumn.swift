@@ -11,6 +11,8 @@ struct ListColumn: View {
     @Binding var question: MenuQuestion?
 
     private static let space = "list"
+    /// Room after the last row, so the last card scrolls over the keyboard.
+    static let trailingRoom: CGFloat = 160
 
     private var gap: ListGap? { model.gap?.column == list.column ? model.gap : nil }
     private var key: String { "list.\(list.column.rawValue)" }
@@ -40,13 +42,14 @@ struct ListColumn: View {
                                 EntryRow(level: level, branch: branch) { EntryCapsule(host: model.entry, section: section) }
                             }
                         }
-                        Color.clear.frame(height: 160)
+                        Color.clear.frame(height: Self.trailingRoom)
                     }
                     .padding(.horizontal, CardMetrics.columnInset)
                     .coordinateSpace(.named(Self.space))
                     .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
                 }
                 .scrollIndicators(.hidden)
+                .softEdges(trailing: ListColumn.trailingRoom)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.rest(column, width: $0) }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
                 // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
@@ -91,21 +94,25 @@ struct ListColumn: View {
             }
         }
         if entry?.at.kind == "end" { rows += typed }
-        return entry == nil ? rows : Self.branched(rows, model: model)
+        let carried = Set(list.cards.filter(model.isCarried).map(\.id))
+        return entry == nil && gap == nil && carried.isEmpty ? rows : Self.branched(rows, carried: carried, model: model)
     }
 
-    /// The branch lines of every row while the field stands in the list, as the core draws a subtask's over the levels
-    /// of the list with the field in it: a card above the field keeps its line going down to it.
-    private static func branched(_ rows: [ListRowView], model: BoardModel) -> [ListRowView] {
-        let branches = model.branches(levels: rows.compactMap(\.level))
+    /// The branch lines of every row while the field or a carry's gap stands in the list, or a card of it is carried, as
+    /// the core draws a subtask's over the levels of the rows as they stand: a card above the field or the gap keeps its
+    /// line going down to it, and a carried card's place closes up with no line left hanging into it.
+    private static func branched(_ rows: [ListRowView], carried: Set<String>, model: BoardModel) -> [ListRowView] {
+        let standing = rows.filter { !$0.isCarried(carried) }
+        let branches = model.branches(levels: standing.compactMap(\.level))
         var at = -1
         return rows.map { row in
-            guard let level = row.level else { return row }
+            guard let level = row.level, !row.isCarried(carried) else { return row }
             at += 1
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
                 return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, id: card.id))
+            case .gap: return .gap(level: level, branch: branch)
             case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
             case .field(_, _, let section): return .field(level: level, branch: branch, section: section)
             default: return row
@@ -148,6 +155,10 @@ private enum ListRowView: Identifiable {
         }
     }
 
+    func isCarried(_ carried: Set<String>) -> Bool {
+        if case .card(let card) = self { carried.contains(card.id) } else { false }
+    }
+
     /// The depth of a row that stands among the cards.
     var level: Int? {
         switch self {
@@ -171,7 +182,9 @@ private struct EntryRow<Content: View>: View {
     }
 }
 
-/// Where a carried card would land: one card's room at the level it would take, a subtask's with its branch.
+/// Where a carried card would land: one card's empty room, the rows parting as in an iOS list (board «3 —
+/// Перетаскивание»: no dashes, no line with a dot). Its level shows by the branch of that level drawn into the room, the
+/// line the card will join, which slides with the system's spring as the finger crosses a level's line.
 private struct GapSpace: View {
     let level: Int
     let branch: Branch?
@@ -344,4 +357,45 @@ struct SelectionCircle: View {
             .contentTransition(.symbolEffect(.replace))
             .accessibilityLabel(on ? "Selected" : "Not selected")
     }
+}
+
+/// A list or the calendar fades out softly at an edge it scrolls past, over half a card's height: at the top under its
+/// title while something is scrolled up there, at the bottom while more is below (where Inbox meets Backlog), as the
+/// plugin's lists do; a list at its top shows no fade there. iOS's own soft scroll edge shows only under the system's bars,
+/// and these columns scroll under their own titles: a mask of the same kind. `trailing` is room at the end of the content
+/// that holds nothing (a list's space to scroll its last card over the keyboard): no fade for it.
+private struct SoftEdges: ViewModifier {
+    var trailing: CGFloat = 0
+    @State private var edges = Edges()
+    static let fade = CardMetrics.height / 2
+
+    struct Edges: Equatable {
+        var top: CGFloat = 0
+        var bottom: CGFloat = 0
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollGeometryChange(for: Edges.self) { geometry in
+                let above = geometry.contentOffset.y + geometry.contentInsets.top
+                let below = geometry.contentSize.height + geometry.contentInsets.bottom - trailing - geometry.contentOffset.y - geometry.containerSize.height
+                return Edges(top: min(Self.fade, max(0, above)), bottom: min(Self.fade, max(0, below)))
+            } action: { _, new in edges = new }
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top)
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom)
+                }
+            }
+    }
+}
+
+extension View {
+    func softEdges(trailing: CGFloat = 0) -> some View { modifier(SoftEdges(trailing: trailing)) }
+}
+
+/// How far a calendar's top fade reaches at a scroll offset: an event cut by the top edge keeps its title under it.
+enum SoftEdge {
+    static func top(at offset: CGFloat) -> CGFloat { min(SoftEdges.fade, max(0, offset)) }
 }
