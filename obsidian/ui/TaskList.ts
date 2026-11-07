@@ -4,7 +4,8 @@ import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
-import { renderTaskCard, renderUnwrittenCard, showProgressDot } from "./TaskCard";
+import { fillCard, fillUnwrittenCard, showProgressDot } from "./TaskCard";
+import { KeyedRows, type RowsDrawing } from "./motion/KeyedRows";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
@@ -34,7 +35,7 @@ export interface TaskListDeps {
 	/** The list's grouping by project: while on, the list draws its project groups in place of its sections. */
 	grouping?(): ListGrouping | null;
 	/** A project group's header: the chevron and the title fold it, the arrow opens the note. */
-	onProjectHead?(head: HTMLElement, group: ProjectGroup): void;
+	onProjectHead?(head: HTMLElement, group: ProjectGroup, signal: AbortSignal): void;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
 	/** The task being typed, which takes its place among the cards about to be drawn (`drawing`) without being one of them; null when none is. */
@@ -45,10 +46,10 @@ export interface TaskListDeps {
 	 */
 	renaming?(): TaskKey | null;
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
-	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
-	onHeader?(head: HTMLElement, group: ListGroup): void;
+	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[], signal: AbortSignal): void;
+	onHeader?(head: HTMLElement, group: ListGroup, signal: AbortSignal): void;
 	/** The No tasks plate under an empty section's header, or of an empty project group (`project`, its part). */
-	onPlate?(plate: HTMLElement, group: ListGroup, project?: ProjectZone): void;
+	onPlate?(plate: HTMLElement, group: ListGroup, signal: AbortSignal, project?: ProjectZone): void;
 }
 
 export interface ListEntry {
@@ -100,6 +101,9 @@ function plateKey(name: GroupName, project?: ProjectZone): string {
 }
 
 const QUICK_ROW = "tc-quick-row";
+/** The key of the field's row, and of the cards of the texts typed and not yet written, by their order. */
+const ENTRY = "entry";
+const UNWRITTEN = "unwritten:";
 export const PLATE = "tc-group-empty";
 
 /** What a list about to draw `shape` shows the field among. */
@@ -127,6 +131,10 @@ export class TaskList {
 	private sectionCards = new Map<ListGroup, HTMLElement[]>();
 	private withHeaders = false;
 	private slot: HTMLElement | null = null;
+	/** The rows by key: a card by its task's id, a header by its section's, so a row lives as long as what it shows. */
+	private readonly keyed: KeyedRows;
+	/** The day of the last drawing: another day is drawn at once, never moved into. */
+	private drawnDay: LocalDate | null | undefined = undefined;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
 	private drawnCards: readonly ListCard[] | null = null;
 	private readonly edges: ScrollEdges;
@@ -138,6 +146,7 @@ export class TaskList {
 		private readonly deps: TaskListDeps,
 	) {
 		el.classList.add("tc-list");
+		this.keyed = new KeyedRows(el);
 		this.edges = new ScrollEdges(el);
 		this.sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => this.fadeCutTitles());
 		this.sizes?.observe(el);
@@ -149,9 +158,10 @@ export class TaskList {
 		this.sizes?.disconnect();
 	}
 
-	render(): void {
+	/** Draws what the list shows now; `moving` false puts it in place at once, as for its first drawing. */
+	render(moving = true): void {
 		this.drawnCards = null;
-		this.draw();
+		this.draw(moving);
 		this.drawnCards = null;
 		this.edges.update();
 		this.fadeCutTitles();
@@ -162,14 +172,14 @@ export class TaskList {
 		for (const name of this.el.querySelectorAll<HTMLElement>(".tc-group-head.is-project > .tc-group-name")) name.classList.toggle("is-cut", name.scrollWidth > name.clientWidth);
 	}
 
-	private draw(): void {
+	private draw(moving: boolean): void {
 		const day = this.deps.day();
 		const items = this.deps.items();
 		const shape = this.shapeOf(items);
 		const entry = this.deps.entry?.(drawingOf(shape)) ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
-		const kept = entry ? this.keptRow() : null;
-		for (const child of [...this.el.children]) if (child !== kept) child.remove();
+		const drawing = this.keyed.begin(moving && this.drawnDay === day);
+		this.drawnDay = day;
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
@@ -178,20 +188,22 @@ export class TaskList {
 		this.rendered = sectionsOf(shape);
 		this.withHeaders = shape.headers;
 		const rows: { node: HTMLElement; level: number }[] = [];
+		const signals = new Map<HTMLElement, AbortSignal>();
 		const at = entry?.at ?? null;
 		let entered = entry === null;
+		let entryRow: HTMLElement | null = null;
 		let section = 0;
 		const enter = (): void => {
 			if (entered || !entry) return;
 			entered = true;
-			this.enterRows(entry, rows, kept);
+			entryRow = this.enterRows(drawing, entry, rows);
 		};
 		const enterAtCard = (): void => {
 			if (at?.kind === "in" && at.section === section && at.card === this.entries.length) enter();
 		};
 		const add = ({ item, level }: ListRow, group: GroupName, project: ProjectZone | undefined): void => {
 			enterAtCard();
-			const card = renderTaskCard(this.el, item, { day });
+			const card = this.cardOf(drawing, item, day, signals);
 			card.style.setProperty(PROPERTY.level, String(level));
 			const renamed = renaming !== null && samePlace(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
@@ -205,21 +217,21 @@ export class TaskList {
 				const { card, item, level } = this.entries[i];
 				let end = i + 1;
 				while (end < this.entries.length && this.entries[end].level > level) end++;
-				this.deps.onCard?.(card, item, this.entries.slice(i + 1, end).map((e) => e.card));
+				this.deps.onCard?.(card, item, this.entries.slice(i + 1, end).map((e) => e.card), signals.get(card)!);
 			}
 		};
 		if (at?.kind === "top") enter();
 		let i = -1;
 		for (const part of shape.drawn) {
 			if (part.kind === "project") {
-				this.nodes.push(this.projectHeader(part.group));
+				this.nodes.push(this.projectHeader(drawing, part.group));
 				continue;
 			}
 			section = ++i;
 			const { group, project } = part;
-			if (this.withHeaders && group.header) this.nodes.push(this.header(group, project));
+			if (this.withHeaders && group.header) this.nodes.push(this.header(drawing, group, project));
 			const platesField = at?.kind === "in" && at.section === i && !at.keepsPlate;
-			if (group.empty && !platesField) this.nodes.push(this.plate(group, project));
+			if (group.empty && !platesField) this.nodes.push(this.plate(drawing, group, project));
 			const groupStart = this.entries.length;
 			for (const row of group.rows) add(row, group.name, project);
 			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
@@ -227,59 +239,67 @@ export class TaskList {
 			enterAtCard();
 		}
 		enter();
-		if (entry) this.markRenamed(renaming);
+		if (entryRow) this.markRenamed(entryRow, renaming);
 		rows.forEach((row, i) => {
 			const lines = branchOf(rows.map((r) => r.level), i);
 			if (lines) branch(row.node, lines.through, lines.last);
 		});
 		const pending = this.deps.pending?.() ?? null;
-		this.slot = pending ? el(this.el, "div", "tc-group-slot") : null;
-		if (pending) renderTaskCard(this.el, pending, { day });
+		this.slot = pending ? drawing.take("slot", () => el(null, "div", "tc-group-slot")).node : null;
+		if (pending) this.cardOf(drawing, pending, day, signals);
+		drawing.finish();
 	}
 
-	/** The field's row from the last drawing: it stays in the list, so the field in it keeps the focus and the keyboard. */
-	private keptRow(): HTMLElement | null {
-		const row = [...this.el.children].find((child) => child.classList.contains(QUICK_ROW));
-		return row instanceof HTMLElement ? row : null;
+	/** A task's card: the one drawn for it last time, filled anew, or a new one; its branches go, the list draws them again. */
+	private cardOf(drawing: RowsDrawing, item: TaskItem, day: LocalDate | null, signals: Map<HTMLElement, AbortSignal>): HTMLElement {
+		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"));
+		if (!fresh) node.replaceChildren();
+		fillCard(node, item, { day });
+		signals.set(node, signal);
+		return node;
 	}
 
-	/**
-	 * The typed texts and the field's row after the rows drawn so far. A kept row stays where it is: what was drawn after
-	 * it moves before it, and its old branches go.
-	 */
-	private enterRows(entry: ListEntryInput, rows: { node: HTMLElement; level: number }[], kept: HTMLElement | null): void {
+	/** The typed texts, each as a plain card at its level, then the field's row, after the rows drawn so far. */
+	private enterRows(drawing: RowsDrawing, entry: ListEntryInput, rows: { node: HTMLElement; level: number }[]): HTMLElement {
 		const put = (row: HTMLElement, level: number): void => {
 			row.style.setProperty(PROPERTY.level, String(level));
 			rows.push({ node: row, level });
 		};
-		const before: HTMLElement[] = [];
-		for (let node = kept?.nextElementSibling ?? null; node; node = node.nextElementSibling) if (node instanceof HTMLElement) before.push(node);
-		for (const { text, level } of entry.pending) {
-			const card = renderUnwrittenCard(this.el, text);
-			before.push(card);
-			put(card, level);
-		}
-		const named = entry.newSection ? this.namedHeader(entry.newSection) : null;
-		if (named) before.push(named);
-		if (kept) kept.before(...before);
-		const row = kept ?? el(this.el, "div", QUICK_ROW);
+		entry.pending.forEach(({ text, level }, i) => {
+			const { node, fresh } = drawing.take(`${UNWRITTEN}${i}`, () => el(null, "div", "tc-card"));
+			if (!fresh) node.replaceChildren();
+			fillUnwrittenCard(node, text);
+			put(node, level);
+		});
+		if (entry.newSection) this.namedHeader(drawing, entry.newSection);
+		const row = drawing.take(ENTRY, () => el(null, "div", QUICK_ROW)).node;
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.level);
+		return row;
+	}
+
+	/**
+	 * The first texts typed here are written: the cards they stood as become the cards of the tasks the file now has
+	 * (`ids`, in the order typed), so a written text stays the same card on the screen.
+	 */
+	written(ids: readonly string[]): void {
+		const typed = ids.length;
+		ids.forEach((id, i) => this.keyed.rekey(`${UNWRITTEN}${i}`, `task:${id}`));
+		for (let i = typed; this.keyed.nodeOf(`${UNWRITTEN}${i}`); i++) this.keyed.rekey(`${UNWRITTEN}${i}`, `${UNWRITTEN}${i - typed}`);
 	}
 
 	/** The header of the section named for the task being typed, over the field, as a section's header looks. */
-	private namedHeader(name: string): HTMLElement {
-		const head = el(this.el, "div", "tc-group-head is-named");
+	private namedHeader(drawing: RowsDrawing, name: string): HTMLElement {
+		const head = drawing.take("named", () => el(null, "div", "tc-group-head is-named")).node;
+		head.replaceChildren();
 		el(head, "span", "tc-group-name", name);
 		return head;
 	}
 
 	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */
-	private markRenamed(renaming: TaskKey | null): void {
-		const row = this.keptRow();
-		if (!row) return;
+	private markRenamed(row: HTMLElement, renaming: TaskKey | null): void {
 		const renamed = renaming === null ? undefined : this.entries.find((e) => samePlace(renaming, e.item.key));
 		if (renamed) showProgressDot(row, renamed.item);
 		else row.querySelector(":scope > .tc-progress-dot")?.remove();
@@ -347,12 +367,14 @@ export class TaskList {
 		return this.nodes;
 	}
 
-	private header(group: ListGroup, project?: ProjectZone): HTMLElement {
-		const head = el(this.el, "div", group.name === null ? "tc-group-head is-ungrouped" : "tc-group-head");
+	private header(drawing: RowsDrawing, group: ListGroup, project?: ProjectZone): HTMLElement {
+		const { node: head, signal } = drawing.take(`head:${JSON.stringify([project ?? "", group.id])}`, () => el(null, "div", "tc-group-head"));
+		head.replaceChildren();
+		head.classList.toggle("is-ungrouped", group.name === null);
 		head.classList.toggle("is-in-project", project !== undefined);
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
 		this.heads.set(head, headerOf({ group, project }));
-		this.deps.onHeader?.(head, group);
+		this.deps.onHeader?.(head, group, signal);
 		return head;
 	}
 
@@ -361,8 +383,9 @@ export class TaskList {
 	 * the count of its tasks while folded, and the arrow that opens the note. A drop on it lands in the group: among its
 	 * tasks without a section, or at its end while it is folded.
 	 */
-	private projectHeader(group: ProjectGroup): HTMLElement {
-		const head = el(this.el, "div", "tc-group-head is-project");
+	private projectHeader(drawing: RowsDrawing, group: ProjectGroup): HTMLElement {
+		const { node: head, signal } = drawing.take(`project:${group.key}`, () => el(null, "div", "tc-group-head is-project"));
+		head.replaceChildren();
 		head.classList.toggle("is-ungrouped", group.project === null);
 		head.classList.toggle("is-shut", group.folded);
 		head.setAttribute("role", "button");
@@ -376,15 +399,15 @@ export class TaskList {
 			open.appendChild(icon("openFile"));
 		}
 		this.heads.set(head, group.head);
-		this.deps.onProjectHead?.(head, group);
+		this.deps.onProjectHead?.(head, group, signal);
 		return head;
 	}
 
-	private plate(group: ListGroup, project?: ProjectZone): HTMLElement {
-		const plate = el(this.el, "div", PLATE, "No tasks");
+	private plate(drawing: RowsDrawing, group: ListGroup, project?: ProjectZone): HTMLElement {
+		const { node: plate, signal } = drawing.take(`plate:${JSON.stringify([project ?? "", group.id])}`, () => el(null, "div", PLATE, "No tasks"));
 		plate.dataset.group = group.name ?? "";
 		this.plates.set(plateKey(group.name, project), plate);
-		this.deps.onPlate?.(plate, group, project);
+		this.deps.onPlate?.(plate, group, signal, project);
 		return plate;
 	}
 }

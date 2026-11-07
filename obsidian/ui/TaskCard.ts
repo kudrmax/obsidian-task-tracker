@@ -21,8 +21,15 @@ export function renderTaskCard(parent: HTMLElement | null, item: TaskItem, opts:
 /** A text typed and not yet written, drawn as a plain card with its title alone until the file has the task. */
 export function renderUnwrittenCard(parent: HTMLElement | null, text: string): HTMLElement {
 	const card = el(parent, "div", "tc-card");
-	fillTitle(el(card, "div", "tc-card-title"), text);
+	fillUnwrittenCard(card, text);
 	return card;
+}
+
+/** A card filled as a text typed and not yet written: its title alone. */
+export function fillUnwrittenCard(card: HTMLElement, text: string): void {
+	markColours(card, { colors: [] });
+	card.classList.remove("is-collapsed");
+	fillTitle(el(card, "div", "tc-card-title"), text);
 }
 
 /** The dot of a task in progress in `parent`'s left padding, once; none for a task not in progress. */

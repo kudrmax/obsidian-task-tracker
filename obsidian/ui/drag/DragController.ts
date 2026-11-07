@@ -80,15 +80,20 @@ export class DragController {
 	constructor(private readonly deps: DragControllerDeps) {}
 
 	/** `subtree`: the cards of the task's subtasks, which gather under it while it is dragged. */
-	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = []): void {
-		card.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
-		});
+	attachCard(card: HTMLElement, item: TaskItem, from: TaskOrigin, subtree: readonly HTMLElement[] = [], signal?: AbortSignal): void {
+		card.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				if (!this.deps.pick?.(item, card, e, "menu")) this.deps.onMenu(item, card);
+			},
+			{ signal },
+		);
 		/** Where the press began: the card captures the pointer, so the release names the card itself. */
 		let pressed: EventTarget | null = null;
-		card.addEventListener("pointerdown", (e) => (pressed = e.target));
+		card.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
 		new LongPress(card, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {
@@ -103,14 +108,19 @@ export class DragController {
 		});
 	}
 
-	attachBlock(block: HTMLElement, item: TaskItem): void {
-		block.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			this.selectWithMenu(block, item);
-		});
+	attachBlock(block: HTMLElement, item: TaskItem, signal?: AbortSignal): void {
+		block.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				this.selectWithMenu(block, item);
+			},
+			{ signal },
+		);
 		let pressed: EventTarget | null = null;
-		block.addEventListener("pointerdown", (e) => (pressed = e.target));
+		block.addEventListener("pointerdown", (e) => (pressed = e.target), { signal });
 		new LongPress(block, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
@@ -122,12 +132,17 @@ export class DragController {
 	}
 
 	/** An event can't be moved: a tap, a held finger, a long click or a right click open its menu. */
-	attachEvent(block: HTMLElement, onMenu: () => void): void {
-		block.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			onMenu();
-		});
+	attachEvent(block: HTMLElement, onMenu: () => void, signal?: AbortSignal): void {
+		block.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				onMenu();
+			},
+			{ signal },
+		);
 		new LongPress(block, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {
@@ -277,12 +292,12 @@ export class DragController {
 		for (const card of lifted) card.classList.add("is-lifted");
 		for (const card of waiting) card.classList.add(WAITING);
 		for (const card of folded) card.classList.add(FOLDED);
-		timeline?.layoutTasks();
+		timeline?.layoutTasks(true);
 		capturePointer(source, e.pointerId);
 		this.deps.onDragging(true);
 		const reopen = () => {
 			for (const card of lifted) card.classList.remove("is-lifted", WAITING, FOLDED);
-			timeline?.layoutTasks();
+			timeline?.layoutTasks(true);
 		};
 		this.follow(
 			source,

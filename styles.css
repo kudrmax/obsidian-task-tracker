@@ -860,6 +860,10 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 /* A list of cards scrolls in the room its column's foot leaves; no row ever shrinks. While a task is typed the foot steps aside and the list's end leaves room over the bar. */
 .tc-list { position: relative; flex: 1 1 0; min-height: 0; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; display: flex; flex-direction: column; gap: var(--tc-card-gap); }
 .tc-list > * { flex-shrink: 0; }
+/* The plugin keeps a scrolled column where it stands itself: its rows stay the same nodes and move into place, so the browser's own anchoring would only push the content under the finger. */
+.tc-list, .tc-timeline, .tc-panel, .tc-search-results { overflow-anchor: none; }
+/* A row on its way out of a list: it fades and folds away and takes no tap. */
+.tc-list > .is-leaving, .tc-items > .is-leaving { pointer-events: none; }
 /* The room at a list's end, so its last card can rise to where the fade starts; while a task is typed, at least the room over the bar. */
 .tc-list::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }

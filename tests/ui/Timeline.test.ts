@@ -523,7 +523,7 @@ describe("a stretched block while its new time is written (block 3)", () => {
 		expect(stretched).not.toBe(unstretched);
 		const before = block(view);
 		view.render();
-		expect(block(view)).not.toBe(before);
+		expect(block(view)).toBe(before);
 		expect(block(view).classList.contains("is-resizing")).toBe(true);
 		expect(length(block(view))).toBe(stretched);
 		tasks[0] = task(600, 720);

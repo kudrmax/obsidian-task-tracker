@@ -438,12 +438,15 @@ describe("ListDrop", () => {
 
 		it("measures again once the list is drawn anew", () => {
 			const { list, drop, from } = liftedOf30(29);
+			offsetReads.clear();
 			drop.preview(27, 300, from);
+			const measured = offsetReads.size;
 			list.render();
 			standAt(list.elements, 40);
 			offsetReads.clear();
 			drop.preview(27, 302, from);
-			expect(offsetReads.size).toBe(list.elements.length);
+			expect(measured).toBeGreaterThan(0);
+			expect(offsetReads.size).toBe(measured);
 		});
 	});
 });

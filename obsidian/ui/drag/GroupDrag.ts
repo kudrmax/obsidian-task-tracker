@@ -38,8 +38,9 @@ export interface GroupDragDeps {
 export class GroupDrag {
 	constructor(private readonly deps: GroupDragDeps) {}
 
-	attach(head: HTMLElement, list: GroupedList, taskList: TaskList, group: ListGroup): void {
+	attach(head: HTMLElement, list: GroupedList, taskList: TaskList, group: ListGroup, signal?: AbortSignal): void {
 		new LongPress(head, {
+			signal,
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => {

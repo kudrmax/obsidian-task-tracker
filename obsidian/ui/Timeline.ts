@@ -4,6 +4,7 @@ import { markPast, paintEvent } from "./AllDayRow";
 import type { Theme } from "./eventColors";
 import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, PROPERTY } from "./design";
+import { type Box, boxOf, Motion } from "./motion/Motion";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
 import { markColours, renderMeta, renderProjectMark, showProgressDot } from "./TaskCard";
@@ -31,8 +32,9 @@ export interface TimelineDeps {
 	now(): Date;
 	/** The timeline's height changed: the window, the rows over it or the navigation under it. */
 	onResize?(): void;
-	onBlock?(block: HTMLElement, item: TaskItem): void;
-	onEvent?(block: HTMLElement, event: CalendarEvent): void;
+	/** A block drawn, anew or again: its listeners hang on `signal`, which the next drawing aborts. */
+	onBlock?(block: HTMLElement, item: TaskItem, signal: AbortSignal): void;
+	onEvent?(block: HTMLElement, event: CalendarEvent, signal: AbortSignal): void;
 	/** A dot of the selected card taken: the stretch begins. */
 	onGrip?(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void;
 }
@@ -48,6 +50,12 @@ type HourMark = DrawnMark & { readonly label: HTMLElement };
 interface PlacedEvent extends PlacedSpan {
 	readonly el: HTMLElement;
 	readonly event: CalendarEvent;
+}
+
+/** A block drawn for a task or an event, kept by its id; its listeners hang on `listening`. */
+interface Block {
+	readonly el: HTMLElement;
+	readonly listening: AbortController;
 }
 
 interface PlacedTask {
@@ -118,6 +126,9 @@ export class Timeline {
 	private grid: Grid = { labels: MINUTES_PER_HOUR, lines: MINUTES_PER_HOUR };
 	private events: PlacedEvent[] = [];
 	private tasks: PlacedTask[] = [];
+	private blocks = new Map<string, Block>();
+	/** The day last drawn: another day's cards are drawn at once. */
+	private drawnDate: LocalDate | null = null;
 	private nowEl: HTMLElement | null = null;
 	private dropEl: HTMLElement | null = null;
 	private drop: TaskSpan | null = null;
@@ -292,8 +303,16 @@ export class Timeline {
 		this.canvas.style.setProperty(PROPERTY.roomBottom, px(bottom));
 	}
 
-	render(): void {
-		for (const child of [...this.itemsEl.children]) if (child !== this.field?.box) child.remove();
+	/**
+	 * The day's cards and events anew. Each stays the same block while its task or event is there: one that moved slides
+	 * to its new place and size, a new one fades in, one gone fades out. Another day, or `moving` false, is drawn at once.
+	 */
+	render(moving = true): void {
+		const date = this.deps.date();
+		const moves = moving && this.drawnDate === date;
+		this.drawnDate = date;
+		const before = new Map<HTMLElement, Box>();
+		if (moves) for (const block of this.blocks.values()) before.set(block.el, boxOf(block.el));
 		const stretch = this.stretch;
 		this.stretch = null;
 		this.frame = null;
@@ -302,11 +321,19 @@ export class Timeline {
 		const events = this.deps.events();
 		const spans = events.map((e) => this.eventSpan(e));
 		const boxes = layoutEvents(spans);
+		const drawn = new Map<string, Block>();
 		this.events = events
 			.map((event, i) => ({ event, span: spans[i], box: boxes[i] }))
 			.sort((a, b) => a.box.layer - b.box.layer)
-			.map(({ event, span, box }) => this.placeEvent(event, span, box.left, box.level));
-		this.tasks = this.deps.tasks().map((task) => this.placeTask(task));
+			.map(({ event, span, box }) => this.placeEvent(this.take(drawn, `event:${event.id}`), event, span, box.left, box.level));
+		this.tasks = this.deps.tasks().map((task) => this.placeTask(this.take(drawn, `task:${task.id}`), task));
+		for (const [key, block] of this.blocks) {
+			if (drawn.get(key) === block) continue;
+			block.listening.abort();
+			if (moves) Motion.disappear(block.el, () => block.el.remove());
+			else block.el.remove();
+		}
+		this.blocks = drawn;
 		if (stretch) this.keepStretch(stretch);
 		this.itemsEl.appendChild(this.grips);
 		this.nowEl?.remove();
@@ -317,6 +344,27 @@ export class Timeline {
 			el(this.nowEl, "div", "tc-now-line");
 		}
 		this.layout();
+		if (!moves) return;
+		for (const block of drawn.values()) {
+			const from = before.get(block.el);
+			if (from) Motion.reshape(block.el, from);
+			else Motion.appear(block.el);
+		}
+	}
+
+	/** The block of `key`: the one drawn for it last time, emptied, its listeners renewed; else a new one. */
+	private take(drawn: Map<string, Block>, key: string): Block {
+		const kept = this.blocks.get(key);
+		if (kept && !drawn.has(key)) {
+			kept.listening.abort();
+			const block = { el: kept.el, listening: new AbortController() };
+			block.el.replaceChildren();
+			drawn.set(key, block);
+			return block;
+		}
+		const block = { el: el(this.itemsEl, "div"), listening: new AbortController() };
+		drawn.set(key, block);
+		return block;
 	}
 
 	/** What shows the day itself rather than its hours: the cards and events, and the now line on today. */
@@ -521,8 +569,10 @@ export class Timeline {
 	 * A card lifted for a drag leaves the stack; the others close over its place. The cards stand in the page in the
 	 * stack's order, so a card that lies over another is drawn over it; the dots of the selected card lie over them all.
 	 */
-	layoutTasks(): void {
+	layoutTasks(moving = false): void {
 		const present = this.present();
+		const before = new Map(moving ? present.map((task) => [task.el, boxOf(task.el)] as const) : []);
+		if (!moving) for (const task of present) Motion.settle(task.el);
 		const placed = Array.from(this.itemsEl.querySelectorAll(":scope > .tc-block:not(.is-lifted):not(.tc-quick-row)"));
 		if (present.some((task, i) => placed[i] !== task.el)) for (const task of present) this.itemsEl.insertBefore(task.el, this.grips);
 		const spans: TaskSpan[] = present.map((t) => this.taskSpan(t));
@@ -539,6 +589,7 @@ export class Timeline {
 			bottom = Math.max(bottom, box.top + box.height);
 		});
 		this.canvas.style.setProperty(PROPERTY.stackEnd, px(bottom));
+		for (const [block, from] of before) Motion.reshape(block, from);
 		this.coverRenamed(present);
 		const selected = present.find((t) => t.el.classList.contains("is-selected") && !this.isRenamed(t.item));
 		this.grips.classList.toggle("is-shown", !!selected);
@@ -609,19 +660,22 @@ export class Timeline {
 		return this.deps.boundary().clipToDay(this.deps.date(), event.start, event.end);
 	}
 
-	private placeEvent(event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {
-		const block = el(this.itemsEl, "div", "tc-item tc-event");
+	private placeEvent(taken: Block, event: CalendarEvent, span: Span, left: number, level: number): PlacedEvent {
+		const block = taken.el;
+		block.className = "tc-item tc-event";
 		block.style.setProperty(PROPERTY.x, px(left));
 		paintEvent(block, event, this.deps.theme());
 		el(block, "div", "tc-event-bar");
 		el(el(block, "div", "tc-event-body"), "div", "tc-item-title", event.title);
-		this.deps.onEvent?.(block, event);
+		this.deps.onEvent?.(block, event, taken.listening.signal);
 		return { el: block, event, ...span, level };
 	}
 
 	/** The card of the list on the timeline: the dot of a task in progress, the title fading out, the small time or duration on the right. */
-	private placeTask(item: TaskItem): PlacedTask {
-		const block = el(this.itemsEl, "div", "tc-block");
+	private placeTask(taken: Block, item: TaskItem): PlacedTask {
+		const block = taken.el;
+		block.classList.add("tc-block");
+		block.classList.remove("tc-item", "tc-event", "is-resizing");
 		const card = el(block, "div", "tc-block-card");
 		markColours(card, item);
 		showProgressDot(card, item);
@@ -634,7 +688,7 @@ export class Timeline {
 		const pill = el(card, "span", "tc-block-pill");
 		block.classList.toggle("is-selected", this.isSelected(item));
 		block.classList.toggle("is-renaming", this.isRenamed(item));
-		this.deps.onBlock?.(block, item);
+		this.deps.onBlock?.(block, item, taken.listening.signal);
 		return { el: block, item, meta, pill };
 	}
 }

@@ -90,6 +90,9 @@ export const PROPERTY = {
 /** The durations the code animates with, read from styles.css so the sheet stays the one source. */
 export const DURATION = {
 	collapse: "--tc-duration-collapse",
+	/** An overlay opens: its sheet, its windows, the copies over it. It closes in `collapse`. */
+	menu: "--tc-duration-menu",
+	snap: "--tc-duration-snap",
 	fly: "--tc-duration-fly",
 	fade: "--tc-duration-fade",
 	slide: "--tc-duration-slide",
@@ -98,6 +101,8 @@ export const DURATION = {
 
 /** The easings the code animates with, read from styles.css as the durations are. */
 export const EASING = {
+	/** The one curve a list's rows and every part of an overlay move on. */
+	out: "--tc-ease-out",
 	keyboard: "--tc-ease-keyboard",
 } as const;
 
