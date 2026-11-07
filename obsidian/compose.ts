@@ -15,6 +15,8 @@ import { obsidianHttp } from "./infrastructure/ObsidianHttp";
 import { PhoneCalendarRefresh } from "./infrastructure/PhoneCalendarRefresh";
 import { VaultPathWatcher } from "./infrastructure/VaultPathWatcher";
 import { VaultTaskFileStore } from "./infrastructure/VaultTaskFileStore";
+import { LocalGroupingStore } from "./infrastructure/LocalGroupingStore";
+import { ObsidianNoteIndex, VaultProjects } from "./infrastructure/VaultProjects";
 import { WorkCalendarExportScript } from "./infrastructure/WorkCalendarExportScript";
 import { WorkCalendarShortcut, type WorkCalendarShortcutHost } from "./infrastructure/WorkCalendarShortcut";
 
@@ -45,8 +47,10 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 	const workShortcut = new WorkCalendarShortcut(host.shortcuts);
 	const phoneRefresh = new PhoneCalendarRefresh({ host: host.shortcuts, readIphone: () => calendarFiles.iphone.read().catch(() => null), shortcut: workShortcut, clock, timers: windowTimers });
 	const work: WorkCalendarSetup = { scriptableLoader: () => workExport.loader, export: () => phoneRefresh.export() };
+	const tasksPath = () => tasksFilePath(settings.get()) ?? "";
+	const projects = new VaultProjects(new ObsidianNoteIndex(app, tasksPath), () => settings.get().projectTag, (listener) => settings.onChange(listener));
 	const core = composeCore({
-		tasksFile: new VaultTaskFileStore(app, () => tasksFilePath(settings.get()) ?? ""),
+		tasksFile: new VaultTaskFileStore(app, tasksPath),
 		settings,
 		clock,
 		ticker: windowTicker,
@@ -55,6 +59,8 @@ export function createServices(app: App, host: ServicesHost, settings: SettingsS
 		feeds: [googleFeed],
 		work,
 		isPhone: () => host.shortcuts.isPhone,
+		projects,
+		grouping: new LocalGroupingStore(app),
 	});
 	return {
 		...core,
