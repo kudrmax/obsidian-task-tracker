@@ -285,6 +285,54 @@ final class BoardModel {
 
     // MARK: The day
 
+    private struct ScreenAt: Decodable {
+        let mode: String
+        let date: String
+    }
+
+    /// The finger starts carrying the day `shift` way when the core's `days.stepScreen` leads from this day's calendar to
+    /// another day's (any other answer, Soon or the row's end, is the ribbon's own paging). Asked as the finger starts, so
+    /// a swipe never pages the ribbon where the core leads to a day; the day comes in under the finger as the arrows bring
+    /// it, the one read ahead, or read now when it is not yet.
+    func beginDaySwipe(_ shift: Int) -> Bool {
+        guard dayTurn == nil, carry == nil, let snapshot else { return false }
+        let from: JSONValue = ["mode": "calendar", "date": .string(snapshot.day)]
+        guard let at = try? board.read("days.stepScreen", [from, .number(Double(shift))], over: board.settingsOnly()).decode(ScreenAt.self),
+              at.mode == "calendar" else { return false }
+        // A text being typed is finished first, written for the day it was typed on, as before the arrows turn the day.
+        if entry.isOpen || entry.writing {
+            entry.blur()
+            return true
+        }
+        let kept = ahead[at.date].flatMap { $0.tasksText == snapshot.tasksText ? $0 : nil }
+        guard let peek = kept ?? (try? board.snapshot(day: at.date, measures: CardMetrics.timeline)) else { return true }
+        dayTurn = DayTurn(peek: peek, shift: shift)
+        dayShare = 0
+        return true
+    }
+
+    /// The finger has carried the day this share of the way.
+    func followDaySwipe(_ share: CGFloat) {
+        guard dayTurn != nil else { return }
+        dayShare = min(1, max(0, share))
+    }
+
+    /// Let go: the day runs on to the next one or back to where it stood, as the plugin's pager settles.
+    func endDaySwipe(arrive: Bool) async {
+        guard let turn = dayTurn else { return }
+        let reached = await daySlide.run(from: dayShare, to: arrive ? 1 : 0) { [weak self] share in self?.dayShare = share }
+        guard reached, dayTurn?.peek.day == turn.peek.day else { return }
+        if arrive {
+            shownDay = turn.peek.day == turn.peek.today ? nil : turn.peek.day
+            neighbours = nil
+            landTurn()
+            await reload()
+        } else {
+            dayTurn = nil
+            dayShare = 0
+        }
+    }
+
     var isToday: Bool { snapshot.map { $0.day == $0.today } ?? true }
 
     func step(_ days: Int) async {

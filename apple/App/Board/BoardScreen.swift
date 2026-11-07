@@ -245,7 +245,7 @@ struct Ribbon: View {
                     .id(RibbonPlace.today)
                 }
                 .scrollTargetLayout()
-                .background { EdgesHold() }
+                .background { RibbonHooks(model: model, distance: width - list) }
                 }
             .scrollTargetBehavior(OnePlacePerSwipe(stops: [0, half, width]))
             .scrollPosition($position, anchor: .leading)
@@ -393,18 +393,92 @@ struct BulkActions: View {
     }
 }
 
-/// The ribbon stops at Inbox and at Today as it stops at Soon: no rubber band past its ends that the places between
-/// them don't have. SwiftUI keeps no switch for a scroll view's bounce, so it is turned off on the ribbon's own.
-private struct EdgesHold: UIViewRepresentable {
-    func makeUIView(context: Context) -> Probe { Probe() }
-    func updateUIView(_ probe: Probe, context: Context) {}
+/// The ribbon's own scroll view, reached from inside it: SwiftUI keeps no switch for these.
+/// - It stops at Inbox and at Today as it stops at Soon: no rubber band past its ends that the places between have not.
+/// - At Today a sideways swipe that the core's `days.stepScreen` leads to another day's calendar carries the day, as the
+///   plugin's swipe does: the ribbon stays, the day slides under the finger (`BoardModel.followDaySwipe`), and let go it
+///   runs on or springs back. Any other swipe is the ribbon's own paging, which waits for this one to decline.
+private struct RibbonHooks: UIViewRepresentable {
+    let model: BoardModel
+    /// How far the finger carries a whole day: the calendar's width, the column under the finger (the plugin's lead lane).
+    let distance: CGFloat
+
+    func makeUIView(context: Context) -> Probe { Probe(swipe: context.coordinator) }
+
+    func updateUIView(_ probe: Probe, context: Context) {
+        context.coordinator.model = model
+        context.coordinator.distance = distance
+    }
+
+    func makeCoordinator() -> DaySwipe { DaySwipe() }
 
     final class Probe: UIView {
+        let swipe: DaySwipe
+
+        init(swipe: DaySwipe) {
+            self.swipe = swipe
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not from a storyboard") }
+
         override func didMoveToWindow() {
             super.didMoveToWindow()
             var view = superview
             while let next = view, !(next is UIScrollView) { view = next.superview }
-            (view as? UIScrollView)?.bounces = false
+            guard let ribbon = view as? UIScrollView else { return }
+            ribbon.bounces = false
+            swipe.attach(to: ribbon)
+        }
+    }
+}
+
+/// The day carried by the finger on the calendar, as the plugin's `Swipe` and `ScreenPager`: it follows the finger up to a
+/// whole day, and let go it arrives when the day has come half the way or a flick sends it on, else it springs back.
+@MainActor
+final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
+    weak var model: BoardModel?
+    var distance: CGFloat = 1
+    private weak var ribbon: UIScrollView?
+    private var shift = 0
+    /// The plugin's flick speed (`swipeFlickSpeed`, 0.3 px per ms).
+    private static let flick: CGFloat = 300
+
+    func attach(to ribbon: UIScrollView) {
+        guard self.ribbon !== ribbon else { return }
+        self.ribbon = ribbon
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
+        pan.delegate = self
+        ribbon.addGestureRecognizer(pan)
+        ribbon.panGestureRecognizer.require(toFail: pan)
+    }
+
+    func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard let pan = recognizer as? UIPanGestureRecognizer, let ribbon, let model else { return false }
+        let atToday = abs(ribbon.contentOffset.x - (ribbon.contentSize.width - ribbon.bounds.width)) < 1
+        let velocity = pan.velocity(in: ribbon)
+        guard atToday, abs(velocity.x) > abs(velocity.y) else { return false }
+        shift = velocity.x < 0 ? 1 : -1
+        return model.beginDaySwipe(shift)
+    }
+
+    @objc private func pan(_ pan: UIPanGestureRecognizer) {
+        guard let model, let ribbon else { return }
+        let dx = pan.translation(in: ribbon).x
+        let share = -CGFloat(shift) * dx / max(1, distance)
+        switch pan.state {
+        case .changed:
+            model.followDaySwipe(share)
+        case .ended:
+            let speed = -CGFloat(shift) * pan.velocity(in: ribbon).x
+            let arrive = abs(speed) >= Self.flick ? speed > 0 : share * 2 >= 1
+            Task { await model.endDaySwipe(arrive: arrive) }
+        case .cancelled, .failed:
+            Task { await model.endDaySwipe(arrive: false) }
+        default:
+            break
         }
     }
 }

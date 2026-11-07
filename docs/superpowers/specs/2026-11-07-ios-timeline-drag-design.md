@@ -529,7 +529,12 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   the shown one. While it slides, the incoming day's calendar cards are its read's stack scaled to the zoom shown.
 - frontend-swift (day turn): the day arrows and the day's name take a tap on their whole 32-point square / title row
   (`contentShape`): a plain button took it only on the chevron's strokes, so most taps on the arrows were lost.
-- frontend-swift (day turn), **missing in the door**: swiping past today's calendar to the next days needs the plugin's
+- frontend-swift (day swipe): at Today a sideways swipe asks the core's `days.stepScreen({mode: "calendar", date}, shift)`
+  as the finger starts; when it answers another day's calendar, a pan on the ribbon's scroll view takes the finger (the
+  ribbon's own paging waits for it to decline) and carries the day slide by the calendar's width; let go, it arrives when
+  the day came half way or a flick (the plugin's 0.3 px/ms) sends it on, else springs back, both over the remaining share
+  of 300 ms with the pager's ease. Any other answer (Soon from today) is the ribbon's paging, as before.
+- frontend-swift (day turn), ~~missing in the door~~ (done: backend `days.stepScreen`, 0aa645b): swiping past today's calendar to the next days needs the plugin's
   `stepScreen` (`obsidian/ui/screens.ts`: which screen a swipe right or left leads to from a place and a day — the next
   place, or the next day once at the calendar, or nothing at the row's end). It is a rule in the plugin's UI, not in the
   core; the app does not write it again. Asked of the backend: move it into `core/application` and offer it through the
