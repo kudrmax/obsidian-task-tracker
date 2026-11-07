@@ -375,16 +375,21 @@ describe("the timeline's size", () => {
 	it("stops watching its size once destroyed", () => {
 		const real = globalThis.ResizeObserver;
 		const disconnect = vi.fn();
+		let made = 0;
 		globalThis.ResizeObserver = class {
+			constructor() {
+				made++;
+			}
 			observe(): void {}
 			unobserve(): void {}
 			disconnect = disconnect;
 		} as unknown as typeof ResizeObserver;
 		try {
 			const view = timeline({ hourPx: 56 });
+			expect(made).toBeGreaterThan(0);
 			expect(disconnect).not.toHaveBeenCalled();
 			view.destroy();
-			expect(disconnect).toHaveBeenCalledOnce();
+			expect(disconnect).toHaveBeenCalledTimes(made);
 		} finally {
 			globalThis.ResizeObserver = real;
 		}

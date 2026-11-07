@@ -1,3 +1,4 @@
+import { ScrollEdges } from "./ScrollEdges";
 import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
@@ -76,18 +77,21 @@ export class TaskList {
 	private slot: HTMLElement | null = null;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
 	private drawnCards: readonly ListCard[] | null = null;
+	private readonly edges: ScrollEdges;
 
 	constructor(
 		readonly el: HTMLElement,
 		private readonly deps: TaskListDeps,
 	) {
 		el.classList.add("tc-list");
+		this.edges = new ScrollEdges(el);
 	}
 
 	render(): void {
 		this.drawnCards = null;
 		this.draw();
 		this.drawnCards = null;
+		this.edges.update();
 	}
 
 	private draw(): void {

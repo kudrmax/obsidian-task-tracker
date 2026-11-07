@@ -256,6 +256,11 @@ body {
 	--tc-fade-block-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-block)), transparent);
 	--tc-fade-tile-end: linear-gradient(to right, var(--tc-mask-ink) calc(100% - var(--tc-fade-tile)), transparent calc(100% - var(--tc-space-8)));
 	--tc-fade-peek-bottom: linear-gradient(to bottom, var(--tc-mask-ink) calc(100% - var(--tc-desc-fade)), transparent);
+	/* A list or the calendar fades out softly at an edge content is scrolled under, over half a card's height. */
+	--tc-scroll-fade: calc(var(--tc-card-h) / 2);
+	--tc-fade-scroll-top: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-scroll-fade));
+	--tc-fade-scroll-bottom: linear-gradient(to top, transparent, var(--tc-mask-ink) var(--tc-scroll-fade));
+	--tc-fade-scroll-both: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-scroll-fade), var(--tc-mask-ink) calc(100% - var(--tc-scroll-fade)), transparent);
 	/*
 	 * The bottom of the view fades into the background over every column at once: it starts this far above the topmost
 	 * control of the foot (the switch's track), half gone and nearly gone at the next
@@ -835,6 +840,10 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-list::after { content: ""; flex-shrink: 0; height: var(--tc-foot-fade-day); }
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
 .tc-list::-webkit-scrollbar { display: none; }
+/* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line; a list at rest at that edge shows none. */
+:is(.tc-list, .tc-timeline).is-under-top { -webkit-mask-image: var(--tc-fade-scroll-top); mask-image: var(--tc-fade-scroll-top); }
+:is(.tc-list, .tc-timeline).is-under-bottom { -webkit-mask-image: var(--tc-fade-scroll-bottom); mask-image: var(--tc-fade-scroll-bottom); }
+:is(.tc-list, .tc-timeline).is-under-top.is-under-bottom { -webkit-mask-image: var(--tc-fade-scroll-both); mask-image: var(--tc-fade-scroll-both); }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
@@ -956,6 +965,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 /* An event cut by the timeline's edge keeps its title in view: the title holds to that edge while the event lasts; the event clips without becoming a scroller, so the title sticks to the timeline's. */
 .tc-event { border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); display: flex; overflow: clip; }
 .tc-event-body { flex: 1; min-width: 0; align-self: flex-start; position: sticky; top: 0; bottom: 0; padding: var(--tc-space-4) var(--tc-space-6); }
+/* Under the calendar's top fade the title holds just below it, where it reads whole. */
+.tc-timeline.is-under-top .tc-event-body { top: var(--tc-scroll-fade); }
 .tc-event .tc-item-title { color: var(--tc-event-text); }
 .tc-event.is-past { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
 .tc-allday.is-past { background: var(--tc-event-past-bg); }
