@@ -1,8 +1,6 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, placeShowing, QuickEntrySession, type QuickEntryTasks, SHOWN_LISTS, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import type { RightMode } from "../viewSettings";
-import { SHOWN_LISTS } from "../screens";
 import type { EntryPart } from "./EntryPart";
-import { modeShowing, type SwitchColumn } from "../ColumnSwitch";
 import { LAYOUT } from "../design";
 import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
@@ -70,9 +68,6 @@ interface MenuField {
 	readonly row: HTMLElement;
 	readonly parent: TaskItem | null;
 }
-
-
-const SWITCH_COLUMN: Readonly<Record<ListColumn, SwitchColumn>> = { inbox: "inbox", backlog: "inbox", soon: "soon", day: "now" };
 
 /** The list redraws when the field moves, switches to a section or back, or the texts waiting before it change; typing only changes the field. */
 export function movesRows(before: EntryState | null, after: EntryState): boolean {
@@ -574,7 +569,7 @@ export class QuickEntryController {
 		if (!move) return;
 		this.turning = true;
 		try {
-			this.deps.turnTo(modeShowing(SWITCH_COLUMN[move.column], this.deps.mode()));
+			this.deps.turnTo(placeShowing(move.column, this.deps.mode()));
 		} finally {
 			this.turning = false;
 		}

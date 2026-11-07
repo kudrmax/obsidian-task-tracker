@@ -1,10 +1,11 @@
+import { SCREEN_PLACES } from "../../core/application/contracts";
 import type { RightMode } from "./viewSettings";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { icon } from "./kit/icons";
-import { type Place, placeIndex, PLACES } from "./screens";
+import { type Place, placeIndex } from "./screens";
 
 export interface ColumnSwitchOptions {
 	/** Where the screen stands; Done, which the wheel has no icon for, puts the window a step left of Inbox. */
@@ -36,7 +37,7 @@ function placeShowing(column: number, from: number): number | null {
 /** The place showing `column`: `mode` itself when it does, else the nearest that does, as a tap on its icon turns to. */
 export function modeShowing(column: SwitchColumn, mode: RightMode): RightMode {
 	const place = placeShowing(COLUMNS.indexOf(column), placeOf(mode));
-	return place === null ? mode : PLACES[place];
+	return place === null ? mode : SCREEN_PLACES[place];
 }
 
 interface Press {
@@ -88,7 +89,7 @@ export class ColumnSwitch {
 			if (shift === 0) return;
 			e.preventDefault();
 			const place = placeOf(this.opts.value()) + shift;
-			if (place >= 0 && place < PLACES.length) this.show(PLACES[place]);
+			if (place >= 0 && place < SCREEN_PLACES.length) this.show(SCREEN_PLACES[place]);
 		});
 		this.render();
 	}
@@ -149,9 +150,9 @@ export class ColumnSwitch {
 
 	/** Where the finger puts the wheel: a quick swipe reaches no further than the next place, a careful one anywhere. */
 	private under(press: Press, x: number): number {
-		const reach = press.pace.careful ? PLACES.length : 1;
+		const reach = press.pace.careful ? SCREEN_PLACES.length : 1;
 		const least = Math.max(0, press.start - reach);
-		const most = Math.min(PLACES.length - 1, press.start + reach);
+		const most = Math.min(SCREEN_PLACES.length - 1, press.start + reach);
 		return Math.min(most, Math.max(least, press.from - (x - press.x) / press.step));
 	}
 
@@ -167,7 +168,7 @@ export class ColumnSwitch {
 		if (!released) return this.show(this.opts.value());
 		press.pace.update(e.clientX, e.timeStamp);
 		const at = this.position();
-		this.show(PLACES[press.pace.careful ? Math.round(at) : press.start + Math.sign(at - press.start)]);
+		this.show(SCREEN_PLACES[press.pace.careful ? Math.round(at) : press.start + Math.sign(at - press.start)]);
 	}
 
 	private tap(target: EventTarget | null): void {
@@ -179,7 +180,7 @@ export class ColumnSwitch {
 		const column = cell ? COLUMNS.indexOf(cell.dataset.column as SwitchColumn) : -1;
 		if (column < 0) return;
 		const place = placeShowing(column, placeOf(this.opts.value()));
-		if (place !== null) this.show(PLACES[place]);
+		if (place !== null) this.show(SCREEN_PLACES[place]);
 	}
 
 	/** The wheel rolls from where it stands to its place; a place other than the one shown moves the screen with it. */
@@ -205,7 +206,7 @@ export class ColumnSwitch {
 	private turn(position: number): void {
 		this.el.style.setProperty(PROPERTY.wheel, String(position));
 		this.el.style.setProperty(PROPERTY.before, String(Math.max(0, Math.min(1, position))));
-		this.el.style.setProperty(PROPERTY.after, String(Math.min(1, PLACES.length - 1 - position)));
+		this.el.style.setProperty(PROPERTY.after, String(Math.min(1, SCREEN_PLACES.length - 1 - position)));
 		this.icons.forEach((cell, i) => {
 			const out = Math.max(0, Math.abs((i % COLUMNS.length) - position - 0.5) - 0.5);
 			cell.style.setProperty(PROPERTY.depth, String(out));

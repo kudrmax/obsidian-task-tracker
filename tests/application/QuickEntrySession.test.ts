@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type DropColumn, type EntrySpot, type EntryState, type ListCard, type NewTaskPlace, QuickEntrySession, type RepeatRule, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type WriteLine } from "../../core/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
-import { SHOWN_LISTS as SHOWN } from "../../obsidian/ui/screens";
+import { SHOWN_LISTS as SHOWN } from "../../core/application/contracts";
 import { onDay } from "../fakes/itemOnDay";
 import { toItem } from "../../core/application/taskItems";
 import { TaskDocument } from "../../core/domain/TaskDocument";

@@ -1,6 +1,5 @@
-import { DescriptionDraft, type EntryState, type FullPlace, type FullTree, QuickEntrySession, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../../core/application/contracts";
+import { DescriptionDraft, type EntryState, type FullTree, QuickEntrySession, SHOWN_LISTS, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../../core/application/contracts";
 import { BottomCapsule } from "../BottomCapsule";
-import { SHOWN_LISTS } from "../screens";
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
 import { Button } from "../kit/Button";
@@ -62,8 +61,6 @@ export class FullScreen {
 	/** Typing a subtask or a title: what it means is the session's, the screen draws its state. */
 	private readonly entry: QuickEntrySession;
 	private state: EntryState | null = null;
-	/** The task a new subtask is typed under; null while a rename is typed. */
-	private under: TaskKey | null = null;
 	private field: QuickFieldHandle | null = null;
 	/** The field took the focus once; after that a redraw only gives it back. */
 	private focused = false;
@@ -291,9 +288,8 @@ export class FullScreen {
 	/** A field: a new subtask under `under`, or `renamed` renamed, in the title for the task on screen, else in its card. */
 	private type(under: TaskKey | null, renamed: TaskItem | null): void {
 		this.dropField();
-		this.under = under;
 		const parent = under ?? renamed?.key;
-		if (parent) this.entry.open({ kind: "stack", parent }, renamed ?? undefined);
+		if (parent) this.entry.open(this.entry.stackSpot(parent), renamed ?? undefined);
 	}
 
 	private isCurrent(item: TaskItem | null): boolean {
@@ -335,15 +331,16 @@ export class FullScreen {
 		this.field?.setTint(state.marks.tint);
 	}
 
-	/** Where the field stands among the cards: where the tree puts the new subtask, or in the renamed card's place. */
+	/** Where the field stands among the cards, as the core places it on this task's page: a new subtask's place, or the renamed card's; none in the title. */
 	private listEntry(): ListEntryInput | null {
-		const state = this.state;
-		const at = state && this.fieldPlace(state);
-		if (!state || !at) return null;
+		const current = this.current;
+		const entry = current && this.entry.stackEntry(current);
+		if (!entry || entry.at.kind === "title") return null;
+		const { index, level } = entry.at;
 		return {
-			at: { kind: "in", section: 0, card: at.index, keepsPlate: true },
-			level: at.level,
-			pending: state.pending.map((line) => ({ text: line.text, level: at.level })),
+			at: { kind: "in", section: 0, card: index, keepsPlate: true },
+			level,
+			pending: entry.pending,
 			field: (row: HTMLElement) => {
 				const field = (this.field ??= this.openField(row));
 				if (field.el.parentElement !== row) row.appendChild(field.el);
@@ -352,19 +349,6 @@ export class FullScreen {
 		};
 	}
 
-	private fieldPlace(state: EntryState): FullPlace | null {
-		const tree = this.tree;
-		if (!tree) return null;
-		const renamed = this.renamedCard();
-		if (renamed) {
-			const index = tree.rows.findIndex((row) => samePlace(row.item.key, renamed.key));
-			return index < 0 ? null : { index, level: tree.rows[index].level };
-		}
-		const under = this.under;
-		if (!under || state.renaming) return null;
-		if (samePlace(tree.task.key, under)) return tree.newSubtask;
-		return tree.rows.find((row) => samePlace(row.item.key, under))?.newSubtask ?? tree.newSubtask;
-	}
 
 	private openField(row: HTMLElement): QuickFieldHandle {
 		const state = this.state;
