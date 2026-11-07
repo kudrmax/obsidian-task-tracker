@@ -6,6 +6,8 @@ final class AppServices: Sendable {
     static let shared = AppServices()
 
     let vault: Vault
+    /// The main screen's reads and writes through the core's door.
+    let board: TaskBoard
     private let rules: TaskRules
     private let sync: ReminderSync
     private let tasks: TaskCapture
@@ -16,6 +18,7 @@ final class AppServices: Sendable {
         vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
         sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
+        board = TaskBoard(core: rules, vault: vault)
     }
 
     /// The lists a new task goes into, by their headings' names, in the order the screen offers them: the first is where Siri's goes.
@@ -57,7 +60,7 @@ final class AppServices: Sendable {
         if case .failed(let reason) = status { UserNotifications.showFailure(reason, of: reminder) }
     }
 
-    private static func rules() -> TaskRules {
+    private static func rules() -> PhoneCore {
         guard let url = Bundle.main.url(forResource: "task-calendar-phone", withExtension: "js"),
               let script = try? String(contentsOf: url, encoding: .utf8),
               let core = try? PhoneCore(script: script)

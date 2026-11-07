@@ -1,6 +1,8 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
 import { AppleCalendar } from "./infrastructure/AppleCalendar";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
+import { openOutside } from "./infrastructure/OutsideLink";
+import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
 
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { PluginSettings } from "./infrastructure/PluginSettings";
@@ -74,10 +76,12 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			);
 		});
 		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
+		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
+		this.register(() => services.stopSyncForApp());
 		this.addSettingTab(
 			new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), view: this.viewSettings, google: services.google, work: services.work, calendars: services.calendars }),
 		);
-		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => window.open(url), runScript: runAppleScript });
+		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
 		return {
 			tasks: services.tasks,
 			days: services.days,
@@ -101,7 +105,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	private servicesHost(): ServicesHost {
 		return {
 			pluginDir: this.pluginDir,
-			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => window.open(url) },
+			shortcuts: { isPhone: Platform.isIosApp, vaultName: this.app.vault.getName(), open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }) },
 		};
 	}
 
