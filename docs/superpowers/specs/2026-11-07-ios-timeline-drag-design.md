@@ -329,8 +329,8 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   card never carries the dim) and clears the search ring. The subtask counter is its own `UIButton` laid exactly where the
   capsule draws the counter (the capsule reports that frame). **For the lead to confirm with Max: a tap on a card opens
   nothing; the menu is the long press.**
-- frontend-swift: menu rows that open a sheet or a page run in the context menu's `willEnd` animator's completion (no
-  sleep). ~~Rename, Add Subtask and the plus's new task are small sheets with a focused field~~ (superseded by finding 10:
+- frontend-swift: ~~menu rows that open a sheet or a page run in the context menu's `willEnd` animator's completion~~
+  (superseded by «board fixes»: they run as the menu begins to go). ~~Rename, Add Subtask and the plus's new task are small sheets with a focused field~~ (superseded by finding 10:
   they type in place, see «frontend-swift (quick entry)» below); New Section and Rename Section stay alerts with a field,
   as Notes names a folder.
 - frontend-swift: the tasks file is watched by an `NSFilePresenter` (`Vault.watchTasksFile`) while the scene is active,
@@ -340,9 +340,10 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift: a read finding exactly the text this app last wrote skips the settle wait. Drop to the card in its
   new place, measured on the simulator: 48–69 ms (write 16–27 ms, the screen's read ~35–50 ms), the drop preview's flight
   covering it.
-- frontend-swift: a carried card's rows (with its subtasks) collapse to no height and stay in the hierarchy (their drag
+- frontend-swift: ~~a carried card's rows (with its subtasks) collapse to no height and stay in the hierarchy (their drag
   interaction must outlive the carry); the gap is drawn at the core's level with that level's branch line; a gap that
-  would land in an empty section takes the place of its «No tasks» plate.
+  would land in an empty section takes the place of its «No tasks» plate~~ (superseded by «board fixes»: the plugin's
+  dashed place and drop line).
 - frontend-swift: the zoom is kept in `UserDefaults` (`timelineZoom`: `wholeDay` or the hour's height, as
   `rules.zoomAfterPinch` answers) and opened by `rules.zoomShown` at the column's visible height; the pinch is the scroll
   view's `MagnifyGesture`, the minute under the fingers kept by scrolling to it every frame. The stack is re-laid by
@@ -481,3 +482,40 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift (R9, revised): `reloadIfChanged` compares the settings text too, and closing Settings asks it.
 - frontend-swift (entry jobs): a job with nothing to write ends with `unshown`; a task written but not read schedules a
   read; a failed `placementOfDay` in Date… is shown as the screen's problem.
+
+- frontend-swift (board fixes, 2026-11-07): a list drop shows as the plugin's (`ListDrop`, `DropLine`, Max: the parting gap
+  with a branch stub was ugly): no row moves while the finger does; the carried card waits where it stood as a dashed
+  outline (`--tc-dash`), its subtasks fold away under it; the accent drop line (8 pt dot, 2 pt bar) runs through the
+  middle of the gap from the left edge of the level the core picks to the list's right edge, over the dashed place when
+  the card goes back there at another level, and not at all where the drop changes nothing (`rules.placeOfDrop` null); an
+  empty section's «No tasks» plate lights (`--tc-drop-bg`, accent border) instead of a line. `placeAt` is asked as the
+  plugin asks it (shift 0, no room, held = the last place or the lifted one). Only once the finger lets go do the rows part
+  where the line was, for the system's drop preview to fly into; the card stays hidden until the screen draws it there.
+- frontend-swift (board fixes): the dashed place shows behind the card from the lift, with no fade, and the card hides over
+  it on the first move, so the pick-up has no empty frame. The system's lifted preview is a little translucent on iOS 26;
+  that is UIKit's, not drawn by us.
+- frontend-swift (board fixes): menu rows that open a sheet or a page run as the context menu begins to go (the next turn
+  of the main loop after `willEnd`); the animator's completion came ~1005 ms later on the simulator. Measured after: Open
+  Full Screen pushes ~95 ms after the tap; a write from the menu takes ~175 ms to the redrawn screen (door write 19 ms,
+  the screen's read 110–160 ms in a Debug build).
+- frontend-swift (board fixes): the carried plus is one solid piece (accent fill, white plus, the lift's shadow) moved by
+  the finger from the first point with the grip kept, no spring to the finger; a glass made at the lift showed empty and
+  grey first. The slot's glass is not interactive (it stretched after the finger). The slot stays visible and touchable as
+  the cancel target the whole carry, so a finger that comes down while the plus flies home catches the flying plus; a
+  tremble counts as a tap only if the finger never went further than 10 pt; the plus taken off the screen mid-carry ends
+  the carry and leaves no copy.
+- frontend-swift (board fixes): sections reorder as the plugin's `GroupDrag`: a long press on a header that `reorder`
+  allows lifts it (the header's menu stays on the same long press, the drag takes over once the finger moves, as cards);
+  the section folds away, a card with its name and task count over two layers follows the finger, a dashed card's room
+  marks the slot nearest the finger (places read at the lift, the ones below as if it were gone), and the drop writes
+  `tasks.moveGroup(list, name, rules.groupPlaceOf(names, lifted, slot))`. The list's name is `ColumnSections.list`, now in
+  the snapshot (`BoardList.sectionsOf`), which also replaced the app's own now/soon guess for rename and remove. The float
+  is SwiftUI's drag preview, centred on the finger (no grip offset as the plugin's).
+- frontend-swift (board fixes): the ribbon's scroll view does not bounce, so Inbox and Today stop as Soon does; a touch that
+  stops a tab's scroll half way lets the ribbon go on to the nearer place.
+- frontend-swift (board fixes): one head for every column: the title's row 36 (`--tc-day-row`), 4 under it to the list
+  (`--tc-head-gap`), also between Inbox and Backlog; a section header 26 tall (`--tc-group-head-h`), its name 13 semibold
+  on a 20 line, `--tc-pull-ink` (No section muted), 10 above every header but the first (`--tc-section-gap`), its bottom on
+  the first card (`margin-bottom: -card gap`).
+- frontend-swift (board fixes): a timeline card over an event or a long task draws no ring: the plugin's `is-over` has no
+  rule in `styles.css`.

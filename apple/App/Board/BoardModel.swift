@@ -48,15 +48,17 @@ enum RibbonPlace: Int, Hashable, CaseIterable {
 }
 
 /// A carry's gap in a list: before card `at` of the cards it moves between, at `level`, in section `group`; `place` is the
-/// core's `GapPlace` as `rules.gapAt` fitted it.
+/// core's `GapPlace` as `rules.placeAt` fitted it.
 struct ListGap: Equatable {
     let column: BoardColumn
     let at: Int
     let level: Int
     let group: String?
     let place: JSONValue
-    /// Its branch lines (`rules.gapBranch`), nil at the tasks' level.
-    let branch: Branch?
+    /// The drop line as the plugin draws it (`DropLine`), in the list's content space: from `line.x`, the left edge of
+    /// the gap's level, to the list's right edge, through `line.y`, the middle of the gap; nil where the drop changes
+    /// nothing (the card back where it was lifted from) or lands on an empty section's plate, which lights instead.
+    let line: CGPoint?
 }
 
 /// How long a drop takes to show the card in its new place, told to the log (`Drop landed in … ms`).
@@ -454,10 +456,9 @@ final class BoardModel {
         await write("tasks.removeGroup", [.string(list), .string(section)])
     }
 
+    /// Whose sections a column shows, as the core names the list.
     private func sectionList(_ column: BoardColumn) -> String? {
-        guard let snapshot else { return nil }
-        if column != .day { return column.rawValue }
-        return snapshot.day == snapshot.today ? "now" : "soon"
+        snapshot?.lists[column]?.sectionsOf
     }
 
     // MARK: Select Tasks
@@ -492,12 +493,27 @@ final class BoardModel {
         let item: TaskItem?
         let from: String
         let grab: CGFloat
+        /// A section lifted by its header, carried among its list's sections.
+        var section: SectionCarry? = nil
+    }
+
+    /// A section carried by its header, as the plugin's (`GroupDrag`): its list, its index among the list's groups, and
+    /// each slot's place read as it was lifted: the top of the header it would go before, or the list's end, the ones
+    /// below it as if it were gone.
+    struct SectionCarry {
+        let column: BoardColumn
+        let list: String
+        let names: [String?]
+        let lifted: Int
+        let places: [CGFloat]
     }
 
     /// The carry: its rows close up in their list while it lasts.
     private(set) var carry: Carry?
-    /// Where a carry held over a list would land: the core's gap, its level drawn as the finger moves.
+    /// Where a carry held over a list would land: the core's gap, its level drawn by the drop line as the finger moves.
     private(set) var gap: ListGap?
+    /// The gap a card let go over a list flies into: the rows part for it there, until the screen shows the card in it.
+    private(set) var settling: ListGap?
     /// The minute a carry held over the calendar would start at.
     private(set) var landing: Int?
 
@@ -508,10 +524,81 @@ final class BoardModel {
     /// A drop is being written: its carry ends with it, once the screen is drawn from the file it wrote.
     @ObservationIgnored private var writingDrop = false
 
+    /// A card lifted: it waits as a dashed place where it stood and its subtasks fold away under it, as the plugin's.
     func startCarry(_ card: BoardCard, from column: String, grab: CGFloat) {
         found = nil
-        carry = Carry(id: card.id, item: card.item, from: column, grab: grab)
+        withAnimation(.snappy(duration: 0.25)) { carry = Carry(id: card.id, item: card.item, from: column, grab: grab) }
     }
+
+    /// A section's header lifted: its header and tasks fold away and the list closes over them, as the plugin's.
+    func startSectionCarry(_ column: BoardColumn, _ group: BoardGroup) {
+        guard let list = snapshot?.lists[column], let name = list.sectionsOf, let lifted = list.groups.firstIndex(where: { $0.id == group.id }),
+              let shape = geometry[column] else { return }
+        let heads = list.groups.map { shape.heads[$0.id]?.minY }
+        guard !heads.contains(where: { $0 == nil }) else { return }
+        let tops = heads.compactMap { $0 }
+        let bottoms = shape.cards.values.map(\.maxY) + shape.heads.values.map(\.maxY)
+        let end = (bottoms.max() ?? 0) + (list.groups.last?.empty == true ? CardMetrics.height + CardMetrics.gap : 0)
+        let all = tops + [end]
+        let height = all[lifted + 1] - all[lifted]
+        let places = all.enumerated().map { $0.offset > lifted ? $0.element - height : $0.element }
+        found = nil
+        let section = SectionCarry(column: column, list: name, names: list.groups.map(\.name), lifted: lifted, places: places)
+        withAnimation(.snappy(duration: 0.25)) {
+            carry = Carry(id: "\u{0}section/\(group.id)", item: nil, from: column.rawValue, grab: 0, section: section)
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    /// Where a carried section would go: the slot whose place is nearest the finger, the mark there; none at its own place.
+    private(set) var sectionSlot: Int?
+
+    private func hoverSection(_ section: SectionCarry, _ column: BoardColumn, at point: CGPoint) {
+        guard column == section.column else { return leaveSection() }
+        let slot = section.places.indices.min { abs(section.places[$0] - point.y) < abs(section.places[$1] - point.y) } ?? section.lifted
+        let place: JSONValue? = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(slot))])
+        // Its own place (the core's null, which comes back as no value) shows no mark.
+        let shown = place == nil || place == .null ? nil : slot
+        guard shown != sectionSlot else { return }
+        if shown != nil { UISelectionFeedbackGenerator().selectionChanged() }
+        withAnimation(.snappy(duration: 0.25)) { sectionSlot = shown }
+    }
+
+    private func leaveSection() {
+        guard sectionSlot != nil else { return }
+        withAnimation(.snappy(duration: 0.25)) { sectionSlot = nil }
+    }
+
+    /// Let go: the section moves before the one at the slot, or to the list's end (`tasks.moveGroup`).
+    private func landSection(_ section: SectionCarry, _ column: BoardColumn) -> CGRect? {
+        guard column == section.column, let slot = sectionSlot,
+              let place: JSONValue = ruleNow("rules.groupPlaceOf", [.array(section.names.map(\.json)), .number(Double(section.lifted)), .number(Double(slot))]),
+              !place.isNull else { return nil }
+        writingDrop = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Task {
+            let board = board
+            let arguments: [JSONValue] = [.string(section.list), section.names[section.lifted].json, place]
+            do {
+                try await Task.detached { try board.write("tasks.moveGroup", arguments) }.value
+            } catch {
+                problem = Self.words(error)
+            }
+            dropReadFrom = readsStarted + 1
+            await reload(animated: false)
+            finishDrop()
+        }
+        return nil
+    }
+
+    /// The section a carry lifted, folded away in its list.
+    func isLifted(_ group: BoardGroup, in column: BoardColumn) -> Bool {
+        guard let section = carry?.section, section.column == column else { return false }
+        return section.names.indices.contains(section.lifted) && section.names[section.lifted] == group.name
+    }
+
+    /// The card a carry lifted from a list, waiting there as a dashed place.
+    func isWaiting(_ card: BoardCard) -> Bool { card.id == carry?.id }
 
     func startCarryingPlus() {
         carry = Carry(id: Carried.plus, item: nil, from: "new", grab: 0)
@@ -542,6 +629,8 @@ final class BoardModel {
     private func endCarry() {
         carry = nil
         gap = nil
+        settling = nil
+        sectionSlot = nil
         landing = nil
         hovered = nil
     }
@@ -574,12 +663,12 @@ final class BoardModel {
 
     /// A card's or a header's frame as the list lays it out; kept only while no gap is open in the list.
     func rest(_ column: BoardColumn, card id: String, _ frame: CGRect) {
-        guard gap?.column != column else { return }
+        guard settling?.column != column else { return }
         geometry[column, default: ListGeometry()].cards[id] = frame
     }
 
     func rest(_ column: BoardColumn, head id: String, _ frame: CGRect) {
-        guard gap?.column != column else { return }
+        guard settling?.column != column else { return }
         geometry[column, default: ListGeometry()].heads[id] = frame
     }
 
@@ -598,6 +687,7 @@ final class BoardModel {
     /// The carry held over `column` at `point`: the gap the core places under the finger, its level from the finger's
     /// `x` (a card by its middle, the plus by the finger itself), held until the finger is well past its edge.
     private func hover(_ column: BoardColumn, at point: CGPoint) {
+        if let section = carry?.section { return hoverSection(section, column, at: point) }
         guard let carry, let list = snapshot?.lists[column], let shape = geometry[column] else { return }
         if let hovered, hovered.column == column, abs(hovered.point.x - point.x) < 1, abs(hovered.point.y - point.y) < 1 { return }
         hovered = (column, point)
@@ -618,28 +708,43 @@ final class BoardModel {
         let inset = Double(CardMetrics.columnInset)
         let y = carry.id == Carried.plus ? Double(point.y) : (try? board.carriedMiddle(y: Double(point.y), grab: Double(carry.grab), cardHeight: Double(CardMetrics.height))) ?? Double(point.y)
         let level = (try? board.levelAt(x: Double(point.x), left: inset, width: Double(shape.width) - 2 * inset, indent: Double(CardMetrics.indent))) ?? 0
-        let held = gap?.column == column ? gap?.place ?? .null : .null
-        guard let place = try? board.placeAt(placed, y: y, level: level, shift: Double(CardMetrics.height + CardMetrics.gap), room: held, heads: heads, held: held, hysteresis: 6),
+        let home = homeGap(carry.id, in: column)
+        // As the plugin's: no row moves while the finger does, so nothing shifts under it; the place holds against the last.
+        let held = (gap?.column == column ? gap?.place : nil) ?? home ?? .null
+        guard let place = try? board.placeAt(placed, y: y, level: level, shift: 0, room: .null, heads: heads, held: held, hysteresis: 6),
               let at = place["index"].number, let fitted = place["level"].number else { return }
-        let branch = try? board.gapBranch(levels: others.map(\.level), gap: place)
-        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: place["group"].string, place: place, branch: branch)
+        let group = place["group"].string
+        // The card back where it was lifted from, at its level, changes nothing: the core's null, which comes back as no value.
+        let stays = home.map { home in
+            let drop: JSONValue? = ruleNow("rules.placeOfDrop", [Self.listCards(others), place, home])
+            return drop == nil || drop == .null
+        } ?? false
+        let lights = list.groups.contains { $0.name == group && $0.empty }
+        let shown = stays || lights ? nil : lineAt(column, at: Int(at), level: Int(fitted), group: group, home: home)
+        let next = ListGap(column: column, at: Int(at), level: Int(fitted), group: group, place: place, line: shown)
         guard next != gap else { return }
-        UISelectionFeedbackGenerator().selectionChanged()
+        if next.place != gap?.place { UISelectionFeedbackGenerator().selectionChanged() }
         landing = nil
-        withAnimation(.snappy(duration: 0.25)) { gap = next }
+        withAnimation(.snappy(duration: 0.12)) { gap = next }
     }
 
     private func leave(_ column: BoardColumn) {
+        if carry?.section != nil { return leaveSection() }
         if hovered?.column == column { hovered = nil }
         guard gap?.column == column else { return }
         withAnimation(.snappy(duration: 0.25)) { gap = nil }
     }
 
-    /// Let go over a list: the drop is written, and the card settles into the gap shown (in the list's content space).
+    /// Let go over a list: the drop is written, and the card settles where the line showed it (in the list's content
+    /// space): the rows part there for it, or it goes back into its dashed place.
     private func land(_ column: BoardColumn) -> CGRect? {
         guard let carry else { return nil }
-        let spot = gapRect(column)
+        if let section = carry.section { return landSection(section, column) }
+        let spot = gap.flatMap { landingRect(column, $0) }
         writingDrop = true
+        if carry.id != Carried.plus, let gap, gap.column == column, !returnsHome(gap) {
+            withAnimation(.snappy(duration: 0.25)) { settling = gap }
+        }
         Task {
             await drop(carry, in: column)
             finishDrop()
@@ -647,9 +752,33 @@ final class BoardModel {
         return carry.id == Carried.plus ? nil : spot
     }
 
-    /// Where the gap stands in the list: before the card it parts from, or under the last card of its section.
-    private func gapRect(_ column: BoardColumn) -> CGRect? {
-        guard let gap, gap.column == column, let shape = geometry[column], let list = snapshot?.lists[column] else { return nil }
+    /// The gap is the one the carried card was lifted from: it lands in its dashed place.
+    private func returnsHome(_ gap: ListGap) -> Bool {
+        guard let carry, let home = homeGap(carry.id, in: gap.column) else { return false }
+        return home["index"] == gap.place["index"] && home["group"] == gap.place["group"]
+    }
+
+    /// Where the card lands: its dashed place when the gap is the one it was lifted from, else the room the rows part to.
+    private func landingRect(_ column: BoardColumn, _ gap: ListGap) -> CGRect? {
+        guard let rect = gapRect(column, gap) else { return nil }
+        guard returnsHome(gap), let carry, let waiting = geometry[column]?.cards[carry.id] else { return rect }
+        return CGRect(x: rect.minX, y: waiting.minY, width: rect.width, height: CardMetrics.height)
+    }
+
+    /// The drop line of a gap: through the middle of the room above the card it parts from, or above the dashed place
+    /// when the card goes back where it was lifted from at another level, from the left edge of its level.
+    private func lineAt(_ column: BoardColumn, at: Int, level: Int, group: String?, home: JSONValue?) -> CGPoint? {
+        let probe = ListGap(column: column, at: at, level: level, group: group, place: .null, line: nil)
+        guard let rect = gapRect(column, probe) else { return nil }
+        if let home, let carry, home["index"].number.map(Int.init) == at, home["group"].string == group, let waiting = geometry[column]?.cards[carry.id] {
+            return CGPoint(x: rect.minX, y: waiting.minY - CardMetrics.gap / 2)
+        }
+        return CGPoint(x: rect.minX, y: rect.minY - CardMetrics.gap / 2)
+    }
+
+    /// Where a card put in the gap stands in the list: before the card it parts from, or under the last card of its section.
+    private func gapRect(_ column: BoardColumn, _ gap: ListGap) -> CGRect? {
+        guard let shape = geometry[column], let list = snapshot?.lists[column] else { return nil }
         let others = others(in: column)
         let indent = CGFloat(gap.level) * CardMetrics.indent
         let x = CardMetrics.columnInset + indent
@@ -705,6 +834,8 @@ final class BoardModel {
 
     /// The carry held over the calendar at `minute`, the timeline drawn `hourHeight` an hour: the line on the grid's step.
     private func hover(minute: Double, hourHeight: CGFloat) {
+        // A section lands only among its list's sections.
+        guard carry?.section == nil else { return leaveSection() }
         let snapped = snap(minute, hourHeight: hourHeight)
         if gap != nil { withAnimation(.snappy(duration: 0.25)) { gap = nil } }
         guard snapped != landing else { return }
@@ -736,7 +867,7 @@ final class BoardModel {
 
     /// Let go over the calendar: the card settles at the time the line shows.
     private func landOnCalendar() -> CGRect? {
-        guard let carry, let minute = landing, snapshot != nil else { return nil }
+        guard let carry, carry.section == nil, let minute = landing, snapshot != nil else { return nil }
         let hour = calendarHour
         writingDrop = true
         Task {

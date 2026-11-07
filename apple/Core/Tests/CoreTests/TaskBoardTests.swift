@@ -43,6 +43,20 @@ import Testing
         #expect(menu.edits.contains("subtask"))
     }
 
+    @Test func aSectionMovesWhereTheCorePlacesItsSlot() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let place: JSONValue = try board.rule("rules.groupPlaceOf", [[.null, "Errands"], 1, 0])
+        #expect(place == ["before": .null])
+        let still: JSONValue = try board.rule("rules.groupPlaceOf", [[.null, "Errands"], 1, 2])
+        #expect(still == .null)
+        try board.write("tasks.moveGroup", ["now", "Errands", place])
+        let now = try #require(vault.text.range(of: "## Now"))
+        let errands = try #require(vault.text.range(of: "### Errands"))
+        let run = try #require(vault.text.range(of: "Morning run"))
+        #expect(now.upperBound < errands.lowerBound && errands.upperBound < run.lowerBound)
+    }
+
     @Test func aWriteGoesToTheFileAndUndoTakesItBack() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)
@@ -95,6 +109,9 @@ import Testing
         #expect(day.groups.map(\.header) == ["No section", "Errands"])
         #expect(day.groups[0].cards.map(\.level) == [0, 1])
         #expect(day.groups[0].cards[1].branch == Branch(last: true, through: []))
+        // A section lifts to move among its list's sections, No section does not; the list is the core's name for it.
+        #expect(day.groups.map(\.reorder) == [false, true])
+        #expect(day.sectionsOf == "now")
         #expect(snapshot.lists[.inbox]?.title == "Inbox")
         let run = try #require(snapshot.timeline.slots.first)
         #expect(run.card.item.title == "Morning run")
