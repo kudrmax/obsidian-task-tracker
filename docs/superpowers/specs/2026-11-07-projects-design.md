@@ -189,12 +189,18 @@ Backend (the core's contract):
 
 iPhone app (the minimum that keeps it from breaking):
 
-11. **The app reads the door as loose JSON**, key by key (`[String: Any]` in `PhoneCore`): the new optional fields
-    (`TaskItem.project`, `ScreenView.projects`/`project`, `SearchHit.project`, `menu.project`, the answer's `grouping`)
-    are ignored by what it reads today (capture, reminders, calendars). No decoder changed.
-12. **The app hands in neither `projects` nor `grouping`**, and drops a `grouping` answer: it draws no task lists yet,
-    so Backlog grouped by default changes nothing it shows. When the app's lists come, it keeps `grouping` per device as
-    the Obsidian frontend does (decision 8) and draws the groups.
+11. **The app reads the new fields by leaving them out**: its `Decodable` models (`TaskItem`, `ListGroup`, `GroupMenu`,
+    `TaskMenuModel`, `SearchHit`, `ScreenView`, `SettingsForm`) take the keys they know and skip the rest, so
+    `TaskItem.project`, `can.setProject`, `ListGroup.header`/`reorder`, `menu.project`, `TaskMenuModel.project`,
+    `SearchHit.project`, `ScreenView.projects`/`project` and `projectTag` change nothing it draws; a task goes back to the
+    door as it was read (`TaskItem.json`), field and all. Its drops carry no `project` (its cards and headers have no
+    zone), so a task keeps its project wherever it is dragged.
+12. **The app asks for every list ungrouped**: each call of the main screen hands in `grouping`
+    `{ on: { backlog: false, soon: false } }` (`TaskBoard.ungrouped`). Without it the door groups Backlog by default and
+    its `screen.offer` gains `projects`, which cut a Backlog card's Section menu (and the bulk menu) to its project
+    group's sections. The app draws no groups yet, so its lists and menus stay as before projects; a `grouping` in an
+    answer (`tasks.reveal`) is dropped. When the app's groups come, it keeps `grouping` per device as the Obsidian
+    frontend does (decision 8).
 
 ## Ideas for later
 
