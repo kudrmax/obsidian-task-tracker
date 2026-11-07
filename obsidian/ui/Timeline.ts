@@ -380,7 +380,7 @@ export class Timeline {
 		this.drop = span;
 		const { view, canvasTop } = this.measured();
 		if (!this.dropEl) {
-			this.dropEl = el(document.body, "div", "tc-drop");
+			this.dropEl = el(activeDocument.body, "div", "tc-drop");
 			el(this.dropEl, "span", "tc-drop-pill");
 			el(this.dropEl, "div", "tc-drop-line");
 			this.dropShown = noDropShown();

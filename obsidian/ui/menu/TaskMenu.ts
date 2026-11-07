@@ -187,6 +187,8 @@ export class TaskMenu extends LiftedMenu {
 	/** The repeat page shown, which writes what it holds as the menu closes. */
 	private repeatPage: RepeatPage | null = null;
 	private confirmAsked: (() => void) | null = null;
+	/** The window the menu opened in: Enter confirms a question there. */
+	private readonly keysDoc = activeDocument;
 	private readonly onEnter = (e: KeyboardEvent) => {
 		if (e.key !== "Enter" || !this.confirmAsked) return;
 		e.preventDefault();
@@ -423,8 +425,8 @@ export class TaskMenu extends LiftedMenu {
 	private askFor(what: Asking | null, show = true): void {
 		this.asking = what;
 		this.confirmAsked = null;
-		if (what === null) document.removeEventListener("keydown", this.onEnter, true);
-		else document.addEventListener("keydown", this.onEnter, true);
+		if (what === null) this.keysDoc.removeEventListener("keydown", this.onEnter, true);
+		else this.keysDoc.addEventListener("keydown", this.onEnter, true);
 		if (show) this.showMenu(this.groupsAbove());
 	}
 
@@ -544,19 +546,20 @@ export class TaskMenu extends LiftedMenu {
 			e.preventDefault();
 			e.stopPropagation();
 		};
+		const win = activeWindow;
 		const press = (e: PointerEvent) => {
-			window.removeEventListener("pointerdown", press, true);
+			win.removeEventListener("pointerdown", press, true);
 			if (performance.now() > until) return;
 			stop(e);
-			window.addEventListener("click", stop, { capture: true, once: true });
+			win.addEventListener("click", stop, { capture: true, once: true });
 			this.close();
 			then();
 		};
-		window.addEventListener("pointerdown", press, true);
+		win.addEventListener("pointerdown", press, true);
 	}
 
 	protected override closed(how: CloseHow): void {
-		document.removeEventListener("keydown", this.onEnter, true);
+		this.keysDoc.removeEventListener("keydown", this.onEnter, true);
 		this.repeatPage?.close();
 		this.fieldClosed?.(how);
 	}

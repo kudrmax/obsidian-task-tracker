@@ -22,17 +22,20 @@ export class Overlay {
 		this.onClose("escape");
 	};
 
+	/** The window it opened in: a popout window's menu stands and hears its keys there. */
+	private readonly doc = activeDocument;
+
 	constructor(private readonly onClose: (how: CloseHow) => void) {
-		this.backdrop = el(document.body, "div", "tc-backdrop");
+		this.backdrop = el(this.doc.body, "div", "tc-backdrop");
 		this.backdrop.addEventListener("pointerdown", (e) => {
 			if (e.target === this.backdrop) onClose("away");
 		});
-		document.addEventListener("keydown", this.onKey, true);
+		this.doc.addEventListener("keydown", this.onKey, true);
 	}
 
 	/** Lays a part over the sheet: it shows and goes with it. A part `onLevel` stands at the depth of the others there. */
 	add<T extends HTMLElement>(part: T, onLevel = false): T {
-		(onLevel ? (this.level ??= el(document.body, "div", "tc-level")) : document.body).appendChild(part);
+		(onLevel ? (this.level ??= el(this.doc.body, "div", "tc-level")) : this.doc.body).appendChild(part);
 		this.parts.push(part);
 		return part;
 	}
@@ -50,7 +53,7 @@ export class Overlay {
 	close(): boolean {
 		if (this.closed) return false;
 		this.closed = true;
-		document.removeEventListener("keydown", this.onKey, true);
+		this.doc.removeEventListener("keydown", this.onKey, true);
 		for (const part of this.all()) {
 			part.classList.add("is-closing");
 			part.classList.remove("is-shown");

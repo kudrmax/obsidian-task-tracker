@@ -13,6 +13,7 @@ import { createServices, type Services, type ServicesHost } from "./compose";
 import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
 import { clearCardSize, showCardSize } from "./ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
+import { addWindowDocument } from "./ui/windowDocuments";
 import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
 import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
 import { ProjectBlocks } from "./ui/ProjectBlocks";
@@ -52,6 +53,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		await this.pluginSettings.load();
 		this.register(clearCardSize);
 		this.register(clearPriorityColors);
+		this.followPopoutWindows();
 		const code = this.watchOwnCode();
 		this.registerEvent(this.watchSettingsFile(code));
 		this.registerDomEvent(document, "visibilitychange", () => {
@@ -124,6 +126,23 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	}
 
 	/** The plugin runs the code in its folder: a release Sync brought loads at once, not at Obsidian's next start. */
+	/** A popout window gets the card size and the colours the main window has: a note's block or the screen moved there draws as here. */
+	private followPopoutWindows(): void {
+		const closings = new Map<Document, () => void>();
+		const open = (doc: Document) => {
+			if (doc !== document && !closings.has(doc)) closings.set(doc, addWindowDocument(doc));
+		};
+		this.app.workspace.iterateAllLeaves((leaf) => open(leaf.view.containerEl.ownerDocument));
+		this.registerEvent(this.app.workspace.on("window-open", (win) => open(win.doc)));
+		this.registerEvent(
+			this.app.workspace.on("window-close", (win) => {
+				closings.get(win.doc)?.();
+				closings.delete(win.doc);
+			}),
+		);
+		this.register(() => closings.forEach((close) => close()));
+	}
+
 	private watchOwnCode(): PluginCodeWatcher {
 		const adapter = this.app.vault.adapter;
 		const plugins = (this.app as unknown as { plugins: { disablePlugin(id: string): Promise<void>; enablePlugin(id: string): Promise<boolean> } }).plugins;

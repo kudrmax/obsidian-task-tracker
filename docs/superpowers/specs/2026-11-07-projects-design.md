@@ -208,9 +208,15 @@ Obsidian frontend:
     editor's content (`.cm-sizer`, after `.cm-contentContainer`), in Reading view first in the note's footer
     (`.mod-footer`). One block per Markdown view, moved between the two as the view's mode changes, made when the view
     shows a project note (`projectNotes()` by path) and gone when it does not. Nothing is written into the note.
-14. **The block's frame**: a hairline frame with 14 px corners, 44 px under the note's text (board ProjNote), as tall as
-    `min(640px, 78vh)` (a phone's screen less Obsidian's bars), its own scroll inside. Obsidian's navigation, status bar
-    and keyboard take no room from its foot.
+14. **The block's frame**: a hairline frame with 14 px corners, a paragraph's gap under the note's text (Obsidian's
+    `--p-spacing`; Max rejected the board's 44 px plus Live Preview's room past the note's end, which the block now rises
+    over), its titles' row 8 px under the top line and its cards 8 px under the titles, its wheel 12 px over the bottom
+    line (board Proj4V2), its foot clear of Obsidian's status bar and the phone's navigation at the note's end; as tall as
+    the columns in its window need (the taller column's cards and its foot), at least the board's block (321 px) and at
+    most `min(640px, 78vh)` (a phone's screen less Obsidian's bars); its lists scroll inside only past that. While the
+    calendar is in the window the block is at its tallest (a whole day). It fits again a frame after anything in it
+    changes (tasks, the wheel, a field opened), never during a drag. Obsidian's navigation, status bar and keyboard take no
+    room from its foot.
 15. **The block's foot** holds the wheel and the plus; the undo capsule (Undo, ⋯) stays out, as the board shows. Undo is
     Cmd+Z while the focus is in the block (a tap or click on the block gives it the focus), or the main screen's button.
 16. **The block opens at Inbox and Soon** (the board's position); its wheel, divider and zoom are kept per note on the
@@ -236,6 +242,25 @@ Obsidian frontend:
     sections there are not reordered (`reorder` false); the section button there asks the name, then the first task, as
     inside a group (`createSection` with a zoned place writes nothing).
 26. **Search opened from the block searches only that project's tasks** (the lead's call): `search(query, project)`.
+27. **Inbox and Backlog in the block stack by their cards**, as the board draws them (Inbox's plate, the line, Backlog
+    under it), not half and half as on the main screen; at the block's tallest Inbox keeps its cards up to half the column
+    and Backlog scrolls in the rest. While the calendar is in the window the block is at its tallest.
+28. **The block's place follows its note**: a rename or move of the note (or of its folder) carries the stored wheel,
+    divider and zoom to the new path, and the open block stays; a deleted note's place is dropped.
+29. **The block follows the view's mode however it changes** (a button, a command, `setState`): it watches its view's
+    page, not only Obsidian's layout events.
+30. **In a popout window** the screen and the block listen to their own window (keys, presses, visibility, theme), their
+    menus and lifted cards open there, and the card size and the priority and label colours are put on every window.
+31. **The block's lists end one short step under their last card** (20 px over the wheel's row), not the main screen's
+    64 px fade: a block sized to its cards has nothing under the wheel to fade, and the board draws it so.
+32. **A task's fields take Obsidian's line commands and do nothing** (the lead's call, after Cmd+L wrote
+    `- [ ] - [ ] **word**[]()`): the hotkeys of the commands that change what a line is (checkbox, lists, headings, quote,
+    callout, code, math, table, rule, line swap, list indent) are taken in the title's and the description's own editor
+    keymap and in their scope, everywhere the fields stand. The core strips a list, checkbox, heading or quote marker from
+    a title's start on every write (`taskTitle`); inline marks stay. The Swift app's title field writes through the same
+    core, so the guard reaches it too.
+33. **Cmd+Z and Cmd+Shift+Z in a plain field** (search, a section's name) undo and redo the field's own text and go no
+    further, so the app's Edit menu never hears them.
 
 ## Ideas for later
 

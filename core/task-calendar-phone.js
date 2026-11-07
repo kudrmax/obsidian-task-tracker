@@ -6,8 +6,9 @@
   function oneLine(text) {
     return text.replace(LINE_BREAK, " ");
   }
+  var LINE_MARKERS = /^(?:(?:[-*+]|\d+[.)])\s+(?:\[.\]\s+)?|\[.\]\s+|#{1,6}\s+|>\s*)+/u;
   function taskTitle(text) {
-    return oneLine(text).trim();
+    return oneLine(text).trim().replace(LINE_MARKERS, "").trim();
   }
 
   // core/domain/LocalDate.ts

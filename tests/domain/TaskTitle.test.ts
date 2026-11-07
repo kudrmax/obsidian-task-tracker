@@ -58,3 +58,21 @@ describe("a title written into the file stays on one line", () => {
 		expect(placeTask(doc, sub, { text: BROKEN, placement: { kind: "now" }, priority: null }, T).serialize()).toContain(`    - [ ] ${ONE_LINE}`);
 	});
 });
+
+describe("a title never starts as a line of its own kind", () => {
+	it("loses a list, checkbox, heading or quote marker at its start, however many", () => {
+		for (const typed of ["- [ ] **word**[]()", "- [ ] - [ ] **word**[]()", "* **word**[]()", "1. **word**[]()", "2) **word**[]()", "[x] **word**[]()", "## **word**[]()", "> **word**[]()", " - **word**[]() "]) {
+			expect(taskTitle(typed)).toBe("**word**[]()");
+		}
+	});
+
+	it("keeps a tag, inline marks, links and a marker in its middle", () => {
+		for (const title of ["#home cleanup", "**bold** and _it_", "[[Note]] - [ ] later", "Buy 2. milk", "-5 degrees"]) expect(taskTitle(title)).toBe(title);
+	});
+
+	it("is written so when created or renamed", () => {
+		const doc = parse("## Inbox\n\n## Now\n- [ ] A\n\n## Soon\n\n## Done\n");
+		expect(rename(doc, doc.tasks("now")[0], "- [ ] **word**").serialize()).toContain("## Now\n- [ ] **word**\n");
+		expect(createInSoon(doc, "- [ ] B\nC").serialize()).toContain("## Soon\n- [ ] B C\n");
+	});
+});
