@@ -468,10 +468,12 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         borderStyle = .none
         backgroundColor = .clear
         bar.view.backgroundColor = .clear
-        bar.sizingOptions = .intrinsicContentSize
-        bar.view.frame = CGRect(x: 0, y: 0, width: 402, height: KeyBar.height)
-        bar.view.autoresizingMask = [.flexibleWidth]
-        inputAccessoryView = bar.view
+        bar.safeAreaRegions = []
+        let holder = AccessoryHolder(frame: CGRect(x: 0, y: 0, width: 402, height: KeyBar.height))
+        bar.view.frame = holder.bounds
+        bar.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        holder.addSubview(bar.view)
+        inputAccessoryView = holder
         addAction(UIAction { [weak self] _ in
             guard let self else { return }
             self.host?.typed(self.text ?? "")
@@ -532,6 +534,21 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
             self.host?.blur()
         }
     }
+}
+
+/// The bar's place over the keyboard: always the bar's own height, whatever the buttons it shows this moment, so the
+/// keyboard and the lists above it never move when the field's state changes.
+private final class AccessoryHolder: UIView {
+    override var intrinsicContentSize: CGSize { CGSize(width: UIView.noIntrinsicMetric, height: KeyBar.height) }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        autoresizingMask = [.flexibleWidth]
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a storyboard") }
 }
 
 /// The field in a list's row, on the calendar or on the full screen: the one text field placed in it.
