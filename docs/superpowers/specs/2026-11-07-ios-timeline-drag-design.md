@@ -315,9 +315,8 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   bar and its round search slot itself (same height, centre line and gap as the first build's TabView). The plus is our
   draggable control placed on the search slot's own frame as the bar laid it out (the bar's square subview), the same
   size; the search tab is never selected (`shouldSelectTab` refuses it). A tap on a tab moves the ribbon.
-- frontend-swift: the day list and the calendar slide as one unit when the day changes (`.push` from the arrow's side,
-  `.smooth`); SwiftUI's clip does not hold the UIKit-backed columns apart during a transition, so they move together as
-  the day they are. The day before and after are read ahead (`days.step` + a snapshot each) and shown in the same frame;
+- frontend-swift: ~~the day list and the calendar slide as one unit when the day changes (`.push` from the arrow's side,
+  `.smooth`)~~ (superseded by «day turn» below). The day before and after are read ahead (`days.step` + a snapshot each) and shown in the same frame;
   the screen is read anew underneath.
 - frontend-swift: every drop goes through one UIKit `UIDropInteraction` on the window (`BoardDrop`); the lists and the
   calendar register as places with their frames. So a dropped card's preview flies into the gap or onto the line's time
@@ -519,3 +518,19 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   the first card (`margin-bottom: -card gap`).
 - frontend-swift (board fixes): a timeline card over an event or a long task draws no ring: the plugin's `is-over` has no
   rule in `styles.css`.
+
+- frontend-swift (day turn, 2026-11-07): another day turns as the plugin's `DayTrack`: the «‹ day ›» header, the hour labels,
+  the grid and the divider stand; in each column the day slides within it (the list's rows inside its scroll view, the
+  timeline's events and cards clipped to the items' place, its now line within its own row, the all-day rows), the next
+  day coming in from the arrow's side, both columns in step; the header names whichever day stands nearer (switching at
+  half way). The arrows run it over the plugin's `--tc-duration-slide` (300 ms) with the pager's cubic ease-out, driven by a
+  display link (`DaySlide`); the day read ahead comes in at once, another is read first; arrived, the screen is drawn from
+  it with no animation and read anew underneath. The scroll positions are kept, as the plugin aligns the incoming day with
+  the shown one. While it slides, the incoming day's calendar cards are its read's stack scaled to the zoom shown.
+- frontend-swift (day turn): the day arrows and the day's name take a tap on their whole 32-point square / title row
+  (`contentShape`): a plain button took it only on the chevron's strokes, so most taps on the arrows were lost.
+- frontend-swift (day turn), **missing in the door**: swiping past today's calendar to the next days needs the plugin's
+  `stepScreen` (`obsidian/ui/screens.ts`: which screen a swipe right or left leads to from a place and a day — the next
+  place, or the next day once at the calendar, or nothing at the row's end). It is a rule in the plugin's UI, not in the
+  core; the app does not write it again. Asked of the backend: move it into `core/application` and offer it through the
+  door (e.g. `screen.step({ mode, date }, shift)` → `{ mode, date } | null`), then the app adds the swipe.

@@ -19,15 +19,22 @@ struct ListColumn: View {
     /// The gap a card let go here flies into: the rows part for it.
     private var settling: ListGap? { model.settling?.column == list.column ? model.settling : nil }
     private var key: String { "list.\(list.column.rawValue)" }
+    /// The list's own width: another day slides through it.
+    @State private var width: CGFloat = 0
+    /// The header names the day that stands nearer while another comes in.
+    private var title: String {
+        guard list.column == .day else { return list.title }
+        return model.titleSnapshot?.lists[.day]?.title ?? list.title
+    }
 
     var body: some View {
         let column = list.column
         let drawn = rows
         VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-            ColumnTitle(title: list.title, dayArrows: dayArrows, model: model)
+            ColumnTitle(title: title, dayArrows: dayArrows, model: model)
             ScrollViewReader { scroller in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: CardMetrics.gap) {
+                    DayLane(model: model, width: width, slides: column == .day, shown: VStack(alignment: .leading, spacing: CardMetrics.gap) {
                         ForEach(drawn) { row in
                             switch row {
                             case .header(let group, let header):
@@ -59,10 +66,16 @@ struct ListColumn: View {
                     }
                     .coordinateSpace(.named(Self.space))
                     .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { model.dropping.move(key, origin: $0) }
+                    ) { peek in
+                        if let other = peek.lists[.day] { DayRows(list: other, model: model) }
+                    }
                 }
                 .scrollIndicators(.hidden)
                 .softEdges(trailing: ListColumn.trailingRoom)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.rest(column, width: $0) }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                    width = $0
+                    model.rest(column, width: $0)
+                }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(key, visible: $0) }
                 // The field stays in sight: when it opens or moves, and when the keyboard takes the bottom of the list.
                 .onChange(of: model.entry.moved) { reveal(scroller) }
@@ -190,6 +203,59 @@ private enum ListRowView: Identifiable {
     }
 }
 
+/// One column's day while another day comes in, as the plugin's `DayTrack` lane: the day shown slides out one side as
+/// the next comes in from the other, each seen only within the column. Only this lane reads the share of the way, so a
+/// frame of the slide moves the two days and draws nothing else anew.
+struct DayLane<Shown: View, Next: View>: View {
+    let model: BoardModel
+    let width: CGFloat
+    var slides = true
+    let shown: Shown
+    @ViewBuilder let next: (BoardSnapshot) -> Next
+
+    var body: some View {
+        if slides, let turn = model.dayTurn {
+            let shift = CGFloat(turn.shift)
+            let share = model.dayShare
+            ZStack(alignment: .topLeading) {
+                shown.offset(x: -shift * share * width)
+                next(turn.peek)
+                    .offset(x: shift * (1 - share) * width)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        } else {
+            shown
+        }
+    }
+}
+
+/// Another day's list as it will stand, drawn only while it slides in: its headers, plates and cards, nothing to touch.
+private struct DayRows: View {
+    let list: BoardList
+    let model: BoardModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: CardMetrics.gap) {
+            ForEach(Array(list.groups.enumerated()), id: \.element.id) { index, group in
+                if let header = group.header {
+                    SectionHeader(title: header, group: group, column: list.column, model: model)
+                        .padding(.top, index == 0 ? 0 : ColumnMetrics.sectionGap)
+                        .padding(.bottom, -CardMetrics.gap)
+                }
+                if group.empty { EmptyPlate() }
+                ForEach(group.cards) { card in
+                    TaskCapsule(card: card)
+                        .overlay(alignment: .topLeading) { if let branch = card.branch { BranchLine(branch: branch) } }
+                        .padding(.leading, CGFloat(card.level) * CardMetrics.indent)
+                        .frame(height: CardMetrics.height)
+                }
+            }
+        }
+        .padding(.horizontal, CardMetrics.columnInset)
+    }
+}
+
 /// A row typed in, at its depth with its branch.
 private struct EntryRow<Content: View>: View {
     let level: Int
@@ -247,26 +313,32 @@ struct ColumnTitle: View {
     var body: some View {
         HStack(spacing: 4) {
             if dayArrows {
-                Button("Previous Day", systemImage: "chevron.left") { Task { await model.step(-1) } }
-                    .labelStyle(.iconOnly)
-                    .frame(width: 32, height: 32)
+                Button { Task { await model.step(-1) } } label: { arrow("chevron.left") }
+                    .accessibilityLabel("Previous Day")
             }
             if dayArrows {
-                Button { Task { await model.showToday() } } label: { titleText }
+                Button { Task { await model.showToday() } } label: { titleText.frame(height: ColumnMetrics.titleRow).contentShape(.rect) }
                     .accessibilityHint("Back to today")
             } else {
                 titleText.accessibilityAddTraits(.isHeader)
             }
             if dayArrows {
-                Button("Next Day", systemImage: "chevron.right") { Task { await model.step(1) } }
-                    .labelStyle(.iconOnly)
-                    .frame(width: 32, height: 32)
+                Button { Task { await model.step(1) } } label: { arrow("chevron.right") }
+                    .accessibilityLabel("Next Day")
             }
         }
         .buttonStyle(.plain)
         .fontWeight(.semibold)
         .frame(height: ColumnMetrics.titleRow)
         .padding(.horizontal, dayArrows ? 0 : 16)
+    }
+
+    /// A day arrow: the whole 32-point square takes the tap, not only the chevron's strokes, which a plain button's label
+    /// alone would.
+    private func arrow(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .frame(width: 32, height: 32)
+            .contentShape(.rect)
     }
 
     private var titleText: some View {

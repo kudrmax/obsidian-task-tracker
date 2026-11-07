@@ -155,8 +155,16 @@ final class BoardModel {
     /// The day before and after the shown one, read ahead so the arrows show them in the same frame.
     @ObservationIgnored private var ahead: [String: BoardSnapshot] = [:]
     @ObservationIgnored private var neighbours: (previous: String, next: String)?
-    /// Which way the last change of the day went: the day list and the calendar slide in from that side.
-    private(set) var dayMotion = 1
+    /// Another day coming in, as the plugin's `DayTrack`: the day read for it and the side it comes from (1: the next).
+    private(set) var dayTurn: DayTurn?
+    /// How far the day has come in, 0 to 1. Only the parts that read it move: the day's cards in each column.
+    var dayShare: CGFloat = 0
+    @ObservationIgnored private let daySlide = DaySlide()
+
+    struct DayTurn {
+        let peek: BoardSnapshot
+        let shift: Int
+    }
     @ObservationIgnored private var watch: FileWatch?
 
     /// The screen read again. A read asked while one runs makes that one read once more, and waits for it: every caller
@@ -298,21 +306,44 @@ final class BoardModel {
         shownDay = nil
     }
 
-    /// Another day: the one read ahead slides in at once, as Calendar slides days, then the screen is read for it anew.
+    /// Another day, as the plugin turns it: the header and the hours stand still while in each column the day slides out
+    /// and the next comes in, the header naming whichever stands nearer. The day read ahead comes in at once; another is
+    /// read first. Arrived, the screen is read anew underneath.
     private func turn(to day: String, motion: Int) async {
-        dayMotion = motion
+        landTurn()
         shownDay = day
-        if let kept = ahead[day], kept.tasksText == snapshot?.tasksText {
-            neighbours = nil
-            withAnimation(.smooth) {
-                snapshot = kept
-                entry.screenChanged()
-            }
-            // Read anew underneath, the clock and the undo steps as they are now; the same screen draws nothing new.
-            await reload()
-        } else {
-            await reload(animated: true)
+        neighbours = nil
+        var peek = ahead[day].flatMap { $0.tasksText == snapshot?.tasksText ? $0 : nil }
+        if peek == nil {
+            let board = board
+            peek = try? await Task.detached { try board.snapshot(day: day, measures: CardMetrics.timeline) }.value
         }
+        guard let peek, shownDay == day else { return await reload() }
+        dayTurn = DayTurn(peek: peek, shift: motion)
+        dayShare = 0
+        let arrived = await daySlide.run(from: 0, to: 1) { [weak self] share in self?.dayShare = share }
+        if arrived { landTurn() }
+        await reload()
+    }
+
+    /// The day that came in stands for good: the screen is drawn from it, with no animation.
+    private func landTurn() {
+        daySlide.stop()
+        guard let turn = dayTurn else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            snapshot = turn.peek
+            entry.screenChanged()
+            dayTurn = nil
+            dayShare = 0
+        }
+    }
+
+    /// The header's day while a day comes in: the one that stands nearer.
+    var titleSnapshot: BoardSnapshot? {
+        guard let turn = dayTurn, dayShare >= 0.5 else { return snapshot }
+        return turn.peek
     }
 
     // MARK: Search
@@ -968,6 +999,13 @@ final class BoardModel {
         if laid?.hour != hour { layOut(timeline, hour: hour) }
         guard let laid else { return Self.scaled(timeline.slots, from: CGFloat(CardMetrics.timeline.hour), to: hour) }
         return laid.hour == hour ? laid.slots : Self.scaled(laid.slots, from: laid.hour, to: hour)
+    }
+
+    /// Another day's calendar cards while it slides in: its read's stack, scaled to the hour shown. The stack laid out for
+    /// the day shown is left as it is; the core lays the new day out once it stands.
+    func slidingSlots(_ timeline: BoardTimeline, hour: CGFloat) -> [BoardSlot] {
+        let read = CGFloat(CardMetrics.timeline.hour)
+        return abs(hour - read) < 0.5 ? timeline.slots : Self.scaled(timeline.slots, from: read, to: hour)
     }
 
     /// The last stack the core laid out, and for which timeline and hour.

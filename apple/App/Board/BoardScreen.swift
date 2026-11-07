@@ -228,8 +228,8 @@ struct Ribbon: View {
                         }
                     }
                     column(.soon, half) { lists(.soon) }
-                    // The day list and the calendar are one day: they slide together when it changes.
-                    dayPart {
+                    // The day list and the calendar show one day; when it changes, each slides it within itself.
+                    Group {
                         HStack(spacing: 0) {
                             lists(.day, dayArrows: true)
                                 .frame(width: list)
@@ -293,15 +293,6 @@ struct Ribbon: View {
     private func nearest(_ x: CGFloat, half: CGFloat, width: CGFloat) -> RibbonPlace {
         let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, half), (.today, width)]
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
-    }
-
-    /// The day list and the calendar change days together: the new day slides in from the side the arrow points to.
-    private func dayPart(@ViewBuilder _ content: () -> some View) -> some View {
-        content()
-            .id(snapshot.day)
-            .transition(.push(from: model.dayMotion > 0 ? .trailing : .leading))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .clipShape(.rect)
     }
 
     /// The day list's width: its share of the screen, within the plugin's bounds for a phone.
