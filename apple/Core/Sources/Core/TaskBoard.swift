@@ -41,6 +41,9 @@ public final class TaskBoard: @unchecked Sendable {
     /// The vault's files as they are now.
     public func files(now: Date = Date()) throws -> BoardFiles {
         let settings = vault.settingsJSON()
+        lock.lock()
+        settingsSeen = settings
+        lock.unlock()
         let tasks: String?
         do {
             tasks = try vault.read().tasks
@@ -75,6 +78,27 @@ public final class TaskBoard: @unchecked Sendable {
     /// A pure rule (`rules.*`) on its own context: made over no file, never waiting for a read on another thread.
     public func rule<T: Decodable>(_ method: String, _ arguments: [JSONValue] = [], as type: T.Type = T.self) throws -> T {
         try answer(method, arguments, BoardFiles(tasks: nil, settingsJSON: "", calendars: [:], now: Date()), on: pure).result.decode(T.self)
+    }
+
+    /// A quick entry's call (`entry.*`), on the pure rules' context over the settings as last read: it reads no file, so a
+    /// keystroke never waits for a read.
+    public func entry(_ method: String, _ arguments: [JSONValue]) throws -> JSONValue {
+        let files = BoardFiles(tasks: nil, settingsJSON: lastSettings(), calendars: [:], now: Date())
+        return try answer("entry." + method, arguments, files, on: pure).result
+    }
+
+    private var settingsSeen: String?
+
+    private func lastSettings() -> String {
+        lock.lock()
+        let seen = settingsSeen
+        lock.unlock()
+        if let seen { return seen }
+        let read = vault.settingsJSON()
+        lock.lock()
+        settingsSeen = read
+        lock.unlock()
+        return read
     }
 
     /// A pure rule asked by a read on its own thread, on the reading core.

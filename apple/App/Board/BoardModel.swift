@@ -62,9 +62,40 @@ enum DropTiming {
 final class BoardModel {
     private let board = AppServices.shared.board
 
+    /// Typing tasks in place: the core's quick entry, driven for this screen.
+    @ObservationIgnored let entry = QuickEntryHost()
+
     init() {
         dropping.ended = { [weak self] in self?.carryEnded() }
+        entry.model = self
     }
+
+    /// A screen the quick entry read after its write, drawn in the same step as the entry's state for it.
+    func draw(_ read: BoardSnapshot) {
+        snapshot = read
+        problem = nil
+    }
+
+    /// Another day in the day list, as the quick entry's place menu asks: the screen read for it.
+    func show(day: String) async {
+        shownDay = day
+        await reload(animated: true)
+    }
+
+    func problem(_ error: Error) {
+        problem = Self.words(error)
+    }
+
+    /// A level's or a label's shades in both themes, asked once per colour.
+    func shades(_ color: String) -> Themed<Shades>? {
+        if let known = shadesByColor[color] { return known }
+        guard let dark: Shades = ruleNow("rules.shadesOf", [.string(color), "dark"]), let light: Shades = ruleNow("rules.shadesOf", [.string(color), "light"]) else { return nil }
+        let found = Themed(dark: dark, light: light)
+        shadesByColor[color] = found
+        return found
+    }
+
+    @ObservationIgnored private var shadesByColor: [String: Themed<Shades>] = [:]
 
     /// Where the ribbon stands. A swipe sets it as the ribbon settles; `go(to:)` moves the ribbon there.
     var place = RibbonPlace.today
@@ -93,8 +124,6 @@ final class BoardModel {
     /// The sheets and pages a menu opens.
     var dateFor: [TaskItem]?
     var repeatFor: TaskItem?
-    var renaming: TaskItem?
-    var subtaskOf: TaskItem?
     var newSection: TaskItem?
     var fullScreen: [TaskItem] = []
 
@@ -152,12 +181,16 @@ final class BoardModel {
     /// The screen drawn from `read`; a drop's in one step with the end of its carry, so the card stands in its place at once.
     private func show(_ read: BoardSnapshot, animated: Bool) {
         if animated {
-            withAnimation(.snappy) { snapshot = read }
+            withAnimation(.snappy) {
+                snapshot = read
+                entry.screenChanged()
+            }
         } else {
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) {
                 snapshot = read
+                entry.screenChanged()
                 endCarry()
             }
         }
@@ -239,7 +272,10 @@ final class BoardModel {
         shownDay = day
         if let kept = ahead[day], kept.tasksText == snapshot?.tasksText {
             neighbours = nil
-            withAnimation(.smooth) { snapshot = kept }
+            withAnimation(.smooth) {
+                snapshot = kept
+                entry.screenChanged()
+            }
             // Read anew underneath, the clock and the undo steps as they are now; the same screen draws nothing new.
             await reload()
         } else {
@@ -370,14 +406,6 @@ final class BoardModel {
         await write("tasks.setReminder", [item.key.json, .string(kind)])
     }
 
-    func rename(_ item: TaskItem, to text: String) async {
-        await write("tasks.rename", [item.key.json, .string(text)])
-    }
-
-    func addSubtask(to parent: TaskItem, _ text: String) async {
-        await write("tasks.createInPlace", [.string(text), .null, ["kind": "subtask", "parent": parent.key.json, "before": .null]])
-    }
-
     func toggleCollapsed(_ item: TaskItem) async {
         await write("tasks.toggleCollapsed", [item.key.json])
     }
@@ -426,13 +454,6 @@ final class BoardModel {
 
     // MARK: Drag and drop
 
-    /// Where the plus was let go: the new task's place, waiting for its title.
-    struct NewTaskSpot: Identifiable {
-        let id = UUID()
-        let place: JSONValue
-    }
-
-    var newTaskAt: NewTaskSpot?
 
     /// What is carried: a card (its id, its task, the column it is drawn in, where the finger holds it from its top), or
     /// the plus, a task not written yet.
@@ -622,10 +643,8 @@ final class BoardModel {
             let place: JSONValue = try await rule("rules.placeOfDrop", [Self.listCards(others), gap.place, home])
             if carry.id == Carried.plus {
                 cancelCarry()
-                guard !place.isNull else { return }
-                let look: JSONValue = ["cards": [:], "day": .string(snapshot.day), "shown": [], "sections": [:], "sectioned": [:]]
-                let entry: [String: JSONValue] = try await read("entry.placeOf", [.null, look, .string(column.rawValue), place])
-                if let spot = entry["value"], !spot.isNull { newTaskAt = NewTaskSpot(place: spot) }
+                // The field opens where the drop showed, at the level the gap stood at.
+                entry.openAtDrop(column, ["kind": "place", "column": .string(column.rawValue), "place": place.isNull ? ["kind": "task", "group": gap.group.json, "before": .null] : place])
             } else if !place.isNull, let item = carry.item {
                 await drop(item, from: carry.from, to: ["kind": "place", "column": .string(column.rawValue), "place": place])
                 DropTiming.report(since: dropAt)
@@ -666,16 +685,14 @@ final class BoardModel {
 
     /// Let go over the calendar: the card settles at the time the line shows.
     private func landOnCalendar() -> CGRect? {
-        guard let carry, let minute = landing, let snapshot else { return nil }
+        guard let carry, let minute = landing, snapshot != nil else { return nil }
         let hour = calendarHour
         writingDrop = true
         Task {
             let dropAt = ContinuousClock.now
             if carry.id == Carried.plus {
                 cancelCarry()
-                if let slot: JSONValue = try? await read("tasks.newSlot", [.string(snapshot.day), .number(Double(minute))]) {
-                    newTaskAt = NewTaskSpot(place: ["kind": "slot", "slot": slot])
-                }
+                entry.openAtDrop(nil, ["kind": "time", "start": .number(Double(minute))])
             } else if let item = carry.item {
                 await drop(item, from: carry.from, to: ["kind": "time", "start": .number(Double(minute))])
                 DropTiming.report(since: dropAt)
@@ -705,11 +722,6 @@ final class BoardModel {
 
     /// The grid's minute for each whole minute a carry has passed over at each zoom: a drag asks on every move.
     @ObservationIgnored private var snapped: [SnapKey: Int] = [:]
-
-    /// The task the plus was let go for, once its title is typed.
-    func create(_ text: String, at spot: NewTaskSpot) async {
-        await write("tasks.createInPlace", [.string(text), .null, spot.place])
-    }
 
     private func drop(_ item: TaskItem, from: String, to: JSONValue) async {
         guard let day = snapshot?.day else { return }

@@ -99,9 +99,9 @@ struct TaskMenu {
     private func edits(_ item: TaskItem) -> [MenuNode] {
         let model = model
         var edits: [MenuNode] = []
-        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { model.renaming = item }) }
+        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { model.entry.rename(item) }) }
         if menu.edits.contains("repeat") { edits.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
-        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { model.subtaskOf = item }) }
+        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { model.entry.addSubtask(item) }) }
         edits.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) })
         edits.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
         return edits

@@ -73,6 +73,8 @@ public struct BoardList: Sendable, Hashable {
     public let title: String
     public let groups: [BoardGroup]
     public let showsHeaders: Bool
+    /// The column shows sections (`tasks.columnSections`): a section's name may be typed in it.
+    public let sectioned: Bool
     /// Every card of the list in drawing order, as a drop reads the gaps between them.
     public var cards: [BoardCard] { groups.flatMap(\.cards) }
 }
@@ -289,7 +291,7 @@ extension TaskBoard {
                     empty: group.empty,
                     menu: group.menu)
             }
-            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders)
+            return BoardList(column: column, title: title, groups: groups, showsHeaders: view.showsHeaders, sectioned: sections != nil)
         }
 
         let name: (String) throws -> String = { try self.read("tasks.listName", [.string($0)], over: files) }
