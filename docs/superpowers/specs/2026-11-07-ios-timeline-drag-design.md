@@ -252,6 +252,37 @@ and the plugin reads the same functions instead of its own tables:
   `removeFromSuperview` that drops the first responder, no keys lost while it moves, no `blur` from a stale
   `textFieldDidEndEditing`). Check by typing fast across Enter, a move to another list, a plate and a rename.
 
+**Max's findings on the phone (Swift).**
+
+- M1. The plus is dragged at once: no hold before it lifts (a tap still opens the capture sheet).
+- M2. The plus flying back after a cancelled or targetless drag still dissolves and grows. It flies back to its place
+  as one piece, the way the system returns a cancelled drag preview, and lands in its slot.
+- M3. A card flickers for a moment when its drag starts (screen recording). The lift is one smooth system lift, no
+  frame where the row and its preview both show or both vanish.
+- M4. While dragging it is unclear whether the drop makes a task or a subtask. The gap shows the level the drop will
+  write, indented with its branch line as in the plugin, and moves between levels with an animation as the finger
+  crosses the level's line.
+- M5. The Soon column is as narrow as the calendar. The columns' widths are the plugin's (the ribbon's `d, W−d`
+  pattern applies to which column, check `obsidian/ui` and the board), Soon is not tied to the calendar's width.
+- M6. A swipe can fly through every place at once. Paging goes one place per swipe, as in the plugin.
+- M7. A subtask being dragged keeps its vertical branch line hanging. The carried subtask shows no stray line: the
+  branch closes up as the row leaves, and the gap draws the line it will join.
+
+- M8. The task's menu scrolls by a few points: it must fit without scrolling for a card anywhere on the screen
+  (top, middle, bottom of a column and of the calendar, a task with every option offered). As stock iOS menus do:
+  the most used actions as one row of medium icon buttons at the top (`preferredElementSize = .medium`, as Notes and
+  Files), the rest as rows; rarely used ones may go one level down into a submenu, never deeper. Nothing is removed.
+
+- M9. A scrolled list's cards are cut by a hard line under its title (Inbox, Backlog, Soon, the day: screenshot,
+  a card's sliver under «Backlog»). Every scrolling list and the calendar fade out softly at the edge they scroll
+  under instead: a short vertical fade (the height of about half a card), shown only while content is actually
+  under that edge, so a list at its top shows no fade. In the app: iOS 26's own soft scroll-edge effect where it
+  applies, otherwise a gradient mask of the same kind. In the plugin the same, as a `mask-image` from a new `--tc-…`
+  token, so both look alike (frontend-obsidian, both platforms).
+
+- M10. A tap on the plus opens the capture screen with the text field already focused: the keyboard is up and the
+  cursor in the field as the screen appears, so typing starts at once (voice stays one tap away).
+
 **Docs (frontend-obsidian).** R5: `docs/plugin/app.md` still describes the New Task / Rename / Add Subtask sheets. It
 describes the quick entry in place as the app now has it (the field in the list, Enter, empty Enter, what ends typing,
 «⋯» as the check, the bar over the keyboard and its smaller forms, `p1 `, the long press on the empty calendar, «No
@@ -377,3 +408,11 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
 - frontend-swift (quick entry): the section field is the header's type (15 pt semibold) in the text colour with the
   placeholder «Section name». The task menu's Section › New Section… stays an alert: it names a section to move that task
   into, not a header at the field's place.
+- backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
+  rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
+  rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
+  rows: the plugin's fallback to the end for a parent gone from the rows and Swift's `raw` in the comparison are dropped,
+  the keys compared as `samePlace`.
+- backend (R6b): `SCREEN_PLACES`, `SHOWN_LISTS` and `placeShowing(column, place)` live in `core/application/screenPlaces.ts`
+  (contracts; door `rules.constants`, `rules.placeShowing`). A list not shown is shown from the nearest place that shows
+  it, as the plugin's `modeShowing`: the day's list chosen from Inbox turns to Soon, not to Today as Swift's `turn` did.

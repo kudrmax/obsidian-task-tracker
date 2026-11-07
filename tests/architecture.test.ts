@@ -275,6 +275,9 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	stackCorner: "./timelineStack",
 	timeParts: "./timelineStack",
 	durationParts: "./timelineStack",
+	placeShowing: "./screenPlaces",
+	SCREEN_PLACES: "./screenPlaces",
+	SHOWN_LISTS: "./screenPlaces",
 };
 
 /**
@@ -291,6 +294,8 @@ const DOOR_OF_RUNTIME: Readonly<Record<string, string>> = {
 	EVENT_BG_ALPHA: "rules.constants",
 	DEFAULT_ZOOM_LEVELS: "rules.constants",
 	DEFAULT_ZOOM_HOUR: "rules.constants",
+	SCREEN_PLACES: "rules.constants",
+	SHOWN_LISTS: "rules.constants",
 	LINE_BREAK: "rules.oneLine",
 	DayBoundary: "boundary.dayOf",
 	QuickEntrySession: "entry.enter",
