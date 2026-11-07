@@ -521,11 +521,11 @@ final class EntryTextField: UITextField, UITextFieldDelegate, UIGestureRecognize
         return false
     }
 
-    /// The keyboard went: the entry ends as by a tap elsewhere, unless the field only moved to another row or a sheet of
-    /// the bar took it for a while.
+    /// The keyboard went: the entry ends as by a tap elsewhere, unless the field only moved to another row, waits off
+    /// screen for the list it moved to (another day being read), or a sheet of the bar took it for a while.
     func textFieldDidEndEditing(_ textField: UITextField) {
         Task { @MainActor [weak self] in
-            guard let self, self.wanted, !self.isFirstResponder, self.host?.paused != true else { return }
+            guard let self, self.wanted, self.window != nil, !self.isFirstResponder, self.host?.paused != true else { return }
             self.host?.blur()
         }
     }

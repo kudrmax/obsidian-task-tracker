@@ -858,6 +858,18 @@ final class BoardModel {
         try? board.branchOf(levels: levels, index: index)
     }
 
+    /// Every row's branch among rows of these `levels`, asked once per list of levels: the quick entry's lists draw them
+    /// on each keystroke.
+    func branches(levels: [Int]) -> [Branch?] {
+        if let known = branchesByLevels[levels] { return known }
+        let found = levels.indices.map { levels[$0] > 0 ? branch(levels: levels, index: $0) : nil }
+        if branchesByLevels.count > 64 { branchesByLevels = [:] }
+        branchesByLevels[levels] = found
+        return found
+    }
+
+    @ObservationIgnored private var branchesByLevels: [[Int]: [Branch?]] = [:]
+
     // MARK: Words
 
     static func words(_ error: Error) -> String {

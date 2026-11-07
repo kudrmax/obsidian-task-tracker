@@ -94,17 +94,20 @@ struct ListColumn: View {
         return entry == nil ? rows : Self.branched(rows, model: model)
     }
 
-    /// The branch lines of the rows typed in, as the core draws a subtask's, over the levels of the list as it stands.
+    /// The branch lines of every row while the field stands in the list, as the core draws a subtask's over the levels
+    /// of the list with the field in it: a card above the field keeps its line going down to it.
     private static func branched(_ rows: [ListRowView], model: BoardModel) -> [ListRowView] {
-        let levels = rows.compactMap(\.level)
+        let branches = model.branches(levels: rows.compactMap(\.level))
         var at = -1
         return rows.map { row in
             guard let level = row.level else { return row }
             at += 1
-            guard level > 0 else { return row }
+            let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
-            case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: model.branch(levels: levels, index: at))
-            case .field(_, _, let section): return .field(level: level, branch: model.branch(levels: levels, index: at), section: section)
+            case .card(let card) where card.branch != branch:
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, id: card.id))
+            case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
+            case .field(_, _, let section): return .field(level: level, branch: branch, section: section)
             default: return row
             }
         }
