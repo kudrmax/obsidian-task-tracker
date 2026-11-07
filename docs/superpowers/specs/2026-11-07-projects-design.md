@@ -151,6 +151,42 @@ project block, and agents.md (how an agent reads and writes a task's project).
 
 (The frontends write here the gaps they decide.)
 
+Backend (the core's contract):
+
+1. **The field is read anywhere on the line**, like a label: `🗂️ [[Note]]` (with or without the emoji's variation
+   selector) is taken out of the text wherever it stands, so no title ever holds it; the core writes it after the labels,
+   before `📁` and the other fields. An alias or a heading of the link is dropped (`[[P|p]]` reads as `P`). A plain
+   `[[Note]]` without the marker stays text.
+2. **One project by name**: a task's project is the link's note name, case aside, as Obsidian resolves a link; a project
+   note (from `Projects`) gives it its path and its shortest link. A task's link to an untagged note keeps the name and
+   gets no arrow (`canOpenNote` false); its group in Backlog shows only while it has tasks there.
+3. **Subtasks**: a task put under another always loses its own field (its parent's counts); a subtask leaving its parent
+   (a move, the timeline, a repeat copy) gets the parent's on its line. The search finds a task by its project's name,
+   not its subtasks (they show under it).
+4. **The places carry the project's part** (`zone`: the link, null for No project) on cards, gaps, `ListPlace`, `DropTo`
+   `group`, `NewTaskPlace` and the headers a finger passes; a plain list carries none. A drop or a new task in a part
+   with no task to stand before goes right after the last task of that project the column shows in that section, else
+   to the section's end. The same rule serves the project's view (every card there carries the project).
+5. **A section named in a project's part** (the section button inside a project group, or in a project's view) asks the
+   name, then the first task, and writes both in one call (`NewTaskPlace.section`): the heading right after the group
+   the field stood in, or the task into that section when the list has it (after the project's last task there). The
+   field closes after that first task. Escape, or an empty Enter, after the name writes nothing. No project's part
+   follows the same rule (an empty section is made only with grouping off).
+6. **Section actions in a group** (`renameGroup`/`removeGroup` with `menu.project`): rename to a new name puts the new
+   heading right before the old one with the project's tasks under it; to a name the list has, the tasks join its end;
+   the old section left empty goes. Remove takes the project's tasks to the end of No section.
+7. **The Project row** is `TaskMenuModel.project` in every menu, one task's and the bulk menu's (not a `MenuEditId`):
+   drawn right after Section, or where Section would stand. A subtask's row is disabled and shows its parent's project.
+8. **Grouping state** lives on the device as `GroupingState` (`on` per list, `folded` keys per list): the Obsidian
+   frontend keeps it through the `GroupingStore` port (its local storage), the door hands it back in `grouping`. Folded
+   key: the project's name lowercased, `""` for No project. A found task in a folded group unfolds it (`reveal`).
+9. **The project's view** is `tasks.screen(date, project)`: the same lists filtered to the project, empty sections and
+   grouping left out, the mark off (`ProjectRef.mark`). A drop in a column without sections (a past day) keeps the
+   main screen's rule.
+10. **The setting** `projectTag` (`#project`) is stored with its `#`; a note is a project when it has exactly that tag,
+    case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
+    note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
+
 ## Ideas for later
 
 Approved by Max as directions, to be designed one by one after the core.

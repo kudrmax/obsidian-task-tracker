@@ -276,7 +276,7 @@ export class TaskReads {
 			const markdown = descriptionMarkdown(entry);
 			const descriptionText = markdown === null ? "" : plainDescription(markdown);
 			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
-			const projectText = entry.project === null ? "" : (index.refOf(entry.project)?.name ?? projectName(entry.project));
+			const projectText = entry.project === null || entry.path.length > 0 ? "" : (index.refOf(entry.project)?.name ?? projectName(entry.project));
 			const project = projectText === "" ? null : fuzzy.matchWords(projectText);
 			if (title || description || project) {
 				const hit: SearchHit = {
