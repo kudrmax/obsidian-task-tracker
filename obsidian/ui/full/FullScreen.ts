@@ -195,6 +195,7 @@ export class FullScreen {
 		this.closed = true;
 		this.leaveTask();
 		this.capsule.destroy();
+		this.list.destroy();
 		document.removeEventListener("keydown", this.onKey);
 		this.el.classList.remove("is-shown");
 		window.setTimeout(() => this.el.remove(), tokenMs(this.el, DURATION.fade));

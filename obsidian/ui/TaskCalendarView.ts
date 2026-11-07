@@ -515,6 +515,7 @@ export class TaskCalendarView extends ItemView {
 		this.quick?.close();
 		this.poll?.stop();
 		this.timeline?.destroy();
+		for (const list of [this.list, this.soonList, this.doneList, this.inboxList, this.backlogList]) list?.destroy();
 		this.unsubscribe.splice(0).forEach((off) => off());
 	}
 

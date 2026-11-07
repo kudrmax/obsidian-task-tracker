@@ -1,4 +1,4 @@
-import { SCREEN_PLACES } from "../../core/application/contracts";
+import { type DropColumn, placeShowing, SCREEN_PLACES, type ScreenPlace } from "../../core/application/contracts";
 import type { RightMode } from "./viewSettings";
 import { CarefulPace } from "./CarefulPace";
 import { DURATION, LAYOUT, PROPERTY, tokenMs } from "./design";
@@ -28,16 +28,14 @@ const DRAG = "switch";
 
 const placeOf = (place: Place): number => placeIndex(place);
 
-/** The place a tap on a column turns to: none when the window shows it, else the nearest that does. */
-function placeShowing(column: number, from: number): number | null {
-	if (column === from || column === from + 1) return null;
-	return column < from ? column : column - 1;
-}
+/** The list each icon stands for; the calendar's icon is no list, and only the calendar's place shows it. */
+const LIST_OF: Readonly<Record<SwitchColumn, DropColumn | null>> = { inbox: "inbox", soon: "soon", now: "day", calendar: null };
 
-/** The place showing `column`: `mode` itself when it does, else the nearest that does, as a tap on its icon turns to. */
-export function modeShowing(column: SwitchColumn, mode: RightMode): RightMode {
-	const place = placeShowing(COLUMNS.indexOf(column), placeOf(mode));
-	return place === null ? mode : SCREEN_PLACES[place];
+/** The place a tap on an icon turns to: the one standing, when it shows the icon's column, else the nearest that does (from Done, as from Inbox, its neighbour). */
+function placeForIcon(column: SwitchColumn, from: Place): ScreenPlace {
+	const list = LIST_OF[column];
+	if (list === null) return "calendar";
+	return placeShowing(list, from === "done" ? "inbox" : from);
 }
 
 interface Press {
@@ -177,10 +175,11 @@ export class ColumnSwitch {
 			return;
 		}
 		const cell = target instanceof Element ? target.closest<HTMLElement>(".tc-seg-icon") : null;
-		const column = cell ? COLUMNS.indexOf(cell.dataset.column as SwitchColumn) : -1;
-		if (column < 0) return;
-		const place = placeShowing(column, placeOf(this.opts.value()));
-		if (place !== null) this.show(SCREEN_PLACES[place]);
+		const column = cell?.dataset.column as SwitchColumn | undefined;
+		if (!column || !COLUMNS.includes(column)) return;
+		const from = this.opts.value();
+		const place = placeForIcon(column, from);
+		if (place !== from) this.show(place);
 	}
 
 	/** The wheel rolls from where it stands to its place; a place other than the one shown moves the screen with it. */

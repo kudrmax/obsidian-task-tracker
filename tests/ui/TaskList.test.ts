@@ -26,6 +26,21 @@ const task = (text: string, index: number): TaskItem => onDay({
 }, "2026-11-01");
 
 describe("TaskList", () => {
+	it("fades the edge it is scrolled under, and stops following its scroll once destroyed", () => {
+		const el = document.createElement("div");
+		Object.defineProperty(el, "scrollHeight", { get: () => 1000 });
+		Object.defineProperty(el, "clientHeight", { get: () => 400 });
+		const list = new TaskList(el, { items: () => [task("A", 0)], day: () => null });
+		list.render();
+		el.scrollTop = 100;
+		el.dispatchEvent(new Event("scroll"));
+		expect(el.classList.contains("is-under-top")).toBe(true);
+		list.destroy();
+		el.scrollTop = 0;
+		el.dispatchEvent(new Event("scroll"));
+		expect(el.classList.contains("is-under-top")).toBe(true);
+	});
+
 	it("hands out the same cards until it draws again", () => {
 		const list = new TaskList(document.createElement("div"), { items: () => [task("A", 0), task("B", 1)], day: () => null });
 		list.render();

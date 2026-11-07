@@ -102,7 +102,10 @@ export class DayPeek {
 	}
 
 	remove(): void {
+		if (this.removed) return;
 		this.removed = true;
+		this.list.destroy();
+		this.timeline.destroy();
 		this.el.remove();
 	}
 

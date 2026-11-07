@@ -94,6 +94,11 @@ export class TaskList {
 		this.edges.update();
 	}
 
+	/** The list goes away with its view or its peek: it stops following its scroll and size. */
+	destroy(): void {
+		this.edges.destroy();
+	}
+
 	private draw(): void {
 		const day = this.deps.day();
 		const items = this.deps.items();
