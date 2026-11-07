@@ -1,4 +1,4 @@
-import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
+import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, type ProjectZone, QuickEntrySession, type QuickEntryTasks, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import type { RightMode } from "../viewSettings";
 import { SHOWN_LISTS } from "../screens";
 import type { EntryPart } from "./EntryPart";
@@ -149,7 +149,7 @@ export class QuickEntryController {
 			deps.tasks,
 			{
 				cards: (column) => this.cards(column),
-				sections: (column) => deps.list(column)?.groups.map((group) => group.name) ?? [],
+				sections: (column) => deps.list(column)?.sections ?? [],
 				sectioned: (column) => deps.sectioned(column),
 				day: () => deps.day(),
 				today: () => deps.today(),
@@ -182,9 +182,9 @@ export class QuickEntryController {
 	}
 
 	/** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
-	openIn(column: ListColumn, group: GroupName): void {
+	openIn(column: ListColumn, group: GroupName, project?: ProjectZone): void {
 		this.dropField();
-		this.entry.openIn(column, group);
+		this.entry.openIn(column, group, project);
 	}
 
 	/**
@@ -283,7 +283,7 @@ export class QuickEntryController {
 	/** What `column`'s list draws for the entry: none when the field stands elsewhere. */
 	entryIn(column: ListColumn, drawing: EntryDrawing): ListEntryInput | null {
 		const entry = this.state && this.entry.listEntry(column, drawing);
-		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, field: (row) => this.fieldIn(row) } : null;
+		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, newSection: entry.newSection, field: (row) => this.fieldIn(row) } : null;
 	}
 
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */

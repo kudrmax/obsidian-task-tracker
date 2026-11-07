@@ -36,6 +36,8 @@ export interface DragControllerDeps {
 	pick?(item: TaskItem, card: HTMLElement, e: MouseEvent, how: "tap" | "menu"): boolean;
 	/** A list card tapped where `pressed` is: true when the tap folded or unfolded its subtasks, so its menu stays shut. */
 	fold?(item: TaskItem, pressed: EventTarget | null): boolean;
+	/** A card or block tapped where `pressed` is: true when the tap was on its project's mark and opened the note, so its menu stays shut. */
+	mark?(item: TaskItem, pressed: EventTarget | null): boolean;
 	/** The other picked cards that go along when `item` is lifted; none when it is not picked or picked alone. */
 	carried?(item: TaskItem): readonly PickedCard[];
 	readonly haptics: Haptics;
@@ -95,7 +97,7 @@ export class DragController {
 				this.begin(card, payload, e, subtree, carried);
 			},
 			onTap: (e) => {
-				if (this.deps.pick?.(item, card, e, "tap") || this.deps.fold?.(item, pressed)) return;
+				if (this.deps.pick?.(item, card, e, "tap") || this.deps.mark?.(item, pressed) || this.deps.fold?.(item, pressed)) return;
 				this.tapped(e, item, this.deps.onMenu(item, card));
 			},
 		});
@@ -106,11 +108,15 @@ export class DragController {
 			e.preventDefault();
 			this.selectWithMenu(block, item);
 		});
+		let pressed: EventTarget | null = null;
+		block.addEventListener("pointerdown", (e) => (pressed = e.target));
 		new LongPress(block, {
 			delayMs: () => this.deps.longPressMs(),
 			busy: () => this.deps.arbiter.busy,
 			onStart: (e) => (e.pointerType === "mouse" ? this.begin(block, this.payload(block, item, "timeline", e), e) : this.hold(block, item, e)),
-			onTap: (e) => this.tapped(e, item, this.deps.onMenu(item, block)),
+			onTap: (e) => {
+				if (!this.deps.mark?.(item, pressed)) this.tapped(e, item, this.deps.onMenu(item, block));
+			},
 			onLongTap: () => this.selectWithMenu(block, item),
 		});
 	}

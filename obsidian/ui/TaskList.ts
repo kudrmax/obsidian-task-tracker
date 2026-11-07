@@ -1,4 +1,5 @@
-import { type EntryAt, type EntryDrawing, type GroupName, type ListCard, type ListGroup, type ListRow, type ListSection, type ListView, listView, type PendingText, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
 import { el } from "./dom";
@@ -13,6 +14,8 @@ export interface ListEntryInput {
 	readonly pending: readonly PendingText[];
 	/** The field writes a section's name: it stands as the new header does, apart from the group above, whose plate stays. */
 	readonly section?: boolean;
+	/** The section named in a project's part for the task being typed: its header stands over the field. */
+	readonly newSection?: string | null;
 	/** Draws the field into `parent`, the row that stands in the list; gives the field's element. */
 	field(parent: HTMLElement): HTMLElement;
 }
@@ -27,6 +30,10 @@ export interface TaskListDeps {
 	sections?(): readonly ListSection[];
 	/** The header over the tasks outside any section. */
 	ungroupedName?(): string;
+	/** The list's grouping by project: while on, the list draws its project groups in place of its sections. */
+	grouping?(): ListGrouping | null;
+	/** A project group's header: the chevron and the title fold it, the arrow opens the note. */
+	onProjectHead?(head: HTMLElement, group: ProjectGroup): void;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
 	pending?(): TaskItem | null;
 	/** The task being typed, which takes its place among the cards about to be drawn (`drawing`) without being one of them; null when none is. */
@@ -39,8 +46,8 @@ export interface TaskListDeps {
 	/** `subtree` gives the cards of the task's subtasks at every depth: they go wherever the task goes. */
 	onCard?(card: HTMLElement, item: TaskItem, subtree: readonly HTMLElement[]): void;
 	onHeader?(head: HTMLElement, group: ListGroup): void;
-	/** The No tasks plate under an empty section's header. */
-	onPlate?(plate: HTMLElement, group: ListGroup): void;
+	/** The No tasks plate under an empty section's header, or of an empty project group (`project`, its part). */
+	onPlate?(plate: HTMLElement, group: ListGroup, project?: ProjectZone): void;
 }
 
 export interface ListEntry {
@@ -50,14 +57,60 @@ export interface ListEntry {
 	readonly level: number;
 	/** The section it is drawn in: none in a list that shows no headers. */
 	readonly group: GroupName;
+	/** The project's part it is drawn in, in a list grouped by project. */
+	readonly project?: ProjectZone;
+}
+
+/** A section as the list draws it: in a list grouped by project, with the part of the project it is drawn in. */
+export interface DrawnSection {
+	readonly group: ListGroup;
+	readonly project?: ProjectZone;
+}
+
+/** What the list draws, in order: a project group's header, or a section of cards. */
+type Drawn = { readonly kind: "project"; readonly group: ProjectGroup } | ({ readonly kind: "section" } & DrawnSection);
+
+/** What a list shows: its sections as the core groups them, or its project groups, each with its sections. */
+interface ListShape {
+	readonly headers: boolean;
+	readonly drawn: readonly Drawn[];
+}
+
+/** An empty project group: it draws the No tasks plate where its sections would stand, and a task can be put there. */
+const EMPTY_PART: ListGroup = { name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false };
+
+function shapeOf(view: ListView, grouping: ListGrouping | null): ListShape {
+	if (!grouping?.on) return { headers: view.showsHeaders, drawn: view.groups.map((group) => ({ kind: "section", group })) };
+	const drawn = grouping.groups.flatMap((group): Drawn[] => [
+		{ kind: "project", group },
+		...(group.folded ? [] : (group.sections.length > 0 ? group.sections : [EMPTY_PART]).map((section): Drawn => ({ kind: "section", group: section, project: group.zone }))),
+	]);
+	return { headers: true, drawn };
+}
+
+function sectionsOf(shape: ListShape): DrawnSection[] {
+	return shape.drawn.flatMap((d) => (d.kind === "section" ? [{ group: d.group, ...(d.project !== undefined && { project: d.project }) }] : []));
+}
+
+/** A section's header as the places see it: a name, or with its project's part in a grouped list. */
+function headerOf(section: DrawnSection): Header {
+	return section.project === undefined ? section.group.name : { group: section.group.name, project: section.project };
+}
+
+function plateKey(name: GroupName, project?: ProjectZone): string {
+	return JSON.stringify([project === undefined ? "" : project, name]);
 }
 
 const QUICK_ROW = "tc-quick-row";
 export const PLATE = "tc-group-empty";
 
-/** What a list about to draw `view` shows the field among. */
-function drawingOf(view: ListView): EntryDrawing {
-	return { cards: view.groups.flatMap((group) => group.rows.map(({ item, level }) => ({ key: item.key, level, group: group.name }))), sections: view.groups.map((group) => group.name) };
+/** What a list about to draw `shape` shows the field among. */
+function drawingOf(shape: ListShape): EntryDrawing {
+	const sections = sectionsOf(shape);
+	return {
+		cards: sections.flatMap((section) => section.group.rows.map(({ item, level }) => ({ key: item.key, level, group: section.group.name, ...(section.project !== undefined && { project: section.project }) }))),
+		sections: sections.map(headerOf),
+	};
 }
 
 /**
@@ -66,10 +119,12 @@ function drawingOf(view: ListView): EntryDrawing {
  */
 export class TaskList {
 	private entries: ListEntry[] = [];
-	private rendered: readonly ListGroup[] = [];
+	private rendered: readonly DrawnSection[] = [];
 	private nodes: HTMLElement[] = [];
-	/** Each empty section's No tasks plate drawn, by its name. */
-	private plates = new Map<GroupName, HTMLElement>();
+	/** Each header drawn, as the places see it: a section's, or a project group's (its part without a section, or its end while folded). */
+	private heads = new Map<HTMLElement, Header>();
+	/** Each empty section's No tasks plate drawn, by its name and its project's part. */
+	private plates = new Map<string, HTMLElement>();
 	/** Each section's cards as drawn, its subtasks' among them. */
 	private sectionCards = new Map<ListGroup, HTMLElement[]>();
 	private withHeaders = false;
@@ -88,22 +143,29 @@ export class TaskList {
 		this.drawnCards = null;
 		this.draw();
 		this.drawnCards = null;
+		this.fadeCutTitles();
+	}
+
+	/** A project's title fades at its end only when the header cuts it: the count and the arrow follow a whole title right after it. */
+	private fadeCutTitles(): void {
+		for (const name of this.el.querySelectorAll<HTMLElement>(".tc-group-head.is-project > .tc-group-name")) name.classList.toggle("is-cut", name.scrollWidth > name.clientWidth);
 	}
 
 	private draw(): void {
 		const day = this.deps.day();
 		const items = this.deps.items();
-		const view = this.viewOf(items);
-		const entry = this.deps.entry?.(drawingOf(view)) ?? null;
+		const shape = this.shapeOf(items);
+		const entry = this.deps.entry?.(drawingOf(shape)) ?? null;
 		const renaming = this.deps.renaming?.() ?? null;
 		const kept = entry ? this.keptRow() : null;
 		for (const child of [...this.el.children]) if (child !== kept) child.remove();
 		this.entries = [];
 		this.nodes = [];
+		this.heads = new Map();
 		this.plates = new Map();
 		this.sectionCards = new Map();
-		this.rendered = view.groups;
-		this.withHeaders = view.showsHeaders;
+		this.rendered = sectionsOf(shape);
+		this.withHeaders = shape.headers;
 		const rows: { node: HTMLElement; level: number }[] = [];
 		const at = entry?.at ?? null;
 		let entered = entry === null;
@@ -116,13 +178,13 @@ export class TaskList {
 		const enterAtCard = (): void => {
 			if (at?.kind === "in" && at.section === section && at.card === this.entries.length) enter();
 		};
-		const add = ({ item, level }: ListRow, group: GroupName): void => {
+		const add = ({ item, level }: ListRow, group: GroupName, project: ProjectZone | undefined): void => {
 			enterAtCard();
 			const card = renderTaskCard(this.el, item, { day });
 			card.style.setProperty(PROPERTY.level, String(level));
 			const renamed = renaming !== null && samePlace(renaming, item.key);
 			card.classList.toggle("is-renaming", renamed);
-			this.entries.push({ card, item, level, group });
+			this.entries.push({ card, item, level, group, ...(project !== undefined && { project }) });
 			this.nodes.push(card);
 			if (!renamed) rows.push({ node: card, level });
 		};
@@ -136,17 +198,23 @@ export class TaskList {
 			}
 		};
 		if (at?.kind === "top") enter();
-		this.rendered.forEach((group, i) => {
-			section = i;
-			if (this.withHeaders) this.nodes.push(this.header(group));
+		let i = -1;
+		for (const part of shape.drawn) {
+			if (part.kind === "project") {
+				this.nodes.push(this.projectHeader(part.group));
+				continue;
+			}
+			section = ++i;
+			const { group, project } = part;
+			if (this.withHeaders && group.header) this.nodes.push(this.header(group, project));
 			const platesField = at?.kind === "in" && at.section === i && !at.keepsPlate;
-			if (group.empty && !platesField) this.nodes.push(this.plate(group));
+			if (group.empty && !platesField) this.nodes.push(this.plate(group, project));
 			const groupStart = this.entries.length;
-			for (const row of group.rows) add(row, group.name);
+			for (const row of group.rows) add(row, group.name, project);
 			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
 			enterAtCard();
-		});
+		}
 		enter();
 		if (entry) this.markRenamed(renaming);
 		rows.forEach((row, i) => {
@@ -181,12 +249,21 @@ export class TaskList {
 			before.push(card);
 			put(card, level);
 		}
+		const named = entry.newSection ? this.namedHeader(entry.newSection) : null;
+		if (named) before.push(named);
 		if (kept) kept.before(...before);
 		const row = kept ?? el(this.el, "div", QUICK_ROW);
 		for (const old of row.querySelectorAll(":scope > .tc-branch, :scope > .tc-branch-pass")) old.remove();
 		entry.field(row);
 		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.level);
+	}
+
+	/** The header of the section named for the task being typed, over the field, as a section's header looks. */
+	private namedHeader(name: string): HTMLElement {
+		const head = el(this.el, "div", "tc-group-head is-named");
+		el(head, "span", "tc-group-name", name);
+		return head;
 	}
 
 	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */
@@ -214,30 +291,40 @@ export class TaskList {
 
 	/** The cards the list is about to draw from what it is to show now, as `listCards` gives them once it has. */
 	get comingCards(): readonly ListCard[] {
-		return drawingOf(this.viewOf(this.deps.items())).cards;
+		return drawingOf(this.shapeOf(this.deps.items())).cards;
 	}
 
-	private viewOf(items: readonly TaskItem[]): ListView {
-		return listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);
+	private shapeOf(items: readonly TaskItem[]): ListShape {
+		return shapeOf(listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []), this.deps.grouping?.() ?? null);
 	}
 
-	/** A card as places in the list see it: in the section it is drawn in. */
+	/** A card as places in the list see it: in the section, and the project's part, it is drawn in. */
 	listCard(entry: ListEntry): ListCard {
-		return { key: entry.item.key, level: entry.level, group: entry.group };
+		return { key: entry.item.key, level: entry.level, group: entry.group, ...(entry.project !== undefined && { project: entry.project }) };
 	}
 
 	/** The sections as drawn; one ungrouped run when the list shows none. */
 	get groups(): readonly ListGroup[] {
-		return this.rendered;
+		return this.rendered.map((section) => section.group);
+	}
+
+	/** The sections as drawn, each with its project's part in a list grouped by project: what the field stands among. */
+	get sections(): readonly Header[] {
+		return this.rendered.map(headerOf);
+	}
+
+	/** What a header drawn means for a place: undefined for any other node. */
+	headerAt(node: HTMLElement): Header | undefined {
+		return this.heads.get(node);
 	}
 
 	get headers(): boolean {
 		return this.withHeaders;
 	}
 
-	/** The No tasks plate of empty section `name`; null when none is drawn. */
-	plateOf(name: GroupName): HTMLElement | null {
-		return this.plates.get(name) ?? null;
+	/** The No tasks plate of empty section `name` (of the project's part `project`); null when none is drawn. */
+	plateOf(name: GroupName, project?: ProjectZone): HTMLElement | null {
+		return this.plates.get(plateKey(name, project)) ?? null;
 	}
 
 	/** The cards drawn in `group`, one of `groups`, its subtasks' among them. */
@@ -250,18 +337,45 @@ export class TaskList {
 		return this.nodes;
 	}
 
-	private header(group: ListGroup): HTMLElement {
+	private header(group: ListGroup, project?: ProjectZone): HTMLElement {
 		const head = el(this.el, "div", group.name === null ? "tc-group-head is-ungrouped" : "tc-group-head");
+		head.classList.toggle("is-in-project", project !== undefined);
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
+		this.heads.set(head, headerOf({ group, project }));
 		this.deps.onHeader?.(head, group);
 		return head;
 	}
 
-	private plate(group: ListGroup): HTMLElement {
+	/**
+	 * A project group's header: the section header with a chevron before its title, turned down while the group is open,
+	 * the count of its tasks while folded, and the arrow that opens the note. A drop on it lands in the group: among its
+	 * tasks without a section, or at its end while it is folded.
+	 */
+	private projectHeader(group: ProjectGroup): HTMLElement {
+		const head = el(this.el, "div", "tc-group-head is-project");
+		head.classList.toggle("is-ungrouped", group.project === null);
+		head.classList.toggle("is-shut", group.folded);
+		head.setAttribute("role", "button");
+		head.setAttribute("aria-expanded", String(!group.folded));
+		el(head, "span", "tc-group-chevron").appendChild(icon("chevronRight"));
+		el(head, "span", "tc-group-name", group.title);
+		if (group.folded) el(head, "span", "tc-group-count", String(group.count));
+		if (group.canOpenNote) {
+			const open = el(head, "span", "tc-group-open");
+			open.setAttribute("aria-label", `Open ${group.title}`);
+			open.appendChild(icon("openFile"));
+		}
+		const end = group.end.kind === "task" ? group.end : null;
+		this.heads.set(head, group.folded && end ? { group: end.group, project: group.zone } : { group: null, project: group.zone });
+		this.deps.onProjectHead?.(head, group);
+		return head;
+	}
+
+	private plate(group: ListGroup, project?: ProjectZone): HTMLElement {
 		const plate = el(this.el, "div", PLATE, "No tasks");
 		plate.dataset.group = group.name ?? "";
-		this.plates.set(group.name, plate);
-		this.deps.onPlate?.(plate, group);
+		this.plates.set(plateKey(group.name, project), plate);
+		this.deps.onPlate?.(plate, group, project);
 		return plate;
 	}
 }

@@ -5,7 +5,7 @@ import { formatHour, formatTime, minutesOf } from "./dates";
 import { DESIGN, PROPERTY } from "./design";
 import { clear, el, px } from "./dom";
 import { Grips } from "./kit/Grips";
-import { markColours, renderMeta, showProgressDot } from "./TaskCard";
+import { markColours, renderMeta, renderProjectMark, showProgressDot } from "./TaskCard";
 import { shownCardSize } from "./cardSize";
 import { fillTitle } from "./TaskTitle";
 import { durationParts, gridAt, type Grid, itemBox, layoutEvents, minutesToPx, type PlacedSpan, pxToMinutes, scrollPlace, type Span, stackTasks, type TaskSpan, timeParts } from "./timelineLayout";
@@ -624,6 +624,7 @@ export class Timeline {
 		markColours(card, item);
 		showProgressDot(card, item);
 		fillTitle(el(card, "div", "tc-card-title"), item.text);
+		renderProjectMark(card, item);
 		renderMeta(card, item);
 		const meta = el(card, "span", "tc-block-meta is-hidden");
 		el(meta, "span");

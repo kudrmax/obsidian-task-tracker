@@ -37,6 +37,7 @@ export function fillCard(card: HTMLElement, item: TaskItem, opts: TaskCardOption
 	card.classList.toggle("is-collapsed", item.collapsed);
 	showProgressDot(card, item);
 	fillTitle(el(card, "div", "tc-card-title"), item.text);
+	renderProjectMark(card, item);
 	renderMeta(card, item);
 	const corner = cardDue(item, opts.day);
 	if (!corner) return;
@@ -58,11 +59,30 @@ export function renderMeta(card: HTMLElement, item: TaskItem): void {
 	if (meta) card.appendChild(meta);
 }
 
-/** The column of a card already drawn, right after its title, as the task now stands: set, changed, or taken away. */
+/** The column of a card already drawn, right after its title and its project's mark, as the task now stands: set, changed, or taken away. */
 export function showMeta(card: HTMLElement, item: TaskItem): void {
 	card.querySelector(":scope > .tc-meta")?.remove();
 	const meta = metaOf(item);
-	if (meta) card.querySelector(":scope > .tc-card-title")?.after(meta);
+	if (meta) (card.querySelector(":scope > .tc-project-mark") ?? card.querySelector(":scope > .tc-card-title"))?.after(meta);
+}
+
+/**
+ * The folder of a task's project on the right of its card, in the date's place and of its width, left of the counter,
+ * the date and the repeat; on the Mac its tooltip names the project. None where the screen shows no mark (`ProjectRef.mark`).
+ */
+export function renderProjectMark(card: HTMLElement, item: Pick<TaskItem, "project">): void {
+	const project = item.project;
+	if (!project?.mark) return;
+	const mark = el(card, "span", "tc-project-mark");
+	mark.appendChild(icon("project"));
+	mark.setAttribute("aria-label", project.name);
+	mark.title = project.name;
+	mark.classList.toggle("is-openable", project.canOpenNote);
+}
+
+/** A tap on a card's project mark opens the project's note, in place of its menu. */
+export function onProjectMark(target: EventTarget | null): boolean {
+	return target instanceof Element && target.closest(".tc-project-mark") !== null;
 }
 
 /** A tap on the subtask counter of a card folds the task's subtasks away or shows them again, in place of its menu. */
