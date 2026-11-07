@@ -239,3 +239,11 @@ describe("the picked tasks carried along", () => {
 		expect(carriedWith(a, [a, b])).toEqual([b]);
 	});
 });
+
+describe("the order of the groups", () => {
+	it("is the same for every menu, statuses on top and Delete last, so both frontends draw one order", () => {
+		const order = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
+		expect(taskMenu([item()], T, [], [], null).groups).toEqual(order);
+		expect(taskMenu([item(), item()], T, [], [], null, { kind: "bulk" }).groups).toEqual(order);
+	});
+});

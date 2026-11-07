@@ -4,7 +4,7 @@ import type { PriorityLevel } from "../domain/Priority";
 import { type LocalDate, nextProgress, REMINDER_KINDS, type TaskStatus } from "../domain/Task";
 import { projectKey } from "../domain/Project";
 import { NO_PROJECT } from "./projects";
-import type { ColumnSections, DropColumn, MenuEditId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
+import type { ColumnSections, DropColumn, MenuEditId, MenuGroupId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
 
@@ -148,11 +148,15 @@ export function menuProject(items: readonly TaskItem[], known: readonly ProjectR
 	};
 }
 
+/** The menu's groups top to bottom, the same in every frontend. */
+export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
+
 /** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
 export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectRef[] = []): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
 	const edits = menuEdits(items, of, sections);
 	return {
+		groups: MENU_GROUPS,
 		statuses: menuStatuses(items, of),
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
 		labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },

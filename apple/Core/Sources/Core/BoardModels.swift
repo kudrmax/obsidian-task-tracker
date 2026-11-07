@@ -351,6 +351,8 @@ public struct Removal: Decodable, Hashable, Sendable {
 
 /// `TaskMenuModel`: what a task's menu, or the bulk menu, offers.
 public struct TaskMenuModel: Decodable, Hashable, Sendable {
+    /// The order the groups are drawn in, top to bottom: the core's, the same as the plugin's.
+    public let groups: [String]
     public let statuses: [MenuStatus]
     public let levels: MenuTiles
     public let labels: MenuTiles

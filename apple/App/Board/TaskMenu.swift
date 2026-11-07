@@ -18,16 +18,14 @@ enum MenuQuestion: Identifiable {
 /// One row of a menu, drawn the same by UIKit (a card's menu) and SwiftUI (a bar's menu).
 indirect enum MenuNode {
     /// `opens`: it opens a sheet, an alert or a page, which UIKit shows only once the menu has gone.
-    case action(title: String, symbol: String?, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, opens: Bool = false, run: @MainActor () -> Void)
+    case action(title: String, symbol: String?, tint: String? = nil, destructive: Bool = false, checked: Bool = false, keepsOpen: Bool = false, opens: Bool = false, disabled: Bool = false, run: @MainActor () -> Void)
     case submenu(title: String, symbol: String, subtitle: String?, children: [MenuNode])
     /// A group between separators; `row` draws it as the row of icons over their titles on top of a menu.
     case group(row: Bool, children: [MenuNode])
 }
 
-/// The task's menu as iOS 26 draws a context menu, short enough to fit beside a card anywhere on the screen with no
-/// scroll, as Notes and Files keep theirs: the most used actions as one row of three icons on top (Done, Rename, Add
-/// Subtask; the system's medium row holds three), then the other statuses, the places and marks, each a row that opens
-/// one level down, the pages, and Delete last. Every row is the core's `TaskMenuModel`: the menu offers what it offers.
+/// The task's menu as iOS 26 draws a menu, in the plugin's order as the core gives it: the statuses, the priorities and
+/// the labels as rows of icons, the moves, the edits, the pages, Delete last. Every row is the core's `TaskMenuModel`.
 @MainActor
 struct TaskMenu {
     let items: [TaskItem]
@@ -41,21 +39,85 @@ struct TaskMenu {
 
     private var single: Bool { items.count == 1 }
 
+    /// The groups in the core's order (`menu.groups`), the plugin's: each drawn as iOS draws a menu's group.
     var nodes: [MenuNode] {
-        let first = menu.statuses.first { $0.id == "done" } ?? menu.statuses.first
-        let others = menu.statuses.filter { $0.id != first?.id }
-        var row: [MenuNode] = first.map { [status($0)] } ?? []
-        if single, let item = items.first { row += quickEdits(item) }
-        var nodes: [MenuNode] = [.group(row: true, children: row)]
-        var marks: [MenuNode] = []
-        if !others.isEmpty {
-            marks.append(.submenu(title: "Status", symbol: "circle.dashed", subtitle: nil, children: others.map(status)))
+        menu.groups.compactMap(group)
+    }
+
+    private func group(_ id: String) -> MenuNode? {
+        let items = items, model = model
+        let children: [MenuNode]
+        var row = true
+        switch id {
+        case "statuses":
+            children = menu.statuses.map(status)
+        case "levels":
+            children = menu.levels.tiles.map { tile in
+                .action(title: tile.mark.title, symbol: tile.on ? "flag.fill" : "flag", tint: tile.mark.color, checked: tile.on, disabled: menu.levels.disabled) { Task { await model.togglePriority(items, tile.mark.title) } }
+            }
+        case "labels":
+            children = menu.labels.tiles.map { tile in
+                .action(title: tile.mark.title, symbol: tile.on ? "tag.fill" : "tag", tint: tile.mark.color, checked: tile.on, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
+            }
+        case "moves":
+            children = menu.moves.map { move in
+                .action(title: MoveWords.title(move.id), symbol: MoveWords.symbol(move.id), opens: move.date == nil) {
+                    if let date = move.date { Task { await model.postpone(items, to: date) } } else { model.dateFor = items }
+                }
+            }
+        case "edits":
+            children = editRows
+            row = false
+        case "opens":
+            children = single ? items.first.map(opens) ?? [] : []
+            row = false
+        case "remove":
+            children = remove.map { [$0] } ?? []
+            row = false
+        default:
+            children = []
         }
-        marks += pages
-        nodes.append(.group(row: false, children: marks))
-        if single, let item = items.first { nodes.append(.group(row: false, children: opens(item))) }
-        if let remove { nodes.append(.group(row: false, children: [remove])) }
-        return nodes
+        return children.isEmpty ? nil : .group(row: row, children: children)
+    }
+
+    /// The edit rows in the core's order (`menu.edits`).
+    private var editRows: [MenuNode] {
+        let items = items, model = model, inStack = inStack
+        guard let item = items.first else { return [] }
+        var rows: [MenuNode] = []
+        for edit in menu.edits {
+            switch edit {
+            case "rename" where single:
+                rows.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } })
+            case "reminder" where single && !menu.reminders.isEmpty:
+                rows.append(.submenu(title: "Reminder", symbol: "bell", subtitle: menu.reminders.first(where: \.checked).map { ReminderWords.title($0.kind) }, children: menu.reminders.map { reminder in
+                    .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
+                }))
+            case "description" where single:
+                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { model.fullScreen.append(item) })
+            case "repeat" where single:
+                rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
+            case "section":
+                if let section = sectionPage { rows.append(section) }
+            case "subtask" where single:
+                rows.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } })
+            default: break
+            }
+        }
+        return rows
+    }
+
+    private var sectionPage: MenuNode? {
+        guard let sections = menu.sections else { return nil }
+        let items = items, model = model
+        var rows: [MenuNode] = sections.options.map { option in
+            .action(title: option.name ?? sections.choice.ungrouped, symbol: nil, checked: option.checked) { Task { await model.toSection(items, option.name) } }
+        }
+        if sections.create {
+            rows = [.group(row: false, children: rows), .group(row: false, children: [.action(title: "New Section…", symbol: "plus", opens: true) { model.newSection = items.first }])]
+        }
+        let current = sections.options.first(where: \.checked).map { $0.name ?? sections.choice.ungrouped }
+        return .submenu(title: "Section", symbol: "rectangle.stack", subtitle: current, children: rows)
     }
 
     private func status(_ status: MenuStatus) -> MenuNode {
@@ -73,63 +135,10 @@ struct TaskMenu {
         }
     }
 
-    private var pages: [MenuNode] {
-        var pages: [MenuNode] = []
-        let items = items, model = model
-        if !menu.levels.disabled, !menu.levels.tiles.isEmpty {
-            pages.append(.submenu(title: "Priority", symbol: "flag", subtitle: menu.levels.tiles.first(where: \.on)?.mark.title, children: menu.levels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: "flag.fill", tint: tile.mark.color, checked: tile.on) { Task { await model.togglePriority(items, tile.mark.title) } }
-            }))
-        }
-        if !menu.labels.disabled, !menu.labels.tiles.isEmpty {
-            let on = menu.labels.tiles.filter(\.on).map(\.mark.title)
-            pages.append(.submenu(title: "Labels", symbol: "tag", subtitle: on.isEmpty ? nil : on.joined(separator: ", "), children: menu.labels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, keepsOpen: true) { Task { await model.toggleLabel(items, tile.mark.title) } }
-            }))
-        }
-        if !menu.moves.isEmpty || menu.removeDue {
-            var moves: [MenuNode] = menu.moves.map { move in
-                .action(title: MoveWords.title(move.id), symbol: MoveWords.symbol(move.id), opens: move.date == nil) {
-                    if let date = move.date { Task { await model.postpone(items, to: date) } } else { model.dateFor = items }
-                }
-            }
-            if menu.removeDue {
-                moves.append(.action(title: "Remove Due Date", symbol: "calendar.badge.minus") { Task { await model.removeDue(items) } })
-            }
-            pages.append(.submenu(title: "Move To", symbol: "calendar", subtitle: nil, children: moves))
-        }
-        if let sections = menu.sections, menu.edits.contains("section") {
-            var rows: [MenuNode] = sections.options.map { option in
-                .action(title: option.name ?? sections.choice.ungrouped, symbol: nil, checked: option.checked) { Task { await model.toSection(items, option.name) } }
-            }
-            if sections.create {
-                rows = [.group(row: false, children: rows), .group(row: false, children: [.action(title: "New Section…", symbol: "plus", opens: true) { model.newSection = items.first }])]
-            }
-            let current = sections.options.first(where: \.checked).map { $0.name ?? sections.choice.ungrouped }
-            pages.append(.submenu(title: "Section", symbol: "rectangle.stack", subtitle: current, children: rows))
-        }
-        if single, let item = items.first, !menu.reminders.isEmpty {
-            pages.append(.submenu(title: "Reminder", symbol: "bell", subtitle: menu.reminders.first(where: \.checked).map { ReminderWords.title($0.kind) }, children: menu.reminders.map { reminder in
-                .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
-            }))
-        }
-        return pages
-    }
-
-    /// Rename and Add Subtask, typed in place: the row on top.
-    private func quickEdits(_ item: TaskItem) -> [MenuNode] {
-        let model = model, inStack = inStack
-        var edits: [MenuNode] = []
-        if menu.edits.contains("rename") { edits.append(.action(title: "Rename", symbol: "pencil", opens: true) { if inStack { model.entry.renameInStack(item) } else { model.entry.rename(item) } }) }
-        if menu.edits.contains("subtask") { edits.append(.action(title: "Add Subtask", symbol: "arrow.turn.down.right", opens: true) { if inStack { model.entry.addSubtaskInStack(item) } else { model.entry.addSubtask(item) } }) }
-        return edits
-    }
-
     /// The pages a task opens: its repeat, its full screen, its line in Obsidian.
     private func opens(_ item: TaskItem) -> [MenuNode] {
         let model = model
         var opens: [MenuNode] = []
-        if menu.edits.contains("repeat") { opens.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item }) }
         if !ownPage { opens.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
         opens.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
         return opens
@@ -148,11 +157,12 @@ extension MenuNode {
     @MainActor
     private func element(_ later: @escaping (@escaping @MainActor () -> Void) -> Void, _ palette: (String) -> UIColor?) -> UIMenuElement {
         switch self {
-        case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let run):
+        case .action(let title, let symbol, let tint, let destructive, let checked, let keepsOpen, let opens, let disabled, let run):
             var image = symbol.flatMap { UIImage(systemName: $0) }
             if let tint, let color = palette(tint) { image = image?.withTintColor(color, renderingMode: .alwaysOriginal) }
             var attributes: UIMenuElement.Attributes = destructive ? [.destructive] : []
             if keepsOpen { attributes.insert(.keepsMenuPresented) }
+            if disabled { attributes.insert(.disabled) }
             return UIAction(title: title, image: image, attributes: attributes, state: checked ? .on : .off) { _ in
                 if opens { later { run() } } else { run() }
             }
@@ -162,7 +172,7 @@ extension MenuNode {
             return menu
         case .group(let row, let children):
             let menu = UIMenu(options: .displayInline, children: children.map { $0.element(later, palette) })
-            if row { menu.preferredElementSize = .medium }
+            if row { menu.preferredElementSize = children.count > 3 ? .small : .medium }
             return menu
         }
     }
@@ -177,11 +187,11 @@ struct MenuNodes: View {
     var body: some View {
         ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
             switch node {
-            case .action(let title, let symbol, _, let destructive, let checked, let keepsOpen, _, let run):
+            case .action(let title, let symbol, _, let destructive, let checked, let keepsOpen, _, let disabled, let run):
                 let button = Button(role: destructive ? .destructive : nil) { run() } label: {
                     if let symbol { Label(title, systemImage: checked ? "checkmark" : symbol) } else if checked { Label(title, systemImage: "checkmark") } else { Text(title) }
                 }
-                if keepsOpen { button.menuActionDismissBehavior(.disabled) } else { button }
+                if keepsOpen { button.menuActionDismissBehavior(.disabled).disabled(disabled) } else { button.disabled(disabled) }
             case .submenu(let title, let symbol, let subtitle, let children):
                 Menu {
                     MenuNodes(nodes: children)

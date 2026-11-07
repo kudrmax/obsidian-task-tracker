@@ -81,7 +81,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 ### `tasks.*`: `TaskService`
 
 Every method of `TaskService` but `onChange`, by its name and with its arguments: `tasks.screen(date)`,
-`tasks.search(query)`, `tasks.menu(item, from, screen)`, `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
+`tasks.search(query)`, `tasks.menu(item, from, screen)` (its `groups`: the order the menu is drawn in, the plugin's), `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
 priority, place, repeat?, labels?)`, … (87 methods; `methods()` lists them). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 

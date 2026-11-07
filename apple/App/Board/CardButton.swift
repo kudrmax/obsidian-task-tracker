@@ -150,8 +150,9 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }, for: .touchUpInside)
         addSubview(fold)
         addAction(UIAction { [weak self] _ in self?.onTouch() }, for: .touchUpInside)
-        // The menu on a long press, the card its lifted preview; the drag on the same view takes over once the finger moves.
-        addInteraction(UIContextMenuInteraction(delegate: self))
+        // A tap opens the menu, as the plugin's tap does; a long press lifts the card for the drag.
+        isContextMenuInteractionEnabled = true
+        showsMenuAsPrimaryAction = true
         drag = UIDragInteraction(delegate: self)
         drag.isEnabled = true
         addInteraction(drag)
@@ -193,9 +194,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
         onTouch()
-        return UIContextMenuConfiguration(identifier: id as NSString, previewProvider: nil) { [weak self] _ in
-            self?.menuMaker { run in self?.afterMenu = run }
-        }
+        guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return nil }
+        return UIContextMenuConfiguration(identifier: id as NSString, previewProvider: nil) { _ in menu }
     }
 
     override func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configuration: UIContextMenuConfiguration, highlightPreviewForItemWithIdentifier identifier: any NSCopying) -> UITargetedPreview? {
