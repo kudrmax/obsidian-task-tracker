@@ -1,3 +1,4 @@
+import type { ProjectZone } from "../domain/Project";
 import type { LocalDate } from "../domain/Task";
 import type { ColumnSections, DropColumn, DroppedTask, DropFrom, DropOrigin, DropTo, TaskChange, TaskKey, TaskStep } from "./contracts";
 import type { ListPlace } from "./nesting";
@@ -52,8 +53,8 @@ export function placesInGap(column: DropColumn, from: DropOrigin, grouped: boole
 	return from === "new" || from === column || grouped;
 }
 
-/** The table of spec §5.1: what a task dragged from `from` and let go on `to` means, the day column showing `day`. */
-function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
+/** The table of spec §5.1: what a task dragged from `from` and let go on `to` means, the day column showing `day`; `project`, the task's own, which a title keeps. */
+function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate, project: ProjectZone): DropMove {
 	switch (to.kind) {
 		case "time":
 			return { kind: "toTime", from, start: to.start, day };
@@ -61,6 +62,8 @@ function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
 			return { kind: "clearSlot" };
 		case "group":
 			return { kind: "moveToGroup", list: to.list, group: to.group, before: to.before, date: to.date ?? undefined, ...(to.project !== undefined && { project: to.project }) };
+		case "title":
+			return { kind: "moveToGroup", list: to.list, group: null, before: null, date: to.date ?? undefined, ...(to.byProject && { project }) };
 		case "nest":
 			return { kind: "nest", parent: to.parent, before: to.before };
 		case "list":
@@ -74,11 +77,11 @@ function dropMove(from: DropFrom, to: ReadDrop, day: LocalDate): DropMove {
 /** What a drop of these tasks means: one task's move, its single call; several, the steps of one `applyAll`, a slot set or cleared for none of them. */
 export type DropMoves = { readonly kind: "one"; readonly key: TaskKey; readonly move: DropMove } | { readonly kind: "many"; readonly steps: readonly TaskStep[] };
 
-/** `TaskService.drop`'s meaning, the day column showing `day`. */
-export function dropMoves(tasks: readonly DroppedTask[], to: ReadDrop, day: LocalDate): DropMoves {
-	if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day) };
+/** `TaskService.drop`'s meaning, the day column showing `day`; `projectOf`, each task's project as the file has it, which a drop on a title reads. */
+export function dropMoves(tasks: readonly DroppedTask[], to: ReadDrop, day: LocalDate, projectOf: (key: TaskKey) => ProjectZone = () => null): DropMoves {
+	if (tasks.length === 1) return { kind: "one", key: tasks[0].key, move: dropMove(tasks[0].from, to, day, projectOf(tasks[0].key)) };
 	const steps = tasks.flatMap(({ key, from }): TaskStep[] => {
-		const move = dropMove(from, to, day);
+		const move = dropMove(from, to, day, projectOf(key));
 		return move.kind === "toTime" || move.kind === "clearSlot" ? [] : [{ key, change: move }];
 	});
 	return { kind: "many", steps };

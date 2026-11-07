@@ -196,6 +196,11 @@ Backend (the core's contract):
 10. **The setting** `projectTag` (`#project`) is stored with its `#`; a note is a project when it has exactly that tag,
     case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
     note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
+11. **A drop on a column's title** is `ScreenView.titleDrops[column]` (`day`, `soon`, `inbox`, `backlog`), a `DropTo`
+    the frontend hands to `drop` unchanged: `{ kind: "title", list, date, byProject }`. Each task of a stack goes by its
+    own project as the file has it at the drop (a subtask: its parent's, written on its line as it leaves). A day
+    column without sections (a past day) gives the plain end of its list (`kind: "list"`); a move into Now dates the
+    task today, as every move there does.
 
 iPhone app (the minimum that keeps it from breaking):
 
