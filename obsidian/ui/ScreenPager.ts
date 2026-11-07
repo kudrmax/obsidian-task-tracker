@@ -87,6 +87,19 @@ export class ScreenPager implements SwipeTarget {
 		this.finish();
 	}
 
+	/**
+	 * With no finger, as an arrow turns it: the screen runs the whole way to the next one `shift`'s way along the track
+	 * `make` draws, as one let go at its start would. What was running stands where it was going first.
+	 */
+	run(shift: Shift, make: () => ScreenTrack): Promise<void> {
+		this.finish();
+		this.reset();
+		const track = make();
+		this.way = { shift, track };
+		this.shift = shift;
+		return this.settle(shift);
+	}
+
 	private frame(settling: Settling, time: number): void {
 		if (this.settling !== settling) return;
 		settling.start ??= time;
