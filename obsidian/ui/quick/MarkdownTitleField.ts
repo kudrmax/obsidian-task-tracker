@@ -31,7 +31,8 @@ export class MarkdownTitleField implements TitleField {
 	private readonly app: App;
 	private scoped = false;
 
-	constructor(app: App, host: EditorHost, sourcePath: string, parent: HTMLElement, opts: TitleFieldOptions) {
+	/** `keys`: the scope the field's own keys stand over; Obsidian's own when none (a note's block gives its own, so its fields' keys never reach the note). */
+	constructor(app: App, host: EditorHost, sourcePath: string, parent: HTMLElement, opts: TitleFieldOptions, keys: Scope = app.scope) {
 		this.el = el(parent, "div", "tc-title-field");
 		this.hint = el(null, "span", "", opts.placeholder);
 		const { events } = opts;
@@ -62,7 +63,7 @@ export class MarkdownTitleField implements TitleField {
 			},
 		});
 		this.app = app;
-		this.scope = new Scope(app.scope);
+		this.scope = new Scope(keys);
 		this.scope.register(["Alt"], "Tab", () => {
 			if (!this.composing) events.onSwitch();
 			return false;

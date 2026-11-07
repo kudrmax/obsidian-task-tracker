@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment happy-dom
+import { describe, expect, it, vi } from "vitest";
+import { TFile } from "obsidian";
 import type { NoteTags } from "../../core/application/projects";
-import { type NoteIndex, VaultProjects } from "../../obsidian/infrastructure/VaultProjects";
+import { type NoteIndex, ObsidianNoteIndex, VaultProjects } from "../../obsidian/infrastructure/VaultProjects";
 import { GROUPING_KEY, LocalGroupingStore } from "../../obsidian/infrastructure/LocalGroupingStore";
 
 class FakeIndex implements NoteIndex {
@@ -102,5 +104,49 @@ describe("LocalGroupingStore", () => {
 	it("starts afresh from a spoiled entry", () => {
 		const store = new LocalGroupingStore({ loadLocalStorage: () => "{", saveLocalStorage: () => undefined });
 		expect(store.get()).toEqual({});
+	});
+});
+
+describe("ObsidianNoteIndex", () => {
+	type Handler = (...args: unknown[]) => void;
+	function fakeApp() {
+		const file = (path: string, basename: string): TFile => Object.assign(Object.create(TFile.prototype) as TFile, { path, basename, extension: "md" });
+		const files = [file("A.md", "A"), file("B.md", "B")];
+		const caches = new Map<string, { tags?: { tag: string }[] }>([["A.md", { tags: [{ tag: "#project" }] }], ["B.md", {}]]);
+		const handlers = new Map<string, Handler>();
+		let links = 0;
+		const on = (name: string, fn: Handler) => (handlers.set(name, fn), name);
+		const app = {
+			vault: { getMarkdownFiles: () => files, on, offref: () => undefined },
+			metadataCache: { getFileCache: (f: TFile) => caches.get(f.path) ?? null, fileToLinktext: (f: TFile) => (links++, f.basename), on, offref: () => undefined },
+		};
+		return { app: app as never, files, caches, fire: (name: string, ...args: unknown[]) => handlers.get(name)?.(...args), links: () => links };
+	}
+
+	it("works out a note's link only when asked for it", () => {
+		const { app, links } = fakeApp();
+		const notes = new ObsidianNoteIndex(app, () => "TODOs Tasks.md").notes();
+		expect(notes.map((n) => n.tags)).toEqual([["#project"], []]);
+		expect(links()).toBe(0);
+		expect(notes[0].link).toBe("A");
+		expect(links()).toBe(1);
+	});
+
+	it("tells of an edited note only when its tags changed", () => {
+		vi.useFakeTimers();
+		const { app, files, caches, fire } = fakeApp();
+		const index = new ObsidianNoteIndex(app, () => "");
+		index.notes();
+		let heard = 0;
+		index.onChange(() => heard++);
+		fire("changed", files[1]);
+		vi.advanceTimersByTime(1000);
+		expect(heard).toBe(0);
+		caches.set("B.md", { tags: [{ tag: "#project" }] });
+		fire("changed", files[1]);
+		vi.advanceTimersByTime(1000);
+		expect(heard).toBe(1);
+		expect(index.notes().map((n) => n.tags)).toEqual([["#project"], ["#project"]]);
+		vi.useRealTimers();
 	});
 });

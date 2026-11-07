@@ -32,8 +32,6 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** The list's grouping by project: while on, the list draws its project groups in place of its sections. */
 	grouping?(): ListGrouping | null;
-	/** A list with nothing to draw says so with the No tasks plate, which this gets: a column of a project's view. */
-	onEmpty?(plate: HTMLElement): void;
 	/** A project group's header: the chevron and the title fold it, the arrow opens the note. */
 	onProjectHead?(head: HTMLElement, group: ProjectGroup): void;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
@@ -78,16 +76,13 @@ interface ListShape {
 	readonly drawn: readonly Drawn[];
 }
 
-/** An empty project group: it draws the No tasks plate where its sections would stand, and a task can be put there. */
-const EMPTY_PART: ListGroup = { name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false };
-
 function shapeOf(view: ListView, grouping: ListGrouping | null): ListShape {
 	if (!grouping?.on) return { headers: view.showsHeaders, drawn: view.groups.map((group) => ({ kind: "section", group })) };
 	const drawn = grouping.groups.flatMap((group): Drawn[] => [
-		{ kind: "project", group },
-		...(group.folded ? [] : (group.sections.length > 0 ? group.sections : [EMPTY_PART]).map((section): Drawn => ({ kind: "section", group: section, project: group.zone }))),
+		...(group.titled ? [{ kind: "project", group } as const] : []),
+		...(group.folded ? [] : group.sections.map((section): Drawn => ({ kind: "section", group: section, project: group.zone }))),
 	]);
-	return { headers: true, drawn };
+	return { headers: drawn.some((d) => d.kind === "project" || d.group.header), drawn };
 }
 
 function sectionsOf(shape: ListShape): DrawnSection[] {
@@ -133,13 +128,21 @@ export class TaskList {
 	private slot: HTMLElement | null = null;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
 	private drawnCards: readonly ListCard[] | null = null;
+	/** Watches the list's width: a project's title cut or whole again fades or not. */
+	private readonly sizes: ResizeObserver | null;
 
 	constructor(
 		readonly el: HTMLElement,
 		private readonly deps: TaskListDeps,
 	) {
 		el.classList.add("tc-list");
-		if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.fadeCutTitles()).observe(el);
+		this.sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => this.fadeCutTitles());
+		this.sizes?.observe(el);
+	}
+
+	/** The list is gone from the screen: it stops watching its width. */
+	destroy(): void {
+		this.sizes?.disconnect();
 	}
 
 	render(): void {
@@ -220,11 +223,6 @@ export class TaskList {
 		}
 		enter();
 		if (entry) this.markRenamed(renaming);
-		if (this.deps.onEmpty && this.nodes.length === 0 && !entry) {
-			const plate = el(this.el, "div", `${PLATE} is-column`, "No tasks");
-			this.nodes.push(plate);
-			this.deps.onEmpty(plate);
-		}
 		rows.forEach((row, i) => {
 			const lines = branchOf(rows.map((r) => r.level), i);
 			if (lines) branch(row.node, lines.through, lines.last);
@@ -372,8 +370,7 @@ export class TaskList {
 			open.setAttribute("aria-label", `Open ${group.title}`);
 			open.appendChild(icon("openFile"));
 		}
-		const end = group.end.kind === "task" ? group.end : null;
-		this.heads.set(head, group.folded && end ? { group: end.group, project: group.zone } : { group: null, project: group.zone });
+		this.heads.set(head, group.head);
 		this.deps.onProjectHead?.(head, group);
 		return head;
 	}

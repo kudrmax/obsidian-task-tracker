@@ -1,4 +1,4 @@
-import { type App, Component, MarkdownView, Notice, Platform } from "obsidian";
+import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
 import { acceptsDrop, type CalendarEvent, type CalendarPoll, type CalendarService, type DayBoundary, type DayChange, type DayService, type GroupedList, type ListGroup, type ListSection, type ProjectGroup, type ProjectZone, type MenuFrom, type MenuScreen, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock } from "../../core/application/contracts";
 import { LIST_WIDTH_MIN, type RightMode, type ShownSettings, type ShownSettingsStore, type ZoomLevel } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
@@ -84,6 +84,8 @@ export interface ScreenPlace {
 	readonly project?: () => string | undefined;
 	/** The plugin's own view keeps Obsidian's status bar out of its way and shows the undo capsule; a note's block does neither. */
 	readonly view: boolean;
+	/** The keys of a note's block, over Obsidian's: its fields' own keys stand over them, so none reaches the note. */
+	readonly keys?: Scope;
 }
 
 /**
@@ -265,14 +267,14 @@ export class CalendarScreen extends Component {
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("day") !== null,
 			sections: () => this.listSectionsOf("day"),
-			onPlate: (plate, group) => this.attachPlate(plate, "day", group),
+			onPlate: (plate, group, project) => this.attachPlate(plate, "day", group, project),
+			grouping: () => this.data.grouping("now"),
 			pending: () => this.namingIn("day"),
 			entry: (drawing) => this.quick?.entryIn("day", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
-			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("day")) : undefined,
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap());
 		this.doneEl = el(root, "div", "tc-done");
@@ -290,14 +292,14 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
 			sections: () => this.listSectionsOf("inbox"),
-			onPlate: (plate, group) => this.attachPlate(plate, "inbox", group),
+			onPlate: (plate, group, project) => this.attachPlate(plate, "inbox", group, project),
+			grouping: () => this.data.grouping("inbox"),
 			pending: () => this.namingIn("inbox"),
 			entry: (drawing) => this.quick?.entryIn("inbox", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
-			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("inbox")) : undefined,
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
@@ -319,7 +321,6 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, "backlog", this.backlogList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
-			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("backlog")) : undefined,
 		});
 		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
@@ -337,7 +338,6 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
-			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("soon")) : undefined,
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -412,7 +412,7 @@ export class CalendarScreen extends Component {
 			tasks: this.deps.tasks,
 			arbiter: this.arbiter,
 			drag: this.drag,
-			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
+			titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
 			list: (column) => this.listOf(column),
 			sectioned: (column) => this.sectionsOf(column) !== null,
 			timeline: () => this.timeline,
@@ -523,6 +523,7 @@ export class CalendarScreen extends Component {
 	}
 
 	close(): void {
+		for (const list of [this.list, this.inboxList, this.backlogList, this.soonList, this.doneList]) list?.destroy();
 		this.full?.close();
 		this.quick?.close();
 		this.poll?.stop();
@@ -742,6 +743,7 @@ export class CalendarScreen extends Component {
 				root: this.contentEl,
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
+				project: this.where.project?.(),
 				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
 					this.search = null;
@@ -937,7 +939,7 @@ export class CalendarScreen extends Component {
 				this.arbiter.release(NAMING);
 				if (to === null) return this.render();
 				void this.act(async () => {
-					if (!(await this.deps.tasks.renameGroup(list, name, to))) this.render();
+					if (!(await this.deps.tasks.renameGroup(list, name, to, project))) this.render();
 				});
 			},
 		});
@@ -1053,7 +1055,7 @@ export class CalendarScreen extends Component {
 				tasks: this.deps.tasks,
 				undo: this.deps.undo,
 				surface: this.markdown,
-				titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts),
+				titleField: (parent, opts) => new MarkdownTitleField(this.app, this, this.settings.tasksFile, parent, opts, this.where.keys),
 				day: () => this.today(),
 				act: (change) => this.act(change),
 				onUndo: () => void this.undoStep("undo"),

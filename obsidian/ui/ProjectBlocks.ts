@@ -1,4 +1,4 @@
-import { type App, Component, MarkdownView, Platform, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, MarkdownView, Scope, type WorkspaceLeaf } from "obsidian";
 import type { ProjectRef } from "../../core/application/contracts";
 import { CalendarScreen, type ViewDeps } from "./CalendarScreen";
 import { el } from "./dom";
@@ -33,16 +33,19 @@ export class LocalNotePlaces implements NotePlaces {
 /**
  * The plugin's screen at the end of a project note, filtered to the project: shown by itself in Reading view and in Live
  * Preview, where Obsidian puts its own backlinks in the document, and never written into the note. Cmd+Z, Cmd+Shift+Z
- * and Cmd+F are the block's only while the focus is in it.
+ * and Cmd+F are the block's only while the focus is in it, through a scope over Obsidian's keys.
  */
 class ProjectBlock extends Component {
 	readonly el: HTMLElement;
 	private readonly screen: CalendarScreen;
+	/** The block's keys, put over Obsidian's while the focus is in the block: the note's Cmd+F and Cmd+Z don't reach the note. */
+	private readonly scope: Scope;
+	private scoped = false;
 	/** Put on the page and loaded: its screen is open. */
 	shown = false;
 
 	constructor(
-		app: App,
+		private readonly app: App,
 		readonly path: string,
 		private project: ProjectRef,
 		deps: ViewDeps,
@@ -51,7 +54,12 @@ class ProjectBlock extends Component {
 		this.el = el(null, "div", "tc-project-block");
 		this.el.tabIndex = -1;
 		const root = el(this.el, "div");
-		this.screen = this.addChild(new CalendarScreen(app, root, deps, { view: false, project: () => this.project.link }));
+		this.scope = new Scope(app.scope);
+		const screen = this.addChild(new CalendarScreen(app, root, deps, { view: false, project: () => this.project.link, keys: this.scope }));
+		this.screen = screen;
+		this.scope.register(["Mod"], "z", () => screen.undoKey("undo"));
+		this.scope.register(["Mod", "Shift"], "z", () => screen.undoKey("redo"));
+		this.scope.register(["Mod"], "f", () => screen.findKey());
 	}
 
 	/** The project's link follows the note: a rename gives the same note another name. */
@@ -65,11 +73,15 @@ class ProjectBlock extends Component {
 		this.registerDomEvent(this.el, "pointerdown", () => {
 			if (!this.el.contains(document.activeElement)) this.el.focus({ preventScroll: true });
 		});
-		this.registerDomEvent(this.el, "keydown", (e) => this.onKey(e));
+		this.registerDomEvent(this.el, "focusin", () => this.holdKeys(true));
+		this.registerDomEvent(this.el, "focusout", (e) => {
+			if (!(e.relatedTarget instanceof Node && this.el.contains(e.relatedTarget))) this.holdKeys(false);
+		});
 		void this.screen.open();
 	}
 
 	override onunload(): void {
+		this.holdKeys(false);
 		this.screen.close();
 		this.el.remove();
 	}
@@ -78,14 +90,11 @@ class ProjectBlock extends Component {
 		this.screen.resize();
 	}
 
-	private onKey(e: KeyboardEvent): void {
-		const mod = Platform.isMacOS ? e.metaKey : e.ctrlKey;
-		if (!mod || e.altKey) return;
-		const key = e.key.toLowerCase();
-		const handled = key === "z" ? this.screen.undoKey(e.shiftKey ? "redo" : "undo") === false : key === "f" && !e.shiftKey ? this.screen.findKey() === false : false;
-		if (!handled) return;
-		e.preventDefault();
-		e.stopPropagation();
+	private holdKeys(on: boolean): void {
+		if (on === this.scoped) return;
+		this.scoped = on;
+		if (on) this.app.keymap.pushScope(this.scope);
+		else this.app.keymap.popScope(this.scope);
 	}
 }
 
@@ -116,6 +125,7 @@ export class ProjectBlocks extends Component {
 		this.registerEvent(workspace.on("file-open", sync));
 		this.registerEvent(workspace.on("active-leaf-change", sync));
 		this.registerEvent(workspace.on("resize", () => this.blocks.forEach((block) => block.resize())));
+		/** A note may have become a project or stopped being one; a block that stays where it stands is left alone. */
 		this.register(this.host.deps.tasks.onChange(sync));
 		workspace.onLayoutReady(sync);
 	}
@@ -172,12 +182,12 @@ export class ProjectBlocks extends Component {
 		const before = reading ? (footer?.firstChild ?? null) : (content?.nextSibling ?? null);
 		const parent = reading ? footer : content?.parentElement;
 		if (!parent) return;
-		if (block.el.parentElement !== parent || (block.el.nextSibling !== before && block.el !== before)) parent.insertBefore(block.el, before);
+		const moved = block.el.parentElement !== parent || (block.el.nextSibling !== before && block.el !== before);
+		if (moved) parent.insertBefore(block.el, before);
 		if (!block.shown) {
 			block.shown = true;
 			this.addChild(block);
-		}
-		block.resize();
+		} else if (moved) block.resize();
 	}
 
 	private drop(view: MarkdownView, block: ProjectBlock): void {

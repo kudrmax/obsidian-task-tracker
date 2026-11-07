@@ -62,6 +62,16 @@ describe("SearchWindow", () => {
 		document.body.innerHTML = "";
 	});
 
+	it("opened from a project's view, asks the search for that project's tasks only", async () => {
+		const search = vi.fn(async (): Promise<readonly SearchGroup[]> => GROUPS);
+		const root = document.body.appendChild(document.createElement("div"));
+		const win = SearchWindow.open({ root, tasks: { search }, desktop: true, project: "Окружение", sectionName: (s) => s, onPick: vi.fn(), onClose: vi.fn() });
+		win.input.value = "пас";
+		win.input.dispatchEvent(new Event("input"));
+		await Promise.resolve();
+		expect(search).toHaveBeenCalledWith("пас", "Окружение");
+	});
+
 	it("draws the groups the search gives, in its order, under the sections' names", async () => {
 		const { win, type } = setUp(false);
 		await type("пас");

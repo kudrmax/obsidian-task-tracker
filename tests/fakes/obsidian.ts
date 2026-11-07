@@ -298,3 +298,12 @@ export function getAllTags(cache: { frontmatter?: { tags?: string | string[] }; 
 	const props = (typeof front === "string" ? [front] : (front ?? [])).map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
 	return [...props, ...(cache.tags ?? []).map((t) => t.tag)];
 }
+
+/** A vault file, as `instanceof` checks see it. */
+export class TFile {
+	constructor(
+		readonly path = "",
+		readonly basename = "",
+		readonly extension = "md",
+	) {}
+}

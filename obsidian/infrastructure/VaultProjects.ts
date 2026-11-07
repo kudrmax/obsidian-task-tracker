@@ -1,4 +1,4 @@
-import { getAllTags, type App, type EventRef, type TFile } from "obsidian";
+import { getAllTags, type App, type EventRef, TFile } from "obsidian";
 import type { ProjectNote } from "../../core/application/contracts";
 import type { Projects } from "../../core/application/ports";
 import { type NoteTags, projectNotesOf } from "../../core/application/projects";
@@ -67,23 +67,61 @@ export class VaultProjects implements Projects {
 	}
 }
 
-/** How long the index waits after a change of the vault's notes before it reads them again: typing in a note fires on every pause. */
+/** How long the index waits after a change of the vault's notes before it tells: a rename fires several events at once. */
 const SETTLE_MS = 300;
 
-/** The vault's markdown notes, their tags from Obsidian's metadata cache (properties and text), and their shortest links from the tasks file. */
+/** A note as the index keeps it: its name and tags; its link is worked out only when asked, for a project note. */
+interface KeptNote {
+	readonly file: TFile;
+	readonly tags: readonly string[];
+}
+
+/**
+ * The vault's markdown notes and their tags from Obsidian's metadata cache (properties and text), read once and then kept
+ * note by note: an edited note is read again alone, and only a change of its tags, a new, renamed or deleted note tells
+ * the listeners. A note's shortest link from the tasks file is worked out only for the notes asked for it.
+ */
 export class ObsidianNoteIndex implements NoteIndex {
+	private kept: Map<string, KeptNote> | null = null;
+	/** Obsidian has read every note's metadata once: before that, the notes are read afresh. */
+	private resolved = false;
+
 	constructor(
 		private readonly app: App,
 		private readonly tasksFile: () => string,
 	) {}
 
 	notes(): readonly NoteTags[] {
-		const { metadataCache, vault } = this.app;
+		const { metadataCache } = this.app;
 		const from = this.tasksFile();
-		return vault.getMarkdownFiles().map((file: TFile) => {
-			const cache = metadataCache.getFileCache(file);
-			return { name: file.basename, path: file.path, link: metadataCache.fileToLinktext(file, from, true), tags: cache ? (getAllTags(cache) ?? []) : [] };
-		});
+		return [...this.all().values()].map(({ file, tags }) => ({
+			name: file.basename,
+			path: file.path,
+			tags,
+			get link() {
+				return metadataCache.fileToLinktext(file, from, true);
+			},
+		}));
+	}
+
+	private all(): Map<string, KeptNote> {
+		if (!this.kept) this.kept = new Map(this.app.vault.getMarkdownFiles().map((file) => [file.path, this.read(file)]));
+		return this.kept;
+	}
+
+	private read(file: TFile): KeptNote {
+		const cache = this.app.metadataCache.getFileCache(file);
+		return { file, tags: cache ? (getAllTags(cache) ?? []) : [] };
+	}
+
+	/** A note read again: true when its tags changed, or it is new. */
+	private reread(file: TFile): boolean {
+		if (file.extension !== "md") return false;
+		const notes = this.all();
+		const before = notes.get(file.path);
+		const now = this.read(file);
+		notes.set(file.path, now);
+		return !before || before.tags.join("\n") !== now.tags.join("\n");
 	}
 
 	onChange(listener: () => void): () => void {
@@ -94,10 +132,30 @@ export class ObsidianNoteIndex implements NoteIndex {
 			timer = window.setTimeout(listener, SETTLE_MS);
 		};
 		const refs: { ref: EventRef; off: (ref: EventRef) => void }[] = [
-			{ ref: metadataCache.on("changed", later), off: (ref) => metadataCache.offref(ref) },
-			{ ref: metadataCache.on("resolved", later), off: (ref) => metadataCache.offref(ref) },
-			{ ref: vault.on("rename", later), off: (ref) => vault.offref(ref) },
-			{ ref: vault.on("delete", later), off: (ref) => vault.offref(ref) },
+			{ ref: metadataCache.on("changed", (file) => this.reread(file) && later()), off: (ref) => metadataCache.offref(ref) },
+			{
+				ref: metadataCache.on("resolved", () => {
+					if (this.resolved) return;
+					this.resolved = true;
+					this.kept = null;
+					later();
+				}),
+				off: (ref) => metadataCache.offref(ref),
+			},
+			{
+				ref: vault.on("rename", (file, oldPath) => {
+					this.kept?.delete(oldPath);
+					if (file instanceof TFile) this.reread(file);
+					later();
+				}),
+				off: (ref) => vault.offref(ref),
+			},
+			{
+				ref: vault.on("delete", (file) => {
+					if (this.kept?.delete(file.path)) later();
+				}),
+				off: (ref) => vault.offref(ref),
+			},
 		];
 		return () => {
 			window.clearTimeout(timer);

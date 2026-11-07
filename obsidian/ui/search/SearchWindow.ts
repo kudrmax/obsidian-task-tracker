@@ -11,6 +11,8 @@ export interface SearchWindowDeps {
 	readonly root: HTMLElement;
 	readonly tasks: Pick<TaskService, "search">;
 	readonly desktop: boolean;
+	/** The project whose view the search was opened from: it finds only that project's tasks. */
+	readonly project?: string;
 	sectionName(section: SectionKey): string;
 	onPick(hit: SearchHit): void;
 	onClose(): void;
@@ -90,7 +92,8 @@ export class SearchWindow {
 
 	private async find(query: string): Promise<void> {
 		const asked = ++this.asked;
-		const groups = await this.deps.tasks.search(query);
+		const project = this.deps.project;
+		const groups = await (project === undefined ? this.deps.tasks.search(query) : this.deps.tasks.search(query, project));
 		if (asked !== this.asked) return;
 		this.show(query, groups);
 	}

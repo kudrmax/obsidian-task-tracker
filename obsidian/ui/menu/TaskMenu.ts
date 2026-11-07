@@ -82,11 +82,9 @@ export interface ProjectRow {
 	readonly disabled: boolean;
 }
 
-export const NO_PROJECT = "No project";
-
 export function projectRow(model: TaskMenuModel): ProjectRow {
-	const { current, none, disabled } = model.project;
-	return { label: "Project", value: current ? current.name : none ? NO_PROJECT : "", icon: "project", disabled };
+	const { value, disabled } = model.project;
+	return { label: "Project", value, icon: "project", disabled };
 }
 
 /** Where the Project row stands among the edit rows: right after Section, or where Section would stand, before Add subtask. */

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { ListGrouping, ProjectRef, TaskItem } from "../../core/application/contracts";
-import { listGrouping, ProjectIndex } from "../../core/application/projects";
+import { listGrouping, ProjectIndex, viewGrouping } from "../../core/application/projects";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
 import { type PlacedHead, placeAt } from "../../obsidian/ui/drag/listPlace";
@@ -59,12 +59,17 @@ describe("a list grouped by project", () => {
 		expect(list.listCards.every((c) => c.project === undefined)).toBe(true);
 	});
 
-	it("draws No tasks for an empty list that says so: a column of a project's view", () => {
-		let plate: HTMLElement | null = null;
-		const list = new TaskList(document.createElement("div"), { items: () => [], day: () => null, onEmpty: (p) => (plate = p) });
+	it("draws a project's view as one untitled group: no project header, every card and plate in the project's part", () => {
+		const own = ITEMS.filter((item) => item.project !== null);
+		const view = viewGrouping(ref("Окружение"), own, true, SECTIONS);
+		const list = new TaskList(document.createElement("div"), { items: () => own, day: () => null, grouped: () => true, sections: () => SECTIONS, grouping: () => view, ungroupedName: () => "No section" });
 		list.render();
-		expect(plate).not.toBeNull();
-		expect(list.elements).toEqual([plate]);
+		expect(rows(list)).toEqual(["## No section", "Клуб", "Ужин", "## Дальний", "Встреча"]);
+		expect(list.listCards.every((c) => c.project === "Окружение")).toBe(true);
+		const empty = new TaskList(document.createElement("div"), { items: () => [], day: () => null, grouping: () => viewGrouping(ref("Окружение"), [], false, []) });
+		empty.render();
+		expect(rows(empty)).toEqual(["[No tasks]"]);
+		expect(empty.plateOf(null, "Окружение")).not.toBeNull();
 	});
 });
 
