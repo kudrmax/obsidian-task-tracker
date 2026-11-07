@@ -32,9 +32,9 @@ function item(text: string, list: SectionKey, extra: Partial<TaskItem> = {}): Ta
 }
 
 const HITS: readonly SearchHit[] = [
-	{ item: item("Фото на паспорт", "inbox"), title: [{ text: "Фото на ", match: false }, { text: "паспорт", match: true }], description: null },
-	{ item: item("Записаться в МФЦ", "soon", { description: "взять паспорт" }), title: [], description: [{ text: "взять ", match: false }, { text: "паспорт", match: true }] },
-	{ item: item("Оплатить паспорт", "done"), title: [{ text: "Оплатить ", match: false }, { text: "паспорт", match: true }], description: null },
+	{ item: item("Фото на паспорт", "inbox"), title: [{ text: "Фото на ", match: false }, { text: "паспорт", match: true }], project: null, description: null },
+	{ item: item("Записаться в МФЦ", "soon", { description: "взять паспорт" }), title: [], project: null, description: [{ text: "взять ", match: false }, { text: "паспорт", match: true }] },
+	{ item: item("Оплатить паспорт", "done"), title: [{ text: "Оплатить ", match: false }, { text: "паспорт", match: true }], project: null, description: null },
 ];
 
 /** The search's answer: each hit in a group of its list, in the order given. */
@@ -60,6 +60,16 @@ function setUp(desktop: boolean, search = vi.fn(async (query: string): Promise<r
 describe("SearchWindow", () => {
 	afterEach(() => {
 		document.body.innerHTML = "";
+	});
+
+	it("opened from a project's view, asks the search for that project's tasks only", async () => {
+		const search = vi.fn(async (): Promise<readonly SearchGroup[]> => GROUPS);
+		const root = document.body.appendChild(document.createElement("div"));
+		const win = SearchWindow.open({ root, tasks: { search }, desktop: true, project: "Окружение", sectionName: (s) => s, onPick: vi.fn(), onClose: vi.fn() });
+		win.input.value = "пас";
+		win.input.dispatchEvent(new Event("input"));
+		await Promise.resolve();
+		expect(search).toHaveBeenCalledWith("пас", "Окружение");
 	});
 
 	it("draws the groups the search gives, in its order, under the sections' names", async () => {

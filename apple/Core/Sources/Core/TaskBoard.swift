@@ -153,7 +153,7 @@ public final class TaskBoard: @unchecked Sendable {
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
-        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept())
+        let context = DoorContext(tasks: files.tasks, settingsJSON: files.settingsJSON, now: files.now, calendars: files.calendars, fetched: [], history: kept(), groupingJSON: Self.ungrouped)
         do {
             let reply = try (lane ?? core).call(method, arguments.map(\.any), context: context)
             return Answer(result: JSONValue(any: reply.result), tasks: reply.tasks, settings: reply.settingsJSON, history: reply.history)
@@ -163,6 +163,10 @@ public final class TaskBoard: @unchecked Sendable {
             throw BoardError.failed(message)
         }
     }
+
+    /// Every list as it was before projects: the app draws no project groups yet, so none is grouped and the menus offer
+    /// a list's sections whole.
+    static let ungrouped = #"{"on":{"backlog":false,"soon":false}}"#
 
     private func sources(_ settings: String) -> [CalendarFile] {
         lock.lock()

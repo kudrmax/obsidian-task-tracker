@@ -8,8 +8,12 @@ import type { DayColumn, DayRelation, TaskScreen } from "../domain/Days";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
 import type { ListPlace } from "./nesting";
+import type { ProjectZone } from "../domain/Project";
+import type { ListGroup } from "./sections";
 
 export type { GroupName, ReminderKind, SectionKey };
+/** A project's part of a list: the link text of its note (`ProjectRef.link`), null for the tasks of no project. */
+export type { ProjectZone };
 /** What In progress or Stop progress sets on tasks of these statuses. */
 export { nextProgress } from "../domain/Task";
 /** Whether two slots are the same time: the same day, start and end. */
@@ -40,7 +44,7 @@ export { samePlacement } from "../domain/operations";
 /** How the UI tells tasks apart by their keys: the same place, the same line, one task with its subtasks, an id. */
 export { keyId, sameLine, samePlace, sameTaskTree } from "./taskKeys";
 /** Where a card may go among cards with levels, and what a gap among them means: the nesting rules of the file. */
-export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type LevelCard, type ListCard, type ListPlace } from "./nesting";
+export { fitLevel, gapOfPlace, levelRange, placeOfGap, shiftLevel, type GapPlace, type Header, type LevelCard, type ListCard, type ListPlace } from "./nesting";
 /** What a drop in a gap means, and none when it changes nothing; which section a gap is in; where a lifted section goes. */
 export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
@@ -103,11 +107,17 @@ export interface TaskKey {
  * Where to create a task: a place in a list, a place in the day column on `date` (its list and day are the column's,
  * see `dayColumn`), a place among subtasks, or a slot on the calendar.
  */
+/**
+ * `project`, a place in a project's part (a group of a list grouped by project, or the project's own view): the task gets
+ * that project (null: none) and, with no `before`, goes right after the last task of it the column shows in `group`.
+ * `section`, from such a part only: the task goes into that section, made right after `group` when the list lacks it
+ * (an empty section is not made there).
+ */
 export type NewTaskPlace =
-	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
-	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null }
+	| { readonly kind: "list"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate; readonly project?: ProjectZone; readonly section?: string }
+	| { readonly kind: "day"; readonly date: LocalDate; readonly group: GroupName; readonly before: TaskKey | null; readonly project?: ProjectZone; readonly section?: string }
 	| { readonly kind: "subtask"; readonly parent: TaskKey; readonly before: TaskKey | null }
-	| { readonly kind: "slot"; readonly slot: Slot };
+	| { readonly kind: "slot"; readonly slot: Slot; readonly project?: ProjectZone };
 
 /** Where a section is written from the quick-entry field: a top-level place in a column that shows sections. */
 export type SectionPlace = Extract<NewTaskPlace, { readonly kind: "list" } | { readonly kind: "day" }>;
@@ -123,6 +133,28 @@ export interface ListSection {
 export interface SubtaskProgress {
 	readonly done: number;
 	readonly total: number;
+}
+
+/** A task's project as the screens show it. */
+export interface ProjectRef {
+	/** The note's name: what a menu, a group's title and a tooltip show. */
+	readonly name: string;
+	/** What a place (`ProjectZone`) and `setProject` take: the shortest link text Obsidian writes for the note, else the one the line has. */
+	readonly link: string;
+	/** The project note's path, which the arrow and the card's mark open; null when no note with the project tag has that name. */
+	readonly note: string | null;
+	/** A note to open: off for a project whose note is gone or untagged (it keeps its tasks by name). */
+	readonly canOpenNote: boolean;
+	/** The card shows the folder mark: everywhere but inside the project's own view, where the whole view is the project. */
+	readonly mark: boolean;
+}
+
+/** A note with the project tag: what the `Projects` port gives the core. */
+export interface ProjectNote {
+	readonly name: string;
+	readonly path: string;
+	/** The shortest link text Obsidian would write to it. */
+	readonly link: string;
 }
 
 export interface TaskItem {
@@ -151,6 +183,8 @@ export interface TaskItem {
 	readonly colors: readonly PriorityColor[];
 	/** The section of its list it sits in; null outside any. */
 	readonly group: GroupName;
+	/** Its project, a subtask's its parent's; null for none. */
+	readonly project: ProjectRef | null;
 	/** The list the task is in, its task's for a subtask. */
 	readonly list: SectionKey;
 	/** It sits under another task. */
@@ -175,6 +209,8 @@ export interface TaskItem {
 		readonly fold: boolean;
 		/** Its time stretched by the dots on its edges: a task on the timeline. */
 		readonly resize: boolean;
+		/** Put into a project, or taken out: a task; a subtask's is its parent's (its menu shows it, disabled). */
+		readonly setProject: boolean;
 	};
 
 	/** The open subtasks right under this one, in file order, each with its own. */
@@ -230,6 +266,8 @@ export interface FoundPart {
 export interface SearchHit {
 	readonly item: TaskItem;
 	readonly title: readonly FoundPart[];
+	/** The task's project's name in pieces, when the search found the query there; null otherwise. */
+	readonly project: readonly FoundPart[] | null;
 	readonly description: readonly FoundPart[] | null;
 }
 
@@ -285,7 +323,9 @@ export type TaskChange =
 	| { readonly kind: "moveToList"; readonly date: LocalDate }
 	| { readonly kind: "moveToSoon"; readonly date: LocalDate }
 	| { readonly kind: "moveToEnd"; readonly section: EndList }
-	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate }
+	| { readonly kind: "moveToGroup"; readonly list: GroupedList; readonly group: GroupName; readonly before: TaskKey | null; readonly date?: LocalDate; readonly project?: ProjectZone }
+	/** The task's project (`ProjectRef.link`), null for none; a subtask keeps its parent's. */
+	| { readonly kind: "project"; readonly project: string | null }
 	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
 
@@ -308,8 +348,12 @@ export type DropTo =
 	| { readonly kind: "clearSlot" }
 	/** A gap of a list that shows no sections: right before `before`, or at the end (null). */
 	| { readonly kind: "list"; readonly column: DropColumn; readonly before: TaskKey | null }
-	/** A gap of a list that shows sections: right before `before`, or at the end of `group`; `date`, the later day of the column. */
-	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null }
+	/**
+	 * A gap of a list that shows sections: right before `before`, or at the end of `group`; `date`, the later day of the
+	 * column. `project`, a gap of a project's part: the task becomes that project's, and with no `before` goes right after
+	 * its last task the column shows in `group`.
+	 */
+	| { readonly kind: "group"; readonly list: GroupedList; readonly date: LocalDate | null; readonly group: GroupName; readonly before: TaskKey | null; readonly project?: ProjectZone }
 	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
 	/**
 	 * A gap of a list column as the gesture found it: what it means there (`ListPlace`), or null for the column's end where
@@ -401,6 +445,26 @@ export interface MenuReminder {
 /** A row of the edit group. */
 export type MenuEditId = "rename" | "reminder" | "description" | "repeat" | "section" | "subtask";
 
+/** A project the Project page offers; `checked` on the one every task has. */
+export interface MenuProjectOption {
+	readonly project: ProjectRef;
+	readonly checked: boolean;
+}
+
+/** The Project page: a pick writes `setProject` with its `link`, No project with null. */
+export interface MenuProject {
+	/** The project the tasks share, which the row shows; a subtask's is its parent's. Null when they have none or differ. */
+	readonly current: ProjectRef | null;
+	/** The notes with the project tag by name, then a task's project whose note is not one of them. */
+	readonly options: readonly MenuProjectOption[];
+	/** No project, last: checked when no task has one. */
+	readonly none: boolean;
+	/** What the row shows beside «Project»: the shared project's name, «No project» when none has one, nothing when they differ. */
+	readonly value: string;
+	/** The row can't be pressed: only subtasks, whose project is their parent's. */
+	readonly disabled: boolean;
+}
+
 /**
  * The menu of one task, or of several picked at once, as `TaskService.menu` and `bulkMenu` read it: what its groups offer,
  * what is on, what can't be pressed, and what asks first. A status tile writes `pickStatus`, a level `togglePriority`, a
@@ -428,6 +492,11 @@ export interface TaskMenuModel {
 	/** Only where the cards stand in columns that show their list's sections, and the tasks can go among one list's sections. */
 	readonly sections: MenuSections | null;
 	/**
+	 * The Project row, in every menu, one task's and the bulk menu's alike: drawn in the edit group right after Section
+	 * (where Section would stand when it is not offered), its page these options.
+	 */
+	readonly project: MenuProject;
+	/**
 	 * One task's: Rename; Reminder (a task on a time); Add description (one without any); Repeat (one that may repeat);
 	 * Section (with `sections`); Add subtask, except for a subtask of a timeline card's stack. The bulk menu's: Section alone.
 	 */
@@ -439,6 +508,47 @@ export interface TaskMenuModel {
 }
 
 /** The tasks the screen shows for a day: its column and timeline, the other lists, their sections and what the menus offer. */
+/** Which lists show their tasks grouped by project, and how. */
+export interface ListGrouping {
+	/** The list may group: Backlog and Soon; its column's title opens a menu with Group by project, checked while `on`. */
+	readonly canGroup: boolean;
+	readonly on: boolean;
+	/** The groups the column draws in place of its sections while `on`; none while off. */
+	readonly groups: readonly ProjectGroup[];
+}
+
+/**
+ * A project's group of a list grouped by project, or No project, last: a section's header with a chevron that folds it
+ * (`toggleFold`) and, for a project, an arrow beside its title that opens the note.
+ */
+export interface ProjectGroup {
+	/** What `toggleFold` takes: the project's name, "" for No project. */
+	readonly key: string;
+	/** Null for No project. */
+	readonly project: ProjectRef | null;
+	/** The project's name, or «No project». */
+	readonly title: string;
+	readonly folded: boolean;
+	/** Its open tasks in the list, subtasks aside: the count a folded group shows. */
+	readonly count: number;
+	/** The arrow beside the title: a project with a note. */
+	readonly canOpenNote: boolean;
+	/** What its cards (`ListCard.project`), headers, plates and places carry: the project's link, null for No project. */
+	readonly zone: ProjectZone;
+	/** It draws its own header (chevron, title, count, arrow): every group of a grouped list; not the one group of a project's view, which is the whole view. */
+	readonly titled: boolean;
+	/**
+	 * What it draws while unfolded: its tasks without a section first, without a header (`header` false), then its
+	 * sections in the file's order; in No project the list's empty sections too. Never none: an empty group has one empty
+	 * part (`name` null, `empty`, no header), which draws «No tasks» and where its plate writes and a drop lands.
+	 */
+	readonly sections: readonly ListGroup[];
+	/** Where a drop on its title puts a task: the end of the group. */
+	readonly end: ListPlace;
+	/** What a drop on its header means, as a header passed (`Header`): folded, its end; open, its part without a section. */
+	readonly head: { readonly group: GroupName; readonly project: ProjectZone };
+}
+
 export interface ScreenView {
 	readonly day: DayView;
 	readonly soon: readonly TaskItem[];
@@ -451,6 +561,25 @@ export interface ScreenView {
 	readonly missing: boolean;
 	/** The day's events, their sources and the switch's dot are shown: not while the tasks file is missing. */
 	readonly calendars: boolean;
+	/**
+	 * Each list's grouping by project. In a project's own view every list is one untitled group of that project (`titled`
+	 * false), its sections as the main screen shows them, each card, header, plate and place carrying the project's zone;
+	 * `now` there is the day column's, on whatever day it shows.
+	 */
+	readonly projects: Readonly<Record<GroupedList, ListGrouping>>;
+	/** The project whose view this is (the note's block: every list holds only its tasks); null for the main screen. */
+	readonly project: ProjectRef | null;
+}
+
+/**
+ * What a device keeps of the lists grouped by project, apart from the defaults (Backlog grouped, Soon not): plain JSON,
+ * kept on the device and never synced.
+ */
+export interface GroupingState {
+	/** A list switched on or off by hand. */
+	readonly on?: Partial<Record<GroupedList, boolean>>;
+	/** The keys (`ProjectGroup.key`) of the groups folded in each list. */
+	readonly folded?: Partial<Record<GroupedList, readonly string[]>>;
 }
 
 /**
@@ -489,8 +618,13 @@ export interface TaskService {
 	/** `text` with `prefix` first in place of the one it had; null takes it off. */
 	withPriority(text: string, prefix: string | null): string;
 
-	/** Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen that says so (`missing`). */
-	screen(date: LocalDate): Promise<ScreenView>;
+	/**
+	 * Everything the screen shows of the tasks for `date`, the file normalized first; without a tasks file, the empty screen
+	 * that says so (`missing`). With `project` (a link or a name), that project's view: every list and the timeline hold
+	 * only its tasks, without the mark, Done too; empty sections are left out, and each list is one untitled group of the
+	 * project (`ScreenView.projects`), so every place there carries its zone.
+	 */
+	screen(date: LocalDate, project?: string): Promise<ScreenView>;
 	dayView(date: LocalDate): Promise<DayView>;
 	/** The Soon column: Soon tasks without a due date and without a slot, in file order. */
 	soonWithoutDateView(): Promise<readonly TaskItem[]>;
@@ -505,9 +639,10 @@ export interface TaskService {
 	 * query's words in their order, each a part of a word; in a title, failing that, its letters in their order. Case and
 	 * accents aside («ё» is «е»), a description read by its words, not its Markdown. Inbox, Backlog, Soon, Now, Done, and in
 	 * each the best match first: one in the title before one only in the description, then by score, ties in file order.
-	 * A query of spaces finds nothing. Each list's finds in a group of its own.
+	 * A query of spaces finds nothing. Each list's finds in a group of its own. With `project` (a link or a name), only that
+	 * project's tasks: the search opened from its view.
 	 */
-	search(query: string): Promise<readonly SearchGroup[]>;
+	search(query: string, project?: string): Promise<readonly SearchGroup[]>;
 	/**
 	 * Where a task shows: Done, Inbox or Backlog in its list; another on the day it stands on, Soon without one. A subtask
 	 * shows under its task, so where that task does. Where that is on its screens is the frontend's.
@@ -585,6 +720,17 @@ export interface TaskService {
 	setDueDate(key: TaskKey, date: LocalDate | null): Promise<void>;
 	/** A level's prefix first in the task's text, in place of the one it had; null takes it off. */
 	setPriority(key: TaskKey, priority: string | null): Promise<void>;
+	/**
+	 * The tasks' project: the note's link text (`ProjectRef.link`), null for none. A task keeps its place in the lane; a
+	 * subtask is left as it is, its project its parent's. One write.
+	 */
+	setProject(keys: readonly TaskKey[], project: string | null): Promise<void>;
+	/** The notes with the project tag, by name: what the Project page offers. */
+	projectNotes(): readonly ProjectRef[];
+	/** Group by project in `list`'s title menu: kept on the device. */
+	setGrouping(list: GroupedList, on: boolean): Promise<void>;
+	/** A group's chevron or title tapped: folded or unfolded, kept on the device. */
+	toggleFold(list: GroupedList, key: string): Promise<void>;
 	/** The task's labels become these names, written as tags; a task with a priority keeps none. The task as it now stands, its key fresh; null once it is gone. */
 	setLabels(key: TaskKey, labels: readonly string[]): Promise<TaskItem | null>;
 	/** `setLabels` for several tasks in one write; each task as it then stands, in the order given, null for one gone. */
@@ -734,16 +880,22 @@ export interface TaskService {
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
-	/** The name as typed, trimmed: a blank one or the section's own writes nothing; a name the list has merges the two; the No section name hands the tasks to it. Resolves true when it wrote. */
-	renameGroup(list: GroupedList, group: string, name: string): Promise<boolean>;
-	/** The heading goes; its tasks, in order, join the end of No section. */
-	removeGroup(list: GroupedList, group: string): Promise<void>;
+	/**
+	 * The name as typed, trimmed: a blank one or the section's own writes nothing; a name the list has merges the two; the No
+	 * section name hands the tasks to it. Resolves true when it wrote. With `project` (the header's `menu.project`, inside
+	 * a project's group): only that project's tasks go, to section `name` (one the list has, else a heading where this one
+	 * stands); the others stay.
+	 */
+	renameGroup(list: GroupedList, group: string, name: string, project?: ProjectZone): Promise<boolean>;
+	/** The heading goes; its tasks, in order, join the end of No section. With `project`: only that project's tasks leave it. */
+	removeGroup(list: GroupedList, group: string, project?: ProjectZone): Promise<void>;
 	/**
 	 * The field switched to a section, Enter (empty sections spec §4). `### name` goes where the field stands: the tasks the
 	 * column shows below it in its group, in order, go into the new section, written right after that group; the tasks it does
 	 * not show stay. At the end of a group the section is written empty and stays. A blank name or the No section name writes
 	 * nothing; the group's own name writes nothing; a name the list has takes the tasks below to the end of that section.
-	 * One write, one undo step. Gives the section the tasks went to, or null when nothing was written.
+	 * One write, one undo step. Gives the section the tasks went to, or null when nothing was written. A place in a project's
+	 * part (`place.project`) writes nothing: a section there is born with its first task (`NewTaskPlace.section`).
 	 */
 	createSection(name: string, place: SectionPlace): Promise<{ readonly list: GroupedList; readonly group: string } | null>;
 
@@ -997,6 +1149,8 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
+	/** The tag that makes a note a project, `#project` by default. */
+	readonly projectTag: string;
 	readonly presets: readonly string[];
 	readonly ungrouped: string;
 	readonly longPressMs: number;
@@ -1041,6 +1195,8 @@ export interface SettingsService {
 	moveLevel(from: number, to: number): Promise<void>;
 	/** The tag folder trimmed; written when it is one word. */
 	setLabelTag(tag: string): Promise<void>;
+	/** The tag trimmed, `#` first; written when it is one word. */
+	setProjectTag(tag: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */
 	renameLabel(index: number, title: string): Promise<void>;
 	recolourLabel(index: number, color: PriorityColor): Promise<void>;

@@ -1,4 +1,5 @@
 import type { TaskCalendarSettings } from "../settings";
+import type { GroupingState, ProjectNote } from "./contracts";
 
 /** The tasks file as text. Implemented over the Obsidian vault; in tests, in memory. */
 export interface TaskFileStore {
@@ -44,4 +45,25 @@ export interface GoogleLogin {
 	isLoggedIn(): boolean;
 	login(): Promise<string>;
 	logout(): Promise<void>;
+}
+
+/** The notes with the project tag (`projectNotesOf` reads them from the notes' tags): the Obsidian vault's; none on a host without notes. */
+export interface Projects {
+	list(): readonly ProjectNote[];
+	/** Fires when a project note comes, goes, is renamed or loses its tag. Returns the unsubscribe. */
+	onChange(listener: () => void): () => void;
+}
+
+/** What this device keeps of the lists grouped by project, never synced (the plugin: Obsidian's local storage). */
+export interface GroupingStore {
+	get(): GroupingState;
+	set(state: GroupingState): void;
+}
+
+export const NO_PROJECTS: Projects = { list: () => [], onChange: () => () => undefined };
+
+/** A device's grouping kept in memory: for a host that keeps none, and for tests. */
+export function memoryGrouping(start: GroupingState = {}): GroupingStore {
+	let state = start;
+	return { get: () => state, set: (next) => (state = next) };
 }

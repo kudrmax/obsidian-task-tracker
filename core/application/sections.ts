@@ -1,6 +1,7 @@
 import type { GroupedList } from "../domain/Lists";
+import { projectKey } from "../domain/Project";
 import type { GroupName } from "../domain/Task";
-import type { ListSection, TaskItem } from "./contracts";
+import type { ListSection, ProjectZone, TaskItem } from "./contracts";
 
 /** A task of a list at its depth: 0 for a task, one more for each task above a subtask. */
 export interface ListRow {
@@ -16,17 +17,30 @@ export interface ListGroup {
 	readonly rows: readonly ListRow[];
 	/** A section with no task: its header stands over the No tasks plate. No section is never empty. */
 	readonly empty: boolean;
-	/** What its header's menu offers, the section it names: a section is renamed or removed; No section has no menu (null). */
-	readonly menu: { readonly section: string; readonly rename: boolean; readonly remove: boolean } | null;
+	/**
+	 * What its header's menu offers, the section it names: a section is renamed or removed; No section has no menu (null).
+	 * Inside a project's group, `project` is that group's zone: `renameGroup` and `removeGroup` take it and touch only its tasks.
+	 */
+	readonly menu: { readonly section: string; readonly rename: boolean; readonly remove: boolean; readonly project?: ProjectZone } | null;
+	/** It draws a header: a section of a list that shows them; never the tasks without a section inside a project's group. */
+	readonly header: boolean;
+	/** A long press lifts its header to move it among the list's sections: a section, while the list is not grouped by project. */
+	readonly reorder: boolean;
 }
 
 function rowsOf(items: readonly TaskItem[], level = 0): ListRow[] {
 	return items.flatMap((item) => [{ item, level }, ...(item.collapsed ? [] : rowsOf(item.subtasks, level + 1))]);
 }
 
-function groupOf(name: GroupName, items: readonly TaskItem[]): ListGroup {
+function groupOf(name: GroupName, items: readonly TaskItem[], header = true): ListGroup {
 	const section = name !== null;
-	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null };
+	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+}
+
+/** A section of a project's group: its header unless it is the part without a section; its menu touches only that project's tasks; it does not lift. */
+export function projectSection(name: GroupName, items: readonly TaskItem[], project: ProjectZone): ListGroup {
+	const plain = groupOf(name, items, name !== null);
+	return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
 }
 
 /**
@@ -46,9 +60,10 @@ export interface ListView {
  * empty sections spec §5). One that shows none: all its tasks outside any.
  */
 export function listView(items: readonly TaskItem[], sections: boolean, listSections: readonly ListSection[] = []): ListView {
-	if (!sections) return { showsHeaders: false, groups: [groupOf(null, items)] };
+	if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
 	const groups = withEmptySections(byGroup(items), listSections);
-	return { showsHeaders: groups.some((g) => g.name !== null), groups };
+	const showsHeaders = groups.some((g) => g.name !== null);
+	return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
 }
 
 function byGroup(items: readonly TaskItem[]): ListGroup[] {
@@ -61,7 +76,7 @@ function byGroup(items: readonly TaskItem[]): ListGroup[] {
 	return groups.map((g) => groupOf(g.name, g.items));
 }
 
-function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
+export function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
 	const drawn = [...groups];
 	sections.forEach((section, i) => {
 		if (!section.empty || drawn.some((g) => g.name === section.name)) return;
@@ -100,6 +115,11 @@ export interface SectionChoice {
  */
 export interface SectionOffer {
 	readonly lists: Readonly<Record<GroupedList, readonly string[]>>;
+	/**
+	 * In a list grouped by project, the sections each group offers (by `ProjectGroup.key`): those shown in it, then the
+	 * presets; a task's menu there offers its group's.
+	 */
+	readonly projects?: Partial<Record<GroupedList, Readonly<Record<string, readonly string[]>>>>;
 	/** The name of the tasks outside any section. */
 	readonly ungrouped: string;
 }
@@ -115,5 +135,13 @@ export function sectionChoice(tasks: readonly TaskItem[], offer: SectionOffer): 
 	const first = tasks[0];
 	const list = first?.list;
 	if (!first || list === "done" || tasks.some((task) => task.isSubtask || task.list !== list)) return null;
-	return { names: offer.lists[list], current: first.group, ungrouped: offer.ungrouped };
+	const byProject = offer.projects?.[list];
+	const key = groupKeyOf(first);
+	const names = byProject && tasks.every((task) => groupKeyOf(task) === key) ? (byProject[key] ?? offer.lists[list]) : offer.lists[list];
+	return { names, current: first.group, ungrouped: offer.ungrouped };
+}
+
+/** The key of the group a task stands in in a list grouped by project: its project's name, "" for none. */
+export function groupKeyOf(item: TaskItem): string {
+	return item.project ? projectKey(item.project.name) : "";
 }

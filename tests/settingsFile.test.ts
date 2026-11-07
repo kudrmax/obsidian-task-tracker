@@ -92,6 +92,9 @@ class Disk implements SettingsPersistence {
 	}
 }
 
+/** The same defaults written now: the project tag, a setting since Projects, after the keys of 0.4.155. */
+const FILE = OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 2,\n  "projectTag": "#project"\n}');
+
 async function opened(disk: Disk) {
 	const settings = new PluginSettings(disk, "data.json", SETTINGS_FILE);
 	await settings.load();
@@ -108,23 +111,23 @@ describe("data.json", () => {
 		const disk = new Disk(OLD_FILE);
 		const settings = await opened(disk);
 		await settings.update({ dayStartHour: 4 });
-		expect(disk.text).toBe(OLD_FILE.replace('"dayStartHour": 5', '"dayStartHour": 4'));
+		expect(disk.text).toBe(FILE.replace('"dayStartHour": 5', '"dayStartHour": 4'));
 		await settings.update({ cardGap: 3 });
-		expect(disk.text).toBe(OLD_FILE.replace('"dayStartHour": 5', '"dayStartHour": 4').replace('"cardGap": 2', '"cardGap": 3'));
+		expect(disk.text).toBe(FILE.replace('"dayStartHour": 5', '"dayStartHour": 4').replace('"cardGap": 2', '"cardGap": 3'));
 	});
 
 	it("a new file is written with every key in its old place", async () => {
 		const disk = new Disk(null);
 		const settings = await opened(disk);
 		await settings.update({ dayStartHour: 4 });
-		expect(disk.text).toBe(OLD_FILE.replace('"dayStartHour": 5', '"dayStartHour": 4'));
+		expect(disk.text).toBe(FILE.replace('"dayStartHour": 5', '"dayStartHour": 4'));
 	});
 
 	it("keeps an unknown key after the known ones, and the device's part off the file", async () => {
 		const disk = new Disk(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 2,\n  "future": 1\n}'));
 		const settings = await opened(disk);
 		await settings.update({ rightMode: "soon", cardGap: 3 });
-		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 3,\n  "future": 1\n}'));
+		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', '"cardGap": 3,\n  "projectTag": "#project",\n  "future": 1\n}'));
 		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ rightMode: "soon" });
 	});
 });

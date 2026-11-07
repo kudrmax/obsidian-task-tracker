@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Заметка проекта с живым блоком: компонент</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: {{frame.w}}px; height: {{frame.h}}px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;">
+
+<sc-if value="{{phone}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 0; right: 0; top: 56px; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 12px; box-sizing: border-box; z-index: 6;">
+<span style="width: 46px; height: 46px; flex-shrink: 0; border-radius: 23px; background: {{c.chrome}}; color: {{c.chromeIcon}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg></span>
+<span style="flex: 1; min-width: 0; text-align: center; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Окружение в новой стране</span>
+<span style="width: 56px; height: 46px; flex-shrink: 0; border-radius: 23px; background: {{c.chrome}}; color: {{c.chromeIcon}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></span>
+</div>
+<nav aria-label="Obsidian navigation" style="position: absolute; left: 42px; right: 42px; bottom: 19px; height: 49px; border-radius: 25px; background: {{c.nav}}; box-shadow: {{c.navShadow}}; display: flex; align-items: center; justify-content: space-around; z-index: 6; color: {{c.chromeIcon}};">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{c.chromeOff}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<svg width="24" height="22" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="4" width="22" height="16" rx="3.5"></rect><text x="13" y="16" text-anchor="middle" font-size="10" font-family="-apple-system, Inter, sans-serif" fill="currentColor" stroke="none">20</text></svg>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+</nav>
+</sc-if>
+
+<sc-if value="{{desk}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 44px; height: 800px; background: {{c.chrome}}; box-shadow: inset -1px 0 0 {{c.chromeLine}};"></div>
+<div style="position: absolute; left: 14px; top: 14px; display: flex; gap: 8px; flex-direction: column;">
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FF5F57;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #FEBC2E;"></span>
+<span style="width: 12px; height: 12px; border-radius: 6px; background: #28C840;"></span>
+</div>
+<div style="position: absolute; left: 44px; top: 0; right: 0; height: 40px; background: {{c.bg}}; box-shadow: inset 0 -1px 0 {{c.chromeLine}}; display: flex; align-items: center; padding-left: 72px; box-sizing: border-box; font-size: 13px;">Окружение в новой стране</div>
+<div style="position: absolute; right: 0; bottom: 0; height: 24px; box-sizing: border-box; padding: 0 12px; border-top-left-radius: 6px; background: {{c.chrome}}; box-shadow: inset 1px 1px 0 {{c.chromeLine}}; display: flex; align-items: center; gap: 16px; font-size: 12px; color: {{c.muted}}; z-index: 13;"><span>4 backlinks</span><span>38 words</span><span>246 characters</span></div>
+</sc-if>
+
+<div style="position: absolute; left: {{page.left}}px; top: {{page.top}}px; width: {{page.w}}px; height: {{page.h}}px;">
+<div style="font-size: {{t.title}}px; line-height: {{t.titleLh}}px; font-weight: 700; margin-bottom: 12px;">Окружение в новой стране</div>
+<div style="font-size: {{t.body}}px; line-height: {{t.bodyLh}}px;"><span style="display: inline-block; padding: 0 8px; border-radius: 12px; background: {{c.tagBg}}; color: {{c.accent}}; font-size: 14px; line-height: 22px;">#project</span></div>
+<div style="font-size: {{t.body}}px; line-height: {{t.bodyLh}}px; margin-top: 8px;">Переехал, знакомых почти нет. Хочу 3–5 человек, с кем вижусь регулярно.</div>
+<div style="font-size: {{t.h2}}px; line-height: {{t.h2Lh}}px; font-weight: 700; margin-top: 20px;">Мысли</div>
+<div style="font-size: {{t.body}}px; line-height: {{t.bodyLh}}px; margin-top: 6px;">Проще через регулярное, а не разовое.</div>
+
+<sc-if value="{{list}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; margin-top: 44px; height: {{blockH}}px; outline: {{markBlock}}; outline-offset: 6px; border-radius: 4px;">
+<sc-if value="{{showMarks}}" hint-placeholder-val="{{true}}"><span style="position: absolute; left: -4px; top: -32px; height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{tagText}}</span></sc-if>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="9">
+<sc-if value="{{r.isLane}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: {{r.top}}px; width: 100%; height: 36px; display: flex; align-items: center; gap: 8px; padding-left: 4px; box-sizing: border-box;">
+<span style="font-size: 20px; font-weight: 700;">{{r.name}}</span>
+<sc-if value="{{r.folded}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 20px; font-weight: 600; color: {{c.muted}}; font-variant-numeric: tabular-nums;">{{r.count}}</span><span style="width: 16px; height: 20px; display: flex; align-items: center; justify-content: center; color: {{c.pull}};"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 5 16 12 9 19"></polyline></svg></span></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: {{r.top}}px; width: 100%; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; font-size: 13px; line-height: 20px; font-weight: 600; color: {{c.pull}};">{{r.name}}</div>
+</sc-if>
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 0; top: {{r.top}}px; width: {{cardW}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px; font-size: 15px;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.hasTime}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.time}}</span></sc-if>
+<sc-if value="{{r.hasDue}}" hint-placeholder-val="{{false}}"><span style="width: 24px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;"><span style="font-size: 13px; line-height: 13px; font-weight: 700; color: {{c.strong}}; font-variant-numeric: tabular-nums;">{{r.day}}</span><span style="font-size: 9px; line-height: 9px; font-weight: 600; color: {{c.muted}}; letter-spacing: 0.3px;">NOV</span></span></sc-if>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{mini}}" hint-placeholder-val="{{false}}">
+<div style="position: relative; margin-top: 44px; width: 100%; height: {{box.h}}px; box-sizing: border-box; border: 1px solid {{c.line}}; border-radius: 14px; overflow: visible; outline: {{markBlock}}; outline-offset: 4px;">
+<sc-if value="{{showMarks}}" hint-placeholder-val="{{true}}"><span style="position: absolute; left: -4px; top: -34px; height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 6px; background: {{c.mark}}; color: #000000; font-size: 11px; line-height: 20px; font-weight: 600; white-space: nowrap; z-index: 21;">{{tagText}}</span></sc-if>
+<div style="position: absolute; left: {{box.l1}}px; top: 8px; height: 36px; display: flex; align-items: center; font-size: 20px; font-weight: 700;">Inbox</div>
+<div style="position: absolute; left: {{box.l2}}px; top: 8px; height: 36px; display: flex; align-items: center; font-size: 20px; font-weight: 700;">Soon</div>
+<div style="position: absolute; left: {{box.div}}px; top: 52px; width: 1px; height: {{box.colH}}px; background: {{c.line}};"></div>
+<sc-for list="{{box.plates}}" as="p" hint-placeholder-count="2">
+<div style="position: absolute; left: {{p.left}}px; top: 52px; width: {{box.colW}}px; height: 35px; box-sizing: border-box; border: 1px dashed {{c.dash}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px; color: {{c.muted}};">No tasks</div>
+</sc-for>
+<div style="position: absolute; left: 10px; top: 99px; width: {{box.colW}}px; height: 1px; background: {{c.line}};"></div>
+<div style="position: absolute; left: 10px; top: 107px; height: 36px; display: flex; align-items: center; font-size: 20px; font-weight: 700;">Backlog</div>
+<sc-for list="{{box.rows}}" as="r" hint-placeholder-count="3">
+<sc-if value="{{r.isHead}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: {{box.colW}}px; height: 26px; box-sizing: border-box; padding: 0 4px 0 14px; display: flex; align-items: flex-end; font-size: 13px; line-height: 20px; font-weight: 600; color: {{c.pull}}; white-space: nowrap; overflow: hidden;">{{r.name}}</div>
+</sc-if>
+<sc-if value="{{r.isCard}}" hint-placeholder-val="{{true}}">
+<div style="position: absolute; left: 10px; top: {{r.top}}px; width: {{box.colW}}px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; font-size: 15px;"><div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div></div>
+</sc-if>
+</sc-for>
+<div role="group" aria-label="Columns" style="position: absolute; left: {{box.wheelLeft}}px; bottom: 12px; width: 160px; height: 44px; box-sizing: border-box; border-radius: 22px; background: {{c.track}}; box-shadow: {{c.control}}; overflow: hidden;">
+<sc-for list="{{wheel}}" as="o" hint-placeholder-count="4">
+<span style="position: absolute; left: {{o.left}}px; top: 4px; width: 38px; height: 36px; color: {{c.muted}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
+</sc-for>
+<div style="position: absolute; left: 4px; top: 4px; width: 76px; height: 36px; border-radius: 18px; background: {{c.selectedBg}}; display: flex;">
+<sc-for list="{{pill}}" as="o" hint-placeholder-count="2">
+<span style="width: 38px; height: 36px; color: {{c.selectedText}}; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.path}}"></path></svg></span>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variant":{"editor":"enum","default":"list","options":["list","mini"]},"platform":{"editor":"enum","default":"phone","options":["phone","desk"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const variant = this.props.variant ?? 'list';
+    const desk = this.props.platform === 'desk';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: desk ? '#F2F2F2' : '#F2F2F7', text: '#000000', strong: '#1C1C1E', muted: '#8E8E93', pull: '#6C6C70', line: '#E5E5EA', dash: '#C7C7CC', accent: '#8A5CF5', tagBg: 'rgba(138,92,245,0.1)', track: '#EEEEF0', selectedBg: '#1C1C1E', selectedText: '#FFFFFF', control: '0 6px 16px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.1)', chrome: desk ? '#F6F6F6' : '#F2F2F7', chromeLine: '#E3E3E3', chromeIcon: '#3A3A3C', chromeOff: '#C7C7CC', nav: '#F7F7F9', navShadow: '0 0 0 0.5px rgba(0,0,0,0.08), 0 6px 20px rgba(0,0,0,0.08)', mark: '#FF9500' }
+      : { bg: desk ? '#1E1E1E' : '#000000', card: desk ? '#373737' : '#1C1C1C', text: '#FFFFFF', strong: '#E5E5EA', muted: '#8E8E93', pull: '#AEAEB2', line: desk ? '#363636' : '#2C2C2E', dash: '#3A3A3C', accent: '#9580FF', tagBg: 'rgba(149,128,255,0.16)', track: desk ? '#373737' : '#1C1C1E', selectedBg: '#E5E5EA', selectedText: '#000000', control: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.1)', chrome: desk ? '#262626' : '#1F1F21', chromeLine: '#363636', chromeIcon: '#E5E5EA', chromeOff: '#6C6C70', nav: '#2A2A2C', navShadow: 'none', mark: '#FFD60A' };
+
+    const frame = desk ? { w: 1200, h: 800 } : { w: 390, h: 844 };
+    const page = desk ? { left: 272, top: 72, w: 700, h: 700 } : { left: 24, top: 124, w: 342, h: 652 };
+    const t = desk ? { title: 32, titleLh: 40, body: 16, bodyLh: 24, h2: 24, h2Lh: 30 } : { title: 26, titleLh: 32, body: 16, bodyLh: 24, h2: 22, h2Lh: 28 };
+    const cardW = desk ? 520 : page.w;
+
+    const rows = [];
+    let y = 0;
+    const lane = (name, extra) => { rows.push({ isLane: true, isHead: false, isCard: false, top: y, name, folded: false, count: '', ...extra }); y += 36; };
+    const head = (name) => { rows.push({ isLane: false, isHead: true, isCard: false, top: y, name }); y += 26; };
+    const card = (title, extra) => { rows.push({ isLane: false, isHead: false, isCard: true, top: y, title, hasTime: false, time: '', hasDue: false, day: '', ...extra }); y += 37; };
+    const gap = () => { y += 10; };
+    lane('Now'); card('Написать Ане', { hasTime: true, time: '18:00' }); gap();
+    lane('Soon'); card('Сходить на языковой обмен', { hasDue: true, day: '12' }); gap();
+    lane('Backlog'); card('Найти клуб по скалолазанию'); head('Дальний бэклог'); card('Организовать свою встречу'); gap();
+    lane('Done', { folded: true, count: '3' });
+    const blockH = y;
+
+    const W = page.w;
+    const colW = Math.floor((W - 2 - 30) / 2);
+    const box = {
+      h: 52 + 99 - 52 + 44 + 4 + 35 + 2 + 26 + 35 + 16 + 44 + 12 + 4,
+      l1: 14, l2: 10 + colW + 20 + 4,
+      div: 10 + colW + 10,
+      colW,
+      colH: 0,
+      plates: [{ left: 10 }, { left: 10 + colW + 20 }],
+      rows: [
+        { isHead: false, isCard: true, top: 147, title: 'Найти клуб по скалолазанию' },
+        { isHead: true, isCard: false, top: 184, name: 'Дальний бэклог' },
+        { isHead: false, isCard: true, top: 212, title: 'Организовать свою встречу' }
+      ],
+      wheelLeft: Math.round((W - 160) / 2)
+    };
+    box.colH = box.h - 52 - 68;
+    const paths = {
+      inbox: 'M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5 M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z',
+      soon: 'M5 21.5h14 M5 2.5h14 M17 21.5v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 3.9a2 2 0 0 0-.6 1.4v4.2 M7 2.5v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-3.9a2 2 0 0 0 .6-1.4V2.5',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      cal: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5'
+    };
+    const wheel = ['inbox', 'soon', 'now', 'cal'].map((k, i) => ({ left: 4 + i * 38, path: paths[k] }));
+    const pill = [{ path: paths.inbox }, { path: paths.soon }];
+
+    const showMarks = this.props.marks !== false && this.props.marks !== 'false';
+    const markBlock = showMarks ? '2px dashed ' + c.mark : 'none';
+    const tagText = variant === 'list' ? '↓ Живой блок: задачи проекта по разделам' : '↓ Живой блок: экран плагина, только этот проект';
+    return {
+      c, frame, page, t, cardW, rows, blockH, box, wheel, pill, markBlock, showMarks, tagText,
+      phone: !desk, desk,
+      list: variant === 'list', mini: variant === 'mini'
+    };
+  }
+}
+</script>
+</body>
+</html>

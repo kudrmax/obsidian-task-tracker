@@ -67,6 +67,11 @@ export interface Task {
 	readonly priority: string | null;
 	/** The names of the labels the line is tagged with, in its order; a task has these or a priority, not both. */
 	readonly labels: readonly string[];
+	/**
+	 * The link text of its project's note, `🗂️ [[…]]` on its line; null without one. A subtask's line may carry one; it is
+	 * ignored while the subtask has a parent (`TaskEntry.project` is the one that counts).
+	 */
+	readonly project: string | null;
 	/** Its subtasks are folded away on the screen: the marker on its line. Only a task with an open subtask keeps it. */
 	readonly collapsed: boolean;
 	/** Nested lines (deeper indent than the task), raw, in file order. They travel with the task. */

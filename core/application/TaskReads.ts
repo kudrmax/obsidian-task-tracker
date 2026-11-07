@@ -41,6 +41,9 @@ import { type ItemLevels, itemLevels, toItem } from "./taskItems";
 import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
 import type { Clock, SettingsStore } from "./ports";
+import { inProject, projectName } from "../domain/Project";
+import { groupSectionNames, listGrouping, ProjectIndex, viewGrouping } from "./projects";
+import type { GroupingState, ListGrouping, ProjectNote, ProjectRef } from "./contracts";
 
 /** The file as one read sees it: normalized for `today`, the day beginning at `boundary`; `text` as the file holds it. */
 export interface Snapshot {
@@ -61,6 +64,22 @@ export interface Read<R> {
 	readonly missing?: () => R;
 	answer(s: Snapshot | null): R;
 }
+
+/** What the reads know of projects besides the file: the project notes, and how this device groups its lists. */
+export interface ProjectSource {
+	notes(): readonly ProjectNote[];
+	grouping(): GroupingState;
+}
+
+const NO_PROJECT_SOURCE: ProjectSource = { notes: () => [], grouping: () => ({}) };
+
+/** Which tasks a screen shows: all of them, or one project's (its view, where the cards go without the mark). */
+interface Scope {
+	readonly project: string | null;
+	readonly index: ProjectIndex;
+}
+
+const NO_GROUPING: ListGrouping = { canGroup: false, on: false, groups: [] };
 
 /** A list's sections with a heading or tasks, in file order; an empty one is a heading over no task. */
 function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[] {
@@ -100,7 +119,18 @@ export class TaskReads {
 		private readonly rules: TaskRules,
 		private readonly settings: SettingsStore,
 		private readonly clock: Clock,
+		private readonly projects: ProjectSource = NO_PROJECT_SOURCE,
 	) {}
+
+	/** The project notes, by name, as the Project page offers them. */
+	projectNotes(): readonly ProjectRef[] {
+		return this.index().known();
+	}
+
+	/** How this device groups its lists now. */
+	grouping(): GroupingState {
+		return this.projects.grouping();
+	}
 
 	priorityLevels(): readonly PriorityLevel[] {
 		return this.rules.priorityLevels();
@@ -130,27 +160,57 @@ export class TaskReads {
 	}
 
 	/** The screen of `date`: the file tidied for today first; without a file, the empty screen. */
-	screenRead(date: LocalDate): Read<ScreenView> {
-		return { reads: true, tidies: true, missing: () => this.missingScreen(date), answer: (s) => this.screen(s!, date) };
+	screenRead(date: LocalDate, project?: string): Read<ScreenView> {
+		return { reads: true, tidies: true, missing: () => this.missingScreen(date, project), answer: (s) => this.screen(s!, date, project) };
 	}
 
-	screen(s: Snapshot, date: LocalDate): ScreenView {
+	/** The screen of `date`; with `project`, that project's view. */
+	screen(s: Snapshot, date: LocalDate, project?: string): ScreenView {
+		const scope: Scope = { project: project ?? null, index: this.index() };
+		const { doc, today, boundary } = s;
+		const shown = (entries: readonly TaskEntry[]) => (scope.project === null ? entries : entries.filter((e) => inProject(e.project, scope.project)));
+		const item = this.itemOf(today, scope);
+		const lists = { inbox: shown(inboxList(doc)), backlog: shown(backlogList(doc)), soon: shown(soonWithoutDate(doc)) };
+		const day = { date, list: shown(dayList(doc, date, today, boundary)).map(item), slotted: shown(slottedOn(doc, date, boundary)).map(item) };
+		const all = this.listSections(s);
+		const sections = scope.project === null ? all : (Object.fromEntries(GROUPED_LISTS.map((list) => [list, all[list].filter((sec) => !sec.empty)])) as unknown as Record<GroupedList, readonly ListSection[]>);
+		const view = { soon: lists.soon.map(item), inbox: lists.inbox.map(item), backlog: lists.backlog.map(item) };
+		const projects = this.listGroupings(scope, { ...view, day: day.list }, sections, date);
+		const offer = this.offerOf(s, date, shown, sections, projects);
 		return {
-			day: this.dayView(s, date),
-			soon: this.soonWithoutDateView(s),
-			inbox: this.inboxView(s),
-			backlog: this.backlogView(s),
-			done: this.doneView(s),
-			sections: this.listSections(s),
-			offer: this.sectionOffer(s, date),
+			day,
+			...view,
+			done: shown(doc.tasks("done")).map(item),
+			sections,
+			offer,
 			missing: false,
 			calendars: true,
+			projects,
+			project: scope.project === null ? null : scope.index.refOf(scope.project, false),
 		};
 	}
 
+	/** Each list's grouping by project on this device; none in a project's view. */
+	private listGroupings(scope: Scope, view: Readonly<Record<"soon" | "inbox" | "backlog" | "day", readonly TaskItem[]>>, sections: Readonly<Record<GroupedList, readonly ListSection[]>>, date: LocalDate): Readonly<Record<GroupedList, ListGrouping>> {
+		if (scope.project !== null) {
+			const ref = scope.index.refOf(scope.project, false)!;
+			const dayList = this.columnSections("day", date)?.list ?? null;
+			return {
+				inbox: viewGrouping(ref, view.inbox, true, sections.inbox),
+				backlog: viewGrouping(ref, view.backlog, true, sections.backlog),
+				soon: viewGrouping(ref, view.soon, true, sections.soon),
+				now: viewGrouping(ref, view.day, dayList !== null, dayList === null ? [] : sections[dayList]),
+			};
+		}
+		const state = this.projects.grouping();
+		const of = (list: "soon" | "inbox" | "backlog") => listGrouping({ list, items: view[list], sections: sections[list], projects: scope.index, state });
+		return { inbox: of("inbox"), backlog: of("backlog"), soon: of("soon"), now: NO_GROUPING };
+	}
+
 	/** The screen without a tasks file: nothing in any list, and no calendars beside nothing. */
-	missingScreen(date: LocalDate): ScreenView {
+	missingScreen(date: LocalDate, project?: string): ScreenView {
 		const none = { inbox: [], backlog: [], soon: [], now: [] };
+		const off = { inbox: NO_GROUPING, backlog: NO_GROUPING, soon: NO_GROUPING, now: NO_GROUPING };
 		return {
 			day: { date, list: [], slotted: [] },
 			soon: [],
@@ -161,6 +221,8 @@ export class TaskReads {
 			offer: { lists: none, ungrouped: this.settings.get().groups.ungrouped },
 			missing: true,
 			calendars: false,
+			projects: off,
+			project: project === undefined ? null : this.index().refOf(project, false),
 		};
 	}
 
@@ -185,12 +247,20 @@ export class TaskReads {
 		return doc.tasks("done").map(this.itemOf(today));
 	}
 
-	sectionOffer({ doc, today, boundary }: Snapshot, date: LocalDate): SectionOffer {
+	sectionOffer(s: Snapshot, date: LocalDate): SectionOffer {
+		return this.screen(s, date).offer;
+	}
+
+	/** The sections the menus offer on the screen `shown` draws; a list grouped by project offers each group its own. */
+	private offerOf({ doc, today, boundary }: Snapshot, date: LocalDate, filter: (entries: readonly TaskEntry[]) => readonly TaskEntry[], sections: Readonly<Record<GroupedList, readonly ListSection[]>>, projects: Readonly<Record<GroupedList, ListGrouping>>): SectionOffer {
 		const { presets, ungrouped } = this.settings.get().groups;
-		const shown = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-		const names = (list: GroupedList) =>
-			offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sectionsOf(doc, list)), presets, ungrouped);
-		return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
+		const shown = filter([...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)]);
+		const names = (list: GroupedList) => offeredNames(shownSections(shown.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
+		const lists = { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") };
+		const grouped = GROUPED_LISTS.filter((list) => projects[list].on);
+		if (grouped.length === 0) return { lists, ungrouped };
+		const byGroup = (list: GroupedList) => Object.fromEntries(Object.entries(groupSectionNames(projects[list])).map(([key, groups]) => [key, offeredNames(groups, presets, ungrouped)]));
+		return { lists, ungrouped, projects: Object.fromEntries(grouped.map((list) => [list, byGroup(list)])) };
 	}
 
 	listSections({ doc }: Snapshot): Readonly<Record<GroupedList, readonly ListSection[]>> {
@@ -198,36 +268,41 @@ export class TaskReads {
 	}
 
 	/** A query that finds nothing reads no file. */
-	searchRead(query: string): Read<readonly SearchGroup[]> {
-		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query) };
+	searchRead(query: string, project?: string): Read<readonly SearchGroup[]> {
+		return { reads: FuzzyQuery.of(query) !== null, answer: (s) => this.search(s, query, project) };
 	}
 
-	search(s: Snapshot | null, query: string): readonly SearchGroup[] {
+	/** With `project`, only that project's tasks (and their subtasks). */
+	search(s: Snapshot | null, query: string, project?: string): readonly SearchGroup[] {
 		const fuzzy = FuzzyQuery.of(query);
 		if (!fuzzy || !s) return [];
 		const { doc, today } = s;
 		const item = this.itemOf(today);
 		const ranked: RankedHit[] = [];
+		const index = this.index();
 		const visit = (entry: TaskEntry): void => {
 			const titleText = plainText(entry.task.text);
 			const title = fuzzy.match(titleText);
 			const markdown = descriptionMarkdown(entry);
 			const descriptionText = markdown === null ? "" : plainDescription(markdown);
 			const description = descriptionText === "" ? null : fuzzy.matchWords(descriptionText);
-			if (title || description) {
+			const projectText = entry.project === null || entry.path.length > 0 ? "" : (index.refOf(entry.project)?.name ?? projectName(entry.project));
+			const project = projectText === "" ? null : fuzzy.matchWords(projectText);
+			if (title || description || project) {
 				const hit: SearchHit = {
 					item: item(entry),
 					title: title ? matchParts(titleText, title.found) : [],
+					project: project ? matchParts(projectText, project.found) : null,
 					description: description ? snippetParts(descriptionText, description.found) : null,
 				};
-				ranked.push({ hit, title, description });
+				ranked.push({ hit, title, description: description ?? project });
 			}
 			for (const sub of entry.subtasks) if (isOpen(sub.task.status)) visit(sub);
 		};
 		const groups: SearchGroup[] = [];
 		for (const list of SEARCH_ORDER) {
 			ranked.length = 0;
-			for (const entry of doc.tasks(list)) visit(entry);
+			for (const entry of doc.tasks(list)) if (project === undefined || inProject(entry.project, project)) visit(entry);
 			if (ranked.length > 0) groups.push({ list, hits: ranked.sort(byQuality).map((r) => r.hit) });
 		}
 		return groups;
@@ -256,7 +331,7 @@ export class TaskReads {
 
 	/** The tasks the keys name as the file has them, in their order; throws StaleTaskError when one is gone. */
 	itemsAt({ doc, today }: Snapshot, keys: readonly TaskKey[]): readonly TaskItem[] {
-		const levels = this.itemLevels();
+		const levels = this.itemLevels(this.scopeAll());
 		return keys.map((key) => {
 			const entry = this.rules.entryOf(doc, key);
 			const parent = key.path.length > 0 ? (doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null) : null;
@@ -269,7 +344,7 @@ export class TaskReads {
 		const entry = doc.find(place.section, place.index, place.path);
 		if (!entry) return null;
 		const parent = place.path.length > 0 ? (doc.find(place.section, place.index, place.path.slice(0, -1)) ?? null) : null;
-		return toItem(entry, today, this.itemLevels(), parent, this.rules.moment().boundary);
+		return toItem(entry, today, this.itemLevels(this.scopeAll()), parent, this.rules.moment().boundary);
 	}
 
 	/** The task's line in the file once tidied for today, from 0. */
@@ -314,12 +389,12 @@ export class TaskReads {
 
 	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectNotes());
 	}
 
 	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectNotes());
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {
@@ -351,15 +426,24 @@ export class TaskReads {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
 	}
 
-	private itemOf(today: LocalDate): (entry: TaskEntry) => TaskItem {
-		const levels = this.itemLevels();
+	private itemOf(today: LocalDate, scope: Scope = this.scopeAll()): (entry: TaskEntry) => TaskItem {
+		const levels = this.itemLevels(scope);
 		const { boundary } = this.rules.moment();
 		return (entry) => toItem(entry, today, levels, null, boundary);
 	}
 
-	private itemLevels(): ItemLevels {
+	private itemLevels(scope: Scope): ItemLevels {
 		const settings = this.settings.get();
-		return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels));
+		const mark = scope.project === null;
+		return itemLevels(usableLevels(settings.priorities), usableLabels(settings.labels), (link) => scope.index.refOf(link, mark));
+	}
+
+	private index(): ProjectIndex {
+		return new ProjectIndex(this.projects.notes());
+	}
+
+	private scopeAll(): Scope {
+		return { project: null, index: this.index() };
 	}
 
 	private today(): LocalDate {

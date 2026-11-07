@@ -30,6 +30,8 @@ export interface MenuRowSpec {
 	readonly iconSide?: "end" | "start";
 	/** The purpose: where the row stands. */
 	readonly cls?: string;
+	/** Shown but not pressed: Project for subtasks, whose project is their parent's. */
+	readonly disabled?: boolean;
 }
 
 function rowClass(spec: MenuRowSpec): string {
@@ -49,6 +51,7 @@ export function menuRow(parent: HTMLElement, spec: MenuRowSpec): HTMLButtonEleme
 		if (spec.days) weekLetters(row, spec.days);
 		if (spec.icon) row.appendChild(icon(spec.icon));
 	}
+	row.disabled = spec.disabled === true;
 	row.addEventListener("click", spec.onPick);
 	return row;
 }

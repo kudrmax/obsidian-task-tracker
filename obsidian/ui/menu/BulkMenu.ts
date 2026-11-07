@@ -8,10 +8,10 @@ import { pickMark } from "../TaskSelection";
 import type { LocalDate } from "../types";
 import { askGroup, menuGroup, menuRow, type MenuTileSpec, menuRoom, placePanel, tileGroup, tileRows } from "./MenuPanel";
 import { datePage } from "./DatePage";
-import { sectionChooser } from "./SectionChooser";
+import { projectChooser, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
+import { type Asking, askLooks, labelTiles, priorityTiles, projectRow, statusTiles } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -28,6 +28,8 @@ export interface BulkActions {
 	postpone(date: LocalDate): Promise<void>;
 	removeDue(): Promise<void>;
 	toSection(name: GroupName): Promise<void>;
+	/** The tasks' project: a note's link, null for No project. */
+	setProject(project: string | null): Promise<void>;
 	remove(): Promise<void>;
 }
 
@@ -124,7 +126,11 @@ export class BulkMenu {
 		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
-		if (model.edits.includes("section")) menuGroup(panel, [{ label: "Section", icon: "section", onPick: () => this.showSections() }]);
+		const project = projectRow(model);
+		menuGroup(panel, [
+			...(model.edits.includes("section") ? [{ label: "Section", icon: "section", onPick: () => this.showSections() } as const] : []),
+			{ ...project, onPick: () => this.showProjects() },
+		]);
 		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete");
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
@@ -176,6 +182,19 @@ export class BulkMenu {
 				sections,
 				onBack: () => this.showMenu(),
 				onPick: (name) => this.pick(() => actions.toSection(name))(),
+			}),
+		);
+	}
+
+	/** The Project page: every picked task gets the project picked; subtasks keep their parents'. */
+	private showProjects(): void {
+		const { actions } = this.context;
+		this.asking = null;
+		this.panel.replace((panel) =>
+			projectChooser(panel, {
+				project: this.context.menu(this.context.items).project,
+				onBack: () => this.showMenu(),
+				onPick: (link) => this.pick(() => actions.setProject(link))(),
 			}),
 		);
 	}

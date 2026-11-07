@@ -6,7 +6,7 @@ import { AutoScroll } from "./AutoScroll";
 import { carriesMany, type ColumnSections, type DragOrigin, type DragPayload, type DropResult, type DropTarget, type ListColumn, originsOf } from "./DropTarget";
 import { DropLine } from "./DropLine";
 import { type ListFrame, readFrame, toClient } from "./listFrame";
-import { type PlacedCard, type PlacedHead, placeAt } from "./listPlace";
+import { headerOfPlace, type PlacedCard, type PlacedHead, placeAt, sameHeader } from "./listPlace";
 
 const INDENT = "--tc-subtask-indent";
 const LIFTED = "is-lifted";
@@ -107,7 +107,7 @@ export class ListDrop implements DropTarget {
 		this.place = place;
 		if (fresh && (!before || !sameGap(before, place) || before.level !== place.level)) this.onNewPlace();
 		const home = this.isHome(place, frame);
-		const plate = home ? null : this.list.plateOf(place.group);
+		const plate = home ? null : this.list.plateOf(place.group, place.project);
 		this.light(plate);
 		if (plate) this.line.hide();
 		else if (!home) {
@@ -207,8 +207,6 @@ export class ListDrop implements DropTarget {
 		const cards: Measured[] = [];
 		const heads: PlacedHead[] = [];
 		const entries = new Map(this.list.cards.map((entry) => [entry.card, entry]));
-		const groups = this.list.groups;
-		let groupIndex = 0;
 		for (const node of nodes) {
 			if (node.classList.contains(LIFTED)) {
 				if (!node.classList.contains(WAITING)) removed += step;
@@ -221,8 +219,8 @@ export class ListDrop implements DropTarget {
 				cards.push({ entry, top: node.offsetTop - removed, left: node.offsetLeft, width: node.offsetWidth, height: node.offsetHeight });
 				continue;
 			}
-			while (groupIndex < groups.length && !node.classList.contains("tc-group-head")) groupIndex++;
-			heads.push({ group: groups[groupIndex++]?.name ?? null, firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
+			const header = this.list.headerAt(node);
+			if (header !== undefined) heads.push({ group: header, opens: node.classList.contains("is-project"), firstCard: cards.length, top: node.offsetTop - removed, height: node.offsetHeight });
 		}
 		return { nodes, size, width, indent: tokenPx(this.list.el, INDENT), cards, heads, waiting };
 	}
@@ -252,8 +250,12 @@ export class ListDrop implements DropTarget {
 		const right = cards[0]?.rect.right ?? r.right;
 		const at = cards[place.index];
 		const prev = cards[place.index - 1];
-		const head = heads.find((h) => h.group === place.group);
-		const inGroup = (measured: { entry: ListEntry }) => this.list.listCard(measured.entry).group === place.group;
+		const header = headerOfPlace(place);
+		const head = [...heads].reverse().find((h) => sameHeader(h.group, header));
+		const inGroup = (measured: { entry: ListEntry }) => {
+			const card = this.list.listCard(measured.entry);
+			return sameHeader(card.project === undefined ? card.group : { group: card.group, project: card.project }, header);
+		};
 		const top =
 			at && inGroup(at) ? at.rect.top
 			: prev && inGroup(prev) ? prev.rect.bottom + card.gap
@@ -268,7 +270,8 @@ export class ListDrop implements DropTarget {
 		const at = all.findIndex((entry) => entry.card.classList.contains(LIFTED));
 		if (at < 0) return null;
 		const before = all.slice(0, at).filter((entry) => !entry.card.classList.contains(LIFTED)).length;
-		return { kind: "gap", index: before, level: all[at].level, group: this.list.listCard(all[at]).group };
+		const { group, project } = this.list.listCard(all[at]);
+		return { kind: "gap", index: before, level: all[at].level, group, ...(project !== undefined && { project }) };
 	}
 
 	/** A card carried along: the gap is picked by its middle, so it goes into the gap its middle is nearest to. */

@@ -50,11 +50,13 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `calendars` | `{ google?, iphone?, work? }`: each calendar file's text, `null` or left out for none (`calendarFiles` says where they are) |
 | `fetched` | the calendar sources the host fetches itself (a status names no device for them); `["google"]` when left out |
 | `history` | the undo steps as the last answer gave them; left out before the first |
+| `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open) |
+| `grouping` | `GroupingState`, how this device groups its lists by project, as the last answer gave it; left out for the defaults (Backlog grouped, Soon not) |
 
 **Answer** (`DoorAnswer`):
 
 ```
-{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>" }
+{ "ok": true, "result": …, "tasks"?: "<new text>", "step"?: true, "history"?: {…}, "settings"?: "<new data.json>", "grouping"?: {…} }
 { "ok": false, "error": { "code": "staleTask" | "tasksFileMissing" | "blank" | "unknownMethod" | "badArguments" | "failed", "message": "…" } }
 ```
 
@@ -68,6 +70,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 - `step`: the write is an action undo takes back; tidying is none. With it comes `history`.
 - `settings`: the call changed the settings (a calendar shown or hidden; the phone carrying the old choice of calendars
   over, once). The host writes this text as `data.json`; every key it does not know is kept.
+- `grouping`: the call changed how this device groups its lists (`tasks.setGrouping`, `tasks.toggleFold`, `tasks.reveal`
+  of a task in a folded group). The host keeps it on the device, never synced, and hands it in again.
 - `staleTask`: a task or section the call names is no longer there as read: read again (`tasks.screen`) and redraw.
   `tasksFileMissing`: the call needs the tasks file; `tasks.createFile` answers the text of a new one. `blank`: a task to
   write has no title (`capture.add`).
@@ -78,7 +82,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 Every method of `TaskService` but `onChange`, by its name and with its arguments: `tasks.screen(date)`,
 `tasks.search(query)`, `tasks.menu(item, from, screen)`, `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
-priority, place, repeat?, labels?)`, … (83 methods; `methods()` lists them). The answers are those of the plugin's
+priority, place, repeat?, labels?)`, … (87 methods; `methods()` lists them). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
@@ -93,6 +97,39 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`
   for, the host's own touch tolerance in the same points (the plugin passes 9). A resize is offered while `item.can.resize`.
 - Subscriptions are the host's: it watches the files and calls again after a change.
+
+#### Projects
+
+A task's project is the `🗂️ [[Note]]` field of its line (after the labels, before the other fields); a subtask's is its
+parent's. Every write keeps it, and no title (`TaskItem.title`, `text`, a reminder's) holds it.
+
+- `TaskItem.project`: `ProjectRef` `{ name, link, note, canOpenNote, mark }` or `null`; `item.can.setProject` (false on a
+  subtask). `mark` is the card's folder icon: off in a project's own view.
+- `tasks.screen(date, project?)`: with a project's link or name, that project's view: every list, the timeline and Done
+  hold only its tasks, the empty sections left out; `screen.project` is the project. There every list (`projects.now`:
+  the day column) is one untitled group of the project (`titled` false), so every card, header, plate and place carries
+  its zone, section actions touch only its tasks and no section lifts; `tasks.createSection` with a zoned place writes
+  nothing (a section is born with its first task, `NewTaskPlace.section`). Every screen answers
+  `projects`: each list's `ListGrouping` `{ canGroup, on, groups }`. While `on`, the column draws `groups` (each
+  `ProjectGroup`: `key`, `project`, `title`, `folded`, `count`, `canOpenNote`, `zone`, `titled`, `sections`, `end`,
+  `head`) in place of its sections. `sections` is never empty: an empty group has one empty part (`name` null, `empty`,
+  no header), where its plate writes and a drop lands; `head` is what a drop on the group's header means; each section of a group is a `ListGroup` with `header` and `reorder` (no lift while grouped) and a
+  `menu.project` that `renameGroup` and `removeGroup` take as their last argument.
+- A card of a grouped list or a project's view carries `project: zone` in `ListCard`; a header a finger passes is
+  `{ group, project }` (`rules.gapAt`), so the place (`rules.placeOfDrop`) carries the zone and `tasks.drop` moves the
+  task into that project (null: out of any), right after the project's last task the column shows there when it has
+  no task to stand before. `entry.*` reads the same: `WireLook.sections` holds `{ group, project }` headers, and
+  `WireLook.project` is the project of a project's view (every task written there gets it).
+- `tasks.setProject(keys, link | null)`: one write; a subtask is left as it is. `tasks.projectNotes()`: the project notes
+  by name. A menu's `project` (`MenuProject` `{ current, options, none, disabled }`) is the Project row's page.
+- `tasks.setGrouping(list, on)`, `tasks.toggleFold(list, key)`: answer the new `grouping`.
+- `tasks.renameGroup(list, group, name, project?)`, `tasks.removeGroup(list, group, project?)`: with `project` (null: No
+  project), only that project's tasks of the section move.
+- `tasks.search(query, project?)` finds a task by its project's name too: `SearchHit.project`, the name in pieces. With
+  `project`, only that project's tasks (the search opened from its view).
+- A menu's `project.value` is the row's value, ready: the shared project's name, «No project», or empty when they differ.
+- `NewTaskPlace` `list`/`day` take `project` and `section` (a section named in a project's group is born with its first
+  task), `slot` takes `project`. `capture.add` writes no project.
 
 ### `days.*`: `DayService`
 
@@ -156,7 +193,7 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `context.settings`: `form()` (`SettingsForm`, the fields as the screen shows them), `setTasksFile(path)`,
 `setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
-`setLabelTag(tag)`, `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+`setLabelTag(tag)`, `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a

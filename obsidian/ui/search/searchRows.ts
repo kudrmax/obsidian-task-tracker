@@ -16,19 +16,23 @@ function fillParts(parent: HTMLElement, parts: readonly FoundPart[]): void {
 	}
 }
 
-/** A found task as its card: the found words picked out of the title; found in the description, the description's line under the title. */
+/**
+ * A found task as its card: the found words picked out of the title; found in its project's name, that name's line under the
+ * title, else found in the description, the description's line.
+ */
 function renderRow(parent: HTMLElement, hit: SearchHit): HTMLElement {
 	const card = renderTaskCard(parent, hit.item, { day: null });
 	card.classList.add("tc-hit-card");
 	const title = card.querySelector<HTMLElement>(":scope > .tc-card-title");
 	if (!title) return card;
 	if (hit.title.length > 0) fillParts(title, hit.title);
-	if (hit.description) {
+	const snippet = hit.project ?? hit.description;
+	if (snippet) {
 		card.classList.add("has-snippet");
 		const text = el(null, "div", "tc-hit-text");
 		card.replaceChild(text, title);
 		text.appendChild(title);
-		fillParts(el(text, "div", "tc-hit-desc"), hit.description);
+		fillParts(el(text, "div", hit.project ? "tc-hit-desc is-project" : "tc-hit-desc"), snippet);
 	}
 	return card;
 }
