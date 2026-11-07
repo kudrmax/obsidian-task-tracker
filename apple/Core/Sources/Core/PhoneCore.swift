@@ -28,14 +28,17 @@ public struct DoorContext: Sendable {
     public let fetched: [String]?
     /// The undo steps the last answer gave; `nil` before the first.
     public let history: DoorHistory?
+    /// How this device groups its lists by project (`GroupingState`) as JSON text; `nil` for the door's defaults.
+    public let groupingJSON: String?
 
-    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil) {
+    public init(tasks: String?, settingsJSON: String = "", now: Date, calendars: [String: String] = [:], fetched: [String]? = nil, history: DoorHistory? = nil, groupingJSON: String? = nil) {
         self.tasks = tasks
         self.settingsJSON = settingsJSON
         self.now = now
         self.calendars = calendars
         self.fetched = fetched
         self.history = history
+        self.groupingJSON = groupingJSON
     }
 }
 
@@ -217,6 +220,7 @@ public final class PhoneCore: TaskRules, @unchecked Sendable {
         var wire: [String: Any] = ["tasks": context.tasks ?? NSNull(), "settings": context.settingsJSON, "nowMs": ms(context.now), "calendars": context.calendars]
         if let fetched = context.fetched { wire["fetched"] = fetched }
         if let history = context.history { wire["history"] = try JSONSerialization.jsonObject(with: Data(history.json.utf8)) }
+        if let grouping = context.groupingJSON { wire["grouping"] = try JSONSerialization.jsonObject(with: Data(grouping.utf8)) }
         return wire
     }
 

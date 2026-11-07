@@ -187,7 +187,22 @@ Backend (the core's contract):
     case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
     note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
 
-Obsidian frontend (Swift's are 11–12, in its branch):
+iPhone app (the minimum that keeps it from breaking):
+
+11. **The app reads the new fields by leaving them out**: its `Decodable` models (`TaskItem`, `ListGroup`, `GroupMenu`,
+    `TaskMenuModel`, `SearchHit`, `ScreenView`, `SettingsForm`) take the keys they know and skip the rest, so
+    `TaskItem.project`, `can.setProject`, `ListGroup.header`/`reorder`, `menu.project`, `TaskMenuModel.project`,
+    `SearchHit.project`, `ScreenView.projects`/`project` and `projectTag` change nothing it draws; a task goes back to the
+    door as it was read (`TaskItem.json`), field and all. Its drops carry no `project` (its cards and headers have no
+    zone), so a task keeps its project wherever it is dragged.
+12. **The app asks for every list ungrouped**: each call of the main screen hands in `grouping`
+    `{ on: { backlog: false, soon: false } }` (`TaskBoard.ungrouped`). Without it the door groups Backlog by default and
+    its `screen.offer` gains `projects`, which cut a Backlog card's Section menu (and the bulk menu) to its project
+    group's sections. The app draws no groups yet, so its lists and menus stay as before projects; a `grouping` in an
+    answer (`tasks.reveal`) is dropped. When the app's groups come, it keeps `grouping` per device as the Obsidian
+    frontend does (decision 8).
+
+Obsidian frontend:
 
 13. **The block's place** is where Obsidian puts its own backlinks in the document: in Live Preview right after the
     editor's content (`.cm-sizer`, after `.cm-contentContainer`), in Reading view first in the note's footer
@@ -213,9 +228,8 @@ Obsidian frontend (Swift's are 11–12, in its branch):
     opens the note.
 23. **Automatically update internal links off**: the Project tag field's description says to turn it on; nothing else
     warns.
-24. **Open for the lead (backend)**: in the project's view Backlog draws the «No section» header over its tasks without a
-    section (`ListGroup.header` true, as on the main screen), while board Proj4V2 shows those tasks with no header above
-    them. The Obsidian frontend draws what the contract gives.
+24. **«No section» in the block's Backlog** stays as on the main screen (the lead's call: the block thinks like the
+    plugin); board Proj4V2 drew it without.
 
 ## Ideas for later
 
