@@ -51,8 +51,8 @@ are being done now, a small one is done at once, a multi-step one goes to Soon, 
 9. **A task is put into a project from the plugin.** The task menu has «Project»: picking a project writes its link on
    the line, «No project» takes it off; the task keeps its place in the lane. Board:
    `docs/design/canvas/Proj3Flow.dc.html` (approved). A project group has no plus of its own: the plus at the bottom
-   right, taken to a project group (the way it is taken to any place), writes the new task in Backlog with that project's
-   link.
+   right, taken to a project group (the way it is taken to any place), writes the new task into that list (Backlog or
+   Soon) at the drop place, with that project's link.
 10. **Done stays in the file's Done**, with its link: a project's history is its done tasks with the link.
 11. **The project note shows the plugin's screen, filtered to the project** (the live block, in the first version). The
     same columns, the wheel and every gesture as the main screen, so Max thinks the same way in the project and in the
@@ -75,9 +75,80 @@ fixed that but made lines travel between files. One file wins.
    project mark; a tap on the mark opens the note.
 4. **Done.** The task leaves the screen and goes to Done with its link.
 
-## Open
+## Rules for the core
 
-Nothing: every product question is decided. Technical ones are the agents'.
+Decided by the lead after the spec review; the core owns every one, the frontends only draw what it gives.
+
+1. **Which link is the project.** The last wikilink of the task's text whose note resolves and carries the project tag;
+   any other link is plain text. The plugin writes it right after the text, before labels and fields. One per task: the
+   menu replaces it. A link to a note without the tag, a deleted note or a removed tag: plain text, no project. The tag
+   counts in properties (`tags`) or as a tag in the body, exactly the setting's tag, not its nested children, case as
+   Obsidian matches tags.
+2. **The link is not the title.** The core takes the project link out of `title` and gives it as a field `project`
+   (name, note path). Reminders, Live Activities, alarms, «Delete …?», search titles and the card show the title without
+   it. Search also finds a task by its project's name. Repeat, copy and moves carry the link as part of the line.
+3. **Subtasks.** A subtask's project is its parent's; a link written on a subtask line is ignored while it has a parent.
+   A subtask that leaves its parent (moved to another column, the calendar, a repeat copy without parent) gets the
+   parent's link written on its line. A task dropped under a parent of another project loses its own link. «Project» is
+   in a subtask's menu disabled, showing the parent's project.
+4. **Who knows the projects.** A port `Projects` gives the core the list (name, note path, link text); the Obsidian
+   infrastructure fills it from the metadata cache. The door's context gets `projects`, filled by the host; the plugin
+   writes the list to `.obsidian/plugins/task-calendar/projects.json`, where the iPhone app reads it next to the tasks
+   file. Link text is the shortest one Obsidian would write.
+5. **Groups.** The core gives each groupable list as a ready model: groups in order (projects by name, «No project»
+   last), each with title, project, folded, count, `canOpenNote`, and its sections. Count: open top-level tasks of that
+   group in that list. A project without tasks in that list has no group (see Questions). Defaults (Backlog on, Soon off),
+   which lists can group (`TaskList.canGroupByProject`) and the fold state store are the core's, as `ScreenBehaviour`.
+6. **«No section» inside a group.** Inside a project group and inside «No project», the tasks without a section stand
+   first without a header, as decision 8 says; the «No section» header appears only with grouping off, as today.
+7. **Empty sections with grouping on** show inside «No project» only; a tap on their «No tasks» writes a task without a
+   project. A section header lifted with a long press with grouping on does not lift (`can.reorderSection` false).
+8. **Section actions inside a group.** Rename to a new name puts the new heading where the old one stood, the project's
+   tasks moved under it; the section button inside a group asks the name, then the first task (Escape after the name
+   drops both); tasks of the project below the field do not move. The task menu's Section in a grouped list offers the
+   sections of the task's group. A drop on a section header inside another project's group changes the project too.
+9. **Folded group**: a drop on its title puts the task at the group's end; search opening a task in a folded group
+   unfolds it; Select tasks does not select inside folded groups.
+10. **Mass actions** get «Project» (all selected get the project; subtasks follow their parents). A stack dropped into a
+    group: all get its project.
+11. **The mark and the card.** The folder icon stands in the date's place when the card shows no date; with a date, a
+    repeat or a counter, it stands left of them, the same width. It is on subtasks too (their parent's project), off
+    inside the project note's block, on in grouped lists as well. In Select tasks a tap on it selects, like the card.
+12. **📁 in the file stays «subtasks folded».** The project mark is drawn, never written; docs/plugin says so plainly.
+13. **Rename of a project note.** Relies on Obsidian's «Automatically update internal links»; the plugin checks it at
+    start and says so in settings when it is off. Obsidian's rewrite of the tasks file is an outside change: undo across
+    it says «Can't undo: the tasks file changed», as today. docs/plugin names both.
+
+## The iPhone app
+
+It has no task screen today (New Task and Settings only). For projects it changes only through the core: reminders,
+alarms and Live Activities show the title without the link (rule 2); quick entry writes without a project. Grouping, the
+mark and «Project» come to the app when it gets a task screen.
+
+## The block in the note: risks to check first
+
+The frontend-obsidian agent starts with a spike before anything else: put the plugin's screen at the end of a note in
+Reading and Live Preview, on the desktop and the phone, and report what breaks. Known risks: no public API for an
+in-document footer (backlinks-in-document is core; checked from memory only); the wheel and column swipes inside a
+scrolling note vs Obsidian's own swipes; the block's height (proposed: the height of the phone's screen, its own scroll
+inside); the block's own wheel position, day and divider (proposed: its own, kept per note); calendar events on its
+timeline (proposed: shown, as on the main screen, so the day reads the same); Cmd+Z and Cmd+F only when the focus is in
+the block.
+
+## Contract
+
+Written by the backend agent from these rules before the frontends start: the `project` field and `can.setProject` on
+`TaskItem`, the grouped list model, the project picker's menu model, the drop targets of groups, `ProjectsService`
+(list, set project, open-note target), the settings field «Project tag», the door's `projects`. `contracts.ts` and
+`settings.ts` change with the whole team, in this feature's branch.
+
+## Decisions
+
+(The frontends write here the gaps they decide.)
+
+## Questions for Max
+
+1. Does a project with no tasks in a list show its group there (empty, with «No tasks»)?
 
 ## Ideas for later
 
