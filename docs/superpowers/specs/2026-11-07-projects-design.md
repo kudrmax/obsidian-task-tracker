@@ -187,6 +187,36 @@ Backend (the core's contract):
     case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
     note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
 
+Obsidian frontend (Swift's are 11–12, in its branch):
+
+13. **The block's place** is where Obsidian puts its own backlinks in the document: in Live Preview right after the
+    editor's content (`.cm-sizer`, after `.cm-contentContainer`), in Reading view first in the note's footer
+    (`.mod-footer`). One block per Markdown view, moved between the two as the view's mode changes, made when the view
+    shows a project note (`projectNotes()` by path) and gone when it does not. Nothing is written into the note.
+14. **The block's frame**: a hairline frame with 14 px corners, 44 px under the note's text (board ProjNote), as tall as
+    `min(640px, 78vh)` (a phone's screen less Obsidian's bars), its own scroll inside. Obsidian's navigation, status bar
+    and keyboard take no room from its foot.
+15. **The block's foot** holds the wheel and the plus; the undo capsule (Undo, ⋯) stays out, as the board shows. Undo is
+    Cmd+Z while the focus is in the block (a tap or click on the block gives it the focus), or the main screen's button.
+16. **The block opens at Inbox and Soon** (the board's position); its wheel, divider and zoom are kept per note on the
+    device (Obsidian's local storage), its day in memory.
+17. **An empty column of the block** shows the dashed No tasks plate of an empty section; a tap on it opens the field at
+    the column's end.
+18. **A project group's title fades** at its end only when the header cuts it (the board fades only long names); the count
+    and the arrow follow the whole title right after it.
+19. **Group by project**: a tap on the row switches it and closes the menu, as a pick in Section does.
+20. **A task found by its project's name** shows the name, the found part lit, on the line under its title where a
+    description's line would stand.
+21. **Project on a subtask** is drawn as a dimmed row that can't be pressed (the tiles' off look), its value the parent's
+    project. In the bulk menu Project stands right after Section in one group.
+22. **The mark on the timeline**: the block's card shows the folder too, after its title and before its time; a tap on it
+    opens the note.
+23. **Automatically update internal links off**: the Project tag field's description says to turn it on; nothing else
+    warns.
+24. **Open for the lead (backend)**: in the project's view Backlog draws the «No section» header over its tasks without a
+    section (`ListGroup.header` true, as on the main screen), while board Proj4V2 shows those tasks with no header above
+    them. The Obsidian frontend draws what the contract gives.
+
 ## Ideas for later
 
 Approved by Max as directions, to be designed one by one after the core.

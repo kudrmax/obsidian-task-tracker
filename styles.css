@@ -1138,6 +1138,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-menu-tile > svg { width: var(--tc-menu-tile-icon); height: var(--tc-menu-tile-icon); flex-shrink: 0; stroke-width: var(--tc-stroke-menu); }
 .tc-menu-tile[data-priority] > svg { color: var(--tc-priority-ink); fill: var(--tc-priority-ink); }
 .tc-panel button.tc-menu-tile:disabled { opacity: var(--tc-tile-off-opacity); }
+.tc-panel button.tc-menu-row:disabled { opacity: var(--tc-tile-off-opacity); cursor: default; }
 /* The quick moves: their icons in the accent, as the drop zones' were. */
 .tc-menu-tiles.is-move .tc-menu-tile > svg { color: var(--tc-accent-ui); }
 .tc-menu-tile-label { width: 100%; box-sizing: border-box; padding: 0 var(--tc-space-8); overflow: hidden; white-space: nowrap; text-align: center; font-size: var(--tc-font-menu-tile); font-weight: var(--tc-weight-menu-tile); }

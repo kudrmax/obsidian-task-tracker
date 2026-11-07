@@ -179,6 +179,13 @@ describe("the settings tab: the tasks file", () => {
 		}
 	});
 
+	it("writes the project tag with its #, on the Tasks file page", async () => {
+		await open();
+		page("Tasks file");
+		expect(input("Project tag").value).toBe("#project");
+		await writes(() => type(input("Project tag"), "goal"), { projectTag: "#goal" });
+	});
+
 	it("writes each marker as typed", async () => {
 		const markers = [
 			["Due date marker", "dueDateMarker"],
