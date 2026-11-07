@@ -32,6 +32,8 @@ export interface TaskListDeps {
 	ungroupedName?(): string;
 	/** The list's grouping by project: while on, the list draws its project groups in place of its sections. */
 	grouping?(): ListGrouping | null;
+	/** A list with nothing to draw says so with the No tasks plate, which this gets: a column of a project's view. */
+	onEmpty?(plate: HTMLElement): void;
 	/** A project group's header: the chevron and the title fold it, the arrow opens the note. */
 	onProjectHead?(head: HTMLElement, group: ProjectGroup): void;
 	/** A card waiting for the name of the section it starts: drawn last, under the place for the name. */
@@ -137,6 +139,7 @@ export class TaskList {
 		private readonly deps: TaskListDeps,
 	) {
 		el.classList.add("tc-list");
+		if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.fadeCutTitles()).observe(el);
 	}
 
 	render(): void {
@@ -217,6 +220,11 @@ export class TaskList {
 		}
 		enter();
 		if (entry) this.markRenamed(renaming);
+		if (this.deps.onEmpty && this.nodes.length === 0 && !entry) {
+			const plate = el(this.el, "div", `${PLATE} is-column`, "No tasks");
+			this.nodes.push(plate);
+			this.deps.onEmpty(plate);
+		}
 		rows.forEach((row, i) => {
 			if (row.level === 0) return;
 			const { through, last } = linesOf(rows.map((r) => r.level), i);

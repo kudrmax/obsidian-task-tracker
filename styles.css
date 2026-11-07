@@ -249,6 +249,14 @@ body {
 	--tc-stroke-group-chevron: var(--tc-stroke-2-4);
 	--tc-group-open-turn: 90deg;
 	--tc-stroke-group-open: var(--tc-stroke-2);
+	/*
+	 * A project note's block: the plugin's screen under the note's text, framed by a hairline, as tall as a phone's screen
+	 * leaves room for it; Obsidian's navigation and status bar take nothing from it, they stand under the note.
+	 */
+	--tc-block-top: 44px;
+	--tc-block-h: min(640px, 78vh);
+	--tc-radius-block: 14px;
+	--tc-block-chrome: 0px;
 	/* The project's folder on a card, in the date's place and of its width. */
 	--tc-stroke-project-mark: var(--tc-stroke-2);
 	/* A lifted section, and a dragged task with subtasks: two layers under it, each a step further down and narrower by a step on each side. */
@@ -1044,6 +1052,9 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-lifted { position: fixed; z-index: var(--tc-layer-panel); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); font-size: var(--tc-font-body); overflow: hidden; pointer-events: none; }
 .tc-link { color: var(--tc-accent); }
 .tc-lifted .tc-link { pointer-events: auto; cursor: pointer; }
+.tc-project-block { margin-top: var(--tc-block-top); height: var(--tc-block-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
+/* The block's foot stands on its own frame: the measures made of Obsidian's chrome are made again without it. */
+.tc-project-block > .task-calendar.is-block { --tc-chrome-room: var(--tc-block-chrome); --tc-keyboard-room: var(--tc-block-chrome); --tc-foot-room: calc(var(--tc-space-8) + var(--tc-switch-row) + var(--tc-chrome-room)); --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade)); --tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20)); }
 .tc-lifted.is-title { background: none; border-radius: 0; padding: 0 var(--tc-space-4); align-items: center; }
 .tc-lifted-title { font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; }
 .task-calendar .tc-head-title.has-menu { cursor: pointer; }

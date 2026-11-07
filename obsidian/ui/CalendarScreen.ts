@@ -272,6 +272,7 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
+			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("day")) : undefined,
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap());
 		this.doneEl = el(root, "div", "tc-done");
@@ -296,6 +297,7 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
+			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("inbox")) : undefined,
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap());
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
@@ -317,6 +319,7 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, "backlog", this.backlogList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
+			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("backlog")) : undefined,
 		});
 		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap());
 		this.soonEl = el(root, "div", "tc-soon");
@@ -334,6 +337,7 @@ export class CalendarScreen extends Component {
 			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
 			ungroupedName: () => this.settings.ungrouped,
 			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
+			onEmpty: this.where.project ? (plate) => plate.addEventListener("click", () => this.quick?.openAtEnd("soon")) : undefined,
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap());
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");

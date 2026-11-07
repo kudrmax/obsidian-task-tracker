@@ -16,6 +16,8 @@ export interface SettingsTabDeps {
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
+	/** Obsidian rewrites the links to a note it renames (Files and links → Automatically update internal links). */
+	readonly updatesLinks?: () => boolean;
 }
 
 const MINUTES_PER_HOUR = 60;
@@ -117,6 +119,16 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			this.text(el, name, desc, this.settings.markers[marker], (text) => this.service.setMarker(marker, text));
 		}
 		this.text(el, "Label tag", "The tag's part before the slash: a task tagged #label/<name> has the label of that name. One word.", this.settings.labelTag, (tag) => this.service.setLabelTag(tag));
+		this.text(el, "Project tag", this.projectTagDesc(), this.settings.projectTag, (tag) => this.service.setProjectTag(tag));
+	}
+
+	/**
+	 * A note with this tag, in its properties or its text, is a project. A task's project is a link to its note, which
+	 * Obsidian keeps right on a rename only while it updates internal links: said here when that is off.
+	 */
+	private projectTagDesc(): string {
+		const base = "A note with this tag, in its properties or its text, is a project: the task menu's Project offers it. One word.";
+		return this.deps.updatesLinks?.() === false ? `${base} Turn on Files and links → Automatically update internal links: otherwise renaming a project's note breaks its tasks' links.` : base;
 	}
 
 	/** The priorities' rows; see `colourRows`. */

@@ -169,3 +169,56 @@ export class ShownSettingsStore {
 		return () => offs.forEach((off) => off());
 	}
 }
+
+/** What a project note's block keeps of its own: where its window stands, its divider and its zoom. */
+export type NotePlace = Partial<Pick<ViewSettings, (typeof DEVICE_KEYS)[number]>>;
+
+/** Where the blocks keep their places on this device, per note: never synced. */
+export interface NotePlaces {
+	get(path: string): NotePlace;
+	set(path: string, place: NotePlace): void;
+}
+
+/** A block opens at Inbox and Soon, as the board shows it: a project's steps wait there and in Backlog. */
+const BLOCK_DEFAULTS: NotePlace = { rightMode: "inbox" };
+
+/**
+ * A project note's block reads the screen's settings as the plugin's view does, but keeps its own window, divider and zoom
+ * per note: turning the wheel in one note moves neither the plugin's screen nor another note's block.
+ */
+export class NoteShownSettings {
+	private seen: { readonly base: ShownSettings; readonly own: NotePlace } | null = null;
+	private shown: ShownSettings | null = null;
+	private readonly listeners = new Set<() => void>();
+
+	constructor(
+		private readonly base: Pick<ShownSettingsStore, "get" | "onChange">,
+		private readonly places: NotePlaces,
+		private readonly path: () => string,
+	) {}
+
+	get(): ShownSettings {
+		const base = this.base.get();
+		const own = this.places.get(this.path());
+		if (!this.seen || this.seen.base !== base || JSON.stringify(this.seen.own) !== JSON.stringify(own) || !this.shown) {
+			this.seen = { base, own };
+			this.shown = { ...base, ...BLOCK_DEFAULTS, ...own };
+		}
+		return this.shown;
+	}
+
+	async set(patch: NotePlace): Promise<void> {
+		const path = this.path();
+		this.places.set(path, { ...this.places.get(path), ...patch });
+		for (const listener of [...this.listeners]) listener();
+	}
+
+	onChange(listener: () => void): () => void {
+		this.listeners.add(listener);
+		const off = this.base.onChange(listener);
+		return () => {
+			this.listeners.delete(listener);
+			off();
+		};
+	}
+}
