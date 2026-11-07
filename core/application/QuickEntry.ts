@@ -8,6 +8,7 @@ import { samePlacement } from "../domain/operations";
 import type { DraftMarks, DropColumn, DropTo, NewTaskPlace, TaskItem, TaskKey, TaskService } from "./contracts";
 import { fitLevel, type GapPlace, gapOfPlace, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
 import { sameLine, samePlace } from "./taskKeys";
+import { fullTree } from "./fullTree";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 export type EntrySpot =
@@ -56,6 +57,38 @@ export function entryAt(drawing: EntryDrawing, place: GapPlace, section: boolean
 	while (end < cards.length && cards[end].group === place.group) end++;
 	const card = place.index >= from && place.index <= end ? place.index : end;
 	return { kind: "in", section: at, card, keepsPlate: section };
+}
+
+/**
+ * Where a task's full screen draws the field among the rows of its subtasks (`tasks.fullTree`'s `rows`): in the title
+ * (the task itself renamed); in the place of row `index` (that subtask renamed); or a new subtask before row `index`
+ * (`rows.length`: after them all) at `level`, the texts typed before it waiting right above it at that level.
+ */
+export type StackAt =
+	| { readonly kind: "title" }
+	| { readonly kind: "row"; readonly index: number; readonly level: number }
+	| { readonly kind: "new"; readonly index: number; readonly level: number };
+
+/** The field as a task's full screen draws it: where it stands, and the texts waiting before it (none but for a new subtask). */
+export interface StackEntry {
+	readonly at: StackAt;
+	readonly pending: readonly PendingText[];
+}
+
+/** Where `task`'s full screen draws the field of `state`: none unless it stands in the stack of `task` or one of its subtasks. */
+export function stackEntry(state: EntryState | null, task: TaskItem): StackEntry | null {
+	if (!state || state.spot.kind !== "stack") return null;
+	const { rows, newSubtask } = fullTree(task);
+	const renaming = state.renaming;
+	if (renaming) {
+		if (samePlace(renaming.key, task.key)) return { at: { kind: "title" }, pending: [] };
+		const index = rows.findIndex((row) => samePlace(row.item.key, renaming.key));
+		return index < 0 ? null : { at: { kind: "row", index, level: rows[index].level }, pending: [] };
+	}
+	const parent = state.spot.parent;
+	const place = samePlace(parent, task.key) ? newSubtask : rows.find((row) => samePlace(row.item.key, parent))?.newSubtask;
+	if (!place) return null;
+	return { at: { kind: "new", index: place.index, level: place.level }, pending: state.pending.map(({ text }) => ({ text, level: place.level })) };
 }
 
 export interface PendingText {
@@ -270,6 +303,16 @@ export class QuickEntry {
 		const section = state.section === true;
 		const drawing = drawn ?? { cards: this.look.cards(column), sections: this.look.sections(column) };
 		return { place: list.place, pending: state.pending, section, at: entryAt(drawing, list.place, section) };
+	}
+
+	/** Where `task`'s full screen draws the field: none unless it stands in the stack of `task` or one of its subtasks. */
+	stackEntry(task: TaskItem): StackEntry | null {
+		return stackEntry(this.state, task);
+	}
+
+	/** Where a task's full screen types under `parent` or renames it: the stack of its subtasks there, whatever list shows it. */
+	stackSpot(parent: TaskKey): EntrySpot {
+		return { kind: "stack", parent };
 	}
 
 	/** A double click on a list's free room: the field after the last card, in the last section, at the top level. */

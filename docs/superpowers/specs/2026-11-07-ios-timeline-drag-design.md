@@ -280,6 +280,9 @@ and the plugin reads the same functions instead of its own tables:
   applies, otherwise a gradient mask of the same kind. In the plugin the same, as a `mask-image` from a new `--tc-…`
   token, so both look alike (frontend-obsidian, both platforms).
 
+- M10. A tap on the plus opens the capture screen with the text field already focused: the keyboard is up and the
+  cursor in the field as the screen appears, so typing starts at once (voice stays one tap away).
+
 **Docs (frontend-obsidian).** R5: `docs/plugin/app.md` still describes the New Task / Rename / Add Subtask sheets. It
 describes the quick entry in place as the app now has it (the field in the list, Enter, empty Enter, what ends typing,
 «⋯» as the check, the bar over the keyboard and its smaller forms, `p1 `, the long press on the empty calendar, «No
@@ -410,3 +413,11 @@ tasks», rename in place, subtasks on the full screen) and its check steps.
   Backlog fades at its bottom too. Under the foot's own fade the bottom mask is hidden anyway. The full screen and search
   results keep their edges (not named in M9). An event cut by the timeline's top keeps its title just below the fade
   (`top: var(--tc-scroll-fade)` while `is-under-top`), so it reads whole instead of half faded.
+- backend (R6a–c): a field on a task's full screen opens at `entry.stackSpot(parent)` (a new subtask, or with the item a
+  rename), whatever list shows the task; `entry.stackEntry(task)` answers `{ at, pending }` among `tasks.fullTree(task)`'s
+  rows, `at` `title` | `row` | `new`, null when the field's parent (or renamed task) is neither the task nor one of its
+  rows: the plugin's fallback to the end for a parent gone from the rows and Swift's `raw` in the comparison are dropped,
+  the keys compared as `samePlace`.
+- backend (R6b): `SCREEN_PLACES`, `SHOWN_LISTS` and `placeShowing(column, place)` live in `core/application/screenPlaces.ts`
+  (contracts; door `rules.constants`, `rules.placeShowing`). A list not shown is shown from the nearest place that shows
+  it, as the plugin's `modeShowing`: the day's list chosen from Inbox turns to Soon, not to Today as Swift's `turn` did.

@@ -206,16 +206,31 @@ The answer's `result` is `{ session, state, changes, jobs, value }`: the session
 answer (`choosePlace`'s `PlaceMove`, `openAtDrop`'s boolean, …).
 
 Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSlot(slot)`, `openAtDrop(column,
-dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `open(spot, renaming?)`, `type(text)`,
+dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
 `setPriority(prefix)`, `togglePriority(prefix)`, `setLabels(names)`, `toggleLabel(name)`, `setRepeat(rule)`,
 `indent(1 | -1)`, `toggleSection()`, `enter()`, `blur()`, `escape()`, `choosePlace(placement)`, `moveToEnd(column)`,
-`placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column, drawn?)`.
+`placeOf(column, listPlace)`, `state()`, `renaming()`, `listEntry(column, drawn?)`, `stackEntry(task)`.
+
+Where a field opens: `subtaskSpot(parent)` for Add Subtask from a list or the calendar (a `"stack"` spot means the task
+shows in no list: open its full screen and the field last in its stack there), `renameSpot(item, inStack)` for Rename
+(null: nowhere), and on a task's full screen `stackSpot(parent)` for both: `open(stackSpot(key))` types a new subtask
+last under `key`, `open(stackSpot(item.key), item)` renames `item` there (the page's own task in its title). Example:
+`entry.stackSpot(session, look, { section: "now", index: 0, path: [1], raw: "\t- [ ] Pack" })` → `value`
+`{ kind: "stack", parent: { … } }`.
 
 `listEntry` answers what a list draws for the field: `{ place, pending, section, at }`, `at` where among the cards and
 sections the list is about to draw (`drawn`: `{ cards, sections }`, the look's when left out) the field stands:
 `{ kind: "top" }` before the first header, `{ kind: "in", section, card, keepsPlate }` in the section at that index
 before the card at that index (the section's end for a place outside its cards), its No tasks plate kept only when
 `keepsPlate`, or `{ kind: "end" }` after everything.
+
+`stackEntry(task)` answers the same for a task's full screen, among the rows of `tasks.fullTree(task)`: `{ at, pending }`,
+`at` one of `{ kind: "title" }` (the task itself renamed: its title is the field), `{ kind: "row", index, level }` (the
+subtask at row `index` renamed: the field takes its row) or `{ kind: "new", index, level }` (a new subtask: the field
+before row `index`, `rows.length` after them all, at `level`, the `pending` texts right above it at that level); null
+when the field stands anywhere but the stack of `task` or one of its subtasks. Example: the field typing under row 0
+`Pack` (level 0, two subtasks) after `Charger` was entered → `{ at: { kind: "new", index: 3, level: 1 },
+pending: [{ text: "Charger", level: 1 }] }`.
 
 **Writes are jobs.** Enter queues a job and opens the next field at once. The host runs the session's jobs one at a time,
 in order, each once its lists show every write before it:
@@ -286,9 +301,15 @@ without the lifted ones, `shift` how far the open gap `room` pushes the cards af
 to leave it; `room`, `held` may be `null`, `heads` `[]`, `hysteresis` `0`); the branch lines: `branchOf(levels, index)`
 (the row's `{ last, through }`: `last` its line bends in, `through[k]` the line of level `k + 1` goes on past it; `null`
 for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of its level before `cards[gap.index]`);
+the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
+`column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
+or `"calendar"`, the app's Today);
 `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
-`DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
+`DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another),
+`SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its
+order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`; the quick entry's
+`look.shown`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
 value the door does not offer.
 
 ## What the door leaves to the host

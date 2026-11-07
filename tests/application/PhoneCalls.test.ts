@@ -520,6 +520,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.placeAt", [{ level: 0, group: null, top: 0, height: 35 }, { level: 1, group: null, top: 37, height: 35 }], 60, 1.4, 0, null, [], { kind: "gap", index: 1, level: 1, group: null }, 6),
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
+		plain("rules.placeShowing", "day", "inbox"),
 		plain("timeline.zoomLevels"),
 		...[
 			["openAtEnd", "soon"],
@@ -529,6 +530,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 			["openAtDrop", "day", { kind: "list", column: "day", before: null }],
 			["subtaskSpot", key(screen, "Parent")],
 			["renameSpot", named(screen, "Later"), false],
+			["stackSpot", key(screen, "Parent")],
+			["stackEntry", named(screen, "Later")],
 			["open", { kind: "list", column: "day", place: gap }],
 			["state"],
 			["renaming"],
