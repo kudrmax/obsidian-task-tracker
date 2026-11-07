@@ -31,7 +31,7 @@ export function grownStart(start: number, size: number, grown: number, room: num
 }
 
 export function windowRoom(el: Element): Room {
-	return { width: window.innerWidth, height: window.innerHeight, margin: tokenPx(el, "--tc-whole-margin") };
+	return { width: activeWindow.innerWidth, height: activeWindow.innerHeight, margin: tokenPx(el, "--tc-whole-margin") };
 }
 
 /**

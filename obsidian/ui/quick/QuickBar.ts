@@ -233,7 +233,7 @@ export class QuickBar implements EntryPart {
 
 	/** Over a menu's blur on the phone: at the bottom of the view's box, above the blur. */
 	private dock(view: DOMRect): BarPosition {
-		return { left: px(view.left), width: px(view.width), bottom: `calc(${px(window.innerHeight - view.bottom)} + var(--tc-bar-bottom))` };
+		return { left: px(view.left), width: px(view.width), bottom: `calc(${px(activeWindow.innerHeight - view.bottom)} + var(--tc-bar-bottom))` };
 	}
 
 	/** On the desktop: where the capsule stands by the field, inside the room; null while no part of the field shows, the capsule out of sight. */

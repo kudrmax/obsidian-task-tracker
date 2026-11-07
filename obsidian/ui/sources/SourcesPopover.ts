@@ -40,7 +40,7 @@ export class SourcesPopover {
 	/** Over the switch, centred on it. */
 	private static over(panel: HTMLElement, rect: DOMRect): void {
 		panel.style.left = px(rect.left + rect.width / 2);
-		panel.style.setProperty(PROPERTY.panelY, px(window.innerHeight - rect.top));
+		panel.style.setProperty(PROPERTY.panelY, px(activeWindow.innerHeight - rect.top));
 	}
 
 	private static row(panel: HTMLElement, text: ReturnType<typeof sourceText>, status: SourceStatus): void {

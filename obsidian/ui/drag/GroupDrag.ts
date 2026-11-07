@@ -76,11 +76,12 @@ export class GroupDrag {
 		};
 		moveTo(e.clientX, e.clientY);
 		capturePointer(head, e.pointerId);
+		const doc = head.ownerDocument;
 		const finish = (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", cancel);
+			doc.removeEventListener("pointermove", move);
+			doc.removeEventListener("pointerup", up);
+			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(head, e.pointerId);
 			float.remove();
 			mark.remove();
@@ -96,9 +97,9 @@ export class GroupDrag {
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", cancel);
+		doc.addEventListener("pointermove", move);
+		doc.addEventListener("pointerup", up);
+		doc.addEventListener("pointercancel", cancel);
 	}
 
 	/** Each slot's place: the top of the header it goes before, or the list's end; below the lifted section, as if it were gone. */
@@ -113,7 +114,7 @@ export class GroupDrag {
 
 	/** The header under the finger, like a lifted card, its count on the right and two layers of its cards beneath. */
 	private float(group: ListGroup): HTMLElement {
-		const stack = el(document.body, "div", "tc-section-float");
+		const stack = el(activeDocument.body, "div", "tc-section-float");
 		el(stack, "div", "tc-stack-layer is-2");
 		el(stack, "div", "tc-stack-layer is-1");
 		const card = el(stack, "div", "tc-section-card");

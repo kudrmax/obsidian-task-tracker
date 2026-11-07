@@ -125,7 +125,7 @@ export class TaskSelection {
 	}
 
 	private show(): void {
-		for (const card of document.querySelectorAll<HTMLElement>(`.tc-card.${SELECTED}`)) card.classList.remove(SELECTED);
+		for (const card of activeDocument.querySelectorAll<HTMLElement>(`.tc-card.${SELECTED}`)) card.classList.remove(SELECTED);
 		for (const p of this.picked.values()) p.card.classList.add(SELECTED);
 		this.onChange();
 	}

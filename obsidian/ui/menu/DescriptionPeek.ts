@@ -40,7 +40,7 @@ export class DescriptionPeek {
 		const margin = tokenPx(this.el, "--tc-whole-margin");
 		const least = LAYOUT.descPeekLeast;
 		const menuSpan = tokenPx(menu, "--tc-menu-gap") + menu.offsetHeight;
-		const height = window.innerHeight;
+		const height = activeWindow.innerHeight;
 		const menuAbove = menu.classList.contains("is-above");
 		const freeAbove = copy.top - gap - margin;
 		const freeBelow = height - copy.bottom - gap - margin;
@@ -50,7 +50,7 @@ export class DescriptionPeek {
 		else if (menuAbove) room = this.standOver(copy.top - menuSpan - gap, copy.top - menuSpan - gap - margin);
 		else room = this.standUnder(copy.bottom + menuSpan + gap, height - copy.bottom - menuSpan - gap - margin);
 		this.el.hidden = room < least;
-		this.el.style.left = px(Math.max(margin, Math.min(copy.left, window.innerWidth - margin - this.el.offsetWidth)));
+		this.el.style.left = px(Math.max(margin, Math.min(copy.left, activeWindow.innerWidth - margin - this.el.offsetWidth)));
 		this.el.style.maxHeight = px(Math.max(0, Math.min(tokenPx(this.el, "--tc-desc-peek-max"), room)));
 		this.markCut();
 	}
@@ -63,7 +63,7 @@ export class DescriptionPeek {
 	private standOver(bottom: number, room: number): number {
 		this.el.classList.remove("is-under");
 		this.el.style.top = "";
-		this.el.style.bottom = px(window.innerHeight - bottom);
+		this.el.style.bottom = px(activeWindow.innerHeight - bottom);
 		return room;
 	}
 

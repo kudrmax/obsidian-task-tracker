@@ -177,13 +177,14 @@ export class DragController {
 	 * nor a scroll takes it under the menu. `moveOn` hears the finger leave its place, and the screen is then its to pass on.
 	 */
 	private holdFinger(source: HTMLElement, e: PointerEvent, moveOn?: (ev: PointerEvent) => void): boolean {
+		const doc = source.ownerDocument;
 		if (!this.deps.arbiter.claim(HOLD)) return false;
 		capturePointer(source, e.pointerId);
 		const detach = () => {
 			lost();
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", end);
-			document.removeEventListener("pointercancel", end);
+			doc.removeEventListener("pointermove", move);
+			doc.removeEventListener("pointerup", end);
+			doc.removeEventListener("pointercancel", end);
 			releasePointer(source, e.pointerId);
 		};
 		const move = (ev: PointerEvent) => {
@@ -197,10 +198,10 @@ export class DragController {
 			detach();
 			this.deps.arbiter.release(HOLD);
 		};
-		const lost = onLostLift(e.pointerId, () => end(e));
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", end);
-		document.addEventListener("pointercancel", end);
+		const lost = onLostLift(doc, e.pointerId, () => end(e));
+		doc.addEventListener("pointermove", move);
+		doc.addEventListener("pointerup", end);
+		doc.addEventListener("pointercancel", end);
 		return true;
 	}
 
@@ -228,6 +229,7 @@ export class DragController {
 	}
 
 	private beginNewSlot(canvas: HTMLElement, e: PointerEvent): void {
+		const doc = canvas.ownerDocument;
 		const drop = this.deps.newSlot();
 		if (!drop || !this.deps.arbiter.claim(NEW_SLOT)) return;
 		this.deps.haptics.tap();
@@ -240,9 +242,9 @@ export class DragController {
 		const finish = (ev: PointerEvent, open: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
 			lost();
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", cancel);
+			doc.removeEventListener("pointermove", move);
+			doc.removeEventListener("pointerup", up);
+			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(canvas, e.pointerId);
 			this.deps.arbiter.release(NEW_SLOT);
 			const slot = drop.slot;
@@ -251,10 +253,10 @@ export class DragController {
 		};
 		const up = (ev: PointerEvent) => finish(ev, true);
 		const cancel = (ev: PointerEvent) => finish(ev, false);
-		const lost = onLostLift(e.pointerId, () => finish(e, false));
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", cancel);
+		const lost = onLostLift(doc, e.pointerId, () => finish(e, false));
+		doc.addEventListener("pointermove", move);
+		doc.addEventListener("pointerup", up);
+		doc.addEventListener("pointercancel", cancel);
 	}
 
 	/** `carried`: the other picked cards, lifted with this one; each waits as a dashed place where it stood. */
@@ -353,6 +355,7 @@ export class DragController {
 	 * sees the finger where it lifted the card at once: a card lifted from a list keeps its place there open from the start.
 	 */
 	private follow(source: HTMLElement, e: PointerEvent, makeSession: (detach: () => void) => DragSession, settled: () => void): void {
+		const doc = source.ownerDocument;
 		const session = makeSession(() => detach());
 		session.move(e.clientX, e.clientY);
 		const move = (ev: PointerEvent) => {
@@ -362,7 +365,7 @@ export class DragController {
 		const end = (settling: () => Promise<void>) => {
 			if (ended) return;
 			ended = true;
-			document.removeEventListener("keydown", escape, true);
+			doc.removeEventListener("keydown", escape, true);
 			void settling().then(settled);
 		};
 		const up = (ev: PointerEvent) => {
@@ -378,19 +381,19 @@ export class DragController {
 			ev.stopPropagation();
 			end(() => session.cancel());
 		};
-		const lost = onLostLift(e.pointerId, () => end(() => session.cancel()));
+		const lost = onLostLift(doc, e.pointerId, () => end(() => session.cancel()));
 		const detach = () => {
 			lost();
-			document.removeEventListener("keydown", escape, true);
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", cancel);
+			doc.removeEventListener("keydown", escape, true);
+			doc.removeEventListener("pointermove", move);
+			doc.removeEventListener("pointerup", up);
+			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(source, e.pointerId);
 		};
-		document.addEventListener("keydown", escape, true);
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", cancel);
+		doc.addEventListener("keydown", escape, true);
+		doc.addEventListener("pointermove", move);
+		doc.addEventListener("pointerup", up);
+		doc.addEventListener("pointercancel", cancel);
 	}
 
 	/**
@@ -398,6 +401,7 @@ export class DragController {
 	 * the service's (see `TaskService.stretch` and `resize`).
 	 */
 	private beginResize(block: HTMLElement, item: TaskItem, edge: ResizeEdge, e: PointerEvent): void {
+		const doc = block.ownerDocument;
 		const timeline = this.deps.timeline();
 		if (!timeline || !item.can.resize || !this.deps.arbiter.claim(RESIZE)) return;
 		const shown = timeline.shownSpan(item);
@@ -417,9 +421,9 @@ export class DragController {
 		/** The screen stays held until the write is done: a second grab of the card, or another gesture, would start from its old time. */
 		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
-			document.removeEventListener("pointermove", move);
-			document.removeEventListener("pointerup", up);
-			document.removeEventListener("pointercancel", cancel);
+			doc.removeEventListener("pointermove", move);
+			doc.removeEventListener("pointerup", up);
+			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(block, e.pointerId);
 			let unchanged = false;
 			try {
@@ -437,9 +441,9 @@ export class DragController {
 		const up = (ev: PointerEvent) => void finish(ev, true).catch(report);
 		const cancel = (ev: PointerEvent) => void finish(ev, false).catch(report);
 		timeline.stretchTo(block, span, edge);
-		document.addEventListener("pointermove", move);
-		document.addEventListener("pointerup", up);
-		document.addEventListener("pointercancel", cancel);
+		doc.addEventListener("pointermove", move);
+		doc.addEventListener("pointerup", up);
+		doc.addEventListener("pointercancel", cancel);
 	}
 
 }
@@ -448,10 +452,10 @@ export class DragController {
  * iOS sends a finger's lift to the element it touched, and a redraw (a pinch's new hour lines) may have taken that element
  * away: a finger that comes down alone proves the held one gone, and `lost` ends what it held. Returns the unsubscribe.
  */
-function onLostLift(pointerId: number, lost: () => void): () => void {
+function onLostLift(doc: Document, pointerId: number, lost: () => void): () => void {
 	const down = (ev: PointerEvent) => {
 		if (ev.isPrimary && ev.pointerId !== pointerId) lost();
 	};
-	document.addEventListener("pointerdown", down, true);
-	return () => document.removeEventListener("pointerdown", down, true);
+	doc.addEventListener("pointerdown", down, true);
+	return () => doc.removeEventListener("pointerdown", down, true);
 }

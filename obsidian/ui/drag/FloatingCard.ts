@@ -35,9 +35,9 @@ export class FloatingCard implements Float {
 	private showTask(item: TaskItem, day: LocalDate, count: number): void {
 		fillCard(this.el, item, { day });
 		if (item.subtasks.length > 0 || count > 1) {
-			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(document.body, "div", `tc-float-under is-${depth}`));
+			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(activeDocument.body, "div", `tc-float-under is-${depth}`));
 		}
-		document.body.appendChild(this.el);
+		activeDocument.body.appendChild(this.el);
 		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
 		this.fitStack();
 		if (count > 1) this.showCount(count);
@@ -45,7 +45,7 @@ export class FloatingCard implements Float {
 
 	/** The number of tasks carried, on the top card's upper right corner, moved along with it. */
 	private showCount(count: number): void {
-		const badge = (this.count = el(document.body, "div", "tc-float-count", String(count)));
+		const badge = (this.count = el(activeDocument.body, "div", "tc-float-count", String(count)));
 		badge.style.left = px(this.el.offsetWidth);
 	}
 

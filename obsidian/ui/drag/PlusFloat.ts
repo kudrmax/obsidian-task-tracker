@@ -10,7 +10,7 @@ export class PlusFloat implements Float {
 	private readonly el: HTMLElement;
 
 	constructor(private readonly grab: Grab) {
-		this.el = roundShape(document.body, "plus", "accent", "tc-float-plus");
+		this.el = roundShape(activeDocument.body, "plus", "accent", "tc-float-plus");
 	}
 
 	moveTo(x: number, y: number): void {

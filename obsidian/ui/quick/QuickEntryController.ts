@@ -171,9 +171,9 @@ export class QuickEntryController {
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
 		});
-		document.addEventListener("click", this.tapAway, true);
-		document.addEventListener("pointerdown", this.pressed, true);
-		document.addEventListener("mousedown", this.mousePressed, true);
+		deps.root.ownerDocument.addEventListener("click", this.tapAway, true);
+		deps.root.ownerDocument.addEventListener("pointerdown", this.pressed, true);
+		deps.root.ownerDocument.addEventListener("mousedown", this.mousePressed, true);
 		deps.root.addEventListener("scroll", this.scrolled, true);
 		deps.root.addEventListener("transitionend", this.settled, true);
 		this.sizeWatch.observe(deps.root);
@@ -346,9 +346,9 @@ export class QuickEntryController {
 
 	/** The view closes: the text typed is kept, as by a tap elsewhere. */
 	close(): void {
-		document.removeEventListener("click", this.tapAway, true);
-		document.removeEventListener("pointerdown", this.pressed, true);
-		document.removeEventListener("mousedown", this.mousePressed, true);
+		this.deps.root.ownerDocument.removeEventListener("click", this.tapAway, true);
+		this.deps.root.ownerDocument.removeEventListener("pointerdown", this.pressed, true);
+		this.deps.root.ownerDocument.removeEventListener("mousedown", this.mousePressed, true);
 		this.deps.root.removeEventListener("scroll", this.scrolled, true);
 		this.deps.root.removeEventListener("transitionend", this.settled, true);
 		this.sizeWatch.disconnect();

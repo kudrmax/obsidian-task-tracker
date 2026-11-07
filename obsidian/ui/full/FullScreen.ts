@@ -118,7 +118,7 @@ export class FullScreen {
 		Button.create(this.el, { kind: "round", tone: "accent", label: "Add subtask", icon: "plus", cls: "tc-plus", onPress: () => this.current && this.addSubtask(this.current) });
 		this.el.addEventListener("focusin", () => this.showDone());
 		this.el.addEventListener("focusout", () => requestAnimationFrame(() => this.showDone()));
-		document.addEventListener("keydown", this.onKey);
+		this.el.ownerDocument.addEventListener("keydown", this.onKey);
 		requestAnimationFrame(() => this.el.classList.add("is-shown"));
 	}
 
@@ -196,7 +196,7 @@ export class FullScreen {
 		this.leaveTask();
 		this.capsule.destroy();
 		this.list.destroy();
-		document.removeEventListener("keydown", this.onKey);
+		this.el.ownerDocument.removeEventListener("keydown", this.onKey);
 		this.el.classList.remove("is-shown");
 		window.setTimeout(() => this.el.remove(), tokenMs(this.el, DURATION.fade));
 		this.deps.onClose();

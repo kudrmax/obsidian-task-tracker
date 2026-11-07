@@ -1,4 +1,5 @@
 import { type LabelLevel, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
+import { onWindowDocument, windowDocuments } from "./windowDocuments";
 import type { LabelPaint } from "./viewSettings";
 
 export { contrast, inkOf, type PriorityShades, shadesOf } from "../../core/application/contracts";
@@ -36,26 +37,43 @@ export function priorityRules(levels: readonly (PriorityLevel | LabelLevel)[]): 
 	return rules.join("\n");
 }
 
-let sheet: HTMLStyleElement | null = null;
+/** The stylesheet each window's document holds, and the rules and paint they show. */
+const sheets = new Map<Document, HTMLStyleElement>();
+let rules: string | null = null;
+let blend = false;
+
+function paintDocument(doc: Document): void {
+	if (rules !== null) {
+		let sheet = sheets.get(doc);
+		if (!sheet) sheets.set(doc, (sheet = doc.head.appendChild(doc.createElement("style"))));
+		sheet.textContent = rules;
+	}
+	doc.body.classList.toggle(BLEND, blend);
+}
+
+onWindowDocument(paintDocument);
 
 /**
- * The levels' colours as a stylesheet in the document: cards, menus and the settings read the same shades from it. The
- * settings show a colour still being picked the same way, before it is saved.
+ * The levels' colours as a stylesheet in every window's document: cards, menus and the settings read the same shades from
+ * it. The settings show a colour still being picked the same way, before it is saved.
  */
 export function showPriorityColors(levels: readonly PriorityLevel[], labels: readonly LabelLevel[] = []): void {
-	sheet ??= document.head.appendChild(document.createElement("style"));
-	sheet.textContent = priorityRules([...levels, ...labels]);
+	rules = priorityRules([...levels, ...labels]);
+	windowDocuments().forEach(paintDocument);
 }
 
 const BLEND = "tc-labels-blend";
 
-/** How cards of several labels are painted, for every card in the document: stripes, or with `blend` one colour flowing into the next. */
+/** How cards of several labels are painted, for every card in every window: stripes, or with `blend` one colour flowing into the next. */
 export function showLabelPaint(paint: LabelPaint): void {
-	document.body.classList.toggle(BLEND, paint === "blend");
+	blend = paint === "blend";
+	for (const doc of windowDocuments()) doc.body.classList.toggle(BLEND, blend);
 }
 
 export function clearPriorityColors(): void {
-	sheet?.remove();
-	sheet = null;
-	document.body.classList.remove(BLEND);
+	for (const sheet of sheets.values()) sheet.remove();
+	sheets.clear();
+	rules = null;
+	blend = false;
+	for (const doc of windowDocuments()) doc.body.classList.remove(BLEND);
 }
