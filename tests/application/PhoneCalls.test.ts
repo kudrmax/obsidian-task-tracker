@@ -639,6 +639,28 @@ describe("the door's quick entry", () => {
 		expect((answer.result as { session: { jobs: unknown[] } }).session.jobs).toEqual([]);
 	});
 
+	it("answers a rename entered and not yet written: the task's id and the text its card shows meanwhile", () => {
+		const screen = callDoor("tasks.screen", [T], context()) as Extract<DoorAnswer, { ok: true }>;
+		const view = screen.result as ScreenView;
+		const task = view.day.list.find((i) => i.title === "In progress")!;
+		const look = { cards: { day: view.day.list.map((i) => ({ key: i.key, level: 0, group: i.group })) }, day: T, shown: ["day"] };
+		let answer = callDoor("entry.renameSpot", wire([null, look, task, false]), context()) as Extract<DoorAnswer, { ok: true }>;
+		const step = (method: string, ...args: unknown[]) => {
+			answer = callDoor(`entry.${method}`, wire([(answer.result as { session: unknown }).session, look, ...args]), context()) as Extract<DoorAnswer, { ok: true }>;
+			return answer.result as { state: { renamed: unknown } | null; renamed: unknown; value: unknown; jobs: { id: string }[] };
+		};
+		const spot = (answer.result as { value: unknown }).value;
+		expect(step("open", spot, task).renamed).toEqual([]);
+		step("type", "Renamed [[Mom]]");
+		const entered = step("enter");
+		const renamed = [{ id: task.id, key: task.key, text: "Renamed [[Mom]]", title: "Renamed Mom" }];
+		expect(entered.renamed).toEqual(renamed);
+		expect(entered.state?.renamed).toEqual(renamed);
+		const [job] = entered.jobs;
+		step("call", job.id);
+		expect(step("done", job.id).renamed).toEqual([]);
+	});
+
 	it("opens the plus in Inbox where the screen shows no day list", () => {
 		const answer = callDoor("entry.openFromPlus", [null, { cards: {}, day: T, shown: ["inbox", "backlog", "soon"] }], context()) as Extract<DoorAnswer, { ok: true }>;
 		expect(answer.result).toMatchObject({ state: { spot: { kind: "list", column: "inbox" } } });

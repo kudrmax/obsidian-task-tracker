@@ -283,9 +283,13 @@ Typing tasks in place, every rule of it (`core/application/QuickEntry.ts`). Each
   are `sectioned`, the `day` the day list shows, and `shown`: the lists on screen in their order (a task is looked for
   there first; the plus opens in the day list while it shows, else in Inbox). The layout is the frontend's.
 
-The answer's `result` is `{ session, state, changes, jobs, value }`: the session to hand in next; the field's
+The answer's `result` is `{ session, state, changes, jobs, value, renamed }`: the session to hand in next; the field's
 `EntryState` (null: closed); each change on the way (`{ state, drawnNext }`); the jobs this call queued; the method's own
-answer (`choosePlace`'s `PlaceMove`, `openAtDrop`'s boolean, …).
+answer (`choosePlace`'s `PlaceMove`, `openAtDrop`'s boolean, …); and `renamed`, every rename entered and not yet
+written (`PendingRename` `{ id, key, text, title }`: the task's `TaskItem.id`, its key as read at the open, and the
+`text` and `title` its card shows until the write is drawn), the field open or closed. `EntryState.renamed` holds the
+same while the field is open. A card whose `id` is in `renamed` draws `title` in place of its own; the entry drops it
+once its job is `done`.
 
 Methods: `openAtEnd(column)`, `openFromPlus()`, `openIn(column, group)`, `openSlot(slot)`, `openAtDrop(column,
 dropTo)`, `subtaskSpot(parent)`, `renameSpot(item, inStack)`, `stackSpot(parent)`, `open(spot, renaming?)`, `type(text)`,
