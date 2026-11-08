@@ -16,7 +16,7 @@ export interface GroupMenuOptions {
 /** The menu of a section's header, like a task's: the header stays as it is over the blur, the panel grows out under it. */
 export const GroupMenu = {
 	open(head: HTMLElement, opts: GroupMenuOptions): { close(): void } {
-		const overlay = new Overlay(() => overlay.close());
+		const overlay = new Overlay(() => void overlay.close(), head);
 		const rect = head.getBoundingClientRect();
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-head"), false);
 		el(copy.el, "span", "tc-group-name", opts.name);
@@ -48,7 +48,7 @@ export interface ColumnMenuOptions {
  */
 export const ColumnMenu = {
 	open(title: HTMLElement, opts: ColumnMenuOptions): { close(): void } {
-		const overlay = new Overlay(() => overlay.close());
+		const overlay = new Overlay(() => void overlay.close(), title);
 		const rect = title.getBoundingClientRect();
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
 		el(copy.el, "span", "tc-lifted-title", opts.title);
