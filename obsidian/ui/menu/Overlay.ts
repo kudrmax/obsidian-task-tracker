@@ -1,5 +1,6 @@
 import { DURATION, tokenMs } from "../design";
 import { el } from "../dom";
+import { Picks } from "../kit/Panel";
 
 /** How an overlay was closed by the user: Escape, or a tap on the sheet. */
 export type CloseHow = "escape" | "away";
@@ -34,6 +35,12 @@ export class Overlay {
 		if (e.target === this.backdrop) this.onClose("away");
 	};
 
+	/**
+	 * The picks of every window over this overlay, one set for all: the first closes the overlay as its owner closes it
+	 * (`onClose`), and acts once its parts have gone; any pick after it does nothing.
+	 */
+	readonly picks: Picks;
+
 	/** The window it opened in: a popout window's menu stands and hears its keys there. */
 	private readonly doc: Document;
 
@@ -44,6 +51,10 @@ export class Overlay {
 		sheet?: HTMLElement,
 	) {
 		this.doc = sheet?.ownerDocument ?? source?.ownerDocument ?? activeDocument;
+		this.picks = new Picks(
+			() => onClose("away"),
+			(then) => this.afterClose(then),
+		);
 		this.backdrop = sheet ?? el(this.doc.body, "div", "tc-backdrop");
 		this.backdrop.classList.remove(CLOSING);
 		this.backdrop.addEventListener("pointerdown", this.onSheet);
@@ -94,6 +105,14 @@ export class Overlay {
 	get closed(): Promise<void> | null {
 		return this.gone ? null : (this.ending ?? new Promise(() => undefined));
 	}
+
+	/** `then` runs once the overlay has closed and its parts have left the page: at once when they have. */
+	afterClose(then: () => void | Promise<void>): void {
+		const closing = this.closed;
+		if (closing) void closing.then(then);
+		else void then();
+	}
+
 
 	/** Every part fades out at once and they leave the page together; resolves then. Closing again gives the same end. */
 	close(): Promise<void> {

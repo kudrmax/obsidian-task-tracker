@@ -2,7 +2,7 @@ import type { GroupName, MenuStatusId, TaskItem, TaskMenuModel } from "../../../
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
-import { Panel, Picks } from "../kit/Panel";
+import { Panel } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import { pickMark } from "../TaskSelection";
 import type { LocalDate } from "../types";
@@ -73,10 +73,7 @@ export class BulkMenu {
 		this.source = context.at === "beside" ? this.besideList(context.source) : context.source.getBoundingClientRect();
 		context.cards.forEach((card, i) => this.lift(card, rects[i]));
 		if (context.at === "over") LiftedCopy.over(this.overlay, context.source.cloneNode(true) as HTMLElement, false).pin(this.source).el.classList.add("tc-control-copy");
-		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, picks: new Picks(
-				() => this.close(),
-				() => this.overlay.closed,
-			), place: (panel) => this.place(panel) });
+		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, place: (panel) => this.place(panel) });
 		this.showMenu();
 		this.overlay.show();
 	}

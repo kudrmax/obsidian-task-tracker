@@ -51,6 +51,27 @@ describe("a list's rows live as long as their tasks", () => {
 		expect(signals.map((signal) => signal.aborted)).toEqual([true, false]);
 	});
 
+	it("gives a text typed the task its write answered, by that key, and no other task that comes meanwhile", () => {
+		let items: TaskItem[] = [task("A", "1")];
+		let pending = [{ text: "Bread", level: 0 }];
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), {
+			items: () => items,
+			day: () => null,
+			entry: () => ({ at: { kind: "top" }, level: 0, pending, field: (row) => row }),
+		});
+		list.render();
+		const typed = list.el.querySelector(".tc-card:not(.tc-quick-row)")!;
+		expect(typed.textContent).toBe("Bread");
+		const bread = task("Bread", "9");
+		list.adopt(bread.key);
+		pending = [];
+		items = [task("Synced", "5"), bread, task("A", "1")];
+		list.render();
+		const cards = list.cards.map((entry) => entry.card);
+		expect(cards[1]).toBe(typed);
+		expect(cards[0]).not.toBe(typed);
+	});
+
 	it("keeps a section's header through a rename", () => {
 		let name = "Morning";
 		const list = new TaskList(document.body.appendChild(document.createElement("div")), {

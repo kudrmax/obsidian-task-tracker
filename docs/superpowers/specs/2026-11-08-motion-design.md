@@ -279,14 +279,19 @@ every condition that changes the layout is animated by the transaction that chan
    drop line, a section's mark) stays where it stands. The first drawing after the tasks are read and another day are
    drawn at once. The timeline's blocks and events are kept the same way by id; a block moves by its top, left and height,
    a new one fades in, a gone one fades out. A project's chevron is kept, so it turns.
-21. **Obsidian, R2: a written text stays its card.** In the drawing where texts typed leave the field's pending list,
-   the first new task cards take over their rows (an heir key), so the text becomes the task without a blink.
+21. **Obsidian, R2: a written text stays its card.** The key `createInPlace` answers for each text the field writes is
+   handed to the lists (`TaskList.adopt`); the card drawn for the task at exactly that line (`keyId`) takes over the
+   typed text's row (an heir key), so the text becomes the task without a blink. No counting: a task that comes from
+   Sync meanwhile never takes the row.
 22. **Obsidian, R3: a scrolled list holds its place** (`ScrollHold`, `--tc-list-hold` under the last row): while rows
    fold away at its end it keeps a screen of room for twice the collapse time, then only what its scroll needs, and gives
    it back as the finger scrolls up. Without it the content under the finger was pulled down by the shrinking end.
 23. **Obsidian, R4: a pick that opens a field acts inside the tap** (`Picks.pickNow`: Rename, Add description, Add
-   subtask, New section, a section's Rename, ⋯ → Search): iOS raises the keyboard only for a field focused by the tap
-   itself. Every other pick waits for `Overlay.closed`.
+   subtask, New section, a section's Rename): iOS raises the keyboard only for a field focused by the tap itself. Every
+   other pick waits for the overlay's close (`Overlay.afterClose`). The picks are the overlay's own (`Overlay.picks`, one
+   set for every window over it, which `Panel.over` takes); ⋯ → Search is a pick that hands the sheet off
+   (`Picks.handOff`). What the repeat page holds is written after the close by the same `afterClose`, and a search result
+   moves the screen once the search has closed.
 24. **Obsidian, R6: the overlay's motion.** Every part opens on `--tc-duration-menu` and closes on
    `--tc-duration-collapse`, curve `--tc-ease-out`: sheet, panel, popover, peek, lifted copy, menu stack, the capsule and
    wheel copies, the field row over the blur, and the level's shadow, which fades in from `--tc-level-shadow-off`. ⋯ →
@@ -296,17 +301,19 @@ every condition that changes the layout is animated by the transaction that chan
    split over the card from their old boxes to the new ones on `--tc-duration-menu`; each page (menu, sections, projects,
    reminders, repeat, picker) keeps its scroll; Delete's question scrolls into view smoothly. The description's peek
    fades away and back (`is-away`). The bulk menu and the column menus use the same pages.
-26. **Obsidian, R7: one end of a drag** (`DragSession`): the drop is written and drawn, the copy flies to the card the
+26. **Obsidian, R7: one end of a drag** (`DragSession`, for a card, the plus and a section alike): the drop is written and drawn, the copy flies to the card the
    task stands on now (found by id, `ArrivingCard.dropping` from before the write; where a moving card will rest is read
    without stopping it, `restingRect`), and only then is the place released (`onReturn` after landing). Dropped in its
    own list, the card is the same node: its dashed place slides to the new place and the copy lands in it. A cancel flies
    back to the dashed place first and shows the card after. The plugin writes before it flies (a few ms) rather than
    asking `tasks.landing` first: the place it flies to is the real one by construction, as decision 11's.
-27. **Obsidian, R7: a section lands as a card does**: the copy flies to the mark (or back to its header), the move is
-   written and drawn, then the mark folds as the section unfolds there. The mark opens and closes between the sections
+27. **Obsidian, R7: a section lands as a card does**, through the same `DragSession` (the slots between the sections are
+   its one target): the move is written and drawn, the mark is put right after the folded section, so the section's
+   header stands where it will open, the copy lands on that header (`restingRect`), and only then does the section
+   unfold as the mark folds. A cancel flies back to the header first. The mark opens and closes between the sections
    as the finger moves. Tap opens the menu, a long press only lifts (as decision 12).
 28. **Obsidian, R7: the plus let go on a place lands in the field opened there**, scaled to the field's height, and
-   fades (as decision 13); let go on nothing it fades where it is.
+   fades (as decision 13); let go on nothing, or cancelled, it flies home to the plus, as a cancelled card does.
 29. **Obsidian, R8: Rename's field row stands in for the card** in the same frame both ways (as decision 14): it does not
    grow in, it goes at once when the card comes back, and a list's field row keeps a card's height when its field goes.
 30. **Obsidian, R8: modes slide.** Select mode's circle opens from no width at the card's start and the title slides over

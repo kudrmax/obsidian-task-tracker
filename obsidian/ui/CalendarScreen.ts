@@ -909,7 +909,7 @@ export class CalendarScreen extends Component {
 	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null> {
 		this.bulk.dropping(drag);
 		this.arriving.dropping(drag.item);
-		await this.act(async () => this.arriving.expect((await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate))[0] ?? null));
+		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate)));
 		return this.arriving.shown;
 	}
 

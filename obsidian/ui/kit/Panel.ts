@@ -13,10 +13,10 @@ export type PanelRoot = "tc-panel" | "tc-popover" | "tc-desc-peek";
 export class Picks {
 	private picked = false;
 
-	/** `closed` resolves once the window has gone, null when it has gone already; without it the pick acts at once. */
+	/** `afterClose` runs what is picked once the window has gone (an overlay's `afterClose`); without it, at once. */
 	constructor(
 		private readonly close: () => void,
-		private readonly closed: () => Promise<void> | null = () => null,
+		private readonly afterClose: (then: () => void | Promise<void>) => void = (then) => void then(),
 	) {}
 
 	pick(then: () => void | Promise<void>): () => void {
@@ -24,9 +24,16 @@ export class Picks {
 			if (this.picked) return;
 			this.picked = true;
 			this.close();
-			const closing = this.closed();
-			if (closing) void closing.then(then);
-			else void then();
+			this.afterClose(then);
+		};
+	}
+
+	/** A pick that hands the window's sheet to the window it opens (⋯ → Search): nothing closes here, and no other pick follows. */
+	handOff(then: () => void): () => void {
+		return () => {
+			if (this.picked) return;
+			this.picked = true;
+			then();
 		};
 	}
 
@@ -45,8 +52,8 @@ export interface PanelSpec {
 	readonly root: PanelRoot;
 	/** The window's own classes besides its root. */
 	readonly cls?: string;
-	/** Shared by every window of one menu: one pick closes them all. */
-	readonly picks: Picks;
+	/** Shared by every window of one menu: one pick closes them all. Over an overlay, the overlay's own by default. */
+	readonly picks?: Picks;
 	/** Stands the window by what it belongs to, once it is built. */
 	readonly place?: (panel: HTMLElement) => void;
 }
@@ -57,14 +64,14 @@ export class Panel {
 
 	/** Over an overlay's sheet: it shows and goes with the overlay; on its level, at the depth of the parts there. */
 	static over(overlay: Overlay, spec: PanelSpec, onLevel = true): Panel {
-		return new Panel(overlay.add(Panel.make(spec), onLevel), spec);
+		return new Panel(overlay.add(Panel.make(spec), onLevel), spec, spec.picks ?? overlay.picks);
 	}
 
 	/** In `holder`, with no sheet: its owner shows it and takes it away. */
 	static inside(holder: HTMLElement, spec: PanelSpec): Panel {
 		const panel = Panel.make(spec);
 		holder.appendChild(panel);
-		return new Panel(panel, spec);
+		return new Panel(panel, spec, spec.picks ?? new Picks(() => holder.removeChild(panel)));
 	}
 
 	private static make(spec: PanelSpec): HTMLElement {
@@ -73,7 +80,11 @@ export class Panel {
 
 	private readonly pages: PanelPages;
 
-	private constructor(element: HTMLElement, private readonly spec: PanelSpec) {
+	private constructor(
+		element: HTMLElement,
+		private readonly spec: PanelSpec,
+		private readonly picks: Picks,
+	) {
 		this.el = element;
 		this.pages = new PanelPages(() => [element]);
 	}
@@ -89,11 +100,11 @@ export class Panel {
 	}
 
 	pick(then: () => void | Promise<void>): () => void {
-		return this.spec.picks.pick(then);
+		return this.picks.pick(then);
 	}
 
 	pickNow(then: () => void | Promise<void>): () => void {
-		return this.spec.picks.pickNow(then);
+		return this.picks.pickNow(then);
 	}
 
 	/**

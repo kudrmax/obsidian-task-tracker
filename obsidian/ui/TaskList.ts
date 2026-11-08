@@ -1,5 +1,5 @@
 import { ScrollEdges } from "./ScrollEdges";
-import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { branchOf, type EntryAt, type EntryDrawing, type GroupName, type Header, type ListCard, type ListGroup, type ListGrouping, type ListRow, type ListSection, type ListView, keyId, listView, type PendingText, type ProjectGroup, type ProjectZone, samePlace, type TaskItem, type TaskKey } from "../../core/application/contracts";
 import { icon } from "./kit/icons";
 import { PROPERTY } from "./design";
 import type { LocalDate } from "./types";
@@ -136,15 +136,15 @@ export class TaskList {
 	private readonly keyed: KeyedRows;
 	private readonly hold: ScrollHold;
 	/**
-	 * How many texts typed here were drawn as plain cards last time, and how many of them the file has written since:
-	 * the first new cards drawn now take over their rows (`heirs`), so a written text stays the same card on the screen.
+	 * The tasks the field has written, by the key each write answered (`TaskService.createInPlace`), oldest first: the card
+	 * drawn for one takes over the row of the text it was typed as, so a written text stays the same card on the screen.
 	 */
-	private typedDrawn = 0;
+	private created: TaskKey[] = [];
 	/** A card was renamed in place last time, and is now: its field's row comes and goes with the card's in the same frame. */
 	private renamedDrawn = false;
 	private renamingNow = false;
+	/** How many texts typed have become their tasks' cards in this drawing. */
 	private written = 0;
-	private heirs: string[] = [];
 	/** The day of the last drawing: another day is drawn at once, never moved into. */
 	private drawnDay: LocalDate | null | undefined = undefined;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
@@ -198,10 +198,7 @@ export class TaskList {
 		this.renamedDrawn = renaming !== null;
 		this.renamingNow = renaming !== null;
 		this.drawnDay = day;
-		const typed = entry?.pending.length ?? 0;
-		this.written = Math.max(0, this.typedDrawn - typed);
-		this.heirs = Array.from({ length: this.written }, (_, i) => `${UNWRITTEN}${i}`);
-		this.typedDrawn = typed;
+		this.written = 0;
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
@@ -274,7 +271,7 @@ export class TaskList {
 
 	/** A task's card: the one drawn for it last time, filled anew, or a new one; its branches go, the list draws them again. */
 	private cardOf(drawing: RowsDrawing, item: TaskItem, day: LocalDate | null, signals: Map<HTMLElement, AbortSignal>): HTMLElement {
-		const heir = this.heirs.length > 0 && !this.keyed.nodeOf(`task:${item.id}`) ? this.heirs.shift() : undefined;
+		const heir = this.heirOf(item);
 		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"), heir);
 		if (!fresh) node.replaceChildren();
 		fillCard(node, item, { day });
@@ -310,6 +307,24 @@ export class TaskList {
 		head.replaceChildren();
 		el(head, "span", "tc-group-name", name);
 		return head;
+	}
+
+	/** A task the field has just written takes over the row of the text it was typed as; it stops being awaited then. */
+	private heirOf(item: TaskItem): string | undefined {
+		const at = this.created.findIndex((key) => keyId(key) === keyId(item.key));
+		if (at < 0 || this.keyed.nodeOf(`task:${item.id}`)) return undefined;
+		this.created.splice(at, 1);
+		return `${UNWRITTEN}${this.written++}`;
+	}
+
+	/** The field wrote a task where it was typed (`key`, as the write answered): its card takes the typed text's row when drawn. */
+	adopt(key: TaskKey): void {
+		this.created.push(key);
+	}
+
+	/** The field closed: no text typed is awaited any more. */
+	forgetTyped(): void {
+		this.created = [];
 	}
 
 	/** The field's row keeps the dot of the task in progress it renames; a row for a new task has none. */

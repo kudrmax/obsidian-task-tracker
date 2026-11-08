@@ -3,24 +3,30 @@ import type { DragPayload, DropResult, DropTarget, Float } from "./DropTarget";
 
 export type { DragOrigin, DragPayload, DropResult, DropTarget, Float, NewTaskPayload, TaskDragPayload, TaskOrigin } from "./DropTarget";
 
-export interface DragSessionOptions {
-	readonly payload: DragPayload;
-	readonly targets: readonly DropTarget[];
+export interface DragSessionOptions<P = DragPayload, R = DropResult> {
+	readonly payload: P;
+	readonly targets: readonly DropTarget<P, R>[];
 	readonly float: Float;
 	/** Where the card's place stands now, so a cancelled drag flies back to it. */
 	origin(): DOMRect;
 	/** The copy has landed, on the task's new place or back on its old one: the place is released and the card shows. */
 	onReturn?(): void;
 	/** The drop, or null for a cancelled drag. A task's drop gives its card once written and drawn: the float lands on it. */
-	onEnd(result: DropResult | null): Promise<HTMLElement | null | void>;
+	onEnd(result: R | null): Promise<HTMLElement | null | void>;
+	/** What it carries has no card of its own to land on (a new task): it lands where the target shows its place. */
+	readonly landsOnTarget?: boolean;
 }
 
-/** One drag from lift to drop: routes the pointer to the target under it and settles the card at the end. */
-export class DragSession {
-	private current: DropTarget | null = null;
+/**
+ * One drag from lift to drop, the one end every drag has (a task's card, the plus, a section): it routes the pointer to
+ * the target under it; let go, the drop is written and drawn, the copy flies to where what it carries stands now, and
+ * only then is the place released; cancelled, the copy flies back first.
+ */
+export class DragSession<P = DragPayload, R = DropResult> {
+	private current: DropTarget<P, R> | null = null;
 	private done = false;
 
-	constructor(private readonly opts: DragSessionOptions) {}
+	constructor(private readonly opts: DragSessionOptions<P, R>) {}
 
 	/** The targets read the layout first; the float, fixed over everything, is written last, so it moves nothing they measure. */
 	move(x: number, y: number): void {
@@ -42,7 +48,7 @@ export class DragSession {
 		if (!target || !result) return this.settleBack();
 		const line = target.landing();
 		const card = await this.opts.onEnd(result);
-		const landing = card ? restingRect(card) : this.opts.payload.from === "new" ? line : null;
+		const landing = card ? restingRect(card) : this.opts.landsOnTarget ? line : null;
 		await (landing ? this.opts.float.land(landing) : this.opts.float.vanish());
 		this.opts.onReturn?.();
 		this.clearAll();

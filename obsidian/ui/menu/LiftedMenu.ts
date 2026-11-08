@@ -18,10 +18,9 @@ export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
 export abstract class LiftedMenu {
 	protected readonly overlay: Overlay;
 	/** Every window of the menu picks through these: one pick closes the menu, then acts. */
-	protected readonly picks = new Picks(
-		() => this.close(),
-		() => this.overlay.closed,
-	);
+	protected get picks(): Picks {
+		return this.overlay.picks;
+	}
 	private readonly liftedCopy: LiftedCopy;
 	/** Where the copy stands before it is raised. */
 	protected copy = new DOMRect();

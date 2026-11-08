@@ -83,19 +83,34 @@ describe("Overlay", () => {
 });
 
 describe("a window's picks", () => {
+	it("are the overlay's own: a pick closes the overlay as its owner does, and acts once its parts have gone", () => {
+		vi.useFakeTimers();
+		const closed: string[] = [];
+		const overlay = new Overlay((how) => {
+			closed.push(how);
+			void overlay.close();
+		});
+		const acted: string[] = [];
+		overlay.picks.pick(() => void acted.push("write"))();
+		expect(closed).toEqual(["away"]);
+		overlay.picks.pick(() => void acted.push("again"))();
+		vi.runAllTimers();
+		expect(acted).toEqual(["write"]);
+	});
+
 	it("act once the window's close has ended, and a pick that types acts inside the tap", async () => {
 		const { Picks } = await import("../../obsidian/ui/kit/Panel");
 		let end: () => void = () => {};
 		const closing = new Promise<void>((resolve) => (end = resolve));
 		const acted: string[] = [];
-		const picks = new Picks(() => acted.push("close"), () => closing);
+		const picks = new Picks(() => acted.push("close"), (then) => void closing.then(then));
 		picks.pick(() => void acted.push("write"))();
 		expect(acted).toEqual(["close"]);
 		end();
 		await closing;
 		await Promise.resolve();
 		expect(acted).toEqual(["close", "write"]);
-		const typing = new Picks(() => acted.push("close2"), () => new Promise(() => {}));
+		const typing = new Picks(() => acted.push("close2"), () => {});
 		typing.pickNow(() => void acted.push("field"))();
 		expect(acted.slice(2)).toEqual(["close2", "field"]);
 	});
