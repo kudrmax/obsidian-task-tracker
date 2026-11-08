@@ -450,7 +450,10 @@ every condition that changes the layout is animated by the transaction that chan
     a drop between cards, on a part's header and on a column's title that puts the task into a folded part. The folded
     part's `sections` still hold its cards on the screen, so `section` and `index` are its place once it is unfolded.
     Added only.
-
+56. **Both, R7: a drop into a folded project part sinks into its header.** No card of the task is drawn there, so the
+    copy flies into the part's header, takes its size on the way and fades as it arrives; the group's count fades to its
+    new number. A card's copy always lands at the full size of its place (the plugin reads a growing row's resting
+    height before its grow starts). Plugin: `Float.sink`, `TaskList.foldedHeadOf`; iPhone: `DropLanding.part.folded`.
 
 ## Done when
 
