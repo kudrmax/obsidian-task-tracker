@@ -385,6 +385,11 @@ every condition that changes the layout is animated by the transaction that chan
     `QuickEntry.renamed` (`QuickEntrySession.renamed`), in `EntryState.renamed` while the field is open, and through the
     door in every `entry.*` answer's `renamed`, the field open or closed. A frontend draws the card with that id under
     `title` until the job is `done`. Added only: nothing existing changed.
+47. **Obsidian, as decisions 40, 43 and 46.** Enter: the line typed takes the field's place in the same frame (a new
+    typed row stands in, it does not grow) and the field's row opens anew under it (`RowsDrawing.regrow`), the rows below
+    sliding; a row grows from and folds to nothing past its own `min-height`. A section's copy lands folding shut from its
+    top onto the line its section opens from. A card or block of a task in `QuickEntrySession.renamed` draws that entry's
+    text until the write is drawn, so Enter in Rename never shows the old title (`TaskList`/`Timeline` `renamed`).
 
 ## Done when
 

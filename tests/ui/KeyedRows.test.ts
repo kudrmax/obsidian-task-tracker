@@ -72,6 +72,17 @@ describe("a list's rows live as long as their tasks", () => {
 		expect(cards[0]).not.toBe(typed);
 	});
 
+	it("draws a rename entered and not yet written under its new text, on the same card", () => {
+		let renamed: { id: string; text: string; title: string }[] = [];
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => [task("Old name", "3")], day: () => null, renamed: () => renamed });
+		list.render();
+		const card = list.cards[0].card;
+		renamed = [{ id: "3", text: "New name", title: "New name" }];
+		list.render();
+		expect(list.cards[0].card).toBe(card);
+		expect(card.textContent).toBe("New name");
+	});
+
 	it("keeps a section's header through a rename", () => {
 		let name = "Morning";
 		const list = new TaskList(document.body.appendChild(document.createElement("div")), {

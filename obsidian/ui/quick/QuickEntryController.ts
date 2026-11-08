@@ -24,6 +24,13 @@ import { WriteQueue } from "./WriteQueue";
 /** A list as a place to drop, and the column it is. */
 export type ColumnDrop = DropTarget & { readonly column: ListColumn };
 
+/** A rename entered and not yet written, as the entry tells it: the task's id and the text its card shows meanwhile. */
+export interface RenamedText {
+	readonly id: string;
+	readonly text: string;
+	readonly title: string;
+}
+
 /** The list columns a field types in. */
 const COLUMNS: readonly ListColumn[] = ["day", "soon", "inbox", "backlog"];
 
@@ -286,6 +293,11 @@ export class QuickEntryController {
 	entryIn(column: ListColumn, drawing: EntryDrawing): ListEntryInput | null {
 		const entry = this.state && this.entry.listEntry(column, drawing);
 		return entry ? { at: entry.at, level: entry.place.level, pending: entry.pending, section: entry.section, newSection: entry.newSection, field: (row) => this.fieldIn(row) } : null;
+	}
+
+	/** The renames entered and not yet written: each task's card shows its new text until the write is drawn (decision 46). */
+	renamed(): readonly RenamedText[] {
+		return this.entry.renamed;
 	}
 
 	/** The task being renamed, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
