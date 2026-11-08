@@ -39,6 +39,14 @@ describe("a list grouped by project", () => {
 		expect(rows(draw(grouped({ folded: { backlog: ["окружение"] } })))).toEqual(["# Окружение (3)", "# Стать счастливым", "[No tasks]", "# No project", "Испанский", "## Дальний", "Велосипед"]);
 	});
 
+	it("knows the folded group's header each of its tasks is held behind, and no header for a task shown", () => {
+		const list = draw(grouped({ folded: { backlog: ["окружение"] } }));
+		const head = list.foldedHeadOf(ITEMS[3].id);
+		expect(head?.querySelector(".tc-group-name")?.textContent).toBe("Окружение");
+		expect(list.foldedHeadOf(ITEMS[0].id)).toBe(head);
+		expect(list.foldedHeadOf(ITEMS[1].id)).toBeNull();
+	});
+
 	it("gives a project with a note the arrow and No project none", () => {
 		const heads = draw(grouped()).elements.filter((n) => n.classList.contains("is-project"));
 		expect(heads.map((h) => h.querySelector(".tc-group-open") !== null)).toEqual([true, true, false]);

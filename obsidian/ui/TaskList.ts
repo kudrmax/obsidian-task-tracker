@@ -7,6 +7,7 @@ import { el } from "./dom";
 import { fillCard, fillUnwrittenCard, showProgressDot } from "./TaskCard";
 import { KeyedRows, type RowsDrawing } from "./motion/KeyedRows";
 import { ScrollHold } from "./motion/ScrollHold";
+import { Motion } from "./motion/Motion";
 
 /** A task being typed in the list: the texts already typed, as plain cards each at its level, and the field after them, in `place`. */
 export interface ListEntryInput {
@@ -134,6 +135,8 @@ export class TaskList {
 	/** Where a lifted section will land, shown as a dashed place among the sections; none while no section is carried. */
 	private landing: Landing | null = null;
 	private headsById = new Map<string, HTMLElement>();
+	/** The header of each folded project group drawn, by the id of each task it holds out of sight. */
+	private foldedHeads = new Map<string, HTMLElement>();
 	/** Each empty section's No tasks plate drawn, by its name and its project's part. */
 	private plates = new Map<string, HTMLElement>();
 	/** Each section's cards as drawn, its subtasks' among them. */
@@ -211,6 +214,7 @@ export class TaskList {
 		this.nodes = [];
 		this.heads = new Map();
 		this.headsById = new Map();
+		this.foldedHeads = new Map();
 		this.plates = new Map();
 		this.sectionCards = new Map();
 		this.rendered = sectionsOf(shape);
@@ -421,6 +425,11 @@ export class TaskList {
 		return this.headsById.get(id) ?? null;
 	}
 
+	/** The header of the folded project group that holds the task of id `id` out of sight; null when no folded group holds it. */
+	foldedHeadOf(id: string): HTMLElement | null {
+		return this.foldedHeads.get(id) ?? null;
+	}
+
 	/** The No tasks plate of empty section `name` (of the project's part `project`); null when none is drawn. */
 	plateOf(name: GroupName, project?: ProjectZone): HTMLElement | null {
 		return this.plates.get(plateKey(name, project)) ?? null;
@@ -457,6 +466,7 @@ export class TaskList {
 	private projectHeader(drawing: RowsDrawing, group: ProjectGroup): HTMLElement {
 		const { node: head, signal } = drawing.take(`project:${group.key}`, () => el(null, "div", "tc-group-head is-project"));
 		const chevron = head.querySelector(":scope > .tc-group-chevron") ?? el(null, "span", "tc-group-chevron");
+		const counted = head.querySelector(":scope > .tc-group-count")?.textContent ?? null;
 		if (!chevron.firstChild) chevron.appendChild(icon("chevronRight"));
 		for (const child of [...head.childNodes]) if (child !== chevron) child.remove();
 		if (chevron.parentElement !== head) head.prepend(chevron);
@@ -465,7 +475,11 @@ export class TaskList {
 		head.setAttribute("role", "button");
 		head.setAttribute("aria-expanded", String(!group.folded));
 		el(head, "span", "tc-group-name", group.title);
-		if (group.folded) el(head, "span", "tc-group-count", String(group.count));
+		if (group.folded) {
+			const count = el(head, "span", "tc-group-count", String(group.count));
+			if (counted !== null && counted !== count.textContent) Motion.appear(count);
+			for (const section of group.sections) for (const { item } of section.rows) this.foldedHeads.set(item.id, head);
+		}
 		if (group.canOpenNote) {
 			const open = el(head, "span", "tc-group-open");
 			open.setAttribute("aria-label", `Open ${group.title}`);

@@ -71,7 +71,7 @@ export const Motion = {
 		row.style.overflow = "hidden";
 		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
-		GROWN.set(row, parseFloat(style.height) || 0);
+		GROWN.set(row, parseFloat(to.height) || 0);
 		const done = () => {
 			if (GROWTHS.get(row) === growth) row.style.overflow = overflow;
 		};

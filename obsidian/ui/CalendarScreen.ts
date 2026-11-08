@@ -13,7 +13,7 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { type ColumnTitle, ListDrop } from "./drag/ListDrop";
-import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { ColumnMenu, GroupMenu } from "./menu/GroupMenu";
 import { failureText } from "./failureText";
@@ -960,11 +960,20 @@ export class CalendarScreen extends Component {
 
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
-	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null> {
+	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null> {
 		this.bulk.dropping(drag);
 		this.arriving.dropping(drag.item);
 		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate)));
-		return this.arriving.shown;
+		return this.arriving.shown ?? this.foldedAway(drag.item.id);
+	}
+
+	/** The header of the folded project group a task went into, in whichever list shows it. */
+	private foldedAway(id: string): HeldOut | null {
+		for (const list of [this.soonList, this.backlogList, this.inboxList, this.list]) {
+			const behind = list?.foldedHeadOf(id);
+			if (behind && behind.getClientRects().length > 0) return { behind };
+		}
+		return null;
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */

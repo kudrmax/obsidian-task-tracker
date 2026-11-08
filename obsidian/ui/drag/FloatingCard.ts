@@ -89,6 +89,12 @@ export class FloatingCard implements Float {
 		await new Promise((resolve) => window.setTimeout(resolve, tokenMs(this.el, DURATION.fly) + SETTLE_MS));
 	}
 
+	/** Slides into the rect, taking its size, and fades as it goes. */
+	sink(rect: DOMRect): Promise<void> {
+		this.el.classList.add("is-sinking", "is-gone");
+		return this.flyTo(rect);
+	}
+
 	async vanish(): Promise<void> {
 		for (const layer of this.stack) layer.classList.add("is-gone");
 		this.count?.classList.add("is-gone");
