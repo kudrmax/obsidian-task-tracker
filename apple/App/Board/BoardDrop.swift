@@ -156,7 +156,12 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         let target = UIDragPreviewTarget(container: view, center: CGPoint(x: landing.midX, y: landing.midY))
         let center = CGPoint(x: landing.midX, y: landing.minY)
         if foldsOnDrop() {
-            return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: view, center: center, transform: CGAffineTransform(scaleX: 1, y: 0.001)))
+            // No shadow either: a folded copy's shadow would stay a line over the header.
+            let parameters = UIDragPreviewParameters()
+            parameters.backgroundColor = .clear
+            parameters.shadowPath = UIBezierPath()
+            let folded = UIDragPreviewTarget(container: view, center: center, transform: CGAffineTransform(scaleX: 1, y: 0.001))
+            return UITargetedDragPreview(view: defaultPreview.view, parameters: parameters, target: folded)
         }
         return defaultPreview.retargetedPreview(with: target)
     }
