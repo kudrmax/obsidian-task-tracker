@@ -108,8 +108,8 @@ const UNWRITTEN = "unwritten:";
 /** The key of the dashed place a lifted section lands on. */
 const LANDING = "landing";
 
-/** Where a lifted section's landing place stands: over the `before`-th header drawn, or right after the section named `after`. */
-export type Landing = { readonly before: number } | { readonly after: GroupName };
+/** Where a lifted section's landing place stands: over the `before`-th header drawn, or right after the section of id `after` (`ListGroup.id`). */
+export type Landing = { readonly before: number } | { readonly after: string };
 export const PLATE = "tc-group-empty";
 
 /** What a list about to draw `shape` shows the field among. */
@@ -133,7 +133,7 @@ export class TaskList {
 	private heads = new Map<HTMLElement, Header>();
 	/** Where a lifted section will land, shown as a dashed place among the sections; none while no section is carried. */
 	private landing: Landing | null = null;
-	private headsByName = new Map<GroupName, HTMLElement>();
+	private headsById = new Map<string, HTMLElement>();
 	/** Each empty section's No tasks plate drawn, by its name and its project's part. */
 	private plates = new Map<string, HTMLElement>();
 	/** Each section's cards as drawn, its subtasks' among them. */
@@ -210,7 +210,7 @@ export class TaskList {
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
-		this.headsByName = new Map();
+		this.headsById = new Map();
 		this.plates = new Map();
 		this.sectionCards = new Map();
 		this.rendered = sectionsOf(shape);
@@ -272,7 +272,7 @@ export class TaskList {
 			this.sectionCards.set(group, this.entries.slice(groupStart).map((e) => e.card));
 			subtrees(groupStart);
 			enterAtCard();
-			if (landing && "after" in landing && landing.after === group.name) mark();
+			if (landing && "after" in landing && landing.after === group.id) mark();
 		}
 		if (landing && "before" in landing && landing.before >= headsDrawn) mark();
 		enter();
@@ -401,7 +401,7 @@ export class TaskList {
 
 	/**
 	 * The place a lifted section lands, drawn as a row of the list (`before`: the header it stands over, counted among the
-	 * headers drawn, past the last for the end; `after`: right after the section of that name, once the move is drawn);
+	 * headers drawn, past the last for the end; `after`: right after the section of that id, once the move is drawn);
 	 * null takes it away, folding. The list draws itself again.
 	 */
 	showLanding(at: Landing | null): void {
@@ -409,9 +409,9 @@ export class TaskList {
 		this.render();
 	}
 
-	/** The header drawn for the section named `name`, if one is. */
-	headOf(name: GroupName): HTMLElement | null {
-		return this.headsByName.get(name) ?? null;
+	/** The header drawn for the section of id `id` (`ListGroup.id`, the same through a move or a rename), if one is. */
+	headOf(id: string): HTMLElement | null {
+		return this.headsById.get(id) ?? null;
 	}
 
 	/** The No tasks plate of empty section `name` (of the project's part `project`); null when none is drawn. */
@@ -436,7 +436,7 @@ export class TaskList {
 		head.classList.toggle("is-in-project", project !== undefined);
 		el(head, "span", "tc-group-name", group.name ?? this.deps.ungroupedName?.() ?? "");
 		this.heads.set(head, headerOf({ group, project }));
-		if (project === undefined) this.headsByName.set(group.name, head);
+		if (project === undefined) this.headsById.set(group.id, head);
 		this.deps.onHeader?.(head, group, signal);
 		return head;
 	}

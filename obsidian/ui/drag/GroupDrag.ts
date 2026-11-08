@@ -86,15 +86,15 @@ export class GroupDrag {
 			},
 			/**
 			 * The move is written and the list drawn as the file now has it, its landing place right after the section; the
-			 * copy lands on the section's header as drawn there, found by the section's name. The screen stays the drag's
+			 * copy lands on the section's header as drawn there, found by the section's id. The screen stays the drag's
 			 * until the copy has landed.
 			 */
 			onEnd: async (place) => {
 				if (!place) return null;
 				this.deps.haptics.tap();
 				await this.deps.onMove(list, group.name, place).catch((error: unknown) => console.error("Task Calendar: section move", error));
-				taskList.showLanding({ after: group.name });
-				return taskList.headOf(group.name);
+				taskList.showLanding({ after: group.id });
+				return taskList.headOf(group.id);
 			},
 		});
 		session.move(e.clientX, e.clientY);

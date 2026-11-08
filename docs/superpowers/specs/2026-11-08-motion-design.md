@@ -310,9 +310,10 @@ every condition that changes the layout is animated by the transaction that chan
 27. **Obsidian, R7: a section lands as a card does**, through the same `DragSession` (the slots between the sections are
    its one target). The landing place is a row the list draws (`TaskList.showLanding`, ordered by `KeyedRows` like every
    row): over the slot's header while the finger moves, right after the section once the move is written and the list
-   drawn, so the section's header stands where it will open. The copy lands on that header, found by the section's name
-   in the list as drawn (`moveGroup` answers nothing, so it is not the lifted node), and only then does the section unfold
-   as the place folds; the screen stays the drag's until then. A cancel flies back to the header first. The mark opens and closes between the sections
+   drawn, so the section's header stands where it will open. The copy lands on that header, found by the section's id
+   (`ListGroup.id`, which a move keeps: decision 7) in the list as drawn, never by its name (sections of one name stand in
+   several projects), and only then does the section unfold as the place folds; the screen stays the drag's until then.
+   A cancel flies back to the header first. The mark opens and closes between the sections
    as the finger moves. Tap opens the menu, a long press only lifts (as decision 12).
 28. **Obsidian, R7: the plus let go on a place lands in the field opened there**, scaled to the field's height, and
    fades (as decision 13); let go on nothing, or cancelled, it flies home to the plus, as a cancelled card does.
