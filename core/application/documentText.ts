@@ -2,7 +2,7 @@ import { DayBoundary } from "../domain/DayBoundary";
 import { normalize } from "../domain/normalize";
 import { usablePresets } from "../domain/operations";
 import type { LocalDate } from "../domain/Task";
-import { type LineIds, TaskDocument } from "../domain/TaskDocument";
+import { TaskDocument } from "../domain/TaskDocument";
 import type { Markers } from "../domain/TaskLine";
 import { type TaskCalendarSettings, usableLabels, usableLevels } from "../settings";
 
@@ -36,20 +36,18 @@ export function sectionNames(settings: TaskCalendarSettings): readonly string[] 
 	return [s.inbox, s.now, s.soon, s.backlog, s.done];
 }
 
-/** `ids`, the tags its lines get: who its tasks are (`TaskIdentity`); left out, each line's own by its place. */
-export function parseText(text: string, settings: TaskCalendarSettings, ids?: LineIds): TaskDocument {
+export function parseText(text: string, settings: TaskCalendarSettings): TaskDocument {
 	const s = settings.sections;
 	return TaskDocument.parse(
 		text,
 		{ inbox: s.inbox, backlog: s.backlog, now: s.now, soon: s.soon, done: s.done, ungrouped: settings.groups.ungrouped },
 		markersOf(settings),
-		ids,
 	);
 }
 
 /** Parsed, with every section, normalized for `today`. */
-export function readDocument(text: string, settings: TaskCalendarSettings, today: LocalDate, boundary = boundaryOf(settings), ids?: LineIds): TaskDocument {
-	return normalize(parseText(text, settings, ids).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
+export function readDocument(text: string, settings: TaskCalendarSettings, today: LocalDate, boundary = boundaryOf(settings)): TaskDocument {
+	return normalize(parseText(text, settings).ensureSections(sectionNames(settings)), today, boundary, usablePresets(settings.groups.presets));
 }
 
 /**

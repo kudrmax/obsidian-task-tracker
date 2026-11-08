@@ -83,7 +83,7 @@ export class TaskServiceImpl implements TaskService {
 		private readonly history: UndoHistory | null = null,
 		private readonly projects: Projects = NO_PROJECTS,
 		private readonly grouping: GroupingStore = memoryGrouping(),
-		private readonly identity: TaskIdentity = new TaskIdentity(),
+		identity: TaskIdentity = new TaskIdentity(),
 	) {
 		this.rules = new TaskRules(settings, clock, identity);
 		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
@@ -509,7 +509,7 @@ export class TaskServiceImpl implements TaskService {
 		let change = null as { before: string; written: TextChange; ids: ReadonlyMap<number, string> } | null;
 		await this.store.write((text) => {
 			try {
-				const ids = this.identity.idsOf(text);
+				const ids = this.rules.idsOf(text);
 				const written = this.rules.change(text, operation, at);
 				change = { before: text, written, ids };
 				return written.text;
@@ -522,7 +522,7 @@ export class TaskServiceImpl implements TaskService {
 		if (!change) return null;
 		const { before, written, ids } = change;
 		this.normalized = { text: written.text, today: at.today, reading: at.reading, doc: written.after, changed: false };
-		if (record) this.history?.record(before, written.text, { before: ids, after: this.identity.idsOf(written.text) });
+		if (record) this.history?.record(before, written.text, { before: ids, after: this.rules.idsOf(written.text) });
 		return { before: written.before, after: written.after };
 	}
 

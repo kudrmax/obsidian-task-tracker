@@ -1,5 +1,5 @@
 import { matchLines } from "../domain/LineMatch";
-import { type LineIds, type OutlineLine, outlineOf, type TaskDocument } from "../domain/TaskDocument";
+import type { LineIds, OutlineLine, TaskDocument } from "../domain/TaskDocument";
 
 /** A heading or a task line of the text the ids are for, in file order, with its id. */
 export interface TaskIdLine {
@@ -29,13 +29,17 @@ export interface CarriedLines {
 
 /**
  * The identity of the tasks file's tasks and sections through the life of a service: the ids of its task lines and
- * headings. A write carries them by the lines it made of which (`wrote`), an undo step by the lines it gave back
- * (`carried`); a text changed elsewhere keeps the id of every such line it left in place, and of a line edited in place,
- * by an ordered diff of its headings and task lines, read from the lines themselves: a text is parsed once, with its ids.
+ * headings, kept for the file as read, tidied for today, which is what every screen shows and every write starts from.
+ * A text is matched by its own reading: parsed, each line tagged by its line, and tidied, which carries the tags of the
+ * lines it moves; so a file a host keeps untidied reads with the same ids every time. A write carries the ids by the
+ * lines it made of which (`wrote`), an undo step by the lines it gave back (`carried`); a text changed elsewhere keeps
+ * the id of every heading and task line it left in place, or edited in place, by an ordered diff of its reading.
  */
 export class TaskIdentity {
 	private current: TaskIdState;
 	private last: { readonly text: string; readonly ids: LineIds } | null = null;
+	/** The ids an undo step gave the lines of its text, by line, until that text is read. */
+	private pending: { readonly text: string; readonly ids: ReadonlyMap<number, string> } | null = null;
 
 	constructor(state: TaskIdState = NO_TASK_IDS) {
 		this.current = state;
@@ -45,67 +49,75 @@ export class TaskIdentity {
 		return this.current;
 	}
 
-	/** The tags `text`'s lines are parsed with: the ids its tasks and headings have, reconciled first when the ids are another text's. */
-	of(text: string): LineIds {
+	/**
+	 * What `text`'s reading is retagged by (`TaskDocument.retagged`): `read` gives it parsed and tidied, each line tagged by
+	 * its line. Kept, with the ids of the reading's lines, until another text is read.
+	 */
+	of(text: string, read: () => TaskDocument): LineIds {
 		if (this.last?.text === text) return this.last.ids;
-		const outline = outlineOf(text);
-		const known = sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.reconciled(text, outline);
-		return this.keep(text, known);
-	}
-
-	/** Every task's and heading's id in `text`, by its line. */
-	idsOf(text: string): ReadonlyMap<number, string> {
-		return this.of(text).known;
+		const doc = read();
+		const outline = doc.outline();
+		const next = this.current.next;
+		const known = this.pending?.text === text ? this.given(outline, this.pending.ids) : sameOutline(this.current.lines, outline) ? this.inOrder(outline) : this.matched(outline);
+		this.pending = null;
+		const fresh = outline.some((o) => !known.has(o.tag));
+		for (const o of outline) if (!known.has(o.tag)) known.set(o.tag, `t${next + o.tag}`);
+		const settled = !fresh && sameOutline(this.current.lines, outline) && outline.every((o, i) => known.get(o.tag) === this.current.lines[i].id);
+		if (!settled) this.current = { next: next + doc.nextTag(), lines: outline.map((o) => ({ raw: o.raw, task: o.task, id: known.get(o.tag)! })) };
+		const ids = { known, next };
+		this.last = { text, ids };
+		return ids;
 	}
 
 	/** A write left `text`, the document `after`: its tasks and headings are who its lines' tags say. */
 	wrote(text: string, after: TaskDocument): void {
-		const tags = after.lineTags();
-		this.commit(text, after.nextTag(), outlineOf(text).map((line) => ({ ...line, id: tags[line.line] })));
+		const tags = after.outlineTags();
+		this.current = { next: after.nextTag(), lines: after.outline().map((o) => ({ raw: o.raw, task: o.task, id: tags.get(o.line)! })) };
+		this.pending = null;
+		this.last = { text, ids: { known: new Map([...tags].map(([line, tag]) => [line, tag])), next: this.current.next } };
 	}
 
-	/** An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. */
+	/**
+	 * An undo step made `after` of `before`: a line it gave back is who it was, a line it left is who it was. Known once
+	 * `after` is read (`of`).
+	 */
 	carried(before: string, after: string, step: CarriedLines): void {
-		const was = this.of(before).known;
-		const next = this.current.next;
+		const was = this.last?.text === before ? this.last.ids.known : this.pending?.text === before ? this.pending.ids : new Map<number, string>();
 		const given = new Set(step.ids.values());
-		const lines = outlineOf(after).map((line) => {
-			const origin = step.origins[line.line];
-			const kept = origin === null || origin === undefined ? undefined : was.get(origin);
-			return { ...line, id: step.ids.get(line.line) ?? (kept !== undefined && !given.has(kept) ? kept : `t${next + line.line}`) };
+		const ids = new Map<number, string>();
+		step.origins.forEach((origin, line) => {
+			const own = step.ids.get(line) ?? (origin === null ? undefined : was.get(origin));
+			if (own !== undefined && (step.ids.has(line) || !given.has(own))) ids.set(line, own);
 		});
-		this.commit(after, next + after.split("\n").length, lines);
+		this.pending = { text: after, ids };
+		this.last = null;
 	}
 
-	private inOrder(outline: readonly OutlineLine[]): Map<number, string> {
-		return new Map(outline.map((line, i) => [line.line, this.current.lines[i].id]));
-	}
-
-	/** The ids of another text carried over to `text`'s lines by place and line; a line it added gets a new one. */
-	private reconciled(text: string, outline: readonly OutlineLine[]): Map<number, string> {
-		const old = this.current.lines;
-		const pairs = matchLines(
-			old.map((l) => l.raw),
-			outline.map((l) => l.raw),
-			(b, a) => old[b].task === outline[a].task,
-		);
+	/** The ids of the reading's lines that an undo step gave its text's lines. */
+	private given(outline: readonly OutlineLine[], ids: ReadonlyMap<number, string>): Map<number, string> {
 		const known = new Map<number, string>();
-		for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].line, old[b].id);
-		const next = this.current.next;
-		for (const line of outline) if (!known.has(line.line)) known.set(line.line, `t${next + line.line}`);
-		this.current = { next: next + text.split("\n").length, lines: outline.map((l) => ({ raw: l.raw, task: l.task, id: known.get(l.line)! })) };
+		for (const o of outline) {
+			const id = ids.get(o.tag);
+			if (id !== undefined) known.set(o.tag, id);
+		}
 		return known;
 	}
 
-	private commit(text: string, next: number, lines: readonly (OutlineLine & { readonly id: string })[]): void {
-		this.current = { next, lines: lines.map(({ raw, task, id }) => ({ raw, task, id })) };
-		this.last = { text, ids: { known: new Map(lines.map((l) => [l.line, l.id])), next } };
+	private inOrder(outline: readonly OutlineLine[]): Map<number, string> {
+		return new Map(outline.map((o, i) => [o.tag, this.current.lines[i].id]));
 	}
 
-	private keep(text: string, known: ReadonlyMap<number, string>): LineIds {
-		const ids = { known, next: this.current.next };
-		this.last = { text, ids };
-		return ids;
+	/** The ids of the reading the state is for, carried to this reading's lines by place and line. */
+	private matched(outline: readonly OutlineLine[]): Map<number, string> {
+		const old = this.current.lines;
+		const pairs = matchLines(
+			old.map((l) => l.raw),
+			outline.map((o) => o.raw),
+			(b, a) => old[b].task === outline[a].task,
+		);
+		const known = new Map<number, string>();
+		for (const [b, a] of pairs) if (old[b].task === outline[a].task) known.set(outline[a].tag, old[b].id);
+		return known;
 	}
 }
 
