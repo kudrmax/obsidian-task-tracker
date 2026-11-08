@@ -408,6 +408,12 @@ every condition that changes the layout is animated by the transaction that chan
     home (it flies into the slot); a card's copy flies to its own place, so the slot is the plus again as it is let go,
     not when the system's drop animator ends a second later.
 
+51. **Obsidian, R9 with the day turn (0.4.179): a tap on a day's arrow or name during a turn lets that turn run on**
+    from where it is to its day, and the next turn starts once the screen has drawn it: `ScreenPager.stand` puts nothing
+    in its place in one frame (decision 32), and `turnDay` already waits for the turn under way. The other day is still
+    drawn at once (decision 20): the turn slides the day drawn before and the peek, and the lists draw the day it brings
+    in, in place, when it has landed, with no row folding or growing.
+
 ## Done when
 
 - The cases in `2026-11-08-motion-audit/` re-measured with the same samplers show no jump (no one-frame move above 2 px
