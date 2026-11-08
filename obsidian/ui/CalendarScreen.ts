@@ -950,12 +950,14 @@ export class CalendarScreen extends Component {
 	/** The name is edited where the header stands, the caret at its end. */
 	private renameInPlace(head: HTMLElement, list: GroupedList, name: string, project?: ProjectZone): void {
 		if (!this.arbiter.claim(NAMING)) return;
-		const slot = el(null, "div", "tc-group-slot");
+		const slot = el(null, "div", "tc-group-slot is-rename");
 		head.before(slot);
 		head.classList.add("is-renamed");
 		GroupNameField.open(slot, {
 			value: name,
 			onDone: (to) => {
+				slot.remove();
+				head.classList.remove("is-renamed");
 				this.arbiter.release(NAMING);
 				if (to === null) return this.render();
 				void this.act(async () => {
