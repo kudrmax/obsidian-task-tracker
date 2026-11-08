@@ -325,7 +325,7 @@ export class DragController {
 	 * The plus taken: the plus itself follows the finger over the same targets as a task, but no card is lifted. Let go
 	 * off every target, or cancelled, the plus flies back to `source` and `onDrop` hears null; let go on one, `onDrop` hears where once it has landed. False when another gesture holds the screen: nothing starts.
 	 */
-	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void): boolean {
+	beginNew(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => HTMLElement | null | void): boolean {
 		if (!this.deps.arbiter.claim(DRAG)) return false;
 		this.deps.haptics.tap();
 		const origin = source.getBoundingClientRect();
@@ -343,7 +343,7 @@ export class DragController {
 					targets,
 					float,
 					origin: () => origin,
-					// Placed, the task opens as the finger lifts, its line giving way to the field; the plus shrinks meanwhile.
+					// Placed, the task's field opens as the finger lifts, in its place; the plus lands in the field and fades.
 					onEnd: async (result) => {
 						detach();
 						if (!result) return;
@@ -351,7 +351,7 @@ export class DragController {
 						this.deps.arbiter.release(DRAG);
 						for (const target of targets) target.clear();
 						this.deps.haptics.tap();
-						onDrop(result);
+						return onDrop(result) ?? null;
 					},
 				}),
 			() => {

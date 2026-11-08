@@ -385,11 +385,16 @@ export class QuickEntryController {
 	}
 
 	/** The plus came to rest: the field opens where it landed, in a list or in a slot of the timeline. */
-	private dropped(result: DropResult | null): void {
+	/** The plus let go: on a place the field opens there in the same tap, and the plus lands in it (this gives the field). */
+	private dropped(result: DropResult | null): HTMLElement | null {
 		this.carrying = false;
 		this.ring.hide();
 		this.dropField();
-		if (!this.entry.openAtDrop(this.droppedOn, result)) this.showPlus();
+		if (!this.entry.openAtDrop(this.droppedOn, result)) {
+			this.showPlus();
+			return null;
+		}
+		return this.field?.el.isConnected ? this.field.el : null;
 	}
 
 	/** The menu stays over the screen, its panel gone, and the field stands last in its stack of subtasks. */

@@ -5,7 +5,7 @@ import type { Float } from "./DropTarget";
 
 const SETTLE_MS = 20;
 
-/** The plus itself under the finger while a new task is carried: let go on a place it shrinks into the line's dot. */
+/** The plus itself under the finger while a new task is carried: let go on a place it lands in the field opened there and fades. */
 export class PlusFloat implements Float {
 	private readonly el: HTMLElement;
 
@@ -17,10 +17,11 @@ export class PlusFloat implements Float {
 		this.el.style.transform = `translate3d(${x - this.grab.dx}px, ${y - this.grab.dy}px, 0)`;
 	}
 
-	/** Its centre goes to the left end of `rect`'s middle, where the line starts, and it shrinks away there. */
+	/** It goes to the start of `rect` (the field opened where it was let go), as tall as the field, and fades there. */
 	land(rect: DOMRect): Promise<void> {
-		const half = this.el.offsetWidth / 2;
-		return this.fly(`translate3d(${rect.left - half}px, ${rect.top + rect.height / 2 - half}px, 0) scale(0)`);
+		const size = this.el.offsetWidth || 1;
+		const scale = Math.min(1, rect.height / size);
+		return this.fly(`translate3d(${rect.left}px, ${rect.top + rect.height / 2 - (size * scale) / 2}px, 0) scale(${scale})`, true);
 	}
 
 	/** Back into the plus's place, its size kept. */
@@ -28,19 +29,20 @@ export class PlusFloat implements Float {
 		return this.fly(`translate3d(${rect.left}px, ${rect.top}px, 0)`);
 	}
 
-	/** Shrinks away where it is. */
+	/** Fades away where it is. */
 	vanish(): Promise<void> {
-		return this.fly(`${this.el.style.transform} scale(0)`);
+		return this.fly(this.el.style.transform, true);
 	}
 
 	remove(): void {
 		this.el.remove();
 	}
 
-	private async fly(transform: string): Promise<void> {
+	private async fly(transform: string, fade = false): Promise<void> {
 		this.el.classList.add("is-flying");
 		void this.el.offsetWidth;
 		this.el.style.transform = transform;
+		this.el.classList.toggle("is-gone", fade);
 		await new Promise((resolve) => window.setTimeout(resolve, tokenMs(this.el, DURATION.fly) + SETTLE_MS));
 	}
 }
