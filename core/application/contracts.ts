@@ -50,7 +50,8 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 /** Typing tasks in place: every rule of the quick entry, the frontend drawing its state and turning gestures into its calls. */
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
-export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, type ScreenPlace } from "./screenPlaces";
+export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
 /** What a task menu's repeat page writes: a rule changed there as the menu closes, unless it is the task's own again; Remove at once. */
@@ -953,6 +954,8 @@ export interface DayService {
 	relation(date: LocalDate): DayRelation;
 	/** The day `days` after `date`, before it for a negative count: the step of the day arrows and of the screens past today. */
 	step(date: LocalDate, days: number): LocalDate;
+	/** Where a swipe or a day arrow leads from `from`, a step back (-1) or on (1); null past the row's ends. */
+	stepScreen(from: ScreenAtOf, shift: -1 | 1): ScreenAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
 	/**

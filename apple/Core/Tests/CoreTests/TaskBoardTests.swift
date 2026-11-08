@@ -43,6 +43,17 @@ import Testing
         #expect(menu.edits.contains("subtask"))
     }
 
+    @Test func aSwipeOnTheCalendarLeadsWhereTheCoreSays() throws {
+        let board = board(FakeVault(Self.file))
+        let files = board.settingsOnly(now: Fixtures.date(6, 10))
+        let on: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-06"], 1], over: files)
+        #expect(on == ["mode": "calendar", "date": "2026-11-07"])
+        let back: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-06"], -1], over: files)
+        #expect(back == ["mode": "soon", "date": "2026-11-06"])
+        let walk: JSONValue = try board.read("days.stepScreen", [["mode": "calendar", "date": "2026-11-08"], -1], over: files)
+        #expect(walk == ["mode": "calendar", "date": "2026-11-07"])
+    }
+
     @Test func aSectionMovesWhereTheCorePlacesItsSlot() throws {
         let vault = FakeVault(Self.file)
         let board = board(vault)

@@ -150,6 +150,40 @@ describe("ScreenPager", () => {
 		frames.mockRestore();
 	});
 
+	it("runs the whole way with no finger along the track it is given, as one let go at its start, over the slide's time", async () => {
+		const { pager, made } = setUp();
+		const given = fakeTrack(WIDTH);
+		let stood = false;
+		void pager.run(-1, () => given).then(() => (stood = true));
+		expect(made).toEqual([]);
+		vi.advanceTimersByTime(SLIDE_MS / 4);
+		const midway = last(given.shown) ?? 0;
+		expect(midway).toBeGreaterThan(0);
+		expect(midway).toBeLessThan(WIDTH);
+		expect(given.landed).toEqual([]);
+		vi.advanceTimersByTime(SLIDE_MS);
+		await Promise.resolve();
+		expect(last(given.shown)).toBe(WIDTH);
+		expect(given.landed).toEqual([true]);
+		expect(stood).toBe(true);
+	});
+
+	it("stands a running slide where it was going before it runs the next, so nothing is drawn twice", () => {
+		const { pager } = setUp();
+		const first = fakeTrack(WIDTH);
+		const second = fakeTrack(WIDTH);
+		void pager.run(1, () => first);
+		vi.advanceTimersByTime(SLIDE_MS / 10);
+		const order: string[] = [];
+		void pager.run(1, () => {
+			order.push(`first landed ${first.landed.join()}`);
+			return second;
+		});
+		expect(order).toEqual(["first landed true"]);
+		expect(last(first.shown)).toBe(-WIDTH);
+		expect(second.landed).toEqual([]);
+	});
+
 	it("stands at once when let go without being drawn", async () => {
 		const { pager, made } = setUp();
 		await pager.settle(null);
