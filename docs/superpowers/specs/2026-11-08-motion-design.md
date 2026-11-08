@@ -438,6 +438,14 @@ every condition that changes the layout is animated by the transaction that chan
     stands. `DropLanding.list` gains `part` (`LandingPart` `{ key, zone, section, index }`): the part as the screen draws
     it (`ProjectGroup.key`, its `zone`), the section in it, and the index among that section's cards in the part. It is
     there only for such a list; `group` and `index` stay as they were (the file's order). Added only.
+54. **Backend, R8: the field in a list grouped by project stands in its project's part.** `QuickEntry.renameSpot` gave
+    the gap before the renamed card without the card's project, so in a grouped list the field found no section of that
+    part and stood above the first header, its card's part left empty (Soon, a task of Japanese). The rename's place now
+    carries its card's `project`, as every other place the core gives the field already did (`gapOfPlace` for the
+    plus at a drop, Add Subtask and an empty section's plate; the last part's section for the plus and a double click;
+    a level's shift and a rename's next field keep it). The plugin takes the same path
+    (`QuickEntryController.rename` → `renameSpot`), so it is fixed there too. Nothing in the contract changed.
+
 
 ## Done when
 

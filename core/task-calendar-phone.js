@@ -3188,14 +3188,15 @@ ${key.title}`.toLowerCase();
       return { kind: "list", column: found.column, place: gapOfPlace(this.look.cards(found.column), { kind: "subtask", parent, before: null }) };
     }
     /**
-     * Where `item` is renamed: right before its card in the list that shows it; else, opened from a menu's stack, there; else
+     * Where `item` is renamed: right before its card in the list that shows it, in its card's section of its project's part
+     * where the list is grouped by project; else, opened from a menu's stack, there; else
      * over its card on the timeline; null when it shows nowhere the field can stand.
      */
     renameSpot(item, inStack) {
       const found = this.find(item.key);
       if (found) {
         const card = this.look.cards(found.column)[found.index];
-        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group } };
+        return { kind: "list", column: found.column, place: { kind: "gap", index: found.index, level: card.level, group: card.group, ...card.project !== void 0 && { project: card.project } } };
       }
       if (inStack) return { kind: "stack", parent: item.key };
       return item.slot ? { kind: "slot", slot: item.slot } : null;
