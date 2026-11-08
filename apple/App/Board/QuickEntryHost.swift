@@ -319,7 +319,7 @@ final class QuickEntryHost {
     }
 
     private static func listCards(_ cards: [BoardCard]) -> JSONValue {
-        .array(cards.map { ["key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
+        .array(cards.map { ["id": .string($0.id), "key": $0.item.key.json, "level": .number(Double($0.level)), "group": $0.item.group.json] })
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], over snapshot: BoardSnapshot? = nil) -> JSONValue? {
@@ -454,8 +454,11 @@ final class QuickEntryHost {
         }
         let board = board
         let day = model.shownDay
+        // A task typed is made by `createWithId`: its card is found in the next drawing by its id, whatever else wrote to
+        // the file between the write and that read (a key names only the place right after the write).
+        let call = method == "createInPlace" ? "createWithId" : method
         let written: Result<JSONValue, Error> = await Task.detached {
-            Result { try board.write("tasks." + method, args) }
+            Result { try board.write("tasks." + call, args) }
         }.value
         if case .failure(let error) = written { model.problem(error) }
         let read: BoardSnapshot?
@@ -466,7 +469,7 @@ final class QuickEntryHost {
             read = nil
         }
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
-        let created: JSONValue? = if method == "createInPlace", case .success(let key) = written, read != nil { key } else { nil }
+        let created: JSONValue? = if method == "createInPlace", case .success(let made) = written, !made.isNull, read != nil { made } else { nil }
         let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil
         // Written but not read: the screen reads again once this job is done, so the task shows.
         if read == nil, case .success = written { Task { await model.reload() } }

@@ -209,6 +209,40 @@ extension TaskBoardTests {
         #expect(isList(done["session"]["jobs"], count: 0))
     }
 
+    @Test func aTaskTypedIsFoundByItsIdWhateverWroteBeforeTheDrawing() throws {
+        let vault = FakeVault(Self.file)
+        let board = board(vault)
+        let screen: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files(now: Fixtures.date(6, 10)))
+        func cards(_ inbox: [TaskItem]) -> JSONValue { .array(inbox.map { ["id": .string($0.id), "key": $0.key.json, "level": 0, "group": .null] }) }
+        func look(_ inbox: [TaskItem]) -> JSONValue {
+            ["cards": ["inbox": cards(inbox)], "sections": ["inbox": [.null]], "sectioned": ["inbox": true], "day": "2026-11-06", "shown": ["inbox"]]
+        }
+        var session = JSONValue.null
+        func call(_ method: String, _ arguments: [JSONValue], _ inbox: [TaskItem]) throws -> JSONValue {
+            let reply = try board.entry(method, [session, look(inbox)] + arguments)
+            session = reply["session"]
+            return reply
+        }
+        _ = try call("openIn", ["inbox", .null], screen.inbox)
+        _ = try call("type", ["Fresh"], screen.inbox)
+        _ = try call("enter", [], screen.inbox)
+        guard case .array(let jobs) = session["jobs"], let id = jobs.first?["id"].string else { Issue.record("no job queued"); return }
+        let job = try call("call", [.string(id)], screen.inbox)["value"]
+        guard job["method"].string == "createInPlace", case .array(let args) = job["args"] else { Issue.record("no create"); return }
+        let made = try board.write("tasks.createWithId", args)
+        let madeId = try #require(made["id"].string)
+        // Another write lands before the screen is drawn: a line put above it moves the new task's key.
+        vault.text = vault.text.replacingOccurrences(of: "## Inbox\n", with: "## Inbox\n- [ ] Synced from the Mac\n")
+        let after: ScreenView = try board.read("tasks.screen", ["2026-11-06"], over: try board.files(now: Fixtures.date(6, 10)))
+        let fresh = try #require(after.inbox.first { $0.title == "Fresh" })
+        #expect(fresh.id == madeId)
+        #expect(fresh.key.json != made["key"])
+        let shown = try call("shown", [.string(id), made, .object(["inbox": cards(after.inbox)])], after.inbox)
+        #expect(isList(shown["state"]["pending"], of: []))
+        let done = try call("done", [.string(id)], after.inbox)
+        #expect(isList(done["session"]["jobs"], count: 0))
+    }
+
     private func isList(_ value: JSONValue, of texts: [String]) -> Bool {
         guard case .array(let items) = value else { return false }
         return items.map { $0["text"].string ?? "" } == texts

@@ -343,6 +343,9 @@ every condition that changes the layout is animated by the transaction that chan
     answer as before. To use it, a frontend calls `createWithId` where it calls `createInPlace` for a typed task, gives
     its cards `id: item.id`, and hands the `CreatedTask` to `shown` (the plugin: `QuickEntryController.telling` and
     `TaskList`'s cards; `QuickEntrySession` switches with it).
+37. **iPhone, decision 36 applied: a task typed is made by `tasks.createWithId`** (the quick entry's `createInPlace` job),
+    and `entry.shown` gets its `{ key, id }` with the drawn cards carrying their ids, so the field's line becomes the
+    card found by id even when another write (Sync, a reminder's button, a drop) moved its key before the drawing.
 
 ## Done when
 
