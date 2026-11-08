@@ -164,6 +164,8 @@ export interface TaskMenuContext {
 	readonly onSubtask?: (subtask: TaskItem, card: HTMLElement) => void;
 	/** Draws the start of the task's description over its copy; without it the menu shows none. */
 	readonly markdown?: MarkdownSurface;
+	/** Opened by a finger still held on the card: its column stays still under it. */
+	readonly held?: boolean;
 }
 
 /**
@@ -208,7 +210,7 @@ export class TaskMenu extends LiftedMenu {
 
 	private constructor(private context: TaskMenuContext) {
 		super(context.source);
-		this.openOver(context.source, () => this.build());
+		this.openOver(context.source, () => this.build(), context.held !== true);
 	}
 
 	/** The copy over the blur, a timeline card's subtasks under it, and the panel. */

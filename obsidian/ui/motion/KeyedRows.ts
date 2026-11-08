@@ -42,17 +42,11 @@ export class KeyedRows {
 		return this.rows.get(key)?.node ?? null;
 	}
 
-	/** The row of `from` is from now on the row of `to`: what was typed and not yet written becomes the task the file now has. */
-	rekey(from: string, to: string): void {
-		const row = this.rows.get(from);
-		if (!row || this.rows.has(to)) return;
-		this.rows.delete(from);
-		this.rows.set(to, row);
-	}
-
-	/** @internal */
-	take(key: string, make: () => HTMLElement, moving: boolean): TakenRow & { readonly row: Row } {
-		const kept = this.rows.get(key);
+	/** @internal: `taken` says whether a row is already drawn in this drawing; `heir` names a row this key takes over when it has none of its own. */
+	take(key: string, make: () => HTMLElement, moving: boolean, taken: (row: Row) => boolean, heir?: string): TakenRow & { readonly row: Row } {
+		const own = this.rows.get(key);
+		const inherited = heir === undefined ? undefined : this.rows.get(heir);
+		const kept = own && !taken(own) ? own : inherited && !taken(inherited) && !(own && !taken(own)) ? inherited : undefined;
 		if (kept) {
 			kept.listening.abort();
 			kept.listening = new AbortController();
@@ -72,8 +66,9 @@ export class KeyedRows {
 	/** @internal: the rows of this drawing, in order; those not drawn leave. */
 	settle(drawn: Map<string, Row>, moving: boolean): HTMLElement[] {
 		const gone: HTMLElement[] = [];
+		const kept = new Set(drawn.values());
 		for (const [key, row] of this.rows) {
-			if (drawn.get(key) === row) continue;
+			if (kept.has(row)) continue;
 			row.listening.abort();
 			if (!moving) {
 				row.node.remove();
@@ -109,9 +104,13 @@ export class RowsDrawing {
 		if (moving) for (const child of rows.host.children) this.before.set(child, child.getBoundingClientRect());
 	}
 
-	/** The row of `key`, next in order: the one drawn for it last time, or `make`'s. */
-	take(key: string, make: () => HTMLElement): TakenRow {
-		const taken = this.rows.take(key, make, this.moving);
+	/**
+	 * The row of `key`, next in order: the one drawn for it last time, or `make`'s. A key with no row yet may take over
+	 * the row of `heir` (a text typed that the file now has as a task), which then stays the same row on the screen.
+	 */
+	take(key: string, make: () => HTMLElement, heir?: string): TakenRow {
+		const drawnRows = new Set(this.drawn.values());
+		const taken = this.rows.take(key, make, this.moving, (row) => drawnRows.has(row), heir);
 		this.drawn.set(key, taken.row);
 		this.order.push(taken.node);
 		if (taken.fresh) this.fresh.add(taken.node);

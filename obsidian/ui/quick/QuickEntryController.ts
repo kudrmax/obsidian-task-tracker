@@ -1,7 +1,8 @@
 import { type EntryDrawing, type EntrySpot, type EntryState, type GroupName, type ListCard, type Placement, placeShowing, type ProjectZone, QuickEntrySession, type QuickEntryTasks, SHOWN_LISTS, type TaskItem, type TaskKey, type TaskService } from "../../../core/application/contracts";
 import type { RightMode } from "../viewSettings";
 import type { EntryPart } from "./EntryPart";
-import { LAYOUT } from "../design";
+import { DURATION, EASING, LAYOUT, tokenMs } from "../design";
+import { easingOf } from "../easing";
 import { FramePass } from "../FramePass";
 import type { Glide } from "../Keyboard";
 import type { DragController } from "../drag/DragController";
@@ -487,8 +488,9 @@ export class QuickEntryController {
 		if (!scroller) return false;
 		const top = box.top;
 		const by = rect.bottom > limit ? rect.bottom - limit : rect.top < top ? rect.top - top : 0;
-		if (glide && by !== 0) {
-			this.glide.start(scroller, scroller.scrollTop + by, glide, (at) => this.revealedAt.set(scroller, at));
+		const smooth = glide ?? this.smoothScroll();
+		if (smooth && by !== 0) {
+			this.glide.start(scroller, scroller.scrollTop + by, smooth, (at) => this.revealedAt.set(scroller, at));
 			return true;
 		}
 		if (by !== 0) this.glide.stop();
@@ -496,6 +498,13 @@ export class QuickEntryController {
 		if (by !== 0) scroller.scrollTop += by;
 		this.revealedAt.set(scroller, scroller.scrollTop);
 		return by !== 0;
+	}
+
+	/** Every scroll the plugin makes for the field is one smooth scroll, in the list's motion tokens; none where nothing moves (a test). */
+	private smoothScroll(): Glide | null {
+		const root = this.deps.root;
+		const ms = tokenMs(root, DURATION.collapse);
+		return ms > 0 ? { ms, ease: easingOf(getComputedStyle(root).getPropertyValue(EASING.out)), rise: 0 } : null;
 	}
 
 	/** The bar stands by the field: over a menu's blur above it; on the desktop next to the field, inside what shows of its column. */

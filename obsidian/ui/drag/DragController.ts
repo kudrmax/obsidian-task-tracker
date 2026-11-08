@@ -51,7 +51,7 @@ export interface DragControllerDeps {
 	/** The `edge` dot let go at `minute`, a card being `minDurationMin` tall: true once the new time is written, false when nothing changes. */
 	onResize(item: TaskItem, edge: ResizeEdge, minute: number, minDurationMin: number): Promise<boolean>;
 	/** Opens the task menu over `source`; `lifted` dresses the copy of the card that stays over the blur. */
-	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void): OpenMenu;
+	onMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, held?: boolean): OpenMenu;
 	/** A card or block double-clicked: its title is renamed in place, no menu. */
 	onRename(item: TaskItem): void;
 	/** A long tap on an empty place of the timeline, let go: the field of a new task in the slot the target showed. */
@@ -165,9 +165,9 @@ export class DragController {
 	}
 
 	/** Selects the card and opens its menu; the dots on the copy over the blur stretch the card as its own do. */
-	private selectWithMenu(block: HTMLElement, item: TaskItem): OpenMenu {
+	private selectWithMenu(block: HTMLElement, item: TaskItem, held = false): OpenMenu {
 		this.deps.timeline()?.select(item);
-		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close));
+		return this.deps.onMenu(item, block, (copy, close) => this.gripsOn(copy, block, item, close), held);
 	}
 
 	/** A dot of the selected card taken. */
@@ -184,7 +184,7 @@ export class DragController {
 		});
 		if (!held) return;
 		this.deps.haptics.tap();
-		const menu = this.selectWithMenu(block, item);
+		const menu = this.selectWithMenu(block, item, true);
 	}
 
 	/**

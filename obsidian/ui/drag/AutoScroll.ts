@@ -10,6 +10,17 @@ export function edgeVelocity(y: number, top: number, bottom: number, edge = LAYO
 	return 0;
 }
 
+/**
+ * Where what a scroller shows ends at the bottom: a list and the timeline run down under the view's foot (the switch, the
+ * plus and Undo, and on the phone Obsidian's own bar under them), so their edge for scrolling is the top of the switch's row.
+ */
+export function shownBottom(scroller: HTMLElement, bottom: number): number {
+	const foot = scroller.closest(".task-calendar")?.querySelector<HTMLElement>(":scope > .tc-seg");
+	if (!foot) return bottom;
+	const top = foot.getBoundingClientRect().top;
+	return top > 0 && top < bottom ? top : bottom;
+}
+
 export interface Frames {
 	request(fn: () => void): number;
 	cancel(id: number): void;
@@ -41,7 +52,7 @@ export class AutoScroll {
 	/** The finger is at `y`, the scroller's box read by the caller before it wrote anything: a step is planned near an edge it heads for, and none elsewhere. */
 	follow(y: number, box: DOMRect): void {
 		const el = this.scroller();
-		const velocity = edgeVelocity(y, box.top, box.bottom);
+		const velocity = edgeVelocity(y, box.top, shownBottom(el, box.bottom));
 		const from = this.lastY;
 		this.lastY = y;
 		const towards = from !== null && (y === from ? this.scrolling : velocity > 0 === y > from);

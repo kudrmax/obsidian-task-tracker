@@ -1334,7 +1334,9 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-preset-row input[type="text"].tc-preset-name { flex: 1; min-width: 0; }
 .tc-level-row input[type="text"].tc-label-name { flex: 1 1 var(--tc-label-name-w); width: auto; min-width: var(--tc-label-name-w); margin: 0; }
 .tc-row-grip { touch-action: none; cursor: grab; }
-.tc-level-row.is-dragging { opacity: var(--tc-pressed); }
+.tc-level-row.is-dragging { position: relative; z-index: var(--tc-layer-block); opacity: var(--tc-pressed); }
+/* The rows a dragged row passes slide aside, and the row let go glides into its place, as the cards of a list do. */
+.tc-level-row.is-shifting { transition: transform var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-swatches { display: flex; align-items: center; gap: var(--tc-space-6); flex-shrink: 0; }
 .tc-swatch-well { position: relative; width: var(--tc-swatch); height: var(--tc-swatch); flex-shrink: 0; border-radius: var(--tc-radius-circle); background: var(--tc-swatch-well); display: flex; align-items: center; justify-content: center; }
 .tc-swatch-well.is-on { box-shadow: 0 0 0 var(--tc-swatch-ring) var(--tc-swatch-halo), 0 0 0 calc(2 * var(--tc-swatch-ring)) var(--tc-priority-ink); }

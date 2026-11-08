@@ -232,7 +232,7 @@ export class CalendarScreen extends Component {
 				await this.act(async () => (written = await this.deps.tasks.resize(item.key, this.selectedDate, edge, minute, minDurationMin)));
 				return written;
 			},
-			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
+			onMenu: (item, source, lifted, held) => this.showMenu(item, source, lifted, undefined, held),
 			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.quick?.openSlot(slot),
@@ -1093,7 +1093,7 @@ export class CalendarScreen extends Component {
 	}
 
 	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean): TaskMenu {
 		const tasks = this.deps.tasks;
 		const from = this.menuFrom(source, full);
 		const column = this.columnOf(source);
@@ -1105,6 +1105,7 @@ export class CalendarScreen extends Component {
 			item,
 			source,
 			lifted,
+			held,
 			menu: (task) => tasks.menu(task, from, screen),
 			onSubtask: (subtask, card) => this.showMenu(subtask, card),
 			markdown: full?.holds(item) ? undefined : this.markdown,

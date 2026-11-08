@@ -48,8 +48,14 @@ export abstract class LiftedMenu {
 	/**
 	 * The menu opens over `source` once it stands in view: its column scrolls to it first, with its own smooth scroll, and
 	 * `build` lays out the copy and the panel when the column stands still. A pressed thing that went meanwhile closes it.
+	 * Under a finger still held down (`scroll` false) nothing scrolls: the menu opens over what the column shows of it.
 	 */
-	protected openOver(source: HTMLElement, build: () => void): void {
+	protected openOver(source: HTMLElement, build: () => void, scroll = true): void {
+		if (!scroll) {
+			build();
+			this.overlay.show();
+			return;
+		}
 		this.stopScroll = scrollIntoColumn(source, () => {
 			if (this.gone) return;
 			if (!source.isConnected) return this.close();

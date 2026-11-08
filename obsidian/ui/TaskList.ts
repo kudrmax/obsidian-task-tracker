@@ -133,6 +133,13 @@ export class TaskList {
 	private slot: HTMLElement | null = null;
 	/** The rows by key: a card by its task's id, a header by its section's, so a row lives as long as what it shows. */
 	private readonly keyed: KeyedRows;
+	/**
+	 * How many texts typed here were drawn as plain cards last time, and how many of them the file has written since:
+	 * the first new cards drawn now take over their rows (`heirs`), so a written text stays the same card on the screen.
+	 */
+	private typedDrawn = 0;
+	private written = 0;
+	private heirs: string[] = [];
 	/** The day of the last drawing: another day is drawn at once, never moved into. */
 	private drawnDay: LocalDate | null | undefined = undefined;
 	/** `listCards` as of the last drawing, made the first time it is asked for. */
@@ -180,6 +187,10 @@ export class TaskList {
 		const renaming = this.deps.renaming?.() ?? null;
 		const drawing = this.keyed.begin(moving && this.drawnDay === day);
 		this.drawnDay = day;
+		const typed = entry?.pending.length ?? 0;
+		this.written = Math.max(0, this.typedDrawn - typed);
+		this.heirs = Array.from({ length: this.written }, (_, i) => `${UNWRITTEN}${i}`);
+		this.typedDrawn = typed;
 		this.entries = [];
 		this.nodes = [];
 		this.heads = new Map();
@@ -252,7 +263,8 @@ export class TaskList {
 
 	/** A task's card: the one drawn for it last time, filled anew, or a new one; its branches go, the list draws them again. */
 	private cardOf(drawing: RowsDrawing, item: TaskItem, day: LocalDate | null, signals: Map<HTMLElement, AbortSignal>): HTMLElement {
-		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"));
+		const heir = this.heirs.length > 0 && !this.keyed.nodeOf(`task:${item.id}`) ? this.heirs.shift() : undefined;
+		const { node, fresh, signal } = drawing.take(`task:${item.id}`, () => el(null, "div", "tc-card"), heir);
 		if (!fresh) node.replaceChildren();
 		fillCard(node, item, { day });
 		signals.set(node, signal);
@@ -266,7 +278,7 @@ export class TaskList {
 			rows.push({ node: row, level });
 		};
 		entry.pending.forEach(({ text, level }, i) => {
-			const { node, fresh } = drawing.take(`${UNWRITTEN}${i}`, () => el(null, "div", "tc-card"));
+			const { node, fresh } = drawing.take(`${UNWRITTEN}${i}`, () => el(null, "div", "tc-card"), `${UNWRITTEN}${i + this.written}`);
 			if (!fresh) node.replaceChildren();
 			fillUnwrittenCard(node, text);
 			put(node, level);
@@ -278,16 +290,6 @@ export class TaskList {
 		row.classList.toggle("is-section", entry.section === true);
 		put(row, entry.level);
 		return row;
-	}
-
-	/**
-	 * The first texts typed here are written: the cards they stood as become the cards of the tasks the file now has
-	 * (`ids`, in the order typed), so a written text stays the same card on the screen.
-	 */
-	written(ids: readonly string[]): void {
-		const typed = ids.length;
-		ids.forEach((id, i) => this.keyed.rekey(`${UNWRITTEN}${i}`, `task:${id}`));
-		for (let i = typed; this.keyed.nodeOf(`${UNWRITTEN}${i}`); i++) this.keyed.rekey(`${UNWRITTEN}${i}`, `${UNWRITTEN}${i - typed}`);
 	}
 
 	/** The header of the section named for the task being typed, over the field, as a section's header looks. */
