@@ -66,10 +66,10 @@ export const Motion = {
 		const timing = timingOf(row);
 		if (!timing) return;
 		const style = getComputedStyle(row);
-		const to = { height: style.height, marginTop: style.marginTop, marginBottom: style.marginBottom, opacity: "1" };
+		const to = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom, opacity: "1" };
 		const overflow = row.style.overflow;
 		row.style.overflow = "hidden";
-		const growth = row.animate([{ height: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
+		const growth = row.animate([{ height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" }, to], timing);
 		GROWTHS.set(row, growth);
 		GROWN.set(row, parseFloat(style.height) || 0);
 		const done = () => {
@@ -92,9 +92,9 @@ export const Motion = {
 			return null;
 		}
 		const style = getComputedStyle(row);
-		const full = { height: style.height, marginTop: style.marginTop, marginBottom: style.marginBottom };
+		const full = { height: style.height, minHeight: style.minHeight, marginTop: style.marginTop, marginBottom: style.marginBottom };
 		row.style.overflow = "hidden";
-		const folded = { height: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" };
+		const folded = { height: "0px", minHeight: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" };
 		const leaving = fade
 			? row.animate(
 					[
