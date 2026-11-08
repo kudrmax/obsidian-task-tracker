@@ -53,11 +53,11 @@ struct TaskMenu {
             children = menu.statuses.map(status)
         case "levels":
             children = menu.levels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: tile.on ? "flag.fill" : "flag", tint: tile.mark.color, checked: tile.on, disabled: menu.levels.disabled) { Task { await model.togglePriority(items, tile.mark.title) } }
+                .action(title: tile.mark.title, symbol: "flag.fill", tint: tile.mark.color, checked: tile.on, disabled: menu.levels.disabled) { Task { await model.togglePriority(items, tile.mark.title) } }
             }
         case "labels":
             children = menu.labels.tiles.map { tile in
-                .action(title: tile.mark.title, symbol: tile.on ? "tag.fill" : "tag", tint: tile.mark.color, checked: tile.on, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
+                .action(title: model.labelTitle(tile.mark.title), symbol: "tag.fill", tint: tile.mark.color, checked: tile.on, disabled: menu.labels.disabled) { Task { await model.toggleLabel(items, tile.mark.title) } }
             }
         case "moves":
             children = menu.moves.map { move in

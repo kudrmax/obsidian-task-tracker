@@ -23,14 +23,29 @@ public struct Branch: Decodable, Sendable, Hashable {
     }
 }
 
-/// A card as a column draws it: its task, how deep it stands, the corner, and its colour.
+/// How a card is coloured: the shades of each of its colours (`TaskItem.colors`, `rules.shadesOf`), the first tinting its
+/// dot and corner; a card of several labels is painted with every one of them, as stripes or, with `blend`, one colour
+/// flowing into the next (the settings' `labelPaint`).
+public struct CardPaint: Sendable, Hashable {
+    public let colors: [Themed<Shades>]
+    public let blend: Bool
+
+    public init(colors: [Themed<Shades>], blend: Bool) {
+        self.colors = colors
+        self.blend = blend
+    }
+}
+
+/// A card as a column draws it: its task, how deep it stands, the corner, and its colours.
 public struct BoardCard: Sendable, Hashable, Identifiable {
     public let item: TaskItem
     public let level: Int
     public let branch: Branch?
     public let due: DueLabel?
     public let repeats: Bool
-    public let shades: Themed<Shades>?
+    public let paint: CardPaint?
+    /// The first colour's shades: the card's tint, its dot's and its corner's.
+    public var shades: Themed<Shades>? { paint?.colors.first }
     /// On the timeline, the corner's two lines (`stackCorner`): the start a stacked card is put on, or the duration of one
     /// shorter than it; nil for neither, and on a list's card.
     public let corner: [String]?
@@ -41,7 +56,7 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
     /// The card goes by `id`: its own, or its task's.
     public func names(_ id: String) -> Bool { self.id == id || item.id == id }
 
-    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, shades: Themed<Shades>?, corner: [String]? = nil, id: String? = nil) {
+    public init(item: TaskItem, level: Int, branch: Branch?, due: DueLabel?, repeats: Bool, paint: CardPaint?, corner: [String]? = nil, id: String? = nil) {
         self.id = id ?? item.id
         self.corner = corner
         self.item = item
@@ -49,7 +64,7 @@ public struct BoardCard: Sendable, Hashable, Identifiable {
         self.branch = branch
         self.due = due
         self.repeats = repeats
-        self.shades = shades
+        self.paint = paint
     }
 }
 
@@ -274,6 +289,12 @@ public struct BoardSnapshot: Sendable {
 }
 
 extension TaskBoard {
+    /// How a card of several labels is painted, as the settings say (`screenSettings.get().labelPaint`): `blend`, or the
+    /// stripes.
+    func labelPaint(over files: BoardFiles) throws -> String? {
+        try read("screenSettings.get", over: files)["labelPaint"].string
+    }
+
     /// The screen for `day` (`nil`: today) over the vault's files as they are now.
     public func snapshot(day wanted: String?, measures: TimelineMeasures, now: Date = Date()) throws -> BoardSnapshot {
         let files = try files(now: now)
@@ -282,7 +303,7 @@ extension TaskBoard {
         let screen: ScreenView = try read("tasks.screen", [.string(day)], over: files)
         let relation: String = try read("days.relation", [.string(day)], over: files)
         let dayTitle: String = try readRule("rules.dayTitle", [.string(day), .string(relation), .string(today)])
-        var painter = Painter(board: self)
+        var painter = Painter(board: self, blend: try labelPaint(over: files) == "blend")
 
         func list(_ column: BoardColumn, _ items: [TaskItem], title: String) throws -> BoardList {
             let sections: ColumnSections? = try read("tasks.columnSections", [.string(column.rawValue), .string(day)], over: files)
@@ -344,7 +365,7 @@ extension TaskBoard {
                 branch: try readRule("rules.branchOf", [levels, .number(Double(index))]),
                 due: try due?.date.map { try painter.due($0) },
                 repeats: due?.repeats ?? false,
-                shades: try row.item.colors.first.map { try painter.shades($0) },
+                paint: try painter.paint(row.item),
                 id: painter.identity(row.item))
         }
     }
@@ -371,7 +392,7 @@ extension TaskBoard {
         let slots = try zip(shown, boxes).map { pair, box -> BoardSlot in
             let start = pair.0.slot?.start ?? pair.1.start
             let corner = try self.corner(box, start: start, pair.1.start, pair.1.end)
-            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, shades: try pair.0.colors.first.map { try painter.shades($0) }, corner: corner, id: painter.identity(pair.0))
+            let card = BoardCard(item: pair.0, level: 0, branch: nil, due: nil, repeats: false, paint: try painter.paint(pair.0), corner: corner, id: painter.identity(pair.0))
             return BoardSlot(card: card, start: pair.1.start, end: pair.1.end, slotStart: start, box: box)
         }
         let now: Int? = day == today ? try read("boundary.offsetOf", [.string(day), .number((files.now.timeIntervalSince1970 * 1000).rounded())], over: files) : nil
@@ -397,7 +418,7 @@ extension TaskBoard {
         let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, paint: old.paint, corner: try corner(box, start: slot.slotStart, slot.start, slot.end), id: old.id)
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }
@@ -463,6 +484,7 @@ extension TaskBoard {
 /// The core's paints, each asked for once per drawing.
 struct Painter {
     let board: TaskBoard
+    let blend: Bool
     private var shadesByColor: [String: Themed<Shades>] = [:]
     private var dueByDate: [String: DueLabel] = [:]
     private var seen: [String: Int] = [:]
@@ -475,8 +497,14 @@ struct Painter {
         return count == 0 ? line : "\(line)#\(count)"
     }
 
-    init(board: TaskBoard) {
+    init(board: TaskBoard, blend: Bool) {
         self.board = board
+        self.blend = blend
+    }
+
+    /// A task's card colours: none without a priority or a label.
+    mutating func paint(_ item: TaskItem) throws -> CardPaint? {
+        item.colors.isEmpty ? nil : CardPaint(colors: try item.colors.map { try shades($0) }, blend: blend)
     }
 
     mutating func shades(_ color: String) throws -> Themed<Shades> {

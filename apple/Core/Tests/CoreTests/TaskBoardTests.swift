@@ -43,6 +43,19 @@ import Testing
         #expect(menu.edits.contains("subtask"))
     }
 
+    @Test func aCardOfSeveralLabelsCarriesEachColourInTheSettingsOrder() throws {
+        let vault = FakeVault(Self.file.replacingOccurrences(of: "- [ ] Idea", with: "- [ ] Idea #label/Quick #label/Calm\n- [ ] Plain #label/Calm"))
+        vault.settings = #"{"labels":[{"name":"Calm","color":"blue"},{"name":"Quick","color":"green"}]}"#
+        let snapshot = try board(vault).snapshot(day: nil, measures: TimelineMeasures(hour: 56, cardHeight: 35, cardGap: 2, itemInset: 1, itemGap: 2, overlayInset: 18), now: Fixtures.date(6, 10))
+        let cards = try #require(snapshot.lists[.inbox]).cards
+        let blue = try board(vault).rule("rules.shadesOf", ["blue", "dark"], as: Shades.self)
+        let green = try board(vault).rule("rules.shadesOf", ["green", "dark"], as: Shades.self)
+        let idea = try #require(cards.first { $0.item.title == "Idea" }?.paint)
+        #expect(idea.colors.map(\.dark) == [blue, green])
+        #expect(!idea.blend)
+        #expect(cards.first { $0.item.title == "Plain" }?.paint?.colors.count == 1)
+    }
+
     @Test func aSwipeOnTheCalendarLeadsWhereTheCoreSays() throws {
         let board = board(FakeVault(Self.file))
         let files = board.settingsOnly(now: Fixtures.date(6, 10))

@@ -282,7 +282,7 @@ final class QuickEntryHost {
 
     /// A label's name as the screen shows it.
     func labelTitle(_ name: String) -> String {
-        model?.ruleNow("rules.labelTitle", [.string(name)]) ?? name
+        model?.labelTitle(name) ?? name
     }
 
     // MARK: The door

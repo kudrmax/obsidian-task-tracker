@@ -142,7 +142,7 @@ struct ListColumn: View {
             let branch = level > 0 ? branches[safe: at] ?? nil : nil
             switch row {
             case .card(let card) where card.branch != branch:
-                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, shades: card.shades, corner: card.corner, id: card.id))
+                return .card(BoardCard(item: card.item, level: card.level, branch: branch, due: card.due, repeats: card.repeats, paint: card.paint, corner: card.corner, id: card.id))
             case .gap: return .gap(level: level, branch: branch)
             case .pending(let index, let text, _, _): return .pending(index: index, text: text, level: level, branch: branch)
             case .field(_, _, let section): return .field(level: level, branch: branch, section: section)

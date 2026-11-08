@@ -9,8 +9,12 @@ struct TaskCapsule: View {
     var picked = false
     var ringed = false
     var height: CGFloat = CardMetrics.height
+    /// The copy over a menu: the title wraps instead of fading, and the card grows down to hold its lines.
+    var whole = false
     /// Where the subtask counter is drawn, in the capsule's own space: the card lays its fold button there.
     var onCounter: ((CGRect) -> Void)?
+    /// Where the title's room is, in the capsule's own space: the menu's copy grows by what the title lacks of it.
+    var onTitle: ((CGRect) -> Void)?
 
     @Environment(\.colorScheme) private var scheme
 
@@ -19,21 +23,22 @@ struct TaskCapsule: View {
     private var onTimeline: Bool { card.corner != nil || height != CardMetrics.height }
 
     var body: some View {
-        HStack(alignment: onTimeline ? .top : .center, spacing: 6) {
+        HStack(alignment: onTimeline || whole ? .top : .center, spacing: 6) {
             if selecting { pickCircle }
-            // The title never widens the card: it runs on past the room and fades out over its last points.
-            Color.clear
-                .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 18)
-                .overlay(alignment: .leading) {
-                    Text(card.item.text)
-                        .font(.system(size: CardMetrics.title))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
-                        .strikethrough(card.item.closed, color: Palette.muted)
-                }
-                .mask(fadeMask)
-                .accessibilityElement(children: .combine)
+            if whole {
+                // The copy over a menu shows the whole title, on as many lines as the width it was given needs.
+                title
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, alignment: .leading)
+            } else {
+                // The title never widens the card: it runs on past the room and fades out over its last points.
+                Color.clear
+                    .frame(maxWidth: .infinity, minHeight: CardMetrics.titleLine, maxHeight: CardMetrics.titleLine)
+                    .overlay(alignment: .leading) { title.lineLimit(1).fixedSize() }
+                    .mask(fadeMask)
+                    .accessibilityElement(children: .combine)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onTitle?($0) }
+            }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
             if let due = card.due {
@@ -44,9 +49,10 @@ struct TaskCapsule: View {
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .padding(.top, onTimeline ? (CardMetrics.height - 18) / 2 : 0)
-        .frame(maxWidth: .infinity, minHeight: CardMetrics.height, maxHeight: onTimeline ? .infinity : CardMetrics.height, alignment: onTimeline ? .top : .center)
-        .frame(height: max(height, CardMetrics.height), alignment: .top)
+        .padding(.top, onTimeline || whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : 0)
+        .padding(.bottom, whole ? (CardMetrics.height - CardMetrics.titleLine) / 2 : 0)
+        .frame(maxWidth: .infinity, minHeight: max(height, CardMetrics.height), maxHeight: onTimeline || whole ? .infinity : CardMetrics.height, alignment: onTimeline || whole ? .top : .center)
+        .frame(height: whole ? nil : max(height, CardMetrics.height), alignment: .top)
         .background(alignment: .topLeading) {
             if card.item.inProgress, !selecting {
                 Circle().fill(metaInk(shades)).frame(width: 4, height: 4)
@@ -54,12 +60,13 @@ struct TaskCapsule: View {
                     .accessibilityLabel("In progress")
             }
         }
-        .background(fill, in: .rect(cornerRadius: CardMetrics.radius))
+        .background { ground.clipShape(.rect(cornerRadius: CardMetrics.radius)) }
         .background(alignment: .bottom) {
             // Its subtasks folded away: a card peeking out under it.
             if card.item.collapsed {
-                RoundedRectangle(cornerRadius: CardMetrics.radius)
-                    .fill(fill.opacity(0.55))
+                ground
+                    .opacity(0.55)
+                    .clipShape(.rect(cornerRadius: CardMetrics.radius))
                     .frame(height: CardMetrics.height)
                     .padding(.horizontal, 8)
                     .offset(y: 4)
@@ -72,6 +79,13 @@ struct TaskCapsule: View {
         }
         .contentShape(.rect(cornerRadius: CardMetrics.radius))
         .coordinateSpace(.named(Self.space))
+    }
+
+    private var title: Text {
+        Text(card.item.text)
+            .font(.system(size: CardMetrics.title))
+            .foregroundStyle(card.item.closed ? Palette.muted : Color.primary)
+            .strikethrough(card.item.closed, color: Palette.muted)
     }
 
     /// The subtask counter over the description's mark, as the plugin stacks them; either alone when the task has only it.
@@ -135,6 +149,15 @@ struct TaskCapsule: View {
 
     private var shades: Shades? { card.shades.map { scheme == .dark ? $0.dark : $0.light } }
     private var fill: Color { shades.map { Color(hex: $0.fill) } ?? Palette.card(scheme) }
+
+    /// The card's ground: its one colour, or, for several labels, each one's fill as stripes or a blend.
+    @ViewBuilder private var ground: some View {
+        if let paint = card.paint, let fills = LabelFills(paint, scheme) {
+            fills
+        } else {
+            Rectangle().fill(fill)
+        }
+    }
     private var metaColor: Color { metaInk(shades) }
     private func metaInk(_ shades: Shades?) -> Color { shades.map { Color(hex: $0.meta) } ?? Palette.muted }
 
@@ -162,6 +185,53 @@ struct TaskCapsule: View {
         }
         .frame(width: 20, height: 20)
         .accessibilityLabel(picked ? "Selected" : "Not selected")
+    }
+}
+
+/// A card of several labels, painted as the plugin paints it (`styles.css`, «A task with several labels»): narrow bands
+/// of their fills in turn across the card at a slant, or, with the settings' blend, one fill flowing into the next from
+/// left to right. The plugin paints up to four.
+struct LabelFills: View {
+    let fills: [Color]
+    let blend: Bool
+
+    /// A band's width across (`--tc-label-stripe`) and the slant, as CSS turns a gradient (`--tc-label-stripe-angle`).
+    static let stripe: CGFloat = 6
+    static let angle: Angle = .degrees(120)
+    static let most = 4
+
+    init?(_ paint: CardPaint, _ scheme: ColorScheme) {
+        guard paint.colors.count > 1 else { return nil }
+        fills = paint.colors.prefix(Self.most).map { Color(hex: scheme == .dark ? $0.dark.fill : $0.light.fill) }
+        blend = paint.blend
+    }
+
+    var body: some View {
+        if blend {
+            LinearGradient(colors: fills, startPoint: .leading, endPoint: .trailing)
+        } else {
+            Canvas { context, size in
+                // CSS measures a gradient's stops along its line from the corner it starts at: for this slant the
+                // top left, the bands square to the line.
+                let along = CGVector(dx: sin(Self.angle.radians), dy: -cos(Self.angle.radians))
+                let across = CGVector(dx: -along.dy, dy: along.dx)
+                let reach = size.width + size.height
+                let length = size.width * along.dx + size.height * along.dy
+                var band = 0
+                while CGFloat(band) * Self.stripe < length {
+                    // Each band reaches a hair into the next, which covers it: no seam of the ground between them.
+                    let near = CGFloat(band) * Self.stripe, far = near + Self.stripe + 0.5
+                    var path = Path()
+                    path.move(to: CGPoint(x: along.dx * near - across.dx * reach, y: along.dy * near - across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * near + across.dx * reach, y: along.dy * near + across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * far + across.dx * reach, y: along.dy * far + across.dy * reach))
+                    path.addLine(to: CGPoint(x: along.dx * far - across.dx * reach, y: along.dy * far - across.dy * reach))
+                    path.closeSubpath()
+                    context.fill(path, with: .color(fills[band % fills.count]))
+                    band += 1
+                }
+            }
+        }
     }
 }
 

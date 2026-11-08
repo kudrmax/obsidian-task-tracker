@@ -1022,6 +1022,11 @@ final class BoardModel {
         if let url = link.url { await UIApplication.shared.open(url) }
     }
 
+    /// A label's name as the screen shows it (`rules.labelTitle`): the tag's underscores read as spaces.
+    func labelTitle(_ name: String) -> String {
+        ruleNow("rules.labelTitle", [.string(name)]) ?? name
+    }
+
     /// A level's or a label's colour as a menu's flag draws it, in either theme.
     func ink(_ color: String, dark: Bool) -> UIColor? {
         guard let hex: String = try? board.rule("rules.inkOf", [.string(color), .string(dark ? "dark" : "light")]) else { return nil }

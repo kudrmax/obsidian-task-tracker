@@ -49,7 +49,11 @@ enum CardMetrics {
     static let leading: CGFloat = 14
     static let trailing: CGFloat = 10
     static let title: CGFloat = 15
+    /// A title's line (`--tc-leading-card`): one on a card, as many as a copy over the menu needs.
+    static let titleLine: CGFloat = 18
     static let fade: CGFloat = 12
+    /// What a copy grown over a menu keeps from the window's edges (`--tc-whole-margin`).
+    static let wholeMargin: CGFloat = 10
     static let indent: CGFloat = 20
     static let branchWidth: CGFloat = 1.5
     static let columnInset: CGFloat = 10

@@ -40,7 +40,7 @@ struct CardButton: UIViewRepresentable {
 
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
-            TaskCapsule(card: card, ringed: ringed, height: height) { [weak control] in control?.counterFrame = $0 }
+            TaskCapsule(card: card, ringed: ringed, height: height, onCounter: { [weak control] in control?.counterFrame = $0 }, onTitle: { [weak control] in control?.titleFrame = $0 })
         }
         .margins(.all, 0)
     }
@@ -108,6 +108,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var counterFrame: CGRect? {
         didSet { setNeedsLayout() }
     }
+    /// Where the capsule's title has its room: the menu's copy grows by what the title lacks of it.
+    var titleFrame: CGRect?
     private let fold = UIButton(type: .custom)
     /// Shows the menu, anchored to the card, when a tap has ended.
     private lazy var opener = MenuOpener { [weak self] in self?.menuEnded($0) }
@@ -205,12 +207,55 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
         opener.present(menu, at: point) { [weak self] in
             guard let self else { return nil }
+            if let whole = self.wholePreview() {
+                // The grown copy stands in for the card: the card itself is not seen beside it under the backdrop.
+                self.content.alpha = 0
+                return whole
+            }
             return UITargetedPreview(view: self.content, parameters: self.capsule)
         }
     }
 
+    /// The copy the menu lifts when the card cuts its title, as the plugin's: grown to the right by what the title lacks,
+    /// never wider than the window less its margins, and where it still doesn't fit, wrapped onto more lines with the
+    /// copy grown down. It stands where the card is, pulled back only as far as it takes to keep inside the margins. A
+    /// card that shows its whole title is lifted itself.
+    private func wholePreview() -> UITargetedPreview? {
+        guard let look, let window, let room = titleFrame else { return nil }
+        let text = look.card.item.text as NSString
+        let natural = text.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
+        guard natural > room.width - CardMetrics.fade else { return nil }
+        let margin = CardMetrics.wholeMargin
+        let widest = window.bounds.width - 2 * margin
+        let missing = (natural - room.width).rounded(.up)
+        let width = max(bounds.width, min(bounds.width + missing, widest))
+        let copy = UIHostingConfiguration {
+            TaskCapsule(card: look.card, height: look.height, whole: true)
+        }
+        .margins(.all, 0)
+        .makeContentView()
+        copy.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
+        let height = max(bounds.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
+        copy.frame = CGRect(x: 0, y: 0, width: width, height: height)
+        let card = convert(bounds, to: window)
+        let left = Self.grownStart(card.minX, card.width, width, window.bounds.width, margin)
+        let top = Self.grownStart(card.minY, card.height, height, window.bounds.height, margin)
+        let parameters = UIPreviewParameters()
+        parameters.visiblePath = UIBezierPath(roundedRect: copy.bounds, cornerRadius: CardMetrics.radius)
+        parameters.backgroundColor = .clear
+        return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: left + width / 2, y: top + height / 2)))
+    }
+
+    /// Where a grown copy starts on one axis (the plugin's `grownStart`): where the card did, pulled back only as far as
+    /// it takes to end inside the margin (or where the card ended, if that is further), never past the near margin.
+    private static func grownStart(_ start: CGFloat, _ size: CGFloat, _ grown: CGFloat, _ room: CGFloat, _ margin: CGFloat) -> CGFloat {
+        let end = max(start + size, room - margin)
+        return max(min(start, margin), min(start, end - grown))
+    }
+
     /// A row that opens a sheet or a page runs once the menu has gone.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
+        if let animator { animator.addCompletion { [weak self] in self?.content.alpha = 1 } } else { content.alpha = 1 }
         guard let run = afterMenu else { return }
         afterMenu = nil
         // As the menu starts to go, not when its animation ends: the animator completes about a second later.
@@ -231,6 +276,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The capsule itself is lifted: from an open menu the system turns the menu's preview, this capsule, into the carried
     /// card, and only a lift of the same view lets the menu give way to the drag.
     func dragInteraction(_ interaction: UIDragInteraction, previewForLifting item: UIDragItem, session: UIDragSession) -> UITargetedDragPreview? {
+        // Lifted from a menu that showed a grown copy instead: the capsule shows again to be carried.
+        content.alpha = 1
         let parameters = UIDragPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: content.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
@@ -248,6 +295,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     func dragInteraction(_ interaction: UIDragInteraction, sessionAllowsMoveOperation session: UIDragSession) -> Bool { true }
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
+        content.alpha = 1
         home = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
         onCarry(grab)
     }
