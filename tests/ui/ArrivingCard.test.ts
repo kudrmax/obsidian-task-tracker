@@ -25,6 +25,17 @@ describe("ArrivingCard", () => {
 		expect(other.classList.contains("is-arriving")).toBe(false);
 	});
 
+	it("hides the dropped task's card in a drawing made while its drop is still being written, known by its id", () => {
+		const arriving = new ArrivingCard();
+		const item = { ...task("- [ ] A", 3), id: "t7" } as TaskItem;
+		arriving.dropping(item);
+		const card = drawn();
+		arriving.attach(card, { ...task("- [ ] A moved", 0), id: "t7" } as TaskItem);
+		expect(card.classList.contains("is-arriving")).toBe(true);
+		arriving.expect(key("- [ ] A moved", 0));
+		expect(arriving.shown).toBe(card);
+	});
+
 	it("follows a redraw while the float flies: the new card is the one hidden and given", () => {
 		const arriving = new ArrivingCard();
 		arriving.expect(key("- [ ] A"));

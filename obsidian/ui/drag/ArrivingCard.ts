@@ -9,17 +9,29 @@ const ARRIVING = "is-arriving";
  */
 export class ArrivingCard {
 	private id: string | null = null;
+	/** The dropped task's identity (`TaskItem.id`), known before the write: a drawing made while it is written hides its card too. */
+	private task: string | null = null;
 	private card: HTMLElement | null = null;
+
+	/** The task dropped, before its drop is written: every card drawn for it from now on waits for the float. */
+	dropping(item: TaskItem): void {
+		this.arrived();
+		this.task = item.id;
+	}
 
 	/** The task the drop gave, as the file now has it; null when it gave none. */
 	expect(key: TaskKey | null): void {
-		this.arrived();
+		const task = this.task;
+		const card = this.card;
 		this.id = key && keyId(key);
+		this.task = task;
+		this.card = card?.isConnected ? card : null;
 	}
 
 	/** A card drawn for `item`: hidden while it is the expected task's. */
 	attach(card: HTMLElement, item: TaskItem): void {
-		if (this.id === null || keyId(item.key) !== this.id) return;
+		const expected = (this.id !== null && keyId(item.key) === this.id) || (this.task !== null && item.id === this.task);
+		if (!expected) return;
 		if (this.card?.isConnected && this.card !== card) return;
 		card.classList.add(ARRIVING);
 		this.card = card;
@@ -35,5 +47,6 @@ export class ArrivingCard {
 		this.card?.classList.remove(ARRIVING);
 		this.card = null;
 		this.id = null;
+		this.task = null;
 	}
 }

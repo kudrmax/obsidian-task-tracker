@@ -21,6 +21,8 @@ export class Overlay {
 	private ending: Promise<void> | null = null;
 	/** Every part has left the page. */
 	private gone = false;
+	/** Parts faded away while the overlay stays: showing it shows them no more. */
+	private readonly retired = new Set<HTMLElement>();
 	/** Escape closes this and nothing else: Obsidian would otherwise take it as a step back. */
 	private readonly onKey = (e: KeyboardEvent) => {
 		if (e.key !== "Escape") return;
@@ -79,7 +81,7 @@ export class Overlay {
 
 	show(): void {
 		(this.doc.defaultView ?? window).requestAnimationFrame(() => {
-			if (this.ending === null) this.all().forEach((part) => part.classList.add(SHOWN));
+			if (this.ending === null) this.all().forEach((part) => part.classList.toggle(SHOWN, !this.retired.has(part)));
 		});
 	}
 
@@ -115,6 +117,7 @@ export class Overlay {
 
 	/** One part fades out and stays away, the rest of the overlay open: a menu's panel giving its room to a field. */
 	retire(part: HTMLElement): void {
+		this.retired.add(part);
 		part.classList.add(CLOSING);
 		part.classList.remove(SHOWN);
 		part.style.pointerEvents = "none";

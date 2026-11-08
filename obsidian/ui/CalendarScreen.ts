@@ -908,6 +908,7 @@ export class CalendarScreen extends Component {
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
 	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null> {
 		this.bulk.dropping(drag);
+		this.arriving.dropping(drag.item);
 		await this.act(async () => this.arriving.expect((await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate))[0] ?? null));
 		return this.arriving.shown;
 	}
