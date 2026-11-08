@@ -3114,8 +3114,13 @@ ${key.title}`.toLowerCase();
         place,
         places: placeChoices(place),
         repeatable: task && run.spot.kind !== "slot",
-        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today())
+        repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
+        renamed: this.renamed
       };
+    }
+    /** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
+    get renamed() {
+      return this.session.jobs.flatMap((job) => job.kind === "rename" ? [{ id: job.item.id, key: job.item.key, text: job.draft.text, title: plainText(job.draft.text) }] : []);
     }
     /** The renamed task, whose card every list hides while the rename is open, wherever the field stands (§4.8). */
     get renaming() {
@@ -6324,7 +6329,7 @@ ${key.title}`.toLowerCase();
         const [id, created, coming] = args;
         entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
       } else value = entry[name](...args);
-      return { session: entry.session, state: entry.state, changes, jobs, value: value === void 0 ? null : value };
+      return { session: entry.session, state: entry.state, changes, jobs, value: value === void 0 ? null : value, renamed: entry.renamed };
     };
   }
   var ENTRY = Object.fromEntries([...ENTRY_METHODS, "state", "renaming", "shown"].map((name) => [name, entryCall(name)]));

@@ -519,6 +519,26 @@ describe("QuickEntrySession", () => {
 		expect(tasks.created).toEqual([]);
 	});
 
+	it("a rename entered and not yet written tells the task's id and its new text, in the state and without a field", async () => {
+		const tasks = new FakeTasks(["A", "B"]);
+		const entry = tasks.entry();
+		const gate = deferred();
+		tasks.gate = gate.promise;
+		const a = item("A");
+		entry.open(at(0), a);
+		entry.type("A2 [[Mom]]");
+		entry.enter();
+		const renamed = [{ id: a.id, key: a.key, text: "A2 [[Mom]]", title: "A2 Mom" }];
+		expect(entry.state?.renamed).toEqual(renamed);
+		expect(entry.renamed).toEqual(renamed);
+		entry.escape();
+		expect(entry.state).toBeNull();
+		expect(entry.renamed).toEqual(renamed);
+		gate.resolve();
+		await entry.idle();
+		expect(entry.renamed).toEqual([]);
+	});
+
 	it("a rename sends no rule when the bar's rule is the task's own: anchored or not, weekdays in any order", async () => {
 		const tasks = new FakeTasks(["A"]);
 		const entry = tasks.entry();

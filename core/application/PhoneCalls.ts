@@ -40,7 +40,7 @@ import { acceptsDrop, placesInGap } from "./drops";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
-import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
+import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, type PendingRename, QuickEntry } from "./QuickEntry";
 import { sectionNameEnd } from "./SectionNameEntry";
 import { screenSettingsOf } from "./ScreenSettingsImpl";
 import { SettingsServiceImpl } from "./SettingsServiceImpl";
@@ -760,6 +760,8 @@ export interface EntryAnswer {
 	readonly changes: readonly { readonly state: EntryState | null; readonly drawnNext: boolean }[];
 	readonly jobs: readonly EntryJob[];
 	readonly value: unknown;
+	/** The renames entered and not yet written: each card shows its new text meanwhile (`QuickEntry.renamed`). */
+	readonly renamed: readonly PendingRename[];
 }
 
 /** The QuickEntry methods a host calls, each `[session, look, ...args]`; the rest are the jobs' life (`call`, `shown`, `unshown`, `done`). */
@@ -808,7 +810,7 @@ function entryCall(name: string): Handler {
 			const [id, created, coming] = args as [string, A, Partial<Record<DropColumn, readonly ListCard[]>>];
 			entry.shown(id, created ?? null, (column) => coming?.[column] ?? []);
 		} else value = (entry as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
-		return { session: entry.session, state: entry.state, changes, jobs, value: value === undefined ? null : value } satisfies EntryAnswer;
+		return { session: entry.session, state: entry.state, changes, jobs, value: value === undefined ? null : value, renamed: entry.renamed } satisfies EntryAnswer;
 	};
 }
 
