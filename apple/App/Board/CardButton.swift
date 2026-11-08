@@ -6,7 +6,16 @@ import UIKit
 enum Carried {
     static let plus = "\u{0}plus"
 
-    static func provider(_ id: String) -> NSItemProvider { NSItemProvider(object: id as NSString) }
+    /// The carried thing for the system's drag: of a type only this app's process knows, so no field or other app takes
+    /// it as text; the board's own drop reads what is carried from the carry, not from here.
+    static func provider(_ id: String) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: "com.kudrmax.taskcalendar.carried", visibility: .ownProcess) { done in
+            done(Data(id.utf8), nil)
+            return nil
+        }
+        return provider
+    }
 }
 
 /// A card as the design has it, behaving as Files and Podcasts' rows do: a long press lifts it and shows its menu, and
@@ -35,6 +44,8 @@ struct CardButton: UIViewRepresentable {
     var onCancel: () -> Void = {}
     /// The drag session ended, whatever came of it.
     var onEnd: () -> Void = {}
+    /// The drag session ended with a drop: the board's drop ends the carry, or, if nothing of the board took it, the board.
+    var onDropped: () -> Void = {}
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
 
@@ -71,6 +82,7 @@ struct CardButton: UIViewRepresentable {
         control.onCarry = onCarry
         control.onCancel = onCancel
         control.onEnd = onEnd
+        control.onDropped = onDropped
         control.onFold = onFold
         control.onPick = onPick
         control.draggable = draggable
@@ -87,6 +99,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var onCarry: (CGFloat) -> Void = { _ in }
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
+    var onDropped: () -> Void = {}
     var onPick: (() -> Void)?
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
@@ -325,7 +338,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }
         showsInPlace()
         // A drop's copy is still in the air when the session ends here: the drop's own animation ends the carry.
-        guard operation == .cancel || operation == .forbidden else { return }
+        guard operation == .cancel || operation == .forbidden else { return onDropped() }
         onEnd()
     }
 

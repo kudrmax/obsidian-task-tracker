@@ -383,21 +383,25 @@ extension TaskBoard {
         return BoardTimeline(hours: hours, events: placed, allDay: allDay, slots: slots, now: now, opening: opening.minute, pastPaint: past, zoomLevels: zoom.map(\.hourPx))
     }
 
-    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?) throws -> [String]? {
+    private func corner(_ box: StackBox, start: Int, _ shownStart: Int, _ shownEnd: Int?, pure: Bool = false) throws -> [String]? {
         let span: JSONValue = ["start": .number(Double(shownStart)), "end": shownEnd.map { .number(Double($0)) } ?? .null]
         let flags: JSONValue = ["stacked": .bool(box.stacked), "hiddenDuration": .bool(box.hiddenDuration)]
-        return try readRule("rules.stackCorner", [flags, .number(Double(start)), span])
+        let arguments: [JSONValue] = [flags, .number(Double(start)), span]
+        return try pure ? rule("rules.stackCorner", arguments) : readRule("rules.stackCorner", arguments)
     }
 
     /// The timeline's task cards stacked anew at another hour's height (a pinch), each with its corner as it then stands.
-    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures) throws -> [BoardSlot] {
+    /// `pure`: on the pure rules' context, for the main thread, which must never wait for a read made meanwhile on the
+    /// reading core; a read's own thread lays out on that core.
+    public func stack(_ timeline: BoardTimeline, measures: TimelineMeasures, pure: Bool = false) throws -> [BoardSlot] {
         guard !timeline.slots.isEmpty else { return [] }
         let taskSpans = JSONValue.array(timeline.slots.map { ["start": .number(Double($0.start)), "end": $0.end.map { .number(Double($0)) } ?? .null] })
         let eventSpans = JSONValue.array(timeline.events.map { ["start": .number(Double($0.start)), "end": .number(Double($0.end)), "level": .number(Double($0.level))] })
-        let boxes: [StackBox] = try readRule("rules.stackTasks", [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets])
+        let arguments: [JSONValue] = [taskSpans, eventSpans, .number(measures.hour), measures.card, measures.insets]
+        let boxes: [StackBox] = try pure ? rule("rules.stackTasks", arguments) : readRule("rules.stackTasks", arguments)
         return try zip(timeline.slots, boxes).map { slot, box in
             let old = slot.card
-            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end))
+            let card = BoardCard(item: old.item, level: 0, branch: nil, due: nil, repeats: false, shades: old.shades, corner: try corner(box, start: slot.slotStart, slot.start, slot.end, pure: pure))
             return BoardSlot(card: card, start: slot.start, end: slot.end, slotStart: slot.slotStart, box: box)
         }
     }

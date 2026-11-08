@@ -355,7 +355,8 @@ every condition that changes the layout is animated by the transaction that chan
     card found by id even when another write (Sync, a reminder's button, a drop) moved its key before the drawing.
 38. **iPhone, R10: a row folds by its own height** (`FoldAway`): the row's layout height goes to and from nothing with its
     content cut at the bottom, so the rows below move by exactly what shows of it, one row or a block (a section unfolding
-    after its drop, subtasks folding). At rest nothing of a row is cut. The cut is a shape, never a view builder: SwiftUI
+    after its drop, subtasks folding), and the list's gap after it folds with it (a margin down to minus the gap, as the
+    plugin's `Motion` margins). At rest nothing of a row is cut. The cut is a shape, never a view builder: SwiftUI
     runs a transition off the main thread, where a main-actor closure traps (Done on a subtask crashed the app).
 39. **iPhone, R10: what one row holds changes in place.** A list's row folds when it comes or goes; its content changing
     (a card and the rename field that takes its id, decision 14) is drawn in the same frame, as the plugin's decision 29.
@@ -369,7 +370,9 @@ every condition that changes the layout is animated by the transaction that chan
 42. **iPhone, R7: the drop's end belongs to the drop.** The card's own drag session ends a carry only when cancelled
     (its copy is home); the screen's drop session ends one only when a place took the drop, or for a section, whose lift
     has no end of its own. The drawing that writes a drop puts the dropped card in its new place without a slide
-    (`placedByDrop`): its copy flies there.
+    (`placedByDrop`): its copy flies there. A drop nothing of the board took ends the carry when the card's session ends,
+    as a carry let go on no place: every carry ends exactly once. What is carried is of a type only the app's process
+    knows, so no text field takes a card or a section as text.
 43. **iPhone, R7: a section's copy folds shut onto the room it opens** as it lands (the drop preview's target scales it
     to a line): the system keeps a drop's copy on screen until its animator ends, and a section's copy does not look like
     its header.
@@ -391,8 +394,9 @@ every condition that changes the layout is animated by the transaction that chan
     sliding; a row grows from and folds to nothing past its own `min-height`. A section's copy lands folding shut from its
     top onto the line its section opens from. A card or block of a task in `QuickEntrySession.renamed` draws that entry's
     text until the write is drawn, so Enter in Rename never shows the old title (`TaskList`/`Timeline` `renamed`).
-48. **iPhone, R4/R5: a menu asks on its own page.** Won't Do and Delete open a page of the same menu (a submenu: the
-    question over its red answer), as the plugin's menu does; Delete's row is red. No dialog is presented after the
+48. **iPhone, R4/R5: a menu asks on its own page.** Won't Do, Stop and Delete open a page of the same menu (a
+    submenu: the question over its answer), as the plugin's menu does; as there, only Delete is red, its row and its
+    answer. No dialog is presented after the
     menu, which iOS holds until the menu's dismissal has ended (a second). The bulk bar's Done, outside a menu, keeps
     its dialog.
 49. **iPhone, R8: a field takes the keyboard in the gesture that opens it, before the drawing that opens its row.**

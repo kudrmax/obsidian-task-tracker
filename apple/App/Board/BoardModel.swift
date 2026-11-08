@@ -751,6 +751,15 @@ final class BoardModel {
         carryLanded()
     }
 
+    /// A card's drag session ended with a drop. The board's own drop let the carry go when it took the drop, and its
+    /// animation ends it; a drop nothing of the board took (another app's view, a field) ends it here, as a carry
+    /// let go on no place: every carry ends exactly once.
+    func carryDropped() {
+        guard carry != nil, ending == nil else { return }
+        letGo(writes: false)
+        carryLanded()
+    }
+
     /// The screen's drop session ended. Not dropped, a card's copy is still flying home: its card ends the carry once it
     /// is there. A section's lift has no end of its own, so its carry ends here.
     private func dropSessionEnded(performed: Bool) {
@@ -1153,7 +1162,7 @@ final class BoardModel {
     /// so no frame shows the scaled guess (a block a frame taller). A pinch asks on every frame and keeps to `layOut`.
     private func layOutNow(_ timeline: BoardTimeline) {
         guard let hour = zoom.hour, abs(Double(hour) - CardMetrics.timeline.hour) >= 0.5 else { return }
-        if let slots = try? board.stack(timeline, measures: Self.measures(hour)) {
+        if let slots = try? board.stack(timeline, measures: Self.measures(hour), pure: true) {
             laidOut = Laid(timeline: timeline, hour: hour, slots: slots)
         }
     }
