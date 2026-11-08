@@ -121,10 +121,10 @@ export const Motion = {
 	slide(row: HTMLElement, from: DOMRect, duration: DurationToken = DURATION.collapse): void {
 		const timing = timingOf(row, duration);
 		if (!timing) return;
+		SLIDES.get(row)?.cancel();
 		const to = row.getBoundingClientRect();
 		const dx = from.left - to.left;
 		const dy = from.top - to.top;
-		SLIDES.get(row)?.cancel();
 		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
 		SLIDES.set(row, row.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], timing));
 	},
@@ -139,9 +139,9 @@ export const Motion = {
 	reshape(node: HTMLElement, from: Box, duration: DurationToken = DURATION.collapse): void {
 		const timing = timingOf(node, duration);
 		if (!timing) return;
+		SLIDES.get(node)?.cancel();
 		const to = boxOf(node);
 		if (Math.abs(to.top - from.top) < 0.5 && Math.abs(to.left - from.left) < 0.5 && Math.abs(to.height - from.height) < 0.5) return;
-		SLIDES.get(node)?.cancel();
 		RESHAPED.set(node, to);
 		SLIDES.set(node, node.animate([{ top: px(from.top), left: px(from.left), height: px(from.height) }, { top: px(to.top), left: px(to.left), height: px(to.height) }], timing));
 	},

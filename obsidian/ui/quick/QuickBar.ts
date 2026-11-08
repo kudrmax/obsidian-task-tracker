@@ -181,12 +181,13 @@ export class QuickBar implements EntryPart {
 		this.leaving?.cancel();
 		this.leaving = null;
 		this.bar.hidden = false;
+		this.bar.style.pointerEvents = this.mode.style.pointerEvents = "";
 		if (this.deps.desktop()) for (const part of [this.bar, this.mode]) Motion.appear(part, DURATION.menu);
 	}
 
 	/** They fade out on the desktop and only then leave the page; on the phone the bar goes with the keyboard. */
 	private goOut(): void {
-		if (this.bar.hidden) return;
+		if (this.bar.hidden || this.leaving) return;
 		const gone = () => {
 			this.leaving = null;
 			this.bar.hidden = true;
@@ -200,11 +201,11 @@ export class QuickBar implements EntryPart {
 		const fade = (part: HTMLElement) => part.animate([{ opacity: "1" }, { opacity: "0" }], { ...timing, fill: "forwards" });
 		const bar = fade(this.bar);
 		const mode = fade(this.mode);
-		this.leaving = { cancel: () => [bar, mode].forEach((a) => a.cancel()) };
+		const leaving = { cancel: () => [bar, mode].forEach((a) => a.cancel()) };
+		this.leaving = leaving;
 		bar.addEventListener("finish", () => {
-			if (this.leaving === null) return;
-			[bar, mode].forEach((a) => a.cancel());
-			gone();
+			leaving.cancel();
+			if (this.leaving === leaving) gone();
 		});
 	}
 
