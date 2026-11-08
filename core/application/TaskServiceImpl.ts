@@ -11,6 +11,7 @@ import {
 	type DaySpan,
 	type DayView,
 	type DraftMarks,
+	type CreatedTask,
 	type DroppedTask,
 	type DropLanding,
 	type DropOrigin,
@@ -201,6 +202,10 @@ export class TaskServiceImpl implements TaskService {
 
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
 		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels));
+	}
+
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {

@@ -118,6 +118,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "createInPlace", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
 	{ method: "createInPlace", args: (s) => ["Sub", null, { kind: "subtask", parent: key(s, "Parent"), before: null }] },
 	{ method: "createInPlace", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
+	{ method: "createWithId", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
+	{ method: "createWithId", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
 	{ method: "create", args: () => [{ text: "Drafted", placement: { kind: "soon" }, priority: null }] },
 	{ method: "create", args: () => [{ text: "Slotted", placement: { kind: "now" }, priority: null }, { date: T, start: 900, end: 960 }] },
 	{ method: "createSubtask", args: (s) => [key(s, "Parent"), { text: "Under", placement: { kind: "now" }, priority: null }] },
@@ -630,7 +632,8 @@ describe("the door's quick entry", () => {
 		expect(entered.state).toMatchObject({ text: "", pending: [{ text: "Buy milk" }] });
 		const [job] = entered.jobs;
 		expect(step("call", job.id).value).toEqual({ method: "createInPlace", args: ["Buy milk", null, { kind: "day", date: T, group: null, before: null }, null, []] });
-		const shown = step("shown", job.id, null, { day: [] });
+		const made = { key: { section: "now", index: 0, path: [], raw: "- [ ] Buy milk" }, id: "t9" };
+		const shown = step("shown", job.id, made, { day: [{ key: made.key, id: made.id, level: 0, group: null }] });
 		expect(shown.state?.pending).toEqual([]);
 		step("done", job.id);
 		expect((answer.result as { session: { jobs: unknown[] } }).session.jobs).toEqual([]);

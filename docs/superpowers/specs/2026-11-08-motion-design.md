@@ -335,6 +335,14 @@ every condition that changes the layout is animated by the transaction that chan
     line tagged by its line, then tidied, which carries those tags wherever it moves the lines; the reading is matched to
     the kept ids (also a reading), and the text's lines get the ids their tags found. The file read raw or tidied gives
     the same ids. The plugin's service did not show it (its tidying is a real write), and reads the same way now.
+36. **Backend, R1: a task made is named by its id too.** `createInPlace`'s key names the new task only as the file stands
+    right after its write; a write before the screen draws moves it. Added, nothing changed: `TaskService.createWithId`
+    (`tasks.createWithId` through the door), the same arguments and write as `createInPlace`, answering `CreatedTask`
+    `{ key, id }` or null; `ListCard.id` (optional): a card given its task's id is found by it; `QuickEntry.shown` takes
+    the `CreatedTask` too, and then finds the typed task's card by id. `createInPlace` and `entry.shown` with a key
+    answer as before. To use it, a frontend calls `createWithId` where it calls `createInPlace` for a typed task, gives
+    its cards `id: item.id`, and hands the `CreatedTask` to `shown` (the plugin: `QuickEntryController.telling` and
+    `TaskList`'s cards; `QuickEntrySession` switches with it).
 
 ## Done when
 

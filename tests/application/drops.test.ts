@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { acceptsDrop, type DropColumn, type DropFrom, type DropOrigin, type DropTo, placesInGap, type TaskItem, type TaskKey } from "../../core/application/contracts";
-import type { Clock } from "../../core/application/ports";
+import { acceptsDrop, type DropColumn, type DropFrom, type DropOrigin, type DropTo, placesInGap, type ProjectNote, type TaskItem, type TaskKey } from "../../core/application/contracts";
+import { type Clock, memoryGrouping } from "../../core/application/ports";
 import { TaskServiceImpl } from "../../core/application/TaskServiceImpl";
 import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { InMemoryTaskFileStore } from "../fakes/InMemoryTaskFileStore";
@@ -334,4 +334,65 @@ describe("landing: where a drop leaves a task, before it is written", () => {
 		expect(past).toMatchObject({ kind: "timeline", ridesNow: true, span: { start: hourAt(14) + 20 } });
 		expect(later).toMatchObject({ kind: "timeline", ridesNow: false, span: { start: hourAt(16) } });
 	});
+});
+
+describe("landing on a column's title: where the drop leaves the task, before it is written", () => {
+	const NOTES: readonly ProjectNote[] = [
+		{ name: "A", path: "A.md", link: "A" },
+		{ name: "B", path: "B.md", link: "B" },
+	];
+	const PROJECTS = ["## Inbox", "- [ ] I1", "## Now", "- [ ] N1 🗂️ [[A]]", "## Soon", "- [ ] S1 🗂️ [[A]]", "\t- [ ] S1a", "- [ ] S2 🗂️ [[B]]", "- [ ] S3", "## Backlog", "- [ ] BA1 🗂️ [[A]]", "- [ ] BB1 🗂️ [[B]]", "- [ ] BN", "### Later", "- [ ] BA3 🗂️ [[A]]", "## Done", ""].join("\n");
+
+	/** The plain file of this suite, or one of projects with Soon and Backlog grouped by project. */
+	function service(byProject: boolean) {
+		if (!byProject) return setup();
+		const store = new InMemoryTaskFileStore(PROJECTS);
+		const projects = { list: () => NOTES, onChange: () => () => undefined };
+		return { store, svc: new TaskServiceImpl(store, new FakeSettingsStore(), clock, null, projects, memoryGrouping()) };
+	}
+
+	interface TitleCase {
+		readonly name: string;
+		readonly byProject: boolean;
+		readonly day: string;
+		readonly column: DropColumn;
+		readonly tasks: readonly (readonly [string, DropFrom])[];
+	}
+
+	const CASES: readonly TitleCase[] = [
+		{ name: "Soon → today's title", byProject: false, day: T, column: "day", tasks: [["S1", "soon"]] },
+		{ name: "Inbox → a later day's title", byProject: false, day: D, column: "day", tasks: [["I1", "inbox"]] },
+		{ name: "the timeline → today's title", byProject: false, day: T, column: "day", tasks: [["N2", "timeline"]] },
+		{ name: "today's list → Soon's title", byProject: false, day: T, column: "soon", tasks: [["N1", "day"]] },
+		{ name: "Backlog → Inbox's title", byProject: false, day: T, column: "inbox", tasks: [["B2", "backlog"]] },
+		{ name: "Inbox → Backlog's title", byProject: false, day: T, column: "backlog", tasks: [["I1", "inbox"]] },
+		{ name: "several → Backlog's title", byProject: false, day: T, column: "backlog", tasks: [["I1", "inbox"], ["S2", "soon"]] },
+		{ name: "Inbox → Backlog's title grouped by project", byProject: true, day: T, column: "backlog", tasks: [["I1", "inbox"]] },
+		{ name: "a project's task → Backlog's title grouped by project: to its project's part", byProject: true, day: T, column: "backlog", tasks: [["S2", "soon"]] },
+		{ name: "Backlog → Soon's title grouped by project", byProject: true, day: T, column: "soon", tasks: [["BA1", "backlog"], ["BN", "backlog"]] },
+		{ name: "a project's task → today's title", byProject: true, day: T, column: "day", tasks: [["BB1", "backlog"]] },
+		{ name: "a project's task → Inbox's title", byProject: true, day: T, column: "inbox", tasks: [["S1", "soon"]] },
+	];
+
+	for (const c of CASES) {
+		it(`is where the write leaves it: ${c.name}`, async () => {
+			const { store, svc } = service(c.byProject);
+			if (c.byProject) await svc.setGrouping("soon", true);
+			const screen = await svc.screen(c.day);
+			const items = await itemsOf(svc);
+			const byText = (text: string) => items.get(text) ?? [...screen.inbox, ...screen.backlog, ...screen.soon, ...screen.day.list, ...screen.day.slotted].find((i) => i.text === text || i.title === text)!;
+			const to = screen.titleDrops[c.column];
+			expect(to.kind).toBe("title");
+			const tasks = c.tasks.map(([text, from]) => ({ key: byText(text).key, from }));
+			const before = store.text;
+			const landing = await svc.landing(tasks, to, c.day);
+			expect(store.text).toBe(before);
+			await svc.drop(tasks, to, c.day);
+			const ids = c.tasks.map(([text]) => byText(text).id);
+			const after = await Promise.all(ids.map((id) => placeAfter(svc, id, c.day)));
+			expect(landing.map(({ id: _id, ridesNow: _r, ...place }: Record<string, unknown>) => place)).toEqual(after);
+			expect(landing.map((l) => l.id)).toEqual(ids);
+			expect(landing.every((l) => l.kind !== "away")).toBe(true);
+		});
+	}
 });

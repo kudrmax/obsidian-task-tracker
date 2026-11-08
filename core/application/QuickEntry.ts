@@ -5,7 +5,7 @@ import { repeatDay } from "../domain/RepeatDraft";
 import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
-import type { DraftMarks, DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
+import type { CreatedTask, DraftMarks, DropColumn, DropTo, NewTaskPlace, ProjectZone, TaskItem, TaskKey, TaskService } from "./contracts";
 import { fitLevel, type GapPlace, gapOfPlace, type Header, type LevelCard, type ListCard, type ListPlace, placeOfGap, shiftLevel } from "./nesting";
 import { sameLine, samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
@@ -575,7 +575,8 @@ export class QuickEntry {
 	 * leaves the queue, and the places at or past its card move down, in the very drawing that shows its card: where the
 	 * lists draw the task the file holds (`created`, the key the write gave), which its rules may have put elsewhere.
 	 */
-	shown(id: string, created: TaskKey | null, coming: (column: DropColumn) => readonly ListCard[]): void {
+	/** `created`: the task the write made, its key, or with its id (`createWithId`), which finds its card whatever wrote since. */
+	shown(id: string, created: TaskKey | CreatedTask | null, coming: (column: DropColumn) => readonly ListCard[]): void {
 		const job = this.job(id);
 		if (job.kind !== "create") return;
 		const held = this.session.field?.run ?? null;
@@ -788,8 +789,10 @@ export class QuickEntry {
 	 * because another write or a sync landed between the create and this read finds no card: the field then stays where it
 	 * is, as for a task put elsewhere.
 	 */
-	private landed(column: DropColumn, created: TaskKey, cards: readonly ListCard[]): void {
-		const index = cards.findIndex((card) => samePlace(card.key, created) && sameLine(card.key, created));
+	private landed(column: DropColumn, created: TaskKey | CreatedTask, cards: readonly ListCard[]): void {
+		const made = "id" in created ? created : null;
+		const key = made ? made.key : (created as TaskKey);
+		const index = cards.findIndex((card) => (made && card.id !== undefined ? card.id === made.id : samePlace(card.key, key) && sameLine(card.key, key)));
 		if (index < 0) return;
 		for (const run of Object.values(this.session.runs)) {
 			const list = listSpot(run.spot);

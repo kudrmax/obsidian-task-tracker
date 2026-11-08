@@ -412,3 +412,25 @@ describe("a file not yet tidied for today", () => {
 		expect((await svc.dayView(T)).slotted.map((i) => i.id)).toEqual([later.id]);
 	});
 });
+
+describe("createWithId", () => {
+	it("answers the new task's key and id; the id finds it after later writes moved its key", async () => {
+		const { svc } = setup();
+		const created = await svc.createWithId("Fresh", null, { kind: "list", list: "inbox", group: null, before: null });
+		expect(created).not.toBeNull();
+		const fresh = await item(svc, "Fresh");
+		expect(created).toEqual({ key: fresh.key, id: fresh.id });
+		const idea = await item(svc, "Idea");
+		await svc.createInPlace("Before it", null, { kind: "list", list: "inbox", group: null, before: idea.key });
+		const now = (await items(svc)).find((i) => i.id === created!.id)!;
+		expect(now.title).toBe("Fresh");
+		expect(now.key).not.toEqual(created!.key);
+	});
+
+	it("answers null for a blank title, and createInPlace still answers the key alone", async () => {
+		const { svc } = setup();
+		expect(await svc.createWithId("   ", null, { kind: "list", list: "inbox", group: null, before: null })).toBeNull();
+		const key = await svc.createInPlace("Plain", null, { kind: "list", list: "inbox", group: null, before: null });
+		expect(key).toEqual((await item(svc, "Plain")).key);
+	});
+});
