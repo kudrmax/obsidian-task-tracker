@@ -103,6 +103,15 @@ import Testing
         #expect(form.cardHeights == SizeBounds(min: 28, max: 40))
         #expect(form.cardGaps == SizeBounds(min: 0, max: 10))
         #expect(form.labelPaints == ["stripes", "blend"])
+        #expect(form.markerOrder.first == "dueDateMarker")
+        #expect(form.markers["dueDateMarker"] == "📅")
+        #expect(form.refreshSeconds == 60)
+        #expect(form.googleClientReady == false)
+        try board.writeSettings("settings.setMarker", ["repeatMarker", "🔄"])
+        vault.settings = vault.files[try core.settingsFile()] ?? ""
+        let marked: SettingsForm = try board.read("settings.form", over: board.settingsOnly())
+        #expect(marked.markers["repeatMarker"] == "🔄")
+        #expect(try board.rule("rules.formatZoomLevels", [[["hourPx": 28], ["hourPx": 56]]], as: String.self) == "28, 56")
     }
 
     @Test func theWordsAndBoundsTheAppShowsAreTheCores() throws {

@@ -10,13 +10,13 @@ KNOWN = already named by the lead.
 
 | # | What | Where | Sev | Fix |
 |---|---|---|---|---|
-| 0.1 | Repeat sheet breaks on any rule without a detail. Core's `RepeatDraft.detail` is `null` for After done and for unit Days (`core/domain/RepeatDraft.ts:59-62`); Swift decodes it as non-optional `String` (`C/BoardModels.swift:404`). Verified: JSONDecoder throws `valueNotFound`. Result: opening Repeat on a task with `every 3 days` or `… when done` shows an empty sheet; tapping After Done or picking Days does nothing (`A/BoardSheets.swift:190,199` swallow it with `try?`). The quick entry's repeat sheet has the same fault. | C/BoardModels.swift:404 | WRONG (bug) | SWIFT; core: done — the bridge decodes `RepeatDraft.detail` as optional (apple/Core) |
-| 0.2 | Monthly day never shown: app tests `draft.detail == "dayOfMonth"`, core sends `"monthDay"`. | A/BoardSheets.swift:169 | WRONG (bug) | SWIFT |
-| 0.3 | No clock while open: no minute tick, no day rollover. The now line stays where it was at the last read, an overdue task does not ride the now line, and at Day starts at the screen keeps yesterday as Today. Returning to the app only re-reads when the tasks file or settings text changed (`A/BoardModel.swift:237-246`, `A/BoardScreen.swift:57-66`), so the next morning the app can show yesterday's Now/Today until something writes the file. Plugin: every minute, plus `onDayChange` → normalize (docs/door.md `days.*`, file.md «Что плагин делает сам»). | A/BoardModel.swift:237; A/TimelineColumn.swift:263 | WRONG | SWIFT (core already has `days.today`, `tasks.normalize`) |
-| 0.4 | Calendar file changes do not redraw: `reloadIfChanged` compares only tasks text and settings, so a fresh `calendar/google.json` or `iphone.json` arriving by Sync is not shown until the tasks file changes. | A/BoardModel.swift:245 | WRONG | SWIFT |
-| 0.5 | Pick a Date on an undated task cannot pick today: the sheet opens on today and only a change of the selected day writes (`opened` == today). | A/BoardSheets.swift:66-75 | WRONG (bug) | SWIFT |
-| 0.6 | «Description» in the full screen's own «⋯» menu pushes the same task's full screen again (`model.fullScreen.append(item)` from inside it). | A/TaskMenu.swift:97 | WRONG (bug) | SWIFT |
-| 0.7 | Calendar sources are read once per app run (`calendarSources` cached forever): a changed Work calendar file path in settings is not followed. | C/TaskBoard.swift:171-176 | WRONG | SWIFT |
+| 0.1 | Repeat sheet breaks on any rule without a detail. Core's `RepeatDraft.detail` is `null` for After done and for unit Days (`core/domain/RepeatDraft.ts:59-62`); Swift decodes it as non-optional `String` (`C/BoardModels.swift:404`). Verified: JSONDecoder throws `valueNotFound`. Result: opening Repeat on a task with `every 3 days` or `… when done` shows an empty sheet; tapping After Done or picking Days does nothing (`A/BoardSheets.swift:190,199` swallow it with `try?`). The quick entry's repeat sheet has the same fault. | C/BoardModels.swift:404 | WRONG (bug) | SWIFT; core: done — the bridge decodes `RepeatDraft.detail` as optional (apple/Core); app: done (0763de84) — the sheet reads every rule (a rule without a detail decodes) |
+| 0.2 | Monthly day never shown: app tests `draft.detail == "dayOfMonth"`, core sends `"monthDay"`. | A/BoardSheets.swift:169 | WRONG (bug) | SWIFT; app: done (0763de84) — `monthDay`; the line is the core's «On the 5th» (`rules.onTheDay`), seen on screen |
+| 0.3 | No clock while open: no minute tick, no day rollover. The now line stays where it was at the last read, an overdue task does not ride the now line, and at Day starts at the screen keeps yesterday as Today. Returning to the app only re-reads when the tasks file or settings text changed (`A/BoardModel.swift:237-246`, `A/BoardScreen.swift:57-66`), so the next morning the app can show yesterday's Now/Today until something writes the file. Plugin: every minute, plus `onDayChange` → normalize (docs/door.md `days.*`, file.md «Что плагин делает сам»). | A/BoardModel.swift:237; A/TimelineColumn.swift:263 | WRONG | SWIFT (core already has `days.today`, `tasks.normalize`); app: done (0763de84) — the minute tick and the day's turn (7.2, 8.1) |
+| 0.4 | Calendar file changes do not redraw: `reloadIfChanged` compares only tasks text and settings, so a fresh `calendar/google.json` or `iphone.json` arriving by Sync is not shown until the tasks file changes. | A/BoardModel.swift:245 | WRONG | SWIFT; app: done (0763de84) — a calendar file Sync brought reads again (`BoardSnapshot.readFrom`) |
+| 0.5 | Pick a Date on an undated task cannot pick today: the sheet opens on today and only a change of the selected day writes (`opened` == today). | A/BoardSheets.swift:66-75 | WRONG (bug) | SWIFT; app: done (0763de84) — an undated task's sheet opens with no day picked, so today can be picked |
+| 0.6 | «Description» in the full screen's own «⋯» menu pushes the same task's full screen again (`model.fullScreen.append(item)` from inside it). | A/TaskMenu.swift:97 | WRONG (bug) | SWIFT; app: done (0763de84) — Description on the task's own page puts the caret in its description |
+| 0.7 | Calendar sources are read once per app run (`calendarSources` cached forever): a changed Work calendar file path in settings is not followed. | C/TaskBoard.swift:171-176 | WRONG | SWIFT; app: done (0763de84) — the sources are read again when the settings change (`TaskBoard.sources`) |
 
 ## 1. Card rendering
 
@@ -30,7 +30,7 @@ KNOWN = already named by the lead.
 | 1.6 | Tap on the folder icon opens the project note; in Select mode it selects. | absent | MISSING | SWIFT (after 1.5); app: done — a tap on the mark opens the project's view (Decisions 1); in Select mode it selects |
 | 1.7 | Card height (28–40) and gap (0–10) from Settings → Cards. | Fixed 35 / 2 (A/Paint.swift:46-48). | WRONG | CORE (cardHeight/cardGap live in P/viewSettings.ts, not the door) + SWIFT; core: done — `screenSettings.get()` `cardHeight`/`cardGap` (`TaskBoard.screenSettings`); app: done — `CardMetrics.height`/`gap` follow each read's `look` (`screenSettings.get`), radius half the height; the timeline stacks at them |
 | 1.8 | A long title shows whole in the menu and under the finger (card grows, P/wholeCard.ts, P/menu/LiftedMenu.ts). | The menu/drag preview is the same faded capsule (A/CardButton.swift:190-238). | MISSING | SWIFT; app: done in the menu (ios-labels, `rules.wholeWidth`); the drag lifts the capsule itself (Decisions 2) |
-| 1.9 | Search result rows are real cards (priority colour, due, counter, marks). | Plain grey capsule with title only (A/SearchScreen.swift:48-65). | LOOK | SWIFT; app: left to section 9 (search rows with the project line and the match highlight are one piece of work there); `TaskBoard.cards(_:)` is ready for it |
+| 1.9 | Search result rows are real cards (priority colour, due, counter, marks). | Plain grey capsule with title only (A/SearchScreen.swift:48-65). | LOOK | SWIFT; app: left to section 9 (search rows with the project line and the match highlight are one piece of work there); `TaskBoard.cards(_:)` is ready for it; app: done (section 9) — every find is its card (`TaskBoard.cards`): colours, due, counter, marks, the found pieces on the selection ground |
 | 1.10 | Full screen subtasks are list cards with priority/label colours and due (FullScreen uses TaskList). | `shades: nil, due: nil` — subtasks always grey, no date (A/TaskFullScreen.swift:160). | WRONG | SWIFT; app: done — subtasks drawn by `TaskBoard.cards` (paint, due, title links, folder) |
 | 1.11 | Found card ring stays until the next touch anywhere. | Cleared only by touching a card or lifting one (A/ListColumn.swift:532, A/BoardModel.swift:608). | WRONG (minor) | SWIFT; app: done — `TouchWatch` on the window clears the ring at any touch |
 | — | In parity: title fade, due corner (core `rules.cardDue`), repeat mark, counter over description mark, in-progress dot, priority/one-label fill, collapsed peek, branch lines, timeline stack corner. | | | |
@@ -46,7 +46,7 @@ KNOWN = already named by the lead.
 | 2.5 | Add subtask on a timeline card: stack under the lifted copy, field there (P/menu/TaskMenu.ts:272). | Opens the full screen instead (A/QuickEntryHost.swift:155-161; app.md documents it). | WRONG | SWIFT (or a spec decision); app: done — the card is lifted over a dimmed screen where it stood, its subtasks stacked under it with branches and the field last (`TimelineStack`, the full screen's `TaskStack`); the full screen only when no card of it shows |
 | 2.6 | Repeat row shows the current rule on the right ("Every 3 days", weekday letters). | «Repeat…» without value (A/TaskMenu.swift:99). | LOOK/MISSING info | CORE (words are built in P/repeat/repeatLabel.ts — move to core) + SWIFT; core: done — `TaskMenuModel.repeat` `{ value, days }`, `rules.repeatValue`; app: done — the Repeat row's subtitle is `menu.repeat.value`, a weekly schedule's days as the week's letters (`REPEAT_WORDS`) with a dash for the others (Decisions 8) |
 | 2.7 | Repeat page writes once when the menu closes; there is no discard. | Sheet: ✕ discards, only ✓ writes (A/BoardSheets.swift:181-185). | WRONG | SWIFT (core `repeatPage.end` already); app: done — the sheet writes once as it closes, by its check or a swipe down (`repeatPage.end`); no discard; its words from `REPEAT_WORDS` |
-| 2.8 | Pick a date page marks today/the due date; Remove due date at the bottom. | In parity (DateSheet). See bug 0.5. | — | — |
+| 2.8 | Pick a date page marks today/the due date; Remove due date at the bottom. | In parity (DateSheet). See bug 0.5. | — | —; app: done (0.5) |
 | 2.9 | Section page lists in a project group the group's sections. | Grouping forced off, so always the whole list's (C/TaskBoard.swift:167-169). | WRONG (follows 5.x) | CORE context + SWIFT; core: done — grouping no longer forced off: `TaskBoard(grouping:)` keeps the door's `grouping`; app: done — the board keeps the device's grouping, so a grouped card's Section page is its group's (seen on Backlog cards) |
 | 2.10 | Rename / New section inline. | Alerts with a text field (A/BoardSheets.swift:22; A/ListColumn.swift:382). | LOOK | —; app: left — LOOK only: New Section and Rename stay the system alert with a field; the behaviour is the plugin's (the task goes into the new section, the core's `toSection`) |
 | — | In parity: groups order from core, statuses (Done, In progress/Stop progress, Won't do, Stop), confirmations, priorities, moves, Reminder page, Add subtask (lists), Open full screen, Open in Obsidian, Delete. | | | |
@@ -118,18 +118,18 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 9.1 | Found by project name: line with the project's name under the title, match highlighted (`SearchHit.project`). | Field not decoded, line absent (C/BoardModels.swift:426-430). | MISSING | SWIFT |
-| 9.2 | Tap on a Done hit opens the Done column with the card ringed. | Nothing happens (3.3). | MISSING | SWIFT |
-| 9.3 | The found card is scrolled into view (P/FoundCard.ts) in its list or the timeline. | Ribbon/day change only; no scroll to the card (A/BoardModel.swift:400-417). | MISSING | SWIFT |
-| 9.4 | Folded project group with a hit unfolds (`grouping` from `tasks.reveal`). | n/a until 4.1. | MISSING | SWIFT |
-| 9.5 | Rows as cards. | 1.9. | LOOK | SWIFT |
+| 9.1 | Found by project name: line with the project's name under the title, match highlighted (`SearchHit.project`). | Field not decoded, line absent (C/BoardModels.swift:426-430). | MISSING | SWIFT; app: done — the project's name (or the description's line) under the title, the found pieces picked out (`SearchHit.project`) |
+| 9.2 | Tap on a Done hit opens the Done column with the card ringed. | Nothing happens (3.3). | MISSING | SWIFT; app: done — the ribbon goes to the Done column, the card ringed; the tab bar names Inbox (Decisions 21) |
+| 9.3 | The found card is scrolled into view (P/FoundCard.ts) in its list or the timeline. | Ribbon/day change only; no scroll to the card (A/BoardModel.swift:400-417). | MISSING | SWIFT; app: done — a list scrolls the found card to the middle of what shows when it is not whole between its top and the tab bar; the timeline scrolls it into sight |
+| 9.4 | Folded project group with a hit unfolds (`grouping` from `tasks.reveal`). | n/a until 4.1. | MISSING | SWIFT; app: done — `tasks.reveal` unfolds the group (and the collapsed task); the list draws it and scrolls to the card |
+| 9.5 | Rows as cards. | 1.9. | LOOK | SWIFT; app: done (1.9) |
 
 ## 10. Select tasks (bulk)
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
 | 10.1 | Long press carries all picked. | absent (5.4). | MISSING | SWIFT; app: done (5.4) |
-| 10.2 | Bulk Project row. | absent (2.1). | MISSING | SWIFT |
+| 10.2 | Bulk Project row. | absent (2.1). | MISSING | SWIFT; app: done — seen on screen: the bulk menu's Project › wrote `🗂️ [[Repair]]` to both picked tasks and ended the mode |
 | 10.3 | Bulk labels keep the menu and selection for the next label. | Selection kept, menu closes (2.2). | WRONG | SWIFT; app: done — the bulk «⋯» keeps open on a label (the label row's group is `menuActionDismissBehavior(.disabled)`), re-read after each write, and the picked tasks stay picked under their new cards (picked again by their place in the file in the drawing that shows the write) |
 | — | In parity: circles, calendar cards not pickable, statuses, priorities, labels, moves, Remove due date, Section, Delete N without asking, any action ends the mode. | | | |
 
@@ -137,59 +137,59 @@ KNOWN = already named by the lead.
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 11.1 | Circle left of each subtask ticks it done in place (filled, crossed out), tap again reopens. | absent (A/TaskFullScreen.swift:159-165). | MISSING | SWIFT |
-| 11.2 | Over a subtask's title: its parent task; tap goes one level up (`TaskItem.parentText`). | Shows the list name; `parentText` not decoded (A/TaskFullScreen.swift:28). | MISSING | SWIFT |
-| 11.3 | Close from any depth back to the main screen. | Back goes one level per tap. | WRONG | SWIFT |
-| 11.4 | Task gone (done, moved, deleted here or elsewhere) → one level up, else closes. | Stays on the stale task. | MISSING | SWIFT |
-| 11.5 | Description in Obsidian's editor: links, images, markup rendered, links tappable. | Plain `TextEditor` with raw markdown. | MISSING | SWIFT |
-| 11.6 | Add description opens with the cursor in the description; Done button hides the keyboard while typing it. | Same page as Open full screen, no focus; no Done for the description. | WRONG | SWIFT |
-| 11.7 | Bottom row has the undo button. | No undo on the page. | MISSING | SWIFT |
-| 11.8 | Subtasks coloured as cards. | 1.10. | WRONG | SWIFT |
+| 11.1 | Circle left of each subtask ticks it done in place (filled, crossed out), tap again reopens. | absent (A/TaskFullScreen.swift:159-165). | MISSING | SWIFT; app: done — a circle before each subtask (`tasks.toggleDone`), filled with a check once done (a cross once dropped), the card crossed out in place; again opens it (Decisions 17) |
+| 11.2 | Over a subtask's title: its parent task; tap goes one level up (`TaskItem.parentText`). | Shows the list name; `parentText` not decoded (A/TaskFullScreen.swift:28). | MISSING | SWIFT; app: done — over a subtask's title its task (`parentText`, links drawn); a tap goes back to the page it was opened from, or reads the task (`tasks.find`) and shows it |
+| 11.3 | Close from any depth back to the main screen. | Back goes one level per tap. | WRONG | SWIFT; app: done — Close (the cross) empties the pages: back to the main screen from any depth; no back arrow or edge swipe (Decisions 15) |
+| 11.4 | Task gone (done, moved, deleted here or elsewhere) → one level up, else closes. | Stays on the stale task. | MISSING | SWIFT; app: done — each read finds the task (`tasks.find`); gone, its page and every one over it give way, the screen closes when none is left (seen: Delete on a subtask's page) |
+| 11.5 | Description in Obsidian's editor: links, images, markup rendered, links tappable. | Plain `TextEditor` with raw markdown. | MISSING | SWIFT; app: done — drawn as it reads while not typed: headings, list items, quotes, bold and italic, links in the accent opening at a tap (`rules.textParts`); images left out (Decisions 16) |
+| 11.6 | Add description opens with the cursor in the description; Done button hides the keyboard while typing it. | Same page as Open full screen, no focus; no Done for the description. | WRONG | SWIFT; app: done — Description in a menu opens the page with the caret in the description (`BoardModel.describe`); while it is typed the bar's check (Done) hides the keyboard; the empty template shows the word Description, not a lone dash |
+| 11.7 | Bottom row has the undo button. | No undo on the page. | MISSING | SWIFT; app: done — Undo beside Close |
+| 11.8 | Subtasks coloured as cards. | 1.10. | WRONG | SWIFT; app: done (1.10) |
 
 ## 12. Settings
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 12.1 KNOWN | Several labels: Stripes / Blend. | absent | MISSING | CORE + SWIFT; core: done — `settings.form().labelPaints`, `settings.setLabelPaint` (ios-labels) |
-| 12.2 | Cards: height, gap. | absent | MISSING | CORE + SWIFT; core: done — `settings.setCardHeight`/`setCardGap`, form `cardHeights`/`cardGaps` |
-| 12.3 | Long press delay. | absent (and ignored, 5.5) | MISSING | SWIFT; core: done (already) — `settings.setCount("longPressMs", text)` |
-| 12.4 | Zoom levels. | absent (read, not editable) | MISSING | SWIFT |
-| 12.5 | Markers: due, slot, alarm, Live Activity, no-reminder, repeat, collapsed. | absent | MISSING | SWIFT |
-| 12.6 | Project tag (+ hint about auto-updating links). | absent | MISSING | SWIFT |
-| 12.7 | Work calendar file path, Scriptable script Copy. | absent | MISSING | SWIFT |
-| 12.8 | Google Calendar account/client/refresh. | absent (by design?) | MISSING | — |
-| 12.9 | Colour: six preset circles, rainbow picker, hex field; sample card with dot and time. | System ColorPicker only; sample is a name pill. | LOOK | — |
+| 12.1 KNOWN | Several labels: Stripes / Blend. | absent | MISSING | CORE + SWIFT; core: done — `settings.form().labelPaints`, `settings.setLabelPaint` (ios-labels); app: done — Labels → Several Labels: Stripes / Blend (`settings.setLabelPaint`) |
+| 12.2 | Cards: height, gap. | absent | MISSING | CORE + SWIFT; core: done — `settings.setCardHeight`/`setCardGap`, form `cardHeights`/`cardGaps`; app: done — Settings → Cards: two sliders within the form's bounds, written as the finger lifts (`setCardHeight`, `setCardGap`) |
+| 12.3 | Long press delay. | absent (and ignored, 5.5) | MISSING | SWIFT; core: done (already) — `settings.setCount("longPressMs", text)`; app: done — Day and Timeline → Long Press Delay, ms (`settings.setCount("longPressMs")`) |
+| 12.4 | Zoom levels. | absent (read, not editable) | MISSING | SWIFT; app: left — shown, not edited: the core has no `settings.setZoomLevels(text)` (the plugin writes them through its own view store, `viewSettings.setZoomLevels`); the row shows `rules.formatZoomLevels(timeline.zoomLevels())` |
+| 12.5 | Markers: due, slot, alarm, Live Activity, no-reminder, repeat, collapsed. | absent | MISSING | SWIFT; app: done — Tasks File → Line Markers, the form's `markerOrder`, each `settings.setMarker` |
+| 12.6 | Project tag (+ hint about auto-updating links). | absent | MISSING | SWIFT; app: done — Tasks File → Project Tag (`settings.setProjectTag`), with the hint to turn on Automatically update internal links when the vault's `.obsidian/app.json` says `alwaysUpdateLinks: false` |
+| 12.7 | Work calendar file path, Scriptable script Copy. | absent | MISSING | SWIFT; app: done — Calendars → Work Calendar → File Path (`settings.setWorkCalendarFile`); the Scriptable script: n/a — the core marks it host-owned (`WorkCalendarSetup`: the plugin's fallback on the iPhone; the app writes `calendar/iphone.json` itself) |
+| 12.8 | Google Calendar account/client/refresh. | absent (by design?) | MISSING | —; app: done as far as the app can — Calendars → Google Calendar: Client ID (`setGoogleClientId`), Refresh Interval (`setCount("refreshSeconds")`), Account's state; Log in and the client secret stay in Obsidian (`bindClientSecret` is the host's, the phone never edits the secret; the plugin fetches Google and the app reads `google.json`, calendars.md) |
+| 12.9 | Colour: six preset circles, rainbow picker, hex field; sample card with dot and time. | System ColorPicker only; sample is a name pill. | LOOK | —; app: done — the six preset circles before the system picker (a preset written by name, its shade per theme); the picker's own hex field for a code (`settings.typedColour`) |
 | — | In parity: priorities (name, colour, order, delete, add), labels (+ tag), presets, No section, list headings, Day starts at, Scroll to hour, Stale after, tasks file path. | | | |
 
 ## 13. Undo
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 13.1 | Undo also on the full screen. | 11.7. | MISSING | SWIFT |
+| 13.1 | Undo also on the full screen. | 11.7. | MISSING | SWIFT; app: done (11.7) |
 | — | In parity: one step per action, disabled when empty, history in memory, «Can't undo» from core. (⌘⇧Z redo is Mac-only.) | | | |
 
 ## 14. Reminders / notifications
 
-Nothing missing on the app side: the plugin only writes the markers and the Reminder row (in both). App-only: the reminders themselves.
+Nothing missing on the app side: the plugin only writes the markers and the Reminder row (in both). App-only: the reminders themselves. app: done — nothing to change (the Reminder row and the markers are the core's in both; Settings → Tasks File now edits the markers too, 12.5).
 
 ## 15. Sync / other
 
 | # | Plugin | App | Sev | Fix |
 |---|---|---|---|---|
-| 15.1 | Reads again on any change and every minute (0.3, 0.4). | Only tasks/settings text change. | WRONG | SWIFT |
-| 15.2 | Rules decided in Swift that the core should give (reviewer rule 1): list width bounds copied from P/viewSettings.ts (A/BoardScreen.swift:304-305), source status words (A/CalendarsView.swift:110-119, also in P/sources/sourceText.ts), the place's date words (A/QuickEntryHost.swift:949), repeat unit words (A/BoardSheets.swift:217), «calendar cards cannot be picked» (A/BoardModel.swift:560), tab → place mapping. | | WRONG (architecture) | CORE; core: done — `rules.listWidths`, status `words`, `tasks.placementTitle`, `REPEAT_WORDS`, `rules.canPick`; tab → place stays `SCREEN_PLACES` |
+| 15.1 | Reads again on any change and every minute (0.3, 0.4). | Only tasks/settings text change. | WRONG | SWIFT; app: done (0.3, 0.4) |
+| 15.2 | Rules decided in Swift that the core should give (reviewer rule 1): list width bounds copied from P/viewSettings.ts (A/BoardScreen.swift:304-305), source status words (A/CalendarsView.swift:110-119, also in P/sources/sourceText.ts), the place's date words (A/QuickEntryHost.swift:949), repeat unit words (A/BoardSheets.swift:217), «calendar cards cannot be picked» (A/BoardModel.swift:560), tab → place mapping. | | WRONG (architecture) | CORE; core: done — `rules.listWidths`, status `words`, `tasks.placementTitle`, `REPEAT_WORDS`, `rules.canPick`; tab → place stays `SCREEN_PLACES`; app: done — list widths (`rules.listWidths`, `rules.listShareOf`), source words, place words, repeat words and the monthly day (`rules.onTheDay`), `rules.canPick` for every pick (lists, the timeline); Select All, which decided the pick in Swift, is gone (section 16) |
 
 ## 16. The other way: what the app does that the plugin doesn't (behaviour only)
 
-1. Plus tap opens a capture sheet (text + voice) instead of an inline field (6.1).
-2. Select All in Select mode (A/BoardScreen.swift:176).
-3. Select mode bottom bar acts directly: Done, Priority, Move without opening the bulk menu.
-4. Repeat sheet ✕ discards changes (2.7).
-5. Full screen back is one level at a time (11.3); Add subtask of a timeline-only task opens the full screen (2.5).
-6. Section header long press opens a context menu (3.1).
-7. Each swipe moves exactly one place (3.6); a tab always goes to its fixed place (3.5).
-8. Sync button (Obsidian Sync round trip), problem banner that re-reads on tap.
-9. App-only by platform (no plugin counterpart, fine): reminders/alarms/Live Activity, lock-screen widget, Siri/Shortcuts Add Task, voice notes, iPhone calendar export, signing plate, vault folder picker, Recording tag.
+1. Plus tap opens a capture sheet (text + voice) instead of an inline field (6.1). app: kept — Max asked for it.
+2. Select All in Select mode (A/BoardScreen.swift:176). app: done — removed, as the plugin has none.
+3. Select mode bottom bar acts directly: Done, Priority, Move without opening the bulk menu. app: done — the plugin's: a capsule with the cross and the number, a circle with «⋯» in the plus's place; both open the bulk menu (Decisions 18).
+4. Repeat sheet ✕ discards changes (2.7). app: done (Decisions 12).
+5. Full screen back is one level at a time (11.3); Add subtask of a timeline-only task opens the full screen (2.5). app: done — Close to the main screen, the parent line one level up (11.2, 11.3); 2.5 (Decisions 10).
+6. Section header long press opens a context menu (3.1). app: done — a tap opens its menu, a long press lifts the section with UIKit's drag on the header (`SectionHeaderControl`); the SwiftUI `.onDrag` it had could leave a carry standing and a Menu over it took the long press (Decisions 20).
+7. Each swipe moves exactly one place (3.6); a tab always goes to its fixed place (3.5). app: done (3.6) / Decisions 3.
+8. Sync button (Obsidian Sync round trip), problem banner that re-reads on tap. app: kept — Sync because the app needs it; the banner shows the app's own failure to read its files (no vault access, the file busy), which the plugin never meets.
+9. App-only by platform (no plugin counterpart, fine; app: kept): reminders/alarms/Live Activity, lock-screen widget, Siri/Shortcuts Add Task, voice notes, iPhone calendar export, signing plate, vault folder picker, Recording tag.
 
 ## Decisions
 
@@ -206,4 +206,11 @@ Nothing missing on the app side: the plugin only writes the markers and the Remi
 11. **A column's title as a drop place lights as an empty section's plate** (5.1): the accent's outline and fill round the title; only cards land there, never the plus.
 12. **The Repeat sheet has a check, no cross** (2.7): it writes as it closes however it closes (the check or a swipe down), as the plugin's page writes when its menu closes.
 13. **Picked cards are the same card control as everywhere** (5.4): in Select Tasks a tap on a card picks it (no menu), and a picked card's long press lifts the stack: the card on two layers with the number carried on its corner, as the plugin's floating stack.
-
+14. **A find is its card** (1.9, 9.x): the card the lists draw, the found pieces on the selection's ground in semibold (`mark.tc-hit`), the project's name or the description's line under the title in the small muted type, no icon of its own (the card's own description mark stays), as the plugin's search rows; the groups are the system list's sections named by the lists.
+15. **The full screen's bar** (11.3, 11.7): Close (the cross) and Undo stand where the main screen has Undo, in one glass group; «+» and «⋯» stay on the right, the check while typing. No system back arrow and no edge swipe: the plugin's only ways back are Close and the parent line.
+16. **The description as it reads** (11.5): until a tap types in it, the description is drawn as Obsidian shows it (headings, list items with bullets and depth, quotes, bold and italic, links in the accent opening at a tap); a tap elsewhere puts the caret at its end in the system editor. Embedded images are left out (the app reads no attachments). An empty one (the template's lone list mark) shows the word Description in the muted colour.
+17. **The circle stands before the subtask's card** (11.1), as Select Tasks' circle before a card: empty while open, the accent's filled check once done, its cross once dropped; the card stays where it was, crossed out.
+18. **Select Tasks' bar** (16.2, 16.3): in place of Undo and «⋯» a glass capsule with the cross and the number picked, the number opening the bulk menu; in place of the plus a glass circle with «⋯» opening the same menu, dimmed while none is picked; the menu keeps the core's order wherever it opens (`menuOrder(.fixed)`), so Delete stays last over the bottom bar. No Select All.
+19. **Settings' new rows** (12.x): Cards is a section of the main settings (the plugin's main screen has it) with two system sliders written as the finger lifts; Several labels on Labels; Long press delay and the zoom levels on Day and Timeline; the line markers and Project tag on Tasks File; Google Calendar's client and interval and the work calendar's path on Calendars; each text row written when it is left (Return, or the keyboard's Done for a number). The six preset circles stand before the system colour picker.
+20. **A section's header** (3.1, 16.6): a tap opens its menu with nothing lifted over it (the header stays, as a bar button under its menu); a long press lifts the section as the plugin's floating section.
+21. **The Done column's tab** (9.2): while the Done column shows, the tab bar names Inbox, the place beside it.
