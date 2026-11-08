@@ -1,6 +1,5 @@
-import { type LabelLevel, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
+import { type LabelLevel, type LabelPaint, PRIORITY_COLORS, type PriorityColor, type PriorityLevel, shadesOf, usableColor } from "../../core/application/contracts";
 import { onWindowDocument, windowDocuments } from "./windowDocuments";
-import type { LabelPaint } from "./viewSettings";
 
 export { contrast, inkOf, type PriorityShades, shadesOf } from "../../core/application/contracts";
 

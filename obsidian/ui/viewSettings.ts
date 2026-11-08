@@ -16,10 +16,6 @@ export type { Zoom, ZoomLevel } from "../../core/application/contracts";
 import { DEFAULT_ZOOM_HOUR, DEFAULT_ZOOM_LEVELS, parseZoomLevels, type Zoom, type ZoomLevel } from "../../core/application/contracts";
 export { formatZoomLevels, parseZoomLevels } from "../../core/application/contracts";
 
-/** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
-export type LabelPaint = "stripes" | "blend";
-export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
-
 export interface ViewSettings {
 	/** The left column's share of the width the two columns split, 0..1, set by dragging the divider: the line keeps its place as the window changes. */
 	readonly listShare: number;
@@ -32,8 +28,6 @@ export interface ViewSettings {
 	readonly cardHeight: number;
 	/** Between two cards, px: in the list and in a stack on the timeline alike. */
 	readonly cardGap: number;
-	/** How a card of several labels is painted. */
-	readonly labelPaint: LabelPaint;
 }
 
 export const VIEW_DEFAULTS: ViewSettings = {
@@ -43,7 +37,6 @@ export const VIEW_DEFAULTS: ViewSettings = {
 	zoomLevels: DEFAULT_ZOOM_LEVELS,
 	cardHeight: 35,
 	cardGap: 2,
-	labelPaint: "stripes",
 };
 
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];

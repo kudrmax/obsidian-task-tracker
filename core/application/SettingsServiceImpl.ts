@@ -1,6 +1,6 @@
 import { labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
-import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 
@@ -42,6 +42,8 @@ export class SettingsServiceImpl implements SettingsService {
 			priorities: s.priorities,
 			labelTag: s.labelTag,
 			labels: s.labels,
+			labelPaint: s.labelPaint,
+			labelPaints: LABEL_PAINTS,
 			projectTag: s.projectTag,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
@@ -106,6 +108,11 @@ export class SettingsServiceImpl implements SettingsService {
 	async setLabelTag(tag: string): Promise<void> {
 		const labelTag = tag.trim();
 		if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+	}
+
+	async setLabelPaint(paint: string): Promise<void> {
+		const labelPaint = LABEL_PAINTS.find((offered) => offered === paint);
+		if (labelPaint) await this.store.update({ labelPaint });
 	}
 
 	async setProjectTag(tag: string): Promise<void> {

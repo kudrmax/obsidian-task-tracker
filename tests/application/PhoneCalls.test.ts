@@ -340,6 +340,8 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["moveLevel", 1, 0],
 	["setLabelTag", " tags "],
 	["setLabelTag", "two words"],
+	["setLabelPaint", "blend"],
+	["setLabelPaint", "plaid"],
 	["setProjectTag", " проект "],
 	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],
@@ -533,6 +535,9 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 200, fade: 16 }, { width: 390, margin: 10 }),
+		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 100, fade: 16 }, { width: 390, margin: 10 }),
+		plain("rules.grownStart", 200, 180, 230, 390, 10),
 		plain("timeline.zoomLevels"),
 		...[
 			["openAtEnd", "soon"],

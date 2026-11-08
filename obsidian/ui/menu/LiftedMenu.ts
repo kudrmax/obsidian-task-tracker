@@ -1,14 +1,15 @@
+import { grownStart } from "../../../core/application/contracts";
 import { tokenPx } from "../design";
 import { el, px } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
 import { Panel, Picks } from "../kit/Panel";
-import { grownStart, roomWidth, type Size, windowRoom } from "../wholeCard";
+import { type Room, type Size, windowRoom } from "../wholeCard";
 import { type CloseHow, Overlay } from "./Overlay";
 import { scrollIntoColumn, shownPart, topInside } from "./inView";
 import { menuRoom, placePanel } from "./MenuPanel";
 
-/** How the copy over the blur shows what the pressed thing cuts: it grows from `size`, never past `widest`, and answers its new size. */
-export type ShowWhole = (copy: HTMLElement, size: Size, widest: number) => Size;
+/** How the copy over the blur shows what the pressed thing cuts: it grows from `size`, kept inside `room`, and answers its new size. */
+export type ShowWhole = (copy: HTMLElement, size: Size, room: Room) => Size;
 
 /**
  * What a press on a card or an event opens: a copy of it over the blurred screen, where it stood, grown only as far as
@@ -62,7 +63,7 @@ export abstract class LiftedMenu {
 	protected liftWhole(source: HTMLElement, showWhole: ShowWhole): DOMRect {
 		const { rect, box } = shownPart(source);
 		const room = windowRoom(this.lifted);
-		const size = showWhole(this.lifted, rect, roomWidth(room));
+		const size = showWhole(this.lifted, rect, room);
 		const left = grownStart(rect.left, rect.width, size.width, room.width, room.margin);
 		const top = box ? topInside(rect.top, size.height, box) : grownStart(rect.top, rect.height, size.height, room.height, room.margin);
 		this.copy = this.liftedCopy.pin(new DOMRect(left, top, size.width, size.height)).rect;

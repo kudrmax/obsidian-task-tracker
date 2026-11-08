@@ -1,6 +1,6 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
-import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, formatZoomLevels, LABEL_PAINTS, type LabelPaint, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
+import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
+import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, formatZoomLevels, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -11,7 +11,7 @@ import { SettingsPage } from "./SettingsPage";
 
 export interface SettingsTabDeps {
 	readonly settings: SettingsService;
-	/** This view's own settings: the cards' size, how several labels paint a card, the zoom levels. */
+	/** This view's own settings: the cards' size, the zoom levels. */
 	readonly view: ViewSettingsStore;
 	readonly google: GoogleAccount;
 	readonly work: WorkCalendarSetup;
@@ -173,8 +173,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName("Several labels")
 			.setDesc("How a card of several labels is painted.")
 			.addDropdown((d) => {
-				for (const paint of LABEL_PAINTS) d.addOption(paint, PAINT_NAMES[paint]);
-				d.setValue(this.view.labelPaint).onChange((value) => this.deps.view.set({ labelPaint: value as LabelPaint }));
+				for (const paint of this.settings.labelPaints) d.addOption(paint, PAINT_NAMES[paint]);
+				d.setValue(this.settings.labelPaint).onChange((value) => void this.service.setLabelPaint(value as LabelPaint));
 			});
 	}
 

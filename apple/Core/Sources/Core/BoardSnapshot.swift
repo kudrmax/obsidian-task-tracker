@@ -479,6 +479,41 @@ extension TaskBoard {
     }
 
     private static func levels(_ levels: [Double]) -> JSONValue { .array(levels.map { ["hourPx": .number($0)] }) }
+
+    /// How wide the copy of a pressed card grows to show a title the card cuts or fades (`rules.wholeWidth`): `nil` while
+    /// the title shows whole, the card then lifted itself.
+    public func wholeWidth(card: TitleFit, room: Double, margin: Double) throws -> GrownWidth? {
+        try rule("rules.wholeWidth", [card.json, ["width": .number(room), "margin": .number(margin)]])
+    }
+
+    /// Where the grown copy of a card starts on one axis (`rules.grownStart`).
+    public func grownStart(_ start: Double, size: Double, grown: Double, room: Double, margin: Double) throws -> Double {
+        try rule("rules.grownStart", [.number(start), .number(size), .number(grown), .number(room), .number(margin)])
+    }
+}
+
+/// A card's title as it is measured, for the copy that shows it whole: the card's width, the title's box, the title's text
+/// on one line, the fade at its end.
+public struct TitleFit: Sendable {
+    public let width: Double
+    public let titleWidth: Double
+    public let textWidth: Double
+    public let fade: Double
+
+    public init(width: Double, titleWidth: Double, textWidth: Double, fade: Double) {
+        self.width = width
+        self.titleWidth = titleWidth
+        self.textWidth = textWidth
+        self.fade = fade
+    }
+
+    var json: JSONValue { ["width": .number(width), "titleWidth": .number(titleWidth), "textWidth": .number(textWidth), "fade": .number(fade)] }
+}
+
+/// How wide the copy grows, and whether the title is still cut at that width: it then wraps onto more lines.
+public struct GrownWidth: Decodable, Sendable, Hashable {
+    public let width: Double
+    public let cut: Bool
 }
 
 /// The core's paints, each asked for once per drawing.

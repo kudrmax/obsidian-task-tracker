@@ -3,7 +3,7 @@ import type { LocalDate } from "../types";
 import { DESIGN, DURATION, tokenMs, tokenPx } from "../design";
 import { el, px } from "../dom";
 import { fillCard } from "../TaskCard";
-import { roomWidth, stretchWhole, windowRoom } from "../wholeCard";
+import { stretchWhole, windowRoom } from "../wholeCard";
 import type { Float } from "./DropTarget";
 
 export interface Grab {
@@ -38,7 +38,7 @@ export class FloatingCard implements Float {
 			for (let depth = STACK_DEPTH; depth >= 1; depth--) this.stack.push(el(activeDocument.body, "div", `tc-float-under is-${depth}`));
 		}
 		activeDocument.body.appendChild(this.el);
-		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, roomWidth(windowRoom(this.el)));
+		stretchWhole(this.el, { width: DESIGN.floatWidth, height: this.el.getBoundingClientRect().height }, windowRoom(this.el));
 		this.fitStack();
 		if (count > 1) this.showCount(count);
 	}

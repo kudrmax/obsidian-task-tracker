@@ -48,7 +48,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			const view = this.viewSettings.get();
 			showCardSize({ height: view.cardHeight, gap: view.cardGap });
 			showPriorityColors(screen.priorities, screen.labels);
-			showLabelPaint(view.labelPaint);
+			showLabelPaint(screen.labelPaint);
 		});
 		await this.pluginSettings.load();
 		this.register(clearCardSize);

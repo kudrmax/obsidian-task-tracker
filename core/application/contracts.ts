@@ -51,6 +51,11 @@ export { gapAt, groupPlaceOf, placeOfDrop, sameGap } from "./nesting";
 export { QuickEntrySession, type EntryAt, type EntryDrawing, type EntrySpot, type EntryState, type ListEntry as EntryInList, type PendingText, type PlaceChoice, type PlaceMove, type QuickEntryTasks, type QuickEntryView, type StackAt, type StackEntry, type WriteLine } from "./QuickEntrySession";
 /** Where the screen stands, the lists each place shows, and the place a list is shown from. */
 export { placeShowing, SCREEN_PLACES, SHOWN_LISTS, type ScreenAt, type ScreenPlace, type ScreenSpot } from "./screenPlaces";
+/**
+ * The copy of a pressed card that shows its whole title: `wholeWidth(card, room)` how wide it grows (null: the card shows
+ * its title whole and is lifted itself), `grownStart(start, size, grown, room, margin)` where it starts on one axis.
+ */
+export { grownStart, type GrownWidth, type TitleFit, type WholeRoom, wholeWidth } from "./wholeCard";
 import type { ScreenAt as ScreenAtOf } from "./screenPlaces";
 /** What Enter, Escape and a tap elsewhere mean for a section's name typed in place. */
 export { SectionNameEntry } from "./SectionNameEntry";
@@ -70,8 +75,8 @@ export { DESCRIPTION_TEMPLATE } from "../domain/description";
 export { textParts, type TextPart } from "../domain/TaskText";
 /** A task is one line of the file: a line break in its title reads as one space, the same as the domain writes it. */
 export { LINE_BREAK, oneLine } from "../domain/TaskTitle";
-import type { ScreenBehaviour, SectionNames } from "../settings";
-export type { ScreenBehaviour, SectionNames } from "../settings";
+import type { LabelPaint, ScreenBehaviour, SectionNames } from "../settings";
+export type { LabelPaint, ScreenBehaviour, SectionNames } from "../settings";
 export { sameLevels } from "../settings";
 export type { Clock } from "./ports";
 
@@ -1140,6 +1145,8 @@ export interface ScreenSettings extends ScreenBehaviour {
 	readonly ungrouped: string;
 	readonly priorities: readonly PriorityLevel[];
 	readonly labels: readonly LabelLevel[];
+	/** How a card of several labels is painted: `blend`, or stripes. */
+	readonly labelPaint: LabelPaint;
 }
 
 /** The shared settings as a screen sees them. */
@@ -1166,6 +1173,9 @@ export interface SettingsForm {
 	readonly priorities: readonly PriorityLevel[];
 	readonly labelTag: string;
 	readonly labels: readonly LabelLevel[];
+	readonly labelPaint: LabelPaint;
+	/** The paints Several labels offers, in order. */
+	readonly labelPaints: readonly LabelPaint[];
 	/** The tag that makes a note a project, `#project` by default. */
 	readonly projectTag: string;
 	readonly presets: readonly string[];
@@ -1212,6 +1222,8 @@ export interface SettingsService {
 	moveLevel(from: number, to: number): Promise<void>;
 	/** The tag folder trimmed; written when it is one word. */
 	setLabelTag(tag: string): Promise<void>;
+	/** Written when it is one of the form's `labelPaints`. */
+	setLabelPaint(paint: LabelPaint): Promise<void>;
 	/** The tag trimmed, `#` first; written when it is one word. */
 	setProjectTag(tag: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */

@@ -15,6 +15,7 @@ describe("ScreenSettingsImpl", () => {
 			ungrouped: "No section",
 			priorities: DEFAULT_SETTINGS.priorities,
 			labels: [],
+			labelPaint: "stripes",
 		});
 		expect(JSON.stringify(shown)).not.toMatch(/secret|token|google/);
 	});
@@ -27,6 +28,10 @@ describe("ScreenSettingsImpl", () => {
 		await store.update({ longPressMs: 400 });
 		expect(screen.get()).not.toBe(first);
 		expect(screen.get().longPressMs).toBe(400);
+	});
+
+	it("tells how a card of several labels is painted", () => {
+		expect(screenSettingsOf({ ...DEFAULT_SETTINGS, labelPaint: "blend" }).labelPaint).toBe("blend");
 	});
 
 	it("reads No section's name from the sections' settings", () => {

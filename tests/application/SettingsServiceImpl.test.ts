@@ -49,6 +49,22 @@ describe("editing the labels", () => {
 	});
 });
 
+describe("how a card of several labels is painted", () => {
+	it("is offered as stripes or blend, stripes unless set", () => {
+		expect(service().svc.form()).toMatchObject({ labelPaint: "stripes", labelPaints: ["stripes", "blend"] });
+		expect(service({ labelPaint: "blend" }).svc.form().labelPaint).toBe("blend");
+	});
+
+	it("writes a paint offered and nothing else", async () => {
+		const { svc, now, writes } = service();
+		await svc.setLabelPaint("blend");
+		expect(now().labelPaint).toBe("blend");
+		await svc.setLabelPaint("plaid");
+		expect(now().labelPaint).toBe("blend");
+		expect(writes()).toBe(1);
+	});
+});
+
 describe("editing the priority levels", () => {
 	const DEFAULT: readonly PriorityLevel[] = [
 		{ prefix: "p1", color: "red" },

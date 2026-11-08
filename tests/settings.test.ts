@@ -28,7 +28,14 @@ describe("settingsFrom", () => {
 	});
 
 	it("hold nothing of how a frontend lays out its screen", () => {
-		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels", "cardHeight", "cardGap", "labelPaint"]) expect(key in DEFAULT_SETTINGS).toBe(false);
+		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels", "cardHeight", "cardGap"]) expect(key in DEFAULT_SETTINGS).toBe(false);
+	});
+
+	it("paint a card of several labels in stripes unless blend is saved", () => {
+		expect(settingsFrom(null).labelPaint).toBe("stripes");
+		expect(settingsFrom({ labelPaint: "blend" }).labelPaint).toBe("blend");
+		expect(settingsFrom({ labelPaint: "plaid" }).labelPaint).toBe("stripes");
+		expect(storedSettingsFrom({ labelPaint: "blend" }).labelPaint).toBe("blend");
 	});
 
 	it("keeps the other nested keys when one is saved", () => {

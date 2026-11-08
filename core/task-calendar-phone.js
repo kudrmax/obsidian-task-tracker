@@ -1785,6 +1785,7 @@
   }
 
   // core/settings.ts
+  var LABEL_PAINTS = ["stripes", "blend"];
   var DEFAULT_SETTINGS = {
     tasksFile: "TODOs Tasks.md",
     sections: { inbox: "Inbox", now: "Now", soon: "Soon", backlog: "Backlog", done: "Done" },
@@ -1810,6 +1811,7 @@
     ],
     labelTag: "label",
     labels: [],
+    labelPaint: LABEL_PAINTS[0],
     projectTag: "#project",
     groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" }
   };
@@ -1820,8 +1822,12 @@
       ...s,
       sections: { ...DEFAULT_SETTINGS.sections, ...s.sections ?? {} },
       google: { ...DEFAULT_SETTINGS.google, ...s.google ?? {} },
-      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} }
+      groups: { ...DEFAULT_SETTINGS.groups, ...s.groups ?? {} },
+      labelPaint: labelPaintOf(s.labelPaint)
     };
+  }
+  function labelPaintOf(saved) {
+    return LABEL_PAINTS.find((paint) => paint === saved) ?? DEFAULT_SETTINGS.labelPaint;
   }
 
   // core/application/documentText.ts
@@ -3361,6 +3367,19 @@ ${key.title}`.toLowerCase();
     return a.length === b.length && a.every((name, i) => name === b[i]);
   }
 
+  // core/application/wholeCard.ts
+  function wholeWidth(card, room) {
+    if (card.textWidth <= card.titleWidth - card.fade) return null;
+    const missing = Math.ceil(card.textWidth - card.titleWidth);
+    const widest = room.width - 2 * room.margin;
+    const width = Math.max(card.width, Math.min(card.width + missing, widest));
+    return { width, cut: width < card.width + missing };
+  }
+  function grownStart(start, size, grown, room, margin) {
+    const end = Math.max(start + size, room - margin);
+    return Math.max(Math.min(start, margin), Math.min(start, end - grown));
+  }
+
   // core/application/SectionNameEntry.ts
   function sectionNameEnd(ended, event, text) {
     if (ended) return { ended: true };
@@ -3578,7 +3597,8 @@ ${key.title}`.toLowerCase();
       sections: settings.sections,
       ungrouped: settings.groups.ungrouped,
       priorities: settings.priorities,
-      labels: settings.labels
+      labels: settings.labels,
+      labelPaint: settings.labelPaint
     };
   }
 
@@ -3613,6 +3633,8 @@ ${key.title}`.toLowerCase();
         priorities: s.priorities,
         labelTag: s.labelTag,
         labels: s.labels,
+        labelPaint: s.labelPaint,
+        labelPaints: LABEL_PAINTS,
         projectTag: s.projectTag,
         presets: s.groups.presets,
         ungrouped: s.groups.ungrouped,
@@ -3666,6 +3688,10 @@ ${key.title}`.toLowerCase();
     async setLabelTag(tag) {
       const labelTag = tag.trim();
       if (usableLabelTag(labelTag)) await this.store.update({ labelTag });
+    }
+    async setLabelPaint(paint) {
+      const labelPaint = LABEL_PAINTS.find((offered) => offered === paint);
+      if (labelPaint) await this.store.update({ labelPaint });
     }
     async setProjectTag(tag) {
       const bare = tag.trim().replace(/^#/, "");
@@ -5883,6 +5909,7 @@ ${key.title}`.toLowerCase();
     "addLevel",
     "moveLevel",
     "setLabelTag",
+    "setLabelPaint",
     "setProjectTag",
     "renameLabel",
     "recolourLabel",
@@ -6013,7 +6040,9 @@ ${key.title}`.toLowerCase();
     placeAt: (cards, y, level, shift, room, heads, held, hysteresis) => placeAt(cards, y, level, shift, room ?? null, heads ?? [], held ?? null, hysteresis ?? 0),
     branchOf,
     gapBranch,
-    placeShowing
+    placeShowing,
+    wholeWidth,
+    grownStart
   };
   var CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS };
   var TIMELINE = {

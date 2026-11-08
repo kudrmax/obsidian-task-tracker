@@ -70,6 +70,17 @@ export interface SourceSettings {
 	readonly staleAfterMinutes: number;
 }
 
+/** How a card of several labels is painted: narrow diagonal stripes of their colours in turn, or one colour flowing into the next. */
+export type LabelPaint = "stripes" | "blend";
+
+/** The paints a card of several labels may take, in the order the settings offer them; the first is the default. */
+export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
+
+/** How every frontend paints a card alike. */
+export interface CardPaintSettings {
+	readonly labelPaint: LabelPaint;
+}
+
 /** Which notes are projects. */
 export interface ProjectSettings {
 	/** A note with exactly this tag, in its properties or its text, is a project: `#project`. */
@@ -77,7 +88,7 @@ export interface ProjectSettings {
 }
 
 /** The settings every frontend shares: the plugin's data.json holds them, with the TS view's own beside them. */
-export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings;
+export type TaskCalendarSettings = FileFormatSettings & ScreenBehaviour & SourceSettings & ProjectSettings & CardPaintSettings;
 
 export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	tasksFile: "TODOs Tasks.md",
@@ -104,6 +115,7 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	],
 	labelTag: "label",
 	labels: [],
+	labelPaint: LABEL_PAINTS[0],
 	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 };
@@ -117,5 +129,11 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		sections: { ...DEFAULT_SETTINGS.sections, ...(s.sections ?? {}) },
 		google: { ...DEFAULT_SETTINGS.google, ...(s.google ?? {}) },
 		groups: { ...DEFAULT_SETTINGS.groups, ...(s.groups ?? {}) },
+		labelPaint: labelPaintOf(s.labelPaint),
 	};
+}
+
+/** A paint as saved: one of the paints, or the default for anything else. */
+export function labelPaintOf(saved: unknown): LabelPaint {
+	return LABEL_PAINTS.find((paint) => paint === saved) ?? DEFAULT_SETTINGS.labelPaint;
 }

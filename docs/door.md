@@ -197,12 +197,14 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `context.settings`: `form()` (`SettingsForm`, the fields as the screen shows them), `setTasksFile(path)`,
 `setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
-`setLabelTag(tag)`, `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+`setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
+`"stripes"` or `"blend"`; anything else writes nothing), `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
 level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
-`dayStartHours` (what Day starts at offers), `googleClientReady` (Log in has a client id to go with), and
+`dayStartHours` (what Day starts at offers), `labelPaint` and `labelPaints` (Several labels: the paint saved, and the
+paints offered in order, `["stripes", "blend"]`), `googleClientReady` (Log in has a client id to go with), and
 `sectionOrder` and `markerOrder`: the sections' names and the line markers the screen edits, in its order (the words
 for each are the host's).
 
@@ -215,8 +217,10 @@ client secret, which the phone does not edit.
 ### `screenSettings.get()`: what a screen reads of the settings
 
 `ScreenSettings`: the tasks file, the sections' names, the name over tasks outside a section, the priority levels and the
-labels, when a touch becomes a drag (`longPressMs`) and the hour another day opens at (`scrollToHour`). Every frontend's
-screen behaves by them alike. `onChange` is the host's: it watches `data.json`.
+labels, how a card of several labels is painted (`labelPaint`: `"blend"`, one colour flowing into the next, or
+`"stripes"`, the default and what any other saved value reads as), when a touch becomes a drag (`longPressMs`) and the
+hour another day opens at (`scrollToHour`). Every frontend's screen behaves by them alike. `labelPaint` lives in
+`data.json` and travels with the vault: the plugin's settings tab and the app read and write the same key. `onChange` is the host's: it watches `data.json`.
 
 ### `timeline.zoomLevels()`: the zoom's levels
 
@@ -345,6 +349,17 @@ for a task) and `gapBranch(cards, gap)` (the same for an open gap, as a row of i
 the screen's places: `placeShowing(column, place)` (the place a list is shown from: `place` itself when it shows
 `column`, else the nearest place that does; `placeShowing("day", "inbox")` → `"soon"`; a place is `"inbox"`, `"soon"`
 or `"calendar"`, the app's Today);
+the copy of a pressed card that shows its whole title, in points or px: `wholeWidth(card, room)` (`card`
+`{ width, titleWidth, textWidth, fade }`: the card's width, its title's box, the title's text measured on one line, the
+fade at the title's end; `room` `{ width, margin }`: the window and the margin a copy keeps from its edges) answers
+`null` while the title shows whole (the card itself is lifted), else `{ width, cut }`: the copy grown right by what the
+title lacks, never wider than the window less both margins nor narrower than the card, and `cut` when the title still
+doesn't fit at that width (it then wraps and the copy grows down, as tall as the wrapped title measures);
+`wholeWidth({ width: 170, titleWidth: 140, textWidth: 200, fade: 16 }, { width: 390, margin: 10 })` →
+`{ width: 230, cut: false }`. `grownStart(start, size, grown, room, margin)` (one axis: where the copy of a card at
+`start` of `size`, grown to `grown`, starts in a window of `room` with `margin`: where the card did, pulled back only as
+far as it takes to end inside the margin, or at the card's own end if that is further, never past the near margin;
+`grownStart(200, 180, 230, 390, 10)` → `150`);
 `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another),
@@ -402,3 +417,4 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
   `call`, by their error codes (`staleTask`, `blank`).
 - `TaskCapture.oneLine`: `capture` writes the title on one line already; `oneLine` where the app shows it before.
 - `CaptureList`'s cases and their titles: `capture.lists()`, by the headings' names.
+- `CardControl.grownStart` and the width a pressed card's copy grows to: `rules.wholeWidth` and `rules.grownStart`.

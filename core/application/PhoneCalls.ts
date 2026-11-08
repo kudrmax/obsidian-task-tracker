@@ -38,6 +38,7 @@ import {
 } from "./contracts";
 import { acceptsDrop, placesInGap } from "./drops";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
+import { grownStart, wholeWidth } from "./wholeCard";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
@@ -546,6 +547,7 @@ const SETTINGS_METHODS: readonly string[] = [
 	"addLevel",
 	"moveLevel",
 	"setLabelTag",
+	"setLabelPaint",
 	"setProjectTag",
 	"renameLabel",
 	"recolourLabel",
@@ -701,6 +703,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	branchOf,
 	gapBranch,
 	placeShowing,
+	wholeWidth,
+	grownStart,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

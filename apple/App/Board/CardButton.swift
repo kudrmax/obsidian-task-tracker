@@ -216,19 +216,18 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }
     }
 
-    /// The copy the menu lifts when the card cuts its title, as the plugin's: grown to the right by what the title lacks,
-    /// never wider than the window less its margins, and where it still doesn't fit, wrapped onto more lines with the
-    /// copy grown down. It stands where the card is, pulled back only as far as it takes to keep inside the margins. A
-    /// card that shows its whole title is lifted itself.
+    /// The copy the menu lifts when the card cuts its title, as the plugin's: as wide as the core says (`rules.wholeWidth`),
+    /// and where the title still doesn't fit, wrapped onto more lines with the copy grown down. It stands where the core
+    /// places it (`rules.grownStart`). A card that shows its whole title is lifted itself.
     private func wholePreview() -> UITargetedPreview? {
         guard let look, let window, let room = titleFrame else { return nil }
+        let board = AppServices.shared.board
         let text = look.card.item.text as NSString
         let natural = text.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
-        guard natural > room.width - CardMetrics.fade else { return nil }
-        let margin = CardMetrics.wholeMargin
-        let widest = window.bounds.width - 2 * margin
-        let missing = (natural - room.width).rounded(.up)
-        let width = max(bounds.width, min(bounds.width + missing, widest))
+        let margin = Double(CardMetrics.wholeMargin)
+        let fit = TitleFit(width: Double(bounds.width), titleWidth: Double(room.width), textWidth: Double(natural), fade: Double(CardMetrics.fade))
+        guard let grown = try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin) else { return nil }
+        let width = CGFloat(grown.width)
         let copy = UIHostingConfiguration {
             TaskCapsule(card: look.card, height: look.height, whole: true)
         }
@@ -238,19 +237,13 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         let height = max(bounds.height, copy.systemLayoutSizeFitting(CGSize(width: width, height: UIView.layoutFittingCompressedSize.height), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height.rounded(.up))
         copy.frame = CGRect(x: 0, y: 0, width: width, height: height)
         let card = convert(bounds, to: window)
-        let left = Self.grownStart(card.minX, card.width, width, window.bounds.width, margin)
-        let top = Self.grownStart(card.minY, card.height, height, window.bounds.height, margin)
+        guard let left = try? board.grownStart(Double(card.minX), size: Double(card.width), grown: grown.width, room: Double(window.bounds.width), margin: margin),
+              let top = try? board.grownStart(Double(card.minY), size: Double(card.height), grown: Double(height), room: Double(window.bounds.height), margin: margin)
+        else { return nil }
         let parameters = UIPreviewParameters()
         parameters.visiblePath = UIBezierPath(roundedRect: copy.bounds, cornerRadius: CardMetrics.radius)
         parameters.backgroundColor = .clear
-        return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: left + width / 2, y: top + height / 2)))
-    }
-
-    /// Where a grown copy starts on one axis (the plugin's `grownStart`): where the card did, pulled back only as far as
-    /// it takes to end inside the margin (or where the card ended, if that is further), never past the near margin.
-    private static func grownStart(_ start: CGFloat, _ size: CGFloat, _ grown: CGFloat, _ room: CGFloat, _ margin: CGFloat) -> CGFloat {
-        let end = max(start + size, room - margin)
-        return max(min(start, margin), min(start, end - grown))
+        return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: CGFloat(left) + width / 2, y: CGFloat(top) + height / 2)))
     }
 
     /// A row that opens a sheet or a page runs once the menu has gone.

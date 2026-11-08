@@ -278,6 +278,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	placeShowing: "./screenPlaces",
 	SCREEN_PLACES: "./screenPlaces",
 	SHOWN_LISTS: "./screenPlaces",
+	wholeWidth: "./wholeCard",
+	grownStart: "./wholeCard",
 };
 
 /**
