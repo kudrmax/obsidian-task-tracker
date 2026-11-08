@@ -31,11 +31,11 @@ struct TaskFullScreen: View {
         _listName = State(initialValue: page?.listName ?? "")
         _menuModel = State(initialValue: page?.menu)
         _subtaskMenus = State(initialValue: page?.subtaskMenus ?? [:])
-        let text = page?.opened?["text"]?.string ?? ""
-        _draft = State(initialValue: page?.opened?["state"] ?? .null)
+        let text = page?.opened["text"].string ?? ""
+        _draft = State(initialValue: page?.opened["state"] ?? .null)
         _text = State(initialValue: text)
         _placed = State(initialValue: text)
-        _preread = State(initialValue: page?.opened != nil)
+        _preread = State(initialValue: page != nil)
     }
 
     /// The description was opened before the push.
@@ -200,7 +200,7 @@ struct TaskFullScreen: View {
 
     /// The task as the file now has it, its subtasks and menu; a change made elsewhere reaches the editor unless it is in use.
     private func refresh() async {
-        let page = await model.page(task)
+        guard let page = await model.page(task) else { return }
         withAnimation(.snappy) {
             current = page.task
             tree = page.tree

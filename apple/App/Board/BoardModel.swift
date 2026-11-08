@@ -321,37 +321,27 @@ final class BoardModel {
 
     // MARK: A task's page
 
-    /// What a task's page shows, read before the page is pushed so its first frame is whole.
-    struct TaskPage {
-        let task: TaskItem
-        let tree: FullTree?
-        let listName: String
-        let menu: TaskMenuModel?
-        let subtaskMenus: [String: TaskMenuModel]
-        /// The description as the editor opens it (`description.open`).
-        let opened: [String: JSONValue]?
-    }
-
     /// Pages read ahead of their push, by task id.
     @ObservationIgnored private(set) var pages: [String: TaskPage] = [:]
+    /// A page being read for its push: a second tap meanwhile pushes nothing more.
+    @ObservationIgnored private var opening: String?
 
-    /// A task's page: read first, then pushed.
+    /// A task's page: read first, in one go off the main thread, then pushed once.
     func openFullScreen(_ item: TaskItem) async {
-        pages[item.id] = await page(item)
+        guard opening == nil, fullScreen.last?.id != item.id else { return }
+        opening = item.id
+        defer { opening = nil }
+        guard await page(item) != nil, fullScreen.last?.id != item.id else { return }
         fullScreen.append(item)
     }
 
-    /// The task as the file now has it, its subtasks, its list's name and the menus of its page.
-    func page(_ item: TaskItem) async -> TaskPage {
-        let found: TaskItem? = try? await read("tasks.find", [item.key.json, .string(item.text)])
-        let task = found ?? item
-        let tree: FullTree? = try? await rule("tasks.fullTree", [task.json])
-        let listName: String = (try? await read("tasks.listName", [.string(task.list)])) ?? ""
-        let menu = await menu(for: task, from: "full")
-        var menus: [String: TaskMenuModel] = [:]
-        for row in tree?.rows ?? [] { menus[row.item.id] = await self.menu(for: row.item, from: "full") }
-        let opened: [String: JSONValue]? = try? await rule("description.open", [task.description.json])
-        let page = TaskPage(task: task, tree: tree, listName: listName, menu: menu, subtaskMenus: menus, opened: opened)
+    /// The task as the file now has it, its subtasks, its list's name, the menus of its page and its description, kept
+    /// for the page to draw its first frame from.
+    @discardableResult
+    func page(_ item: TaskItem) async -> TaskPage? {
+        let board = board
+        let screen = menuScreen
+        guard let page = try? await Task.detached(operation: { try board.page(item, screen: screen) }).value else { return nil }
         pages[item.id] = page
         return page
     }
@@ -898,12 +888,13 @@ final class BoardModel {
         return room.flatMap { gapRect(column, ListGap(column: column, at: $0.at, level: $0.level, group: $0.group, place: place, line: nil)) }
     }
 
-    /// Where the core will leave `item` dropped `to`, asked over the file as it is, before the write.
+    /// Where the core will leave `item` dropped `to`, asked before the write over the text the screen is drawn from, on
+    /// the pure rules' context: no file is read and no background read is waited for in the frame of the drop.
     private func landing(_ item: TaskItem, from: String, to: JSONValue) -> DropLanding? {
-        guard let day = snapshot?.day else { return nil }
         let tasks: JSONValue = [["key": item.key.json, "from": .string(from)]]
+        guard let snapshot else { return nil }
         do {
-            return try board.landing(tasks, to: to, day: day).first
+            return try board.landing(tasks, to: to, over: snapshot).first
         } catch {
             problem = Self.words(error)
             return nil

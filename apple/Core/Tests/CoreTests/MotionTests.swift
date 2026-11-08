@@ -162,7 +162,7 @@ import Testing
         let idea = try #require(before.lists[.inbox]?.cards.first { $0.item.title == "Idea" })
         let tasks: JSONValue = [["key": idea.item.key.json, "from": "inbox"]]
         let to: JSONValue = ["kind": "time", "start": 0]
-        let landed = try #require(try board.landing(tasks, to: to, day: today).first)
+        let landed = try #require(try board.landing(tasks, to: to, over: before).first)
         #expect(landed.kind == "timeline")
         #expect(landed.id == idea.id)
         #expect(landed.ridesNow == true)
@@ -188,5 +188,20 @@ import Testing
         #expect(list.gap(in: .soon, among: cards) == nil)
         let sub: DropLanding = try JSONValue.object(["kind": "subtask", "id": "x", "item": .null, "parent": .string(parent.id), "index": 0]).decode()
         #expect(sub.gap(in: .day, among: cards) == LandingGap(at: child, level: 1, group: parent.item.group))
+    }
+}
+
+@Suite struct TaskPageTests {
+    @Test func aPageIsReadWholeBeforeItShows() throws {
+        let board = TaskBoard(core: try PhoneCore(script: Fixtures.phoneScript), vault: FakeVault(IdentityTests.file))
+        let screen = try board.snapshot(day: nil, measures: IdentityTests.measures)
+        let parent = try #require(screen.lists.values.flatMap(\.cards).first { $0.item.title == "Parent" })
+        let menuScreen: JSONValue = ["today": .string(screen.today), "day": .string(screen.day), "offer": screen.screen.offer]
+        let page = try board.page(parent.item, screen: menuScreen)
+        #expect(page.task.id == parent.id)
+        let child = try #require(page.tree?.rows.first { $0.item.title == "Child" })
+        #expect(page.subtaskMenus[child.item.id] != nil)
+        #expect(page.menu != nil)
+        #expect(!page.listName.isEmpty)
     }
 }

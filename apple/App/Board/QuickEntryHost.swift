@@ -472,7 +472,9 @@ final class QuickEntryHost {
         if read == nil, case .success = written { Task { await model.reload() } }
         // The screen, the field's line and the job's end in one transaction: the field never shows empty before the card
         // that ends its line, and the rows below move once.
-        return finish(id) {
+        // The job's drawing moves as it differs from the screen (a line written elsewhere in the list slides the rows).
+        let motion = read.map { $0.motion(from: model.snapshot) } ?? .still
+        return finish(id, motion: motion) {
             if method == "createInPlace" {
                 var reply: JSONValue?
                 if let created, let read {
@@ -490,13 +492,12 @@ final class QuickEntryHost {
         }
     }
 
-    /// The job ends, drawn in one transaction with `draw`, what the job showed; false when the door refused to end it, and
-    /// it stays started so it is never run again.
-    private func finish(_ id: String, drawing draw: () -> Void) -> Bool {
+    /// The job ends, drawn in one transaction with `draw`, what the job showed, moving as the screen's drawing differs;
+    /// false when the door refused to end it, and it stays started so it is never run again.
+    private func finish(_ id: String, motion: BoardMotion = .still, drawing draw: () -> Void) -> Bool {
         var ended = false
-        var instant = Transaction()
-        instant.disablesAnimations = true
-        withTransaction(instant) {
+        guard let model else { return false }
+        model.draw(motion: motion) {
             draw()
             guard let reply = answer("done", [.string(id)]) else { return }
             apply(reply)

@@ -39,6 +39,8 @@ public final class TaskBoard: @unchecked Sendable {
     private let lock = NSLock()
     /// One write at a time: each is made over the file and the undo steps the one before it left.
     private let writing = NSLock()
+    /// Held while the tasks file is read with the count of writes, and while a write puts its text and its ids in.
+    private let fileLock = NSLock()
     private var history: DoorHistory?
     /// Who the tasks and sections are, as the last answer over the file gave it: handed in with every call over the file,
     /// so a task keeps its `id` through every write, read and undo (`docs/door.md`, «Ids»).
@@ -57,12 +59,15 @@ public final class TaskBoard: @unchecked Sendable {
     /// The vault's files as they are now.
     public func files(now: Date = Date()) throws -> BoardFiles {
         let settings = vault.settingsJSON()
+        // The file and the count of writes are read together: never a text a write just made with the count from before it.
+        fileLock.lock()
         lock.lock()
         settingsSeen = settings
         let generation = generation
         lock.unlock()
         let tasks: String?
         do {
+            defer { fileLock.unlock() }
             tasks = try vault.read().tasks
         } catch VaultError.tasksFileMissing {
             tasks = nil
@@ -140,13 +145,21 @@ public final class TaskBoard: @unchecked Sendable {
                 keep(reply.ids, over: files)
                 return reply.result
             }
-            if let old = files.tasks {
-                guard try vault.write(tasks: tasks, expecting: old) else { continue }
-            } else {
-                try vault.write(path: try vault.tasksFilePath(), text: tasks)
+            // The text and its ids go in together: no read sees the new text with the ids from before it.
+            fileLock.lock()
+            let written: Bool
+            do {
+                defer { fileLock.unlock() }
+                if let old = files.tasks {
+                    written = try vault.write(tasks: tasks, expecting: old)
+                } else {
+                    try vault.write(path: try vault.tasksFilePath(), text: tasks)
+                    written = true
+                }
+                if written { keepWritten(reply.ids) }
             }
+            guard written else { continue }
             keep(reply.history)
-            keepWritten(reply.ids)
             return reply.result
         }
         throw BoardError.busy
@@ -172,6 +185,12 @@ public final class TaskBoard: @unchecked Sendable {
         let settings: String?
         let history: DoorHistory?
         let ids: DoorIds?
+    }
+
+    /// A call over the text a screen was drawn from, on the pure rules' context: no file is read and no read waits.
+    /// Its ids are not kept: the board's own reads keep them.
+    func answer(_ method: String, _ arguments: [JSONValue], drawnFrom tasks: String?, settingsJSON: String, now: Date) throws -> JSONValue {
+        try answer(method, arguments, BoardFiles(tasks: tasks, settingsJSON: settingsJSON, calendars: [:], now: now), on: pure).result
     }
 
     private func answer(_ method: String, _ arguments: [JSONValue], _ files: BoardFiles, on lane: PhoneCore? = nil) throws -> Answer {
