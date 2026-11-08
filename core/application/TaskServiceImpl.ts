@@ -11,7 +11,9 @@ import {
 	type DaySpan,
 	type DayView,
 	type DraftMarks,
+	type CreatedTask,
 	type DroppedTask,
+	type DropLanding,
 	type DropOrigin,
 	type FullTree,
 	type DropTo,
@@ -46,6 +48,7 @@ import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskR
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
 import type { UndoHistory } from "./UndoHistory";
+import { TaskIdentity } from "./TaskIdentity";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 import { snapMinute } from "./snapGrid";
 
@@ -81,8 +84,9 @@ export class TaskServiceImpl implements TaskService {
 		private readonly history: UndoHistory | null = null,
 		private readonly projects: Projects = NO_PROJECTS,
 		private readonly grouping: GroupingStore = memoryGrouping(),
+		identity: TaskIdentity = new TaskIdentity(),
 	) {
-		this.rules = new TaskRules(settings, clock);
+		this.rules = new TaskRules(settings, clock, identity);
 		this.reads = new TaskReads(this.rules, settings, clock, { notes: () => projects.list(), grouping: () => grouping.get() });
 		this.writes = new TaskWrites(this.rules, this.reads);
 	}
@@ -198,6 +202,10 @@ export class TaskServiceImpl implements TaskService {
 
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<TaskKey | null> {
 		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels));
+	}
+
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {
@@ -440,6 +448,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(await this.ask(this.writes.drop(tasks, to, day)));
 	}
 
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Promise<readonly DropLanding[]> {
+		return this.ask(this.writes.landing(tasks, to, day, project));
+	}
+
 	async normalize(): Promise<void> {
 		const text = await this.store.read();
 		if (text === null) return;
@@ -503,11 +515,12 @@ export class TaskServiceImpl implements TaskService {
 		if (!operation) return null;
 		const at = this.rules.moment();
 		let failure: unknown = null;
-		let change = null as { before: string; written: TextChange } | null;
+		let change = null as { before: string; written: TextChange; ids: ReadonlyMap<number, string> } | null;
 		await this.store.write((text) => {
 			try {
+				const ids = this.rules.idsOf(text);
 				const written = this.rules.change(text, operation, at);
-				change = { before: text, written };
+				change = { before: text, written, ids };
 				return written.text;
 			} catch (e) {
 				failure = e;
@@ -516,9 +529,9 @@ export class TaskServiceImpl implements TaskService {
 		});
 		if (failure !== null) throw failure;
 		if (!change) return null;
-		const { before, written } = change;
+		const { before, written, ids } = change;
 		this.normalized = { text: written.text, today: at.today, reading: at.reading, doc: written.after, changed: false };
-		if (record) this.history?.record(before, written.text);
+		if (record) this.history?.record(before, written.text, { before: ids, after: this.rules.idsOf(written.text) });
 		return { before: written.before, after: written.after };
 	}
 

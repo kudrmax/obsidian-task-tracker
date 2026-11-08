@@ -4,7 +4,7 @@ import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { Button } from "../kit/Button";
 import { icon } from "../kit/icons";
-import { Overlay } from "../menu/Overlay";
+import { type CloseHow, Overlay } from "../menu/Overlay";
 import { renderSearchRows, type SearchRow } from "./searchRows";
 
 export interface SearchWindowDeps {
@@ -15,6 +15,8 @@ export interface SearchWindowDeps {
 	/** The project whose view the search was opened from: it finds only that project's tasks. */
 	readonly project?: string;
 	sectionName(section: SectionKey): string;
+	/** The sheet of the window it replaces («⋯»), taken over as it stands; without it the search opens its own. */
+	readonly sheet?: (onClose: (how: CloseHow) => void) => Overlay;
 	onPick(hit: SearchHit): void;
 	onClose(): void;
 }
@@ -30,7 +32,7 @@ export class SearchWindow {
 	readonly el: HTMLElement;
 	readonly input: HTMLInputElement;
 	private readonly results: HTMLElement;
-	private readonly overlay: Overlay | null;
+	private readonly overlay: Overlay;
 	private rows: SearchRow[] = [];
 	private picked = -1;
 	/** The search last asked for: an answer to an older one comes too late to show. */
@@ -42,7 +44,7 @@ export class SearchWindow {
 	}
 
 	private constructor(private readonly deps: SearchWindowDeps) {
-		this.overlay = deps.desktop ? new Overlay(() => this.cancel()) : null;
+		this.overlay = deps.sheet ? deps.sheet(() => this.cancel()) : new Overlay(() => this.cancel(), deps.root);
 		this.el = el(null, "div", deps.desktop ? "tc-search is-desk" : "tc-search");
 		const field = el(null, "label", "tc-search-field");
 		field.appendChild(icon("search"));
@@ -57,15 +59,16 @@ export class SearchWindow {
 		if (deps.desktop) {
 			this.el.append(field, this.results);
 			this.placeOver(deps.root);
-			this.overlay!.add(this.el);
-			this.overlay!.show();
+			this.overlay.add(this.el);
 		} else {
 			const bar = el(null, "div", "tc-search-bar");
 			bar.appendChild(field);
 			Button.create(bar, { kind: "text", tone: "accent", label: "Cancel", cls: "tc-search-cancel", onPress: () => this.cancel() });
 			this.el.append(this.results, bar);
-			deps.root.appendChild(this.el);
+			this.overlay.addIn(deps.root, this.el);
+			this.overlay.dropSheet();
 		}
+		this.overlay.show();
 		this.input.focus();
 	}
 
@@ -73,8 +76,7 @@ export class SearchWindow {
 		if (this.closed) return;
 		this.closed = true;
 		this.asked++;
-		if (this.overlay) this.overlay.close();
-		else this.el.remove();
+		void this.overlay.close();
 	}
 
 	/** The rows drawn for the last answer. */
@@ -87,9 +89,11 @@ export class SearchWindow {
 		this.deps.onClose();
 	}
 
+	/** A result picked: the window closes, and the screen goes to the task once it has, as every pick of a window does. */
 	private pick(hit: SearchHit): void {
+		if (this.closed) return;
 		this.close();
-		this.deps.onPick(hit);
+		this.overlay.afterClose(() => this.deps.onPick(hit));
 	}
 
 	private async find(query: string): Promise<void> {
@@ -117,9 +121,6 @@ export class SearchWindow {
 			e.preventDefault();
 			const row = this.rows[this.picked];
 			if (row) this.pick(row.hit);
-		} else if (e.key === "Escape" && !this.overlay) {
-			e.preventDefault();
-			this.cancel();
 		}
 	}
 

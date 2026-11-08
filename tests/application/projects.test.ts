@@ -86,7 +86,7 @@ describe("Backlog grouped by project", () => {
 			["Дальний", true, false, ["B3"], { section: "Дальний", rename: true, remove: true, project: "Окружение" }],
 		]);
 		expect(own.end).toEqual({ kind: "task", group: "Дальний", before: null, project: "Окружение" });
-		expect(groups[0].sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
+		expect(groups[0].sections).toEqual([{ id: "none", name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
 		expect(groups[3].sections.map((s) => [s.name, s.empty])).toEqual([
 			[null, false],
 			["Пустой", true],
@@ -218,7 +218,7 @@ describe("the project's view as one group of the project (decision 25)", () => {
 	it("an empty list of the view is the group's empty part: «No tasks», where its plate writes", async () => {
 		const screen = await setup(FILE).svc.screen(LATER, "Английский");
 		const part = screen.projects.inbox.groups[0];
-		expect(part.sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
+		expect(part.sections).toEqual([{ id: "none", name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
 		expect(part.end).toEqual({ kind: "task", group: null, before: null, project: "Английский" });
 	});
 
@@ -252,7 +252,7 @@ describe("a grouped list's group, ready to draw", () => {
 		const { svc } = setup();
 		await svc.toggleFold("backlog", "окружение");
 		const groups = (await svc.screen(T)).projects.backlog.groups;
-		expect(groups[0].sections).toEqual([{ name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
+		expect(groups[0].sections).toEqual([{ id: "none", name: null, items: [], rows: [], empty: true, menu: null, header: false, reorder: false }]);
 		expect(groups[0]).toMatchObject({ titled: true, head: { group: null, project: "Английский" } });
 		expect(groups[1].head).toEqual({ group: "Дальний", project: "Окружение" });
 	});

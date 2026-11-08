@@ -1,10 +1,11 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type DroppedTask, type DropFrom, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
-import { keyId, placeId } from "../../core/application/taskKeys";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
 import { dayMonth } from "../../core/application/dayLabels";
+import { keyId } from "../../core/application/taskKeys";
+import { NO_SECTION_ID } from "../../core/application/sections";
 import { fullTree } from "../../core/application/fullTree";
 import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
 import { DayBoundary } from "../../core/domain/DayBoundary";
@@ -147,11 +148,10 @@ export class DemoTaskService implements TaskService {
 
 	private item(section: SectionKey, index: number): TaskItem {
 		const t = this.sections[section][index];
-		const key: TaskKey = { section, index, path: [], raw: this.raw(t) };
+		const key = { section, index, path: [], raw: this.raw(t) };
 		return {
-			key,
 			id: keyId(key),
-			place: placeId(key),
+			key,
 			text: t.text,
 			title: plainText(t.text),
 			status: t.status,
@@ -232,7 +232,7 @@ export class DemoTaskService implements TaskService {
 
 	/** The demo keeps no sections: a list with tasks is No section alone. */
 	async listSections(): Promise<Readonly<Record<GroupedList, readonly ListSection[]>>> {
-		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ name: null, empty: false }] : []);
+		const groups = (list: GroupedList): readonly ListSection[] => (this.sections[list].length > 0 ? [{ id: NO_SECTION_ID, name: null, empty: false }] : []);
 		return { inbox: groups("inbox"), backlog: groups("backlog"), now: groups("now"), soon: groups("soon") };
 	}
 
@@ -643,6 +643,16 @@ export class DemoTaskService implements TaskService {
 		const moved = tasks.map((t) => this.taskOf(t.key));
 		await this.move(tasks, to, day);
 		return moved.flatMap((t) => this.keyOf(t) ?? []);
+	}
+
+	async createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null): Promise<CreatedTask | null> {
+		const key = await this.createInPlace(text, priority, place, repeat);
+		return key && { key, id: keyId(key) };
+	}
+
+	/** The demo keeps no file to try a drop over: each task lands away, where the screen finds it after the drop. */
+	async landing(tasks: readonly DroppedTask[]): Promise<readonly DropLanding[]> {
+		return tasks.map((t) => ({ kind: "away", id: keyId(t.key), item: null }));
 	}
 
 	private move(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): Promise<void> {

@@ -4,7 +4,7 @@ import { projectKey, projectName, type ProjectZone } from "../domain/Project";
 import type { GroupName } from "../domain/Task";
 import type { GroupingState, ListGrouping, ListSection, ProjectGroup, ProjectNote, ProjectRef, TaskItem } from "./contracts";
 import type { ListPlace } from "./nesting";
-import { groupKeyOf, type ListGroup, listView, projectSection, withEmptySections } from "./sections";
+import { groupKeyOf, type ListGroup, listView, projectSection, sectionId, withEmptySections } from "./sections";
 
 /** The title of the group of tasks without a project. */
 export const NO_PROJECT = "No project";
@@ -162,9 +162,9 @@ function groupOf(list: GroupedList, key: string, project: ProjectRef | null, ite
 	const names: GroupName[] = [null, ...order.filter((name) => name !== null)];
 	const filled = names.flatMap((name) => {
 		const own = items.filter((item) => item.group === name);
-		return own.length > 0 ? [projectSection(name, own, zone)] : [];
+		return own.length > 0 ? [projectSection(name, own, zone, sectionId(name, sections))] : [];
 	});
-	const drawn: readonly ListGroup[] = withEmpty ? withEmptySections(filled, sections).map((g) => (g.items.length === 0 ? projectSection(g.name, [], zone) : g)) : filled;
+	const drawn: readonly ListGroup[] = withEmpty ? withEmptySections(filled, sections).map((g) => (g.items.length === 0 ? projectSection(g.name, [], zone, g.id) : g)) : filled;
 	return projectGroup(key, project, items, zone, drawn, isFolded(state, list, key), true);
 }
 

@@ -1,8 +1,10 @@
 import { isOpen, type LocalDate, type ReminderKind, type Slot, type TaskStatus } from "../domain/Task";
 import type { TaskDocument } from "../domain/TaskDocument";
 import type {
+	CreatedTask,
 	DroppedTask,
 	DropFrom,
+	DropLanding,
 	DropTo,
 	EndList,
 	GroupedList,
@@ -23,6 +25,7 @@ import { tileStatus, toggledLabels, toggledPriority } from "./menus";
 import type { Read, Snapshot, TaskReads } from "./TaskReads";
 import type { Operation, TaskRules } from "./TaskRules";
 import { droppedSpan } from "./TimelineSpans";
+import { landingOf } from "./landing";
 
 /** The document as normalized before and after an operation ran. */
 export interface DocChange {
@@ -62,11 +65,16 @@ export class TaskWrites {
 	}
 
 	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<TaskKey | null> {
+		const write = this.createWithId(text, priority, place, repeat, labels);
+		return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
+	}
+
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = []): Write<CreatedTask | null> {
 		return {
 			operation: this.rules.createInPlace(text, priority, place, repeat, labels),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
-				return created ? { section: created.section, index: created.index, path: created.path, raw: created.raw } : null;
+				return created ? { key: { section: created.section, index: created.index, path: created.path, raw: created.raw }, id: created.id } : null;
 			},
 		};
 	}
@@ -332,6 +340,25 @@ export class TaskWrites {
 			answer: (s) => {
 				const moves = dropMoves(tasks, read, day, (key) => (s ? this.rules.entryOf(s.doc, key).project : null));
 				return this.landed(tasks, moves.kind === "one" ? this.moveOne(s, moves.key, moves.move) : this.applyAll(moves.steps));
+			},
+		};
+	}
+
+	/**
+	 * Where `drop` would leave the tasks, writing nothing: its operation tried over the file as read, and the screen of
+	 * `day` read over the result by the same code as the screen.
+	 */
+	landing(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, project?: string): Read<readonly DropLanding[]> {
+		const drop = this.drop(tasks, to, day);
+		return {
+			reads: true,
+			answer: (s) => {
+				const ids = tasks.map((task) => this.rules.entryOf(s!.doc, task.key).id);
+				const write = drop.answer(s);
+				const after = write.operation ? this.rules.trial(s!.doc, write.operation).after : s!.doc;
+				const screen = this.reads.screen({ text: after.serialize(), doc: after, today: s!.today, boundary: s!.boundary }, day, project);
+				const timeline = this.reads.timeline();
+				return ids.map((id) => landingOf(screen, id, day, timeline));
 			},
 		};
 	}

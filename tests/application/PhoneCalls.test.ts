@@ -118,6 +118,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "createInPlace", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
 	{ method: "createInPlace", args: (s) => ["Sub", null, { kind: "subtask", parent: key(s, "Parent"), before: null }] },
 	{ method: "createInPlace", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
+	{ method: "createWithId", args: () => ["Placed", "p1", { kind: "list", list: "now", group: "Errands", before: null }, null, ["Fast"]] },
+	{ method: "createWithId", args: () => ["   ", null, { kind: "day", date: T, group: null, before: null }] },
 	{ method: "create", args: () => [{ text: "Drafted", placement: { kind: "soon" }, priority: null }] },
 	{ method: "create", args: () => [{ text: "Slotted", placement: { kind: "now" }, priority: null }, { date: T, start: 900, end: 960 }] },
 	{ method: "createSubtask", args: (s) => [key(s, "Parent"), { text: "Under", placement: { kind: "now" }, priority: null }] },
@@ -195,6 +197,8 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "createSection", args: (s) => ["Evening", { kind: "day", date: T, group: null, before: key(s, "In progress") }] },
 	{ method: "applyAll", args: (s) => [[{ key: key(s, "Idea"), change: { kind: "moveToEnd", section: "soon" } }, { key: key(s, "Shop"), change: { kind: "status", status: "done" } }]] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Later"), from: "soon" }], { kind: "time", start: 660 }, T] },
+	{ method: "landing", args: (s) => [[{ key: key(s, "Later"), from: "soon" }], { kind: "time", start: 300 }, T] },
+	{ method: "landing", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }, { key: key(s, "Someday"), from: "backlog" }], { kind: "list", column: "soon", before: null }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }, { key: key(s, "Someday"), from: "backlog" }], { kind: "list", column: "soon", before: null }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "soon", place: { kind: "task", group: null, before: key(s, "Later") } }, T] },
 	{ method: "normalize", args: () => [] },
@@ -508,7 +512,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.repeatDraft", T, rule),
 		plain("rules.editRepeat", wire(callDoor("rules.repeatDraft", [T, null], context()) as { result: unknown }).result, { what: "kind", to: "schedule" }),
 		plain("rules.samePlacement", { kind: "now" }, { kind: "date", date: T }),
-		...["keyId", "placeId"].map((m) => plain(`rules.${m}`, key(screen, "Shop"))),
+		plain("rules.keyId", key(screen, "Shop")),
 		...["sameLine", "samePlace", "sameTaskTree"].map((m) => plain(`rules.${m}`, key(screen, "Shop"), key(screen, "Parent"))),
 		plain("rules.fitLevel", look.cards.day, gap),
 		plain("rules.gapOfPlace", look.cards.day, { kind: "task", group: null, before: null }),
@@ -676,10 +680,33 @@ describe("the door's quick entry", () => {
 		expect(entered.state).toMatchObject({ text: "", pending: [{ text: "Buy milk" }] });
 		const [job] = entered.jobs;
 		expect(step("call", job.id).value).toEqual({ method: "createInPlace", args: ["Buy milk", null, { kind: "day", date: T, group: null, before: null }, null, []] });
-		const shown = step("shown", job.id, null, { day: [] });
+		const made = { key: { section: "now", index: 0, path: [], raw: "- [ ] Buy milk" }, id: "t9" };
+		const shown = step("shown", job.id, made, { day: [{ key: made.key, id: made.id, level: 0, group: null }] });
 		expect(shown.state?.pending).toEqual([]);
 		step("done", job.id);
 		expect((answer.result as { session: { jobs: unknown[] } }).session.jobs).toEqual([]);
+	});
+
+	it("answers a rename entered and not yet written: the task's id and the text its card shows meanwhile", () => {
+		const screen = callDoor("tasks.screen", [T], context()) as Extract<DoorAnswer, { ok: true }>;
+		const view = screen.result as ScreenView;
+		const task = view.day.list.find((i) => i.title === "In progress")!;
+		const look = { cards: { day: view.day.list.map((i) => ({ key: i.key, level: 0, group: i.group })) }, day: T, shown: ["day"] };
+		let answer = callDoor("entry.renameSpot", wire([null, look, task, false]), context()) as Extract<DoorAnswer, { ok: true }>;
+		const step = (method: string, ...args: unknown[]) => {
+			answer = callDoor(`entry.${method}`, wire([(answer.result as { session: unknown }).session, look, ...args]), context()) as Extract<DoorAnswer, { ok: true }>;
+			return answer.result as { state: { renamed: unknown } | null; renamed: unknown; value: unknown; jobs: { id: string }[] };
+		};
+		const spot = (answer.result as { value: unknown }).value;
+		expect(step("open", spot, task).renamed).toEqual([]);
+		step("type", "Renamed [[Mom]]");
+		const entered = step("enter");
+		const renamed = [{ id: task.id, key: task.key, text: "Renamed [[Mom]]", title: "Renamed Mom" }];
+		expect(entered.renamed).toEqual(renamed);
+		expect(entered.state?.renamed).toEqual(renamed);
+		const [job] = entered.jobs;
+		step("call", job.id);
+		expect(step("done", job.id).renamed).toEqual([]);
 	});
 
 	it("opens the plus in Inbox where the screen shows no day list", () => {

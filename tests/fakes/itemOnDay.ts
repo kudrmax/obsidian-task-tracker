@@ -1,15 +1,14 @@
 import type { TaskItem } from "../../core/application/contracts";
 import { markColors } from "../../core/application/marks";
-import { keyId, placeId } from "../../core/application/taskKeys";
+import { keyId } from "../../core/application/taskKeys";
 import { canPostpone, canRemoveDue, dayOfTask } from "../../core/domain/Days";
 import { canRemind, type LocalDate } from "../../core/domain/Task";
 import { plainText } from "../../core/domain/TaskText";
 
-/** A task item as the service reads it on `today`: its title, its duration, its day and what may be done to it follow from its fields, unless given; no labels (the colours from the priority and labels given), not collapsed, of no project and under no task's key unless given; all its subtasks the open ones unless given. */
-export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "place"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id" | "place">>, today: LocalDate): TaskItem {
+/** A task item as the service reads it on `today`: its title, its duration, its day and what may be done to it follow from its fields, unless given; no labels (the colours from the priority and labels given), not collapsed, of no project and under no task's key unless given; its id its key's; all its subtasks the open ones unless given. */
+export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id"> & Partial<Pick<TaskItem, "day" | "repeatDay" | "can" | "title" | "labels" | "colors" | "collapsed" | "allSubtasks" | "durationMin" | "parentKey" | "project" | "id">>, today: LocalDate): TaskItem {
 	return {
 		id: keyId(item.key),
-		place: placeId(item.key),
 		labels: [],
 		colors: markColors(item.priority, item.labels ?? []),
 		collapsed: false,

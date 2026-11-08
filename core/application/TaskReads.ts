@@ -35,7 +35,7 @@ import type {
 } from "./contracts";
 import { draftMarksOf } from "./marks";
 import { carriedWith, menuOffer, taskMenu } from "./menus";
-import { offeredNames, type SectionOffer, shownSections } from "./sections";
+import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
 import { type ItemLevels, itemLevels, toItem } from "./taskItems";
@@ -87,7 +87,7 @@ function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[
 	return doc
 		.groups(list)
 		.filter((g) => g.heading || g.entries.length > 0)
-		.map((g) => ({ name: g.name, empty: g.name !== null && g.entries.length === 0 }));
+		.map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
 }
 
 /** The sections a search walks, in the order its results stand. */

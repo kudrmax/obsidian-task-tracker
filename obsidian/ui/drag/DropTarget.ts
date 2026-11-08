@@ -60,16 +60,22 @@ export type DragPayload = TaskDragPayload | NewTaskPayload;
 export type DropResult = DropTo;
 
 /** Somewhere a dragged task may land: it previews while the pointer is over it and says what the drop means. */
-export interface DropTarget {
-	hitTest(x: number, y: number, drag: DragPayload): boolean;
-	preview(x: number, y: number, drag: DragPayload): void;
+/** A place to drop on: a list, the timeline, the plus's cancel ring; or the slots among a list's sections for a lifted section (`P`, `R`). */
+export interface DropTarget<P = DragPayload, R = DropResult> {
+	hitTest(x: number, y: number, drag: P): boolean;
+	preview(x: number, y: number, drag: P): void;
 	/** Where a new task carried on the plus comes to rest, in client pixels, while a preview shows. A task's card lands on its card as drawn after the drop. */
 	landing(): DOMRect | null;
 	/** The finger has gone elsewhere, the drag goes on. */
 	leave(): void;
 	/** The drag is over. */
 	clear(): void;
-	drop(x: number, y: number, drag: DragPayload): DropResult | null;
+	drop(x: number, y: number, drag: P): R | null;
+}
+
+/** A drop's task stands where no card of it is drawn: in a folded project group, behind its header. */
+export interface HeldOut {
+	readonly behind: HTMLElement;
 }
 
 /** The card under the finger. */
@@ -77,6 +83,8 @@ export interface Float {
 	moveTo(x: number, y: number): void;
 	/** Settles where the drop puts it. */
 	land(rect: DOMRect): Promise<void>;
+	/** Goes into `rect` and fades there: the drop is written into a part held out of sight under that header. */
+	sink(rect: DOMRect): Promise<void>;
 	/** Fades where it is: the drop is written but its card does not show. */
 	vanish(): Promise<void>;
 	/** Flies back to where it came from. */

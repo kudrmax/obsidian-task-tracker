@@ -2,6 +2,7 @@ import { dividerAt, type DividerStop } from "../../core/application/contracts";
 import { capturePointer, el, releasePointer } from "./dom";
 import type { GestureArbiter } from "./gestures";
 import { PointerSpeed } from "./PointerSpeed";
+import { SnapGlide } from "./motion/SnapGlide";
 
 export interface DividerOptions {
 	width(): number;
@@ -28,6 +29,8 @@ interface Press {
 /** The strip between the columns: dragging it, or its handle, sets the list's width; brought slowly near the middle, it holds to it. The drag holds the screen. */
 export class Divider {
 	private press: Press | null = null;
+	/** The width shown: the step into the middle and out of it glides. */
+	private readonly glide: SnapGlide;
 
 	private readonly el: HTMLElement;
 
@@ -37,6 +40,7 @@ export class Divider {
 	) {
 		this.el = host;
 		this.el.classList.add("tc-divider");
+		this.glide = new SnapGlide(host, (width) => opts.onWidth(width));
 		el(this.el, "div", "tc-divider-line");
 		const handle = el(this.el, "span", "tc-divider-handle");
 		handle.setAttribute("role", "separator");
@@ -53,6 +57,7 @@ export class Divider {
 		const width = this.opts.width();
 		const speed = new PointerSpeed(e.clientX, e.timeStamp);
 		this.press = { x: e.clientX, width, pointerId: e.pointerId, speed, snapped: width === this.opts.center() };
+		this.glide.reset();
 		capturePointer(this.el, e.pointerId);
 		e.preventDefault();
 	}
@@ -69,17 +74,21 @@ export class Divider {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
 		const { width, snapped } = this.place(e);
 		if (snapped && !this.press.snapped) this.opts.onSnap();
+		const stepped = snapped !== this.press.snapped;
 		this.press.snapped = snapped;
-		this.opts.onWidth(width);
+		this.glide.set(width, stepped);
 	}
 
 	private up(e: PointerEvent): void {
 		if (!this.press || e.pointerId !== this.press.pointerId) return;
-		const { width } = this.place(e);
+		const press = this.press;
+		const { width, snapped } = this.place(e);
 		releasePointer(this.el, e.pointerId);
 		this.press = null;
-		this.opts.arbiter.release(RESIZE);
-		this.opts.onWidth(width);
-		this.opts.onRelease(width);
+		this.glide.set(width, snapped !== press.snapped);
+		this.glide.whenSettled(() => {
+			this.opts.arbiter.release(RESIZE);
+			this.opts.onRelease(width);
+		});
 	}
 }

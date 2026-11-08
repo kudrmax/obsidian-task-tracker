@@ -4,6 +4,9 @@ import { Panel, type Picks } from "../kit/Panel";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import type { Overlay } from "./Overlay";
 
+/** The peek fades away and back with the overlay's motion: it is never taken off in one frame. */
+const AWAY = "is-away";
+
 export interface PeekActions {
 	/** A tap on the text: the menu goes, then the whole description. */
 	onRead(): void;
@@ -49,15 +52,15 @@ export class DescriptionPeek {
 		else if (menuAbove && freeBelow >= least) room = this.standUnder(copy.bottom + gap, freeBelow);
 		else if (menuAbove) room = this.standOver(copy.top - menuSpan - gap, copy.top - menuSpan - gap - margin);
 		else room = this.standUnder(copy.bottom + menuSpan + gap, height - copy.bottom - menuSpan - gap - margin);
-		this.el.hidden = room < least;
+		this.el.classList.toggle(AWAY, room < least);
 		this.el.style.left = px(Math.max(margin, Math.min(copy.left, activeWindow.innerWidth - margin - this.el.offsetWidth)));
 		this.el.style.maxHeight = px(Math.max(0, Math.min(tokenPx(this.el, "--tc-desc-peek-max"), room)));
 		this.markCut();
 	}
 
-	/** Gone while the menu is typed in: the field and the keyboard need its room. */
+	/** Fades away while the menu is typed in, or split over and under the card: the field and the panel need its room. */
 	hide(): void {
-		this.el.hidden = true;
+		this.el.classList.add(AWAY);
 	}
 
 	private standOver(bottom: number, room: number): number {

@@ -6,6 +6,7 @@ import { Button } from "../kit/Button";
 import { icon } from "../kit/icons";
 import type { MarkdownEditing, MarkdownSurface } from "../markdown/MarkdownSurface";
 import { movesRows } from "../quick/QuickEntryController";
+import { RenamedTexts } from "../RenamedTexts";
 import { QuickField, type QuickFieldHandle, type QuickKey } from "../quick/QuickField";
 import type { TitleField, TitleFieldFactory } from "../quick/TitleField";
 import { WriteQueue } from "../quick/WriteQueue";
@@ -70,6 +71,8 @@ export class FullScreen {
 	/** Each refresh is numbered: only the last one asked for draws. */
 	private reading = 0;
 	private closed = false;
+	/** The renames typed on the whole screen, told to every card drawn (`RenamedTexts`) until they are written; this ends the telling. */
+	private readonly renames: () => void;
 	private readonly onKey = (e: KeyboardEvent) => this.key(e);
 
 	static open(deps: FullScreenDeps, item: TaskItem, editing: boolean): FullScreen {
@@ -94,6 +97,7 @@ export class FullScreen {
 			},
 			new WriteQueue((error) => deps.onError(error)),
 		);
+		this.renames = RenamedTexts.add(() => this.entry.renamed);
 		this.el = el(deps.root, "div", "tc-sheet tc-full");
 		const bar = el(this.el, "div", "tc-sheet-bar");
 		Button.create(bar, { kind: "text", label: "Close", onPress: () => this.close() });
@@ -193,6 +197,7 @@ export class FullScreen {
 	close(): void {
 		if (this.closed) return;
 		this.closed = true;
+		this.renames();
 		this.leaveTask();
 		this.capsule.destroy();
 		this.list.destroy();

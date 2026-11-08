@@ -1,7 +1,7 @@
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
-import { Panel, Picks } from "../kit/Panel";
+import { Panel } from "../kit/Panel";
 import { menuGroup, menuRoom, menuRow, placePanel } from "./MenuPanel";
 import { Overlay } from "./Overlay";
 
@@ -16,21 +16,21 @@ export interface GroupMenuOptions {
 /** The menu of a section's header, like a task's: the header stays as it is over the blur, the panel grows out under it. */
 export const GroupMenu = {
 	open(head: HTMLElement, opts: GroupMenuOptions): { close(): void } {
-		const overlay = new Overlay(() => overlay.close());
+		const overlay = new Overlay(() => void overlay.close(), head);
 		const rect = head.getBoundingClientRect();
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-head"), false);
 		el(copy.el, "span", "tc-group-name", opts.name);
 		copy.pin(rect, { width: true, height: true });
-		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		const panel = Panel.over(overlay, { root: "tc-panel", place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		const { onRename, onRemove } = opts;
 		panel.replace((p) =>
 			menuGroup(p, [
-				...(onRename ? [{ label: "Rename", icon: "rename", onPick: panel.pick(onRename) } as const] : []),
+				...(onRename ? [{ label: "Rename", icon: "rename", onPick: panel.pickNow(onRename) } as const] : []),
 				...(onRemove ? [{ label: "Remove section", icon: "removeSection", onPick: panel.pick(onRemove) } as const] : []),
 			]),
 		);
 		overlay.show();
-		return { close: () => overlay.close() };
+		return { close: () => void overlay.close() };
 	},
 };
 
@@ -48,18 +48,18 @@ export interface ColumnMenuOptions {
  */
 export const ColumnMenu = {
 	open(title: HTMLElement, opts: ColumnMenuOptions): { close(): void } {
-		const overlay = new Overlay(() => overlay.close());
+		const overlay = new Overlay(() => void overlay.close(), title);
 		const rect = title.getBoundingClientRect();
 		const copy = LiftedCopy.over(overlay, el(null, "div", "tc-lifted is-title"), false);
 		el(copy.el, "span", "tc-lifted-title", opts.title);
 		copy.pin(rect, { width: true, height: true });
-		const panel = Panel.over(overlay, { root: "tc-panel", picks: new Picks(() => overlay.close()), place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
+		const panel = Panel.over(overlay, { root: "tc-panel", place: (p) => placePanel(p, rect, tokenPx(p, "--tc-menu-gap"), menuRoom()) }, false);
 		panel.replace((p) => {
 			const group = menuGroup(p, []);
 			menuRow(group, { label: "Group by project", icon: opts.grouped ? "check" : undefined, choice: true, onPick: panel.pick(() => opts.onGroup(!opts.grouped)) });
 			return group;
 		});
 		overlay.show();
-		return { close: () => overlay.close() };
+		return { close: () => void overlay.close() };
 	},
 };

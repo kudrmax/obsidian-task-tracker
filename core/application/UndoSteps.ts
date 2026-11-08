@@ -1,5 +1,6 @@
-import { type Hunk, TextPatch } from "../domain/TextPatch";
+import { type Hunk, type PatchIds, type Swapped, TextPatch } from "../domain/TextPatch";
 import type { UndoOutcome } from "./contracts";
+import type { CarriedLines } from "./TaskIdentity";
 
 /** The steps kept: enough to go back over an evening's work, not the whole day's. */
 const DEPTH = 100;
@@ -31,8 +32,8 @@ export class UndoSteps {
 	}
 
 	/** A change just made: a new step, and nothing left to do again. False when it changed no line. */
-	record(before: string, after: string): boolean {
-		const patch = TextPatch.between(before, after);
+	record(before: string, after: string, ids?: PatchIds): boolean {
+		const patch = TextPatch.between(before, after, ids);
 		if (patch.empty) return false;
 		this.done.push(patch);
 		if (this.done.length > DEPTH) this.done.shift();
@@ -54,8 +55,8 @@ export class UndoSteps {
 	}
 
 	/** `text` with the step taken back or done again; null when its lines were edited since. */
-	private static make(way: UndoWay, patch: TextPatch, text: string): string | null {
-		return way === "undo" ? patch.revert(text) : patch.apply(text);
+	private static make(way: UndoWay, patch: TextPatch, text: string): Swapped | null {
+		return way === "undo" ? patch.reverted(text) : patch.applied(text);
 	}
 
 	/** A step made: it can be made the other way now. A step that could not be made is dropped. */
@@ -63,13 +64,13 @@ export class UndoSteps {
 		(way === "undo" ? this.undone : this.done).push(patch);
 	}
 
-	/** A whole step over `text`, at once: the outcome and the text it leaves. */
-	step(way: UndoWay, text: string): { readonly outcome: UndoOutcome; readonly text: string } {
+	/** A whole step over `text`, at once: the outcome and the text it leaves; for a step made, how its lines were carried. */
+	step(way: UndoWay, text: string): { readonly outcome: UndoOutcome; readonly text: string; readonly carried?: CarriedLines } {
 		const patch = this.take(way);
 		if (!patch) return { outcome: "nothing", text };
 		const next = UndoSteps.make(way, patch, text);
 		if (next === null) return { outcome: "conflict", text };
 		this.made(way, patch);
-		return { outcome: "done", text: next };
+		return { outcome: "done", text: next.text, carried: { origins: next.origins, ids: next.ids } };
 	}
 }

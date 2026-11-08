@@ -13,6 +13,8 @@ export interface LongPressOptions {
 	onLongTap?(e: PointerEvent): void;
 	/** Whether this press is for this element at all: a press that starts on a child with gestures of its own is not. */
 	accepts?(e: PointerEvent): boolean;
+	/** The element is drawn again: its press ends and it hears no more. */
+	readonly signal?: AbortSignal;
 }
 
 interface Press {
@@ -38,10 +40,12 @@ export class LongPress {
 		private readonly el: HTMLElement,
 		private readonly opts: LongPressOptions,
 	) {
-		el.addEventListener("pointerdown", (e) => this.down(e));
-		el.addEventListener("pointermove", (e) => this.move(e));
-		el.addEventListener("pointerup", (e) => this.up(e));
-		el.addEventListener("pointercancel", (e) => this.cancel(e));
+		const signal = opts.signal;
+		el.addEventListener("pointerdown", (e) => this.down(e), { signal });
+		el.addEventListener("pointermove", (e) => this.move(e), { signal });
+		el.addEventListener("pointerup", (e) => this.up(e), { signal });
+		el.addEventListener("pointercancel", (e) => this.cancel(e), { signal });
+		signal?.addEventListener("abort", () => this.end());
 	}
 
 	private down(e: PointerEvent): void {

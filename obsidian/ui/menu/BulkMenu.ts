@@ -2,7 +2,7 @@ import type { GroupName, MenuEditId, MenuStatusId, TaskItem, TaskMenuModel } fro
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
-import { Panel, Picks } from "../kit/Panel";
+import { Panel } from "../kit/Panel";
 import { fillCard } from "../TaskCard";
 import { pickMark } from "../TaskSelection";
 import type { LocalDate } from "../types";
@@ -68,12 +68,12 @@ export class BulkMenu {
 	private asking: Asking | null = null;
 
 	private constructor(private context: BulkMenuContext) {
-		this.overlay = new Overlay(() => this.close());
+		this.overlay = new Overlay(() => this.close(), context.source);
 		const rects = context.cards.map((card) => card.getBoundingClientRect());
 		this.source = context.at === "beside" ? this.besideList(context.source) : context.source.getBoundingClientRect();
 		context.cards.forEach((card, i) => this.lift(card, rects[i]));
 		if (context.at === "over") LiftedCopy.over(this.overlay, context.source.cloneNode(true) as HTMLElement, false).pin(this.source).el.classList.add("tc-control-copy");
-		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, picks: new Picks(() => this.close()), place: (panel) => this.place(panel) });
+		this.panel = Panel.over(this.overlay, { root: "tc-panel", cls: `is-task is-bulk is-${context.at}`, place: (panel) => this.place(panel) });
 		this.showMenu();
 		this.overlay.show();
 	}
@@ -109,7 +109,7 @@ export class BulkMenu {
 
 	private showMenu(): void {
 		this.panel.el.classList.remove("is-picker");
-		this.panel.replace((panel) => this.buildMenu(panel));
+		this.panel.replace((panel) => this.buildMenu(panel), "menu");
 	}
 
 	private buildMenu(panel: HTMLElement): void {
@@ -183,6 +183,7 @@ export class BulkMenu {
 				onBack: () => this.showMenu(),
 				onPick: (name) => this.pick(() => actions.toSection(name))(),
 			}),
+			"sections",
 		);
 	}
 
@@ -196,6 +197,7 @@ export class BulkMenu {
 				onBack: () => this.showMenu(),
 				onPick: (link) => this.pick(() => actions.setProject(link))(),
 			}),
+			"projects",
 		);
 	}
 
@@ -210,10 +212,13 @@ export class BulkMenu {
 				onPick: (date) => this.pick(() => actions.postpone(date))(),
 				onRemove: model.removeDue ? this.pick(() => actions.removeDue()) : undefined,
 			}),
+			"picker",
 		);
 	}
 
 	close(): void {
-		if (this.overlay.close()) this.context.onClose();
+		if (this.overlay.isClosed) return;
+		void this.overlay.close();
+		this.context.onClose();
 	}
 }

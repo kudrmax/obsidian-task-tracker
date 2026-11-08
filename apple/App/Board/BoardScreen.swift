@@ -15,7 +15,6 @@ struct BoardScreen: View {
     }
     @State private var router = CaptureRouter.shared
     @State private var sync = ObsidianSync.shared
-    @State private var question: MenuQuestion?
     @State private var sheet: BoardSheet?
     /// Where the system lays out the tab bar's search slot, on the screen.
     @State private var plusSlot: CGRect?
@@ -25,6 +24,9 @@ struct BoardScreen: View {
     var body: some View {
         NavigationStack(path: $model.fullScreen) {
             content
+                // The board stands under the keyboard, which slides over it; each list and the calendar take the part
+                // it covers as room to scroll (`keyboardRoom`), so nothing is cut ahead of the keyboard's own motion.
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 .toolbar {
                     if model.selecting { selectionBar } else if let project = model.project { projectBar(project) } else { mainBar }
                 }
@@ -32,13 +34,13 @@ struct BoardScreen: View {
                 .navigationDestination(for: TaskItem.self) { item in TaskFullScreen(item: item, model: model).id(item.id) }
         }
         .overlay {
-            // The tab bar hides while a task is typed, as in every app.
-            if !model.selecting, model.fullScreen.isEmpty, !model.entry.isOpen {
-                bottomBar.transition(.move(edge: .bottom).combined(with: .opacity))
+            // The tab bar hides while a task is typed, in Select Tasks and under a pushed page, as in every app. Its own
+            // motion, scoped to it: whatever hides it (a push, the field, Select Tasks), it slides with the system's spring.
+            ZStack {
+                if barShown { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
             }
+            .animation(.snappy, value: barShown)
         }
-        .animation(.snappy, value: model.selecting)
-        .animation(.snappy, value: model.entry.isOpen)
         .background { DropAnchor(drop: model.dropping) }
         .background {
             TouchWatch { point in
@@ -67,7 +69,6 @@ struct BoardScreen: View {
         .fullScreenCover(item: $model.projectShown, onDismiss: { Task { await model.reloadIfChanged() } }) { shown in
             BoardScreen(project: shown.project)
         }
-        .menuQuestions($question, model: model)
         .task { await model.reload() }
         .onChange(of: scene, initial: true) {
             // The tasks file changes outside the app too: back in front, the screen reads it again if it did or the clock
@@ -87,6 +88,8 @@ struct BoardScreen: View {
         }
     }
 
+    private var barShown: Bool { !model.selecting && model.fullScreen.isEmpty && !model.entry.isOpen }
+
     /// The system tab bar with its search slot, laid out by iOS; the plus stands on that slot, the same size, so it can be
     /// carried while the bar keeps the system's layout.
     private var bottomBar: some View {
@@ -96,7 +99,7 @@ struct BoardScreen: View {
                 model.dropping.floor = $0.minY
             })
             if let slot = plusSlot {
-                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.carrying, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
+                PlusButton(open: { router.openTyping() }, accent: Palette.accent(scheme), cancelling: model.showsCancelTarget, drop: model.dropping, onCarry: { model.startCarryingPlus() }, onCancel: { model.cancelCarry() }, onEnd: { model.carryEnded() })
                     .frame(width: slot.width, height: slot.height)
                     .offset(x: slot.minX, y: slot.minY)
             }
@@ -107,7 +110,7 @@ struct BoardScreen: View {
     @ViewBuilder
     private var content: some View {
         if let snapshot = model.snapshot, !snapshot.screen.missing {
-            Ribbon(snapshot: snapshot, model: model, question: $question)
+            Ribbon(snapshot: snapshot, model: model)
                 .overlay(alignment: .top) { problem }
                 .overlay { if let stack = model.stackShown { TimelineStack(shown: stack, model: model) } }
                 .overlay(alignment: .bottom) { NoteSuggestions(host: model.entry) }
@@ -242,7 +245,7 @@ struct BoardScreen: View {
                 .tint(.primary)
         }
         ToolbarItem(placement: .topBarLeading) {
-            BulkMenu(model: model, question: $question) {
+            BulkMenu(model: model) {
                 Text(verbatim: "\(model.picked.count)")
                     .font(.headline)
                     .monospacedDigit()
@@ -252,7 +255,7 @@ struct BoardScreen: View {
         }
         ToolbarSpacer(placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
-            BulkMenu(model: model, question: $question) {
+            BulkMenu(model: model) {
                 Image(systemName: "ellipsis")
             }
             .buttonStyle(.glassProminent)
@@ -270,11 +273,10 @@ enum BoardSheet: String, Identifiable {
 /// The ribbon: four columns side by side, Inbox over Backlog, Soon, the day list and the calendar, each a fixed width the
 /// whole time, as if the ones off the screen stood just past its edges. The day list and Inbox are as wide as the
 /// divider leaves the day list, Soon and the calendar the rest; so Inbox–Soon, Soon–day and day–calendar each fill the
-/// screen, at offsets 0, the day list's width and the screen's. A swipe is the system's paging scroll between them.
+/// screen, at offsets 0, the day list's width and the screen's (`2026-11-07-ios-timeline-drag-design.md`). A swipe is the system's paging scroll between them.
 struct Ribbon: View {
     let snapshot: BoardSnapshot
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
     @State private var position = ScrollPosition(idType: RibbonPlace.self)
     /// How far the ribbon has come from Soon to Today, 0 to 1: the divider's handle shows at Today.
     @State private var toToday: CGFloat = 0
@@ -292,34 +294,34 @@ struct Ribbon: View {
     var body: some View {
         GeometryReader { box in
             let width = box.size.width
-            let half = width / 2
-            // As the plugin's ribbon: Inbox and Soon are half the screen each, and so is the day list beside Soon; at Today
-            // the day list takes its own width and the calendar the rest, the day list's width following the swipe there.
-            let list = half + (listWidth(width) - half) * toToday
-            // The Done column, while the search has opened it, stands left of Inbox: every place moves right by it.
-            let lead = model.doneShown ? half : 0
+            // Every column keeps its width the whole time, so nothing reflows under a swipe: the day list and Inbox over
+            // Backlog are the divider's width, Soon and the calendar the rest; each place shows two that fill the screen.
+            let list = listWidth(width)
+            // The Done column, while the search has opened it, stands left of Inbox, as wide as Inbox: every place moves
+            // right by it.
+            let lead = model.doneShown ? list : 0
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
                     if model.doneShown {
-                        DoneColumn(model: model, question: $question)
-                            .frame(width: half)
+                        DoneColumn(model: model)
+                            .frame(width: list)
                             .frame(maxHeight: .infinity, alignment: .top)
                     }
                     // One column, Inbox over Backlog, each exactly the column's width.
-                    column(.inbox, half) {
+                    column(.inbox, list) {
                         VStack(alignment: .leading, spacing: ColumnMetrics.headGap) {
-                            lists(.inbox).frame(width: half)
-                            lists(.backlog).frame(width: half)
+                            lists(.inbox).frame(width: list)
+                            lists(.backlog).frame(width: list)
                         }
                     }
-                    column(.soon, half) { lists(.soon) }
+                    column(.soon, width - list) { lists(.soon) }
                     // The day list and the calendar show one day; when it changes, each slides it within itself.
                     Group {
                         HStack(spacing: 0) {
                             lists(.day, dayArrows: true)
                                 .frame(width: list)
                                 .frame(maxHeight: .infinity, alignment: .top)
-                            TimelineColumn(timeline: snapshot.timeline, model: model, question: $question)
+                            TimelineColumn(timeline: snapshot.timeline, model: model)
                                 .frame(width: width - list)
                                 .frame(maxHeight: .infinity, alignment: .top)
                         }
@@ -332,7 +334,7 @@ struct Ribbon: View {
                 .scrollTargetLayout()
                 .background { RibbonHooks(model: model, distance: width - list) }
                 }
-            .scrollTargetBehavior(NearestPlace(stops: (lead > 0 ? [0] : []) + [lead, lead + half, lead + width]))
+            .scrollTargetBehavior(NearestPlace(stops: (lead > 0 ? [0] : []) + [lead, lead + list, lead + width]))
             .scrollPosition($position, anchor: .leading)
             .scrollIndicators(.hidden)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
@@ -340,17 +342,17 @@ struct Ribbon: View {
             } action: { _, x in
                 offset = x
                 let from = x - lead
-                toToday = min(1, max(0, (from - half) / max(1, half)))
+                toToday = min(1, max(0, (from - list) / max(1, width - list)))
                 // The selection moves along with a swipe; a tab's own scroll leaves it on the tab chosen.
                 guard phase == .interacting || phase == .decelerating else { return }
-                let near = nearest(from, half: half, width: width)
+                let near = nearest(from, soon: list, width: width)
                 if near != model.place { model.place = near }
             }
             .onScrollPhaseChange { _, new in
                 phase = new
                 if new == .idle {
                     // Off the Done column, onto Inbox or further: it closes until the next search, Inbox where it stood.
-                    if lead > 0, offset > half / 2 {
+                    if lead > 0, offset > lead / 2 {
                         var instant = Transaction()
                         instant.disablesAnimations = true
                         withTransaction(instant) {
@@ -361,8 +363,8 @@ struct Ribbon: View {
                     }
                     // A touch that stops a tab's scroll on its way leaves the ribbon between two places: it goes on to the
                     // nearer one, as a swipe would.
-                    let near = nearest(offset - lead, half: half, width: width)
-                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: half; case .today: width }
+                    let near = nearest(offset - lead, soon: list, width: width)
+                    let stop: CGFloat = switch near { case .inbox: 0; case .soon: list; case .today: width }
                     if lead == 0, abs(offset - stop) > 0.5 {
                         model.place = near
                         withAnimation(.smooth) { position.scrollTo(id: near, anchor: .leading) }
@@ -391,8 +393,8 @@ struct Ribbon: View {
     }
 
     /// The place nearest the ribbon's offset: the tab bar's selection moves along with a swipe.
-    private func nearest(_ x: CGFloat, half: CGFloat, width: CGFloat) -> RibbonPlace {
-        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, half), (.today, width)]
+    private func nearest(_ x: CGFloat, soon: CGFloat, width: CGFloat) -> RibbonPlace {
+        let stops: [(RibbonPlace, CGFloat)] = [(.inbox, 0), (.soon, soon), (.today, width)]
         return stops.min { abs($0.1 - x) < abs($1.1 - x) }?.0 ?? .today
     }
 
@@ -444,7 +446,7 @@ struct Ribbon: View {
     @ViewBuilder
     private func lists(_ column: BoardColumn, dayArrows: Bool = false) -> some View {
         if let list = snapshot.lists[column] {
-            ListColumn(list: list, model: model, dayArrows: dayArrows, question: $question)
+            ListColumn(list: list, model: model, dayArrows: dayArrows)
         }
     }
 }
@@ -453,7 +455,6 @@ struct Ribbon: View {
 /// Section, Project, Delete. Any action ends Select Tasks but a label, which keeps the menu and the picks for the next.
 struct BulkMenu<Label: View>: View {
     @Bindable var model: BoardModel
-    @Binding var question: MenuQuestion?
     @ViewBuilder let label: Label
     @State private var menu: TaskMenuModel?
     @Environment(\.colorScheme) private var scheme
@@ -461,7 +462,7 @@ struct BulkMenu<Label: View>: View {
     var body: some View {
         let items = model.pickedItems
         Menu {
-            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model) { question = $0 }.nodes, palette: { model.ink($0, dark: scheme == .dark) }) }
+            if let menu { MenuNodes(nodes: TaskMenu(items: items, menu: menu, model: model).nodes, palette: { model.ink($0, dark: scheme == .dark) }) }
         } label: {
             label
         }
@@ -538,6 +539,13 @@ final class DaySwipe: NSObject, UIGestureRecognizerDelegate {
         let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
         pan.delegate = self
         ribbon.addGestureRecognizer(pan)
+        // A lift takes the touch before the pan has seen it move, so the pan would stay waiting the whole carry and keep
+        // the ribbon's pan waiting on it (a dropped section's rows then came in under the rows below): it fails then.
+        model?.carryBegins = { [weak pan] in
+            guard let pan, pan.state == .possible else { return }
+            pan.isEnabled = false
+            pan.isEnabled = true
+        }
         ribbon.panGestureRecognizer.require(toFail: pan)
     }
 

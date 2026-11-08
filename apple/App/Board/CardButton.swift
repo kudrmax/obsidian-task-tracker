@@ -6,7 +6,16 @@ import UIKit
 enum Carried {
     static let plus = "\u{0}plus"
 
-    static func provider(_ id: String) -> NSItemProvider { NSItemProvider(object: id as NSString) }
+    /// The carried thing for the system's drag: of a type only this app's process knows, so no field or other app takes
+    /// it as text; the board's own drop reads what is carried from the carry, not from here.
+    static func provider(_ id: String) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: "com.kudrmax.taskcalendar.carried", visibility: .ownProcess) { done in
+            done(Data(id.utf8), nil)
+            return nil
+        }
+        return provider
+    }
 }
 
 /// A card as the design has it, behaving as Files and Podcasts' rows do: a long press lifts it and shows its menu, and
@@ -15,6 +24,8 @@ enum Carried {
 /// A tap only highlights it; the subtask counter is its own button, which folds.
 struct CardButton: UIViewRepresentable {
     let card: BoardCard
+    /// The task's new text while its rename is written: drawn instead of the text as read.
+    var renamedText: String?
     /// The card's menu; `later` holds a row that opens a sheet or a page until the menu has gone.
     let menu: (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?
     var ringed = false
@@ -22,6 +33,8 @@ struct CardButton: UIViewRepresentable {
     var draggable = true
     /// The card stands in a carry: it hides once the carried copy has left it, until the carry ends.
     var carried = false
+    /// Where the carried copy came down, in the window, when this card's carry ended: it glides from there to its place.
+    var arrival: CGRect?
     var onTouch: () -> Void = {}
     /// The card was lifted to carry, the finger this far below its top.
     var onCarry: (CGFloat) -> Void = { _ in }
@@ -29,6 +42,8 @@ struct CardButton: UIViewRepresentable {
     var onCancel: () -> Void = {}
     /// The drag session ended, whatever came of it.
     var onEnd: () -> Void = {}
+    /// The drag session ended with a drop: the board's drop ends the carry, or, if nothing of the board took it, the board.
+    var onDropped: () -> Void = {}
     /// A tap on the subtask counter, when the card offers it: its subtasks fold away or show again.
     var onFold: (() -> Void)?
     /// A tap on a link of the title: it opens, in place of the menu.
@@ -54,7 +69,7 @@ struct CardButton: UIViewRepresentable {
     private func configuration(control: CardControl?) -> UIHostingConfiguration<TaskCapsule, EmptyView> {
         UIHostingConfiguration {
             TaskCapsule(
-                card: card, ringed: ringed, height: height,
+                card: card, text: renamedText, ringed: ringed, height: height,
                 onCounter: { [weak control] in control?.counterFrame = $0 },
                 onTitle: { [weak control] in control?.titleFrame = $0 },
                 onLinks: { [weak control] in control?.links = $0 },
@@ -73,7 +88,7 @@ struct CardButton: UIViewRepresentable {
 
     private func update(_ control: CardControl) {
         control.id = card.id
-        let look = CardControl.Look(card: card, ringed: ringed, height: height)
+        let look = CardControl.Look(card: card, text: renamedText, ringed: ringed, height: height)
         control.menuMaker = menu
         if control.look != look {
             control.look = look
@@ -84,12 +99,14 @@ struct CardButton: UIViewRepresentable {
         control.onCarry = onCarry
         control.onCancel = onCancel
         control.onEnd = onEnd
+        control.onDropped = onDropped
         control.onFold = onFold
         control.onLink = onLink
         // The folder mark opens the note only where the note can open, and never while tasks are being picked.
         control.onProject = picking == nil && card.item.project?.mark == true && card.item.project?.canOpenNote == true ? onProject : nil
         control.picking = picking
         control.draggable = picking.map(\.picked) ?? draggable
+        control.arrival = arrival
         control.carried = carried
         control.liftDelay = CardMetrics.press
         control.accessibilityLabel = card.item.title
@@ -103,10 +120,12 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     var onCarry: (CGFloat) -> Void = { _ in }
     var onCancel: () -> Void = {}
     var onEnd: () -> Void = {}
+    var onDropped: () -> Void = {}
     var onFold: (() -> Void)? {
         didSet { fold.isHidden = onFold == nil }
     }
     var onLink: ((TextPart) -> Void)?
+    var arrival: CGRect?
     var onProject: (() -> Void)? {
         didSet { mark.isHidden = onProject == nil }
     }
@@ -128,19 +147,24 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         }
     }
     /// Gone from its place while carried, once the carried card has left it; back in it once the system has flown a
-    /// cancelled carry home.
+    /// cancelled carry home. A card the screen draws anew for the carried task (its new place) hides from the start.
     var carried = false {
         didSet {
             guard carried != oldValue else { return }
-            // The carry is over (its drop drawn, or cancelled): the next carry starts from the card in its place.
-            if !carried { left = false }
-            guard !returning else { return }
+            // The carry is over (its copy landed and its drop drawn): the next carry starts from the card in its place.
+            if !carried {
+                left = false
+                lifting = false
+                home = false
+                if let arrival { glide(from: arrival) }
+            }
             showsInPlace()
         }
     }
     /// What the card is drawn from: it is drawn anew only when this changes, not on every pass of the screen.
     struct Look: Equatable {
         let card: BoardCard
+        let text: String?
         let ringed: Bool
         let height: CGFloat
     }
@@ -163,17 +187,40 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// The press's highlight over the capsule, as a button's: outside the content, so a lifted preview never carries it.
     private let press = UIView()
     private var drag: UIDragInteraction!
+    /// While its menu is open and its preview flies home inside it, the card draws over the cards after it in the list:
+    /// SwiftUI stacks the wrappers of the cards' views in the order of the list and keeps no `zIndex` for them, so the
+    /// card's own wrapper, the first of its holders that has siblings, is raised.
+    private var raised = false {
+        didSet {
+            guard raised != oldValue else { return }
+            if raised {
+                var holder: UIView? = self
+                while let view = holder, let parent = view.superview, parent.subviews.count == 1 { holder = parent }
+                lifted = holder
+                lifted?.layer.zPosition = 1
+            } else {
+                lifted?.layer.zPosition = 0
+                lifted = nil
+            }
+        }
+    }
+    private weak var lifted: UIView?
     /// A menu row that opens a sheet or a page, run once the menu has begun to go.
     private var afterMenu: (@MainActor () -> Void)?
     /// Where the card stood when it was lifted, in the window: a cancelled carry flies back there.
-    private var home: CGPoint?
+    private var origin: CGPoint?
     /// The carried card has moved off its place: only then does the card hide, so the lift (from a long press or from the
     /// open menu) always has the capsule itself to lift, and no frame shows neither.
     private var left = false
     /// How far below the card's top the finger held it as the drag began.
     private var grab: CGFloat = 0
-    /// A cancelled carry is flying home: the card shows again once it lands.
-    private var returning = false
+    /// This card was lifted: it shows until the carried copy leaves it.
+    private var lifting = false
+    /// A cancelled carry's copy has flown home into this card: it shows again.
+    private var home = false
+    /// A cancel's flight home is under way: the session's end waits for it.
+    private var flyingHome = false
+    private var endAfterFlight = false
 
     init(content: UIView & UIContentView) {
         self.content = content
@@ -255,7 +302,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     // MARK: The menu
 
     /// The card whose menu is up. A write from it that keeps it open (a label) draws the task as a new card, the line
-    /// being another: the menu follows the task by its place in the file.
+    /// being another: the menu follows the task by its id.
     private static weak var menuOwner: CardControl?
     /// A card's menu is up.
     static var menuShowing: Bool { menuOwner?.opener.showing == true }
@@ -265,7 +312,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     /// A card drawn: when it is the task whose menu shows, the menu and the copy over it take the new drawing.
     static func follow(card: BoardCard, look: Look, menu: @escaping (_ later: @escaping (@escaping @MainActor () -> Void) -> Void) -> UIMenu?, from control: CardControl) {
         guard let owner = menuOwner, owner.opener.showing, let shown = owner.look else { return }
-        guard shown.card.item.place == card.item.place, shown != look || owner === control else { return }
+        guard shown.card.item.id == card.item.id, shown != look || owner === control else { return }
         owner.menuMaker = menu
         owner.redrawn(look)
     }
@@ -275,10 +322,10 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
     private func redrawn(_ look: Look) {
         if self.look != look {
             self.look = look
-            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, ringed: look.ringed, height: look.height) }.margins(.all, 0)
+            content.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, ringed: look.ringed, height: look.height) }.margins(.all, 0)
         }
         if let copy = wholeCopy {
-            copy.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, height: look.height, whole: true) }.margins(.all, 0)
+            copy.configuration = UIHostingConfiguration { TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true) }.margins(.all, 0)
         }
         if let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) { opener.refresh(menu) }
     }
@@ -307,6 +354,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         guard let menu = menuMaker({ [weak self] run in self?.afterMenu = run }) else { return }
         Self.menuOwner = self
         if let look, let window { Self.lastLifted = (look.card, convert(bounds, to: window)) }
+        raised = true
         opener.present(menu, at: point) { [weak self] in
             // A card drawn anew while its menu showed has left the screen: the menu goes without a preview.
             guard let self, self.window != nil else { return nil }
@@ -315,7 +363,8 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
                 self.content.alpha = 0
                 return whole
             }
-            return UITargetedPreview(view: self.content, parameters: self.capsule)
+            let home = UIPreviewTarget(container: self, center: CGPoint(x: self.bounds.midX, y: self.bounds.midY))
+            return UITargetedPreview(view: self.content, parameters: self.capsule, target: home)
         }
     }
 
@@ -326,14 +375,14 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         guard let look, let window, let room = titleFrame else { return nil }
         let board = AppServices.shared.board
         // The title as the card draws it: each piece's words, a link by its label, as the plugin measures its drawn title.
-        let drawn = look.card.parts.map(\.shown).joined() as NSString
+        let drawn = (look.text ?? look.card.parts.map(\.shown).joined()) as NSString
         let natural = drawn.size(withAttributes: [.font: UIFont.systemFont(ofSize: CardMetrics.title)]).width
         let margin = Double(CardMetrics.wholeMargin)
         let fit = TitleFit(width: Double(bounds.width), titleWidth: Double(room.width), textWidth: Double(natural), fade: Double(CardMetrics.fade))
         guard let grown = try? board.wholeWidth(card: fit, room: Double(window.bounds.width), margin: margin) else { return nil }
         let width = CGFloat(grown.width)
         let copy = UIHostingConfiguration {
-            TaskCapsule(card: look.card, height: look.height, whole: true)
+            TaskCapsule(card: look.card, text: look.text, height: look.height, whole: true)
         }
         .margins(.all, 0)
         .makeContentView()
@@ -351,10 +400,19 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         return UITargetedPreview(view: copy, parameters: parameters, target: UIPreviewTarget(container: window, center: CGPoint(x: CGFloat(left) + width / 2, y: CGFloat(top) + height / 2)))
     }
 
-    /// A row that opens a sheet or a page runs once the menu has gone.
+    /// A row that opens a sheet or a page runs once the menu has gone. The card stays over its neighbours until its
+    /// preview, which flies home inside the card, has landed.
     private func menuEnded(_ animator: (any UIContextMenuInteractionAnimating)?) {
         wholeCopy = nil
-        if let animator { animator.addCompletion { [weak self] in self?.content.alpha = 1 } } else { content.alpha = 1 }
+        if let animator {
+            animator.addCompletion { [weak self] in
+                self?.content.alpha = 1
+                self?.raised = false
+            }
+        } else {
+            content.alpha = 1
+            raised = false
+        }
         guard let run = afterMenu else { return }
         afterMenu = nil
         // As the menu starts to go, not when its animation ends: the animator completes about a second later.
@@ -367,6 +425,7 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
         // Where the finger holds the card, read while the touch still stands on it: once the lift (or the menu's) has
         // begun, the session reports the point against the lifted preview, which is no longer where the card stands.
         grab = session.location(in: self).y
+        lifting = true
         let item = UIDragItem(itemProvider: Carried.provider(id))
         item.localObject = id
         return [item]
@@ -409,40 +468,65 @@ final class CardControl: UIControl, UIDragInteractionDelegate {
 
     func dragInteraction(_ interaction: UIDragInteraction, sessionWillBegin session: UIDragSession) {
         content.alpha = 1
-        home = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
+        origin = window.map { convert(CGPoint(x: bounds.midX, y: bounds.midY), to: $0) }
         onCarry(grab)
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, willEndWith operation: UIDropOperation) {
         guard operation == .cancel else { return }
-        // The row takes its place back at once; the card itself shows when the system's preview has flown into it.
-        returning = true
+        // The line and the marks go now; the card's place is released once the copy is home.
         onCancel()
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, previewForCancelling item: UIDragItem, withDefault defaultPreview: UITargetedDragPreview) -> UITargetedDragPreview? {
-        guard let window, let home else { return defaultPreview }
-        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: home))
+        guard let window, let origin else { return defaultPreview }
+        return defaultPreview.retargetedPreview(with: UIDragPreviewTarget(container: window, center: origin))
     }
 
     func dragInteraction(_ interaction: UIDragInteraction, item: UIDragItem, willAnimateCancelWith animator: any UIDragAnimating) {
-        animator.addCompletion { [weak self] _ in self?.landed() }
+        flyingHome = true
+        animator.addCompletion { [weak self] _ in self?.cameHome() }
     }
 
-    /// A drop keeps the card hidden while its write is drawn: it shows again only where the screen then draws it.
+    /// The session's end: the carry ends once anything still flying has landed. A drop keeps the card hidden until the
+    /// screen draws it where it was dropped.
     func dragInteraction(_ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation) {
-        if !carried { left = false }
-        if returning { landed() } else { showsInPlace() }
+        guard !flyingHome else {
+            endAfterFlight = true
+            return
+        }
+        showsInPlace()
+        // A drop's copy is still in the air when the session ends here: the drop's own animation ends the carry.
+        guard operation == .cancel || operation == .forbidden else { return onDropped() }
         onEnd()
     }
 
     private func showsInPlace() {
-        alpha = carried && left ? 0 : 1
+        alpha = carried && !home && (left || !lifting) ? 0 : 1
     }
 
-    private func landed() {
-        returning = false
+    /// The cancelled copy is home: the card shows in the same frame the copy goes, then the carry ends.
+    private func cameHome() {
+        flyingHome = false
+        home = true
         showsInPlace()
+        onEnd()
+        endAfterFlight = false
+    }
+
+    /// The copy came down elsewhere than the screen drew the card (a stack, the past under now): the card glides from
+    /// there to its place with the system's spring.
+    private func glide(from rect: CGRect) {
+        arrival = nil
+        guard let window else { return }
+        let here = convert(bounds, to: window)
+        let dx = rect.midX - here.midX
+        let dy = rect.midY - here.midY
+        guard hypot(dx, dy) > 2 else { return }
+        transform = CGAffineTransform(translationX: dx, y: dy)
+        UIView.animate(springDuration: 0.35, bounce: 0, options: [.allowUserInteraction]) {
+            self.transform = .identity
+        }
     }
 }
 

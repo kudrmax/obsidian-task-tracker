@@ -12,6 +12,23 @@ export interface Hunk {
 	/** The block began at the file's first line, or ended at its last: a find has to stand there too. */
 	readonly atStart: boolean;
 	readonly atEnd: boolean;
+	/** Who the task on each removed line was (null: no task), as the change was made: taking it back gives each its own again. */
+	readonly removedIds?: readonly (string | null)[];
+	/** Who the task on each added line was: doing it again gives each its own again. */
+	readonly addedIds?: readonly (string | null)[];
+}
+
+/** The tasks' ids by line, from 0, on each side of a change. */
+export interface PatchIds {
+	readonly before: ReadonlyMap<number, string>;
+	readonly after: ReadonlyMap<number, string>;
+}
+
+/** A change taken back or made again: the text, each line's line in the text it was made over (null: put in), and the ids the change gave back by line. */
+export interface Swapped {
+	readonly text: string;
+	readonly origins: readonly (number | null)[];
+	readonly ids: ReadonlyMap<number, string>;
 }
 
 type Side = "removed" | "added";
@@ -24,8 +41,12 @@ type Side = "removed" | "added";
 export class TextPatch {
 	private constructor(private readonly changes: readonly Hunk[]) {}
 
-	static between(before: string, after: string): TextPatch {
-		return new TextPatch(hunksOf(before.split("\n"), after.split("\n")));
+	/** `ids`, who the tasks are on each side: each changed block keeps its lines' (`Hunk.removedIds`, `addedIds`). */
+	static between(before: string, after: string, ids?: PatchIds): TextPatch {
+		const hunks = hunksOf(before.split("\n"), after.split("\n"));
+		if (!ids) return new TextPatch(hunks);
+		const of = (map: ReadonlyMap<number, string>, from: number, count: number) => Array.from({ length: count }, (_, k) => map.get(from + k) ?? null);
+		return new TextPatch(hunks.map((h) => ({ ...h, removedIds: of(ids.before, h.before, h.removed.length), addedIds: of(ids.after, h.after, h.added.length) })));
 	}
 
 	/** The patch as plain data, for a host that keeps the steps itself; `TextPatch.of` reads it back. */
@@ -43,24 +64,38 @@ export class TextPatch {
 
 	/** `current` with the change taken back, or null when a changed block is no longer to be found. */
 	revert(current: string): string | null {
-		return this.swap(current, "added", "removed");
+		return this.reverted(current)?.text ?? null;
 	}
 
 	/** `current` with the change made again, or null when a block it changes is no longer to be found. */
 	apply(current: string): string | null {
+		return this.applied(current)?.text ?? null;
+	}
+
+	/** `revert`, with where each line came from and who the lines it gave back were. */
+	reverted(current: string): Swapped | null {
+		return this.swap(current, "added", "removed");
+	}
+
+	/** `apply`, with where each line came from and who the lines it made again were. */
+	applied(current: string): Swapped | null {
 		return this.swap(current, "removed", "added");
 	}
 
-	private swap(current: string, from: Side, to: Side): string | null {
+	private swap(current: string, from: Side, to: Side): Swapped | null {
 		const lines = current.split("\n");
 		const shift = (hunk: Hunk) => (from === "added" ? hunk.after : hunk.before);
 		const places = this.changes.map((hunk) => find(lines, hunk, hunk[from], shift(hunk)));
 		if (places.some((place, i) => place === null || (i > 0 && place <= places[i - 1]! + this.changes[i - 1][from].length - 1))) return null;
+		const rows: { line: string; origin: number | null; id: string | null }[] = lines.map((line, origin) => ({ line, origin, id: null }));
 		for (let i = this.changes.length - 1; i >= 0; i--) {
 			const hunk = this.changes[i];
-			lines.splice(places[i]!, hunk[from].length, ...hunk[to]);
+			const ids = to === "removed" ? hunk.removedIds : hunk.addedIds;
+			rows.splice(places[i]!, hunk[from].length, ...hunk[to].map((line, k) => ({ line, origin: null, id: ids?.[k] ?? null })));
 		}
-		return lines.join("\n");
+		const ids = new Map<number, string>();
+		rows.forEach((row, i) => row.id !== null && ids.set(i, row.id));
+		return { text: rows.map((row) => row.line).join("\n"), origins: rows.map((row) => row.origin), ids };
 	}
 }
 
@@ -146,7 +181,7 @@ function changedBlocks(before: readonly string[], after: readonly string[]): (re
 const TABLE_CELLS = 1_000_000;
 
 /** The pairs of lines `b` and `a` share, as [index in b, index in a] in order. */
-function sharedLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
+export function sharedLines(b: readonly string[], a: readonly string[]): (readonly [number, number])[] {
 	return (b.length + 1) * (a.length + 1) <= TABLE_CELLS ? tableLines(b, a) : myersLines(b, a);
 }
 

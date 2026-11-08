@@ -119,14 +119,14 @@ describe("SearchWindow", () => {
 		await type("пас");
 		win.shown[2].el.click();
 		expect(onPick).toHaveBeenCalledWith(HITS[2]);
-		expect(win.el.isConnected).toBe(false);
+		expect(win.el.classList.contains("is-closing")).toBe(true);
 	});
 
 	it("Cancel on the phone closes it and says so", () => {
 		const { win, onClose } = setUp(false);
 		win.el.querySelector<HTMLButtonElement>(".tc-search-cancel")!.click();
 		expect(onClose).toHaveBeenCalledOnce();
-		expect(win.el.isConnected).toBe(false);
+		expect(win.el.classList.contains("is-closing")).toBe(true);
 	});
 
 	it("on the desktop the arrows walk the rows and Enter opens the one picked", async () => {

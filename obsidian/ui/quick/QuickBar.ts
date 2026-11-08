@@ -1,6 +1,7 @@
 import type { EntryPart } from "./EntryPart";
 import { type EntryState, type GroupedList, labelTitle, type PlaceChoice, type Placement, repeatDraft, type RepeatRule, samePlacement } from "../../../core/application/contracts";
-import { DESIGN } from "../design";
+import { DESIGN, DURATION } from "../design";
+import { Motion, timingOf } from "../motion/Motion";
 import { el, px, restingTop } from "../dom";
 import { Button } from "../kit/Button";
 import { Panel, Picks } from "../kit/Panel";
@@ -90,6 +91,8 @@ export class QuickBar implements EntryPart {
 	/** The place the place button shows. */
 	private shownPlace: Placement | null = null;
 	private panel: OpenPanel | null = null;
+	/** The bar fading out on the desktop, until it leaves the page; a new entry calls it off. */
+	private leaving: { cancel(): void } | null = null;
 	/** Where the desktop capsule stands: the room it was placed in and the side of the field it took. */
 	private desk: { readonly room: DOMRect; readonly side: Side } | null = null;
 	/** The field the bar last stood by: a panel opening or closing moves the desktop capsule to make room for it. */
@@ -123,7 +126,7 @@ export class QuickBar implements EntryPart {
 
 	show(state: QuickBarState): void {
 		this.state = state;
-		this.bar.hidden = false;
+		if (this.bar.hidden || this.leaving) this.comeIn();
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
 		const section = state.section === true;
 		const desktop = this.deps.desktop();
@@ -170,9 +173,41 @@ export class QuickBar implements EntryPart {
 	hide(): void {
 		this.closePanel();
 		this.stopGlide();
-		this.bar.hidden = true;
-		this.mode.hidden = true;
+		this.goOut();
 		this.follow(null);
+	}
+
+	/** The bar and the section capsule fade in where they stand on the desktop; on the phone the bar rides the keyboard in. */
+	private comeIn(): void {
+		this.leaving?.cancel();
+		this.leaving = null;
+		this.bar.hidden = false;
+		this.bar.style.pointerEvents = this.mode.style.pointerEvents = "";
+		if (this.deps.desktop()) for (const part of [this.bar, this.mode]) Motion.appear(part, DURATION.menu);
+	}
+
+	/** They fade out on the desktop and only then leave the page; on the phone the bar goes with the keyboard. */
+	private goOut(): void {
+		if (this.bar.hidden || this.leaving) return;
+		const gone = () => {
+			this.leaving = null;
+			this.bar.hidden = true;
+			this.mode.hidden = true;
+			this.bar.style.pointerEvents = "";
+			this.mode.style.pointerEvents = "";
+		};
+		const timing = this.deps.desktop() ? timingOf(this.bar) : null;
+		if (!timing) return gone();
+		this.bar.style.pointerEvents = this.mode.style.pointerEvents = "none";
+		const fade = (part: HTMLElement) => part.animate([{ opacity: "1" }, { opacity: "0" }], { ...timing, fill: "forwards" });
+		const bar = fade(this.bar);
+		const mode = fade(this.mode);
+		const leaving = { cancel: () => [bar, mode].forEach((a) => a.cancel()) };
+		this.leaving = leaving;
+		bar.addEventListener("finish", () => {
+			leaving.cancel();
+			if (this.leaving === leaving) gone();
+		});
 	}
 
 	/**
@@ -289,9 +324,11 @@ export class QuickBar implements EntryPart {
 		this.bar.ownerDocument.addEventListener("pointerdown", this.pressOutside, true);
 	}
 
+	/** The open panel fades out, as every window does, and leaves the page once it has. */
 	private closePanel(): void {
 		if (!this.panel) return;
-		this.panel.el.remove();
+		const el = this.panel.el;
+		Motion.disappear(el, () => el.remove());
 		this.panel = null;
 		delete this.bar.dataset.panel;
 		this.restand();

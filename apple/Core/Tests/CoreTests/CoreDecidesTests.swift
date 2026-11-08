@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Core
 
-/// What the app takes from the core instead of deciding it: a task's names (its line, its place), the menu's Project row
+/// What the app takes from the core instead of deciding it: a task's id, the menu's Project row
 /// and its words, the divider's hold to the middle, and whether Google is logged in.
 @Suite struct CoreDecidesTests {
     static let day = "2026-11-06"
@@ -15,16 +15,14 @@ import Testing
     let core = try! PhoneCore(script: Fixtures.phoneScript)
     let at = Fixtures.date(6, 10)
 
-    @Test func aTaskIsNamedByTheCoreItsPlaceOutlivingARename() throws {
+    @Test func aTaskIsNamedByTheCoreItsIdOutlivingARename() throws {
         let vault = FakeVault(Self.file)
         let board = TaskBoard(core: core, vault: vault)
         let milk = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).screen.inbox.first)
-        #expect(milk.place == (try board.placeId(milk.key)))
-        #expect(milk.id == (try board.rule("rules.keyId", [milk.key.json], as: String.self)))
         try board.write("tasks.rename", [milk.key.json, "Buy oat milk"])
         let renamed = try #require(try board.snapshot(day: Self.day, measures: Self.measures, now: at).screen.inbox.first)
-        #expect(renamed.place == milk.place)
-        #expect(renamed.id != milk.id)
+        #expect(renamed.text == "Buy oat milk")
+        #expect(renamed.id == milk.id)
     }
 
     @Test func theMenuPutsProjectWhereTheCoreSaysAndNamesNoProject() throws {

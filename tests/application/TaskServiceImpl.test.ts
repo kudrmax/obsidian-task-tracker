@@ -13,6 +13,11 @@ const D = "2026-11-03";
 const clock: Clock = { now: () => new Date(2026, 9, 30, 14, 20) };
 const FULL = "## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B\n\n## Soon\n\n- [ ] C\n\n## Backlog\n\n## Done\n";
 
+/** Each list's sections but their ids, which a test of what the sections are leaves aside. */
+function unkeyed<S extends { readonly id: string }>(lists: Readonly<Record<string, readonly S[]>>): Record<string, Omit<S, "id">[]> {
+	return Object.fromEntries(Object.entries(lists).map(([list, sections]) => [list, sections.map(({ id: _id, ...rest }) => rest)]));
+}
+
 function setup(text: string | null, settings = new FakeSettingsStore()) {
 	const store = new InMemoryTaskFileStore(text);
 	const svc = new TaskServiceImpl(store, settings, clock);
@@ -790,13 +795,15 @@ describe("createInPlace", () => {
 		expect(key).toEqual((await svc.inboxView())[0].key);
 	});
 
-	it("gives the first of twins side by side, whichever was typed: a field at either lands under both", async () => {
+	it("gives the very twin typed, side by side with the other: the write knows which line it made", async () => {
 		const { svc } = setup("## Inbox\n\n- [ ] X\n- [ ] Y\n\n## Now\n\n## Soon\n\n## Done\n\n## Backlog\n");
-		const [, y] = await svc.inboxView();
+		const [x, y] = await svc.inboxView();
 		const key = await svc.createInPlace("X", null, { kind: "list", list: "inbox", group: null, before: y.key });
 		const inbox = await svc.inboxView();
 		expect(inbox.map((i) => i.text)).toEqual(["X", "X", "Y"]);
-		expect(key).toEqual(inbox[0].key);
+		expect(key).toEqual(inbox[1].key);
+		expect(inbox[0].id).toBe(x.id);
+		expect(inbox[1].id).not.toBe(x.id);
 	});
 
 	it("gives the twin a schedule moved out of Inbox, with an identical task left behind", async () => {
@@ -1007,6 +1014,11 @@ describe("one parse per version of the file", () => {
 		return Promise.all([svc.dayView(T), svc.soonWithoutDateView(), svc.inboxView()]);
 	}
 
+	/** What a read gives but the tasks' ids, which last as long as the service that gave them. */
+	function withoutIds(value: unknown): unknown {
+		return JSON.parse(JSON.stringify(value, (k, v) => (k === "id" ? undefined : v)));
+	}
+
 	async function reload(svc: TaskServiceImpl) {
 		await svc.normalize();
 		return views(svc);
@@ -1036,7 +1048,8 @@ describe("one parse per version of the file", () => {
 			const after = parse.mock.calls.length;
 			const seen = await reload(svc);
 			expect(parse).toHaveBeenCalledTimes(after);
-			expect(seen).toEqual(await reload(new TaskServiceImpl(new InMemoryTaskFileStore(store.text), new FakeSettingsStore(), clock)));
+			const fresh = await reload(new TaskServiceImpl(new InMemoryTaskFileStore(store.text), new FakeSettingsStore(), clock));
+			expect(withoutIds(seen)).toEqual(withoutIds(fresh));
 		});
 	}
 
@@ -1180,7 +1193,7 @@ describe("empty sections", () => {
 
 	it("listSections gives each list's groups in file order, empty sections marked", async () => {
 		const { svc } = setup("## Inbox\n\n### Пусто\n\n## Now\n\n- [ ] A\n### X\n- [ ] B\n### E\n### T\nnote\n\n## Soon\n\n### Y\n- [ ] S 📅 2026-11-03\n\n## Backlog\n\n## Done\n");
-		expect(await svc.listSections()).toEqual({
+		expect(unkeyed(await svc.listSections())).toEqual({
 			inbox: [{ name: "Пусто", empty: true }],
 			backlog: [],
 			now: [
@@ -1195,7 +1208,7 @@ describe("empty sections", () => {
 
 	it("listSections names No section where its heading stands", async () => {
 		const { svc } = setup("## Now\n\n### X\n- [ ] B\n### No section\n- [ ] A\n");
-		expect((await svc.listSections()).now).toEqual([
+		expect(unkeyed(await svc.listSections()).now).toEqual([
 			{ name: "X", empty: false },
 			{ name: null, empty: false },
 		]);
@@ -1245,7 +1258,7 @@ describe("empty sections", () => {
 		const [, b] = (await svc.dayView(T)).list;
 		await svc.moveToGroup(b.key, "now", null, null);
 		expect(store.text).toBe("## Inbox\n\n## Now\n\n- [ ] A\n- [ ] B 📅 2026-10-30\n\n## Soon\n\n## Backlog\n\n## Done\n");
-		expect((await svc.listSections()).now).toEqual([{ name: null, empty: false }]);
+		expect(unkeyed(await svc.listSections()).now).toEqual([{ name: null, empty: false }]);
 		await history.undo();
 		expect(store.text).toBe(text);
 	});
@@ -1255,7 +1268,7 @@ describe("empty sections", () => {
 		const [a] = (await svc.dayView(T)).list;
 		await svc.moveToGroup(a.key, "now", "E", null);
 		expect(store.text).toContain("### E\n- [ ] A 📅 2026-10-30\n");
-		expect((await svc.listSections()).now).toEqual([
+		expect(unkeyed(await svc.listSections()).now).toEqual([
 			{ name: "X", empty: false },
 			{ name: "E", empty: false },
 		]);

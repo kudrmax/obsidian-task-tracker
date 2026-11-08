@@ -39,13 +39,20 @@ struct SearchScreen: View {
             .onChange(of: focused) { if !focused, query.isEmpty { dismiss() } }
             .task(id: query) {
                 try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
                 let found: [SearchGroup] = (try? await model.read("tasks.search", [.string(query)] + (model.projectLink.map { [JSONValue.string($0)] } ?? []))) ?? []
                 let drawn = await model.cards(found.flatMap(\.hits).map { ListRow(item: $0.item, level: 0) })
+                var named = names
+                for group in found where named[group.list] == nil {
+                    named[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
+                }
                 guard !Task.isCancelled else { return }
-                cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
-                groups = found
-                for group in groups where names[group.list] == nil {
-                    names[group.list] = try? await model.read("tasks.listName", [.string(group.list)])
+                // The hits change by their tasks' ids: one that stays slides, one that goes or comes fades, in one step
+                // with the groups' names.
+                withAnimation(.snappy) {
+                    cards = Dictionary(drawn.map { ($0.item.id, $0) }, uniquingKeysWith: { first, _ in first })
+                    names = named
+                    groups = found
                 }
             }
         }

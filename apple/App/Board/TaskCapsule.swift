@@ -5,6 +5,8 @@ import SwiftUI
 /// in a column on the right, the in-progress dot in the left padding, the colour of its priority or first label.
 struct TaskCapsule: View {
     let card: BoardCard
+    /// Drawn instead of the task's text: its new text while its rename is written.
+    var text: String?
     var selecting = false
     var picked = false
     var ringed = false
@@ -140,9 +142,12 @@ struct TaskCapsule: View {
     private static let snippetLine: CGFloat = 15
     private static let snippetPad: CGFloat = 6
 
+    /// The title's pieces: the card's, or its new text alone while its rename is written.
+    private var parts: [TextPart] { text.map { [TextPart(text: $0)] } ?? card.parts }
+
     /// The title as the plugin's card writes it: the text as typed, each link by its word in the accent.
     private var title: Text {
-        card.parts.reduce(Text(verbatim: "")) { text, part in
+        parts.reduce(Text(verbatim: "")) { text, part in
             text + (part.isLink ? Text(verbatim: part.shown).foregroundColor(Palette.accent(scheme)) : Text(verbatim: part.shown))
         }
         .font(.system(size: CardMetrics.title))
@@ -152,9 +157,9 @@ struct TaskCapsule: View {
 
     /// The title on its one line, each piece its own text so a link's place is known for the tap that opens it.
     @ViewBuilder private var linedTitle: some View {
-        if card.parts.contains(where: \.isLink) {
+        if parts.contains(where: \.isLink) {
             HStack(spacing: 0) {
-                ForEach(Array(card.parts.enumerated()), id: \.offset) { index, part in
+                ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
                     piece(part)
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frame in
                             guard part.isLink else { return }

@@ -178,8 +178,8 @@ struct TimelineStack: View {
 
     /// The lifted card as the calendar draws it now: its counter follows the subtasks written.
     private var card: BoardCard {
-        let place = shown.card.item.place
-        return model.snapshot?.timeline.slots.first { $0.card.item.place == place }?.card ?? shown.card
+        let id = shown.card.item.id
+        return model.snapshot?.timeline.slots.first { $0.card.item.id == id }?.card ?? shown.card
     }
 
     private static let width: CGFloat = 320

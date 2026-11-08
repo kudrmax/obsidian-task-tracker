@@ -69,11 +69,11 @@ public struct ProjectRef: Codable, Hashable, Sendable {
 }
 
 public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
-    public let key: TaskKey
-    /// The core's name of the task as read, its line included (`keyId`).
+    /// Who the task is, as the core names it (`TaskItem.id`, `docs/door.md` «Ids»): the same through every write, move,
+    /// re-read and undo while the board hands the door's `ids` back. What a view keys its card by; `key` is the task as
+    /// read, what an action names.
     public let id: String
-    /// The core's name of its place in the file, whatever its line (`placeId`): two reads of one task share it.
-    public let place: String
+    public let key: TaskKey
     public let text: String
     public let title: String
     public let status: String
@@ -110,16 +110,15 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
     public var closed: Bool { !open }
 
     enum CodingKeys: String, CodingKey {
-        case key, id, place, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
+        case id, key, text, title, status, dueDate, slot, durationMin, reminder, open, repeatable, priority, labels, colors, group, list
         case isSubtask, day, repeatDay, can, subtasks, allSubtasks, progress, collapsed, description, parentKey, project, parentText
         case repeatRule = "repeat"
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        key = try c.decode(TaskKey.self, forKey: .key)
         id = try c.decode(String.self, forKey: .id)
-        place = try c.decode(String.self, forKey: .place)
+        key = try c.decode(TaskKey.self, forKey: .key)
         text = try c.decode(String.self, forKey: .text)
         title = try c.decode(String.self, forKey: .title)
         status = try c.decode(String.self, forKey: .status)
@@ -155,6 +154,8 @@ public struct TaskItem: Decodable, Hashable, Sendable, Identifiable {
 }
 
 public struct ListSection: Codable, Hashable, Sendable {
+    /// Who the section is (`ListSection.id`): the same through a rename and a move; `"none"` for No section.
+    public let id: String
     public let name: String?
     public let empty: Bool
 }
@@ -253,6 +254,8 @@ public struct GroupMenu: Decodable, Hashable, Sendable {
 }
 
 public struct ListGroup: Decodable, Sendable {
+    /// Its section's id: who the header is through a rename.
+    public let id: String
     public let name: String?
     public let rows: [ListRow]
     public let empty: Bool

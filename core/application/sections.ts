@@ -11,6 +11,8 @@ export interface ListRow {
 
 /** The tasks of one section of a list, in file order. */
 export interface ListGroup {
+	/** Its section's `ListSection.id`: who it is through a rename; the same for the section in every group that draws it. */
+	readonly id: string;
 	readonly name: GroupName;
 	readonly items: readonly TaskItem[];
 	/** The rows its column draws: each task, then its open subtasks a level deeper, unless they are folded away. */
@@ -32,14 +34,23 @@ function rowsOf(items: readonly TaskItem[], level = 0): ListRow[] {
 	return items.flatMap((item) => [{ item, level }, ...(item.collapsed ? [] : rowsOf(item.subtasks, level + 1))]);
 }
 
-function groupOf(name: GroupName, items: readonly TaskItem[], header = true): ListGroup {
+/** The id of No section, in every list: there is one in each. */
+export const NO_SECTION_ID = "none";
+
+/** A section's id among the list's sections by its name; one the list does not hold as read is known by its name alone. */
+export function sectionId(name: GroupName, sections: readonly ListSection[]): string {
+	if (name === null) return NO_SECTION_ID;
+	return sections.find((s) => s.name === name)?.id ?? `section:${name}`;
+}
+
+function groupOf(name: GroupName, items: readonly TaskItem[], header = true, id = sectionId(name, [])): ListGroup {
 	const section = name !== null;
-	return { name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
+	return { id, name, items, rows: rowsOf(items), empty: section && items.length === 0, menu: section ? { section: name, rename: true, remove: true } : null, header, reorder: section };
 }
 
 /** A section of a project's group: its header unless it is the part without a section; its menu touches only that project's tasks; it does not lift. */
-export function projectSection(name: GroupName, items: readonly TaskItem[], project: ProjectZone): ListGroup {
-	const plain = groupOf(name, items, name !== null);
+export function projectSection(name: GroupName, items: readonly TaskItem[], project: ProjectZone, id = sectionId(name, [])): ListGroup {
+	const plain = groupOf(name, items, name !== null, id);
 	return { ...plain, menu: plain.menu && { ...plain.menu, project }, reorder: false };
 }
 
@@ -61,19 +72,19 @@ export interface ListView {
  */
 export function listView(items: readonly TaskItem[], sections: boolean, listSections: readonly ListSection[] = []): ListView {
 	if (!sections) return { showsHeaders: false, groups: [groupOf(null, items, false)] };
-	const groups = withEmptySections(byGroup(items), listSections);
+	const groups = withEmptySections(byGroup(items, listSections), listSections);
 	const showsHeaders = groups.some((g) => g.name !== null);
 	return { showsHeaders, groups: groups.map((g) => ({ ...g, header: showsHeaders })) };
 }
 
-function byGroup(items: readonly TaskItem[]): ListGroup[] {
+function byGroup(items: readonly TaskItem[], sections: readonly ListSection[]): ListGroup[] {
 	const groups: { name: GroupName; items: TaskItem[] }[] = [];
 	for (const item of items) {
 		const group = groups.find((g) => g.name === item.group);
 		if (group) group.items.push(item);
 		else groups.push({ name: item.group, items: [item] });
 	}
-	return groups.map((g) => groupOf(g.name, g.items));
+	return groups.map((g) => groupOf(g.name, g.items, true, sectionId(g.name, sections)));
 }
 
 export function withEmptySections(groups: readonly ListGroup[], sections: readonly ListSection[]): readonly ListGroup[] {
@@ -85,7 +96,7 @@ export function withEmptySections(groups: readonly ListGroup[], sections: readon
 		drawn.forEach((g, j) => {
 			if (above.has(g.name)) at = j + 1;
 		});
-		drawn.splice(at, 0, groupOf(section.name, []));
+		drawn.splice(at, 0, groupOf(section.name, [], true, section.id));
 	});
 	return drawn;
 }

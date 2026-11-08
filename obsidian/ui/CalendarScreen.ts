@@ -13,7 +13,7 @@ import { ColumnHeaders } from "./ColumnHeaders";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { type ColumnTitle, ListDrop } from "./drag/ListDrop";
-import { type ColumnSections, type DropResult, droppedTasks, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { ColumnMenu, GroupMenu } from "./menu/GroupMenu";
 import { failureText } from "./failureText";
@@ -23,6 +23,7 @@ import { GestureArbiter } from "./gestures";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { EventMenu } from "./menu/EventMenu";
 import { TaskMenu } from "./menu/TaskMenu";
+import type { Sheet } from "./menu/LiftedMenu";
 import type { EditorOwner } from "./markdown/EmbeddedEditor";
 import { ObsidianMarkdown } from "./markdown/ObsidianMarkdown";
 import { MarkdownTitleField } from "./quick/MarkdownTitleField";
@@ -30,6 +31,7 @@ import { QuickEntryController } from "./quick/QuickEntryController";
 import { ObsidianChrome } from "./quick/ObsidianChrome";
 import { FullScreen } from "./full/FullScreen";
 import { MoreMenu } from "./menu/MoreMenu";
+import type { CloseHow, Overlay } from "./menu/Overlay";
 import type { TaskLink } from "./TaskTitle";
 import { SourcesPopover } from "./sources/SourcesPopover";
 import { levelsFor, zoomAfterPinch, zoomShown } from "./zoomLevels";
@@ -133,6 +135,8 @@ export class CalendarScreen extends Component {
 	/** The quick field's editor while it has the focus: Obsidian's commands and hotkeys go to it. */
 	activeEditor: EditorOwner | null = null;
 	private scrolledFor: LocalDate | null = null;
+	/** The lists were last drawn from tasks read: what changes from then on moves into place; the first cards read are drawn at once. */
+	private drawnRead = false;
 	/** The settings the screen last followed: a change is weighed against them. */
 	private seen: ShownSettings;
 	private readonly arbiter = new GestureArbiter();
@@ -237,7 +241,7 @@ export class CalendarScreen extends Component {
 				await this.act(async () => (written = await this.deps.tasks.resize(item.key, this.selectedDate, edge, minute, minDurationMin)));
 				return written;
 			},
-			onMenu: (item, source, lifted) => this.showMenu(item, source, lifted),
+			onMenu: (item, source, lifted, held) => this.showMenu(item, source, lifted, undefined, held),
 			onRename: (item) => this.quick?.rename(item),
 			newSlot: () => this.timelineDrop,
 			onNewSlot: (slot) => this.quick?.openSlot(slot),
@@ -275,21 +279,21 @@ export class CalendarScreen extends Component {
 			day: () => this.selectedDate,
 			grouped: () => this.sectionsOf("day") !== null,
 			sections: () => this.listSectionsOf("day"),
-			onPlate: (plate, group, project) => this.attachPlate(plate, "day", group, project),
+			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "day", group, signal, project),
 			grouping: () => this.data.grouping("now"),
 			pending: () => this.namingIn("day"),
 			entry: (drawing) => this.quick?.entryIn("day", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group),
+			onHeader: (head, group, signal) => this.groupDrag.attach(head, this.sectionsOf("day")?.list ?? "now", this.list!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "day", subtree),
+			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "day", subtree, signal),
 		});
 		this.leftDrop = new ListDrop(this.list, this.leftEl, "day", (origins) => acceptsDrop("day", origins), () => this.sectionsOf("day"), true, () => this.haptics.tap(), this.columnTitle("day"));
 		this.doneEl = el(root, "div", "tc-done");
 		this.doneList = new TaskList(el(this.doneEl, "div"), {
 			items: () => this.data.done,
 			day: () => null,
-			onCard: (card, item) => this.attachDoneCard(card, item),
+			onCard: (card, item, _subtree, signal) => this.attachDoneCard(card, item, signal),
 		});
 		el(el(root, "div", "tc-divider is-fixed is-done"), "div", "tc-divider-line");
 		this.inboxEl = el(root, "div", "tc-inbox");
@@ -300,14 +304,14 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("inbox") !== null,
 			sections: () => this.listSectionsOf("inbox"),
-			onPlate: (plate, group, project) => this.attachPlate(plate, "inbox", group, project),
+			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "inbox", group, signal, project),
 			grouping: () => this.data.grouping("inbox"),
 			pending: () => this.namingIn("inbox"),
 			entry: (drawing) => this.quick?.entryIn("inbox", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, "inbox", this.inboxList!, group),
+			onHeader: (head, group, signal) => this.groupDrag.attach(head, "inbox", this.inboxList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "inbox", subtree),
+			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "inbox", subtree, signal),
 		});
 		this.inboxDrop = new ListDrop(this.inboxList, inboxPane, "inbox", (origins) => acceptsDrop("inbox", origins), () => this.sectionsOf("inbox"), true, () => this.haptics.tap(), this.columnTitle("inbox"));
 		this.backlogTitle = el(el(backlogPane, "div", "tc-pane-head"), "div", "tc-head-title");
@@ -320,15 +324,15 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("backlog") !== null,
 			sections: () => this.listSectionsOf("backlog"),
-			onPlate: (plate, group, project) => this.attachPlate(plate, "backlog", group, project),
+			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "backlog", group, signal, project),
 			grouping: () => this.data.grouping("backlog"),
-			onProjectHead: (head, group) => this.attachProjectHead(head, "backlog", group),
+			onProjectHead: (head, group, signal) => this.attachProjectHead(head, "backlog", group, signal),
 			pending: () => this.namingIn("backlog"),
 			entry: (drawing) => this.quick?.entryIn("backlog", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, "backlog", this.backlogList!, group),
+			onHeader: (head, group, signal) => this.groupDrag.attach(head, "backlog", this.backlogList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "backlog", subtree),
+			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "backlog", subtree, signal),
 		});
 		this.backlogDrop = new ListDrop(this.backlogList, backlogPane, "backlog", (origins) => acceptsDrop("backlog", origins), () => this.sectionsOf("backlog"), false, () => this.haptics.tap(), this.columnTitle("backlog"));
 		this.soonEl = el(root, "div", "tc-soon");
@@ -337,15 +341,15 @@ export class CalendarScreen extends Component {
 			day: () => null,
 			grouped: () => this.sectionsOf("soon") !== null,
 			sections: () => this.listSectionsOf("soon"),
-			onPlate: (plate, group, project) => this.attachPlate(plate, "soon", group, project),
+			onPlate: (plate, group, signal, project) => this.attachPlate(plate, "soon", group, signal, project),
 			grouping: () => this.data.grouping("soon"),
-			onProjectHead: (head, group) => this.attachProjectHead(head, "soon", group),
+			onProjectHead: (head, group, signal) => this.attachProjectHead(head, "soon", group, signal),
 			pending: () => this.namingIn("soon"),
 			entry: (drawing) => this.quick?.entryIn("soon", drawing) ?? null,
 			renaming: () => this.quick?.renaming() ?? null,
-			onHeader: (head, group) => this.groupDrag.attach(head, "soon", this.soonList!, group),
+			onHeader: (head, group, signal) => this.groupDrag.attach(head, "soon", this.soonList!, group, signal),
 			ungroupedName: () => this.settings.ungrouped,
-			onCard: (card, item, subtree) => this.attachCard(card, item, "soon", subtree),
+			onCard: (card, item, subtree, signal) => this.attachCard(card, item, "soon", subtree, signal),
 		});
 		this.soonDrop = new ListDrop(this.soonList, this.soonEl, "soon", (origins) => acceptsDrop("soon", origins), () => this.sectionsOf("soon"), true, () => this.haptics.tap(), this.columnTitle("soon"));
 		el(el(root, "div", "tc-divider is-fixed is-inbox"), "div", "tc-divider-line");
@@ -374,12 +378,12 @@ export class CalendarScreen extends Component {
 			isPast: (event) => this.deps.calendars.isPast(event),
 			now: () => this.deps.clock.now(),
 			onResize: () => this.fitWholeDay(),
-			onBlock: (block, item) => {
+			onBlock: (block, item, signal) => {
 				this.found.attach(block, item);
 				this.arriving.attach(block, item);
-				this.drag.attachBlock(block, item);
+				this.drag.attachBlock(block, item, signal);
 			},
-			onEvent: (block, event) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) })),
+			onEvent: (block, event, signal) => this.drag.attachEvent(block, () => EventMenu.open({ source: block, openInCalendar: () => this.deps.openInCalendar(event) }), signal),
 			onGrip: (block, item, edge, e) => this.drag.grip(block, item, edge, e),
 		});
 		el(root, "div", "tc-fade");
@@ -449,7 +453,7 @@ export class CalendarScreen extends Component {
 		if (this.where.view) {
 			const capsule = new BottomCapsule(root, this.deps.undo, {
 				onUndo: () => void this.undoStep("undo"),
-				onMore: (anchor) => MoreMenu.open({ anchor, onSearch: () => this.openSearch(), onSelect: () => this.bulk.start() }),
+				onMore: (anchor) => MoreMenu.open({ anchor, onSearch: (sheet) => this.openSearch(sheet), onSelect: () => this.bulk.start() }),
 			});
 			this.unsubscribe.push(() => capsule.destroy());
 		}
@@ -637,11 +641,11 @@ export class CalendarScreen extends Component {
 	}
 
 	/**
-	 * The day's arrows and its name turn the day as a swipe to it does, the whole way with no finger. A tap during a turn
-	 * stands that turn where it was going and turns on from there once the screen has drawn the day it brought in.
+	 * The day's arrows and its name turn the day as a swipe to it does, the whole way with no finger. A tap during a turn,
+	 * or while a swipe runs to its place, lets that run on to its place, and the day turns on from there once the screen
+	 * has drawn the day it brought in (decision 51).
 	 */
 	private turnDay(to: () => { readonly date: LocalDate; readonly shift: Shift } | null): void {
-		this.pager?.stand();
 		this.turning = this.turning.then(async () => {
 			await this.drawnLanding();
 			await this.afterEntry(async () => {
@@ -768,16 +772,24 @@ export class CalendarScreen extends Component {
 	}
 
 	/** A Done card has no drag: a tap, a right click open its menu, as anywhere. */
-	private attachDoneCard(card: HTMLElement, item: TaskItem): void {
+	private attachDoneCard(card: HTMLElement, item: TaskItem, signal: AbortSignal): void {
 		this.found.attach(card, item);
 		this.arriving.attach(card, item);
-		card.addEventListener("click", (e) => {
-			if (!this.fold(item, e.target)) this.showMenu(item, card);
-		});
-		card.addEventListener("contextmenu", (e) => {
-			e.preventDefault();
-			this.showMenu(item, card);
-		});
+		card.addEventListener(
+			"click",
+			(e) => {
+				if (!this.fold(item, e.target)) this.showMenu(item, card);
+			},
+			{ signal },
+		);
+		card.addEventListener(
+			"contextmenu",
+			(e) => {
+				e.preventDefault();
+				this.showMenu(item, card);
+			},
+			{ signal },
+		);
 	}
 
 	/** A tap on a card's subtask counter folds its open subtasks away, or shows them again; true when it did, in place of the menu. */
@@ -788,7 +800,8 @@ export class CalendarScreen extends Component {
 		return true;
 	}
 
-	private openSearch(): void {
+	/** `sheet`: the sheet of the window the search replaces, which it takes over. */
+	private openSearch(sheet?: (onClose: (how: CloseHow) => void) => Overlay): void {
 		if (this.search) return;
 		void this.afterEntry(() => {
 			this.search = SearchWindow.open({
@@ -796,6 +809,7 @@ export class CalendarScreen extends Component {
 				tasks: this.deps.tasks,
 				desktop: !this.contentEl.ownerDocument.body.classList.contains("is-mobile"),
 				project: this.where.project?.(),
+				...(sheet && { sheet }),
 				sectionName: (section) => this.deps.tasks.listName(section),
 				onPick: (hit) => {
 					this.search = null;
@@ -937,19 +951,29 @@ export class CalendarScreen extends Component {
 	}
 
 	/** A list's card: its gestures. */
-	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[]): void {
+	private attachCard(card: HTMLElement, item: TaskItem, column: ListColumn, subtree: readonly HTMLElement[], signal: AbortSignal): void {
 		this.found.attach(card, item);
 		this.arriving.attach(card, item);
 		this.bulk.attach({ item, card, column, subtree });
-		this.drag.attachCard(card, item, column, subtree);
+		this.drag.attachCard(card, item, column, subtree, signal);
 	}
 
 	/** A drop: the service says what it means for the file (spec §5.1), for the card under the finger and those carried along. */
 	/** The drop written and drawn: the card the dragged task stands on now, hidden until the float lands on it. */
-	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | null> {
+	private async applyDrop(drag: TaskDragPayload, result: DropResult): Promise<HTMLElement | HeldOut | null> {
 		this.bulk.dropping(drag);
-		await this.act(async () => this.arriving.expect((await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate))[0] ?? null));
-		return this.arriving.shown;
+		this.arriving.dropping(drag.item);
+		await this.act(async () => void (await this.deps.tasks.drop(droppedTasks(drag), result, this.selectedDate)));
+		return this.arriving.shown ?? this.foldedAway(drag.item.id);
+	}
+
+	/** The header of the folded project group a task went into, in whichever list shows it. */
+	private foldedAway(id: string): HeldOut | null {
+		for (const list of [this.soonList, this.backlogList, this.inboxList, this.list]) {
+			const behind = list?.foldedHeadOf(id);
+			if (behind && behind.getClientRects().length > 0) return { behind };
+		}
+		return null;
 	}
 
 	/** The card waits at the end of its column under a field for the section's name; Enter makes the section, anything else puts it back. */
@@ -990,12 +1014,14 @@ export class CalendarScreen extends Component {
 	/** The name is edited where the header stands, the caret at its end. */
 	private renameInPlace(head: HTMLElement, list: GroupedList, name: string, project?: ProjectZone): void {
 		if (!this.arbiter.claim(NAMING)) return;
-		const slot = el(null, "div", "tc-group-slot");
+		const slot = el(null, "div", "tc-group-slot is-rename");
 		head.before(slot);
 		head.classList.add("is-renamed");
 		GroupNameField.open(slot, {
 			value: name,
 			onDone: (to) => {
+				slot.remove();
+				head.classList.remove("is-renamed");
 				this.arbiter.release(NAMING);
 				if (to === null) return this.render();
 				void this.act(async () => {
@@ -1012,12 +1038,12 @@ export class CalendarScreen extends Component {
 	}
 
 	/** A tap on an empty section's No tasks plate (of a project's part in a grouped list): the field of a new task there. */
-	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup, project?: ProjectZone): void {
-		plate.addEventListener("click", () => this.quick?.openIn(column, group.name, project));
+	private attachPlate(plate: HTMLElement, column: ListColumn, group: ListGroup, signal: AbortSignal, project?: ProjectZone): void {
+		plate.addEventListener("click", () => this.quick?.openIn(column, group.name, project), { signal });
 	}
 
 	/** A project group's header: a tap folds or unfolds it, the arrow opens the project's note. */
-	private attachProjectHead(head: HTMLElement, list: GroupedList, group: ProjectGroup): void {
+	private attachProjectHead(head: HTMLElement, list: GroupedList, group: ProjectGroup, signal: AbortSignal): void {
 		head.addEventListener("click", (e) => {
 			if (this.arbiter.busy) return;
 			const note = group.project?.note;
@@ -1027,7 +1053,7 @@ export class CalendarScreen extends Component {
 			}
 			this.haptics.tap();
 			void this.act(() => this.deps.tasks.toggleFold(list, group.key));
-		});
+		}, { signal });
 	}
 
 	/** The menu of Backlog's or Soon's title: Group by project, kept on the device. */
@@ -1131,7 +1157,7 @@ export class CalendarScreen extends Component {
 	}
 
 	/** The task menu; a list card's offers the sections of its list too. On the whole screen, typing and opening stay there. */
-	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen): TaskMenu {
+	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet): TaskMenu {
 		const tasks = this.deps.tasks;
 		const from = this.menuFrom(source, full);
 		const column = this.columnOf(source);
@@ -1143,8 +1169,10 @@ export class CalendarScreen extends Component {
 			item,
 			source,
 			lifted,
+			held,
+			sheet,
 			menu: (task) => tasks.menu(task, from, screen),
-			onSubtask: (subtask, card) => this.showMenu(subtask, card),
+			onSubtask: (subtask, card, taken) => this.showMenu(subtask, card, undefined, undefined, undefined, taken),
 			markdown: full?.holds(item) ? undefined : this.markdown,
 			today,
 			day: this.selectedDate,
@@ -1226,23 +1254,25 @@ export class CalendarScreen extends Component {
 		this.switcher.render();
 		if (parts.has("tasks")) {
 			this.bulk.selection.forgetDrawn();
-			this.list.render();
+			const moving = this.drawnRead;
+			this.drawnRead = this.data.read;
+			this.list.render(moving);
 			const missing = this.data.missing;
 			root.classList.toggle("is-missing", missing);
 			for (const part of [this.leftEl, this.soonEl, this.inboxEl, this.doneEl, this.rightEl]) part.classList.toggle("tc-hidden", missing);
 			root.querySelector(".tc-missing")?.remove();
 			if (missing) this.renderMissing(root);
-			this.soonList.render();
-			this.inboxList.render();
+			this.soonList.render(moving);
+			this.inboxList.render(moving);
 			this.backlogTitle.textContent = this.deps.tasks.listName("backlog");
 			this.backlogTitle.classList.toggle("has-menu", this.data.grouping("backlog").canGroup);
 			this.headers.render();
-			this.backlogList.render();
-			this.doneList.render();
+			this.backlogList.render(moving);
+			this.doneList.render(moving);
 		}
 		const hoursAt = this.landing?.peek.date === this.selectedDate ? { top: this.timeline.el.getBoundingClientRect().top, scroll: this.timeline.el.scrollTop } : null;
 		if (parts.has("events")) renderAllDayRows(this.allDayEl, this.rightEl, this.data.allDay, this.theme(), (event) => this.deps.calendars.isPast(event));
-		if (parts.has("tasks") || parts.has("events")) this.timeline.render();
+		if (parts.has("tasks") || parts.has("events")) this.timeline.render(this.drawnRead);
 		if (hoursAt !== null) this.keepHoursAt(hoursAt);
 		if (parts.has("tasks") && this.scrolledFor !== this.selectedDate) {
 			this.scrolledFor = this.selectedDate;

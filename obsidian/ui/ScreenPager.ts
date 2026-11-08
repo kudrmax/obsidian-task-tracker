@@ -48,6 +48,8 @@ export class ScreenPager implements SwipeTarget {
 	private shift: Shift | null = null;
 	private dx = 0;
 	private settling: Settling | null = null;
+	/** Resolves once the screen stands after the settle under way. */
+	private ending: Promise<void> = Promise.resolve();
 
 	constructor(private readonly deps: ScreenPagerDeps) {}
 
@@ -74,25 +76,25 @@ export class ScreenPager implements SwipeTarget {
 		const to = arrived && track.distance !== null ? -this.shift * track.distance : 0;
 		const span = track.distance ?? this.deps.width();
 		const ms = span > 0 ? this.deps.duration() * Math.min(1, Math.abs(to - this.dx) / span) : 0;
-		return new Promise((resolve) => {
+		return (this.ending = new Promise((resolve) => {
 			const settling: Settling = { track, arrived, from: this.dx, to, ms, start: null, frame: 0, timer: 0, resolve };
 			this.settling = settling;
 			if (ms <= 0) return this.finish();
 			settling.frame = requestAnimationFrame((time) => this.frame(settling, time));
 			settling.timer = window.setTimeout(() => this.finish(), ms + FRAME_SLACK_MS);
-		});
+		}));
 	}
 
-	stand(): void {
-		this.finish();
-	}
+	/** A tap while the screen runs to its place: it runs on from where it is, never put there in one frame; the tap is free to go to what it hit. */
+	stand(): void {}
 
 	/**
 	 * With no finger, as an arrow turns it: the screen runs the whole way to the next one `shift`'s way along the track
-	 * `make` draws, as one let go at its start would. What was running stands where it was going first.
+	 * `make` draws, as one let go at its start would. What was running (a swipe let go) runs on to its place first, never
+	 * put there in one frame (decisions 32 and 51).
 	 */
 	run(shift: Shift, make: () => ScreenTrack): Promise<void> {
-		this.finish();
+		if (this.settling) return this.ending.then(() => this.run(shift, make));
 		this.reset();
 		const track = make();
 		this.way = { shift, track };

@@ -165,6 +165,11 @@ const readLines = new WeakMap<Markers, Map<string, ParsedTaskLine | null>>();
 const KEPT_LINES = 20_000;
 
 /** The task a line holds under `markers`, or null; the answer is shared, never to be changed. */
+/** A line with a checkbox: a task line under any markers. */
+export function isTaskLine(line: string): boolean {
+	return LINE_RE.test(line);
+}
+
 export function parseTaskLine(line: string, markers: Markers): ParsedTaskLine | null {
 	let kept = readLines.get(markers);
 	if (!kept) readLines.set(markers, (kept = new Map()));

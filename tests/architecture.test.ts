@@ -212,7 +212,6 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	MINUTES_PER_DAY: "../domain/LocalDate",
 	samePlacement: "../domain/operations",
 	keyId: "./taskKeys",
-	placeId: "./taskKeys",
 	MOST_CARD_COLORS: "./marks",
 	sameLine: "./taskKeys",
 	samePlace: "./taskKeys",
