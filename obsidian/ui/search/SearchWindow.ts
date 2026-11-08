@@ -89,9 +89,11 @@ export class SearchWindow {
 		this.deps.onClose();
 	}
 
+	/** A result picked: the window closes, and the screen goes to the task once it has, as every pick of a window does. */
 	private pick(hit: SearchHit): void {
+		if (this.closed) return;
 		this.close();
-		this.deps.onPick(hit);
+		this.overlay.afterClose(() => this.deps.onPick(hit));
 	}
 
 	private async find(query: string): Promise<void> {

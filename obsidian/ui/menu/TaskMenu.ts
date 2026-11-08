@@ -582,7 +582,9 @@ export class TaskMenu extends LiftedMenu {
 
 	protected override closed(how: CloseHow): void {
 		this.keysDoc.removeEventListener("keydown", this.onEnter, true);
-		this.repeatPage?.close();
+		const page = this.repeatPage;
+		/** What the repeat page holds is written as every pick is, once the menu has gone. */
+		if (page) this.overlay.afterClose(() => page.close());
 		this.fieldClosed?.(how);
 	}
 }

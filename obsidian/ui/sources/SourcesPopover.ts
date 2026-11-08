@@ -3,7 +3,7 @@ import { PROPERTY } from "../design";
 import { el, px } from "../dom";
 import { icon } from "../kit/icons";
 import { LiftedCopy } from "../kit/LiftedCopy";
-import { Panel, Picks } from "../kit/Panel";
+import { Panel } from "../kit/Panel";
 import { menuRow } from "../menu/MenuPanel";
 import { Overlay } from "../menu/Overlay";
 import { sourceText } from "./sourceText";
@@ -29,10 +29,7 @@ export class SourcesPopover {
 		const copy = LiftedCopy.over(this.overlay, opts.anchor.cloneNode(true) as HTMLElement, false);
 		copy.el.classList.add("tc-seg-copy");
 		copy.pin(rect);
-		const panel = Panel.over(this.overlay, { root: "tc-popover", picks: new Picks(
-				() => this.close(),
-				() => this.overlay.closed,
-			), place: (p) => SourcesPopover.over(p, rect) }, false);
+		const panel = Panel.over(this.overlay, { root: "tc-popover", place: (p) => SourcesPopover.over(p, rect) }, false);
 		panel.replace((p) => {
 			for (const status of opts.statuses) SourcesPopover.row(p, sourceText(status), status);
 			menuRow(p, { label: "Refresh now", icon: "refresh", root: "tc-source-refresh", iconSide: "start", onPick: panel.pick(() => opts.onRefresh()) });
