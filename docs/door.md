@@ -50,7 +50,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 | `calendars` | `{ google?, iphone?, work? }`: each calendar file's text, `null` or left out for none (`calendarFiles` says where they are) |
 | `fetched` | the calendar sources the host fetches itself (a status names no device for them); `["google"]` when left out |
 | `history` | the undo steps as the last answer gave them; left out before the first |
-| `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open) |
+| `projects` | the notes with the project tag, `ProjectNote` `{ name, path, link }`, as `notes.projects` answers them over the vault's notes; left out for none: a task's project then comes from its own `🗂️` field alone (its name, no note to open), no project groups get a note's arrow, and the Project row offers only the projects tasks already name |
 | `grouping` | `GroupingState`, how this device groups its lists by project, as the last answer gave it; left out for the defaults (Backlog grouped, Soon not) |
 
 **Answer** (`DoorAnswer`):
@@ -88,6 +88,12 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read.
 - `tasks.screen(date)` with no tasks file answers the empty screen with `missing: true`.
 - `tasks.createFile()` answers the new file's text in `tasks`; with a file already there it fails.
+- `tasks.placementTitle(placement)`: the quick entry's place button's words for its `place`: the list's name as the
+  settings head it, a day as `5 Nov` (`{ kind: "date", date: "2026-11-05" }` → `"5 Nov"`), never the device's locale.
+- A menu's `repeat` (`RepeatRow` `{ value, days }`): the Repeat row's value on the right, ready: `"Every 3 days"`,
+  `"On the 5th"`, `"Every 2 months on the 5th"`, `"Every 3 weeks after done"`; for a weekly schedule `value` is empty and
+  `days` the weekdays (0 Monday) the row lights among the week's letters (`REPEAT_WORDS.weekdays[i].letter`); empty and
+  null for no rule and in the bulk menu.
 - `tasks.drop(tasks, to, day)` answers the dropped tasks' keys as the file now has them: the screen settles the card on
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
@@ -166,6 +172,10 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 - A status's `updatedDate` is the calendar date of `updatedAtMs` by the clock: the date shown for an update before
   yesterday (`updatedDay` "other").
 - `isPast(event)`: by `event.endMs`, as CalendarDay greys an event (over once its end has come); `past` on each event is the same.
+- Each status's `words` (`SourceWords`) is its row in the sources window, worded: `name` (`Google Calendar`, `iPhone
+  calendars`, `Work calendar`), `short`, `sub` (`Updated today`, `Exported from iPhone`, `Not updated yet`, or the
+  problem: `not logged in`, `file missing`, `no answer in 15 s`, a failure's own text) and `time` (`14:19`, `Yesterday
+  08:02`, `3 Oct 08:02`, empty with no update); the orange mark is `stale`.
 - An event's `color` is `null` when its calendar's file gives none: the frontend draws the source's own colour.
 
 ### `reminders.*`: the phone's reminders
@@ -198,13 +208,15 @@ The settings screen, every read and write but one, answered by the plugin's own 
 `setSection(key, name)`, `setMarker(marker, text)`, `setCount(field, text)`, `setDayStartHour(hour)`,
 `renameLevel(index, prefix)`, `recolourLevel(index, color)`, `removeLevel(index)`, `addLevel()`, `moveLevel(from, to)`,
 `setLabelTag(tag)`, `setLabelPaint(paint)` (how a card of several labels is painted: one of the form's `labelPaints`,
-`"stripes"` or `"blend"`; anything else writes nothing), `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
+`"stripes"` or `"blend"`; anything else writes nothing), `setCardHeight(px)` and `setCardGap(px)` (Cards: written rounded
+while within the form's `cardHeights` `{ min: 28, max: 40 }` and `cardGaps` `{ min: 0, max: 10 }`, else nothing), `setProjectTag(tag)` (the tag that makes a note a project, `#project`; stored with its `#`), `renameLabel(index, title)`, `recolourLabel(index, color)`, `removeLabel(index)`, `addLabel()`,
 `moveLabel(from, to)`, `colourOf(text, shades)` (the preset a typed code is, by the shades the host draws presets in),
 `renamePreset(index, name)`, `removePreset(index)`, `addPreset()`, `movePreset(from, to)`, `setUngrouped(name)`,
 `setGoogleClientId(id)`, `setWorkCalendarFile(path)`, `typedColour(of, index, text, shades)` (a colour code typed for a
 level or a label and left: the colour to write, `null` for no colour or the one it has). `form()` also answers
 `dayStartHours` (what Day starts at offers), `labelPaint` and `labelPaints` (Several labels: the paint saved, and the
-paints offered in order, `["stripes", "blend"]`), `googleClientReady` (Log in has a client id to go with), and
+paints offered in order, `["stripes", "blend"]`), `cardHeight`, `cardGap`, `cardHeights` and `cardGaps` (Cards: the
+sizes saved and the bounds the sliders move within), `googleClientReady` (Log in has a client id to go with), and
 `sectionOrder` and `markerOrder`: the sections' names and the line markers the screen edits, in its order (the words
 for each are the host's).
 
@@ -218,15 +230,44 @@ client secret, which the phone does not edit.
 
 `ScreenSettings`: the tasks file, the sections' names, the name over tasks outside a section, the priority levels and the
 labels, how a card of several labels is painted (`labelPaint`: `"blend"`, one colour flowing into the next, or
-`"stripes"`, the default and what any other saved value reads as), when a touch becomes a drag (`longPressMs`) and the
-hour another day opens at (`scrollToHour`). Every frontend's screen behaves by them alike. `labelPaint` lives in
-`data.json` and travels with the vault: the plugin's settings tab and the app read and write the same key. `onChange` is the host's: it watches `data.json`.
+`"stripes"`, the default and what any other saved value reads as), a card's height and the gap between two cards
+(`cardHeight`, `cardGap`, points on the phone: a list's cards, a stack on the timeline, a lifted card; 35 and 2 unless
+set), when a touch becomes a drag (`longPressMs`, the long press on a card and on the empty timeline alike) and the
+hour another day opens at (`scrollToHour`). Every frontend's screen behaves by them alike. `labelPaint`, `cardHeight` and `cardGap` live in
+`data.json` and travel with the vault: the plugin's settings tab and the app read and write the same key. `onChange` is the host's: it watches `data.json`.
 
 ### `timeline.zoomLevels()`: the zoom's levels
 
 The hour's heights a pinch settles on, `[{ hourPx }]`, as `data.json` keeps them under `zoomLevels`; `DEFAULT_ZOOM_LEVELS`
 when it keeps none or one doesn't read (a height not a positive number). The settings tab of the plugin writes them; the
 host hands them to `rules.levelsFor` with its screen's whole-day height.
+
+### `notes.*`: the vault's notes, for a host without Obsidian
+
+The plugin reads the notes through Obsidian; an app reads the vault's files itself and asks these. Paths are from the
+vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `NSString` and `UITextField` do.
+
+- `tags(texts)`: each note's tags as Obsidian reads them, `#` first, each once: the properties' `tags:` (or `tag:`) as a
+  list, in brackets or as words, then `#tag` in the text after a space or the line's start, outside code blocks and code
+  spans (`#2026`, digits alone, is no tag). `tags(["---\ntags: [project]\n---\n#next"])` → `[["#project", "#next"]]`.
+  A host keeps each file's tags by its modification date and asks again only for the files changed.
+- `projects(notes)`: `notes` is every markdown file of the vault, `{ path, tags }`; the answer is the notes with exactly
+  the settings' project tag (`projectTag`, a nested `#project/sub` is not it), by name, each `ProjectNote` `{ name, path,
+  link }` with the link Obsidian writes: its name while no other note has it, else its path without `.md`. Hand it in as
+  `context.projects` on every call; with it the Project row, the project groups of Backlog and Soon (`screen.projects`),
+  a card's folder icon (`TaskItem.project.mark`, `canOpenNote`, `note`: the path to open) and a project's view
+  (`tasks.screen(date, project)`) work as in the plugin. A call made over a changed list redraws as any other.
+- `linkQuery(text, caret)`: the `[[` the caret stands in, typed and not closed before it, on its line: `{ query, from,
+  to }` (`to` past a `]]` right after the caret), `null` for none: show the note list while it answers one.
+  `linkQuery("Call [[Alp", 10)` → `{ query: "Alp", from: 5, to: 10 }`.
+- `suggest(query, notes, limit?)`: the files that `[[query` offers, best first, at most `limit` (20): the name as typed,
+  a name starting with it, holding it, a path holding it, a path holding each word; the shorter name first, then A–Z;
+  all of them A–Z for nothing typed. `notes` is every file of the vault `{ path }` (attachments too); each answer is
+  `{ name, path, link }`.
+- `insert(text, at, link)`: the title with `[[link]]` in place of `at` (the `linkQuery` answer), and the caret after it:
+  `{ text, caret }`.
+- `open(target, notes)`: the file a note link in a title opens (`textParts`' `target`): by its path, else its name, as
+  Obsidian resolves it, a heading after `#` left aside; `{ name, path, link }`, `null` for none.
 
 ### `history.*`: undo
 
@@ -318,9 +359,20 @@ replaces it only while it has no focus and no write waits).
 What the plugin's UI calls itself, by the names in `contracts.ts`: `nextProgress`, `sameSlot`, `sameRule`,
 `repeatParts`, `repeatDraft`, `editRepeat`, `samePlacement`, `keyId`, `sameLine`, `samePlace`, `sameTaskTree`,
 `fitLevel`, `gapOfPlace`, `levelRange`, `placeOfGap`, `shiftLevel`, `gapAt`, `groupPlaceOf`, `placeOfDrop`, `sameGap`,
-`listView`, `sectionChoice`, `cardDue`, `textParts`, `oneLine`, `sameLevels`, `labelTitle`, `sameLabels`,
+`listView`, `sectionChoice`, `cardDue`, `textParts` (a title in pieces, as every frontend draws it: `{ kind: "text", text }`
+as typed, `{ kind: "note", label, target }` for `[[target]]`, `[[target|label]]` and a markdown link to a note, `{ kind:
+"url", label, target }` for `[label](https://…)` and a bare address; a link's `label` is drawn in the accent and a tap on
+it opens `target`: a url as it is, a note by `notes.open(target, notes)`, the file the link resolves to; code spans,
+escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabels`,
 `isPresetColor`, `usableColor` (a colour a level or a label may be drawn in: a preset or `#RRGGBB`), `acceptsDrop`,
-`placesInGap`; the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
+`placesInGap`, `canPick(from)` (Select tasks picks a card drawn at `from`, a `MenuFrom`: a list column's, never the
+timeline's, Done's, a stack's or the full screen's), `repeatValue(rule)` (the Repeat row's words, `null` for weeks on a
+schedule), `onTheDay(rule)` (`"On the 5th"` under a monthly schedule's unit, empty for any other), `dayMonth(date)`
+(`"5 Nov"`), `listWidths(share, viewWidth, dividerWidth)` (the list column beside the calendar, every number in points:
+`{ width, min, max, center }`: the width drawn for the saved share of the columns' width, `viewWidth` less the divider's
+own `dividerWidth`, within the design's bounds on a phone and growing on a wider window, the bounds a drag of the divider
+moves within, and the width that centres it; `listWidths(0.5, 390, 16)` → `{ width: 187, min: 110, max: 280, center:
+187 }`), `listShareOf(width, viewWidth, dividerWidth)` (the share a divider let go at `width` saves); the paints every frontend draws alike: `shadesOf(color, theme)` (a level's or a label's `ink`, a card's
 `fill`, its date and dot's `meta`), `inkOf`, `contrast`, `eventHex(event)`, `bgAlphaFor(source)`, `eventColors(hex,
 bgAlpha, theme)` (an event's `bg`, `bar`, `text`); `dayTitle(date, relation, today)` (`Today`, `Tue, 3 Nov`) and
 `dueLabel(date)` (a card's corner: `{ day, month }`); `eventLevels(spans)` (how deep each event lies over the others); `stackTasks(tasks, events, hourPx, card, insets)` (each task card's top, height and left edge on the timeline: they never share the width), `overlayLeft(level, insets)`, `eventLeft(level, insets)`, `stackCorner(box, slotStart, span)` (what a stack card shows on the right: its start when stacked, its duration when shorter than one; null for neither), `timeParts`, `durationParts`; a past event's paint: `pastEventPaint(ground, text, theme)` (`{ bg, bar, text }` as
@@ -363,6 +415,10 @@ far as it takes to end inside the margin, or at the card's own end if that is fu
 `constants()` gives `REMINDER_KINDS`, `MINUTES_PER_DAY`,
 `DESCRIPTION_TEMPLATE`, `PRIORITY_COLORS`, `EVENT_BG_ALPHA`, `LISTS` (the lists a task is written into: Inbox, Backlog, Now, Soon),
 `DEFAULT_ZOOM_LEVELS` and `DEFAULT_ZOOM_HOUR` (the zoom a timeline opens at before a pinch settled on another),
+`CARD_HEIGHTS`, `CARD_GAPS` and `DEFAULT_CARD_SIZE` (the Cards bounds and defaults), `LIST_WIDTHS` (`{ min: 110,
+max: 280 }`), `REPEAT_WORDS` (the repeat page's words: `kinds` `{ schedule: "Schedule", afterDone: "After done" }`,
+`every` `"Every"`, `units` `{ day: "days", week: "weeks", month: "months" }`, `weekdays` Monday first `{ short: "Mon",
+name: "Monday", letter: "M" }`, `remove` `"Remove repeat"`),
 `SCREEN_PLACES` (`["inbox", "soon", "calendar"]`, left to right) and `SHOWN_LISTS` (the lists each place shows, in its
 order: `{ inbox: ["inbox", "backlog", "soon"], soon: ["soon", "day"], calendar: ["day"] }`; the quick entry's
 `look.shown`). `tests/architecture.test.ts` fails when contracts.ts hands the UI a runtime
@@ -418,3 +474,10 @@ JavaScriptCore of its own set to that zone (`osascript -l JavaScript`: a process
 - `TaskCapture.oneLine`: `capture` writes the title on one line already; `oneLine` where the app shows it before.
 - `CaptureList`'s cases and their titles: `capture.lists()`, by the headings' names.
 - `CardControl.grownStart` and the width a pressed card's copy grows to: `rules.wholeWidth` and `rules.grownStart`.
+- Grouping forced off (`TaskBoard.ungrouped`): the device's own `grouping`, kept as the door answers it, and the vault's
+  projects in `context.projects` (`notes.projects`).
+- A card's fixed 35 and 2 points: `screenSettings.get()`'s `cardHeight` and `cardGap`; the list's width bounds
+  (`BoardScreen.minList`, `maxList`): `rules.listWidths`.
+- The Repeat row's and the repeat page's words (`BoardSheets.unit`, the weekday letters): the menu's `repeat` and
+  `REPEAT_WORDS`; the sources' words (`CalendarsView.name`, `words`): each status's `words`; the place button's date
+  formatted in the device's locale: `tasks.placementTitle`; «calendar cards cannot be picked»: `rules.canPick`.

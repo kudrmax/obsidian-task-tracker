@@ -76,9 +76,19 @@ export type LabelPaint = "stripes" | "blend";
 /** The paints a card of several labels may take, in the order the settings offer them; the first is the default. */
 export const LABEL_PAINTS: readonly LabelPaint[] = ["stripes", "blend"];
 
-/** How every frontend paints a card alike. */
+/** The bounds a card's height and the gap between cards are kept in, px (points on the phone). */
+export const CARD_HEIGHTS = { min: 28, max: 40 } as const;
+export const CARD_GAPS = { min: 0, max: 10 } as const;
+/** A card's height and the gap between cards before the settings say otherwise. */
+export const DEFAULT_CARD_SIZE = { height: 35, gap: 2 } as const;
+
+/** How every frontend paints a card alike: its labels, its height and the gap to the next. */
 export interface CardPaintSettings {
 	readonly labelPaint: LabelPaint;
+	/** A task card's height: the list, New task and the timeline's stack; its ends are round, half of it. */
+	readonly cardHeight: number;
+	/** Between two cards: in a list and in a stack on the timeline alike. */
+	readonly cardGap: number;
 }
 
 /** Which notes are projects. */
@@ -116,6 +126,8 @@ export const DEFAULT_SETTINGS: TaskCalendarSettings = {
 	labelTag: "label",
 	labels: [],
 	labelPaint: LABEL_PAINTS[0],
+	cardHeight: DEFAULT_CARD_SIZE.height,
+	cardGap: DEFAULT_CARD_SIZE.gap,
 	projectTag: "#project",
 	groups: { presets: ["Morning", "Afternoon", "Evening"], ungrouped: "No section" },
 };
@@ -130,7 +142,15 @@ export function settingsFrom(saved: unknown): TaskCalendarSettings {
 		google: { ...DEFAULT_SETTINGS.google, ...(s.google ?? {}) },
 		groups: { ...DEFAULT_SETTINGS.groups, ...(s.groups ?? {}) },
 		labelPaint: labelPaintOf(s.labelPaint),
+		cardHeight: sizeOf(s.cardHeight, CARD_HEIGHTS, DEFAULT_SETTINGS.cardHeight),
+		cardGap: sizeOf(s.cardGap, CARD_GAPS, DEFAULT_SETTINGS.cardGap),
 	};
+}
+
+/** A size as saved: a whole number within its bounds, or the default for anything that is no number. */
+export function sizeOf(saved: unknown, bounds: { readonly min: number; readonly max: number }, fallback: number): number {
+	if (typeof saved !== "number" || !Number.isFinite(saved)) return fallback;
+	return Math.min(bounds.max, Math.max(bounds.min, Math.round(saved)));
 }
 
 /** A paint as saved: one of the paints, or the default for anything else. */

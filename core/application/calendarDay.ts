@@ -1,3 +1,4 @@
+import { sourceWords } from "./sourceWords";
 import { dayRelation, type DayRelation } from "../domain/Days";
 import { localDateOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
@@ -92,17 +93,16 @@ export class CalendarDay {
 		const problem = this.reading.problem(source);
 		const file = this.reading.files.get(source);
 		const updatedAt = file?.exportedAt ?? null;
-		return {
+		const facts = {
 			source,
 			kind: KINDS[source],
 			problem,
-			events: shown,
 			updatedAt,
 			updatedDay: updatedAt === null ? null : this.relationOf(updatedAt),
 			updatedDate: updatedAt === null ? null : localDateOf(updatedAt),
 			detail: this.reading.fed(source) ? null : (file?.device ?? null),
-			stale: problem !== null || this.isOld(updatedAt),
 		};
+		return { ...facts, events: shown, stale: problem !== null || this.isOld(updatedAt), words: sourceWords(facts) };
 	}
 
 	/** How the calendar date of `at` stands to the clock's: a moment's today and yesterday are calendar days, not the plugin's day. */

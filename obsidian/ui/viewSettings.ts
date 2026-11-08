@@ -24,10 +24,6 @@ export interface ViewSettings {
 	/** The zoom a pinch last settled on: the timeline opens at it. */
 	readonly zoom: Zoom;
 	readonly zoomLevels: readonly ZoomLevel[];
-	/** A task card's height, px: the list, New task and the timeline's stack; its ends are round, half of it. */
-	readonly cardHeight: number;
-	/** Between two cards, px: in the list and in a stack on the timeline alike. */
-	readonly cardGap: number;
 }
 
 export const VIEW_DEFAULTS: ViewSettings = {
@@ -35,8 +31,6 @@ export const VIEW_DEFAULTS: ViewSettings = {
 	rightMode: "calendar",
 	zoom: DEFAULT_ZOOM_HOUR,
 	zoomLevels: DEFAULT_ZOOM_LEVELS,
-	cardHeight: 35,
-	cardGap: 2,
 };
 
 const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
@@ -44,14 +38,6 @@ const VIEW_KEYS = Object.keys(VIEW_DEFAULTS) as (keyof ViewSettings)[];
 /** What belongs to the device, not the vault: the divider's place, the column shown and the zoom are set by hand on each screen, and must not travel through Sync. */
 export const DEVICE_KEYS = ["listShare", "rightMode", "zoom"] as const satisfies readonly (keyof ViewSettings)[];
 
-export const LIST_WIDTH_MIN = 110;
-export const LIST_WIDTH_MAX = 280;
-export const CARD_HEIGHT_MIN = 28;
-export const CARD_HEIGHT_MAX = 40;
-export const CARD_GAP_MAX = 10;
-
-/** A card's height and the gap between cards before the settings are read. */
-export const DEFAULT_CARD_SIZE: { readonly height: number; readonly gap: number } = { height: VIEW_DEFAULTS.cardHeight, gap: VIEW_DEFAULTS.cardGap };
 
 /** The view's settings of what was saved, the defaults for any it lacks. */
 export function viewSettingsFrom(saved: unknown): ViewSettings {

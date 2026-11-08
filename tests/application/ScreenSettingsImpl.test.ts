@@ -16,6 +16,8 @@ describe("ScreenSettingsImpl", () => {
 			priorities: DEFAULT_SETTINGS.priorities,
 			labels: [],
 			labelPaint: "stripes",
+			cardHeight: 35,
+			cardGap: 2,
 		});
 		expect(JSON.stringify(shown)).not.toMatch(/secret|token|google/);
 	});

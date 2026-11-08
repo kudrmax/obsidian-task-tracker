@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, settingsFrom } from "../core/settings";
 import { storedSettingsFrom } from "../obsidian/settingsFile";
-import { viewSettingsFrom } from "../obsidian/ui/viewSettings";
 
 describe("settingsFrom", () => {
 	it("returns the defaults for nothing saved", () => {
@@ -21,14 +20,16 @@ describe("settingsFrom", () => {
 		expect(settingsFrom({ dayStartHour: 4 }).dayStartHour).toBe(4);
 	});
 
-	it("draws cards 35 px high, 2 px apart, unless set: the view's own settings", () => {
-		expect(viewSettingsFrom(null)).toMatchObject({ cardHeight: 35, cardGap: 2 });
-		expect(viewSettingsFrom({ cardHeight: 30, cardGap: 0 })).toMatchObject({ cardHeight: 30, cardGap: 0 });
+	it("draws cards 35 px high, 2 px apart, unless set, within their bounds: every frontend's alike", () => {
+		expect(settingsFrom(null)).toMatchObject({ cardHeight: 35, cardGap: 2 });
+		expect(settingsFrom({ cardHeight: 30, cardGap: 0 })).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		expect(settingsFrom({ cardHeight: 99, cardGap: -3 })).toMatchObject({ cardHeight: 40, cardGap: 0 });
+		expect(settingsFrom({ cardHeight: "tall", cardGap: 3.6 })).toMatchObject({ cardHeight: 35, cardGap: 4 });
 		expect(storedSettingsFrom({ cardHeight: 30 })).toMatchObject({ cardHeight: 30, cardGap: 2, dayStartHour: 5 });
 	});
 
 	it("hold nothing of how a frontend lays out its screen", () => {
-		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels", "cardHeight", "cardGap"]) expect(key in DEFAULT_SETTINGS).toBe(false);
+		for (const key of ["listShare", "rightMode", "zoom", "zoomLevels"]) expect(key in DEFAULT_SETTINGS).toBe(false);
 	});
 
 	it("paint a card of several labels in stripes unless blend is saved", () => {

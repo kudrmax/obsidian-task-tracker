@@ -1,3 +1,4 @@
+import { repeatRow } from "./repeatWords";
 import { addDays } from "../domain/LocalDate";
 import type { LabelLevel } from "../domain/Label";
 import type { PriorityLevel } from "../domain/Priority";
@@ -77,6 +78,11 @@ export type MenuOf = { readonly kind: "task"; readonly from: MenuFrom } | { read
 const A_LIST_CARD: MenuOf = { kind: "task", from: "day" };
 
 const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbox", "backlog"]);
+
+/** Whether Select tasks picks a card drawn there: a list column's; never the timeline's, Done's, a stack's or the whole screen's. */
+export function canPick(from: MenuFrom): boolean {
+	return COLUMNS.has(from);
+}
 
 /**
  * The sections a menu offers, opened from cards at `froms`: the screen's offer when every card stands in a list column
@@ -167,6 +173,7 @@ export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: r
 		project: menuProject(items, projects),
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
+		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),
 		remove: { confirm: of.kind === "task" },
 	};
 }

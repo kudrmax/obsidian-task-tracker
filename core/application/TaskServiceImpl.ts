@@ -232,6 +232,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.reads.listName(list);
 	}
 
+	placementTitle(placement: Placement): string {
+		return this.reads.placementTitle(placement);
+	}
+
 	dayOfPlacement(placement: Placement): LocalDate | null {
 		return this.reads.dayOfPlacement(placement);
 	}

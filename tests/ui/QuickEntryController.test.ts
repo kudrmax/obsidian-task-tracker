@@ -139,6 +139,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 			placementOf: (): Placement => ({ kind: "now" }),
 			placementOfDay: (date) => placementOfDay(date, TODAY),
 			listName: (list) => DEFAULT_SETTINGS.sections[list],
+			placementTitle: (placement) => (placement.kind === "date" ? placement.date : DEFAULT_SETTINGS.sections[placement.kind]),
 			dayOfPlacement: (placement) => dayOfPlacement(placement, TODAY),
 			newSlot: (date, start) => ({ date, start, end: null }),
 			...priorityTitles([{ prefix: "p1", color: "red" }], labels),

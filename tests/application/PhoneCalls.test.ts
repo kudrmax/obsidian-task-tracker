@@ -127,6 +127,7 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "columnSections", args: () => ["day", T] },
 	{ method: "placementOfDay", args: () => [LATER] },
 	{ method: "listName", args: () => ["backlog"] },
+	{ method: "placementTitle", args: () => [{ kind: "date", date: "2026-11-05" }] },
 	{ method: "dayOfPlacement", args: () => [{ kind: "now" }] },
 	{ method: "setStatus", args: (s) => [key(s, "Lunch"), "done"] },
 	{ method: "toggleDone", args: (s) => [key(s, "Idea")] },
@@ -290,7 +291,7 @@ describe("the door's coverage", () => {
 
 	it("answers in no space no interface names", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
-		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline"];
+		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
 	});
 });
@@ -299,6 +300,21 @@ describe("the door's screen settings", () => {
 	it("answer what ScreenSettingsStore gives a screen over the same settings", () => {
 		const door = callDoor("screenSettings.get", [], { tasks: null, settings: DATA, nowMs: NOW.getTime() });
 		expect(door).toEqual({ ok: true, result: wire(new ScreenSettingsImpl(new FakeSettingsStore(settingsFrom(JSON.parse(DATA)))).get()) });
+	});
+});
+
+describe("the door's notes", () => {
+	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
+
+	it("finds the projects among the vault's notes by the settings' tag, and a task's project opens its note once they are handed in", () => {
+		const notes = ok(callDoor("notes.tags", [["---\ntags: [client]\n---\n", "#project"]], context())) as string[][];
+		expect(notes).toEqual([["#client"], ["#project"]]);
+		const vault = [{ path: "Clients/Acme.md", tags: notes[0] }, { path: "Home.md", tags: notes[1] }];
+		const projects = ok(callDoor("notes.projects", [vault], context(FILE, { settings: JSON.stringify({ projectTag: "#client" }) })));
+		expect(projects).toEqual([{ name: "Acme", path: "Clients/Acme.md", link: "Acme" }]);
+		const text = "## Inbox\n- [ ] Call 🗂️ [[Acme]]\n";
+		const screen = ok(callDoor("tasks.screen", [T], context(text, { projects: projects as never }))) as { inbox: { project: unknown }[] };
+		expect(screen.inbox[0].project).toMatchObject({ name: "Acme", note: "Clients/Acme.md", canOpenNote: true });
 	});
 });
 
@@ -342,6 +358,10 @@ const SETTINGS_CASES: readonly (readonly [string, ...unknown[]])[] = [
 	["setLabelTag", "two words"],
 	["setLabelPaint", "blend"],
 	["setLabelPaint", "plaid"],
+	["setCardHeight", 30.4],
+	["setCardHeight", 41],
+	["setCardGap", 0],
+	["setCardGap", -1],
 	["setProjectTag", " проект "],
 	["setProjectTag", "two words"],
 	["renameLabel", 0, " Very fast "],
@@ -535,10 +555,25 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.branchOf", [0, 1, 1], 1),
 		plain("rules.gapBranch", [{ level: 0, group: null }, { level: 1, group: null }], { kind: "gap", index: 1, level: 1, group: null }),
 		plain("rules.placeShowing", "day", "inbox"),
+		plain("rules.listWidths", 0.5, 390, 16),
+		plain("rules.listShareOf", 187, 390, 16),
+		plain("rules.dayMonth", "2026-11-05"),
+		plain("rules.canPick", "timeline"),
+		plain("rules.repeatValue", { kind: "schedule", every: 2, unit: "month", days: [], dayOfMonth: 5, from: "2026-11-05" }),
+		plain("rules.repeatValue", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),
+		plain("rules.onTheDay", { kind: "schedule", every: 1, unit: "month", days: [], dayOfMonth: 22, from: null }),
 		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 200, fade: 16 }, { width: 390, margin: 10 }),
 		plain("rules.wholeWidth", { width: 170, titleWidth: 140, textWidth: 100, fade: 16 }, { width: 390, margin: 10 }),
 		plain("rules.grownStart", 200, 180, 230, 390, 10),
 		plain("timeline.zoomLevels"),
+		plain("notes.tags", ["---\ntags: [project]\n---\n#next", "plain"]),
+		plain("notes.projects", [{ path: "Projects/Alpha.md", tags: ["#project"] }, { path: "Beta.md" }]),
+		plain("notes.linkQuery", "Call [[Alp", 10),
+		plain("notes.linkQuery", "Call", 4),
+		plain("notes.suggest", "alp", [{ path: "Projects/Alpha.md" }, { path: "Beta.md" }]),
+		plain("notes.insert", "Call [[Alp", { query: "Alp", from: 5, to: 10 }, "Alpha"),
+		plain("notes.open", "Alpha#Plan", [{ path: "Projects/Alpha.md" }]),
+		plain("notes.open", "Gone", [{ path: "Projects/Alpha.md" }]),
 		...[
 			["openAtEnd", "soon"],
 			["openFromPlus"],

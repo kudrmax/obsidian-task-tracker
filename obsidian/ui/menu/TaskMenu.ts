@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, repeatParts, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -15,7 +15,6 @@ import { projectChooser, sectionChooser } from "./SectionChooser";
 import type { MarkdownSurface } from "../markdown/MarkdownSurface";
 import { DescriptionPeek } from "./DescriptionPeek";
 import { repeatPanel } from "../repeat/RepeatPanel";
-import { repeatValue } from "../repeat/repeatLabel";
 
 export type EditRowId = MenuEditId;
 /** What the menu asks about: a status tile that asks first, or Delete. */
@@ -55,9 +54,6 @@ export function askLooks(what: Asking): { readonly verb: string; readonly icon: 
 	return { verb: label, icon, danger: false };
 }
 
-function repeatRow(rule: RepeatRule | null): EditRow {
-	return { id: "repeat", label: "Repeat", value: rule === null ? "" : (repeatValue(rule) ?? ""), days: rule && repeatParts(rule).days, icon: "repeat" };
-}
 
 const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { notification: "Notification", alarm: "Alarm", live: "Live Activity", none: "Off" };
 
@@ -67,7 +63,7 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 		rename: () => ({ id: "rename", label: "Rename", value: "", icon: "rename" }),
 		reminder: () => ({ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" }),
 		description: () => ({ id: "description", label: "Add description", value: "", icon: "description" }),
-		repeat: () => repeatRow(item.repeat),
+		repeat: () => ({ id: "repeat", label: "Repeat", value: model.repeat.value, days: model.repeat.days, icon: "repeat" }),
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
 		subtask: () => ({ id: "subtask", label: "Add subtask", value: "", icon: "subtask" }),
 	};

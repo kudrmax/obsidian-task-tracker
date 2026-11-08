@@ -1,6 +1,6 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App } from "obsidian";
 import { type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type WorkCalendarSetup } from "../../core/application/contracts";
-import { CARD_GAP_MAX, CARD_HEIGHT_MAX, CARD_HEIGHT_MIN, formatZoomLevels, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
+import { formatZoomLevels, type ViewSettings, type ViewSettingsStore } from "./viewSettings";
 import type { Theme } from "./eventColors";
 import { inkOf, showPriorityColors } from "./priorityColors";
 import { formatTime } from "./dates";
@@ -285,8 +285,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The cards' size, the same in the list and in a stack on the timeline: they change as the slider moves. */
 	private cardsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Cards").setHeading();
-		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", CARD_HEIGHT_MIN, CARD_HEIGHT_MAX, this.view.cardHeight, (px) => this.deps.view.set({ cardHeight: px }));
-		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", 0, CARD_GAP_MAX, this.view.cardGap, (px) => this.deps.view.set({ cardGap: px }));
+		const { cardHeights, cardGaps } = this.settings;
+		this.slider(el, "Card height", "Pixels. The ends of a card are round: half its height.", cardHeights.min, cardHeights.max, this.settings.cardHeight, (px) => this.service.setCardHeight(px));
+		this.slider(el, "Gap between cards", "Pixels between cards, in the list and in a stack on the timeline.", cardGaps.min, cardGaps.max, this.settings.cardGap, (px) => this.service.setCardGap(px));
 	}
 
 	private dayPage(el: HTMLElement): void {

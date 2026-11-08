@@ -78,6 +78,12 @@ export { LINE_BREAK, oneLine } from "../domain/TaskTitle";
 import type { LabelPaint, ScreenBehaviour, SectionNames } from "../settings";
 export type { LabelPaint, ScreenBehaviour, SectionNames } from "../settings";
 export { sameLevels } from "../settings";
+/** The bounds of a card's height and of the gap between cards, and both before the settings say otherwise. */
+export { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE } from "../settings";
+/** A date as the quick entry's place button and the sources window write it: `5 Nov`. */
+export { dayMonth } from "./dayLabels";
+/** The list column's width beside the calendar: drawn, its bounds, its middle, and the share a divider let go saves. */
+export { LIST_WIDTHS, listShareOf, type ListWidths, listWidths } from "./listWidth";
 export type { Clock } from "./ports";
 
 /** A priority level, its colours in the order the settings offer them. */
@@ -427,6 +433,8 @@ export interface MenuSections {
  * under a timeline card's menu, or the task on the whole screen.
  */
 export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full";
+/** Whether Select tasks picks a card drawn at a `MenuFrom`: a list column's alone. */
+export { canPick } from "./menus";
 
 /** A picked task of the bulk menu and the column its card stands in. */
 export interface PickedTask {
@@ -466,6 +474,12 @@ export interface MenuProjectOption {
 	readonly project: ProjectRef;
 	readonly checked: boolean;
 }
+
+/** The Repeat row of one task's menu: its value on the right, or the weekdays lit among the week's letters. */
+export type { RepeatRow } from "./repeatWords";
+import type { RepeatRow } from "./repeatWords";
+/** The words for a rule (`repeatValue`, `onTheDay`) and the repeat page's own (`REPEAT_WORDS`). */
+export { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
 
 /** The Project page: a pick writes `setProject` with its `link`, No project with null. */
 export interface MenuProject {
@@ -521,6 +535,8 @@ export interface TaskMenuModel {
 	readonly edits: readonly MenuEditId[];
 	/** The Reminder page's rows, Off last; none without the Reminder row. */
 	readonly reminders: readonly MenuReminder[];
+	/** The Repeat row's value, the first task's rule worded: empty with none. */
+	readonly repeat: RepeatRow;
 	/** Delete, offered on every task (null: not offered); it asks first in one task's menu, the bulk menu's Delete N tasks writes at once. */
 	readonly remove: { readonly confirm: boolean } | null;
 }
@@ -731,6 +747,8 @@ export interface TaskService {
 	placementOfDay(date: LocalDate): Placement;
 	/** The name a list goes by wherever the screens name a place, Done too: its section's name in the settings. A day is named by its date. */
 	listName(list: SectionKey): string;
+	/** A placement as the quick entry's place button names it: the list's name (`listName`), a day as `5 Nov`. */
+	placementTitle(placement: Placement): string;
 	/** The day a placement puts a task on: today for `now`, its day for `date`, none for a list. */
 	dayOfPlacement(placement: Placement): LocalDate | null;
 
@@ -1038,7 +1056,13 @@ export interface SourceStatus {
 	readonly detail: string | null;
 	/** `updatedAt` older than `settings.staleAfterMinutes`, or a problem: the orange dot. */
 	readonly stale: boolean;
+	/** The sources window's words for it, ready. */
+	readonly words: SourceWords;
 }
+
+/** A source's row in the sources window, worded: its names, the line under them, the time on the right. */
+export type { SourceWords } from "./sourceWords";
+import type { SourceWords } from "./sourceWords";
 
 export interface DayEvents {
 	readonly events: readonly CalendarEvent[];
@@ -1147,6 +1171,15 @@ export interface ScreenSettings extends ScreenBehaviour {
 	readonly labels: readonly LabelLevel[];
 	/** How a card of several labels is painted: `blend`, or stripes. */
 	readonly labelPaint: LabelPaint;
+	/** A task card's height and the gap between two cards, px (points on the phone). */
+	readonly cardHeight: number;
+	readonly cardGap: number;
+}
+
+/** A setting's bounds, both kept. */
+export interface SizeBounds {
+	readonly min: number;
+	readonly max: number;
 }
 
 /** The shared settings as a screen sees them. */
@@ -1176,6 +1209,11 @@ export interface SettingsForm {
 	readonly labelPaint: LabelPaint;
 	/** The paints Several labels offers, in order. */
 	readonly labelPaints: readonly LabelPaint[];
+	readonly cardHeight: number;
+	readonly cardGap: number;
+	/** The bounds Card height and Gap between cards move within, whole px. */
+	readonly cardHeights: SizeBounds;
+	readonly cardGaps: SizeBounds;
 	/** The tag that makes a note a project, `#project` by default. */
 	readonly projectTag: string;
 	readonly presets: readonly string[];
@@ -1224,6 +1262,10 @@ export interface SettingsService {
 	setLabelTag(tag: string): Promise<void>;
 	/** Written when it is one of the form's `labelPaints`. */
 	setLabelPaint(paint: LabelPaint): Promise<void>;
+	/** Written, rounded, when within the form's `cardHeights`. */
+	setCardHeight(px: number): Promise<void>;
+	/** Written, rounded, when within the form's `cardGaps`. */
+	setCardGap(px: number): Promise<void>;
 	/** The tag trimmed, `#` first; written when it is one word. */
 	setProjectTag(tag: string): Promise<void>;
 	/** The name as shown, its spaces written as underscores. */

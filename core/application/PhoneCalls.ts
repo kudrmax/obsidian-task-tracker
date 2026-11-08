@@ -11,12 +11,12 @@ import { nextProgress, REMINDER_KINDS, sameSlot } from "../domain/Task";
 import { textParts } from "../domain/TaskText";
 import { oneLine } from "../domain/TaskTitle";
 import { samePlacement } from "../domain/operations";
-import { sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
+import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_CARD_SIZE, sameLevels, settingsFrom, type TaskCalendarSettings } from "../settings";
 import { CalendarDay, type CalendarReading } from "./calendarDay";
 import { CALENDAR_SOURCES, type CalendarFile, calendarPath, readCalendarFile } from "./calendarFile";
 import { captureTitle } from "./captureTitle";
 import { cardDue } from "./cardDue";
-import { dayTitle, dueLabel } from "./dayLabels";
+import { dayMonth, dayTitle, dueLabel } from "./dayLabels";
 import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
@@ -39,6 +39,10 @@ import {
 import { acceptsDrop, placesInGap } from "./drops";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { grownStart, wholeWidth } from "./wholeCard";
+import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
+import { canPick } from "./menus";
+import { LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
+import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, noteTags, type VaultNote, vaultProjects, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
 import type { Clock, SettingsStore } from "./ports";
 import { emptySession, type EntryJob, type EntryLook, type EntrySession, type EntryState, QuickEntry } from "./QuickEntry";
@@ -352,6 +356,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	columnSections: (c, [column, date]) => c.reads.columnSections(column as A, date as string),
 	placementOfDay: (c, [date]) => c.reads.placementOfDay(date as string),
 	listName: (c, [list]) => c.reads.listName(list as A),
+	placementTitle: (c, [placement]) => c.reads.placementTitle(placement as A),
 	dayOfPlacement: (c, [placement]) => c.reads.dayOfPlacement(placement as A),
 	setStatus: (c, [key, status]) => c.run(c.writes.setStatus(key as A, status as A)),
 	toggleDone: (c, [key]) => c.run(c.writes.toggleDone(key as A)),
@@ -548,6 +553,8 @@ const SETTINGS_METHODS: readonly string[] = [
 	"moveLevel",
 	"setLabelTag",
 	"setLabelPaint",
+	"setCardHeight",
+	"setCardGap",
 	"setProjectTag",
 	"renameLabel",
 	"recolourLabel",
@@ -681,6 +688,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	eventColors: (hex, bgAlpha, theme) => eventColors(hex, bgAlpha ?? EVENT_BG_ALPHA, theme ?? "dark"),
 	dayTitle,
 	dueLabel,
+	dayMonth,
 	eventLevels,
 	stackTasks,
 	overlayLeft,
@@ -705,10 +713,15 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	placeShowing,
 	wholeWidth,
 	grownStart,
+	listWidths,
+	listShareOf,
+	repeatValue,
+	onTheDay,
+	canPick,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
-const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS };
+const CONSTANTS = { REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SCREEN_PLACES, SHOWN_LISTS, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS };
 
 /** What the timeline reads of `data.json` beside the shared settings: the zoom's levels, so a host never parses the file. */
 const TIMELINE: Readonly<Record<string, Handler>> = {
@@ -806,6 +819,19 @@ const DESCRIPTION: Readonly<Record<string, Handler>> = {
 	read: (_c, [state, description, editor]) => descriptionRead(state as A, (description ?? null) as string | null, editor as A),
 };
 
+/**
+ * The vault's notes for a host without Obsidian: their tags, the projects among them (what it hands in as
+ * `context.projects`), the `[[` typed in a title and the notes it offers, and the note a link in a title opens.
+ */
+const NOTES: Readonly<Record<string, Handler>> = {
+	tags: (_c, [texts]) => (texts as string[]).map((text) => noteTags(text)),
+	projects: (c, [notes]) => vaultProjects(notes as VaultNote[], c.settings.projectTag),
+	linkQuery: (_c, [text, caret]) => linkQuery(text as string, caret as number),
+	suggest: (_c, [query, notes, limit]) => noteSuggestions(query as string, notes as VaultNote[], (limit ?? undefined) as number | undefined),
+	insert: (_c, [text, at, link]) => withNoteLink(text as string, at as LinkQuery, link as string),
+	open: (_c, [target, notes]) => noteOfLink(target as string, notes as VaultNote[]),
+};
+
 const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	tasks: TASKS,
 	days: DAYS,
@@ -821,6 +847,7 @@ const SPACES: Readonly<Record<string, Readonly<Record<string, Handler>>>> = {
 	reminders: REMINDERS,
 	capture: CAPTURE,
 	timeline: TIMELINE,
+	notes: NOTES,
 	rules: { ...Object.fromEntries(Object.entries(RULES).map(([name, fn]) => [name, (_c: Call, args: unknown[]) => fn(...args)])), constants: () => CONSTANTS },
 };
 

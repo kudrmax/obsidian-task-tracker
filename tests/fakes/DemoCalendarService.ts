@@ -54,8 +54,8 @@ export class DemoCalendarService implements CalendarService {
 			allDay: events.filter((e) => e.allDay),
 			timed: events.filter((e) => !e.allDay),
 			statuses: [
-				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false },
-				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, updatedDay: "yesterday", updatedDate: "2026-10-29", detail: "iPhone", stale: true },
+				{ source: "google", kind: "synced", problem: null, events: count("google"), updatedAt: GOOGLE_UPDATED, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: "14:19" } },
+				{ source: "work", kind: "exported", problem: null, events: count("work"), updatedAt: WORK_EXPORTED, updatedDay: "yesterday", updatedDate: "2026-10-29", detail: "iPhone", stale: true, words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: "Yesterday 08:02" } },
 			],
 			stale: true,
 		};

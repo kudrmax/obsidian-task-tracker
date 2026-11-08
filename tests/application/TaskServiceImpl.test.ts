@@ -331,6 +331,14 @@ describe("the day column and the day of a placement", () => {
 		expect(renamed.listName("now")).toBe("Сейчас");
 	});
 
+	it("names a placement for the quick entry's place button: the list's name, a day as `5 Nov`", () => {
+		const sections = { ...DEFAULT_SETTINGS.sections, inbox: "Входящие" };
+		const { svc } = setup(FULL, new FakeSettingsStore({ ...DEFAULT_SETTINGS, sections }));
+		expect(svc.placementTitle({ kind: "inbox" })).toBe("Входящие");
+		expect(svc.placementTitle({ kind: "now" })).toBe("Now");
+		expect(svc.placementTitle({ kind: "date", date: "2026-11-05" })).toBe("5 Nov");
+	});
+
 	it("today follows the hour the day starts at", () => {
 		const night = new TaskServiceImpl(new InMemoryTaskFileStore(FULL), new FakeSettingsStore({ ...DEFAULT_SETTINGS, dayStartHour: 4 }), { now: () => new Date(2026, 9, 31, 2, 0) });
 		expect(night.dayColumn(T)).toEqual({ list: "now", date: null, sections: true });

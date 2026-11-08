@@ -5,7 +5,7 @@ import type { DropResult, DropTarget } from "../../obsidian/ui/drag/DropTarget";
 import { DragController, type DragControllerDeps } from "../../obsidian/ui/drag/DragController";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
 import { DESIGN } from "../../obsidian/ui/design";
-import { VIEW_DEFAULTS } from "../../obsidian/ui/viewSettings";
+import { DEFAULT_CARD_SIZE } from "../../core/application/contracts";
 
 const rect = (x: number, y: number) => new DOMRect(x, y, 44, 36);
 const landing = new DOMRect(100, 200, 150, 40);
@@ -355,7 +355,7 @@ describe("DragController: stretching a block (block 3)", () => {
 		haptics.tap.mockClear();
 		pointer("pointermove", 50, 720);
 		pointer("pointerup", 50, 720);
-		await vi.waitFor(() => expect(deps.onResize).toHaveBeenCalledWith(item, "end", 720, ((VIEW_DEFAULTS.cardHeight + DESIGN.itemGap) / 56) * 60));
+		await vi.waitFor(() => expect(deps.onResize).toHaveBeenCalledWith(item, "end", 720, ((DEFAULT_CARD_SIZE.height + DESIGN.itemGap) / 56) * 60));
 		await vi.waitFor(() => expect(haptics.tap).toHaveBeenCalledTimes(1));
 	});
 

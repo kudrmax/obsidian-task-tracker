@@ -9,6 +9,7 @@ import { FakeSettingsStore } from "../fakes/FakeSettingsStore";
 import { FakeTimers } from "../fakes/FakeTimers";
 
 const WRITTEN = new Date(2026, 9, 30, 8, 0);
+const TIME = "08:00";
 const NOW = new Date(2026, 9, 30, 9, 0);
 
 function event(source: CalendarSource, id: string, start: Date, end: Date, allDay = false): CalendarEvent {
@@ -128,8 +129,8 @@ describe("CalendarServiceImpl", () => {
 		const day = await refreshed(service([google, work], [new FakeFeed("google")]));
 		expect(day.events.map((e) => e.id)).toEqual(["w1", "g1"]);
 		expect(day.statuses).toEqual([
-			{ source: "google", kind: "synced", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false },
-			{ source: "work", kind: "exported", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: "iPhone", stale: false },
+			{ source: "google", kind: "synced", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: false, words: { name: "Google Calendar", short: "Google", sub: "Updated today", time: TIME } },
+			{ source: "work", kind: "exported", problem: null, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: "iPhone", stale: false, words: { name: "Work calendar", short: "Work", sub: "Exported from iPhone", time: TIME } },
 		]);
 	});
 
@@ -156,7 +157,7 @@ describe("CalendarServiceImpl", () => {
 		feed.failWith = new Error("Google API 500");
 		const day = await refreshed(service([file], [feed]));
 		expect(day.events.map((e) => e.id)).toEqual(["kept"]);
-		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", problem: { kind: "failed", detail: "Google API 500" }, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: true });
+		expect(day.statuses[0]).toEqual({ source: "google", kind: "synced", problem: { kind: "failed", detail: "Google API 500" }, events: 1, updatedAt: WRITTEN, updatedDay: "today", updatedDate: "2026-10-30", detail: null, stale: true, words: { name: "Google Calendar", short: "Google", sub: "Google API 500", time: TIME } });
 	});
 
 	it("a feed that answers again clears its error", async () => {
@@ -210,7 +211,7 @@ describe("CalendarServiceImpl", () => {
 		const work = new FakeFile("work");
 		work.failWith = new SourceProblemError({ kind: "fileMissing" }, "file missing");
 		const day = await refreshed(service([work]));
-		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true });
+		expect(day.statuses[0]).toEqual({ source: "work", kind: "exported", problem: { kind: "fileMissing" }, events: 0, updatedAt: null, updatedDay: null, updatedDate: null, detail: null, stale: true, words: { name: "Work calendar", short: "Work", sub: "file missing", time: "" } });
 	});
 
 	it("a file written longer ago than staleAfterMinutes is stale", async () => {

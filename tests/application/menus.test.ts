@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SectionOffer, TaskItem, TaskKey } from "../../core/application/contracts";
-import { carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../core/application/menus";
+import { canPick, carriedWith, labelOn, levelOn, menuOffer, quickMoves, taskMenu, tileStatus, toggledLabels, toggledPriority } from "../../core/application/menus";
 import { onDay } from "../fakes/itemOnDay";
 
 const T = "2026-11-03";
@@ -201,9 +201,23 @@ describe("the edit group", () => {
 		expect(edits(sub, { kind: "task", from: "full" })).toContain("subtask");
 	});
 
+	it("words the task's rule on the Repeat row, and none for the picked tasks", () => {
+		const every3 = item({ repeat: { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: T } });
+		expect(taskMenu([every3], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "Every 3 days", days: null });
+		expect(taskMenu([item()], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "", days: null });
+		expect(taskMenu([every3], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "", days: null });
+	});
+
 	it("gives the picked tasks Section alone, where it is offered", () => {
 		expect(edits(item(), { kind: "bulk" })).toEqual([]);
 		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section"]);
+	});
+});
+
+describe("Select tasks", () => {
+	it("picks the cards of the list columns, never the timeline's, Done's, a stack's or the whole screen's", () => {
+		expect((["day", "soon", "inbox", "backlog"] as const).map(canPick)).toEqual([true, true, true, true]);
+		expect((["timeline", "done", "stack", "full"] as const).map(canPick)).toEqual([false, false, false, false]);
 	});
 });
 

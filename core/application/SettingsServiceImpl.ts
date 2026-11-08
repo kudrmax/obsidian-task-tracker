@@ -1,6 +1,6 @@
 import { labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
-import { DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
+import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
 import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 
@@ -44,6 +44,10 @@ export class SettingsServiceImpl implements SettingsService {
 			labels: s.labels,
 			labelPaint: s.labelPaint,
 			labelPaints: LABEL_PAINTS,
+			cardHeight: s.cardHeight,
+			cardGap: s.cardGap,
+			cardHeights: CARD_HEIGHTS,
+			cardGaps: CARD_GAPS,
 			projectTag: s.projectTag,
 			presets: s.groups.presets,
 			ungrouped: s.groups.ungrouped,
@@ -113,6 +117,16 @@ export class SettingsServiceImpl implements SettingsService {
 	async setLabelPaint(paint: string): Promise<void> {
 		const labelPaint = LABEL_PAINTS.find((offered) => offered === paint);
 		if (labelPaint) await this.store.update({ labelPaint });
+	}
+
+	async setCardHeight(px: number): Promise<void> {
+		const cardHeight = withinBounds(px, CARD_HEIGHTS);
+		if (cardHeight !== null) await this.store.update({ cardHeight });
+	}
+
+	async setCardGap(px: number): Promise<void> {
+		const cardGap = withinBounds(px, CARD_GAPS);
+		if (cardGap !== null) await this.store.update({ cardGap });
 	}
 
 	async setProjectTag(tag: string): Promise<void> {
@@ -232,4 +246,11 @@ function moved<T>(list: readonly T[], from: number, to: number): T[] {
 	const [item] = items.splice(from, 1);
 	items.splice(to, 0, item);
 	return items;
+}
+
+/** A number rounded, when it stands within the bounds; null for anything else. */
+function withinBounds(value: unknown, bounds: { readonly min: number; readonly max: number }): number | null {
+	if (typeof value !== "number" || !Number.isFinite(value)) return null;
+	const whole = Math.round(value);
+	return whole >= bounds.min && whole <= bounds.max ? whole : null;
 }

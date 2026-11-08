@@ -1,4 +1,4 @@
-import { dueLabel, MINUTES_PER_DAY } from "../../core/application/contracts";
+import { dayMonth as coreDayMonth, dueLabel, MINUTES_PER_DAY } from "../../core/application/contracts";
 import type { LocalDate } from "./types";
 
 const MINUTES_PER_HOUR = 60;
@@ -50,8 +50,7 @@ const DAYS_PER_WEEK = 7;
 
 /** `3 Nov`. */
 export function dayMonth(date: LocalDate): string {
-	const { day, month } = dueLabel(date);
-	return `${day} ${month[0]}${month.slice(1).toLowerCase()}`;
+	return coreDayMonth(date);
 }
 
 /** `November 2026`. */

@@ -6,7 +6,6 @@ import { Button } from "../kit/Button";
 import { Panel, Picks } from "../kit/Panel";
 import { markLongLabels, type MenuTileSpec, type PlaceIconName, tileGroup, tileRows } from "../menu/MenuPanel";
 import { MonthPicker } from "../menu/MonthPicker";
-import { dayMonth } from "../dates";
 import { repeatPanel } from "../repeat/RepeatPanel";
 import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
@@ -30,6 +29,8 @@ export interface QuickBarDeps {
 	today(): LocalDate;
 	/** The name a list goes by, as the user named its section. */
 	listName(list: GroupedList): string;
+	/** The place button's words for a placement: a list's name, a day as `5 Nov`. */
+	placementTitle(placement: Placement): string;
 	/** The placement of a task for a day picked: Now for today, else that day. */
 	placementOfDay(day: LocalDate): Placement;
 	onIndent(delta: 1 | -1): void;
@@ -264,7 +265,7 @@ export class QuickBar implements EntryPart {
 	private showPlace(place: Placement): void {
 		this.shownPlace = place;
 		this.place.setIcon(placeIcon(place));
-		this.place.setText(place.kind === "date" ? dayMonth(place.date) : this.deps.listName(place.kind));
+		this.place.setText(this.deps.placementTitle(place));
 	}
 
 	/** A section's name may be longer than the button: its end fades, as a card's title does. */

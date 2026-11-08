@@ -63,6 +63,19 @@ describe("how a card of several labels is painted", () => {
 		expect(now().labelPaint).toBe("blend");
 		expect(writes()).toBe(1);
 	});
+
+	it("writes a card's height and gap rounded within their bounds, and nothing outside them", async () => {
+		const { svc, now, writes } = service();
+		expect(svc.form()).toMatchObject({ cardHeight: 35, cardGap: 2, cardHeights: { min: 28, max: 40 }, cardGaps: { min: 0, max: 10 } });
+		await svc.setCardHeight(30.4);
+		await svc.setCardGap(0);
+		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		await svc.setCardHeight(41);
+		await svc.setCardGap(-1);
+		await svc.setCardHeight(Number.NaN);
+		expect(now()).toMatchObject({ cardHeight: 30, cardGap: 0 });
+		expect(writes()).toBe(2);
+	});
 });
 
 describe("editing the priority levels", () => {

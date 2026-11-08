@@ -36,7 +36,7 @@ async function stored(disk = new Disk()): Promise<{ disk: Disk; settings: Plugin
 describe("view settings", () => {
 	it("read what was saved, the defaults for the rest, and nothing else", () => {
 		expect(viewSettingsFrom(null)).toEqual(VIEW_DEFAULTS);
-		expect(viewSettingsFrom({ cardGap: 4, tasksFile: "x.md" })).toEqual({ ...VIEW_DEFAULTS, cardGap: 4 });
+		expect(viewSettingsFrom({ zoomLevels: [{ hourPx: 40 }], cardGap: 4, tasksFile: "x.md" })).toEqual({ ...VIEW_DEFAULTS, zoomLevels: [{ hourPx: 40 }] });
 	});
 
 	it("keep what the screen sets on the device: data.json is not touched", async () => {
@@ -68,9 +68,9 @@ describe("view settings", () => {
 		const view = new ViewSettingsStore(settings);
 		const first = view.get();
 		expect(view.get()).toBe(first);
-		await view.set({ cardGap: 4 });
+		await view.set({ zoomLevels: [{ hourPx: 40 }] });
 		expect(view.get()).not.toBe(first);
-		expect(view.get().cardGap).toBe(4);
+		expect(view.get().zoomLevels).toEqual([{ hourPx: 40 }]);
 	});
 });
 
