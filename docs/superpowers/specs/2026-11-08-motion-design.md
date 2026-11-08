@@ -384,7 +384,20 @@ every condition that changes the layout is animated by the transaction that chan
     `TaskItem.id`, its key as read at the open, its new `text` and `title` as the item will read), in
     `QuickEntry.renamed` (`QuickEntrySession.renamed`), in `EntryState.renamed` while the field is open, and through the
     door in every `entry.*` answer's `renamed`, the field open or closed. A frontend draws the card with that id under
-    `title` until the job is `done`. Added only: nothing existing changed.
+    its new `text` until the job is `done` (the card draws `TaskItem.text`, so the same field shows no change when the
+    write is drawn; `title` is the plain form for questions). Added only: nothing existing changed.
+47. **iPhone, R4/R5: a menu asks on its own page.** Won't Do and Delete open a page of the same menu (a submenu: the
+    question over its red answer), as the plugin's menu does; Delete's row is red. No dialog is presented after the
+    menu, which iOS holds until the menu's dismissal has ended (a second). The bulk bar's Done, outside a menu, keeps
+    its dialog.
+48. **iPhone, R8: a field takes the keyboard in the gesture that opens it, before the drawing that opens its row.**
+    Taking the keyboard reloads its views and holds the main thread (a third of a second on the simulator); done inside
+    the opening drawing it swallowed the row's opening, and the plus's copy faded over nothing. Focused first (from where
+    the field waits, parked in the window), whatever is typed goes into the field, and the row opens on a free main
+    thread.
+49. **iPhone, R7: the slot is the cancel target while a finger holds a carry**, and for the plus until its own copy is
+    home (it flies into the slot); a card's copy flies to its own place, so the slot is the plus again as it is let go,
+    not when the system's drop animator ends a second later.
 
 ## Done when
 
