@@ -8,15 +8,25 @@ struct TimelineColumn: View {
     let timeline: BoardTimeline
     @Bindable var model: BoardModel
     @Binding var question: MenuQuestion?
-    @State private var position = ScrollPosition(y: 0)
-    @State private var opened = false
-    /// The hour's height drawn now; nil until the column knows its height.
-    @State private var hour: CGFloat?
-    @State private var visible: CGFloat = 0
+    @State private var position: ScrollPosition
+    @State private var opened: Bool
     @State private var pinch: Pinch?
-    /// The hour heights a pinch moves between at this column's height, asked once per height.
-    @State private var range: [Double] = []
     @State private var scroll = ScrollSpot()
+    /// The zoom and the column's height, the screen's: a new day's timeline opens at the zoom the last one showed.
+    private var zoom: TimelineZoom { model.zoom }
+    private var hour: CGFloat? { zoom.hour }
+    private var visible: CGFloat { zoom.visible }
+    private var range: [Double] { zoom.range }
+
+    init(timeline: BoardTimeline, model: BoardModel, question: Binding<MenuQuestion?>) {
+        self.timeline = timeline
+        self.model = model
+        _question = question
+        // A day slid in opens where the core says from its first frame, at the zoom shown: no frame at the top first.
+        let top = model.zoom.openingTop(timeline)
+        _position = State(initialValue: ScrollPosition(y: top ?? 0))
+        _opened = State(initialValue: top != nil)
+    }
     /// The zoom a pinch last settled on, kept on the device: `wholeDay`, or the hour's height.
     @AppStorage("timelineZoom") private var savedZoom: String = ""
 
@@ -45,6 +55,16 @@ struct TimelineColumn: View {
         let screenY: CGFloat
     }
 
+    /// The minute the pinch started under stays under the fingers at the hour's height drawn now.
+    private func holdPinchedMinute() {
+        guard let pinch, let hour else { return }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) {
+            position.scrollTo(y: max(0, CGFloat(pinch.minute) / 60 * hour + Measure.labelLift - pinch.screenY))
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Measure.allDayGap) {
             ForEach(timeline.allDay) { event in
@@ -62,13 +82,15 @@ struct TimelineColumn: View {
                 .softEdges()
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in scroll.y = y }
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height - $0.contentInsets.top - $0.contentInsets.bottom } action: { _, height in
-                    visible = height
+                    zoom.visible = height
                     settleZoom()
                     open()
                     reveal(hour)
                 }
+                // A pinch's scroll is set once the content has its new height: never cut short by the old one.
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in holdPinchedMinute() }
                 .onChange(of: model.entry.moved) { reveal(hour) }
-                .simultaneousGesture(zoom)
+                .simultaneousGesture(pinchGesture)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.dropping.move(Self.key, visible: $0) }
             }
         }
@@ -187,24 +209,25 @@ struct TimelineColumn: View {
         return scheme == .dark ? themed.dark : themed.light
     }
 
-    @ViewBuilder
     private func slotCard(_ slot: BoardSlot) -> some View {
         let tall = CGFloat(slot.box.height)
-        if model.selecting {
-            TaskCapsule(card: slot.card, height: tall).opacity(0.5)
-        } else {
-            CardButton(
-                card: slot.card,
-                menu: { later in model.cardMenu(slot.card.item, ask: { question = $0 }, later: later) },
-                ringed: model.found == slot.id,
-                height: tall,
-                carried: model.isCarried(slot.card),
-                onTouch: { model.found = nil },
-                onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
-                onCancel: { model.cancelCarry() },
-                onEnd: { model.carryEnded() })
-                .frame(height: max(tall, CardMetrics.height))
-        }
+        let selecting = model.selecting
+        // One card in and out of Select Tasks: the calendar's cannot be picked, so they dim and take no touch.
+        return CardButton(
+            card: slot.card,
+            menu: { later in selecting ? nil : model.cardMenu(slot.card.item, ask: { question = $0 }, later: later) },
+            ringed: model.found == slot.id,
+            height: tall,
+            draggable: !selecting,
+            carried: model.isHidden(slot.card),
+            arrival: model.arrival?.id == slot.id ? model.arrival?.from : nil,
+            onTouch: { model.found = nil },
+            onCarry: { model.startCarry(slot.card, from: "timeline", grab: $0) },
+            onCancel: { model.cancelCarry() },
+            onEnd: { model.carryEnded() })
+            .frame(height: max(tall, CardMetrics.height))
+            .opacity(selecting ? 0.5 : 1)
+            .allowsHitTesting(!selecting)
     }
 
     /// Where a carried card would land: the line at its start and the time in the accent, as Calendar draws a moved event.
@@ -254,11 +277,12 @@ struct TimelineColumn: View {
     /// The zoom kept on the device, at this height of the screen: the whole day stays the whole day.
     private func settleZoom() {
         guard pinch == nil else { return }
-        range = wholeDay.map { model.zoomRange(wholeDay: $0, levels: timeline.zoomLevels) } ?? []
-        hour = CGFloat(model.zoomShown(saved: saved, wholeDay: wholeDay, levels: timeline.zoomLevels))
+        zoom.range = wholeDay.map { model.zoomRange(wholeDay: $0, levels: timeline.zoomLevels) } ?? []
+        let shown = CGFloat(model.zoomShown(saved: saved, wholeDay: wholeDay, levels: timeline.zoomLevels))
+        if zoom.hour != shown { zoom.hour = shown }
     }
 
-    private var zoom: some Gesture {
+    private var pinchGesture: some Gesture {
         MagnifyGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
                 guard let shown = hour, let wholeDay else { return }
@@ -268,26 +292,43 @@ struct TimelineColumn: View {
                 let next = min(CGFloat(range.last ?? wholeDay), max(CGFloat(range.first ?? wholeDay), start.hour * value.magnification))
                 var instant = Transaction()
                 instant.disablesAnimations = true
-                withTransaction(instant) {
-                    hour = next
-                    position.scrollTo(y: max(0, CGFloat(start.minute) / 60 * next + Measure.labelLift - start.screenY))
-                }
+                withTransaction(instant) { zoom.hour = next }
+                holdPinchedMinute()
             }
             .onEnded { _ in
                 pinch = nil
                 guard let shown = hour, let wholeDay else { return }
                 let settled = model.zoomAfterPinch(hour: Double(shown), wholeDay: wholeDay, levels: timeline.zoomLevels)
                 savedZoom = settled.map { String($0) } ?? "wholeDay"
-                if settled == nil { hour = CGFloat(wholeDay) }
+                if settled == nil { zoom.hour = CGFloat(wholeDay) }
             }
     }
 
     /// The day opens where the core says: today on the now line at half the height, another day at its hour on top.
     private func open() {
-        guard !opened, visible > 0, let hour else { return }
+        guard !opened, let top = zoom.openingTop(timeline) else { return }
         opened = true
-        let top = y(timeline.opening, hour) - (timeline.now != nil ? visible / 2 : 0)
-        position.scrollTo(y: max(0, top))
+        position.scrollTo(y: top)
+    }
+}
+
+/// The timeline's zoom and height, kept by the screen across days: a day turned keeps the zoom, its timeline drawn anew.
+@MainActor
+@Observable
+final class TimelineZoom {
+    /// The hour's height drawn now; nil until the column knows its height.
+    var hour: CGFloat?
+    /// The column's height that shows.
+    var visible: CGFloat = 0
+    /// The hour heights a pinch moves between at this height, asked once per height.
+    var range: [Double] = []
+
+    /// Where a day's timeline opens (`days.openAt`): today on the now line at half the height, another day at its hour
+    /// on top; nil until the column's height and zoom are known.
+    func openingTop(_ timeline: BoardTimeline) -> CGFloat? {
+        guard visible > 0, let hour else { return nil }
+        let top = CGFloat(timeline.opening) / 60 * hour + TimelineGeometry.labelLift - (timeline.now != nil ? visible / 2 : 0)
+        return max(0, top)
     }
 }
 

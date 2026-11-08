@@ -212,6 +212,49 @@ every condition that changes the layout is animated by the transaction that chan
    a task's: `ListSection.id` and `ListGroup.id`, the same through rename, move, writes to its tasks and undo; No section
    is `"none"` in every list. `ProjectGroup.key` (the project's name) already names a project's group; no write renames
    a project, so it needs no other key.
+8. **iPhone, R1: the board keeps `ids` as it keeps `history`** (`TaskBoard`): handed in with every call made over the
+   tasks file, kept from every answer over it; a call over no file (a menu, a pure rule, the quick entry's lane) neither
+   sends nor keeps them. An answer over files read before the board's last write never replaces that write's ids (a
+   count of writes stamped on the files read). `TaskItem.id`, `ListSection.id` and `ListGroup.id` are the core's; a card,
+   a timeline block, a header and its plate are keyed by them (`Painter.identity` is gone).
+9. **iPhone, R10/R13: one drawing, one transaction, its motion from the difference** (`BoardSnapshot.motion(from:)`):
+   `still` (the first drawing, or nothing drawn differs: no animation), `turn` (another day: the day part pushes in from
+   the day's side), `change` (the system's snappy spring). Every read goes through it (a drop, Sync, a return to the app,
+   Undo, search, the day arrows, the quick entry's writes), never a flag of the call. A row that comes or goes in a list
+   folds open or shut from its top while it fades (`FoldAway`): its visible part shrinks as fast as the rows below close
+   the gap, so they never draw over it.
+10. **iPhone, R7: one end of a carry** (`CarryEnd`, owned by `BoardModel`): a carry ends when its copy has landed (the
+    drop animation's completion, a cancel's flight home, the plus's flight home; the session's end only after them) and,
+    when the drop writes, when the first read made after the write is drawn. That read puts the dropped card in its new
+    place, still hidden, and takes away the room it flew into, the drop line and the section mark in the drawing's own
+    transaction. At the end the card shows; when the core put it elsewhere than the copy came down (a stack, the past
+    under now), it glides from there to its place with the system's spring. UIKit asks for the drop's target at the
+    drop, before the write: the copy flies to the place the gap or the line showed, and the card itself then glides to
+    the place the task took, found by its id in the new drawing. A cancel's card shows in the frame its copy lands.
+11. **iPhone, R7: a section's header opens its menu on a tap**, as a card does (Rename, Remove Section, as the core offers
+    them); a long press only lifts it. No context menu on a header, so the lift never flashes one. A section dropped
+    flies to the mark that showed its slot.
+12. **iPhone, R7: the plus let go on a place opens the field in the same frame** (the place is asked of the core's pure
+    rules synchronously) and its copy grows into the field's place there and fades; it flies home only from no place or
+    the cancel target, and its carry (the × on the slot) ends once it is home. The slot's +/× changes with the system's
+    symbol replace, the rest of its look on one spring without bounce.
+13. **iPhone, R8: Rename gives the card's row to the field**: the field's row takes the renamed card's id, so the rows
+    around it do not move. Select Tasks keeps the same card (`CardButton`) in both modes: the circle slides in beside it,
+    a tap on the card or the circle picks it; the calendar's cards dim and take no touch. Selection starts and ends in
+    one explicit transaction.
+14. **iPhone, R8/R14: no `.animation` at the screen's root.** The tab bar's presence is one condition (not Select Tasks,
+    no page pushed, no field open) with its own scoped animation; everything else moves in the transaction that changes
+    it. The quick entry draws the screen, the field and the job's end in one transaction.
+15. **iPhone, R14: a task's page is read before its push** (`BoardModel.openFullScreen`: the task as the file has it, its
+    subtasks, its list's name, the menus, the description as the editor opens it); its later refreshes animate. Search
+    results change by their tasks' ids, with their groups' names, in one transaction.
+16. **iPhone, R11: the timeline's zoom and height are the screen's** (`TimelineZoom`), so a day turned keeps the zoom; the
+    new day's timeline starts scrolled where the core opens it from its first frame. A pinch sets its scroll again once
+    the content has its new height (never cut short by the old one); the core's restacked blocks glide in (0.2 s).
+17. **iPhone, F4: the ribbon's widths are the 2026-11-07 spec's**: Inbox over Backlog and the day list the divider's
+    width `d`, Soon and the calendar `W − d`, places at 0, `d`, `W`. No width changes during a swipe.
+18. **iPhone, F1: Capture's «Added to …» stands at the bottom of the empty field**, fading in and out; the field keeps its
+    height.
 
 ## Done when
 

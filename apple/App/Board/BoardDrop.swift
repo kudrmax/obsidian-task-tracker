@@ -22,8 +22,14 @@ struct DropPlace {
 @MainActor
 final class BoardDrop: NSObject, UIDropInteractionDelegate {
     private(set) lazy var interaction = UIDropInteraction(delegate: self)
-    /// Told when a carry's drag session ends, whatever came of it: the screen's way to end a carry whose card is gone.
+    /// Told when a carry's drag session ends, whatever came of it, once its drop has flown: the screen's way to end a
+    /// carry whose card is gone.
     var ended: () -> Void = {}
+    /// Told when a drop's copy has come down, with where it came down in the window (nil: the system's own place).
+    var landed: (CGRect?) -> Void = { _ in }
+    /// A drop's copy is flying: the session's end waits for it.
+    private var flying = false
+    private var endAfterFlight = false
     private var places: [String: DropPlace] = [:]
     private var current: String?
     /// Where the card let go will stand, in the window, kept for the drop's preview.
@@ -73,12 +79,16 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
     /// The plus held over no place (the cancel target, the bars).
     func carryOff() { leave() }
 
-    /// The plus let go: true when a place took it.
-    func letGo() -> Bool {
-        guard let current, let place = places[current] else { return false }
+    /// What came of the plus let go: no place under it, or a place took it, with where its field opens in the window.
+    enum LetGo {
+        case missed
+        case taken(CGRect?)
+    }
+
+    func letGo() -> LetGo {
+        guard let current, let place = places[current] else { return .missed }
         self.current = nil
-        _ = place.land()
-        return true
+        return .taken(place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) })
     }
 
     // MARK: A system carry
@@ -102,6 +112,10 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: any UIDropSession) {
         current = nil
+        guard !flying else {
+            endAfterFlight = true
+            return
+        }
         landing = nil
         ended()
     }
@@ -110,6 +124,22 @@ final class BoardDrop: NSObject, UIDropInteractionDelegate {
         guard let current, let place = places[current] else { return }
         landing = place.land().map { $0.offsetBy(dx: place.origin.x, dy: place.origin.y) }
         self.current = nil
+    }
+
+    /// The drop's own animation: the carry ends once it is done, never while the copy is still in the air.
+    func dropInteraction(_ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: any UIDragAnimating) {
+        flying = true
+        let target = landing
+        animator.addCompletion { [weak self] _ in
+            guard let self else { return }
+            self.flying = false
+            self.landed(target)
+            if self.endAfterFlight {
+                self.endAfterFlight = false
+                self.landing = nil
+                self.ended()
+            }
+        }
     }
 
     /// The carried card settles into its place: into the gap, or onto the line's time.

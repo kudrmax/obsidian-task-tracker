@@ -156,8 +156,14 @@ final class QuickEntryHost {
     /// screen, the field last in the stack of its subtasks there.
     func addSubtask(_ parent: TaskItem) {
         guard let spot = value("subtaskSpot", [parent.key.json]) else { return }
-        if spot["kind"].string == "stack", model?.fullScreen.last?.id != parent.id { model?.fullScreen.append(parent) }
-        opening { call("open", [spot]) }
+        guard spot["kind"].string == "stack", let model, model.fullScreen.last?.id != parent.id else {
+            return opening { call("open", [spot]) }
+        }
+        // The page is read before it is pushed, then the field opens in it.
+        Task {
+            await model.openFullScreen(parent)
+            opening { call("open", [spot]) }
+        }
     }
 
     /// Rename: the card gives its place to the field with its text.
@@ -438,15 +444,13 @@ final class QuickEntryHost {
     private func run(_ id: String) async -> Bool {
         guard let model else { return false }
         guard let call = answer("call", [.string(id)]) else {
-            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
-            return finish(id)
+            return finish(id) { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
         }
         session = call["session"]
         let job = call["value"]
         guard let method = job["method"].string, case .array(let args) = job["args"] else {
             // Nothing to write: a line waiting for it stops waiting.
-            drawInstantly { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
-            return finish(id)
+            return finish(id) { if let reply = answer("unshown", [.string(id)]) { apply(reply) } }
         }
         let board = board
         let day = model.shownDay
@@ -464,7 +468,11 @@ final class QuickEntryHost {
         if method == "edit", case .success(let answer) = written, let item = try? answer.decode(TaskItem.self) { renamed?(item) }
         let created: JSONValue? = if method == "createInPlace", case .success(let key) = written, read != nil { key } else { nil }
         let stack = created != nil && state?.spotKind == "stack" ? await stackRead?() : nil
-        drawInstantly {
+        // Written but not read: the screen reads again once this job is done, so the task shows.
+        if read == nil, case .success = written { Task { await model.reload() } }
+        // The screen, the field's line and the job's end in one transaction: the field never shows empty before the card
+        // that ends its line, and the rows below move once.
+        return finish(id) {
             if method == "createInPlace" {
                 var reply: JSONValue?
                 if let created, let read {
@@ -480,23 +488,22 @@ final class QuickEntryHost {
                 placeField(over: read)
             }
         }
-        // Written but not read: the screen reads again once this job is done, so the task shows.
-        if read == nil, case .success = written { Task { await model.reload() } }
-        return finish(id)
     }
 
-    private func drawInstantly(_ draw: () -> Void) {
+    /// The job ends, drawn in one transaction with `draw`, what the job showed; false when the door refused to end it, and
+    /// it stays started so it is never run again.
+    private func finish(_ id: String, drawing draw: () -> Void) -> Bool {
+        var ended = false
         var instant = Transaction()
         instant.disablesAnimations = true
-        withTransaction(instant, draw)
-    }
-
-    /// The job ends; false when the door refused to end it, and it stays started so it is never run again.
-    private func finish(_ id: String) -> Bool {
-        guard let reply = answer("done", [.string(id)]) else { return false }
-        apply(reply)
-        started.remove(id)
-        return true
+        withTransaction(instant) {
+            draw()
+            guard let reply = answer("done", [.string(id)]) else { return }
+            apply(reply)
+            ended = true
+        }
+        if ended { started.remove(id) }
+        return ended
     }
 
     /// Resolves once every write the session queued is made.

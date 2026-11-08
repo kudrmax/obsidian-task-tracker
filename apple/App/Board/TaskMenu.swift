@@ -94,7 +94,7 @@ struct TaskMenu {
                     .action(title: ReminderWords.title(reminder.kind), symbol: nil, checked: reminder.checked) { Task { await model.setReminder(item, reminder.kind) } }
                 }))
             case "description" where single:
-                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { model.fullScreen.append(item) })
+                rows.append(.action(title: "Description", symbol: "text.alignleft", opens: true) { Task { await model.openFullScreen(item) } })
             case "repeat" where single:
                 rows.append(.action(title: "Repeat…", symbol: "repeat", opens: true) { model.repeatFor = item })
             case "section":
@@ -139,7 +139,7 @@ struct TaskMenu {
     private func opens(_ item: TaskItem) -> [MenuNode] {
         let model = model
         var opens: [MenuNode] = []
-        if !ownPage { opens.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { model.fullScreen.append(item) }) }
+        if !ownPage { opens.append(.action(title: "Open Full Screen", symbol: "arrow.up.left.and.arrow.down.right", opens: true) { Task { await model.openFullScreen(item) } }) }
         opens.append(.action(title: "Open in Obsidian", symbol: "arrow.up.forward.app") { Task { await model.openInObsidian(item) } })
         return opens
     }
