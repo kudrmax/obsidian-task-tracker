@@ -78,6 +78,16 @@ fixed that but made lines travel between files. One file wins.
    project mark; a tap on the mark opens the note.
 4. **Done.** The task leaves the screen and goes to Done with its `🗂️`.
 
+## Drop on a column's title (Max, 2026-11-07)
+
+A task dropped on a list's title («Inbox», «Soon», «Backlog», «Now»/a day's title where the list has one) goes into that
+list keeping its project: in a grouped list to the end of its own project's group (its part without a section; the group
+appears in Soon if it was not there), in an ungrouped list to the end of the list's part without a section. While a
+task is dragged over a list's title, the title lights up exactly as a section header does under a drop; no new element.
+The core gives the title's drop target ready, per list; the UI only draws the light. A drop inside a group still means
+«put it here», the project taken from that group. The iPhone app draws no groups yet, so its drops keep the project
+already; it gets the title drop with its groups.
+
 ## Rules for the core
 
 Decided by the lead after the spec review; the core owns every one, the frontends only draw what it gives.
@@ -186,6 +196,11 @@ Backend (the core's contract):
 10. **The setting** `projectTag` (`#project`) is stored with its `#`; a note is a project when it has exactly that tag,
     case aside, in properties or text (`projectNotesOf` reads the notes' tags: the Obsidian infrastructure gives each
     note's `getAllTags` with its name, path and `fileToLinktext`). `data.json` gains the key.
+11. **A drop on a column's title** is `ScreenView.titleDrops[column]` (`day`, `soon`, `inbox`, `backlog`), a `DropTo`
+    the frontend hands to `drop` unchanged: `{ kind: "title", list, date, byProject }`. Each task of a stack goes by its
+    own project as the file has it at the drop (a subtask: its parent's, written on its line as it leaves). A day
+    column without sections (a past day) gives the plain end of its list (`kind: "list"`); a move into Now dates the
+    task today, as every move there does.
 
 iPhone app (the minimum that keeps it from breaking):
 
@@ -261,6 +276,13 @@ Obsidian frontend:
     core, so the guard reaches it too.
 33. **Cmd+Z and Cmd+Shift+Z in a plain field** (search, a section's name) undo and redo the field's own text and go no
     further, so the app's Edit menu never hears them.
+34. **The lit title** (Obsidian frontend): a section header has no light of its own under a drop, so the title takes the
+    light of the drop target it is closest to, the empty section's plate: in its own rounded box (the title's radius
+    and padding, as it has for its tap) the ground `--tc-drop-bg` and the text `--tc-accent`; no border, no new shape.
+    The drop line hides while the title is lit.
+35. **The title's target** is the whole title row across its column (the column's width, the title's height), not the
+    letters only, so a finger finds it. A task or a stack lights it; the plus does not: a new task still lands only
+    between cards, and over the title it keeps the place on the list's top as before.
 
 ## Ideas for later
 

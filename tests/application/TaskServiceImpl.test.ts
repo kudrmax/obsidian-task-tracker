@@ -1368,6 +1368,7 @@ describe("TaskServiceImpl.screen", () => {
 			calendars: true,
 			projects: screen.projects,
 			project: null,
+			titleDrops: screen.titleDrops,
 		});
 		expect(screen.projects.backlog).toMatchObject({ canGroup: true, on: true });
 		expect(screen.projects.soon).toEqual({ canGroup: true, on: false, groups: [] });

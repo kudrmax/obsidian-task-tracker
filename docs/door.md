@@ -92,6 +92,10 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   its task where it stands. A drop in a list column is `{ kind: "place", column, place }`: the `ListPlace` its gap means
   (`rules.placeOfDrop`), or `null` at the end of a column that places nothing in a gap (`rules.placesInGap`). The door
   reads it by whose sections the column shows on `day`; the host never builds `list`, `group` or `nest` itself.
+  A drop on a column's title is `screen.titleDrops[column]` (`day`, `soon`, `inbox`, `backlog`) handed back as it is:
+  `{ kind: "title", list, date, byProject }` puts each task at the end of the list's part without a section, its
+  project kept (where the list groups by project, `byProject`, at the end of its own project's part there), e.g.
+  `tasks.drop([{ key, from: "soon" }], screen.titleDrops.backlog, day)`.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
 - `tasks.snap(minute, hourPx, tolerancePx)`: the minute a drag, a drop or a stretch on the timeline stands at, the
   timeline drawn `hourPx` points an hour: the finest of 5, 15, 30 and 60 minutes a finger moves at least `tolerancePx`

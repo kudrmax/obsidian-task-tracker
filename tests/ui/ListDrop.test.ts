@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GroupedList, GroupName, SectionKey, TaskItem } from "../../core/application/contracts";
+import type { DropTo, GroupedList, GroupName, SectionKey, TaskItem } from "../../core/application/contracts";
 import type { DragPayload, ListColumn, NewTaskPayload } from "../../obsidian/ui/drag/DropTarget";
 import { ListDrop } from "../../obsidian/ui/drag/ListDrop";
 import { readDrop } from "../../core/application/drops";
@@ -141,6 +141,65 @@ describe("ListDrop", () => {
 		expect(drop.hitTest(50, 99, from)).toBe(false);
 		expect(drop.hitTest(50, 101, from)).toBe(true);
 		expect(drop.drop(50, 101, from)).toEqual({ kind: "group", list: "backlog", date: null, group: null, before: only.key });
+	});
+
+	describe("the column's title: a task carried onto it goes where the screen says, the title lit", () => {
+		const backlogTitle: DropTo = { kind: "title", list: "backlog", date: null, byProject: true };
+		function titled(drops: DropTo | null = backlogTitle, accepts = () => true) {
+			const { list } = setup([item("backlog", 0, "L", null)], "backlog", "backlog");
+			const area = list.el.parentElement!;
+			const title = document.createElement("div");
+			area.prepend(title);
+			title.getBoundingClientRect = () => new DOMRect(14, 104, 80, 28);
+			const drop = new ListDrop(list, area, "backlog", accepts, () => ({ list: "backlog", date: null }), false, () => undefined, { el: () => title, drop: () => drops });
+			return { drop, title, list };
+		}
+		const carried = drag("soon", item("soon", 0, "S", null));
+
+		it("over the title row, anywhere across the column, the drop is the screen's title drop, handed on as it is", () => {
+			const { drop } = titled();
+			expect(drop.drop(150, 110, carried)).toBe(backlogTitle);
+			expect(drop.drop(20, 131, carried)).toBe(backlogTitle);
+		});
+
+		it("lights the title while the task is over it, no drop line; off it the title goes dark and the line shows", () => {
+			const { drop, title, list } = titled();
+			drop.preview(50, 110, carried);
+			expect(title.classList.contains("is-hot")).toBe(true);
+			expect(list.el.querySelector(".tc-list-drop.is-shown")).toBeNull();
+			drop.preview(50, 160, carried);
+			expect(title.classList.contains("is-hot")).toBe(false);
+			expect(list.el.querySelector(".tc-list-drop.is-shown .tc-drop-line")).not.toBeNull();
+			drop.preview(50, 110, carried);
+			drop.leave();
+			expect(title.classList.contains("is-hot")).toBe(false);
+			drop.preview(50, 110, carried);
+			drop.clear();
+			expect(title.classList.contains("is-hot")).toBe(false);
+		});
+
+		it("under the title the list takes the task in a gap as before", () => {
+			const { drop } = titled();
+			expect(drop.drop(50, picking(100 + 40), carried)).toEqual({ kind: "place", column: "backlog", place: { kind: "task", group: null, before: null } });
+		});
+
+		it("the plus is not taken by the title: a new task's place is a gap", () => {
+			const { drop, title } = titled();
+			const plus: NewTaskPayload = { from: "new", item: null, grabPx: 22 };
+			drop.preview(50, 110, plus);
+			expect(title.classList.contains("is-hot")).toBe(false);
+			expect(drop.drop(50, 110, plus)?.kind).toBe("place");
+		});
+
+		it("nothing before the screen is read; a list that does not take the task takes it on its title neither", () => {
+			const unread = titled(null);
+			unread.drop.preview(50, 110, carried);
+			expect(unread.title.classList.contains("is-hot")).toBe(false);
+			expect(unread.drop.drop(50, 110, carried)?.kind).toBe("place");
+			const refusing = titled(backlogTitle, () => false);
+			expect(refusing.drop.hitTest(50, 110, carried)).toBe(false);
+			expect(refusing.drop.drop(50, 110, carried)).toBeNull();
+		});
 	});
 
 	it("under the list the column takes nothing", () => {
