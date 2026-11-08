@@ -61,29 +61,14 @@ describe("the column scrolls to what was pressed with its own smooth scroll, the
 		expect(scrollBy).not.toHaveBeenCalled();
 	});
 
-	it("scrolls smoothly and opens once the column has stood still", () => {
-		vi.useFakeTimers();
-		const { scroller, item, scrollBy } = column(150);
-		const then = vi.fn();
-		scrollIntoColumn(item, then, 100);
-		expect(scrollBy).toHaveBeenCalledWith({ top: -50, behavior: "smooth" });
-		vi.advanceTimersByTime(80);
-		scroller.dispatchEvent(new Event("scroll"));
-		vi.advanceTimersByTime(80);
-		expect(then).not.toHaveBeenCalled();
-		vi.advanceTimersByTime(30);
-		expect(then).toHaveBeenCalledOnce();
-	});
-
-	it("opens on the column's scroll end, and nothing once called off", () => {
+	it("brings the item into view with the plugin's one scroll, and opens once the column stands there", () => {
 		const { scroller, item } = column(150);
+		Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 2000 });
+		Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 500 });
+		scroller.scrollTop = 100;
 		const then = vi.fn();
 		scrollIntoColumn(item, then);
-		scroller.dispatchEvent(new Event("scrollend"));
+		expect(scroller.scrollTop).toBe(50);
 		expect(then).toHaveBeenCalledOnce();
-		const later = vi.fn();
-		const stop = scrollIntoColumn(column(150).item, later);
-		stop();
-		expect(later).not.toHaveBeenCalled();
 	});
 });

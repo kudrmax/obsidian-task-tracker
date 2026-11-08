@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
 import { ArrivingCard } from "../../obsidian/ui/drag/ArrivingCard";
 
-const task = (raw: string, index = 0) => ({ key: { section: "now", index, path: [], raw } }) as unknown as TaskItem;
-const key = (raw: string, index = 0) => task(raw, index).key;
+const task = (id: string, raw = `- [ ] ${id}`) => ({ id, key: { section: "now", index: 0, path: [], raw } }) as unknown as TaskItem;
 
 function drawn(): HTMLElement {
 	return document.body.appendChild(document.createElement("div"));
@@ -13,57 +12,39 @@ function drawn(): HTMLElement {
 describe("ArrivingCard", () => {
 	afterEach(() => document.body.replaceChildren());
 
-	it("hides the dropped task's card as drawn, and gives it", () => {
+	it("hides the dropped task's card, known by its id from before the write, whatever its line becomes, and gives it", () => {
 		const arriving = new ArrivingCard();
-		arriving.expect(key("- [ ] A", 3));
+		arriving.dropping(task("t7"));
 		const other = drawn();
 		const card = drawn();
-		arriving.attach(other, task("- [ ] A", 2));
-		arriving.attach(card, task("- [ ] A", 3));
+		arriving.attach(other, task("t8"));
+		arriving.attach(card, task("t7", "- [ ] moved 📅 2026-11-09"));
 		expect(arriving.shown).toBe(card);
 		expect(card.classList.contains("is-arriving")).toBe(true);
 		expect(other.classList.contains("is-arriving")).toBe(false);
 	});
 
-	it("hides the dropped task's card in a drawing made while its drop is still being written, known by its id", () => {
-		const arriving = new ArrivingCard();
-		const item = { ...task("- [ ] A", 3), id: "t7" } as TaskItem;
-		arriving.dropping(item);
-		const card = drawn();
-		arriving.attach(card, { ...task("- [ ] A moved", 0), id: "t7" } as TaskItem);
-		expect(card.classList.contains("is-arriving")).toBe(true);
-		arriving.expect(key("- [ ] A moved", 0));
-		expect(arriving.shown).toBe(card);
-	});
-
 	it("follows a redraw while the float flies: the new card is the one hidden and given", () => {
 		const arriving = new ArrivingCard();
-		arriving.expect(key("- [ ] A"));
+		arriving.dropping(task("t7"));
 		const first = drawn();
-		arriving.attach(first, task("- [ ] A"));
+		arriving.attach(first, task("t7"));
 		first.remove();
 		const redrawn = drawn();
-		arriving.attach(redrawn, task("- [ ] A"));
+		arriving.attach(redrawn, task("t7"));
 		expect(arriving.shown).toBe(redrawn);
 	});
 
 	it("shows the card again once landed, and hides no later drawing", () => {
 		const arriving = new ArrivingCard();
-		arriving.expect(key("- [ ] A"));
+		arriving.dropping(task("t7"));
 		const card = drawn();
-		arriving.attach(card, task("- [ ] A"));
+		arriving.attach(card, task("t7"));
 		arriving.arrived();
 		expect(card.classList.contains("is-arriving")).toBe(false);
 		const later = drawn();
-		arriving.attach(later, task("- [ ] A"));
+		arriving.attach(later, task("t7"));
 		expect(later.classList.contains("is-arriving")).toBe(false);
-		expect(arriving.shown).toBeNull();
-	});
-
-	it("gives no card when the drop gave no task", () => {
-		const arriving = new ArrivingCard();
-		arriving.expect(null);
-		arriving.attach(drawn(), task("- [ ] A"));
 		expect(arriving.shown).toBeNull();
 	});
 });
