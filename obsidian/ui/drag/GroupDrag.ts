@@ -1,5 +1,7 @@
 import { type GroupedList, type GroupName, type GroupPlace, groupPlaceOf } from "../../../core/application/contracts";
+import { DURATION } from "../design";
 import { capturePointer, el, releasePointer } from "../dom";
+import { Motion, timingOf } from "../motion/Motion";
 import type { GestureArbiter } from "../gestures";
 import type { Haptics } from "../haptics";
 import type { ListGroup } from "../../../core/application/contracts";
@@ -10,6 +12,21 @@ import { LongPress } from "./LongPress";
 const FOLDED = "is-folded";
 
 const DRAG = "drag";
+
+/** The lifted section's copy flies to `rect` and settles there, as a dropped card's does. */
+function flyTo(float: HTMLElement, rect: DOMRect): Promise<void> {
+	const timing = timingOf(float, DURATION.fly);
+	const to = `translate3d(${rect.left}px, ${rect.top}px, 0)`;
+	if (!timing) {
+		float.style.transform = to;
+		return Promise.resolve();
+	}
+	const flight = float.animate([{ transform: float.style.transform }, { transform: to }], { ...timing, fill: "forwards" });
+	return flight.finished.then(
+		() => undefined,
+		() => undefined,
+	);
+}
 
 /** The slot whose place on screen is nearest the finger. */
 export function nearestSlot(places: readonly number[], y: number): number {
@@ -58,11 +75,12 @@ export class GroupDrag {
 		const heads = taskList.elements.filter((node) => node.classList.contains("tc-group-head"));
 		const places = this.places(heads, taskList, lifted);
 		const grab = { dx: e.clientX - head.getBoundingClientRect().left, dy: e.clientY - head.getBoundingClientRect().top };
-		const float = this.float(group);
+		const float = this.float(head.ownerDocument, group);
 		const plate = taskList.plateOf(group.name);
 		const cards = [...taskList.cardsOf(group), ...(plate ? [plate] : [])];
 		for (const node of [head, ...cards]) node.classList.add(FOLDED);
-		const mark = el(null, "div", "tc-group-drop");
+		/** Where the section lands: a dashed place that opens between the sections as the finger comes, and closes behind it. */
+		let mark: HTMLElement | null = null;
 		let slot = lifted;
 		/** The slot the mark was last put at: the finger moving within one slot leaves it be. */
 		let marked: number | null = null;
@@ -71,33 +89,47 @@ export class GroupDrag {
 			slot = nearestSlot(places, y);
 			if (slot === marked) return;
 			marked = slot;
-			if (groupPlaceOf(names, lifted, slot) === null) mark.remove();
-			else if (slot < heads.length) heads[slot].before(mark);
+			if (mark) Motion.leave(mark, () => undefined, false);
+			mark = null;
+			if (groupPlaceOf(names, lifted, slot) === null) return;
+			mark = el(null, "div", "tc-group-drop");
+			if (slot < heads.length) heads[slot].before(mark);
 			else taskList.el.appendChild(mark);
+			Motion.enter(mark);
 		};
 		moveTo(e.clientX, e.clientY);
 		capturePointer(head, e.pointerId);
 		const doc = head.ownerDocument;
-		const finish = (ev: PointerEvent, apply: boolean) => {
+		/**
+		 * The section lands as a task does: the copy flies to its place (the mark, or back where it was lifted), the move is
+		 * written and drawn, and only then does the section open there as the mark closes, one giving the other its room.
+		 */
+		const finish = async (ev: PointerEvent, apply: boolean) => {
 			if (ev.pointerId !== e.pointerId) return;
 			doc.removeEventListener("pointermove", move);
 			doc.removeEventListener("pointerup", up);
 			doc.removeEventListener("pointercancel", cancel);
 			releasePointer(head, e.pointerId);
-			float.remove();
-			mark.remove();
-			for (const node of [head, ...cards]) node.classList.remove(FOLDED);
-			this.deps.arbiter.release(DRAG);
 			const place = apply ? groupPlaceOf(names, lifted, slot) : null;
-			if (!place) return;
-			this.deps.haptics.tap();
-			void this.deps.onMove(list, group.name, place);
+			const landing = place && mark ? mark : head;
+			await flyTo(float, landing.getBoundingClientRect());
+			if (place) {
+				this.deps.haptics.tap();
+				await this.deps.onMove(list, group.name, place).catch((error: unknown) => console.error("Task Calendar: section move", error));
+			}
+			this.deps.arbiter.release(DRAG);
+			float.remove();
+			if (mark) Motion.leave(mark, () => undefined, false);
+			for (const node of [head, ...cards]) {
+				Motion.settle(node);
+				node.classList.remove(FOLDED);
+			}
 		};
 		const move = (ev: PointerEvent) => {
 			if (ev.pointerId === e.pointerId) moveTo(ev.clientX, ev.clientY);
 		};
-		const up = (ev: PointerEvent) => finish(ev, true);
-		const cancel = (ev: PointerEvent) => finish(ev, false);
+		const up = (ev: PointerEvent) => void finish(ev, true);
+		const cancel = (ev: PointerEvent) => void finish(ev, false);
 		doc.addEventListener("pointermove", move);
 		doc.addEventListener("pointerup", up);
 		doc.addEventListener("pointercancel", cancel);
@@ -114,8 +146,8 @@ export class GroupDrag {
 	}
 
 	/** The header under the finger, like a lifted card, its count on the right and two layers of its cards beneath. */
-	private float(group: ListGroup): HTMLElement {
-		const stack = el(activeDocument.body, "div", "tc-section-float");
+	private float(doc: Document, group: ListGroup): HTMLElement {
+		const stack = el(doc.body, "div", "tc-section-float");
 		el(stack, "div", "tc-stack-layer is-2");
 		el(stack, "div", "tc-stack-layer is-1");
 		const card = el(stack, "div", "tc-section-card");

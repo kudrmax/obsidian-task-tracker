@@ -63,8 +63,11 @@ export const Motion = {
 		growth.addEventListener("cancel", done);
 	},
 
-	/** A row goes: it fades where it stands, then folds away as the rows under it close up; `gone` runs once it has left the page. */
-	leave(row: HTMLElement, gone: () => void): Animation | null {
+	/**
+	 * A row goes: it fades where it stands, then folds away as the rows under it close up; `gone` runs once it has left
+	 * the page. A place that only marked where something lands (`fade` false) folds and fades at once.
+	 */
+	leave(row: HTMLElement, gone: () => void, fade = true): Animation | null {
 		const timing = timingOf(row);
 		row.classList.add("is-leaving");
 		if (!timing) {
@@ -75,14 +78,17 @@ export const Motion = {
 		const style = getComputedStyle(row);
 		const full = { height: style.height, marginTop: style.marginTop, marginBottom: style.marginBottom };
 		row.style.overflow = "hidden";
-		const leaving = row.animate(
-			[
-				{ ...full, opacity: "1", easing: timing.easing },
-				{ ...full, opacity: "0", easing: timing.easing, offset: 0.5 },
-				{ height: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" },
-			],
-			{ duration: 2 * timing.duration, fill: "forwards" },
-		);
+		const folded = { height: "0px", marginTop: "0px", marginBottom: px(-gapOf(row)), opacity: "0" };
+		const leaving = fade
+			? row.animate(
+					[
+						{ ...full, opacity: "1", easing: timing.easing },
+						{ ...full, opacity: "0", easing: timing.easing, offset: 0.5 },
+						folded,
+					],
+					{ duration: 2 * timing.duration, fill: "forwards" },
+				)
+			: row.animate([{ ...full, opacity: "1" }, folded], { ...timing, fill: "forwards" });
 		leaving.addEventListener("finish", () => {
 			row.remove();
 			gone();
