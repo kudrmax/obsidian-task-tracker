@@ -35,6 +35,7 @@ struct SettingsView: View {
             Section("Show and set up") {
                 link("Labels", value: plugin.form.map { "\($0.labels.count)" }, symbol: "tag.fill", tint: .green) { LabelsPage(plugin: plugin) }
                 link("Sections", value: plugin.form.map { "\($0.presets.count)" }, symbol: "rectangle.stack.fill", tint: .indigo) { SectionsPage(plugin: plugin) }
+                link("Projects", value: plugin.form?.projectTag, symbol: "folder.fill", tint: .teal) { ProjectsPage(plugin: plugin) }
                 link("Calendars", symbol: "calendar", tint: .red) { CalendarsView(model: nil) }
                 link("Day and Timeline", symbol: "clock.fill", tint: .blue) { DayPage(plugin: plugin) }
                 link("Tasks File", symbol: "doc.text.fill", tint: .gray) { TasksFilePage(model: model, plugin: plugin) }
@@ -145,6 +146,31 @@ struct LabelsPage: View {
         .navigationTitle("Labels")
         .toolbar { EditButton() }
         .onAppear { tag = plugin.form?.labelTag ?? "" }
+    }
+}
+
+/// The tag that makes a note a project, as the plugin's Project tag setting.
+struct ProjectsPage: View {
+    let plugin: PluginSettings
+    @State private var tag = ""
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Project Tag") {
+                    TextField("#project", text: $tag)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { Task { await plugin.write("settings.setProjectTag", [.string(tag)]) } }
+                }
+            } footer: {
+                Text("A note with this tag, in its properties or its text, is a project: Backlog and Soon group their tasks by it, and a task’s menu offers it under Project.")
+            }
+        }
+        .navigationTitle("Projects")
+        .onAppear { tag = plugin.form?.projectTag ?? "" }
+        .onChange(of: plugin.form?.projectTag) { tag = plugin.form?.projectTag ?? "" }
     }
 }
 

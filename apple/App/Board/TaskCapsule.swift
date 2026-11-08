@@ -11,6 +11,8 @@ struct TaskCapsule: View {
     var height: CGFloat = CardMetrics.height
     /// Where the subtask counter is drawn, in the capsule's own space: the card lays its fold button there.
     var onCounter: ((CGRect) -> Void)?
+    /// Where the project's folder mark is drawn, in the capsule's own space: the card lays its button there.
+    var onMark: ((CGRect) -> Void)?
 
     @Environment(\.colorScheme) private var scheme
 
@@ -34,6 +36,7 @@ struct TaskCapsule: View {
                 }
                 .mask(fadeMask)
                 .accessibilityElement(children: .combine)
+            if card.item.project?.mark == true { projectMark }
             if card.item.progress != nil || card.item.description != nil { meta }
             if let corner = card.corner { stackCorner(corner) }
             if let due = card.due {
@@ -98,6 +101,17 @@ struct TaskCapsule: View {
         }
         .frame(minWidth: 22)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onCounter?($0) }
+    }
+
+    /// The task's project (board Proj2V1): a folder in the caption colour, in the date's place and of its width, left of the
+    /// date, the repeat and the counter; the card's height does not change.
+    private var projectMark: some View {
+        Image(systemName: "folder")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(metaColor)
+            .frame(width: 24, height: 18)
+            .accessibilityLabel("Project \(card.item.project?.name ?? "")")
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { onMark?($0) }
     }
 
     /// A list card's corner: the due day over its month, the repeat mark beside the day; it grows with what it holds.

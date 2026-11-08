@@ -8,6 +8,8 @@ final class AppServices: Sendable {
     let vault: Vault
     /// The main screen's reads and writes through the core's door.
     let board: TaskBoard
+    /// The vault's project notes, found by the settings' project tag.
+    let projects: VaultProjects
     private let rules: TaskRules
     private let sync: ReminderSync
     private let tasks: TaskCapture
@@ -18,7 +20,8 @@ final class AppServices: Sendable {
         vault = Vault(bookmarks: UserDefaultsBookmarks(), rule: rules)
         sync = ReminderSync(vault: vault, rules: rules, notifications: UserNotifications(), alarms: Alarms(), cards: Cards(), calendar: PhoneCalendarExport(rules: rules))
         tasks = TaskCapture(vault: vault, rules: rules)
-        board = TaskBoard(core: rules, vault: vault, pure: Self.rules())
+        projects = VaultProjects(folder: vault, remembered: UserDefaultsText(key: "projectNotes"))
+        board = TaskBoard(core: rules, vault: vault, pure: Self.rules(), grouping: UserDefaultsText(key: "projectGrouping"), projects: projects)
     }
 
     /// The lists a new task goes into, by their headings' names, in the order the screen offers them: the first is where Siri's goes.

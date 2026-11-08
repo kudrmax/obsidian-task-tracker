@@ -50,6 +50,12 @@ struct SearchScreen: View {
             parts(hit.title.isEmpty ? [FoundPart(text: hit.item.text, match: false)] : hit.title)
                 .font(.system(size: CardMetrics.title))
                 .lineLimit(1)
+            if let project = hit.project {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                    parts(project).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
             if let description = hit.description {
                 HStack(spacing: 6) {
                     Image(systemName: "text.alignleft").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
@@ -59,7 +65,7 @@ struct SearchScreen: View {
         }
         .padding(.leading, CardMetrics.leading)
         .padding(.trailing, CardMetrics.trailing)
-        .padding(.vertical, hit.description == nil ? 0 : 6)
+        .padding(.vertical, hit.description == nil && hit.project == nil ? 0 : 6)
         .frame(maxWidth: .infinity, minHeight: CardMetrics.height, alignment: .leading)
         .background(Palette.card(scheme), in: .rect(cornerRadius: CardMetrics.radius))
     }

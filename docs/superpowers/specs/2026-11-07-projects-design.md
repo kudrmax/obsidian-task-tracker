@@ -202,7 +202,7 @@ Backend (the core's contract):
     column without sections (a past day) gives the plain end of its list (`kind: "list"`); a move into Now dates the
     task today, as every move there does.
 
-iPhone app (the minimum that keeps it from breaking):
+iPhone app (the minimum that keeps it from breaking; 11 and 12 replaced by 36–46 when the app got projects):
 
 11. **The app reads the new fields by leaving them out**: its `Decodable` models (`TaskItem`, `ListGroup`, `GroupMenu`,
     `TaskMenuModel`, `SearchHit`, `ScreenView`, `SettingsForm`) take the keys they know and skip the rest, so
@@ -216,6 +216,53 @@ iPhone app (the minimum that keeps it from breaking):
     group's sections. The app draws no groups yet, so its lists and menus stay as before projects; a `grouping` in an
     answer (`tasks.reveal`) is dropped. When the app's groups come, it keeps `grouping` per device as the Obsidian
     frontend does (decision 8).
+
+iPhone app (projects in full, replacing 12 and the stopgap part of 11):
+
+36. **The grouping is the device's**: the app keeps `GroupingState` in its own defaults (`projectGrouping`) exactly as the
+    door answers it (`tasks.setGrouping`, `tasks.toggleFold`, `tasks.reveal`) and hands it in with every call, as the
+    Obsidian frontend's `GroupingStore` does; `TaskBoard.ungrouped` is gone, so Backlog opens grouped by the core's default
+    and every menu reads the grouped lists. The models now decode `project`, `can.setProject`, `ProjectGroup`,
+    `ListGroup.header`, `menu.project`, `TaskMenuModel.project`, `SearchHit.project`, `ScreenView.projects`/`titleDrops`
+    and `projectTag`; the keys it still does not draw stay skipped (11).
+37. **The project notes on the phone**: the app has no metadata cache, so it reads the vault folder by its bookmark: every
+    markdown note outside the dot folders, its tags read as Obsidian's cache reads them (properties `tags` or `tag`, a
+    list or one line; the `#tags` of the text outside code), each note once and then only the notes changed since (by
+    modification date), at most every 3 s and off the screen's thread; the list last found is kept on the device, so the
+    first screen shows the groups at once, and a list that changed redraws the screen. A note's link is its name, or its
+    path without `.md` when another note has that name. A note iCloud keeps only in the cloud is not read. The tag comes
+    from `settings.form().projectTag`. The tag test itself (exactly the tag, case aside, no nested child) repeats the
+    core's `hasProjectTag` in Swift (`VaultProjects.projects`) until the door offers it (`rules.projectNotesOf`): asked of
+    the backend.
+38. **Group by Project** is a stock iOS menu on Backlog's and Soon's titles (`canGroup`), one toggle row with the folder
+    symbol and the system's check; a pick switches and closes the menu (19). Title case, as every row of the app's menus.
+39. **A project group's header** is the app's section header (26 pt row, 13 pt semibold) with the SF `chevron.right` 6 pt
+    into the left padding, turned down while open; a tap anywhere on the header but the arrow folds; folded, the count
+    (12 pt semibold, muted); the arrow is `arrow.up.forward.app`, the symbol of Open in Obsidian, its own button. A title
+    the header cuts fades at its end (18). «No project» is muted and has no arrow.
+40. **The arrow and the folder mark open the note** through Advanced URI (`obsidian://advanced-uri?vault=…&filepath=<the
+    note's path>`), as the app's Open in Obsidian does. The mark's tap target is its 24 pt plus 3 pt each side, the card's
+    height; a mark of a project with no note (`canOpenNote` false) has no target: a tap there opens the menu, as the rest
+    of the card. On the timeline the mark stands left of the stack's corner. In Select Tasks the card is drawn without
+    buttons, so a tap on the mark selects.
+41. **The Project row** is a stock submenu «Project» with the folder symbol and the core's `value` as its subtitle (none
+    when the tasks differ), drawn after Section or, without Section, before Add Subtask, else last; its page lists the
+    project notes, then «No project» (the core's words) in a group of its own; a subtask's row is a disabled row with its
+    parent's project as the subtitle.
+42. **The title as a drop target** is the title's whole row across its column, every column (`titleDrops.day`, `soon`,
+    `inbox`, `backlog`; the day's title with its arrows too). A card over it lights the title in its own rounded box
+    (10 pt corners, 8 pt sides): the accent on the drop ground, no line, as the plugin's (34, 35); let go, the task goes
+    to `tasks.drop` with the title's drop unchanged. The plus over the title shows the place at the list's top, as before.
+43. **A search hit's project** is a line of its own under the title, before the description's: the folder symbol and the
+    name, the found part bold in the accent (20).
+44. **Settings**: «Projects» in Show and set up, the tag as the row's value; its page holds the Project Tag field
+    (`settings.setProjectTag`) and a footer on what the tag does. The Obsidian-only warning on Automatically update
+    internal links (23) is not shown: the app cannot read Obsidian's setting.
+45. **A section named inside a project group** (`ListEntry.newSection`) is drawn as a section header over the field while
+    its first task is typed.
+46. **Group headers as drop places**: a project group's header is a `PlacedHead` with `opens` and its `head`, a section
+    inside a group `{ group, project }`, a card carries its group's zone; the part without a section of an empty group has
+    no header, so the gap there stands under the project's header.
 
 Obsidian frontend:
 
