@@ -168,7 +168,7 @@ describe("ScreenPager", () => {
 		expect(stood).toBe(true);
 	});
 
-	it("stands a running slide where it was going before it runs the next, so nothing is drawn twice", () => {
+	it("lets a running slide run on to its place, never put there in one frame, and only then runs the next", async () => {
 		const { pager } = setUp();
 		const first = fakeTrack(WIDTH);
 		const second = fakeTrack(WIDTH);
@@ -179,9 +179,13 @@ describe("ScreenPager", () => {
 			order.push(`first landed ${first.landed.join()}`);
 			return second;
 		});
+		expect(order).toEqual([]);
+		expect(Math.abs(last(first.shown) ?? 0)).toBeLessThan(WIDTH);
+		vi.advanceTimersByTime(SLIDE_MS * 2);
+		await Promise.resolve();
+		await Promise.resolve();
 		expect(order).toEqual(["first landed true"]);
-		expect(last(first.shown)).toBe(-WIDTH);
-		expect(second.landed).toEqual([]);
+		expect(first.shown.slice(-1)).toEqual([-WIDTH]);
 	});
 
 	it("stands at once when let go without being drawn", async () => {

@@ -641,11 +641,11 @@ export class CalendarScreen extends Component {
 	}
 
 	/**
-	 * The day's arrows and its name turn the day as a swipe to it does, the whole way with no finger. A tap during a turn
-	 * stands that turn where it was going and turns on from there once the screen has drawn the day it brought in.
+	 * The day's arrows and its name turn the day as a swipe to it does, the whole way with no finger. A tap during a turn,
+	 * or while a swipe runs to its place, lets that run on to its place, and the day turns on from there once the screen
+	 * has drawn the day it brought in (decision 51).
 	 */
 	private turnDay(to: () => { readonly date: LocalDate; readonly shift: Shift } | null): void {
-		this.pager?.stand();
 		this.turning = this.turning.then(async () => {
 			await this.drawnLanding();
 			await this.afterEntry(async () => {
